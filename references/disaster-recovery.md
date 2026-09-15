@@ -12,13 +12,13 @@ document and the data readable.
 
 ## 0. What you already have, and what you don't
 
-| Thing                             | Where it lives               | Survives Manus going away  |
-| --------------------------------- | ---------------------------- | -------------------------- |
-| All the source code               | GitHub — `Jnicoara/HelixBid` | Yes                        |
-| Every table (bids, pricing, crew) | Cloudflare R2, nightly       | Yes                        |
-| Uploaded plan PDFs and logos      | Cloudflare R2, nightly       | Yes, as far as it can read |
-| Login accounts                    | **Manus OAuth only**         | **No — must be rebuilt**   |
-| The four Forge/OAuth credentials  | Manus environment settings   | No — replaced, not moved   |
+| Thing                             | Where it lives                | Survives Manus going away  |
+| --------------------------------- | ----------------------------- | -------------------------- |
+| All the source code               | GitHub — `Jnicoara/BidRender` | Yes                        |
+| Every table (bids, pricing, crew) | Cloudflare R2, nightly        | Yes                        |
+| Uploaded plan PDFs and logos      | Cloudflare R2, nightly        | Yes, as far as it can read |
+| Login accounts                    | **Manus OAuth only**          | **No — must be rebuilt**   |
+| The four Forge/OAuth credentials  | Manus environment settings    | No — replaced, not moved   |
 
 The honest summary: **your data is recoverable, your login system is not.**
 Everything below is ordered around that.

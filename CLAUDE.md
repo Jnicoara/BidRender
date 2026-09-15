@@ -10,7 +10,7 @@ BidRender — a trade-contractor bid/estimating tool. Users build a personal cat
 
 `trade` is a different axis from `projectType` (residential/commercial/both), which is only a filter on the assembly library. The schema says so explicitly; do not wire the two together.
 
-The product is **BidRender**. It was called **BidPhase** until v5.75 and **HelixBid** until v5.119, renamed that time because HelixBid clashed with an existing company. The GitHub repo (`Jnicoara/HelixBid`) and the local checkout directory (`BidPhase`) still carry old names. Anywhere else, either old name is stale or a historical record — the `todo.md` entries that record a past rename are the latter and stay as written.
+The product is **BidRender**. It was called **BidPhase** until v5.75 and **HelixBid** until v5.119, renamed that time because HelixBid clashed with an existing company. The GitHub repo was renamed to match on 2026-09-14 (`Jnicoara/BidRender`); only the local checkout directory (`BidPhase`) still carries an old name. Anywhere else, either old name is stale or a historical record — the `todo.md` entries that record a past rename are the latter and stay as written.
 
 **A few `helixbid` names are kept on purpose — do not rename them.** The localStorage keys (`helixbid:trace-draft:`, `helixbid:stamp-queue:`, `helixbid.crashes`, `helixbid.planReader.autoRead`) and the service worker's `helixbid-` cache prefix, because a browser may already hold unsent work or caches under them and a renamed key never finds them. The seed lock names in `server/db.ts`, because an old and a new build must take the same lock during a deploy. And the R2 backup prefix default `helixbid` in `server/backup/config.ts`, because that is the folder the existing backups live in.
 
