@@ -33,7 +33,7 @@ export default function AdminSettingsPage() {
         <AlertTriangle className="w-12 h-12 text-destructive/60" />
         <p className="text-lg font-semibold">Admins only</p>
         <p className="text-sm text-muted-foreground">
-          This screen is for whoever runs HelixBid, not for your company's
+          This screen is for whoever runs BidRender, not for your company's
           account.
         </p>
       </div>
@@ -72,7 +72,7 @@ export default function AdminSettingsPage() {
               <div>
                 <p className="text-xs font-medium">Administrator</p>
                 <p className="text-xs text-muted-foreground">
-                  HelixBid staff. Reaches this screen and the platform-wide
+                  BidRender staff. Reaches this screen and the platform-wide
                   routes behind it.
                 </p>
               </div>

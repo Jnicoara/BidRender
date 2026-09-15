@@ -23,14 +23,14 @@ export const electrical: TradeContent = {
   label: "Electrical",
 
   meta: {
-    title: "HelixBid — Electrical Estimating Software Built By An Electrician",
+    title: "BidRender — Electrical Estimating Software Built By An Electrician",
     description:
       "Take off plans, price materials and labor from your own rates, and send a professional proposal the same day. Estimating software built by an electrician, for electricians.",
     // The hero screenshot doubles as the sharing preview. One real image of the
     // product beats a separately-made card that has to be kept in step with it.
     ogImage: "/brand/shot-bid.jpg",
     ogImageAlt:
-      "A HelixBid bid priced out: line items with quantities and hours beside a total breaking down materials, labor, overhead and markup",
+      "A BidRender bid priced out: line items with quantities and hours beside a total breaking down materials, labor, overhead and markup",
   },
 
   hero: {
@@ -43,7 +43,7 @@ export const electrical: TradeContent = {
     shot: {
       // A real capture of the running app, not a mockup.
       src: "/brand/shot-bid.jpg",
-      alt: "A HelixBid bid priced out: line items grouped by suite with quantities, hours and costs, beside a bid total breaking down materials, labor, overhead and markup to a final bid price",
+      alt: "A BidRender bid priced out: line items grouped by suite with quantities, hours and costs, beside a bid total breaking down materials, labor, overhead and markup to a final bid price",
       width: 1523,
       height: 784,
     },

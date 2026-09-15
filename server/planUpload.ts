@@ -140,7 +140,7 @@ export function checkProxyUpload(raw: {
       ok: false,
       status: 413,
       message:
-        `${filename} is ${formatBytes(byteSize)}. HelixBid accepts plans this large, but the browser is currently ` +
+        `${filename} is ${formatBytes(byteSize)}. BidRender accepts plans this large, but the browser is currently ` +
         `blocked from uploading straight to storage, and the stand-in route tops out at ${formatBytes(PROXY_UPLOAD_MAX_BYTES)}. ` +
         `This is a storage configuration problem, not a problem with your file — do not split it. ` +
         `Until it is fixed, only sets under ${formatBytes(PROXY_UPLOAD_MAX_BYTES)} can be attached.`,

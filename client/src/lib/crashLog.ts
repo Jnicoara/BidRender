@@ -91,7 +91,7 @@ export function addCrash(
  */
 export function formatCrash(crash: CrashRecord): string {
   const lines = [
-    `HelixBid crash report`,
+    `BidRender crash report`,
     `When:    ${crash.at}`,
     `Screen:  ${crash.where}`,
     `Version: ${crash.version}`,

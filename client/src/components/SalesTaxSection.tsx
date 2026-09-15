@@ -337,7 +337,7 @@ export function SalesTaxSection() {
         <TriangleAlert className="w-4 h-4 shrink-0 mt-px" aria-hidden />
         <div className="space-y-1">
           <div className="font-medium">
-            HelixBid does not know your tax rates — you do.
+            BidRender does not know your tax rates — you do.
           </div>
           <div className="text-[#F5C518]/85">
             Nothing here is looked up or kept up to date for you. Every rate and

@@ -79,8 +79,8 @@ function Wordmark({ className }: { className?: string }) {
       className={className ?? "font-bold text-base"}
       style={{ fontFamily: "'Space Grotesk', sans-serif" }}
     >
-      <span className="text-foreground">Helix</span>
-      <span className="text-[#F5C518]">Bid</span>
+      <span className="text-foreground">Bid</span>
+      <span className="text-[#F5C518]">Render</span>
     </span>
   );
 }
@@ -308,7 +308,7 @@ export function LandingPage({
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-5xl flex-col gap-2 px-6 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>Estimating software for {trade.vocabulary.tradespeople}.</p>
-          <p>© {new Date().getFullYear()} HelixBid</p>
+          <p>© {new Date().getFullYear()} BidRender</p>
         </div>
       </footer>
     </div>

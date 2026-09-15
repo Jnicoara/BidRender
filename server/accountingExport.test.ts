@@ -119,7 +119,7 @@ describe("the file QuickBooks reads", () => {
   it("writes one row per line, all under one invoice reference", () => {
     const rows = splitDelimited(toQuickBooksCsv(doc), ",").slice(1);
     expect(rows).toHaveLength(doc.lines.length);
-    expect(new Set(rows.map(r => r[0]))).toEqual(new Set(["HB-501"]));
+    expect(new Set(rows.map(r => r[0]))).toEqual(new Set(["BR-501"]));
   });
 
   it("dates in MM/DD/YYYY, which is what the US importer expects", () => {
@@ -171,15 +171,15 @@ describe("the file QuickBooks reads", () => {
   });
 
   it("keeps the reference stable across exports of the same bid", () => {
-    expect(invoiceReference(501)).toBe("HB-501");
+    expect(invoiceReference(501)).toBe("BR-501");
     expect(
       buildAccountingExport(source({ bidId: 501 }), new Date("2027-01-01"))
         .invoiceNo
-    ).toBe("HB-501");
+    ).toBe("BR-501");
   });
 
   it("names the file after the reference and the date", () => {
-    expect(accountingFilename(doc)).toBe("HB-501-quickbooks-2026-08-14.csv");
+    expect(accountingFilename(doc)).toBe("BR-501-quickbooks-2026-08-14.csv");
   });
 
   it("is readable by a strict CSV reader", () => {

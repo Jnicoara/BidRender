@@ -398,20 +398,20 @@ export default function HelixBidShell() {
         <div
           onClick={() => navigate("dashboard")}
           className="flex items-center justify-center gap-2 px-3 py-4 h-16 border-b border-sidebar-border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-          title="HelixBid — Dashboard"
+          title="BidRender — Dashboard"
         >
           <span
             className="font-bold text-[#F5C518] text-sm shrink-0 group-hover:hidden"
             style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           >
-            HB
+            BR
           </span>
           <span
             className="font-bold text-base whitespace-nowrap hidden group-hover:block transition-opacity duration-150"
             style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           >
-            <span className="text-foreground">Helix</span>
-            <span className="text-[#F5C518]">Bid</span>
+            <span className="text-foreground">Bid</span>
+            <span className="text-[#F5C518]">Render</span>
           </span>
         </div>
 
@@ -561,7 +561,7 @@ export default function HelixBidShell() {
             style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             onClick={() => navigate("dashboard")}
           >
-            HelixBid
+            BidRender
           </span>
           <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground font-mono">
             <ChevronRight size={12} />

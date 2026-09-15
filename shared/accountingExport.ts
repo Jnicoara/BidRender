@@ -172,7 +172,7 @@ const money = (c: number) => c / 100;
  * invoice for the same job rather than updating the first.
  */
 export function invoiceReference(bidId: number): string {
-  return `HB-${bidId}`;
+  return `BR-${bidId}`;
 }
 
 /** `MM/DD/YYYY` — the format QuickBooks Online's US importer expects. */

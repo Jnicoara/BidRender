@@ -83,7 +83,7 @@ describe("the fallback's own size ceiling", () => {
     expect(result.status).toBe(413);
   });
 
-  it("says the file is NOT too large for HelixBid, and not to split it", () => {
+  it("says the file is NOT too large for BidRender, and not to split it", () => {
     // The message that would otherwise do real harm: telling someone their
     // 200MB set is too big sends them away to split a file that is perfectly
     // acceptable, to work around a bucket setting they cannot see.

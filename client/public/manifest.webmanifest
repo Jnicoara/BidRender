@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "HelixBid — Electrical Estimating",
-  "short_name": "HelixBid",
+  "name": "BidRender — Electrical Estimating",
+  "short_name": "BidRender",
   "description": "Take off plans, price materials and labor from your own rates, and send a proposal the same day.",
   "start_url": "/#/dashboard",
   "scope": "/",

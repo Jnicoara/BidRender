@@ -193,8 +193,8 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
             className="text-4xl font-bold tracking-tight mb-2"
             style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           >
-            <span className="text-foreground">Helix</span>
-            <span className="text-[#F5C518]">Bid</span>
+            <span className="text-foreground">Bid</span>
+            <span className="text-[#F5C518]">Render</span>
           </h1>
           <p className="text-muted-foreground text-sm">
             Electrical estimating for the field
