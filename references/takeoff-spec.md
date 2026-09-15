@@ -1,6 +1,7 @@
 # Takeoff screen — master spec
 
-> **Draft for approval — written 2026-09-14.**
+> **Written 2026-09-14, and updated the same day with decisions (section 9),
+> the V3 fix order (section 12), and sections 13–16.**
 >
 > **This is the single source of truth for the Takeoff screen** (a bid's Plans
 > screen, `#/bids/:id/plans`). When this document and anything else disagree —
@@ -48,15 +49,17 @@ from now on.
 | **Essential**    | You cannot do a real, accurate takeoff without it.          |
 | **Nice-to-have** | Saves time or effort, but a takeoff can be done without it. |
 
-| Source           | Meaning                                                                                                                           |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Old screen       | The pre-Aug 12 viewer, `PlanPanel.tsx`. Read it with `git show 0a270af^:client/src/components/PlanPanel.tsx`. The richest source. |
-| Older viewer     | `PlanViewer.tsx`, a June viewer already unused by August. Minor source.                                                           |
-| Changelog        | `CHANGELOG.md`, Aug 12–19.                                                                                                        |
-| Plan             | `ASSEMBLIES_PLAN.md` — **incomplete**; see "Where things came from".                                                              |
-| Current code     | `client/src/pages/TakeoffPage.tsx`, `client/src/components/takeoff/`, and the takeoff server routers.                             |
-| Your request     | Asked for directly when this spec was commissioned.                                                                               |
-| Earlier decision | Decided before this spec (AI rules, "Where do I…?" wording, tablet use).                                                          |
+| Source             | Meaning                                                                                                                           |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| Old screen         | The pre-Aug 12 viewer, `PlanPanel.tsx`. Read it with `git show 0a270af^:client/src/components/PlanPanel.tsx`. The richest source. |
+| Older viewer       | `PlanViewer.tsx`, a June viewer already unused by August. Minor source.                                                           |
+| Changelog          | `CHANGELOG.md`, Aug 12–19.                                                                                                        |
+| Plan               | `ASSEMBLIES_PLAN.md` — **incomplete**; see "Where things came from".                                                              |
+| Current code       | `client/src/pages/TakeoffPage.tsx`, `client/src/components/takeoff/`, and the takeoff server routers.                             |
+| Your request       | Asked for directly when this spec was commissioned.                                                                               |
+| Earlier decision   | Decided before this spec (AI rules, "Where do I…?" wording, tablet use).                                                          |
+| Decided 2026-09-14 | Decided by you after the first draft. Treat as a requirement.                                                                     |
+| Proposed           | Suggested for discussion. Not decided.                                                                                            |
 
 ---
 
@@ -83,26 +86,28 @@ from now on.
 
 ## 1. Viewing the sheet
 
-| ID  | What it does                                                                                                                                 | Status         | Source                          | Need         |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------- | ------------ |
-| V1  | Attach plan PDFs to a bid: drop or pick files, several at once, up to 500MB each, with a progress bar, Cancel and Retry.                     | **Works**      | Current code, Changelog         | Essential    |
-| V2  | Start a new bid from a plan in one step from the Dashboard ("Upload a plan").                                                                | **Works**      | Changelog Aug 14                | Nice-to-have |
-| V3  | Remove a plan from a bid, with a warning that says truthfully what is lost.                                                                  | **Half-wired** | Current code                    | Essential    |
-| V4  | A sheet list down the side, with real sheet names taken from the PDF's bookmarks, and renaming.                                              | **Works**      | Plan item 1, Changelog          | Essential    |
-| V5  | Move between pages: on-screen arrows, arrow keys, Page Up/Down, Home/End, and a "3 / 18" counter.                                            | **Works**      | Old screen, Current code        | Essential    |
-| V6  | Draw each page in the background so the app never freezes on a dense drawing.                                                                | **Works**      | Old screen, Current code        | Essential    |
-| V7  | **Zoom:** mouse wheel, pinch, **+ / − / 0** keys, on-screen zoom buttons showing the %, opens fitted to the page at 40%, range 10% to 1000%. | **Missing**    | Old screen, Your request        | Essential    |
-| V8  | **Pan:** click and drag with a mouse, drag with one finger, and pinch moves the view while zooming.                                          | **Missing**    | Old screen, Your request        | Essential    |
-| V9  | Marks and traced lines stay visible and tappable at every zoom level (they scale with zoom, with a minimum on-screen size).                  | **Missing**    | Old screen, Your request        | Essential    |
-| V10 | Clicking an item in the counted list shows that exact mark on the drawing.                                                                   | **Works**      | Plan item 5, Changelog          | Essential    |
-| V11 | Plan addresses that expire mid-session are renewed without interrupting you.                                                                 | **Works**      | Changelog Aug 15                | Essential    |
-| V12 | A warning before opening a very large plan (over 150MB).                                                                                     | **Works**      | Changelog Aug 14                | Nice-to-have |
-| V13 | Resizable side panels.                                                                                                                       | **Works**      | Current code                    | Nice-to-have |
-| V14 | Crosshair lines across the whole sheet that follow the cursor.                                                                               | **Missing**    | Old screen                      | Nice-to-have |
-| V15 | Page thumbnail overview to jump between pages.                                                                                               | **Missing**    | Old screen                      | Nice-to-have |
-| V16 | Hide pages you do not need.                                                                                                                  | **Missing**    | Old screen                      | Nice-to-have |
-| V17 | Keyboard shortcuts for tools (the old screen had **M** measure, **C** count, **U** undo).                                                    | **Missing**    | Old screen                      | Nice-to-have |
-| V18 | Two drawings side by side.                                                                                                                   | **Missing**    | Plan item 2 (one reading of it) | Nice-to-have |
+| ID  | What it does                                                                                                                                                   | Status         | Source                                     | Need         |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------ | ------------ |
+| V1  | Attach plan PDFs to a bid: drop or pick files, several at once, up to 500MB each, with a progress bar, Cancel and Retry.                                       | **Works**      | Current code, Changelog                    | Essential    |
+| V2  | Start a new bid from a plan in one step from the Dashboard ("Upload a plan").                                                                                  | **Works**      | Changelog Aug 14                           | Nice-to-have |
+| V3  | Remove a plan from a bid, with a warning that says truthfully what is lost. **Fix first** — ahead of zoom and pan.                                             | **Half-wired** | Current code; fix order Decided 2026-09-14 | Essential    |
+| V4  | A sheet list down the side, with real sheet names taken from the PDF's bookmarks, and renaming.                                                                | **Works**      | Plan item 1, Changelog                     | Essential    |
+| V5  | Move between pages: on-screen arrows, arrow keys, Page Up/Down, Home/End, and a "3 / 18" counter.                                                              | **Works**      | Old screen, Current code                   | Essential    |
+| V6  | Draw each page in the background so the app never freezes on a dense drawing.                                                                                  | **Works**      | Old screen, Current code                   | Essential    |
+| V7  | **Zoom:** mouse wheel, pinch, **+ / − / 0** keys, on-screen zoom buttons showing the %, opens fitted to the page at 40%, range 10% to 1000%.                   | **Missing**    | Old screen, Your request                   | Essential    |
+| V8  | **Pan:** click and drag with a mouse, drag with one finger, and pinch moves the view while zooming.                                                            | **Missing**    | Old screen, Your request                   | Essential    |
+| V9  | Marks and traced lines stay visible and tappable at every zoom level (they scale with zoom, with a minimum on-screen size).                                    | **Missing**    | Old screen, Your request                   | Essential    |
+| V10 | Clicking an item in the counted list shows that exact mark on the drawing.                                                                                     | **Works**      | Plan item 5, Changelog                     | Essential    |
+| V11 | Plan addresses that expire mid-session are renewed without interrupting you.                                                                                   | **Works**      | Changelog Aug 15                           | Essential    |
+| V12 | A warning before opening a very large plan (over 150MB).                                                                                                       | **Works**      | Changelog Aug 14                           | Nice-to-have |
+| V13 | Resizable side panels.                                                                                                                                         | **Works**      | Current code                               | Nice-to-have |
+| V14 | Crosshair lines across the whole sheet that follow the cursor.                                                                                                 | **Missing**    | Old screen                                 | Nice-to-have |
+| V15 | Page thumbnail overview to jump between pages.                                                                                                                 | **Missing**    | Old screen                                 | Nice-to-have |
+| V16 | Hide pages you do not need.                                                                                                                                    | **Missing**    | Old screen                                 | Nice-to-have |
+| V17 | Keyboard shortcuts for tools (the old screen had **M** measure, **C** count, **U** undo).                                                                      | **Missing**    | Old screen                                 | Nice-to-have |
+| V18 | Two drawings side by side.                                                                                                                                     | **Missing**    | Plan item 2 (one reading of it)            | Nice-to-have |
+| V19 | **Sheet coverage:** see at a glance which sheets have been worked and which have not been touched, with a warning before a bid goes out with sheets untouched. | **Missing**    | Decided 2026-09-14 (section 13)            | Essential    |
+| V20 | **Revision comparison:** see what changed between two versions of the same sheet, so an old revision is not bid.                                               | **Missing**    | Proposed (section 14)                      | Nice-to-have |
 
 **Notes**
 
@@ -113,9 +118,21 @@ from now on.
   says "You can attach the file again" — attaching it again brings none of the
   takeoff back. The trash icon that opens it only appears on mouse hover
   (`TakeoffPage.tsx:1787`).
+  - **Decided 2026-09-14: this is the first thing to fix, ahead of zoom and pan
+    (V7, V8).** It is the only item in this spec that can destroy work already
+    done, the dialog says the opposite of what happens, and the trigger is
+    hidden behind a mouse hover.
+  - **The fix covers all three together:** the warning says exactly what will be
+    deleted, with counts ("12 stamps and 3 traced runs on 4 sheets will be
+    deleted, and cannot be brought back"); the remove control is visible without
+    hovering and big enough for a finger; and the button's words match what it
+    does.
+  - **Still open, not decided:** whether removing a plan should delete straight
+    away, or keep it somewhere it can be restored for a while, the way archived
+    bids work.
 - **V6** — Real drawings failed to draw with "Cannot read properties of undefined
-  (reading 'createElement')" until the fix of 2026-09-14. **That fix exists only
-  on the `local-dev` branch, uncommitted.** The browser console also shows
+  (reading 'createElement')" until the fix of 2026-09-14. **That fix is committed
+  on the `local-dev` branch (v5.114), but not yet pushed or deployed.** The browser console also shows
   "Setting up fake worker": the PDF is read inside the drawing thread rather than
   its own. It still draws, but may be slower on very large sets — worth checking.
 - **V7, V8** — Never rebuilt. There is no zoom, pan, mouse-wheel or touch code
@@ -170,21 +187,22 @@ from now on.
 
 ## 3. Counting
 
-| ID  | What it does                                                                                                                                                        | Status         | Source                               | Need         |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------ | ------------ |
-| C1  | **Stamp tool:** choose what you are counting once, then tap every place it occurs.                                                                                  | **Half-wired** | Plan item 7, Changelog, Current code | Essential    |
-| C2  | **Start the stamp tool by picking an assembly directly** (search, recently used), so things not in the plan's legend can still be counted.                          | **Missing**    | Your request, Plan item 7, Changelog | Essential    |
-| C3  | Plain high-contrast rings on the drawing, so you can see what has been counted.                                                                                     | **Works**      | Plan item 6, Changelog               | Essential    |
-| C4  | A counted-items list: each assembly with its count, and numbered chips that jump to each mark.                                                                      | **Works**      | Plan item 5, Changelog               | Essential    |
-| C5  | **Remove a stamp:** a visible remove control, the Delete key, and Undo.                                                                                             | **Half-wired** | Your request, Plan item 7, Changelog | Essential    |
-| C6  | **Undo the last stamp** (and undo a removal).                                                                                                                       | **Missing**    | Old screen, Your request             | Essential    |
-| C7  | Move a stamp by dragging it.                                                                                                                                        | **Missing**    | Plan item 7                          | Nice-to-have |
-| C8  | Stamps survive a crash or a lost connection: saved in the browser as you tap, sent in batches, re-sent later.                                                       | **Works**      | Changelog                            | Essential    |
-| C9  | **Legend:** drag a box around a symbol on the plan's legend, name it, link it to an assembly once; the link is remembered on every future job; unlink or remove it. | **Works**      | Plan items 4 and 9, Changelog        | Nice-to-have |
-| C10 | **Location tags** (Underground, Slab/Floor, Wall, Ceiling/Overhead, Exposed, Roof) on stamps and runs, one at a time or all of one assembly on a sheet at once.     | **Half-wired** | Changelog, Your request              | Nice-to-have |
-| C11 | **Layers:** show or hide marks by System (Devices, Lighting, Panels, conduit, cable) and by Location; warns when part of the sheet is hidden.                       | **Works**      | Changelog, Plan § Layers             | Nice-to-have |
-| C12 | Count without tapping each one (type a quantity, or rows × per row).                                                                                                | **Missing**    | Old screen                           | Nice-to-have |
-| C13 | Remove every stamp of one assembly on a sheet at once.                                                                                                              | **Missing**    | Found in this review                 | Nice-to-have |
+| ID  | What it does                                                                                                                                                                                           | Status         | Source                                           | Need         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- | ------------------------------------------------ | ------------ |
+| C1  | **Stamp tool:** choose what you are counting once, then tap every place it occurs.                                                                                                                     | **Half-wired** | Plan item 7, Changelog, Current code             | Essential    |
+| C2  | **Start the stamp tool by picking an assembly directly** (search, recently used), so things not in the plan's legend can still be counted.                                                             | **Missing**    | Your request, Plan item 7, Changelog             | Essential    |
+| C3  | Plain high-contrast rings on the drawing, so you can see what has been counted.                                                                                                                        | **Works**      | Plan item 6, Changelog                           | Essential    |
+| C4  | A counted-items list: each assembly with its count, and numbered chips that jump to each mark.                                                                                                         | **Works**      | Plan item 5, Changelog                           | Essential    |
+| C5  | **Remove a stamp:** a visible remove control, the Delete key, and Undo.                                                                                                                                | **Half-wired** | Your request, Plan item 7, Changelog             | Essential    |
+| C6  | **Undo the last stamp** (and undo a removal).                                                                                                                                                          | **Missing**    | Old screen, Your request                         | Essential    |
+| C7  | Move a stamp by dragging it.                                                                                                                                                                           | **Missing**    | Plan item 7                                      | Nice-to-have |
+| C8  | Stamps survive a crash or a lost connection: saved in the browser as you tap, sent in batches, re-sent later.                                                                                          | **Works**      | Changelog                                        | Essential    |
+| C9  | **Legend:** drag a box around a symbol on the plan's legend, name it, link it to an assembly once; the link is remembered on every future job; unlink or remove it.                                    | **Works**      | Plan items 4 and 9, Changelog                    | Nice-to-have |
+| C10 | **Location tags** (Underground, Slab/Floor, Wall, Ceiling/Overhead, Exposed, Roof) on stamps and runs: a sticky location chosen on the tool before tapping, plus "all of this assembly on this sheet". | **Half-wired** | Changelog, Your request, Decided 2026-09-14 (D8) | Essential    |
+| C11 | **Layers:** show or hide marks by System (Devices, Lighting, Panels, conduit, cable) and by Location; warns when part of the sheet is hidden.                                                          | **Works**      | Changelog, Plan § Layers                         | Nice-to-have |
+| C12 | Count without tapping each one (type a quantity, or rows × per row).                                                                                                                                   | **Missing**    | Old screen                                       | Nice-to-have |
+| C13 | Remove every stamp of one assembly on a sheet at once.                                                                                                                                                 | **Missing**    | Found in this review                             | Nice-to-have |
+| C14 | **Schedule cross-check:** enter the quantities from the plan's own fixture and panel schedules and compare them with what was counted, with a clear flag when they disagree.                           | **Missing**    | Decided 2026-09-14 (section 13)                  | Essential    |
 
 **Notes**
 
@@ -208,6 +226,22 @@ from now on.
   on the screen ever calls them**, and new stamps are saved with no location. So
   the Location half of Layers (C11) can only ever show "Untagged". The Aug 12
   changelog says tagging works.
+  - **Decided 2026-09-14 (D8): keep location tags and wire them up.** Location
+    changes price and materials in electrical work: underground usually means
+    PVC rather than EMT, wet locations change the conductor type, and overhead
+    work off a lift is slower per foot than work at wall height. On commercial
+    jobs that is real money.
+  - **How:** a sticky location chosen on the stamp or trace tool before tapping,
+    so every mark gets it, plus "set the location of all of this assembly on
+    this sheet". The Location filter in Layers (C11) stays, and starts working
+    once marks carry a location.
+  - **Question to settle when C10 is built:** should the assembly or material
+    follow the location tag — for example a run tagged Underground pricing as
+    PVC instead of EMT, or a wet-location device using a different conductor?
+    If it does, the switch has to be shown, never made silently. Also settle
+    how location relates to job-condition modifiers (working off a lift is
+    already a modifier) and to vertical rise (T17), which also depends on where
+    a device sits.
 - **Old screen counting, for reference:** named count groups ("Outlets - Room
   101") each with its own icon, colour and optional unit cost, optionally linked
   to an assembly; right-click deleted the nearest pin; **U** undid the last pin;
@@ -218,29 +252,36 @@ from now on.
 
 ## 4. Tracing and measuring
 
-| ID  | What it does                                                                                                                                  | Status         | Source                   | Need         |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------ | ------------ |
-| T1  | **Trace a conduit or cable run:** tap along the route, see the length, finish, undo a point, or discard.                                      | **Works**      | Changelog, Old screen    | Essential    |
-| T2  | Conduit is counted once per run; each circuit gets its own full length of wire per conductor; cable is its own raceway, with no conduit line. | **Works**      | Changelog                | Essential    |
-| T3  | Circuits on a run: add, change the conductor count, remove.                                                                                   | **Works**      | Changelog                | Essential    |
-| T4  | **Say what a run is** — for example 3/4" EMT, or 12/2 MC — so it can be priced.                                                               | **Missing**    | Old screen               | Essential    |
-| T5  | Bid-wide totals of conduit, cable and wire from finished runs, leaving out drafts and runs on unscaled sheets.                                | **Works**      | Changelog                | Essential    |
-| T6  | Protect a trace in progress: saved to the server every few seconds, kept in the browser on every tap, and a warning before leaving the page.  | **Works**      | Changelog                | Essential    |
-| T7  | **Pick an interrupted trace back up** and keep going.                                                                                         | **Half-wired** | Changelog                | Essential    |
-| T8  | **Edit a finished run: drag a point** to fix it.                                                                                              | **Missing**    | Old screen, Your request | Essential    |
-| T9  | **Extend a finished run.**                                                                                                                    | **Missing**    | Old screen, Your request | Essential    |
-| T10 | **Split a run**, or leave a gap inside one run ("lift the pen").                                                                              | **Missing**    | Old screen, Your request | Nice-to-have |
-| T11 | **Rename a run.**                                                                                                                             | **Missing**    | Old screen, Your request | Nice-to-have |
-| T12 | Delete a run.                                                                                                                                 | **Works**      | Current code             | Essential    |
-| T13 | Footage labels on the drawing, on each segment.                                                                                               | **Missing**    | Old screen               | Nice-to-have |
-| T14 | Colour each run, and hide the other runs while working on one.                                                                                | **Missing**    | Old screen               | Nice-to-have |
-| T15 | Lengths do not depend on zoom level.                                                                                                          | **Works**      | Current code             | Essential    |
+| ID  | What it does                                                                                                                                                      | Status         | Source                          | Need         |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------- | ------------ |
+| T1  | **Trace a conduit or cable run:** tap along the route, see the length, finish, undo a point, or discard.                                                          | **Works**      | Changelog, Old screen           | Essential    |
+| T2  | Conduit is counted once per run; each circuit gets its own full length of wire per conductor; cable is its own raceway, with no conduit line.                     | **Works**      | Changelog                       | Essential    |
+| T3  | Circuits on a run: add, change the conductor count, remove.                                                                                                       | **Works**      | Changelog                       | Essential    |
+| T4  | **Say what a run is** — for example 3/4" EMT, or 12/2 MC — so it can be priced.                                                                                   | **Missing**    | Old screen                      | Essential    |
+| T5  | Bid-wide totals of conduit, cable and wire from finished runs, leaving out drafts and runs on unscaled sheets.                                                    | **Works**      | Changelog                       | Essential    |
+| T6  | Protect a trace in progress: saved to the server every few seconds, kept in the browser on every tap, and a warning before leaving the page.                      | **Works**      | Changelog                       | Essential    |
+| T7  | **Pick an interrupted trace back up** and keep going.                                                                                                             | **Half-wired** | Changelog                       | Essential    |
+| T8  | **Edit a finished run: drag a point** to fix it.                                                                                                                  | **Missing**    | Old screen, Your request        | Essential    |
+| T9  | **Extend a finished run.**                                                                                                                                        | **Missing**    | Old screen, Your request        | Essential    |
+| T10 | **Split a run**, or leave a gap inside one run ("lift the pen").                                                                                                  | **Missing**    | Old screen, Your request        | Nice-to-have |
+| T11 | **Rename a run.**                                                                                                                                                 | **Missing**    | Old screen, Your request        | Nice-to-have |
+| T12 | Delete a run.                                                                                                                                                     | **Works**      | Current code                    | Essential    |
+| T13 | Footage labels on the drawing, on each segment.                                                                                                                   | **Missing**    | Old screen                      | Nice-to-have |
+| T14 | Colour each run, and hide the other runs while working on one.                                                                                                    | **Missing**    | Old screen                      | Nice-to-have |
+| T15 | Lengths do not depend on zoom level.                                                                                                                              | **Works**      | Current code                    | Essential    |
+| T16 | **Routing waste factor:** an adjustable percentage added to traced length for offsets and obstructions a flat plan does not show, always visible with its amount. | **Missing**    | Decided 2026-09-14 (section 13) | Essential    |
+| T17 | **Vertical rise per device:** the pipe and wire that run up to the ceiling space or down to the slab from each device, which a flat plan does not show.           | **Missing**    | Proposed (section 14)           | Essential    |
 
 **Notes**
 
 - **T1** — The length that follows your finger only appears with a mouse (it
   follows the pointer hovering). On a tablet you see the length after each tap.
   Finishing by double-tap is unreliable on touch, but a Finish button is there.
+- **T2 — correction recorded 2026-09-14:** wire footage is **not** set equal to
+  conduit footage. T2 already counts conduit once per run and a full conductor
+  length for every conductor of every circuit
+  (`shared/takeoffQuantities.ts:192-197`). What is actually missing is extra
+  wire for makeup at each termination and at the panel — see R6 and R7.
 - **T4** — A run today is only "conduit" or "cable". The materials list prints
   its footage as "awaiting a specification". The old screen sent each run to the
   estimate with conduit type and size, conductor count, size and material, wire
@@ -265,11 +306,13 @@ from now on.
 | ID  | What it does                                                                                                                            | Status      | Source                          | Need         |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------- | ------------ |
 | R1  | **Stamped counts become quantities on the bid.**                                                                                        | **Missing** | Your request                    | Essential    |
-| R2  | **Traced footage becomes quantities on the bid** (needs T4 first).                                                                      | **Missing** | Your request, Old screen        | Essential    |
+| R2  | **Traced footage becomes quantities on the bid.** Blocked until T4 exists.                                                              | **Missing** | Your request, Old screen        | Essential    |
 | R3  | A clear rule for when the same assembly is on the bid twice — once from the plans and once added by hand — so nothing is counted twice. | **Missing** | Found in this review            | Essential    |
 | R4  | Quantities from the plans follow the app's cost-snapshot rule: costs are frozen when the line is created, like every other bid line.    | **Missing** | CLAUDE.md, Found in this review | Essential    |
 | R5  | Materials list for a supplier: quantities only, no prices, built from stamps, runs and bid lines, as CSV or PDF.                        | **Works**   | Changelog Aug 14                | Nice-to-have |
-| R6  | Per-run estimating details: makeup allowance, service loop, terminations, waste, pull points, fittings.                                 | **Missing** | Old screen                      | Nice-to-have |
+| R6  | Other per-run estimating details from the old screen: service loop, pull points, fittings. Makeup is now R7; routing waste is T16.      | **Missing** | Old screen                      | Nice-to-have |
+| R7  | **Makeup allowances:** extra conductor at each termination and at the panel, from defaults set once, shown as its own amount.           | **Missing** | Decided 2026-09-14 (section 13) | Essential    |
+| R8  | **From a bid line back to the plan:** click a line that came from the plans and open the Takeoff screen on its marks.                   | **Missing** | Proposed (section 14)           | Nice-to-have |
 
 **Notes**
 
@@ -278,9 +321,18 @@ from now on.
   create a line item" (`server/routers/materialsListRouter.ts:20`). Nothing that
   prices a bid reads stamps or runs. Today a takeoff has to be typed into the bid
   by hand. See D2.
-- **R6** — On the old screen these lived on each run's calculator card. See D3
-  and D15 before bringing any of it back: it is the biggest bloat risk in this
+- **R2 depends on T4.** A run that cannot say whether it is 3/4" EMT or 12/2 MC
+  has nothing to price against, so R2 cannot be built until T4 exists.
+- **R6** — On the old screen these lived on each run's calculator card, all
+  defaulting to 0 and typed by hand per run. Makeup has moved to R7 and routing
+  waste to T16; what remains here is service loop, pull points and fittings.
+  See D15 before bringing any of it back: it is the biggest bloat risk in this
   document.
+- **Watch for double counting before R2 ships:** starter device assemblies
+  already carry wire — for example 25 ft of 12-2 NM-B inside every standard
+  receptacle (`server/seed/baselineAssemblies.ts:98-108`). Once traced cable
+  also reaches the bid, the same wire could be counted twice. R3 has to cover
+  this, not only duplicate lines.
 
 ---
 
@@ -413,8 +465,19 @@ Checked sentence by sentence against the code. Highest risk first.
 ## 9. Decisions for you
 
 Where the old and new screens differ, or where something could make the screen
-more complicated. Each has options, a pick, and the reason. **Nothing here is
-decided until you say so.**
+more complicated. Each has options, a pick, and the reason.
+
+**Decided 2026-09-14:**
+
+- **D2** — (a): counts go onto the bid live, with the rules listed under it.
+- **D8** — keep location tags: a sticky location on the tool, plus "all of this
+  assembly on this sheet". The Location filter stays and gets wired up.
+- **D11** — (a): the plan reader does not read sheets automatically.
+- **D15** — the old per-run estimating form does not come back; anything needed
+  is set once in assemblies or company defaults (see R7 and T16).
+- **Fix order** — V3 is fixed first, ahead of zoom and pan (section 12).
+
+Everything else below is still open until you say so.
 
 **D1 — How zoom stays sharp.**
 
@@ -428,7 +491,7 @@ decided until you say so.**
 - Also pick: a small zoom control (−, %, +, fit) floating in a corner of the
   drawing, big enough for a finger.
 
-**D2 — How counts reach the bid (R1).**
+**D2 — How counts reach the bid (R1). Decided 2026-09-14: (a).**
 
 - (a) **Live:** each stamped assembly is one bid line, marked "from plans", and
   its quantity follows the stamps.
@@ -490,17 +553,19 @@ decided until you say so.**
 - **Pick:** (a). Add (b) only if it turns out to be needed. Name runs
   automatically from what they are (D3), so renaming is rare.
 
-**D8 — Location tags (C10, C11).**
+**D8 — Location tags (C10, C11). Decided 2026-09-14.**
 
-- (a) A "sticky" location chosen on the tool before tapping ("Wall"), so every
-  mark gets it.
-- (b) Tag after placing: select marks and choose, plus "all of this assembly".
-- (c) Drop location tagging and the Location half of Layers.
-- **Pick:** first decide whether location changes the price or the materials (for
-  example, underground means PVC). If it does, (a) plus the bulk part of (b). If
-  it does not, (c).
-- **Bloat warning:** until this is decided, hide the Location filter — it can
-  only ever show "Untagged" today.
+- **Decision:** keep them. Location changes price and materials: underground
+  usually means PVC rather than EMT, wet locations change conductor type, and
+  overhead work off a lift is slower per foot than work at wall height.
+- **Chosen:** (a) a sticky location on the tool before tapping, plus the bulk
+  part of (b), "all of this assembly on this sheet".
+- **Not chosen:** tagging marks one at a time after placing, and dropping
+  location altogether.
+- **The Location filter is not hidden** — it gets wired up as part of C10.
+- **Open question for when C10 is built:** whether the assembly or material
+  follows the location tag (PVC vs EMT), and how that is shown. See the C10
+  note.
 
 **D9 — The legend's job once direct picking exists (C2, C9).**
 
@@ -515,7 +580,7 @@ decided until you say so.**
 - Do not bring back the old free-named count groups. Counting by assembly is what
   lets the count be priced.
 
-**D11 — Should the plan reader read sheets automatically? (A1)**
+**D11 — Should the plan reader read sheets automatically? (A1) Decided 2026-09-14: (a).**
 
 - (a) Off by default, with a Read button.
 - (b) On by default (today).
@@ -546,7 +611,7 @@ decided until you say so.**
 - **Pick:** not now. It doubles what the screen has to manage, and a sheet list
   plus zoom covers most of the need.
 
-**D15 — Bringing back the old per-run estimating details (R6).**
+**D15 — Bringing back the old per-run estimating details (R6). Decided 2026-09-14: as picked.**
 
 - **Pick:** not on the Takeoff screen. Put anything that is really needed into
   assemblies or company defaults, set once.
@@ -604,27 +669,430 @@ Checked against the deleted `PlanPanel.tsx`. These may have been forgotten.
   only with the next stamp placed, or when the sheet is reopened (C8).
 - **Stamp counts are never totalled across the whole bid** on this screen — only
   per sheet (section 8 item 7).
-- **The PDF drawing fix is only on `local-dev`, uncommitted** (V6).
+- **The PDF drawing fix is committed on `local-dev` but not yet pushed or deployed** (V6).
 - **Pages are drawn once at 1.5× size** — the sharpness limit once zoom exists
   (D1).
 - **The PDF reads inside the drawing thread ("fake worker")**, which may be slower
   on very large sets (V6).
 
-## 12. Essential rows that are not Works today
+## 12. Fix order, dependencies, and essential rows not working today
 
-For deciding the order. Grouped by section, not ranked.
+### Fix order
 
-- **Viewing:** V3 (truthful remove-plan warning), V7 zoom, V8 pan, V9 marks
-  visible at any zoom.
-- **Scale:** S6 scale from a known dimension, S7 measure two points, S8 sheet-size
-  check.
-- **Counting:** C1 and C2 start the stamp tool by picking an assembly, C5 remove a
-  stamp, C6 undo.
+1. **V3 first — decided 2026-09-14.** A truthful remove-plan warning, with the
+   hover-only trigger fixed in the same change. It is the only item that can
+   destroy work already done.
+2. Everything after that is still to be ordered.
+
+### Dependencies
+
+- **R2 cannot be built until T4 exists.** A run that cannot say whether it is
+  3/4" EMT or 12/2 MC has nothing to price against.
+- **R3 has to be settled before R1 or R2 ships**, including wire already built
+  into device assemblies (see the notes under section 5).
+- **R7 makeup and T16 routing waste only reach the bid through R2**, so they
+  need T4 and R2 as well. Both can show on a run's own totals before then.
+- **R8 needs R1 and R2** — a bid line has to come from the plans before it can
+  point back to them.
+- **C14 needs C1 and C2** — counts have to be by assembly, and startable
+  directly, before they can be compared with a schedule.
+- **T17 vertical rise overlaps C10** — where a device sits decides which rise
+  applies.
+- **V7 and V8 (zoom and pan) come before V20's overlay view**, and make R8's
+  jump useful.
+
+### Essential rows that are not Works today
+
+Grouped by section, not ranked.
+
+- **Viewing:** V3 (fix first), V7 zoom, V8 pan, V9 marks visible at any zoom,
+  V19 sheet coverage.
+- **Scale:** S6 scale from a known dimension, S7 measure two points, S8
+  sheet-size check.
+- **Counting:** C1 and C2 start the stamp tool by picking an assembly, C5 remove
+  a stamp, C6 undo, C10 location tags, C14 schedule cross-check.
 - **Tracing:** T4 say what a run is, T7 pick up an interrupted trace, T8 drag a
-  point, T9 extend a run.
+  point, T9 extend a run, T16 routing waste factor, T17 vertical rise
+  (proposed).
 - **Onto the bid:** R1 counts, R2 footage, R3 no double counting, R4 cost
-  snapshots.
+  snapshots, R7 makeup allowances.
 - **Wording:** section 8 items 1–3.
+
+---
+
+## 13. Added 2026-09-14 — DECIDED (treat as requirements)
+
+You listed these as A1–A4. They are renamed to fit the tables, because A1–A5
+already mean the AI rows in section 6.
+
+| You called it                    | Spec ID | Where it sits in the tables     |
+| -------------------------------- | ------- | ------------------------------- |
+| A1 Sheet coverage tracking       | **V19** | 1. Viewing the sheet            |
+| A2 Cross-check against schedules | **C14** | 3. Counting                     |
+| A3 Makeup allowances             | **R7**  | 5. Getting results onto the bid |
+| A4 Routing waste factor          | **T16** | 4. Tracing and measuring        |
+
+### V19 — Sheet coverage tracking
+
+**What it does.** Every sheet in the sheet list shows whether it has been worked:
+
+- **Not started** — nothing placed on it.
+- **Worked** — at least one stamp or traced run.
+- **No work here** — you marked it: a cover sheet, a detail, another trade's
+  sheet.
+
+The top of the list reads "7 of 12 sheets worked", beside the existing scaled
+count. Before a bid is sent (the Send menu or the proposal) or marked Won, it
+warns — "3 sheets not started: E3, E4, E5" — with a way to carry on anyway. It
+warns; it does not block.
+
+**Already in the code.**
+
+- The sheet list already counts scaled sheets the same way
+  (`client/src/components/takeoff/SheetIndex.tsx:191, 199`).
+- Stamps and runs are already fetched per sheet
+  (`server/routers/takeoffStampsRouter.ts:137-141, 202-215`,
+  `server/routers/takeoffRunsRouter.ts:121-129`), but nothing asks "which sheets
+  of this bid have anything on them" in one go.
+- A sheet has nowhere to store "no work here" (`drizzle/schema.ts`,
+  `bidPdfSheets`: name and scale fields only), so that needs one new field.
+- There is no "finalize" step today. A bid is Draft, Active, Won or Lost
+  (`drizzle/schema.ts:1680`), with a Send menu and a proposal on the bid screen
+  (`client/src/pages/BidsPage.tsx:536-551`) and the status change at
+  `BidsPage.tsx:598`. The warning belongs on Send, on the proposal, and on
+  moving a bid to Won.
+
+**Simpler version, and the bloat check.** Automatic "worked / not started" plus
+the one-tap "no work here" gets nearly all the value. Leave out a separate
+"marked done" tick per sheet: a tick is one more thing to forget, and the warning
+already names the sheets nobody has touched.
+
+**Tablet and offline.** Sheet rows need tap targets of about 44 pixels, and "no
+work here" must be a visible control, not a hover. Coverage comes from the same
+server data as the rest of the screen, so it has the same offline limits
+(section 7).
+
+### C14 — Cross-check counts against the plan's own schedules
+
+**What it does.** Plans carry fixture and panel schedules with quantities. Beside
+each counted assembly in the counted-items list is a **"Schedule says"** number:
+tap it, type the number, press Enter. When it matches the count it turns green
+and says so; when it does not, it says plainly "Schedule 24 · counted 22". You
+can also add a schedule line for something not counted yet ("Type F — schedule
+12, counted 0"), which is exactly the miss this exists to catch.
+
+**Already in the code.**
+
+- Counts are already grouped per assembly (`shared/takeoffCounts.ts`, shown in
+  `client/src/components/takeoff/RunsPanel.tsx`) — the "counted" side.
+- Nothing reads schedules today. The plan reader is told to ignore them
+  (`server/routers/planCopilotRouter.ts:220`).
+- The viewer already pulls the text off each page for scale detection
+  (`client/src/pages/TakeoffPage.tsx:480-482`). That text could one day
+  pre-fill schedule numbers, but typing comes first.
+- Quick number entry already exists as a shared field (`InlineNumberField`, per
+  `CLAUDE.md` § Editing fields): select on tap, Enter saves, Escape undoes.
+
+**Simpler version, and the bloat check.** One number per counted assembly, typed
+into the list you are already looking at — no separate schedule screen. Reading
+the numbers off the drawing automatically is a later, proposed step, and would
+need a connection.
+
+- **Flagged for you:** you asked for this per sheet. Fixture schedules usually
+  cover the whole set, so a whole-set schedule compared with one sheet's count
+  would always disagree. I'd compare against the whole bid's count by default,
+  and allow per sheet where a schedule really is per floor. Your call.
+- **Panel schedules** (circuits per panel) are harder: they compare against
+  traced circuits (T3), which are typed in freely today. Start with fixture and
+  device schedules, and do panels after T4.
+
+**Tablet and offline.** A number field brings up the number keypad on a tablet,
+and the mismatch flag must be words, not only a colour. Same offline limits as
+the rest of the screen.
+
+**Depends on.** C1 and C2 (counting by assembly, started directly) and C5 (so a
+miscount can be fixed once the check finds it).
+
+### R7 — Makeup allowances (extends R6)
+
+**What it does.** Adds conductor length for making up connections:
+
+- **At each termination** (a box, device or piece of equipment): a set number of
+  feet per conductor.
+- **At the panel:** a set number of feet per conductor, once per circuit.
+
+Both are set **once**, in company defaults, and can be raised on an assembly that
+needs more (a large piece of equipment, for example). They are never a form on
+each run (D15). They show as their own amount wherever wire totals show: "Wire
+900 ft + makeup 84 ft".
+
+**Defaults — picked, and why.** Starting points, not code rules; change them to
+match your crews.
+
+- **1 ft per conductor at each termination.** The electrical code's minimum is
+  6 inches of free conductor at a box. Making up a device — stripping, splicing,
+  folding back — uses more than the minimum, and a foot covers it without
+  padding.
+- **5 ft per conductor at the panel.** A conductor enters the panel and runs
+  along the gutter to its breaker, and a typical panelboard is several feet tall.
+  On a job with 40 homeruns of 3 conductors each, that is 600 ft at the panels
+  alone — which is why it matters.
+
+**How terminations are counted — flagged, not decided.** The simplest rule: every
+traced run has 2 ends and each end is a termination; the panel allowance is added
+once for each circuit on the bid. The catch: circuits are typed in by name today
+(T3), so the same circuit on two runs could get the panel allowance twice unless
+the names match exactly. Settle this when R7 is built.
+
+**Already in the code.**
+
+- The wire math is correct, and has no makeup in it
+  (`shared/takeoffQuantities.ts:192-197`).
+- The old screen had makeup, service loop and termination counts, **all
+  defaulting to 0 and typed per run**
+  (`git show 0a270af^:client/src/components/tabs/UnifiedProjects.tsx`, lines
+  569–579).
+- Company defaults already live in one place (`pricing_defaults`: overhead,
+  profit, productivity) and are inherited by bids (`CLAUDE.md` § Company
+  defaults) — the right home for these.
+- **Double-counting risk:** starter device assemblies already include wire — 25
+  ft of 12-2 NM-B per standard receptacle
+  (`server/seed/baselineAssemblies.ts:98-108`). Makeup must not be added on top
+  of wire an assembly already allows for.
+
+**Tablet and offline.** Set once on a settings screen and applied by
+calculation. No touch or offline issue of its own.
+
+**Depends on.** T4 and R2 to reach the bid; T3 circuits for the panel allowance.
+
+### T16 — Routing waste factor
+
+**What it does.** A percentage added to traced length, because a pipe drawn on a
+flat plan understates the real run: offsets, going around beams and ducts, and
+bends the drawing does not show. It applies to conduit and cable length, and so
+to the wire pulled through it.
+
+- **Where it is set:** a company default, overridable per bid — the same pattern
+  as the productivity factor. Not per run: that is the per-run form D15 ruled
+  out.
+- **Always visible, with its amount:** on each run ("112 ft traced + 10% routing
+  = 123.2 ft"), on the totals ("includes 10% routing"), and on the bid line. It
+  shows even at its default, because a number that changes your footage must
+  never be invisible.
+
+**Default — picked, and why: 10%.** Estimators commonly allow roughly 5–15% for
+routing on runs measured off plans, depending on how crowded the building is.
+10% sits in the middle, is easy to check in your head, and setting it to 0 turns
+it off. It is **only** routing: it does not cover makeup (R7), vertical rise
+(T17) or material cut-off waste, and must never be stacked on those without
+saying so.
+
+**Already in the code.**
+
+- Measuring deliberately adds no waste and no rounding, leaving that to pricing
+  (`shared/takeoffGeometry.ts:158-166`) — so this percentage belongs in pricing,
+  not in the measuring math.
+- The company-default-with-bid-override pattern already exists for productivity
+  (`shared/pricing.ts`; shown on the bid at
+  `client/src/pages/BidsPage.tsx:849-874`). Changing the company default gets the
+  same warning panel as the other company defaults (`CLAUDE.md` § Company
+  defaults).
+- The materials list already tells a supplier its quantities carry no waste
+  allowance (`server/routers/materialsListRouter.ts:209-211`). Once T16 exists,
+  that note has to say what was added.
+
+**Tablet and offline.** Calculation only. The per-bid override is a number field
+following the standing field rules.
+
+**Depends on.** Shows on runs as soon as it exists; reaches the bid with R2.
+
+---
+
+## 14. Added 2026-09-14 — PROPOSED (not decided)
+
+You listed these as B1–B3. Renamed to fit the tables:
+
+| You called it                | Spec ID | Where it sits in the tables     |
+| ---------------------------- | ------- | ------------------------------- |
+| B1 Vertical rise per device  | **T17** | 4. Tracing and measuring        |
+| B2 Revision comparison       | **V20** | 1. Viewing the sheet            |
+| B3 Bid line back to the plan | **R8**  | 5. Getting results onto the bid |
+
+### T17 — Vertical rise per device
+
+**The problem, plainly.** A plan is drawn looking down from above, so it only
+shows horizontal distance. A receptacle box sits about 18 inches off the floor,
+but its pipe usually runs up the wall into the space above the ceiling, turns,
+and heads to the next box or back to the panel. (The run back to the panel is the
+**homerun**.) That vertical piece — the **rise**, or **drop** when it comes down
+from above — never shows on the plan. With a 10 ft ceiling it is about 8–9 ft
+per receptacle, less for a switch mounted higher, and different again when the
+pipe comes up out of the slab instead (a **stub-up**). Multiply by hundreds of
+devices and it is a lot of pipe and wire.
+
+**Three ways to handle it.**
+
+1. **Heights: a ceiling height per sheet, and a mounting height per assembly.**
+   The app works out each device's rise as the difference. Most accurate: it
+   adapts when one floor has 10 ft ceilings and another has 14 ft. But it needs
+   two numbers set, and it needs to know whether the pipe runs above the ceiling
+   or under the slab. A sheet with mixed ceiling heights would need heights per
+   area, which is where it turns into bloat.
+2. **A flat rise per device type, set once on the assembly.** "Receptacle: 9
+   ft", "Switch: 7 ft", "Ceiling light: 2 ft". Simple, one place to set it, and
+   close enough on most jobs. On a tall-ceiling job you change the number or use
+   a different assembly.
+3. **Nothing new: put the rise inside the assembly's materials**, the way the
+   starter device assemblies already include 25 ft of 12-2 NM-B per receptacle
+   (`server/seed/baselineAssemblies.ts:98-108`). No new feature at all. But it
+   is invisible on the takeoff and the bid — you never see "rise" as its own
+   number — and on pipe jobs it mixes vertical pipe in with everything else.
+
+**My pick: 2, shown openly.** A "rise per device" figure on the assembly, set
+once, that shows as its own line on the bid ("Rise: 24 receptacles × 9 ft = 216
+ft of 1/2" EMT, plus wire"). It keeps to the rule that nothing silently changes
+your numbers, works on any sheet, and needs no heights typed in per job. Move to
+option 1 only if tall-ceiling commercial work shows the flat numbers are too far
+off.
+
+**How it overlaps location tags (C10).** Where a device sits decides which rise
+applies: a device tagged **Wall** or **Ceiling/Overhead** rises to the ceiling
+space; one tagged **Slab/Floor** gets a short stub-up instead. So the assembly
+could carry two figures — overhead rise and slab stub-up — and the sticky
+location (D8) picks between them. That keeps it to one choice per job, not a
+form per device.
+
+**Watch for double counting.** If a device assembly already includes wire for its
+drop, as the starter receptacles do, adding rise would count that wire twice.
+Before T17 is built, decide whether device assemblies keep their built-in wire
+(simplest for residential cable jobs) or leave vertical footage to T17 (clearer
+for commercial pipe jobs).
+
+**Already in the code.** Assemblies carry per-device material quantities
+(`server/seed/baselineAssemblies.ts:98-134`), and the server can already store a
+location on each mark (C10). Nothing about ceiling or mounting heights exists.
+
+**Complexity.** Option 2 is small once T4 and R2 exist. Option 1 is medium, and
+grows if heights vary within a sheet.
+
+**Tablet and offline.** Set in the library and applied by calculation. No issue
+of its own.
+
+### V20 — Revision comparison
+
+**What it would do.** Stop you bidding Rev 1 when Rev 3 is out, and show what
+changed between them.
+
+**How big a build — assessed in four levels.**
+
+1. **Small: revision awareness.** Read the revision and date off each sheet's
+   title block, from the text the viewer already pulls off every page
+   (`client/src/pages/TakeoffPage.tsx:480-482`), and show "Rev 3 · 08/02" in the
+   sheet list. When a new PDF arrives with the same sheet names, say "E1: Rev 3
+   replaces Rev 1" and mark the older one as superseded. Title blocks vary, so a
+   wrong reading needs a quick manual fix. **This catches the real risk** —
+   bidding the wrong revision — for the least work.
+2. **Medium: overlay view.** Show both versions on top of each other in two
+   colours, so unchanged lines look the same and changes stand out, lined up by
+   picking two matching points. Needs zoom and pan (V7, V8) first, and is heavy
+   on a tablet's memory with two large sheets.
+3. **Large: automatic change highlighting.** The app finds and circles changes
+   itself. Sheets shift, text reflows and scans are noisy, so it raises false
+   alarms unless carefully tuned. Not recommended now.
+4. **Large: carry marks forward.** Move stamps and runs from Rev 1 onto Rev 3.
+   Needs level 3 to know what moved. Not recommended now.
+
+**My pick:** level 1 once the essentials are done, level 2 after zoom and pan,
+and neither level 3 nor 4 for now.
+
+**Already in the code.** Nothing tracks revisions. The plan reader's architect
+matching already recognises "rev" markers in sheet text, in order to strip them
+(`shared/planSource.ts:94-103`), and the plan reader is told to ignore revision
+clouds (`server/routers/planCopilotRouter.ts:220`).
+
+**Tablet and offline.** Level 1 is fine on a tablet. Level 2 may struggle for
+memory on large sets. Both need the plans open, so the same offline limits apply.
+
+### R8 — From a bid line back to the plan
+
+**What it would do.** On the bid, a line that came from the plans has a "Show on
+plans" link. It opens the Takeoff screen on that assembly's marks, with the
+sheets that have them highlighted in the sheet list.
+
+**Already in the code.** Inside the Takeoff screen this already works: a numbered
+chip in the counted list jumps to its mark
+(`client/src/components/takeoff/RunsPanel.tsx:139-141`, which calls
+`client/src/pages/TakeoffPage.tsx:2003-2006`). What is missing:
+
+- Bid lines do not know they came from the plans, because R1 and R2 are not
+  built.
+- The Takeoff address, `/bids/:id/plans` (`client/src/lib/appRoutes.ts:185-186`),
+  cannot yet say which sheet or assembly to open. Adding that means updating the
+  address tests (`client/src/lib/appRoutes.test.ts`).
+
+**So it is an extension, not new work** — small once R1 and R2 exist, because D2
+already marks those lines "from plans".
+
+**Simpler version.** Open the Takeoff screen filtered to that assembly rather
+than to one exact mark: a bid line is a whole assembly's count, not one stamp.
+
+**Tablet and offline.** Same as the Takeoff screen. Most useful once zoom (V7)
+lets the jump actually show the mark up close.
+
+---
+
+## 15. Adjustments that change your numbers — are they visible?
+
+Checked 2026-09-14. The rule: **anything that changes a quantity, an hour or a
+price must be visible where it changes it.**
+
+| Adjustment                        | What it does                                                                                                                  | Where you can see it                                                                                     | Visible where it matters?                                                                                       |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Assembly overhead hours           | Adds flat setup, testing and cleanup hours to an assembly's labor, before modifiers (`shared/pricing.ts:76-82`)               | Only on the Assemblies screen: "Includes X h of assembly overhead" (`AssembliesLibraryPage.tsx:338-340`) | **No.** Not on the bid breakdown. Starter assemblies ship with 0; one assembly in the Aug 19 backup has it set. |
+| Job-condition modifiers           | Adds a percentage to a line's labor                                                                                           | The bid line shows the modifier names and "frozen" (`BidsPage.tsx:737-739`)                              | **Partly.** The names show; the percentage and the hours it added do not.                                       |
+| Productivity factor               | Scales every labor hour, company-wide or per bid                                                                              | Bid breakdown, whenever it is not 0 (`BidsPage.tsx:849-874`)                                             | Yes.                                                                                                            |
+| Wire built into device assemblies | Every starter receptacle adds 25 ft of 12-2 NM-B; a dedicated circuit adds 35 ft (`server/seed/baselineAssemblies.ts:98-134`) | On the assembly                                                                                          | **Not on the Takeoff screen** — a stamp shows "1 placed", never its wire. Double-count risk once R2 ships.      |
+| Frozen rates on bid lines         | A line keeps the labor rate it was added with, by design (`shared/laborRatePricing.ts:86-90`)                                 | A $0 rate is flagged on the bid (`BidsPage.tsx:821-845`)                                                 | **Partly.** A line frozen at an old, non-zero rate is not flagged after the rate changes (section 16).          |
+| Detected scale                    | Applied automatically when the reading is confident                                                                           | "Detected" badge (`ScaleControl.tsx:258-260`)                                                            | Yes.                                                                                                            |
+| Runs on sheets with no scale      | Left out of the totals                                                                                                        | Said under the totals (`RunsPanel.tsx:419-420`)                                                          | Yes.                                                                                                            |
+| Layer filters                     | Hide marks from the drawing and the counted list                                                                              | Warning in Layers (`LayersPanel.tsx:243`)                                                                | Yes, though see section 8 item 7.                                                                               |
+| Rounding                          | Traced lengths to 1/100 ft (`shared/takeoffGeometry.ts:163-166`); money to the cent (`shared/pricing.ts:169-196`)             | —                                                                                                        | Too small to matter.                                                                                            |
+
+**Requirement for everything new in this spec:** T16 routing waste, R7 makeup and
+T17 rise each show their own amount on the run and on the bid line, the way the
+productivity factor already does. The two "No" rows above should be fixed the
+same way.
+
+---
+
+## 16. Outside the Takeoff screen — flagged so it is not lost
+
+These belong to the **bid screen**, not this one, but they decide whether a bid
+is right no matter how accurate the takeoff is.
+
+**Labor rate — what the Aug 19 backup actually shows.**
+
+- **Your Journeyman rate is $43.00/hr** — your own copy of the starter
+  Journeyman, last changed Aug 14. Starter assemblies use the Journeyman role by
+  default (`server/seed/baselineAssemblies.ts:90`), and a bid line follows your
+  copy (`shared/laborRateLookup.ts`).
+- **Your 7 existing bid lines are priced at $68.00/hr**, not $43. A line keeps
+  the rate it was added with, so they still carry an older figure.
+- **The shipped starter roles are all $0:** Apprentice, Journeyman,
+  Foreman/Master Electrician, Supervisor and Project Manager.
+- **No company default labor rate is set** for your account
+  (`pricing_defaults`).
+
+You said the Journeyman rate has no real dollar value. If $43 is a placeholder
+rather than your actual cost, every bid's labor is wrong — and the $68 already
+on your lines disagrees with it. **The bid screen does not point out that
+disagreement**: its warning only fires for a $0 rate
+(`shared/laborRatePricing.ts:86-90`). The live site may also have changed since
+Aug 19.
+
+**Also on the bid screen:** that $0 warning tells you to "give it a role, then
+re-add the line" (`client/src/pages/BidsPage.tsx:840-842`). The wording is right
+when a line has no role, and wrong when the role exists but its rate is $0.
 
 ---
 
