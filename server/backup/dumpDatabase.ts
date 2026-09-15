@@ -26,6 +26,7 @@
  * rather than letting it become an out-of-memory crash nobody predicted.
  */
 import mysql from "mysql2/promise";
+import { mysqlConnection } from "../databaseConnection";
 
 /** Rows per INSERT statement. Large enough to be fast, small enough to read. */
 const ROWS_PER_INSERT = 200;
@@ -88,7 +89,7 @@ function encodeValue(connection: mysql.Connection, value: unknown): string {
  */
 export async function dumpDatabase(databaseUrl: string): Promise<DumpResult> {
   const connection = await mysql.createConnection({
-    uri: databaseUrl,
+    ...mysqlConnection(databaseUrl),
     // Dates as the strings MySQL stores, not JS Date objects. A Date would be
     // re-serialised through the connection's timezone on the way out, which
     // silently shifts every timestamp in the backup by the offset between the
@@ -202,7 +203,7 @@ export async function dumpDatabase(databaseUrl: string): Promise<DumpResult> {
  * table list and asks MySQL separately.
  */
 export async function listTables(databaseUrl: string): Promise<string[]> {
-  const connection = await mysql.createConnection({ uri: databaseUrl });
+  const connection = await mysql.createConnection(mysqlConnection(databaseUrl));
   try {
     const [rows] = await connection.query<mysql.RowDataPacket[]>(
       `SELECT TABLE_NAME FROM information_schema.TABLES

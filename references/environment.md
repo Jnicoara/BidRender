@@ -93,8 +93,49 @@ account-level permissions.
 | `LOCAL_STORAGE_DIR`                       | Keep plan PDFs and logos in this folder instead of cloud storage                     | Local runs only, e.g. `.local-storage`. Leave unset on a real host.                 |
 | `DISABLE_AI_FEATURES`                     | `true` switches off the plan reader, alias suggestions and the "where do I…?" helper | They answer "switched off" instead of failing, and the plan reader panel is hidden. |
 | `DISABLE_SCHEDULED_JOBS`                  | `true` leaves the nightly backup and archive purge unmounted                         | For a machine the platform scheduler cannot reach.                                  |
+| `DATABASE_CA_CERT`                        | The CA certificate that proves the database server is the real one                   | **Required on DigitalOcean.** See § 5. Unset locally.                               |
 
-## 5. What replacing Forge storage actually means
+## 5. `DATABASE_CA_CERT` — the database's certificate
+
+A managed database (DigitalOcean, PlanetScale, RDS) refuses an unencrypted
+connection, and proves it is the real server with a certificate signed by its
+own authority rather than one Node already trusts. `DATABASE_CA_CERT` is that
+certificate.
+
+**Where to get it:** DigitalOcean control panel → Databases → your cluster →
+Overview → Connection details → **Download CA certificate**
+(`ca-certificate.crt`).
+
+**Where to put it:**
+
+| Running                                     | File                            | Value                                                |
+| ------------------------------------------- | ------------------------------- | ---------------------------------------------------- |
+| On the host                                 | The host's environment settings | Paste the whole certificate text                     |
+| Backups from this laptop against production | `.env.production.local`         | Paste the text, or the path to the downloaded `.crt` |
+| Local development                           | Nowhere — leave it unset        | A local MySQL needs no certificate                   |
+
+Either form works and nothing says which you used: a value starting
+`-----BEGIN CERTIFICATE-----` is the certificate itself, anything else is
+treated as a file path. Line breaks written as `\n` inside an env file are
+turned back into real ones.
+
+**It is used by everything that opens a database connection** —
+`server/databaseConnection.ts` is the single place, called from `server/db.ts`
+(the app), `scripts/migrate.mts` (migrations) and the three backup helpers.
+
+**There is no "encrypt but don't check" option, on purpose.** Skipping the
+identity check is the half of TLS that stops someone in the middle of the
+connection reading every bid and password hash going past. Either the
+certificate is configured and the server is verified, or no encryption is
+requested at all.
+
+**If the database URL asks for encryption and this is unset**, the connection
+fails immediately and names this setting. DigitalOcean's URL ends in
+`?ssl-mode=REQUIRED`; that parameter is removed before mysql2 sees it, because
+mysql2 does not understand it, ignores it, and would connect unencrypted — which
+the server then refuses with an error that says nothing about the real cause.
+
+## 6. What replacing Forge storage actually means
 
 Not a variable swap. `server/storage.ts` asks Forge to presign an S3 operation
 rather than talking to S3 itself, so two functions change to sign against your

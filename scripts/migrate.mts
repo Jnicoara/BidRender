@@ -13,6 +13,7 @@
  */
 import "dotenv/config";
 import mysql from "mysql2/promise";
+import { mysqlConnection } from "../server/databaseConnection";
 import { drizzle } from "drizzle-orm/mysql2";
 import { migrate } from "drizzle-orm/mysql2/migrator";
 import {
@@ -31,7 +32,7 @@ if (!url) {
 
 const folder = process.argv[2] ?? "./drizzle";
 const migrations = readMigrations(folder);
-const connection = await mysql.createConnection(url);
+const connection = await mysql.createConnection(mysqlConnection(url));
 
 /** Date of the newest migration this database has recorded; null for none. */
 async function lastAppliedAt(): Promise<number | null> {

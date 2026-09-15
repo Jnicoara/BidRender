@@ -4,6 +4,10 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-15]
+
+- **BidRender can now connect to a hosted database securely.** Managed database services — DigitalOcean among them — refuse a connection that isn't encrypted, and they prove who they are with their own certificate rather than one a computer already trusts. The app had no setting for that certificate anywhere, so every way it reaches the database would have failed: the app itself, the update runner, and all three parts of the nightly backup. All five now share one piece of code, and the certificate goes in one new setting, `DATABASE_CA_CERT` — either pasted in as text or as the path to the file downloaded from the host. With nothing set, a database on the same computer connects exactly as before. There is deliberately no option to encrypt without checking who answered: that is the half that stops someone in between reading every bid and password on the way past. A database address that asks for encryption while the certificate is missing now fails immediately, naming the setting, instead of failing later and looking like a network fault.
+
 ## [2026-09-14]
 
 - HelixBid is now BidRender inside the code too — file names, comments and documentation — which changes nothing anyone sees. A few internal names keep the old one on purpose: names saved inside a browser, so unsent takeoff work and saved settings are not stranded; the startup lock names; and the backup folder in cloud storage, which is where the existing backups live.

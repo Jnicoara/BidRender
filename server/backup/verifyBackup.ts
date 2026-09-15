@@ -21,6 +21,7 @@
  */
 import { gunzipSync } from "node:zlib";
 import mysql from "mysql2/promise";
+import { mysqlConnection } from "../databaseConnection";
 import type { BackupTarget } from "./target";
 
 export type VerifyResult = {
@@ -152,7 +153,7 @@ async function restoreInto(
   say: (message: string) => void
 ): Promise<Map<string, number>> {
   const connection = await mysql.createConnection({
-    uri: scratchDatabaseUrl,
+    ...mysqlConnection(scratchDatabaseUrl),
     multipleStatements: true,
   });
 

@@ -17,6 +17,7 @@
  * that stays true.
  */
 import mysql from "mysql2/promise";
+import { mysqlConnection } from "../databaseConnection";
 
 /** One place a storage key can be found. */
 export type FileSource = {
@@ -73,7 +74,7 @@ export async function collectFiles(databaseUrl: string): Promise<{
   files: StoredFile[];
   warnings: string[];
 }> {
-  const connection = await mysql.createConnection({ uri: databaseUrl });
+  const connection = await mysql.createConnection(mysqlConnection(databaseUrl));
   const warnings: string[] = [];
   const seen = new Map<string, StoredFile>();
 
