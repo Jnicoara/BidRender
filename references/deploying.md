@@ -135,6 +135,40 @@ the journal entries dated after the newest one the database has recorded. The
 flip side: a new migration must be dated after every existing one, or every
 existing database skips it without a word.
 
+### The DigitalOcean database is built from the migrations. Do NOT restore the Manus backup into it.
+
+Build the tables by running the migrations against an empty database, then load
+only the DATA from the backup. Restoring the backup file as-is would also
+restore Manus's table definitions and Manus's record of which migrations ran,
+and that is the part that cannot be undone later.
+
+Why:
+
+- **The live database is missing 5 foreign keys and 9 indexes.** Migration 0004
+  failed partway on TiDB in July (a constraint name one character over MySQL's
+  limit) and was marked applied by hand, so everything after that statement in
+  the file never ran. 0012's foreign key is missing too.
+- **Restoring would make those gaps permanent.** The backup carries drizzle's
+  migration ledger, so migrations would consider themselves done and never add
+  the missing pieces. Nothing would ever report it.
+- **`assemblies.laborRateId` → `labor_rates` is one of the five, and it is
+  current, not legacy.** It should clear an assembly's labor rate when that rate
+  is deleted. On the live database it does not exist, so deleting a labor rate
+  today leaves assemblies pointing at a rate that is gone. Building fresh fixes
+  it; restoring carries the fault across.
+- **The text-comparison settings would be mismatched.** Live tables were created
+  `utf8mb4_unicode_ci`; a fresh MySQL 8 build uses `utf8mb4_0900_ai_ci`. A
+  database holding both — restored tables plus any created later by a migration
+  — throws "Illegal mix of collations" when a query compares text from two of
+  them.
+- **The backup is mostly test data anyway**: 73 of its 75 accounts are test
+  accounts, and the 4,240 bids in it are fixtures.
+
+So: `pnpm db:push` against the empty DigitalOcean database first, confirm 44 of
+44 applied, and only then load the rows that are actually wanted. The other four
+missing foreign keys and the nine indexes are on the retired `master_*` /
+`project_*` tables and come back for free the same way.
+
 ## 6. Verifying a deploy actually took
 
 A deploy that silently didn't take looks identical to one that did, so check
