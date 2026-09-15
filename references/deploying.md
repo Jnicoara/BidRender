@@ -112,6 +112,29 @@ The same check runs as `server/schemaDrift.test.ts`, so a column added to the
 schema without its migration fails on the author's machine rather than in
 somebody else's console a week later.
 
+### A new database has to build from the files alone
+
+Moving to new hosting means applying every migration to an empty database —
+something the live database never had to do, because it was built one
+migration at a time as they were written, on TiDB. Until v5.118 that stopped
+at 4 of 44 on MySQL 8, twice over: 0004 named a constraint in 65 characters
+(MySQL allows 64), and 0032 used `ADD COLUMN IF NOT EXISTS`, which TiDB
+accepts and MySQL 8 refuses. `server/migrationRun.test.ts` reads every
+migration file for both mistakes, and checks the journal's dates are in order.
+
+Nobody saw it because `drizzle-kit migrate` never prints the error — it redraws
+its spinner and exits 1. So `pnpm db:push` runs `scripts/migrate.mts` instead:
+the same migrator, but a failure names the file, the statement and MySQL's
+reason. When one stops partway, the statements before it in that file have
+already happened — MySQL cannot undo a table change — so running again repeats
+them. On an empty database, drop it and start over.
+
+**Correcting an old migration file is safe for databases that already ran it.**
+drizzle does not compare file contents with what a database ran; it runs only
+the journal entries dated after the newest one the database has recorded. The
+flip side: a new migration must be dated after every existing one, or every
+existing database skips it without a word.
+
 ## 6. Verifying a deploy actually took
 
 A deploy that silently didn't take looks identical to one that did, so check

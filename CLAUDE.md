@@ -21,7 +21,7 @@ pnpm start            # run production build (NODE_ENV=production)
 pnpm check            # tsc --noEmit — run after any nontrivial change
 pnpm test             # vitest run (server/**/*.test.ts only — see vitest.config.ts)
 pnpm format           # prettier --write .
-pnpm db:push          # drizzle-kit generate then migrate, against DATABASE_URL
+pnpm db:push          # drizzle-kit generate, then scripts/migrate.mts, against DATABASE_URL
 ```
 
 Run a single test file: `pnpm vitest run server/materials.test.ts`. Tests use `appRouter.createCaller(ctx)` to call tRPC procedures directly (no HTTP) — see `server/v545.test.ts` for the pattern of building a fake `TrpcContext` with an admin/user role.

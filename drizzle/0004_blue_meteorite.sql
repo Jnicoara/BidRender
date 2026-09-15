@@ -123,7 +123,13 @@ ALTER TABLE `master_items` ADD CONSTRAINT `master_items_userId_users_id_fk` FORE
 ALTER TABLE `master_labor_rates` ADD CONSTRAINT `master_labor_rates_userId_users_id_fk` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `project_assemblies` ADD CONSTRAINT `project_assemblies_projectId_projects_id_fk` FOREIGN KEY (`projectId`) REFERENCES `projects`(`id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `project_assemblies` ADD CONSTRAINT `project_assemblies_masterAssemblyId_master_assemblies_id_fk` FOREIGN KEY (`masterAssemblyId`) REFERENCES `master_assemblies`(`id`) ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `project_assembly_items` ADD CONSTRAINT `project_assembly_items_projectAssemblyId_project_assemblies_id_fk` FOREIGN KEY (`projectAssemblyId`) REFERENCES `project_assemblies`(`id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+-- Named by hand. drizzle-kit's generated name for this constraint is 65
+-- characters and MySQL allows 64 (error 1059), so every new database stopped
+-- here. drizzle/schema.ts and the snapshots keep the generated name on
+-- purpose: changing it there would make drizzle-kit generate a rename that
+-- fails on every existing database, which has either this short name or, on
+-- the live one, no such constraint at all. See server/migrationRun.ts.
+ALTER TABLE `project_assembly_items` ADD CONSTRAINT `project_assembly_items_projectAssemblyId_fk` FOREIGN KEY (`projectAssemblyId`) REFERENCES `project_assemblies`(`id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `project_assembly_items` ADD CONSTRAINT `project_assembly_items_masterItemId_master_items_id_fk` FOREIGN KEY (`masterItemId`) REFERENCES `master_items`(`id`) ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `project_items` ADD CONSTRAINT `project_items_projectId_projects_id_fk` FOREIGN KEY (`projectId`) REFERENCES `projects`(`id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `project_items` ADD CONSTRAINT `project_items_masterItemId_master_items_id_fk` FOREIGN KEY (`masterItemId`) REFERENCES `master_items`(`id`) ON DELETE set null ON UPDATE no action;--> statement-breakpoint
