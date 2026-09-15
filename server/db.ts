@@ -165,6 +165,7 @@ import {
   usableTerm,
 } from "../shared/bidSearch";
 import { addAssemblyOverheadHours } from "../shared/pricing";
+import type { PlanRemovalImpact } from "../shared/planRemoval";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -3714,6 +3715,77 @@ export async function deleteBidPdf(id: number, userId: number) {
   await db
     .delete(bidPdfs)
     .where(and(eq(bidPdfs.id, id), eq(bidPdfs.userId, userId)));
+}
+
+/**
+ * How much takeoff work sits on one plan — everything deleteBidPdf destroys.
+ *
+ * Removing a plan cascades from its sheets to every stamp, traced run (and each
+ * run's circuits) and plan-reader result on them, so the remove warning shows
+ * these counts before anyone can confirm. They are counted straight from the
+ * tables the cascade empties, so the warning and the delete cannot disagree.
+ * See references/takeoff-spec.md, row V3.
+ */
+export async function getBidPdfTakeoffCounts(
+  bidPdfId: number,
+  userId: number
+): Promise<PlanRemovalImpact> {
+  const sheets = await getBidPdfSheets(bidPdfId, userId);
+  if (sheets.length === 0) {
+    return { sheets: 0, stamps: 0, runs: 0, circuits: 0, readerResults: 0 };
+  }
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const sheetIds = sheets.map(sheet => sheet.id);
+
+  const [stamps, runs, circuits, readerResults] = await Promise.all([
+    db
+      .select({ n: sql<number>`count(*)` })
+      .from(takeoffStamps)
+      .where(
+        and(
+          inArray(takeoffStamps.sheetId, sheetIds),
+          eq(takeoffStamps.userId, userId)
+        )
+      ),
+    db
+      .select({ n: sql<number>`count(*)` })
+      .from(takeoffRuns)
+      .where(
+        and(
+          inArray(takeoffRuns.sheetId, sheetIds),
+          eq(takeoffRuns.userId, userId)
+        )
+      ),
+    db
+      .select({ n: sql<number>`count(*)` })
+      .from(takeoffRunCircuits)
+      .innerJoin(takeoffRuns, eq(takeoffRunCircuits.runId, takeoffRuns.id))
+      .where(
+        and(
+          inArray(takeoffRuns.sheetId, sheetIds),
+          eq(takeoffRuns.userId, userId)
+        )
+      ),
+    db
+      .select({ n: sql<number>`count(*)` })
+      .from(planCopilotRuns)
+      .where(
+        and(
+          inArray(planCopilotRuns.sheetId, sheetIds),
+          eq(planCopilotRuns.userId, userId)
+        )
+      ),
+  ]);
+
+  const first = (rows: { n: number }[]) => Number(rows[0]?.n ?? 0);
+  return {
+    sheets: sheets.length,
+    stamps: first(stamps),
+    runs: first(runs),
+    circuits: first(circuits),
+    readerResults: first(readerResults),
+  };
 }
 
 // ─── Plan sheets ──────────────────────────────────────────────────────────────

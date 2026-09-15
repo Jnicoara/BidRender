@@ -241,11 +241,26 @@ export const bidPdfsRouter = router({
     }),
 
   /**
-   * Detach a sheet from a bid.
+   * What removing this plan would delete, for the warning shown first.
+   *
+   * Counts only — it changes nothing. The Takeoff screen will not let a removal
+   * be confirmed until this has answered. See references/takeoff-spec.md, V3.
+   */
+  removalImpact: procedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      await requirePdf(input.id, ctx.scope.dataUserId);
+      return db.getBidPdfTakeoffCounts(input.id, ctx.scope.dataUserId);
+    }),
+
+  /**
+   * Remove a plan from a bid — and, through the database's cascade, every
+   * sheet, stamp, traced run, circuit and plan-reader result on it.
    *
    * Immediate and unconditional, unlike archiving a bid: a PDF attached to the
    * wrong job is a mistake to undo now, not something to hold for 30 days. The
-   * bid it belonged to is untouched.
+   * bid's own line items are untouched. The client shows removalImpact first,
+   * so nobody confirms this without seeing what it deletes.
    */
   remove: procedure
     .input(z.object({ id: z.number().int().positive() }))

@@ -86,53 +86,56 @@ from now on.
 
 ## 1. Viewing the sheet
 
-| ID  | What it does                                                                                                                                                   | Status         | Source                                     | Need         |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------ | ------------ |
-| V1  | Attach plan PDFs to a bid: drop or pick files, several at once, up to 500MB each, with a progress bar, Cancel and Retry.                                       | **Works**      | Current code, Changelog                    | Essential    |
-| V2  | Start a new bid from a plan in one step from the Dashboard ("Upload a plan").                                                                                  | **Works**      | Changelog Aug 14                           | Nice-to-have |
-| V3  | Remove a plan from a bid, with a warning that says truthfully what is lost. **Fix first** — ahead of zoom and pan.                                             | **Half-wired** | Current code; fix order Decided 2026-09-14 | Essential    |
-| V4  | A sheet list down the side, with real sheet names taken from the PDF's bookmarks, and renaming.                                                                | **Works**      | Plan item 1, Changelog                     | Essential    |
-| V5  | Move between pages: on-screen arrows, arrow keys, Page Up/Down, Home/End, and a "3 / 18" counter.                                                              | **Works**      | Old screen, Current code                   | Essential    |
-| V6  | Draw each page in the background so the app never freezes on a dense drawing.                                                                                  | **Works**      | Old screen, Current code                   | Essential    |
-| V7  | **Zoom:** mouse wheel, pinch, **+ / − / 0** keys, on-screen zoom buttons showing the %, opens fitted to the page at 40%, range 10% to 1000%.                   | **Missing**    | Old screen, Your request                   | Essential    |
-| V8  | **Pan:** click and drag with a mouse, drag with one finger, and pinch moves the view while zooming.                                                            | **Missing**    | Old screen, Your request                   | Essential    |
-| V9  | Marks and traced lines stay visible and tappable at every zoom level (they scale with zoom, with a minimum on-screen size).                                    | **Missing**    | Old screen, Your request                   | Essential    |
-| V10 | Clicking an item in the counted list shows that exact mark on the drawing.                                                                                     | **Works**      | Plan item 5, Changelog                     | Essential    |
-| V11 | Plan addresses that expire mid-session are renewed without interrupting you.                                                                                   | **Works**      | Changelog Aug 15                           | Essential    |
-| V12 | A warning before opening a very large plan (over 150MB).                                                                                                       | **Works**      | Changelog Aug 14                           | Nice-to-have |
-| V13 | Resizable side panels.                                                                                                                                         | **Works**      | Current code                               | Nice-to-have |
-| V14 | Crosshair lines across the whole sheet that follow the cursor.                                                                                                 | **Missing**    | Old screen                                 | Nice-to-have |
-| V15 | Page thumbnail overview to jump between pages.                                                                                                                 | **Missing**    | Old screen                                 | Nice-to-have |
-| V16 | Hide pages you do not need.                                                                                                                                    | **Missing**    | Old screen                                 | Nice-to-have |
-| V17 | Keyboard shortcuts for tools (the old screen had **M** measure, **C** count, **U** undo).                                                                      | **Missing**    | Old screen                                 | Nice-to-have |
-| V18 | Two drawings side by side.                                                                                                                                     | **Missing**    | Plan item 2 (one reading of it)            | Nice-to-have |
-| V19 | **Sheet coverage:** see at a glance which sheets have been worked and which have not been touched, with a warning before a bid goes out with sheets untouched. | **Missing**    | Decided 2026-09-14 (section 13)            | Essential    |
-| V20 | **Revision comparison:** see what changed between two versions of the same sheet, so an old revision is not bid.                                               | **Missing**    | Proposed (section 14)                      | Nice-to-have |
+| ID  | What it does                                                                                                                                                   | Status      | Source                          | Need         |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------- | ------------ |
+| V1  | Attach plan PDFs to a bid: drop or pick files, several at once, up to 500MB each, with a progress bar, Cancel and Retry.                                       | **Works**   | Current code, Changelog         | Essential    |
+| V2  | Start a new bid from a plan in one step from the Dashboard ("Upload a plan").                                                                                  | **Works**   | Changelog Aug 14                | Nice-to-have |
+| V3  | Remove a plan from a bid, with a warning that says truthfully what is lost. Fixed first, ahead of zoom and pan.                                                | **Works**   | Current code; fixed 2026-09-14  | Essential    |
+| V4  | A sheet list down the side, with real sheet names taken from the PDF's bookmarks, and renaming.                                                                | **Works**   | Plan item 1, Changelog          | Essential    |
+| V5  | Move between pages: on-screen arrows, arrow keys, Page Up/Down, Home/End, and a "3 / 18" counter.                                                              | **Works**   | Old screen, Current code        | Essential    |
+| V6  | Draw each page in the background so the app never freezes on a dense drawing.                                                                                  | **Works**   | Old screen, Current code        | Essential    |
+| V7  | **Zoom:** mouse wheel, pinch, **+ / − / 0** keys, on-screen zoom buttons showing the %, opens fitted to the page at 40%, range 10% to 1000%.                   | **Missing** | Old screen, Your request        | Essential    |
+| V8  | **Pan:** click and drag with a mouse, drag with one finger, and pinch moves the view while zooming.                                                            | **Missing** | Old screen, Your request        | Essential    |
+| V9  | Marks and traced lines stay visible and tappable at every zoom level (they scale with zoom, with a minimum on-screen size).                                    | **Missing** | Old screen, Your request        | Essential    |
+| V10 | Clicking an item in the counted list shows that exact mark on the drawing.                                                                                     | **Works**   | Plan item 5, Changelog          | Essential    |
+| V11 | Plan addresses that expire mid-session are renewed without interrupting you.                                                                                   | **Works**   | Changelog Aug 15                | Essential    |
+| V12 | A warning before opening a very large plan (over 150MB).                                                                                                       | **Works**   | Changelog Aug 14                | Nice-to-have |
+| V13 | Resizable side panels.                                                                                                                                         | **Works**   | Current code                    | Nice-to-have |
+| V14 | Crosshair lines across the whole sheet that follow the cursor.                                                                                                 | **Missing** | Old screen                      | Nice-to-have |
+| V15 | Page thumbnail overview to jump between pages.                                                                                                                 | **Missing** | Old screen                      | Nice-to-have |
+| V16 | Hide pages you do not need.                                                                                                                                    | **Missing** | Old screen                      | Nice-to-have |
+| V17 | Keyboard shortcuts for tools (the old screen had **M** measure, **C** count, **U** undo).                                                                      | **Missing** | Old screen                      | Nice-to-have |
+| V18 | Two drawings side by side.                                                                                                                                     | **Missing** | Plan item 2 (one reading of it) | Nice-to-have |
+| V19 | **Sheet coverage:** see at a glance which sheets have been worked and which have not been touched, with a warning before a bid goes out with sheets untouched. | **Missing** | Decided 2026-09-14 (section 13) | Essential    |
+| V20 | **Revision comparison:** see what changed between two versions of the same sheet, so an old revision is not bid.                                               | **Missing** | Proposed (section 14)           | Nice-to-have |
 
 **Notes**
 
-- **V3** — Removing a plan permanently deletes **every stamp, traced run, circuit
-  and plan-reader result** on its sheets. The database deletes them
-  automatically (`drizzle/schema.ts`: sheets, stamps, runs and reader runs all
-  cascade from the plan). The dialog mentions only "sheet names and scales" and
-  says "You can attach the file again" — attaching it again brings none of the
-  takeoff back. The trash icon that opens it only appears on mouse hover
-  (`TakeoffPage.tsx:1787`).
-  - **Decided 2026-09-14: this is the first thing to fix, ahead of zoom and pan
-    (V7, V8).** It is the only item in this spec that can destroy work already
-    done, the dialog says the opposite of what happens, and the trigger is
-    hidden behind a mouse hover.
-  - **The fix covers all three together:** the warning says exactly what will be
-    deleted, with counts ("12 stamps and 3 traced runs on 4 sheets will be
-    deleted, and cannot be brought back"); the remove control is visible without
-    hovering and big enough for a finger; and the button's words match what it
-    does.
+- **V3 — fixed 2026-09-14.** Removing a plan permanently deletes **every stamp,
+  traced run, circuit and plan-reader result** on its sheets — the database
+  cascades the delete from the plan (`drizzle/schema.ts`). The dialog used to
+  mention only "sheet names and scales" and say "You can attach the file
+  again", and the trash icon that opened it only appeared on mouse hover.
+  - **What it does now:** before anything can be confirmed, the dialog counts
+    what is on the plan (`bidPdfs.removalImpact`, counted from the same tables
+    the delete empties) and lists it plainly — for example "14 stamps", "3
+    traced runs, with 5 circuits", "1 plan-reader result" — then says it cannot
+    be undone and that attaching the file again brings back the drawing only.
+    The button reads "Delete plan and takeoff" when there is work to lose, and
+    stays disabled until the count has loaded. If the count cannot be loaded,
+    the warning still lists everything that would go, without numbers.
+  - **The trash icon is always visible**, with a 44-pixel tap target.
+  - **Where it lives:** the wording is `shared/planRemoval.ts`, tested in
+    `server/planRemoval.test.ts`; the count and the delete are tested together
+    in `server/planRemovalImpact.test.ts`.
+  - **Not counted:** stamps tapped in the last moment that are still waiting in
+    the browser to be sent (C8).
   - **Still open, not decided:** whether removing a plan should delete straight
     away, or keep it somewhere it can be restored for a while, the way archived
     bids work.
 - **V6** — Real drawings failed to draw with "Cannot read properties of undefined
-  (reading 'createElement')" until the fix of 2026-09-14. **That fix is committed
-  on the `local-dev` branch (v5.114), but not yet pushed or deployed.** The browser console also shows
+  (reading 'createElement')" until the fix of 2026-09-14. **That fix is on GitHub
+  on the `local-dev` branch (v5.114), but not merged to `main` or deployed.** The browser console also shows
   "Setting up fake worker": the PDF is read inside the drawing thread rather than
   its own. It still draws, but may be slower on very large sets — worth checking.
 - **V7, V8** — Never rebuilt. There is no zoom, pan, mouse-wheel or touch code
@@ -414,10 +417,9 @@ also mishandle the partial "range" reads the viewer makes.
 
 - **No pinch zoom and no one-finger pan** (V7, V8).
 - **Targets far too small:** stamp markers about 4 pixels, traced lines under 1
-  pixel (V9), and many small buttons sized at 20–24 pixels — for example remove
-  plan, unlink a legend symbol, and undo a traced point.
+  pixel (V9), and many small buttons sized at 20–24 pixels — for example unlink
+  a legend symbol, and undo a traced point.
 - **Controls that only appear on mouse hover** — invisible on a tablet:
-  - remove a plan (`TakeoffPage.tsx:1787`)
   - rename a sheet (`SheetIndex.tsx:164`)
   - unlink or remove a legend symbol (`LegendPanel.tsx:186, 200`)
   - correct a plan-reader finding (`CoPilotPanel.tsx:391`)
@@ -436,18 +438,18 @@ also mishandle the partial "range" reads the viewer makes.
 
 Checked sentence by sentence against the code. Highest risk first.
 
-| #   | Where                                                       | What it says                                                                                                                                                              | What actually happens                                                                                                                              | Risk   |
-| --- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 1   | "Remove this plan?" dialog (`TakeoffPage.tsx:2145-2147`)    | "…detached from this bid straight away, along with its sheet names and scales. The bid itself, and everything priced on it, is untouched. You can attach the file again." | Also permanently deletes every stamp, traced run, circuit and plan-reader result on those sheets. Attaching the file again brings none of it back. | High   |
-| 2   | Screen subtitle (`TakeoffPage.tsx:1650-1651`)               | "Everything you place lands on the bid."                                                                                                                                  | Nothing placed on this screen becomes a line on the bid (R1, R2).                                                                                  | High   |
-| 3   | Plan reader intro (`CoPilotPanel.tsx:266`)                  | "Nothing lands on the bid until you say so."                                                                                                                              | Even after you press Place, nothing lands on the bid; Place only makes stamps.                                                                     | High   |
-| 4   | Counted items, empty (`RunsPanel.tsx:157`)                  | "Stamp an assembly onto the plan…"                                                                                                                                        | You cannot pick an assembly to stamp; you must capture and link a legend symbol first (C1, C2).                                                    | Medium |
-| 5   | Detected scale tooltip (`ScaleControl.tsx:258`)             | "Read from this sheet — check it before measuring"                                                                                                                        | There is no tool on this screen to check a scale with (S7).                                                                                        | Medium |
-| 6   | Naming a legend symbol (`SymbolCapture.tsx:106`)            | "Used to recognise it again on the next set of plans."                                                                                                                    | Only the AI plan reader recognises symbols. With the reader off, nothing is recognised; the link is reused only when you click it.                 | Medium |
-| 7   | Layers warning (`LayersPanel.tsx:243`)                      | "Showing part of this sheet. Totals below cover the whole bid regardless."                                                                                                | The totals below are for traced runs only. Stamp counts are not totalled for the whole bid anywhere on this screen.                                | Low    |
-| 8   | Stamping and tracing hints (`TraceLayer.tsx:416, 454, 468`) | "click to place · Esc to stop", "(Enter or double-click)", "(Escape twice)"                                                                                               | Mouse-and-keyboard wording; wrong on a tablet.                                                                                                     | Low    |
-| 9   | Upload box (`TakeoffPage.tsx:1723-1726`)                    | "Drop plan PDFs here … or click to choose files from this computer"                                                                                                       | Computer wording; on a tablet you tap to choose.                                                                                                   | Low    |
-| 10  | "Where do I…?" button (`NavigationHelper.tsx:75`)           | "Ask"                                                                                                                                                                     | Close to the "Ask AI" wording you ruled out; the rule is that it navigates, not answers.                                                           | Low    |
+| #   | Where                                                       | What it says                                                                    | What actually happens                                                                                                                                                                            | Risk   |
+| --- | ----------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| 1   | "Remove this plan?" dialog (`TakeoffPage.tsx`)              | Said only sheet names and scales would go, and "You can attach the file again." | **Fixed 2026-09-14 (V3):** it now counts and lists every stamp, traced run, circuit and plan-reader result that will be deleted, and says attaching the file again brings back the drawing only. | Fixed  |
+| 2   | Screen subtitle (`TakeoffPage.tsx:1650-1651`)               | "Everything you place lands on the bid."                                        | Nothing placed on this screen becomes a line on the bid (R1, R2).                                                                                                                                | High   |
+| 3   | Plan reader intro (`CoPilotPanel.tsx:266`)                  | "Nothing lands on the bid until you say so."                                    | Even after you press Place, nothing lands on the bid; Place only makes stamps.                                                                                                                   | High   |
+| 4   | Counted items, empty (`RunsPanel.tsx:157`)                  | "Stamp an assembly onto the plan…"                                              | You cannot pick an assembly to stamp; you must capture and link a legend symbol first (C1, C2).                                                                                                  | Medium |
+| 5   | Detected scale tooltip (`ScaleControl.tsx:258`)             | "Read from this sheet — check it before measuring"                              | There is no tool on this screen to check a scale with (S7).                                                                                                                                      | Medium |
+| 6   | Naming a legend symbol (`SymbolCapture.tsx:106`)            | "Used to recognise it again on the next set of plans."                          | Only the AI plan reader recognises symbols. With the reader off, nothing is recognised; the link is reused only when you click it.                                                               | Medium |
+| 7   | Layers warning (`LayersPanel.tsx:243`)                      | "Showing part of this sheet. Totals below cover the whole bid regardless."      | The totals below are for traced runs only. Stamp counts are not totalled for the whole bid anywhere on this screen.                                                                              | Low    |
+| 8   | Stamping and tracing hints (`TraceLayer.tsx:416, 454, 468`) | "click to place · Esc to stop", "(Enter or double-click)", "(Escape twice)"     | Mouse-and-keyboard wording; wrong on a tablet.                                                                                                                                                   | Low    |
+| 9   | Upload box (`TakeoffPage.tsx:1723-1726`)                    | "Drop plan PDFs here … or click to choose files from this computer"             | Computer wording; on a tablet you tap to choose.                                                                                                                                                 | Low    |
+| 10  | "Where do I…?" button (`NavigationHelper.tsx:75`)           | "Ask"                                                                           | Close to the "Ask AI" wording you ruled out; the rule is that it navigates, not answers.                                                                                                         | Low    |
 
 ### Changelog entries the code contradicts
 
@@ -475,7 +477,8 @@ more complicated. Each has options, a pick, and the reason.
 - **D11** — (a): the plan reader does not read sheets automatically.
 - **D15** — the old per-run estimating form does not come back; anything needed
   is set once in assemblies or company defaults (see R7 and T16).
-- **Fix order** — V3 is fixed first, ahead of zoom and pan (section 12).
+- **Fix order** — V3 is fixed first, ahead of zoom and pan (section 12). Done
+  2026-09-14.
 
 Everything else below is still open until you say so.
 
@@ -660,16 +663,18 @@ Checked against the deleted `PlanPanel.tsx`. These may have been forgotten.
 
 ## 11. Found during this review, not in any plan
 
-- **Removing a plan wipes its takeoff**, and the dialog does not say so (V3,
-  section 8 item 1).
-- **Five controls only appear on mouse hover** (section 7).
+- **Removing a plan wipes its takeoff.** The dialog now says so, with counts —
+  fixed 2026-09-14 (V3).
+- **Four controls only appear on mouse hover** (section 7). The fifth, removing
+  a plan, was fixed with V3.
 - **The offline support may store a new copy of a plan PDF every half hour** on
   an installed app (section 7).
 - **Stamps that failed to send are not retried when the connection returns** —
   only with the next stamp placed, or when the sheet is reopened (C8).
 - **Stamp counts are never totalled across the whole bid** on this screen — only
   per sheet (section 8 item 7).
-- **The PDF drawing fix is committed on `local-dev` but not yet pushed or deployed** (V6).
+- **The PDF drawing fix is on GitHub on `local-dev`, but not merged to `main` or
+  deployed** (V6).
 - **Pages are drawn once at 1.5× size** — the sharpness limit once zoom exists
   (D1).
 - **The PDF reads inside the drawing thread ("fake worker")**, which may be slower
@@ -679,9 +684,8 @@ Checked against the deleted `PlanPanel.tsx`. These may have been forgotten.
 
 ### Fix order
 
-1. **V3 first — decided 2026-09-14.** A truthful remove-plan warning, with the
-   hover-only trigger fixed in the same change. It is the only item that can
-   destroy work already done.
+1. **V3 first — done 2026-09-14.** A truthful remove-plan warning with counts,
+   and the hover-only trigger made always visible, in the same change.
 2. Everything after that is still to be ordered.
 
 ### Dependencies
@@ -705,8 +709,8 @@ Checked against the deleted `PlanPanel.tsx`. These may have been forgotten.
 
 Grouped by section, not ranked.
 
-- **Viewing:** V3 (fix first), V7 zoom, V8 pan, V9 marks visible at any zoom,
-  V19 sheet coverage.
+- **Viewing:** V7 zoom, V8 pan, V9 marks visible at any zoom, V19 sheet
+  coverage.
 - **Scale:** S6 scale from a known dimension, S7 measure two points, S8
   sheet-size check.
 - **Counting:** C1 and C2 start the stamp tool by picking an assembly, C5 remove
@@ -716,7 +720,7 @@ Grouped by section, not ranked.
   (proposed).
 - **Onto the bid:** R1 counts, R2 footage, R3 no double counting, R4 cost
   snapshots, R7 makeup allowances.
-- **Wording:** section 8 items 1–3.
+- **Wording:** section 8 items 2–3.
 
 ---
 

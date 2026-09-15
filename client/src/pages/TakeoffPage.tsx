@@ -72,6 +72,7 @@ import {
 import { SheetIndex } from "@/components/takeoff/SheetIndex";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
 import { UploadProgress } from "@/components/takeoff/UploadProgress";
+import { describePlanRemoval } from "@shared/planRemoval";
 import {
   MAX_PDF_BYTES,
   VIEWER_COMFORTABLE_BYTES,
@@ -712,6 +713,28 @@ export default function TakeoffPage({
     },
     onError: error => toast.error(error.message),
   });
+
+  /**
+   * What removing the plan in the confirm dialog would delete.
+   *
+   * Fetched fresh each time the dialog opens, and the delete button waits for
+   * it, so nobody confirms a removal without seeing how much takeoff goes with
+   * the plan. See references/takeoff-spec.md, row V3.
+   */
+  const removalImpact = trpc.bidPdfs.removalImpact.useQuery(
+    { id: confirmRemove?.id ?? 0 },
+    { enabled: confirmRemove !== null, staleTime: 0, retry: 1 }
+  );
+  const removalChecking =
+    confirmRemove !== null &&
+    (removalImpact.isFetching ||
+      (removalImpact.isPending && !removalImpact.isError));
+  const removalWarning = confirmRemove
+    ? describePlanRemoval(
+        confirmRemove.filename,
+        removalImpact.isError ? null : (removalImpact.data ?? null)
+      )
+    : null;
 
   const ensureSheets = trpc.bidPdfs.ensureSheets.useMutation({
     onSuccess: refreshSheets,
@@ -1781,17 +1804,24 @@ export default function TakeoffPage({
                       {formatBytes(d.byteSize)}
                     </p>
                   </div>
+                  {/* Always visible, with a 44px tap target: it used to appear
+                      only on mouse hover, which hid it on a tablet. The negative
+                      margin keeps the row compact while the target stays full
+                      size. Keys stop here so Enter opens the dialog instead of
+                      selecting the row. */}
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-5 w-5 p-0 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground hover:text-destructive"
+                    className="h-11 w-11 -my-2 -mr-2 p-0 shrink-0 self-center text-muted-foreground hover:text-destructive"
                     onClick={e => {
                       e.stopPropagation();
                       setConfirmRemove(d);
                     }}
+                    onKeyDown={e => e.stopPropagation()}
                     aria-label={`Remove ${d.filename}`}
+                    title={`Remove ${d.filename}`}
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               ))}
@@ -2142,23 +2172,46 @@ export default function TakeoffPage({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove this plan?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirmRemove?.filename} will be detached from this bid straight
-              away, along with its sheet names and scales. The bid itself, and
-              everything priced on it, is untouched. You can attach the file
-              again.
+            <AlertDialogTitle>
+              {removalChecking || !removalWarning
+                ? "Remove this plan?"
+                : removalWarning.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {removalChecking || !removalWarning ? (
+                  <p>Checking what is on {confirmRemove?.filename}…</p>
+                ) : (
+                  <>
+                    <p>{removalWarning.lead}</p>
+                    {removalWarning.losses.length > 0 && (
+                      <ul className="list-disc pl-5 space-y-0.5 text-foreground">
+                        {removalWarning.losses.map(loss => (
+                          <li key={loss}>{loss}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {removalWarning.after.map(line => (
+                      <p key={line}>{line}</p>
+                    ))}
+                  </>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep it</AlertDialogCancel>
             <AlertDialogAction
+              disabled={removalChecking}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
                 if (confirmRemove) remove.mutate({ id: confirmRemove.id });
                 setConfirmRemove(null);
               }}
             >
-              Remove plan
+              {removalChecking || !removalWarning
+                ? "Remove plan"
+                : removalWarning.confirmLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
