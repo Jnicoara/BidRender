@@ -74,7 +74,7 @@ export const PLAN_UPLOAD_PATH = "/api/plan-upload";
  * beats being cut off silently at 32.
  *
  * ── This ceiling is the fallback's, not the app's ────────────────────────────
- * A file between this and MAX_PDF_BYTES is not too big for HelixBid. It is too
+ * A file between this and MAX_PDF_BYTES is not too big for BidRender. It is too
  * big to rescue this way, and the message says so and names the actual fix,
  * because "your 200MB plan set is too large" would be false and would send the
  * user away to split a file that does not need splitting.

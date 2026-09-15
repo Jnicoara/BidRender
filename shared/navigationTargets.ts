@@ -14,7 +14,7 @@
  * than a prompt and a validator that can disagree.
  *
  * `path` values are the app's real hash routes (see pathToRoute in
- * HelixBidShell). Keep them in step; a stale path here is a dead end that looks
+ * BidRenderShell). Keep them in step; a stale path here is a dead end that looks
  * like a working answer.
  */
 

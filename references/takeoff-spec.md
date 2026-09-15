@@ -390,7 +390,7 @@ never be merged into one "AI" box.
 
 ## 7. Tablets and offline use
 
-HelixBid installs as an app (a PWA), and doing a takeoff on a tablet at a job
+BidRender installs as an app (a PWA), and doing a takeoff on a tablet at a job
 site is a real use. **But today "offline" means only that the app's frame opens
 without a signal.** On purpose, the offline support never stores bid or plan
 data (`client/public/sw.js`, lines 5–16), so **a takeoff cannot be opened or done

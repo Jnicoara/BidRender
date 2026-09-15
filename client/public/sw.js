@@ -1,5 +1,5 @@
 /*
- * HelixBid service worker — fast repeat loads, and nothing else.
+ * BidRender service worker — fast repeat loads, and nothing else.
  *
  * ── What this deliberately does NOT do ───────────────────────────────────────
  * It does not cache the API. Not one response, not for a second. Every number
@@ -41,6 +41,9 @@
  * later got wrong: a deploy with a new version starts clean.
  */
 
+// The `helixbid-` prefix is the product's old name, kept on purpose: activate
+// deletes old caches by this prefix, so renaming it would strand every existing
+// cache in the browsers that hold one.
 const CACHE_VERSION = "v1";
 const SHELL_CACHE = `helixbid-shell-${CACHE_VERSION}`;
 const ASSET_CACHE = `helixbid-assets-${CACHE_VERSION}`;

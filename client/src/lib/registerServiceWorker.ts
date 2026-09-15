@@ -75,6 +75,7 @@ export async function disableServiceWorker(): Promise<void> {
       const keys = await caches.keys();
       await Promise.all(
         keys
+          // The old product name, matching the cache names in sw.js.
           .filter(key => key.startsWith("helixbid-"))
           .map(key => caches.delete(key))
       );

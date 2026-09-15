@@ -1,5 +1,5 @@
 /**
- * Platform administration — for whoever runs HelixBid, not for a contractor.
+ * Platform administration — for whoever runs BidRender, not for a contractor.
  *
  * ── What used to be here, and why it went ────────────────────────────────────
  * This screen's main section was a Feature Flags panel: a list of toggles

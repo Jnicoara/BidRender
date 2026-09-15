@@ -69,6 +69,8 @@ export function readR2Config(
       endpoint:
         env.R2_ENDPOINT?.trim() ||
         `https://${accountId}.r2.cloudflarestorage.com`,
+      // `helixbid` is the product's old name and stays: it is the folder the
+      // existing backups live in, and a new default would start an empty one.
       prefix: (env.R2_BACKUP_PREFIX?.trim() || "helixbid").replace(
         /^\/+|\/+$/g,
         ""

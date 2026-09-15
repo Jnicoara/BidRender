@@ -63,7 +63,7 @@ export async function verifyBackup(options: {
   onProgress?: (message: string) => void;
 }): Promise<VerifyResult> {
   const say = options.onProgress ?? (() => {});
-  const schema = options.scratchSchema ?? "helixbid_backup_verify";
+  const schema = options.scratchSchema ?? "bidrender_backup_verify";
 
   const result: VerifyResult = {
     ok: false,

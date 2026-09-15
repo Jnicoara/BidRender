@@ -187,7 +187,7 @@ runIf("restoring the dump", () => {
    * Restores into a scratch schema and drops it again, so it never touches the
    * database it read from.
    */
-  const SCRATCH = "helixbid_backup_restore_test";
+  const SCRATCH = "bidrender_backup_restore_test";
 
   it("restores into an empty database, table for table and row for row", async () => {
     const dump = await dumpDatabase(databaseUrl);
@@ -389,7 +389,7 @@ runIf("the report says what actually happened", () => {
       target.written.get("2026-08-13T22-41-07Z/database.sql.gz")!
     ).toString("utf8");
     expect(dumped).toContain("CREATE TABLE");
-    expect(dumped).toContain("HelixBid database backup");
+    expect(dumped).toContain("BidRender database backup");
   });
 
   it("puts the outcome in the manifest, beside the data", async () => {
@@ -520,7 +520,7 @@ runIf("verifying a backup end to end", () => {
     const result = await verifyBackup({
       target,
       scratchDatabaseUrl: databaseUrl,
-      scratchSchema: "helixbid_verify_selftest",
+      scratchSchema: "bidrender_verify_selftest",
     });
 
     expect(result.errors).toEqual([]);
@@ -559,7 +559,7 @@ runIf("verifying a backup end to end", () => {
     const result = await verifyBackup({
       target,
       scratchDatabaseUrl: databaseUrl,
-      scratchSchema: "helixbid_verify_corrupt",
+      scratchSchema: "bidrender_verify_corrupt",
     });
 
     expect(result.ok, "a corrupted dump must not verify").toBe(false);
@@ -591,7 +591,7 @@ runIf("verifying a backup end to end", () => {
     const result = await verifyBackup({
       target,
       scratchDatabaseUrl: databaseUrl,
-      scratchSchema: "helixbid_verify_mismatch",
+      scratchSchema: "bidrender_verify_mismatch",
     });
 
     expect(result.ok).toBe(false);
@@ -682,7 +682,7 @@ describe("credentials never leave the server", () => {
     R2_ACCOUNT_ID: "acct",
     R2_ACCESS_KEY_ID: "public-id",
     R2_SECRET_ACCESS_KEY: "SUPER-SECRET-VALUE",
-    R2_BUCKET: "helixbid-backups",
+    R2_BUCKET: "bidrender-backups",
   } as unknown as NodeJS.ProcessEnv;
 
   it("reads config from the environment, with a derived endpoint", () => {
@@ -714,7 +714,7 @@ describe("credentials never leave the server", () => {
     expect(serialised).not.toContain("SUPER-SECRET-VALUE");
     expect(serialised).not.toContain("public-id");
     expect(described.configured).toBe(true);
-    expect(described.bucket).toBe("helixbid-backups");
+    expect(described.bucket).toBe("bidrender-backups");
   });
 
   it("uses no VITE_-prefixed variable, which would be bundled to the browser", () => {

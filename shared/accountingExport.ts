@@ -4,7 +4,7 @@
  * ── Numbers out, not documents ───────────────────────────────────────────────
  * This carries the customer, the job reference, a date and the money. It does
  * NOT carry the scope of work, the includes and excludes, or anything else the
- * proposal prints — those are the customer's document and stay in HelixBid.
+ * proposal prints — those are the customer's document and stay in BidRender.
  * Accounting needs what is owed and by whom, and giving it more is not
  * generosity, it is a second copy of the proposal that will go stale.
  *

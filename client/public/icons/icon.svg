@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <!--
-    The "HB" placeholder mark as an app icon — the `any` purpose.
+    The "BR" placeholder mark as an app icon — the `any` purpose.
 
     Rounded corners are drawn IN, because a non-maskable icon is placed as-is:
     iOS applies its own squircle mask, Android and desktop do not. The radius

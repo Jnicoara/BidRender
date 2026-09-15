@@ -4,7 +4,7 @@
  * ── Why JWT_SECRET is here ───────────────────────────────────────────────────
  * The repo's `.env` ships DATABASE_URL and nothing else — every way of RUNNING
  * the app supplies the auth variables on the command line (see
- * .claude/skills/run-helixbid/SKILL.md). A test process therefore legitimately
+ * .claude/skills/run-bidrender/SKILL.md). A test process therefore legitimately
  * starts with no secret.
  *
  * That was harmless until storage URLs began to be signed. `mintStorageToken`

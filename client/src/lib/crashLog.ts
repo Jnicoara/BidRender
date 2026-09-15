@@ -36,6 +36,8 @@ export type CrashRecord = {
   version: string;
 };
 
+// The product's old name, kept on purpose: renaming the key would lose crash
+// reports a browser has already saved.
 export const CRASH_LOG_KEY = "helixbid.crashes";
 
 /**
@@ -154,7 +156,7 @@ export function readCrashes(): CrashRecord[] {
 export function recordCrash(crash: CrashRecord): void {
   // First, because it is the one that works when storage does not.
   console.error(
-    `[HelixBid crash] ${crash.message} — on ${crash.where} (${crash.version})`,
+    `[BidRender crash] ${crash.message} — on ${crash.where} (${crash.version})`,
     crash.stack || crash
   );
   try {

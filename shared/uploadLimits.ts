@@ -25,7 +25,7 @@
  * a number is realistic or merely generous: Procore and Autodesk Construction
  * Cloud accept multi-gigabyte files, Bluebeam Studio and PlanGrid land around
  * 1GB per document, and the takeoff-focused tools sit in the mid hundreds of
- * megabytes. 500MB puts HelixBid in that last group rather than at the bottom
+ * megabytes. 500MB puts BidRender in that last group rather than at the bottom
  * of it, without pretending to be a document management system.
  *
  * ── And why not "no limit" ───────────────────────────────────────────────────

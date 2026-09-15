@@ -27,7 +27,7 @@ describe("on-disk storage", () => {
   let root = "";
 
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), "helixbid-disk-"));
+    root = await mkdtemp(path.join(tmpdir(), "bidrender-disk-"));
     process.env.LOCAL_STORAGE_DIR = root;
   });
 

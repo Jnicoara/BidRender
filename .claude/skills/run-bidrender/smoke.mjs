@@ -1,6 +1,6 @@
 ﻿#!/usr/bin/env node
 /**
- * smoke.mjs â€” drive a RUNNING HelixBid server over its real HTTP API.
+ * smoke.mjs â€” drive a RUNNING BidRender server over its real HTTP API.
  *
  * This is the agent's primary handle on the app. It authenticates the way a
  * browser does, then exercises the Materials library end to end: list, create,
@@ -9,7 +9,7 @@
  * server/routers/*, so this covers the layer PRs actually touch.
  *
  * Start the server first (see SKILL.md), then:
- *   node .claude/skills/run-helixbid/smoke.mjs
+ *   node .claude/skills/run-bidrender/smoke.mjs
  *
  * Env:
  *   BASE_URL    skip port probing, e.g. http://localhost:3002

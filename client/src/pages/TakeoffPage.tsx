@@ -887,6 +887,8 @@ export default function TakeoffPage({
    * read at most once — the server returns a stored reading unless the user
    * asks for a re-read — so leaving it on cannot run away with the bill.
    */
+  // The storage key keeps the product's old name on purpose, so a choice a
+  // browser has already saved still applies.
   const [autoRead, setAutoRead] = useState(() => {
     if (typeof window === "undefined") return true;
     return (

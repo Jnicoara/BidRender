@@ -1,5 +1,5 @@
 /**
- * HelixBidShell — Main layout shell
+ * BidRenderShell — Main layout shell
  * Desktop: fixed left sidebar (icon-only 64px, expands to 224px on hover)
  * Mobile:  fixed bottom navigation bar
  * Design: Tactical Dark Mode SaaS, Safety Yellow accent (#F5C518)
@@ -80,7 +80,7 @@ function getCurrentRouteState(): RouteState {
   return pathToRoute(window.location.pathname);
 }
 
-export default function HelixBidShell() {
+export default function BidRenderShell() {
   const { uiFontScale } = useApp();
 
   const { user } = useAuth();
@@ -154,7 +154,7 @@ export default function HelixBidShell() {
   /**
    * Rewrite a pathname-spelled address into the hash spelling.
    *
-   * `helixbid.app/settings` — typed by hand, or a link written before the app
+   * `bidrender.com/settings` — typed by hand, or a link written before the app
    * became hash-routed — resolves correctly already, because
    * getCurrentRouteState falls back to the pathname. But the pathname then
    * stays on the URL while every later navigation writes only the hash, giving

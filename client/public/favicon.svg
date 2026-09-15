@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
   <!--
-    The "HB" placeholder mark, as a tab icon.
+    The "BR" placeholder mark, as a tab icon.
 
-    Matches what the app renders inline in HelixBidShell, HelixBidHomePage and
-    CategoryLanding: safety yellow HB, bold, on the app's near-black ground.
+    Matches what the app renders inline in the BidRenderShell sidebar: safety
+    yellow BR, bold, on the app's near-black ground.
     Kept in step by hand — there are only those places and this one, and an SVG
     the browser can cache beats rendering a mark at first paint.
 
@@ -13,7 +13,7 @@
 
     Space Grotesk is the app's display face but cannot be loaded here — an SVG
     favicon gets no webfonts — so this falls back through the system stack. At
-    16px the yellow-on-dark HB is what reads, not the letterforms.
+    16px the yellow-on-dark BR is what reads, not the letterforms.
   -->
   <rect width="32" height="32" rx="7" fill="#0F1117"/>
   <text

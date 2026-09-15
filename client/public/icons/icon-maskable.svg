@@ -9,7 +9,7 @@
 
     THE MARK SITS IN THE SAFE ZONE. The spec guarantees only the central circle
     of 80% diameter survives every mask, so anything outside a circle of radius
-    205px here may be trimmed. The HB is set at 168px against 240px on the
+    205px here may be trimmed. The BR is set at 168px against 240px on the
     unmasked icon — about 70% — which keeps both letterforms comfortably inside
     that circle with room for the tighter squircles.
 

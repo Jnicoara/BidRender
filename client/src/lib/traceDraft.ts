@@ -20,6 +20,8 @@
 import type { PagePoint } from "@shared/takeoffGeometry";
 import type { RunPathType } from "@shared/takeoffQuantities";
 
+// Still `helixbid:`, the product's old name, on purpose: a browser may hold an
+// unsent draft under this key, and a renamed key would never find it.
 const KEY_PREFIX = "helixbid:trace-draft:";
 
 /** How long a stranded draft stays offerable before it is assumed stale. */
@@ -154,6 +156,7 @@ export function hasUnsavedWork(
  * This mirrors that window to storage, on the same principle as the trace
  * draft: the server copy is durable, this is the crash mat under it.
  */
+// The old product name again, for the same reason as KEY_PREFIX.
 const STAMP_KEY_PREFIX = "helixbid:stamp-queue:";
 
 export type QueuedStamp = {

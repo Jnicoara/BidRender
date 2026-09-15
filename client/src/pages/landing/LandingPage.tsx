@@ -4,7 +4,7 @@
  * ── Why it looks like this ──────────────────────────────────────────────────
  * The previous version had six sections, a gradient wash, a dot grid, pills,
  * icon cards and a differentiator matrix — a normal SaaS marketing page, and
- * nothing like the product it was selling. HelixBid's own screens are quiet:
+ * nothing like the product it was selling. BidRender's own screens are quiet:
  * `bg-background`, one border weight, `text-muted-foreground` for anything
  * secondary, and the safety yellow spent only on the thing you are meant to
  * press. A visitor who lands here and then signs in should not feel like they
@@ -68,9 +68,9 @@ const SIGNUP_ANCHOR = "early-access";
 /**
  * The app's wordmark, character for character.
  *
- * Lifted from HelixBidShell's sidebar rather than restyled, so the name looks
+ * Lifted from BidRenderShell's sidebar rather than restyled, so the name looks
  * identical either side of signing in. The emblem beside it in the app is the
- * "HB" placeholder, deliberately left off here — a placeholder mark blown up on
+ * "BR" placeholder, deliberately left off here — a placeholder mark blown up on
  * a marketing page is worse than no mark at all.
  */
 function Wordmark({ className }: { className?: string }) {

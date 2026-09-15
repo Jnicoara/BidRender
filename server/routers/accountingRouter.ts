@@ -10,7 +10,7 @@
  *
  * What is NOT read here is as deliberate: no proposal content, no scope notes,
  * no includes and excludes. Accounting gets numbers; the customer's document
- * stays in HelixBid.
+ * stays in BidRender.
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";

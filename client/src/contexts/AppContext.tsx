@@ -1,5 +1,5 @@
 /**
- * HelixBid — global UI preferences.
+ * BidRender — global UI preferences.
  *
  * ── What this used to be ─────────────────────────────────────────────────────
  * This file carried the state for the original four-workspace design: named

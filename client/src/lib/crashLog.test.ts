@@ -15,7 +15,7 @@ function record(over: Partial<CrashRecord> = {}): CrashRecord {
     at: AT.toISOString(),
     message: "Cannot read properties of undefined (reading 'name')",
     stack: "TypeError: boom\n    at BidsPage (BidsPage.tsx:412:9)",
-    componentStack: "\n    in BidsPage\n    in HelixBidShell",
+    componentStack: "\n    in BidsPage\n    in BidRenderShell",
     where: "#/bids/12",
     version: "v5.108",
     ...over,

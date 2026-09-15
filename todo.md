@@ -1,4 +1,4 @@
-# HelixBid TODO
+# BidRender TODO
 
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
@@ -760,7 +760,7 @@ left as written rather than rewritten to match the rename.
 ## v5.92 — Direct Anthropic API Configuration
 
 - [x] Add an encrypted server-side `ANTHROPIC_API_KEY` secret for direct Anthropic requests
-- [x] Configure HelixBid's server-only direct Anthropic client without exposing credentials to the browser or GitHub
+- [x] Configure BidRender's server-only direct Anthropic client without exposing credentials to the browser or GitHub
 - [x] Add automated validation for the direct Anthropic configuration
 - **REVERTED 2026-08-12.** A stopgap while the Forge gateway key was thought to
   be missing; the gateway works, so the second credential path was removed
@@ -772,7 +772,7 @@ left as written rather than rewritten to match the rename.
 ## v5.92 — GitHub Synchronization Verification
 
 - [x] Review the newer GitHub schema changes and identify the exact migrations required by the synchronized code
-- [x] Apply only verified, non-destructive schema migrations needed for the merged HelixBid release
+- [x] Apply only verified, non-destructive schema migrations needed for the merged BidRender release
 - [x] Verify the restarted application loads without server or client build errors
 
 ## v5.93 — Publish Verification & Internal Project Rename
@@ -787,7 +787,7 @@ left as written rather than rewritten to match the rename.
 
 ## v5.94 — Archive Cleanup Activation
 
-- [x] Inspect and apply the verified database migration 0026 required by the current HelixBid GitHub main branch
+- [x] Inspect and apply the verified database migration 0026 required by the current BidRender GitHub main branch
 - [x] Register the documented 30-day archive-cleanup heartbeat for the deployed application
 - [x] Validate the migration and active scheduled job, then save a checkpoint synchronized with GitHub main
 

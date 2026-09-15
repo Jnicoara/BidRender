@@ -4,13 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-HelixBid — a trade-contractor bid/estimating tool. Users build a personal catalog of materials and labor rates, assemble them into reusable assemblies, attach them to project bids, and upload plan PDFs to take off quantities against a live crosshair viewer.
+BidRender — a trade-contractor bid/estimating tool. Users build a personal catalog of materials and labor rates, assemble them into reusable assemblies, attach them to project bids, and upload plan PDFs to take off quantities against a live crosshair viewer.
 
 **Electrical-first by sequencing, not electrical-only by design.** Multiple trades are in the data model from the ground up: every assembly carries a `trade` (`drizzle/schema.ts`, defaulting to `"electrical"`), and a bid carries a `trades` array — one bid may mix line items from several unlocked trades. Unlocking is gated at the app layer rather than in the schema, deliberately, so a new trade needs no migration. Electrical is simply the first trade to ship, which is why the seeded catalog, the trade slang and the starter assemblies are all electrical today. Do not read that focus as a constraint and bake an electrical-only assumption into anything new — adding plumbing or HVAC should be content plus an unlock, not a refactor.
 
 `trade` is a different axis from `projectType` (residential/commercial/both), which is only a filter on the assembly library. The schema says so explicitly; do not wire the two together.
 
-The project was called **BidPhase** until v5.75, and the GitHub repo was renamed to match on 2026-08-12. Only the local checkout directory still carries the old name. Anywhere else, "BidPhase" is either stale or a historical record — `todo.md` entries below v5.75 are the latter and stay as written.
+The product is **BidRender**. It was called **BidPhase** until v5.75 and **HelixBid** until v5.119, renamed that time because HelixBid clashed with an existing company. The GitHub repo (`Jnicoara/HelixBid`) and the local checkout directory (`BidPhase`) still carry old names. Anywhere else, either old name is stale or a historical record — the `todo.md` entries that record a past rename are the latter and stay as written.
+
+**A few `helixbid` names are kept on purpose — do not rename them.** The localStorage keys (`helixbid:trace-draft:`, `helixbid:stamp-queue:`, `helixbid.crashes`, `helixbid.planReader.autoRead`) and the service worker's `helixbid-` cache prefix, because a browser may already hold unsent work or caches under them and a renamed key never finds them. The seed lock names in `server/db.ts`, because an old and a new build must take the same lock during a deploy. And the R2 backup prefix default `helixbid` in `server/backup/config.ts`, because that is the folder the existing backups live in.
 
 ## Commands
 
@@ -367,7 +369,7 @@ its own commit.
 
 tRPC routers live in `server/routers/*Router.ts` and are composed in `server/routers.ts`; DB access goes through query functions in `server/db.ts` (no ORM calls directly inside routers).
 
-**Client structure:** `client/src/pages/HelixBidShell.tsx` is the app shell — a hand-rolled hash router rather than Wouter's route matching, because navigation state also drives the sidebar. `contexts/AppContext.tsx` holds the UI scale and nothing else; theme in `contexts/ThemeContext.tsx`. tRPC client setup is in `lib/trpc.ts`.
+**Client structure:** `client/src/pages/BidRenderShell.tsx` is the app shell — a hand-rolled hash router rather than Wouter's route matching, because navigation state also drives the sidebar. `contexts/AppContext.tsx` holds the UI scale and nothing else; theme in `contexts/ThemeContext.tsx`. tRPC client setup is in `lib/trpc.ts`.
 
 **The route model is `client/src/lib/appRoutes.ts`, not the shell.** `pathToRoute` / `routeToPath` / `retiredAddress` are pure functions with `appRoutes.test.ts` against them, and that is deliberate: the sidebar carries **eight** destinations, down from fourteen, because several screens were folded into others as `?view=` tabs — Kits and Modifiers into Assemblies, Supplier Pricing into Materials, the Bids list and Quick bid's chooser into the Dashboard.
 

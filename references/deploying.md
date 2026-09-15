@@ -1,4 +1,4 @@
-# Deploying HelixBid
+# Deploying BidRender
 
 Reference for the deploy sequence summarised in `CLAUDE.md` § Deploying.
 
@@ -81,7 +81,7 @@ git log -1 --format='%ad %s'    # and what it was
 
 `pnpm db:push` is step 4 rather than an afterthought because a skipped migration
 **does not fail loudly**. The server starts, serves pages, and renders wrong
-data. `.claude/skills/run-helixbid/SKILL.md` documents the symptoms in detail:
+data. `.claude/skills/run-bidrender/SKILL.md` documents the symptoms in detail:
 a single `Seed failed: ... Unknown column` line in the log at startup, materials
 rendering as one flat list with no categories, and per-material trade slang
 finding nothing while the global alias map keeps working — so search looks fine

@@ -12,11 +12,11 @@
 
       A signed-out visitor and a crawler both get this HTML, and neither runs
       far enough into the app to see anything a component sets later. So the
-      static head has to sell the product: it leads with what HelixBid does,
+      static head has to sell the product: it leads with what BidRender does,
       because the name does not explain itself and a result that reads only
-      "HelixBid" gives a searcher nothing to click.
+      "BidRender" gives a searcher nothing to click.
 
-      The app retitles the tab for signed-in users (HelixBidShell), and
+      The app retitles the tab for signed-in users (BidRenderShell), and
       LandingPageContainer re-applies these for a user navigating back out.
       client/src/content/trades/electrical.ts holds the same strings; keep them
       in step, or better, prerender this head from the trade config if this page
@@ -74,7 +74,7 @@
     <meta name="twitter:image" content="/brand/shot-bid.jpg" />
 
     <!--
-      The "HB" placeholder mark. Served from /favicon.svg rather than the old
+      The "BR" placeholder mark. Served from /favicon.svg rather than the old
       /brand/ path deliberately: browsers cache a favicon hard per origin, and a
       new URL is what actually dislodges the one cached before the brand revert.
     -->

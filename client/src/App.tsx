@@ -22,7 +22,7 @@ import AuthGuard from "./components/AuthGuard";
  * A signed-in user pays for the chunk once, on a screen that was always going
  * to show a loading state while auth resolved.
  */
-const HelixBidShell = lazy(() => import("./pages/HelixBidShell"));
+const BidRenderShell = lazy(() => import("./pages/BidRenderShell"));
 
 // Toaster that follows the active theme
 function ToasterWithTheme() {
@@ -46,7 +46,7 @@ function AppChunkFallback() {
  * Routing inside the app is hash-based, so every real address shares the single
  * pathname `/` and wouter has nothing to discriminate on. What the catch-all
  * actually caught was a pathname-spelled address — someone typing
- * `helixbid.app/settings`, or a link written before the hash — and it answered
+ * `bidrender.com/settings`, or a link written before the hash — and it answered
  * with the template's 404 card: a light slate gradient and a blue button inside
  * a dark app, telling a contractor the page "may have been moved or deleted"
  * when it had not.
@@ -63,7 +63,7 @@ function Router() {
     <AuthGuard>
       <Suspense fallback={<AppChunkFallback />}>
         <Switch>
-          <Route component={HelixBidShell} />
+          <Route component={BidRenderShell} />
         </Switch>
       </Suspense>
     </AuthGuard>

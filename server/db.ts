@@ -1033,6 +1033,9 @@ const LIBRARY_OWNERSHIP_FIELDS = [
  * A named lock is the right tool because the tables cannot express this as a
  * UNIQUE index: baseline rows are keyed by `userId IS NULL`, and MySQL lets any
  * number of NULLs coexist in a unique index.
+ *
+ * Lock names still start `helixbid:`, the product's old name. Keep them: during
+ * a deploy the old and the new build must take the same lock.
  */
 async function withSeedLock(
   name: string,
