@@ -56,6 +56,7 @@ import {
   type FeatureId,
 } from "../../shared/permissions";
 import { getDb } from "../db";
+import { AI_FEATURE_IDS, aiFeaturesEnabled } from "../aiFeatures";
 
 /**
  * Everything a request is allowed to do, resolved from the session alone.
@@ -221,7 +222,13 @@ export async function resolveScope(user: User): Promise<RequestScope> {
     role,
     accessTier,
     capabilities: capabilitiesFor(role),
-    features: featuresFor(accessTier),
+    // AI-backed features are withheld while this server has AI switched off,
+    // so the client never offers something that cannot work.
+    features: featuresFor(accessTier).filter(
+      id =>
+        aiFeaturesEnabled() ||
+        !(AI_FEATURE_IDS as readonly string[]).includes(id)
+    ),
     isOwner: membership.ownerUserId === user.id && role === "owner",
   };
 }

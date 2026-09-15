@@ -1,8 +1,12 @@
 // Preconfigured storage helpers for Manus WebDev templates
 // Uploads via Forge Server presigned URL to S3 (PUT direct).
 // Downloads return /manus-storage/{key} paths served via 307 redirect.
+//
+// With LOCAL_STORAGE_DIR set, every function here uses a folder on this machine
+// instead of Forge — see diskStorage.ts.
 
 import { ENV } from "./_core/env";
+import { diskStorageRoot, diskUploadUrl, writeDiskObject } from "./diskStorage";
 
 function getForgeConfig() {
   const forgeUrl = ENV.forgeApiUrl;
@@ -33,8 +37,12 @@ export async function storagePut(
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
-  const { forgeUrl, forgeKey } = getForgeConfig();
   const key = appendHashSuffix(normalizeKey(relKey));
+  if (diskStorageRoot()) {
+    await writeDiskObject(key, data);
+    return { key, url: `/manus-storage/${key}` };
+  }
+  const { forgeUrl, forgeKey } = getForgeConfig();
 
   // 1. Get presigned PUT URL from Forge
   const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
@@ -88,8 +96,12 @@ export async function storagePresignPut(
   relKey: string,
   contentType = "application/octet-stream"
 ): Promise<{ key: string; uploadUrl: string }> {
-  const { forgeUrl, forgeKey } = getForgeConfig();
   const key = appendHashSuffix(normalizeKey(relKey));
+  // An upload URL on this server — same-origin, so no bucket CORS rule.
+  if (diskStorageRoot()) {
+    return { key, uploadUrl: diskUploadUrl(key, new Date()) };
+  }
+  const { forgeUrl, forgeKey } = getForgeConfig();
 
   const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
   presignUrl.searchParams.set("path", key);
@@ -118,6 +130,11 @@ export async function storageGet(
 }
 
 export async function storageGetSignedUrl(relKey: string): Promise<string> {
+  if (diskStorageRoot()) {
+    throw new Error(
+      "Stored files are in LOCAL_STORAGE_DIR on this machine; there is no signed URL to fetch them from."
+    );
+  }
   const { forgeUrl, forgeKey } = getForgeConfig();
   const key = normalizeKey(relKey);
 

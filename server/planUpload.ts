@@ -45,6 +45,7 @@ import { Readable } from "node:stream";
 import { sdk } from "./_core/sdk";
 import { resolveScope } from "./_core/companyScope";
 import { storagePresignPut } from "./storage";
+import { diskStorageRoot, writeDiskObjectStream } from "./diskStorage";
 import { checkPdfUpload, formatBytes } from "../shared/uploadLimits";
 import * as db from "./db";
 
@@ -239,6 +240,14 @@ export async function planUploadHandler(req: Request, res: Response) {
       `bid-plans/${dataUserId}/${bidId}/${filename}`,
       "application/pdf"
     );
+
+    // On-disk storage has no upload URL to forward to: write the stream out
+    // here, capped at the size the request declared.
+    if (diskStorageRoot()) {
+      await writeDiskObjectStream(key, req, byteSize);
+      res.status(200).json({ storageKey: key, byteSize });
+      return;
+    }
 
     // Streamed rather than buffered: this process must not hold a plan set in
     // memory, which is the failure mode the base64-through-tRPC design had.

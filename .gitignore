@@ -115,3 +115,7 @@ client/public/__manus__/version.json
 
 # Per-developer Claude Code permissions. The skills in .claude/skills/ ARE committed.
 .claude/settings.local.json
+
+# On-disk file storage for running locally (LOCAL_STORAGE_DIR)
+.local-storage/
+

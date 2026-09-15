@@ -4,6 +4,14 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-14]
+
+- **Plans now draw.** Opening any real plan on the Takeoff screen failed with "Cannot read properties of undefined (reading 'createElement')". The part of the app that draws pages in the background was reaching for pieces of the web page it cannot see from there — to load a drawing's fonts and to make scratch canvases — so a blank test page drew and every real sheet did not. This was broken everywhere the app runs, not only on a local copy; nobody saw it because plan uploads were failing first. Fonts are now drawn as outlines and scratch canvases are made the background-safe way, and the sheet looks the same.
+- **HelixBid can run on a laptop with no Manus services.** Three new settings, all off unless set: plans and logos can be kept in a folder on the computer instead of cloud storage; the AI features can be switched off, with the plan reader's panel hidden rather than showing failures; and the nightly backup and archive purge can be left switched off. The live site sets none of them, so it behaves exactly as before.
+- **Email-and-password sign-in works on a plain http address.** Browsers were silently throwing the login cookie away there, so signing in on a local copy bounced straight back to the form. Secure https sites, including the live one, are unchanged.
+- **The Manus page-editor script and Manus debug logger no longer load.** The editor script was being added to every page, the live site included; the logger copied browser activity, sign-in tokens included, into a log folder during development. Neither does anything off the Manus platform. An unused owner-notification action that went through Manus is gone too.
+- **The app no longer crashes when no Manus login address is set** — it shows its own sign-in page instead.
+
 ## [2026-08-19]
 
 - **A backup that cannot read a file now says so without crying wolf.** The nightly backup treated any unreadable stored file as a total failure. With a storage fault making some plan PDFs unreadable, that meant a failure alert every single night for something nobody could act on — and an alert that fires nightly is one people stop reading, which is how a real failure gets missed. A run now ends in one of three states: everything copied, **partial** (the database is safely backed up but some stored files could not be read), or genuinely failed. Only a real failure is retried, because a storage refusal gives the same answer on the second and third try and each retry costs a full database dump. Partial is never reported as success — it names every file it could not read, in the log and in the record stored alongside the backup itself.

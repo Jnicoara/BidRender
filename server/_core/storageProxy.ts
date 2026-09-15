@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { ENV } from "./env";
 import { verifyStorageToken } from "../storageTokens";
+import { diskStorageRoot, serveDiskObject } from "../diskStorage";
 
 /**
  * Serve a stored object, to a caller holding a token for it.
@@ -37,6 +38,13 @@ export function registerStorageProxy(app: Express) {
     // must learn nothing about whether the key exists.
     if (!verifyStorageToken(token, key, new Date())) {
       res.status(403).send("This link is not valid, or has expired.");
+      return;
+    }
+
+    // On-disk storage (LOCAL_STORAGE_DIR): serve the file itself. sendFile
+    // answers the byte-range requests pdf.js makes, so nothing is redirected.
+    if (diskStorageRoot()) {
+      serveDiskObject(key, res);
       return;
     }
 

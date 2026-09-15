@@ -4,7 +4,6 @@ import react from "@vitejs/plugin-react";
 import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
-import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 
 // =============================================================================
 // Manus Debug Collector - Vite Plugin
@@ -150,13 +149,11 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [
-  react(),
-  tailwindcss(),
-  jsxLocPlugin(),
-  vitePluginManusRuntime(),
-  vitePluginManusDebugCollector(),
-];
+// Left out: the Manus runtime (their in-page editor, injected into every page
+// including production builds) and the Manus debug collector above (dev only;
+// copies browser console and network traffic into .manus-logs/). Neither does
+// anything off the Manus platform.
+const plugins = [react(), tailwindcss(), jsxLocPlugin()];
 
 export default defineConfig({
   plugins,

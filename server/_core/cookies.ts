@@ -39,10 +39,14 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
+  const secure = isSecureRequest(req);
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    // Browsers discard a SameSite=None cookie that is not also Secure, so over
+    // plain http (a local run) the session would never be stored and sign-in
+    // would bounce straight back to the form. None stays for https.
+    sameSite: secure ? "none" : "lax",
+    secure,
   };
 }

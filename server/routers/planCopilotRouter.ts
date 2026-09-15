@@ -41,6 +41,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import { invokeLLM, type Tool } from "../_core/llm";
+import { aiFeaturesEnabled } from "../aiFeatures";
 import {
   COPILOT_ACTIONS,
   MODEL_INVOCABLE_ACTIONS,
@@ -67,6 +68,13 @@ import * as db from "../db";
  * without anyone remembering to tag it. See _core/trpc.ts.
  */
 const procedure = scoped("bids.view", "bids.edit");
+
+/** Refused outright while AI is switched off; the panel is hidden then too. */
+const readerSwitchedOff = () =>
+  new TRPCError({
+    code: "PRECONDITION_FAILED",
+    message: "The plan reader is switched off on this server.",
+  });
 
 /**
  * The heavier tier, because this one is actually reading something.
@@ -414,6 +422,7 @@ export const planCopilotRouter = router({
       })
     )
     .mutation(async ({ input, ctx }): Promise<CopilotSheetState> => {
+      if (!aiFeaturesEnabled()) throw readerSwitchedOff();
       await requireBid(input.bidId, ctx.scope.dataUserId);
       const sheet = await requireSheet(input.sheetId, ctx.scope.dataUserId);
 
@@ -670,6 +679,7 @@ export const planCopilotRouter = router({
       })
     )
     .mutation(async ({ input, ctx }): Promise<{ answer: string }> => {
+      if (!aiFeaturesEnabled()) throw readerSwitchedOff();
       const sheet = await requireSheet(input.sheetId, ctx.scope.dataUserId);
 
       try {

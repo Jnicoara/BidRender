@@ -35,6 +35,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useCompany } from "@/hooks/useCompany";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -889,9 +890,12 @@ export default function TakeoffPage({
     []
   );
 
+  /** False while the server has AI switched off (server/aiFeatures.ts). */
+  const readerAvailable = useCompany().hasFeature("takeoff.copilot");
+
   const { data: copilot } = trpc.planCopilot.state.useQuery(
     { sheetId: activeSheet?.id ?? 0 },
-    { enabled: Boolean(activeSheet) }
+    { enabled: Boolean(activeSheet) && readerAvailable }
   );
 
   const refreshCopilot = useCallback(() => {
@@ -974,7 +978,7 @@ export default function TakeoffPage({
    */
   const readerFired = useRef<Set<number>>(new Set());
   useEffect(() => {
-    if (!autoRead || !canRead || !activeSheet) return;
+    if (!readerAvailable || !autoRead || !canRead || !activeSheet) return;
     // A sheet that already has a stored reading costs nothing to show, so there
     // is nothing to fire for. `copilot` being undefined means the query has not
     // answered yet — firing then would race it and pay for a second read.
@@ -982,7 +986,14 @@ export default function TakeoffPage({
     if (readerFired.current.has(activeSheet.id)) return;
     readerFired.current.add(activeSheet.id);
     runReader(false);
-  }, [autoRead, canRead, activeSheet?.id, copilot?.runId, runReader]);
+  }, [
+    readerAvailable,
+    autoRead,
+    canRead,
+    activeSheet?.id,
+    copilot?.runId,
+    runReader,
+  ]);
 
   /** A question is about the sheet on screen, so the answer goes with it. */
   useEffect(() => {
@@ -2001,54 +2012,56 @@ export default function TakeoffPage({
                         is the thing a user comes to this pane to act on, and
                         the legend it depends on sits below it where it is
                         still one glance away. */}
-                    <CoPilotPanel
-                      state={copilot}
-                      reading={readSheet.isPending}
-                      autoRead={autoRead}
-                      onAutoReadChange={setAutoReadPersisted}
-                      canRead={canRead}
-                      onRead={runReader}
-                      onConfirm={findingIds => {
-                        if (!copilot?.runId) return;
-                        confirmFindings.mutate({
-                          runId: copilot.runId,
-                          findingIds,
-                          confirmed: true,
-                        });
-                      }}
-                      onDismiss={findingIds =>
-                        dismissFindings.mutate({ findingIds })
-                      }
-                      onCorrect={(findingId, symbolLinkId) =>
-                        correctFinding.mutate({
-                          findingId,
-                          symbolLinkId,
-                          confirmed: true,
-                        })
-                      }
-                      onJumpTo={at => {
-                        setFocusPoint(at);
-                        window.setTimeout(() => setFocusPoint(null), 2200);
-                      }}
-                      symbols={symbols}
-                      onAsk={question => {
-                        if (!activeSheet) return;
-                        const snapshot = snapshotPage(
-                          pageCanvas.current,
-                          RENDER_SCALE
-                        );
-                        if (!snapshot) return;
-                        askCopilot.mutate({
-                          sheetId: activeSheet.id,
-                          question,
-                          pageImage: snapshot.image,
-                          pageText: pageTextByPage.current.get(page) ?? "",
-                        });
-                      }}
-                      asking={askCopilot.isPending}
-                      answer={copilotAnswer}
-                      onClearAnswer={() => setCopilotAnswer(null)}
-                    />
+                    {readerAvailable && (
+                      <CoPilotPanel
+                        state={copilot}
+                        reading={readSheet.isPending}
+                        autoRead={autoRead}
+                        onAutoReadChange={setAutoReadPersisted}
+                        canRead={canRead}
+                        onRead={runReader}
+                        onConfirm={findingIds => {
+                          if (!copilot?.runId) return;
+                          confirmFindings.mutate({
+                            runId: copilot.runId,
+                            findingIds,
+                            confirmed: true,
+                          });
+                        }}
+                        onDismiss={findingIds =>
+                          dismissFindings.mutate({ findingIds })
+                        }
+                        onCorrect={(findingId, symbolLinkId) =>
+                          correctFinding.mutate({
+                            findingId,
+                            symbolLinkId,
+                            confirmed: true,
+                          })
+                        }
+                        onJumpTo={at => {
+                          setFocusPoint(at);
+                          window.setTimeout(() => setFocusPoint(null), 2200);
+                        }}
+                        symbols={symbols}
+                        onAsk={question => {
+                          if (!activeSheet) return;
+                          const snapshot = snapshotPage(
+                            pageCanvas.current,
+                            RENDER_SCALE
+                          );
+                          if (!snapshot) return;
+                          askCopilot.mutate({
+                            sheetId: activeSheet.id,
+                            question,
+                            pageImage: snapshot.image,
+                            pageText: pageTextByPage.current.get(page) ?? "",
+                          });
+                        }}
+                        asking={askCopilot.isPending}
+                        answer={copilotAnswer}
+                        onClearAnswer={() => setCopilotAnswer(null)}
+                      />
+                    )}
                     <LayersPanel
                       present={present}
                       state={effectiveLayers}

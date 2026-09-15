@@ -11,6 +11,7 @@ import { serveStatic, setupVite } from "./vite";
 import { purgeArchivedBidsHandler } from "../scheduled/purgeArchivedBids";
 import { BACKUP_PATH, backupToR2Handler } from "../scheduled/backupToR2";
 import { PLAN_UPLOAD_PATH, planUploadHandler } from "../planUpload";
+import { registerDiskStorageUploads } from "../diskStorage";
 import {
   seedBaselineAssemblies,
   seedBaselineKits,
@@ -46,6 +47,9 @@ async function startServer() {
   // has already tried to read. It is the fallback used when the browser is
   // blocked from PUTting to storage directly — see server/planUpload.ts.
   app.post(PLAN_UPLOAD_PATH, planUploadHandler);
+  // Uploads into on-disk storage when LOCAL_STORAGE_DIR is set. Before the body
+  // parsers for the same reason: the file arrives as a stream to write out.
+  registerDiskStorageUploads(app);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -54,10 +58,20 @@ async function startServer() {
   // Scheduled (cron) callbacks. `/api/scheduled/*` is NOT auto-registered, and
   // must be mounted before the Vite/static fallthrough or the platform's POST
   // lands on the SPA index instead of the handler.
-  app.post("/api/scheduled/purgeArchivedBids", purgeArchivedBidsHandler);
-  // The nightly export to Cloudflare R2. Path comes from the handler module so
-  // the mount, the registration command and the test cannot drift apart.
-  app.post(BACKUP_PATH, backupToR2Handler);
+  //
+  // DISABLE_SCHEDULED_JOBS=true leaves both unmounted, for a machine the
+  // platform scheduler cannot reach and whose copy of the data must not be
+  // purged or backed up on a timer.
+  if (process.env.DISABLE_SCHEDULED_JOBS === "true") {
+    app.post("/api/scheduled/*", (_req, res) => {
+      res.status(404).json({ error: "Scheduled jobs are turned off here." });
+    });
+  } else {
+    app.post("/api/scheduled/purgeArchivedBids", purgeArchivedBidsHandler);
+    // The nightly export to Cloudflare R2. Path comes from the handler module so
+    // the mount, the registration command and the test cannot drift apart.
+    app.post(BACKUP_PATH, backupToR2Handler);
+  }
   // tRPC API
   app.use(
     "/api/trpc",

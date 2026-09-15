@@ -19,6 +19,7 @@ import {
   MATERIAL_UNITS_OF_SALE,
 } from "../../drizzle/schema";
 import { invokeLLM } from "../_core/llm";
+import { aiFeaturesEnabled } from "../aiFeatures";
 import {
   aliasPromptFor,
   filterAliasSuggestions,
@@ -104,6 +105,9 @@ export const materialsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      if (!aiFeaturesEnabled()) {
+        return { suggestions: [] as string[], available: false };
+      }
       // Every other material this user can see — the list a suggestion must
       // not collide with.
       const catalog = await db.getLibraryMaterials(ctx.scope.dataUserId);

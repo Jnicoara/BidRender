@@ -23,6 +23,7 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { invokeLLM, type Tool } from "../_core/llm";
+import { aiFeaturesEnabled } from "../aiFeatures";
 import {
   NAVIGATION_TARGETS,
   NAVIGATION_TARGET_IDS,
@@ -111,6 +112,13 @@ export type NavigationAnswer = {
   target: { id: string; label: string; path: string } | null;
 };
 
+/** The answer while AI is switched off on this server (server/aiFeatures.ts). */
+const SWITCHED_OFF: NavigationAnswer = {
+  message:
+    "The helper is switched off on this computer. Every screen is in the sidebar.",
+  target: null,
+};
+
 const FALLBACK: NavigationAnswer = {
   message:
     "I'm not sure which screen you want. Try naming what you are trying to do — pricing a material, setting a labor rate, starting a bid.",
@@ -143,6 +151,7 @@ export const navigationRouter = router({
   ask: protectedProcedure
     .input(z.object({ question: z.string().trim().min(1).max(300) }))
     .mutation(async ({ input }): Promise<NavigationAnswer> => {
+      if (!aiFeaturesEnabled()) return SWITCHED_OFF;
       let result;
       try {
         result = await invokeLLM({

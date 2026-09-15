@@ -81,15 +81,18 @@ account-level permissions.
 
 ## 4. Optional and operational
 
-| Name                                      | Purpose                                              | Notes                                                                           |
-| ----------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `NODE_ENV`                                | `production` switches to serving the built client    | Set by `pnpm start`.                                                            |
-| `PORT`                                    | Listen port                                          | Defaults to 3000, and takes the next free one if busy.                          |
-| `NAVIGATION_MODEL`                        | Overrides the model behind the "where do I…?" helper | Leave unset unless the gateway renames a model.                                 |
-| `PLAN_COPILOT_MODEL`                      | Same, for the plan reader                            | Same.                                                                           |
-| `VERIFY_DATABASE_URL`                     | Scratch database to restore a backup INTO            | **Never the live one.** `verifyBackup.mts` refuses if it equals `DATABASE_URL`. |
-| `DOTENV_CONFIG_PATH`                      | Which env file a command loads                       | How `.env.production.local` gets used deliberately rather than by accident.     |
-| `VITE_ANALYTICS_ENDPOINT` / `_WEBSITE_ID` | Template analytics tags in `client/index.html`       | Unused by the app itself; safe to drop on a new host.                           |
+| Name                                      | Purpose                                                                              | Notes                                                                               |
+| ----------------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `NODE_ENV`                                | `production` switches to serving the built client                                    | Set by `pnpm start`.                                                                |
+| `PORT`                                    | Listen port                                                                          | Defaults to 3000, and takes the next free one if busy.                              |
+| `NAVIGATION_MODEL`                        | Overrides the model behind the "where do I…?" helper                                 | Leave unset unless the gateway renames a model.                                     |
+| `PLAN_COPILOT_MODEL`                      | Same, for the plan reader                                                            | Same.                                                                               |
+| `VERIFY_DATABASE_URL`                     | Scratch database to restore a backup INTO                                            | **Never the live one.** `verifyBackup.mts` refuses if it equals `DATABASE_URL`.     |
+| `DOTENV_CONFIG_PATH`                      | Which env file a command loads                                                       | How `.env.production.local` gets used deliberately rather than by accident.         |
+| `VITE_ANALYTICS_ENDPOINT` / `_WEBSITE_ID` | Template analytics tags in `client/index.html`                                       | Unused by the app itself; safe to drop on a new host.                               |
+| `LOCAL_STORAGE_DIR`                       | Keep plan PDFs and logos in this folder instead of cloud storage                     | Local runs only, e.g. `.local-storage`. Leave unset on a real host.                 |
+| `DISABLE_AI_FEATURES`                     | `true` switches off the plan reader, alias suggestions and the "where do I…?" helper | They answer "switched off" instead of failing, and the plan reader panel is hidden. |
+| `DISABLE_SCHEDULED_JOBS`                  | `true` leaves the nightly backup and archive purge unmounted                         | For a machine the platform scheduler cannot reach.                                  |
 
 ## 5. What replacing Forge storage actually means
 

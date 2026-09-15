@@ -39,6 +39,80 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).toString();
 
+/**
+ * Everything pdfjs would otherwise borrow from `document`, which a worker
+ * does not have.
+ *
+ * pdfjs defaults to DOM implementations: a canvas factory that calls
+ * `document.createElement("canvas")` for scratch canvases (masks, patterns,
+ * transparency groups), an SVG filter factory, and a font loader that injects
+ * @font-face rules into the page. In here each of those throws "Cannot read
+ * properties of undefined (reading 'createElement')" — but only for a PDF that
+ * needs them, which is every real drawing and no blank test page. Loading and
+ * page counts still worked, so nothing looked wrong until a sheet was drawn.
+ *
+ *   - Scratch canvases are OffscreenCanvas, which workers do have.
+ *   - Filters (transfer functions, luminosity masks) are skipped, as pdfjs
+ *     does itself outside a browser. Drawings rarely use them.
+ *   - Text is drawn as outlines from the font data rather than loaded as a web
+ *     font — again how pdfjs renders without a DOM, and it looks the same.
+ */
+class OffscreenCanvasFactory {
+  create(width: number, height: number) {
+    if (width <= 0 || height <= 0) throw new Error("Invalid canvas size");
+    const canvas = new OffscreenCanvas(width, height);
+    return {
+      canvas,
+      context: canvas.getContext("2d", { willReadFrequently: true }),
+    };
+  }
+  reset(
+    canvasAndContext: { canvas: OffscreenCanvas | null },
+    width: number,
+    height: number
+  ) {
+    if (!canvasAndContext.canvas) throw new Error("Canvas is not specified");
+    if (width <= 0 || height <= 0) throw new Error("Invalid canvas size");
+    canvasAndContext.canvas.width = width;
+    canvasAndContext.canvas.height = height;
+  }
+  destroy(canvasAndContext: {
+    canvas: OffscreenCanvas | null;
+    context: unknown;
+  }) {
+    if (!canvasAndContext.canvas) throw new Error("Canvas is not specified");
+    canvasAndContext.canvas.width = 0;
+    canvasAndContext.canvas.height = 0;
+    canvasAndContext.canvas = null;
+    canvasAndContext.context = null;
+  }
+}
+
+class NoFilterFactory {
+  addFilter() {
+    return "none";
+  }
+  addHCMFilter() {
+    return "none";
+  }
+  addAlphaFilter() {
+    return "none";
+  }
+  addLuminosityFilter() {
+    return "none";
+  }
+  addHighlightHCMFilter() {
+    return "none";
+  }
+  destroy() {}
+}
+
+const WORKER_SAFE_OPTIONS = {
+  CanvasFactory: OffscreenCanvasFactory,
+  FilterFactory: NoFilterFactory,
+  disableFontFace: true,
+};
+
 let pdfDoc: import("pdfjs-dist").PDFDocumentProxy | null = null;
 let loadedHash: string | null = null;
 
@@ -54,8 +128,14 @@ self.onmessage = async (e: MessageEvent) => {
       const t0 = performance.now();
       const loadingTask =
         msg.type === "loadUrl"
-          ? pdfjs.getDocument(pdfRangeLoadOptions(msg.url))
-          : pdfjs.getDocument({ data: new Uint8Array(msg.pdfData) });
+          ? pdfjs.getDocument({
+              ...pdfRangeLoadOptions(msg.url),
+              ...WORKER_SAFE_OPTIONS,
+            })
+          : pdfjs.getDocument({
+              data: new Uint8Array(msg.pdfData),
+              ...WORKER_SAFE_OPTIONS,
+            });
       pdfDoc = await loadingTask.promise;
       loadedHash = msg.hash;
       const elapsed = (performance.now() - t0).toFixed(0);

@@ -1,7 +1,12 @@
 import { z } from "zod";
-import { notifyOwner } from "./notification";
-import { adminProcedure, publicProcedure, router } from "./trpc";
+import { publicProcedure, router } from "./trpc";
 
+/**
+ * `notifyOwner` used to live here, sending through the Manus notification
+ * service. Nothing in the app called it and off the platform there is no
+ * service behind it, so the procedure is gone; `notification.ts` stays until
+ * the Manus helper files are cleared out together.
+ */
 export const systemRouter = router({
   health: publicProcedure
     .input(
@@ -12,18 +17,4 @@ export const systemRouter = router({
     .query(() => ({
       ok: true,
     })),
-
-  notifyOwner: adminProcedure
-    .input(
-      z.object({
-        title: z.string().min(1, "title is required"),
-        content: z.string().min(1, "content is required"),
-      })
-    )
-    .mutation(async ({ input }) => {
-      const delivered = await notifyOwner(input);
-      return {
-        success: delivered,
-      } as const;
-    }),
 });
