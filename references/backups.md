@@ -28,7 +28,23 @@ Four variables, server-side only, `.env` (which is gitignored):
 R2_ACCOUNT_ID=...
 R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
-R2_BUCKET=bidrender-backups
+R2_BUCKET=bidsoftware
+```
+
+**The bucket is `bidsoftware`.** This said `bidrender-backups` for a while,
+which is not a bucket — it is the name someone gave an API token. The backups
+have always been in `bidsoftware`, and `R2_BACKUP_PREFIX` puts them under
+`helixbid/` inside it (both names are older than the product's, and both stay
+for the same reason: that is where the existing backups are).
+
+**Which file these live in matters, and it is easy to get wrong.** The values
+are kept in `.env.production.local`, but `scripts/backup.mts` loads `.env` —
+so running it with no further ceremony reports the configuration as missing
+when it is merely elsewhere. Point the command at the right file rather than
+keeping a second copy of the credentials:
+
+```bash
+DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/backup.mts
 ```
 
 Optional:
@@ -68,9 +84,40 @@ outlast the HTTP request; that is expected, and the CLI is the answer.
 
 ## 4. Running it automatically
 
+> **The nightly backup has never run, and is not being set up on Manus.**
+>
+> Not "stopped running" — never started. The handler arrived in `f87d67b` on
+> 2026-08-14, four days after `ff469cb` (2026-08-10), which is the last commit
+> that ever reached Manus. The deployed site has no `/api/scheduled/backupToR2`
+> route for a cron to call, so the registration command below was never run
+> against a build that could answer it.
+>
+> The R2 credentials were replaced on 2026-09-15 and the old token deleted.
+> That changed nothing here: there was no automatic run to break. Manus is
+> being left, so neither the secret nor the cron is being fixed there.
+>
+> **Every backup in the bucket was taken by hand, and that is the arrangement
+> until the new host is running.** Use the § 3 command, and run it before
+> anything destructive. It is the safe direction for the failure to point —
+> backups must be taken deliberately, rather than appearing to happen and not
+> happening — but it is only safe while somebody remembers. Registering the
+> cron on the new host is the step that ends it.
+>
+> **Check what your newest backup actually contains before trusting it.** As of
+> 2026-09-15 the most recent run is database-only: it was taken against the
+> DigitalOcean database, and the plan PDFs are still behind Manus, so it holds
+> no files at all. The most recent backup containing plan files is
+> 2026-08-19, and its status is `partial`. A run that reports `clean` is
+> telling you it hit no errors, not that it captured everything you assume.
+
 The nightly cron is **two pieces that ship separately** (`CLAUDE.md` §
 Scheduled work). The handler is in the code:
 `server/scheduled/backupToR2.ts`, mounted at `/api/scheduled/backupToR2`.
+
+The rest of this section describes registering it **on Manus**, and is kept as
+the worked example of the shape — a handler in the app, a cron created on the
+platform after deploy. The commands themselves are Manus-specific and will not
+be run again.
 
 The cron itself is created **once, on the Manus platform, from a sandbox
 terminal, after the site is deployed** — a dev machine is unreachable from the

@@ -11,10 +11,10 @@ new host.
 
 ## The one-line version
 
-Of the sixteen settings below, **four survive a move** (they are yours, not
-Manus's), **five have to be regenerated** on any new host, and the rest are
-either optional or derived from the choices you make. The one that catches
-people out is `JWT_SECRET`, which signs two different things.
+Of the settings below, the **Cloudflare R2 ones survive a move** (they are
+yours, not Manus's), **five have to be regenerated** on any new host, and the
+rest are either optional or derived from the choices you make. The one that
+catches people out is `JWT_SECRET`, which signs two different things.
 
 ---
 
@@ -61,7 +61,11 @@ The AI features degrade quietly and on purpose; storage does not.
 > variable it actually wants is `BUILT_IN_FORGE_API_KEY`. It has already sent one
 > investigation down the wrong path.
 
-## 3. Backups — yours already, and the ones that matter most
+## 3. Cloudflare R2 — yours already, and the ones that matter most
+
+Two buckets, two tokens, and they must stay two. See § 3.1 for why.
+
+### Backups — bucket `bidsoftware`
 
 | Name                            | Where the value comes from today | On a new host  |
 | ------------------------------- | -------------------------------- | -------------- |
@@ -72,12 +76,45 @@ The AI features degrade quietly and on purpose; storage does not.
 | `R2_ENDPOINT` _(optional)_      | Defaults from the account id     | Unchanged.     |
 | `R2_BACKUP_PREFIX` _(optional)_ | Defaults to `helixbid`           | Unchanged.     |
 
-**These four are the keys to your own backups.** They belong to your Cloudflare
+> **Replaced on 2026-09-15.** The secret was exposed in a screenshot. A new
+> token was issued and both older tokens were deleted, so the previous values
+> no longer authenticate anywhere. `R2_ACCOUNT_ID` and `R2_BUCKET` did not
+> change — only the key pair did.
+>
+> Replacing them broke no automatic backup, because there was never one to
+> break. The nightly handler shipped four days after the last commit that
+> reached Manus, so the deployed site has no route for a cron to call and the
+> job has never run. **Every backup was taken by hand, and stays that way until
+> the new host is running** (`references/backups.md` § 4).
+
+### Plan files — bucket `bidrender-plans`
+
+New on 2026-09-15, for the move off Manus storage. Nothing reads these yet;
+they are slots for the R2 storage backend.
+
+| Name                         | Where the value comes from   | On a new host     |
+| ---------------------------- | ---------------------------- | ----------------- |
+| `R2_PLANS_ACCOUNT_ID`        | Cloudflare dashboard → R2    | **Unchanged.**    |
+| `R2_PLANS_ACCESS_KEY_ID`     | Cloudflare R2 API token      | **Unchanged.**    |
+| `R2_PLANS_SECRET_ACCESS_KEY` | Cloudflare R2 API token      | **Unchanged.**    |
+| `R2_PLANS_BUCKET`            | Cloudflare — the bucket name | `bidrender-plans` |
+| `R2_PLANS_ENDPOINT`          | Derived from the account id  | **Unchanged.**    |
+
+### 3.1 Why the two are separate, and must stay separate
+
+Same Cloudflare account, **different buckets and different tokens**. The plans
+token signs URLs a browser touches; the backup token must never be anywhere
+near one. If the plans key leaks, the backups have to still be untouchable —
+which is only true if they are a different credential.
+
+Both are scoped to a single bucket with **Object Read & Write**, and neither
+has account-level permission. Verified on 2026-09-15: the plans key cannot
+reach `bidsoftware`, and the backup key cannot reach `bidrender-plans`. Both
+answer `AccessDenied`. Re-check that after reissuing either one.
+
+**These are the keys to your own data.** They belong to your Cloudflare
 account, not Manus, and they carry over untouched. Keep them somewhere that
 survives losing any single provider — a backup you cannot open is not a backup.
-
-The token needs **Object Read & Write** on that one bucket. It does not need
-account-level permissions.
 
 ## 4. Optional and operational
 
