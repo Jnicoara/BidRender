@@ -171,14 +171,23 @@ import type { PlanRemovalImpact } from "../shared/planRemoval";
 
 let _db: MySql2Database | null = null;
 
+/**
+ * The pool behind `_db`, kept because `withSeedLock` needs ONE connection it
+ * can hold for the length of a lock. Every other query is happy with whichever
+ * connection the pool hands out; a named lock is not.
+ */
+let _pool: ReturnType<typeof createPool> | null = null;
+
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       // The pool is built from mysqlConnection rather than the URL directly, so
       // a managed host's TLS certificate is honoured. See databaseConnection.ts.
-      _db = drizzle(createPool(mysqlConnection(process.env.DATABASE_URL)));
+      _pool = createPool(mysqlConnection(process.env.DATABASE_URL));
+      _db = drizzle(_pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
+      _pool = null;
       _db = null;
     }
   }
@@ -1040,32 +1049,60 @@ const LIBRARY_OWNERSHIP_FIELDS = [
  *
  * Lock names still start `helixbid:`, the product's old name. Keep them: during
  * a deploy the old and the new build must take the same lock.
+ *
+ * ── One connection, held for the whole lock ──────────────────────────────────
+ * MySQL ties a named lock to the connection that took it. RELEASE_LOCK from any
+ * other connection does nothing at all: it returns 0, and the lock stays held
+ * until the connection that owns it closes. So taking the lock on a pooled
+ * query and releasing it on another was a coin toss — and the three seeders
+ * below run at once, so the two halves land on whichever connections happen to
+ * be free at the time.
+ *
+ * A stuck lock is not a crash, which is why it could sit here unnoticed. The
+ * cost is paid by the NEXT process: it finds the lock held, logs "could not
+ * acquire", and skips its seed for as long as the holder lives. During a
+ * rolling deploy the holder is the OLD build, so newly shipped starter content
+ * silently never lands.
+ *
+ * The work inside still uses the pool, so the pool must have room for more than
+ * this one connection — it holds ten by default.
+ *
+ * Exported for server/seedLock.test.ts, which proves the lock is let go.
  */
-async function withSeedLock(
+export async function withSeedLock(
   name: string,
   run: () => Promise<void>
 ): Promise<void> {
   const db = await getDb();
-  if (!db) return;
+  if (!db || !_pool) return;
 
-  // 10s is generous for a handful of inserts; on timeout we skip rather than
-  // seed unguarded, and the next startup tries again.
-  const [rows] = await db.execute(
-    sql`SELECT GET_LOCK(${name}, 10) AS acquired`
-  );
-  const acquired = (rows as unknown as Array<{ acquired: number | null }>)[0]
-    ?.acquired;
-  if (acquired !== 1) {
-    console.warn(
-      `[Seed] Could not acquire lock "${name}" — skipping this pass.`
-    );
-    return;
-  }
-
+  const connection = await _pool.getConnection();
   try {
-    await run();
+    // 10s is generous for a handful of inserts; on timeout we skip rather than
+    // seed unguarded, and the next startup tries again.
+    const [rows] = await connection.query(
+      "SELECT GET_LOCK(?, 10) AS acquired",
+      [name]
+    );
+    const acquired = (rows as unknown as Array<{ acquired: number | null }>)[0]
+      ?.acquired;
+    if (acquired !== 1) {
+      console.warn(
+        `[Seed] Could not acquire lock "${name}" — skipping this pass.`
+      );
+      return;
+    }
+
+    try {
+      await run();
+    } finally {
+      // Same connection that took it, which is the only one MySQL will accept.
+      await connection.query("SELECT RELEASE_LOCK(?)", [name]);
+    }
   } finally {
-    await db.execute(sql`SELECT RELEASE_LOCK(${name})`);
+    // Back to the pool either way. Handing it back while still holding the lock
+    // is exactly the failure described above, so the release above is inside.
+    connection.release();
   }
 }
 
