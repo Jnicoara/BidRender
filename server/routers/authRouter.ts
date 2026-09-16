@@ -7,12 +7,21 @@ import { sdk } from "../_core/sdk";
 import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import * as db from "../db";
 import { nanoid } from "nanoid";
+import { toPublicUser } from "@shared/publicUser";
 
 const SALT_ROUNDS = 12;
 
 export const authRouter = router({
-  /** Current user — null if not logged in */
-  me: publicProcedure.query(opts => opts.ctx.user),
+  /**
+   * Current user — null if not logged in.
+   *
+   * Passed through `toPublicUser`, which copies out the fields the browser is
+   * allowed to see. Returning `ctx.user` directly sent the whole `users` row,
+   * password hash included, to every signed-in browser — and `useAuth` stores
+   * what it receives in `localStorage`, so it was written to disk too. See
+   * shared/publicUser.ts.
+   */
+  me: publicProcedure.query(opts => toPublicUser(opts.ctx.user)),
 
   /** Sign up with email + password */
   signup: publicProcedure

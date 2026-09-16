@@ -139,7 +139,44 @@ There is deliberately no option to encrypt without checking who answered.
 The load itself used `.env.digitalocean` (gitignored) for the admin login and
 the certificate path. That file is for setup work, not for running the app.
 
-## 8. What this did NOT do
+## 8. The rules this server enforces, and how many connections it allows
+
+DigitalOcean runs MySQL stricter than a default install, and stricter than the
+Manus database the app grew up on. Its `sql_mode` is:
+
+```
+REAL_AS_FLOAT, PIPES_AS_CONCAT, ANSI_QUOTES, IGNORE_SPACE, ONLY_FULL_GROUP_BY,
+ANSI, STRICT_ALL_TABLES, NO_ZERO_IN_DATE, NO_ZERO_DATE,
+ERROR_FOR_DIVISION_BY_ZERO, NO_ENGINE_SUBSTITUTION
+```
+
+plus `sql_require_primary_key = ON`. Two of those change what SQL MEANS rather
+than merely tightening it:
+
+- **`ANSI_QUOTES`** — a double-quoted word is a COLUMN NAME, not text. SQL must
+  quote names with backticks and text with single quotes.
+- **`PIPES_AS_CONCAT`** — `||` joins text instead of meaning "or".
+
+**The development machine mirrors this list** (`my.ini` on the laptop), so
+anything these rules break surfaces there instead of on the live site. That is
+not theoretical: it caught a real bug — the nightly backup asked the server to
+describe each table and copied the answer down, which under `ANSI_QUOTES` came
+back double-quoted, producing a file its own restore instructions could not
+read. Fixed in v5.125; `server/backup.test.ts` now pins the quoting.
+
+Note the server's own default collation is `utf8mb4_0900_ai_ci` while this
+database is `utf8mb4_unicode_ci` (§ 3). That is deliberate and consistent —
+every table here was created under the database default.
+
+**Connections.** The app opens a pool of up to **10** per running copy
+(`server/db.ts`, mysql2 defaults; extra requests queue rather than fail).
+Migrations take one more and a backup run takes two, so a single copy of the app
+peaks at about thirteen. DigitalOcean allows roughly 75 connections on the 1 GiB
+plan, 150 on 2 GiB and 400 on 4 GiB, so even the smallest plan has room for
+several copies. To cap it without touching code, add `connectionLimit=5` to the
+database address.
+
+## 9. What this did NOT do
 
 - **Manus and the live site were not touched.** Not read, not changed. The data
   came from the Cloudflare backup, which is independent of Manus.

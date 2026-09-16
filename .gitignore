@@ -17,6 +17,12 @@ build/
 # DigitalOcean Managed MySQL connection settings (host, logins, certificate path)
 .env.digitalocean
 
+# Personal working notes. Kept on the machine, never in a public repo: they name
+# real email addresses, local file paths and the state of one laptop, and they
+# go stale fast. Anything durable belongs in references/ instead.
+STATUS.md
+STAGE1-FINDINGS.md
+
 # IDE and editor files
 .vscode/
 .idea/

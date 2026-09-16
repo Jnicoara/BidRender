@@ -216,6 +216,25 @@ The dump sets `FOREIGN_KEY_CHECKS = 0` around itself, so table order does not
 matter. It includes `__drizzle_migrations`, so a restored database knows which
 migrations have run and does not invite anyone to re-run them over live data.
 
+**A dump has to be readable on a server that is not the one that wrote it**, and
+that is easy to get wrong in ways nothing notices until the day it matters:
+
+- **Names must be in backticks, never double quotes.** The header restores under
+  `SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO'`, which does not include `ANSI_QUOTES` —
+  so a dump written by a server that DOES have it (DigitalOcean, by default)
+  would come back double-quoted and fail to load. `dumpDatabase` pins its own
+  session before reading, and `server/backup.test.ts` fails if that stops being
+  true.
+- **Nothing that carries an owner**: no views, triggers, stored procedures,
+  functions, events, or `DEFINER` lines. A `DEFINER` naming a user the new
+  server has never heard of stops a restore dead. This dump writes tables and
+  rows only, so there is nothing to strip.
+- Both backups taken from the old Manus database were checked against MySQL 8.4
+  for all of the above, plus MyISAM tables, zero dates, `utf8mb3`, fulltext and
+  spatial indexes and generated columns — all clean. The only Manus-specific
+  marks are `/*T![clustered_index] …*/` comments, which MySQL ignores because
+  they begin `/*T` rather than `/*!`.
+
 Files restore by uploading `files/<key>` back to whatever storage the app is
 using, at the same key. The keys in the database are unchanged by a restore, so
 they line up as long as the object keys are preserved.
