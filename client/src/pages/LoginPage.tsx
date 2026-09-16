@@ -236,6 +236,7 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
                 </Label>
                 <Input
                   id="name"
+                  name="name"
                   type="text"
                   placeholder="Your name"
                   value={name}
@@ -253,6 +254,7 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
               </Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
                 placeholder="you@example.com"
                 value={email}
@@ -270,7 +272,15 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
               </Label>
               <div className="relative">
                 <Input
+                  // Remounted when the mode changes, so a password manager sees
+                  // a fresh field rather than one whose autocomplete quietly
+                  // turned from "current-password" into "new-password" beneath
+                  // it — which is how a manager ends up offering to save the
+                  // password you are signing in with, or filling the old one
+                  // into a "create account" box.
+                  key={mode}
                   id="password"
+                  name="password"
                   type={showPassword ? "text" : "password"}
                   placeholder={
                     mode === "signup"
