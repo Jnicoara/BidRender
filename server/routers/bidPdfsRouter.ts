@@ -35,8 +35,17 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
-import { storagePresignPut } from "../storage";
-import { storageUrl } from "../storageTokens";
+import { planViewerUrl, storagePresignPut } from "../storage";
+import {
+  MAX_PARTS_PER_SIGN_REQUEST,
+  abortMultipartUpload,
+  completeMultipartUpload,
+  createMultipartUpload,
+  listUploadedParts,
+  signParts,
+} from "../r2Multipart";
+import { selectStorageBackend } from "../storageBackend";
+import { MAX_PARTS } from "../../shared/multipartPlan";
 import {
   detectScaleFromText,
   isAutoApplicable,
@@ -69,6 +78,43 @@ async function requirePdf(bidPdfId: number, userId: number) {
   return pdf;
 }
 
+/**
+ * Refuse a multipart operation unless R2 is the store.
+ *
+ * The Manus proxy has no equivalent, and quietly doing something else instead
+ * would be worse than saying so: a silent single-PUT fallback appears to work
+ * and then dies partway through a large file, which is the exact failure this
+ * design exists to remove.
+ */
+function requireR2(what: string) {
+  if (selectStorageBackend() !== "r2") {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: `${what} need the Cloudflare storage backend, which is not switched on for this server.`,
+    });
+  }
+}
+
+/**
+ * The storage key has to be one this server would have issued for THIS user
+ * and THIS bid.
+ *
+ * Without it, a caller could name any key in the bucket and have the server
+ * sign writes into it — including over another contractor's finished plans.
+ * The prefix carries both ids, so checking it is checking both.
+ *
+ * Applied to every multipart call, not just the first. Each one takes the key
+ * as an argument, so each one is its own opportunity to name somebody else's.
+ */
+function requireOwnKey(storageKey: string, userId: number, bidId: number) {
+  if (!storageKey.startsWith(`bid-plans/${userId}/${bidId}/`)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "That upload does not belong to this bid.",
+    });
+  }
+}
+
 /** One sheet as the client sees it — ratio as a number, not a decimal string. */
 function toSheetView(row: db.BidPdfSheetRow) {
   return {
@@ -86,7 +132,7 @@ function toSheetView(row: db.BidPdfSheetRow) {
 }
 
 /** What the client gets back for one sheet, including where to fetch it. */
-function toView(row: Awaited<ReturnType<typeof db.getBidPdf>> & object) {
+async function toView(row: Awaited<ReturnType<typeof db.getBidPdf>> & object) {
   return {
     id: row.id,
     bidId: row.bidId,
@@ -96,15 +142,19 @@ function toView(row: Awaited<ReturnType<typeof db.getBidPdf>> & object) {
     sortOrder: row.sortOrder,
     createdAt: row.createdAt,
     /**
-     * Served through the storage proxy, which verifies the token in this path
-     * before it 307s to a signed S3 URL.
+     * Where the viewer loads this document from.
      *
-     * Minted here rather than stored, because it expires — see
-     * server/storageTokens.ts. Every caller of this function has already been
-     * through `requireBid`/`requirePdf`, which is what makes handing out the
-     * URL an authorization decision rather than a lookup.
+     * On R2 this is a long-lived signed R2 link, so pdf.js fetches byte ranges
+     * straight from storage and this server is not in the loop. Everywhere else
+     * it is the storage-proxy url, which verifies the token in the path before
+     * it 307s to a signed URL.
+     *
+     * Minted here rather than stored, because it expires and because a signed
+     * url must never be written down. Every caller of this function has already
+     * been through `requireBid`/`requirePdf`, which is what makes handing out
+     * the url an authorization decision rather than a lookup.
      */
-    url: storageUrl(row.storageKey, new Date()),
+    url: await planViewerUrl(row.storageKey, new Date()),
   };
 }
 
@@ -115,7 +165,10 @@ export const bidPdfsRouter = router({
     .query(async ({ input, ctx }) => {
       await requireBid(input.bidId, ctx.scope.dataUserId);
       const rows = await db.getBidPdfs(input.bidId, ctx.scope.dataUserId);
-      return rows.map(toView);
+      // In parallel: each one may mint a signed link, and on R2 the first for
+      // a given key also confirms the object is there. Sequential would make
+      // opening a bid wait on one round trip per sheet.
+      return Promise.all(rows.map(row => toView(row)));
     }),
 
   /**
@@ -155,6 +208,158 @@ export const bidPdfsRouter = router({
       );
 
       return { uploadUrl, storageKey: key };
+    }),
+
+  /**
+   * ── Sending a large plan set in pieces ─────────────────────────────────────
+   *
+   * Four procedures, all of which hand out permission and never touch a byte.
+   * The browser cuts the file up, sends each piece straight to R2 on a signed
+   * url, and comes back here to stitch them together. See shared/multipartPlan
+   * for the arithmetic and server/r2Multipart.ts for the storage calls.
+   *
+   * Only available on R2. The Manus proxy has no equivalent operation, and a
+   * silent single-PUT fallback would be worse than a clear refusal: it would
+   * appear to work and then fail at whatever size that path actually tops out
+   * at, which is the vague mid-transfer death this whole design removes.
+   */
+  createMultipartUpload: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        filename: filenameSchema,
+        byteSize: z.number().int().min(1),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      requireR2("Large uploads");
+
+      const check = checkPdfUpload({
+        filename: input.filename,
+        byteSize: input.byteSize,
+      });
+      if (!check.ok) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: check.message });
+      }
+
+      // The same key shape the single-PUT ticket builds, hash suffix and all,
+      // because `confirmAttach` checks the prefix on whichever path produced it.
+      const { key } = await storagePresignPut(
+        `bid-plans/${ctx.scope.dataUserId}/${input.bidId}/${input.filename}`,
+        "application/pdf"
+      );
+      const uploadId = await createMultipartUpload(key, "application/pdf");
+      return { storageKey: key, uploadId };
+    }),
+
+  /**
+   * Signed urls for a batch of pieces.
+   *
+   * Asked for as the upload goes rather than all at once, so a set that takes
+   * twenty minutes is not working from urls signed twenty minutes ago.
+   */
+  signUploadParts: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        storageKey: z.string().min(1).max(1024),
+        uploadId: z.string().min(1).max(1024),
+        partNumbers: z
+          .array(z.number().int().min(1).max(MAX_PARTS))
+          .min(1)
+          .max(MAX_PARTS_PER_SIGN_REQUEST),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      requireR2("Large uploads");
+      requireOwnKey(input.storageKey, ctx.scope.dataUserId, input.bidId);
+      return signParts(input.storageKey, input.uploadId, input.partNumbers);
+    }),
+
+  /**
+   * Which pieces R2 already holds — the whole of how resuming works.
+   *
+   * Deliberately asks storage rather than trusting anything the browser
+   * remembers. A piece the browser believes it sent but that did not survive
+   * is exactly the case resuming exists for, and only one of those two sources
+   * was actually present when it happened.
+   */
+  listUploadedParts: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        storageKey: z.string().min(1).max(1024),
+        uploadId: z.string().min(1).max(1024),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      requireR2("Large uploads");
+      requireOwnKey(input.storageKey, ctx.scope.dataUserId, input.bidId);
+      return listUploadedParts(input.storageKey, input.uploadId);
+    }),
+
+  /** Stitch the pieces into the finished file. Does not record the sheet. */
+  completeMultipartUpload: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        storageKey: z.string().min(1).max(1024),
+        uploadId: z.string().min(1).max(1024),
+        parts: z
+          .array(
+            z.object({
+              partNumber: z.number().int().min(1).max(MAX_PARTS),
+              etag: z.string().min(1).max(256),
+            })
+          )
+          .min(1),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      requireR2("Large uploads");
+      requireOwnKey(input.storageKey, ctx.scope.dataUserId, input.bidId);
+      await completeMultipartUpload(
+        input.storageKey,
+        input.uploadId,
+        input.parts
+      );
+      return { storageKey: input.storageKey };
+    }),
+
+  /**
+   * Throw away an upload the user cancelled.
+   *
+   * Never fails the caller. The bucket's 7-day abort rule is the guarantee that
+   * abandoned pieces do not accumulate; this is the courtesy that makes a
+   * cancel immediate. Reporting an error because the tidying-up failed would
+   * tell the user about a problem that is not theirs and is already handled.
+   */
+  abortMultipartUpload: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        storageKey: z.string().min(1).max(1024),
+        uploadId: z.string().min(1).max(1024),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      requireOwnKey(input.storageKey, ctx.scope.dataUserId, input.bidId);
+      if (selectStorageBackend() !== "r2") return { aborted: false };
+      try {
+        await abortMultipartUpload(input.storageKey, input.uploadId);
+        return { aborted: true };
+      } catch (error) {
+        console.warn(
+          `[BidPdfs] could not abort an upload for bid ${input.bidId}; the bucket's expiry rule will clear it.`,
+          error
+        );
+        return { aborted: false };
+      }
     }),
 
   /**

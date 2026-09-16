@@ -91,14 +91,15 @@ beforeEach(async () => {
 // ── The rule itself ──────────────────────────────────────────────────────────
 
 describe("the size limit", () => {
-  it("is 500MB", () => {
-    expect(MAX_PDF_BYTES).toBe(500 * 1024 * 1024);
+  it("is 2GB", () => {
+    expect(MAX_PDF_BYTES).toBe(2 * 1024 * 1024 * 1024);
   });
 
   it("clears a scanned commercial set, which is why it was raised", () => {
-    // The case the 150MB ceiling turned away: a full set printed and re-scanned
-    // at 300dpi colour, which is the most common large file in this trade.
-    for (const size of [200 * MB, 300 * MB, 450 * MB]) {
+    // The case each earlier ceiling turned away: a full set printed and
+    // re-scanned at 300dpi colour, which is the most common large file in this
+    // trade. The last two sizes are the ones 500MB refused.
+    for (const size of [200 * MB, 450 * MB, 900 * MB, 1600 * MB]) {
       expect(
         checkPdfUpload({ filename: "Scanned set.pdf", byteSize: size }).ok
       ).toBe(true);
@@ -112,7 +113,7 @@ describe("the size limit", () => {
   });
 
   it("accepts a file exactly at the limit", () => {
-    // The limit is inclusive: "up to 500MB" has to mean 500MB works.
+    // The limit is inclusive: "up to 2GB" has to mean 2GB works.
     expect(
       checkPdfUpload({ filename: "E1.pdf", byteSize: MAX_PDF_BYTES }).ok
     ).toBe(true);
@@ -147,14 +148,14 @@ describe("what the refusal says", () => {
   it("names the file, its size, the limit, and what to do", () => {
     const result = checkPdfUpload({
       filename: "Tower A - Electrical.pdf",
-      byteSize: 600 * MB,
+      byteSize: 3 * 1024 * MB,
     });
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("expected a refusal");
 
     // Each of these is load-bearing: which file, how far over, and the way out.
     expect(result.message).toContain("Tower A - Electrical.pdf");
-    expect(result.message).toContain("600MB");
+    expect(result.message).toContain("3GB");
     expect(result.message).toContain(formatBytes(MAX_PDF_BYTES));
     expect(result.message).toMatch(/split/i);
   });
@@ -195,7 +196,7 @@ describe("what the refusal says", () => {
 
 describe("formatting a size", () => {
   it("prints the limit as a round number", () => {
-    expect(formatBytes(MAX_PDF_BYTES)).toBe("500MB");
+    expect(formatBytes(MAX_PDF_BYTES)).toBe("2GB");
   });
 
   it("prints a real file size to one decimal", () => {

@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   int,
   json,
@@ -1918,7 +1919,16 @@ export const bidPdfs = mysqlTable(
     filename: varchar("filename", { length: 512 }).notNull(),
     /** S3 object key from storagePut(). Resolved through /manus-storage/<key>. */
     storageKey: varchar("storageKey", { length: 1024 }).notNull(),
-    byteSize: int("byteSize").default(0).notNull(),
+    /**
+     * How big the file is, in bytes.
+     *
+     * BIGINT, not INT, and the difference is load-bearing: a signed INT tops
+     * out at 2,147,483,647, which is one byte under 2GB — exactly the limit the
+     * app accepts. As an INT, a 2GB plan set uploaded perfectly to storage and
+     * then failed to attach, with the error arriving after the twenty minutes
+     * of transfer rather than before. Found by a test that tried the limit.
+     */
+    byteSize: bigint("byteSize", { mode: "number" }).default(0).notNull(),
     /**
      * Filled in by the client after the document first opens, because counting
      * pages means parsing the PDF and only the viewer has a parser. NULL means

@@ -400,6 +400,49 @@ bucket.
 A cross-origin PUT is always preflighted, so the bucket needs a CORS rule for
 the app's origin. Without one the client falls back to the same-origin route in
 `planUpload.ts`, which works but is capped by the platform's request body limit.
+The rule must also **expose the `ETag` header** — an upload in pieces cannot be
+reassembled without the receipt R2 returns for each piece.
+
+## Large plan sets — pieces going up, byte ranges coming down
+
+`MAX_PDF_BYTES` is 2GB, and that number is only real on R2. Two things make it
+so, and **neither may be quietly undone by a change that only looks at one end**.
+
+**Going up: pieces, and R2 is the memory.** Above 64MB a file is cut into equal
+16MB pieces (`shared/multipartPlan.ts`), four in flight, each signed by the
+server and sent browser→R2. Resuming asks R2 which pieces it holds —
+**never a local record of what was sent**. That distinction is the whole design:
+a local note is wrong in exactly the case resuming exists for, a connection that
+died mid-piece, and acting on a wrong note completes a file that is corrupt. A
+corrupt plan set is worse than a failed upload because nothing says it happened.
+Equal-sized pieces are an R2 rule, not a preference, and they are what make a
+piece number map to a byte range by arithmetic.
+
+**Coming down: one long-lived link, and it must be byte-identical.**
+`planViewerUrl` hands pdf.js a 12-hour signed R2 link so page loads skip this
+server entirely. `viewerUrlWindow` pins the signing time AND the expiry to a
+fixed boundary so re-minting inside the window returns the same string. Pinning
+only the expiry is the easy mistake — the signature covers `X-Amz-Date`, so the
+url would still differ every second, and since the viewer reloads the document
+whenever `doc.url` changes, every background refetch would silently restart an
+open plan. Same reasoning as `storageTokenExpiry`.
+
+**A signed url is a bearer credential.** Never log one, never store one in a
+column, never put one in the address bar. It outlives the session in a log file
+and is readable by anyone who can read logs.
+
+**Above 50MB pdf.js stops downloading the rest of the document in the
+background** (`shared/pdfRangeLoading.ts`). Below it, prefetching is free and
+makes later pages instant; above it, it is a gigabyte competing with the page
+being drawn.
+
+**A size column has to be BIGINT.** `bid_pdfs.byteSize` was `int`, which tops
+out one byte under 2GB — so a 2GB set uploaded perfectly and then failed to
+attach, after the transfer rather than before it. Anything new that records a
+file size needs the same treatment.
+
+`pnpm dev:r2` plus a real several-hundred-MB PDF is the only way to exercise
+this properly; the pure modules carry the cases that can be written down.
 
 ## Architecture
 

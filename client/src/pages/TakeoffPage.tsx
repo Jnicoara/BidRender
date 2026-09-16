@@ -86,6 +86,18 @@ import {
   type UploadError,
 } from "@/lib/planUploadTransport";
 import {
+  fileIdentity,
+  planParts,
+  shouldUseMultipart,
+} from "@shared/multipartPlan";
+import { uploadInParts } from "@/lib/multipartUpload";
+import { useUploadSpeeds } from "@/lib/useUploadSpeeds";
+import {
+  findResumableUpload,
+  forgetUpload,
+  rememberUpload,
+} from "@/lib/uploadResumeStore";
+import {
   appendJobs,
   clearFinished,
   dismissJob,
@@ -238,14 +250,20 @@ function usePdfWorker() {
     });
   }, []);
 
-  const loadUrl = useCallback((url: string, hash: string) => {
-    return new Promise<number>((resolve, reject) => {
-      const worker = workerRef.current;
-      if (!worker) return reject(new Error("Viewer not ready"));
-      loadWaiters.current.push({ resolve, reject });
-      worker.postMessage({ type: "loadUrl", url, hash });
-    });
-  }, []);
+  // byteSize decides whether pdf.js also downloads the rest of the document in
+  // the background — see shared/pdfRangeLoading.ts. Passed rather than guessed,
+  // because the wrong answer on a 1GB set is a gigabyte of wasted connection.
+  const loadUrl = useCallback(
+    (url: string, hash: string, byteSize: number | null) => {
+      return new Promise<number>((resolve, reject) => {
+        const worker = workerRef.current;
+        if (!worker) return reject(new Error("Viewer not ready"));
+        loadWaiters.current.push({ resolve, reject });
+        worker.postMessage({ type: "loadUrl", url, hash, byteSize });
+      });
+    },
+    []
+  );
 
   // Memoised as a whole. These go into effect dependency arrays, and a fresh
   // function identity per render restarts the document load on every render —
@@ -380,21 +398,23 @@ function PlanPane({
         // storage gateways cannot answer range requests; only in that case do
         // we retain the previous complete-download path as a compatibility
         // fallback for ordinary-sized files.
-        const pages = await loadUrl(doc.url, hash).catch(async rangeError => {
-          const resp = await fetch(doc.url);
-          // A refused URL is usually just an old one — plan URLs are signed and
-          // expire. Distinguished here so the outer catch can ask for a fresh
-          // one instead of telling the user their plan is broken.
-          if (isExpiredPlanUrl(resp.status)) throw new PlanUrlExpired();
-          if (!resp.ok)
-            throw new Error(`Could not fetch the plan (${resp.status})`);
-          const buffer = await resp.arrayBuffer();
-          try {
-            return await load(buffer, hash);
-          } catch {
-            throw rangeError;
+        const pages = await loadUrl(doc.url, hash, doc.byteSize ?? null).catch(
+          async rangeError => {
+            const resp = await fetch(doc.url);
+            // A refused URL is usually just an old one — plan URLs are signed and
+            // expire. Distinguished here so the outer catch can ask for a fresh
+            // one instead of telling the user their plan is broken.
+            if (isExpiredPlanUrl(resp.status)) throw new PlanUrlExpired();
+            if (!resp.ok)
+              throw new Error(`Could not fetch the plan (${resp.status})`);
+            const buffer = await resp.arrayBuffer();
+            try {
+              return await load(buffer, hash);
+            } catch {
+              throw rangeError;
+            }
           }
-        });
+        );
         if (cancelled) return;
         setPageCount(pages);
         setLoading(false);
@@ -634,6 +654,10 @@ export default function TakeoffPage({
   uploadsRef.current = uploads;
   /** The transfer in flight, so it can be cancelled. */
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+  /** Speed and time-left for each upload row. See lib/useUploadSpeeds.ts. */
+  const readingFor = useUploadSpeeds();
+  /** Cancels an upload that is going up in pieces. See cancelUpload. */
+  const abortRef = useRef<AbortController | null>(null);
   const uploading = isBusy(uploads);
   const [confirmRemove, setConfirmRemove] = useState<Document | null>(null);
   const [materialsListOpen, setMaterialsListOpen] = useState(false);
@@ -699,6 +723,12 @@ export default function TakeoffPage({
 
   const createTicket = trpc.bidPdfs.createUploadTicket.useMutation();
   const confirmAttach = trpc.bidPdfs.confirmAttach.useMutation();
+  // The pieces path, for a set too large to send as one request. See
+  // client/src/lib/multipartUpload.ts.
+  const startMultipart = trpc.bidPdfs.createMultipartUpload.useMutation();
+  const signUploadParts = trpc.bidPdfs.signUploadParts.useMutation();
+  const completeMultipart = trpc.bidPdfs.completeMultipartUpload.useMutation();
+  const abortMultipart = trpc.bidPdfs.abortMultipartUpload.useMutation();
 
   const setPageCount = trpc.bidPdfs.setPageCount.useMutation({
     onSuccess: () => void utils.bidPdfs.list.invalidate({ bidId }),
@@ -1430,6 +1460,119 @@ export default function TakeoffPage({
         setUploads(prev => patchJob(prev, job.id, patch));
 
       /**
+       * Send a large set in pieces, continuing an interrupted one if there is
+       * one for this exact file.
+       *
+       * Returns the storage key, or null when this server cannot do pieces —
+       * in which case the caller carries on down the ordinary path rather than
+       * failing, because a backend without the operation is a configuration
+       * fact, not the user's problem.
+       */
+      const uploadLargeFile = async (file: File): Promise<string | null> => {
+        const resumed = findResumableUpload(bidId, file);
+        let started: { storageKey: string; uploadId: string };
+
+        if (resumed) {
+          started = {
+            storageKey: resumed.storageKey,
+            uploadId: resumed.uploadId,
+          };
+        } else {
+          try {
+            started = await startMultipart.mutateAsync({
+              bidId,
+              filename: file.name,
+              byteSize: file.size,
+            });
+          } catch (error) {
+            // PRECONDITION_FAILED means this server is not on R2. Anything
+            // else is a real failure and must not be swallowed into a silent
+            // fallback that would then fail more confusingly.
+            const code = (error as { data?: { code?: string } })?.data?.code;
+            if (code === "PRECONDITION_FAILED") return null;
+            throw error;
+          }
+        }
+
+        const { partSize } = planParts(file.size);
+        rememberUpload({
+          bidId,
+          storageKey: started.storageKey,
+          uploadId: started.uploadId,
+          file: fileIdentity(file),
+          partSize,
+          startedAt: resumed?.startedAt ?? Date.now(),
+        });
+
+        const controller = new AbortController();
+        // The cancel button aborts an XHR; give it something that aborts the
+        // whole run of pieces instead.
+        abortRef.current = controller;
+
+        try {
+          await uploadInParts({
+            file,
+            byteSize: file.size,
+            partSize,
+            signal: controller.signal,
+            transport: {
+              signParts: partNumbers =>
+                signUploadParts.mutateAsync({
+                  bidId,
+                  storageKey: started.storageKey,
+                  uploadId: started.uploadId,
+                  partNumbers,
+                }),
+              listParts: () =>
+                utils.bidPdfs.listUploadedParts.fetch({
+                  bidId,
+                  storageKey: started.storageKey,
+                  uploadId: started.uploadId,
+                }),
+              complete: parts =>
+                completeMultipart
+                  .mutateAsync({
+                    bidId,
+                    storageKey: started.storageKey,
+                    uploadId: started.uploadId,
+                    parts,
+                  })
+                  .then(() => undefined),
+            },
+            onProgress: p =>
+              setState({
+                sent: p.bytesSent,
+                partsDone: p.partsDone,
+                partCount: p.partCount,
+                paused: p.paused,
+                stalled: p.stalled,
+                retrying: p.retrying,
+              }),
+          });
+        } catch (error) {
+          // The record survives a failure on purpose: that is what makes the
+          // next attempt a resume rather than a fresh start. It is only
+          // forgotten on success or on an explicit cancel.
+          if (controller.signal.aborted) {
+            forgetUpload(started.storageKey);
+            void abortMultipart
+              .mutateAsync({
+                bidId,
+                storageKey: started.storageKey,
+                uploadId: started.uploadId,
+              })
+              .catch(() => {});
+          }
+          throw error;
+        } finally {
+          abortRef.current = null;
+        }
+
+        forgetUpload(started.storageKey);
+        return started.storageKey;
+      };
+
+      /**
        * `retryable: false` is for failures the same bytes will always produce —
        * too large, not a PDF. Offering Retry there is offering a button that
        * cannot work; the way forward is a different file.
@@ -1470,14 +1613,16 @@ export default function TakeoffPage({
         return;
       }
 
-      // Accepted, but say so before the viewer struggles with it. The app
-      // takes files up to MAX_PDF_BYTES; it opens them comfortably up to
-      // rather less, because the whole document is read into memory (see
-      // VIEWER_COMFORTABLE_BYTES). Warning beats a limit that implies
-      // everything under it will open.
+      // A genuinely huge set opens fine but takes a visible moment the first
+      // time. This used to warn from 150MB that it "may not render on a
+      // low-memory device", which was true when the viewer read the whole
+      // document into memory and stopped being true when it started fetching
+      // byte ranges a page at a time. A warning that has stopped being true is
+      // worse than none, so the threshold moved and the alarm came out of the
+      // wording — see VIEWER_COMFORTABLE_BYTES.
       if (file.size > VIEWER_COMFORTABLE_BYTES) {
-        toast.warning(
-          `${file.name} is ${formatBytes(file.size)}. It will attach, but a set this large can be slow to open and may not render on a low-memory device.`
+        toast.info(
+          `${file.name} is ${formatBytes(file.size)}. It will attach and open normally — just give it a moment the first time.`
         );
       }
 
@@ -1491,9 +1636,43 @@ export default function TakeoffPage({
           },
         };
 
+        let storageKey: string;
+
+        /**
+         * A set too large for one request goes up in pieces.
+         *
+         * Tried before the single-PUT path rather than as a fallback from it:
+         * discovering that a 1.5GB upload needed pieces by watching it fail
+         * twenty minutes in is precisely the experience this exists to remove.
+         * `shouldUseMultipart` is a size check, so the decision costs nothing.
+         *
+         * If the server says it cannot do pieces — anything but R2 — this
+         * falls through to the ordinary path, which is the honest behaviour
+         * for a backend that has no such operation.
+         */
+        if (shouldUseMultipart(file.size)) {
+          const sent = await uploadLargeFile(file);
+          if (sent) {
+            storageKey = sent;
+            xhrRef.current = null;
+            setState({ state: "finishing", sent: file.size });
+            const attached = await confirmAttach.mutateAsync({
+              bidId,
+              filename: file.name,
+              storageKey,
+              byteSize: file.size,
+            });
+            setState({ state: "done" });
+            setSelectedDocId(attached.id);
+            setPage(1);
+            void utils.bidPdfs.list.invalidate({ bidId });
+            toast.success(`${attached.filename} attached.`);
+            return;
+          }
+        }
+
         // The direct path first: browser straight to storage, no size ceiling
         // and nothing buffered on our server. See lib/planUploadTransport.ts.
-        let storageKey: string;
         try {
           const ticket = await createTicket.mutateAsync({
             bidId,
@@ -1547,7 +1726,16 @@ export default function TakeoffPage({
         fail(message, { detail });
       }
     },
-    [bidId, createTicket, confirmAttach, utils]
+    [
+      bidId,
+      createTicket,
+      confirmAttach,
+      utils,
+      startMultipart,
+      signUploadParts,
+      completeMultipart,
+      abortMultipart,
+    ]
   );
 
   /**
@@ -1602,8 +1790,13 @@ export default function TakeoffPage({
   );
 
   const cancelUpload = useCallback(() => {
+    // Two shapes of upload, two ways to stop one. A single-request upload is
+    // one XHR to abort; an upload in pieces has several in flight plus a queue
+    // behind them, so it carries an AbortController instead.
     xhrRef.current?.abort();
     xhrRef.current = null;
+    abortRef.current?.abort();
+    abortRef.current = null;
   }, []);
 
   /**
@@ -1714,7 +1907,13 @@ export default function TakeoffPage({
       {/* Above the workspace rather than inside the empty state, so it is in
           the same place whether this is the first plan or the tenth. */}
       <UploadProgress
-        jobs={uploads}
+        // Speed and time left are derived here rather than stored on the job:
+        // they are a view of recent history, not a fact about the upload, and
+        // putting them in state would re-render every row on every reading.
+        jobs={uploads.map(job => ({
+          ...job,
+          ...readingFor(job.id, job.sent, job.byteSize),
+        }))}
         onCancel={cancelUpload}
         onDismiss={id => setUploads(prev => dismissJob(prev, id))}
         onRetry={id => void retryUpload(id)}

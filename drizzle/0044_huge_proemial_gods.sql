@@ -1,0 +1,11 @@
+-- Plan file sizes need more than a signed INT.
+--
+-- INT tops out at 2,147,483,647 — one byte under 2GB, which is exactly the
+-- size limit the app now accepts. Left as an INT, a 2GB plan set uploaded
+-- perfectly to storage and then failed to attach, with the error arriving
+-- after twenty minutes of transfer rather than before it.
+--
+-- DEFAULT 0 is restated deliberately: MySQL's MODIFY COLUMN replaces the whole
+-- definition, so leaving it off here would silently drop the default that the
+-- schema still declares.
+ALTER TABLE `bid_pdfs` MODIFY COLUMN `byteSize` bigint NOT NULL DEFAULT 0;

@@ -21,7 +21,9 @@ import {
   r2PresignGet,
   r2PresignPut,
   r2PutObject,
+  r2ViewerUrl,
 } from "./r2Storage";
+import { storageUrl } from "./storageTokens";
 import {
   legacyReadBackends,
   selectStorageBackend,
@@ -219,4 +221,35 @@ export async function storageGetSignedUrl(relKey: string): Promise<string> {
 
   const { url } = (await resp.json()) as { url: string };
   return url;
+}
+
+/**
+ * The URL the plan VIEWER should load a document from.
+ *
+ * ── Why this is not the same as every other read URL ─────────────────────────
+ * Ordinary reads go through `/manus-storage/<token>/<key>`, which verifies the
+ * token and redirects. That is one round trip through this server per byte
+ * range — and pdf.js asks for a byte range for every slice of every page of a
+ * plan somebody is scrolling through. For a 1GB scanned set that is a great
+ * many requests to a server that does nothing but sign and redirect.
+ *
+ * So when the object is genuinely in R2, this hands back a long-lived signed
+ * R2 link and takes this server out of the loop. When it is anywhere else —
+ * including an old object still sitting in Manus or on disk while R2 is live —
+ * it falls back to the proxy url, which knows how to find it.
+ *
+ * The returned value is a bearer credential. Give it to the caller that asked
+ * and nowhere else: never a log line, never a database column, never the
+ * address bar.
+ */
+export async function planViewerUrl(
+  relKey: string,
+  now: Date
+): Promise<string> {
+  const key = normalizeKey(relKey);
+  // resolveReadBackend's answer is cached per key, so this costs nothing after
+  // the first call for a given plan.
+  const backend = await resolveReadBackend(key).catch(() => null);
+  if (backend === "r2") return r2ViewerUrl(key, now);
+  return storageUrl(key, now);
 }

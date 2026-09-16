@@ -12,8 +12,10 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
+  VIEWER_URL_WINDOW_SECONDS,
   r2PresignGet,
   r2PresignPut,
+  r2ViewerUrl,
   resetR2StorageForTests,
 } from "./r2Storage";
 
@@ -26,6 +28,7 @@ const FAKE_ENV = {
 
 /** The shape every stored key already has, filename and hash suffix included. */
 const KEY = "bid-plans/7/42/Electrical Plans_a1b2c3d4.pdf";
+const NOW = new Date("2026-09-16T08:20:00Z");
 
 const saved: Record<string, string | undefined> = {};
 
@@ -139,3 +142,75 @@ function encodePath(key: string): string {
     .map(segment => encodeURIComponent(segment))
     .join("/");
 }
+
+describe("the viewer link", () => {
+  const LATER = new Date(NOW.getTime() + 37 * 60 * 1000);
+
+  /**
+   * The property the whole viewer design rests on.
+   *
+   * The client holds this url in a React Query cache and the viewer reloads the
+   * document whenever it changes. The app refetches in the background on window
+   * focus — every alt-tab back to a takeoff — so a url that differed per mint
+   * would silently restart the open plan each time, losing the page the
+   * estimator was on.
+   */
+  it("is byte-identical when minted again inside the same window", async () => {
+    const a = await r2ViewerUrl(KEY, NOW);
+    const b = await r2ViewerUrl(KEY, LATER);
+    expect(a).toBe(b);
+  });
+
+  it("pins the signing time, not just the expiry", async () => {
+    // The part that is easy to miss: the signature covers X-Amz-Date, so
+    // bucketing only the duration still yields a different url every second.
+    const url = new URL(await r2ViewerUrl(KEY, NOW));
+    const stamp = url.searchParams.get("X-Amz-Date");
+    const again = new URL(await r2ViewerUrl(KEY, LATER));
+    expect(again.searchParams.get("X-Amz-Date")).toBe(stamp);
+  });
+
+  it("changes once the window has rolled over", async () => {
+    const next = new Date(NOW.getTime() + 13 * 60 * 60 * 1000);
+    expect(await r2ViewerUrl(KEY, NOW)).not.toBe(await r2ViewerUrl(KEY, next));
+  });
+
+  /**
+   * Long enough to outlive a working day: pdf.js re-requests this same url for
+   * every byte range for as long as the plan is open, so an expiry mid-takeoff
+   * interrupts somebody counting devices.
+   */
+  it("lasts long enough for a day of takeoff", async () => {
+    const url = new URL(await r2ViewerUrl(KEY, NOW));
+    const seconds = Number(url.searchParams.get("X-Amz-Expires"));
+    expect(seconds).toBeGreaterThanOrEqual(VIEWER_URL_WINDOW_SECONDS);
+  });
+
+  it("is never shorter than the window it promises", async () => {
+    // Bucketing means real validity varies between one and two windows. It has
+    // to vary upward only.
+    for (const minutes of [0, 1, 359, 719]) {
+      const at = new Date(NOW.getTime() + minutes * 60 * 1000);
+      const url = new URL(await r2ViewerUrl(KEY, at));
+      const issued = url.searchParams.get("X-Amz-Date")!;
+      const start = Date.UTC(
+        Number(issued.slice(0, 4)),
+        Number(issued.slice(4, 6)) - 1,
+        Number(issued.slice(6, 8)),
+        Number(issued.slice(9, 11)),
+        Number(issued.slice(11, 13)),
+        Number(issued.slice(13, 15))
+      );
+      const expires = Number(url.searchParams.get("X-Amz-Expires")) * 1000;
+      const goodUntil = start + expires;
+      expect(goodUntil - at.getTime()).toBeGreaterThanOrEqual(
+        VIEWER_URL_WINDOW_SECONDS * 1000
+      );
+    }
+  });
+
+  it("opens one object and nothing else", async () => {
+    const url = new URL(await r2ViewerUrl(KEY, NOW));
+    expect(url.pathname).toBe(`/${encodePath(KEY)}`);
+  });
+});

@@ -24,9 +24,10 @@
  * user needs to know WHICH file of five did not make it and why.
  */
 import { cn } from "@/lib/utils";
-import { AlertCircle, Loader2, RotateCcw, X } from "lucide-react";
+import { AlertCircle, Loader2, PauseCircle, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatBytes } from "@shared/uploadLimits";
+import { formatSpeed, formatTimeRemaining } from "@shared/uploadSpeed";
 
 export type UploadJobView = {
   id: string;
@@ -45,6 +46,20 @@ export type UploadJobView = {
    * Those rows offer only Dismiss, because the way forward is a different file.
    */
   retryable?: boolean;
+
+  /** Pieces, for a large set going up in parts. Absent for an ordinary upload. */
+  partsDone?: number;
+  partCount?: number;
+  /** Waiting for the network. Not a failure, and nothing has been lost. */
+  paused?: boolean;
+  /** Nothing has moved for a while, though the browser still claims a network. */
+  stalled?: boolean;
+  /** Which attempt a piece is on, while it is being re-sent. */
+  retrying?: number | null;
+  /** Bytes per second over the last few seconds, or null if not yet known. */
+  speed?: number | null;
+  /** Seconds left at that speed, or null when there is no honest estimate. */
+  secondsLeft?: number | null;
 };
 
 export function UploadProgress({
@@ -84,6 +99,10 @@ export function UploadProgress({
             <div className="flex items-center gap-2">
               {failed ? (
                 <AlertCircle className="w-3.5 h-3.5 shrink-0 text-destructive" />
+              ) : job.paused || job.stalled ? (
+                // Still, not spinning. A spinner while nothing is moving says
+                // work is happening, and none is.
+                <PauseCircle className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
               ) : (
                 <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-[#F5C518]" />
               )}
@@ -126,7 +145,18 @@ export function UploadProgress({
                       ? "Finishing…"
                       : job.state === "waiting"
                         ? "Queued"
-                        : `${pct}% · ${formatBytes(job.sent)} of ${formatBytes(job.byteSize)}`}
+                        : job.paused
+                          ? // The states where the numbers would mislead: a
+                            // speed and a time left are both meaningless while
+                            // nothing is moving, so neither is shown.
+                            `Paused — no connection · ${pct}%`
+                          : job.stalled
+                            ? // The browser still claims a network, but nothing
+                              // has moved for a while. "Waiting" rather than
+                              // "lost" in the verb, because the upload has not
+                              // given up and neither should the reader.
+                              `Connection lost — waiting… · ${pct}%`
+                            : `${pct}% · ${formatBytes(job.sent)} of ${formatBytes(job.byteSize)}`}
                   </span>
                   {job.state === "uploading" && (
                     <Button
@@ -166,7 +196,12 @@ export function UploadProgress({
               >
                 <div
                   className={cn(
-                    "h-full rounded-full bg-[#F5C518] transition-[width] duration-200",
+                    "h-full rounded-full transition-[width] duration-200",
+                    // Greyed while paused: a bar in the live colour that is not
+                    // advancing is the thing that reads as frozen.
+                    job.paused || job.stalled
+                      ? "bg-muted-foreground/50"
+                      : "bg-[#F5C518]",
                     // The record-the-sheet step has no measurable progress, so
                     // the full bar pulses rather than sitting inert.
                     job.state === "finishing" && "animate-pulse"
@@ -175,6 +210,34 @@ export function UploadProgress({
                 />
               </div>
             )}
+
+            {/*
+              The slow line: how fast, how long, and which piece.
+
+              Only while genuinely transferring. On a paused or finishing row
+              these numbers are stale by definition, and a stale speed is worse
+              than none — it is the figure someone reads to decide whether to
+              give up, so it has to describe now.
+            */}
+            {!failed &&
+            job.state === "uploading" &&
+            !job.paused &&
+            !job.stalled ? (
+              <p className="mt-1 text-[0.65rem] font-mono tabular-nums text-muted-foreground">
+                {[
+                  formatSpeed(job.speed ?? null),
+                  formatTimeRemaining(job.secondsLeft ?? null),
+                  // Pieces only when there are pieces — an ordinary upload is
+                  // one request and "piece 1 of 1" is noise.
+                  job.partCount && job.partCount > 1
+                    ? `piece ${Math.min((job.partsDone ?? 0) + 1, job.partCount)} of ${job.partCount}`
+                    : "",
+                  job.retrying ? `retrying (attempt ${job.retrying})` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            ) : null}
 
             {/* Announced for anyone who cannot see the bar. Percentage only, so
                 it is not read out on every progress event. */}

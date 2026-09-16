@@ -60,6 +60,35 @@ export type UploadJob = {
   file: File;
   /** False when re-sending identical bytes cannot possibly work. */
   retryable: boolean;
+
+  /**
+   * ── Only set while a large set is going up in pieces ───────────────────────
+   * A percentage that crawls for twenty minutes is much easier to trust when
+   * there is discrete progress behind it, so a big upload also reports which
+   * piece it is on. Absent for an ordinary single-request upload, where there
+   * is nothing to count.
+   */
+  partsDone?: number;
+  partCount?: number;
+  /**
+   * Waiting for the network to come back.
+   *
+   * Distinct from a failure on purpose: nothing is wrong, nothing has been
+   * lost, and there is nothing for the user to do but reconnect. Shown as
+   * "Paused" rather than counted toward the stall watchdog.
+   */
+  paused?: boolean;
+  /**
+   * Nothing has moved for a while, though the browser still claims a network.
+   *
+   * Separate from `paused` because Windows can take most of a minute to admit
+   * a Wi-Fi connection has gone. In that gap the browser insists it is online
+   * while every byte goes nowhere, and a live-looking bar that has stopped
+   * moving is indistinguishable from the app having hung.
+   */
+  stalled?: boolean;
+  /** Which attempt a piece is on, while it is being retried. */
+  retrying?: number | null;
 };
 
 let sequence = 0;

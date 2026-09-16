@@ -7,6 +7,7 @@
  *
  * Protocol:
  *   Main → Worker:  { type: 'load', pdfData: ArrayBuffer, hash: string }
+ *   Main → Worker:  { type: 'loadUrl', url: string, hash: string, byteSize?: number }
  *   Main → Worker:  { type: 'render', pageNum: number, scale: number, hash: string, reqId: string }
  *   Main → Worker:  { type: 'outline', hash: string, reqId: string }
  *   Main → Worker:  { type: 'text', pageNum: number, hash: string, reqId: string }
@@ -129,7 +130,7 @@ self.onmessage = async (e: MessageEvent) => {
       const loadingTask =
         msg.type === "loadUrl"
           ? pdfjs.getDocument({
-              ...pdfRangeLoadOptions(msg.url),
+              ...pdfRangeLoadOptions(msg.url, msg.byteSize ?? null),
               ...WORKER_SAFE_OPTIONS,
             })
           : pdfjs.getDocument({

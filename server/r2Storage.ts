@@ -56,6 +56,10 @@ let cachedClient: { client: S3Client; config: R2PlansConfig } | null = null;
  * told by `selectStorageBackend` that R2 is the backend, so an incomplete
  * config at this point is a genuine misconfiguration and not a fallback case.
  */
+export function r2Client(): { client: S3Client; config: R2PlansConfig } {
+  return r2();
+}
+
 function r2(): { client: S3Client; config: R2PlansConfig } {
   if (cachedClient) return cachedClient;
 
@@ -134,6 +138,79 @@ export async function r2PresignGet(key: string): Promise<string> {
     client,
     new GetObjectCommand({ Bucket: config.bucket, Key: key }),
     { expiresIn: DOWNLOAD_WINDOW_SECONDS }
+  );
+}
+
+/**
+ * How long a viewer link lasts.
+ *
+ * Twelve hours, because this one has to outlive a working day rather than a
+ * single redirect. The viewer hands it to pdf.js, which then re-requests the
+ * SAME url for every byte range of every page for as long as the plan is open;
+ * a link that expires mid-takeoff interrupts someone counting devices.
+ */
+export const VIEWER_URL_WINDOW_SECONDS = 12 * 60 * 60;
+
+/**
+ * When a viewer link minted now should start and stop being valid.
+ *
+ * ── Bucketed, and that is the entire point ───────────────────────────────────
+ * Both ends are pinned to a fixed boundary so that every mint inside the same
+ * window produces a BYTE-IDENTICAL url. That is not tidiness. The client holds
+ * these in a React Query cache and the viewer reloads the document whenever the
+ * url changes, so a url that differed on each mint would silently restart an
+ * open plan every time the app refetched in the background — which it does on
+ * window focus, meaning every alt-tab back to a takeoff.
+ *
+ * The SIGNING TIME has to be pinned as well as the expiry, which is the part
+ * that is easy to miss: the signature covers X-Amz-Date, so bucketing only the
+ * duration still yields a different url every second.
+ *
+ * Same reasoning as `storageTokenExpiry` in storageTokens.ts, and the same
+ * consequence: real validity varies between one and two windows, never less
+ * than the window promised.
+ */
+export function viewerUrlWindow(now: Date): {
+  signingDate: Date;
+  expiresIn: number;
+} {
+  const windowMs = VIEWER_URL_WINDOW_SECONDS * 1000;
+  const start = Math.floor(now.getTime() / windowMs) * windowMs;
+  return {
+    signingDate: new Date(start),
+    // Two windows from the pinned start, so a url minted at the very end of a
+    // window is still good for a full window afterwards.
+    expiresIn: VIEWER_URL_WINDOW_SECONDS * 2,
+  };
+}
+
+/**
+ * A long-lived signed link the viewer gives straight to pdf.js.
+ *
+ * ── Why this bypasses our own storage proxy ──────────────────────────────────
+ * The proxy answers one request per byte range: pdf.js asks it, it verifies a
+ * token, signs, and redirects to R2. That is a round trip through this server
+ * for every slice of every page of a plan somebody is scrolling through. Handing
+ * over a signed link once takes this server out of the loop entirely.
+ *
+ * ── What is given up, stated plainly ─────────────────────────────────────────
+ * This is a bearer link: whoever holds it can read that one object until it
+ * expires. That was already true of the proxy url it replaces — the change is
+ * that the window is twelve hours rather than thirty minutes. Ownership is
+ * still checked where the link is MINTED, and the link still opens exactly one
+ * object and grants nothing else.
+ *
+ * Which is why a link like this must never be written down. It is returned to
+ * the caller that asked and nowhere else: not logged, not stored in a column,
+ * not put in the address bar. A signed url in a log file outlives the session
+ * and is readable by anyone who can read logs.
+ */
+export async function r2ViewerUrl(key: string, now: Date): Promise<string> {
+  const { client, config } = r2();
+  return getSignedUrl(
+    client,
+    new GetObjectCommand({ Bucket: config.bucket, Key: key }),
+    viewerUrlWindow(now)
   );
 }
 
