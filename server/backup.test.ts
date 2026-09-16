@@ -141,6 +141,24 @@ runIf("the dump covers every table", () => {
     expect(dump.sql).toContain(`CREATE TABLE \`${ORPHAN_TABLE}\``);
   });
 
+  /**
+   * ── The dialect the dump is WRITTEN in has to match the one it is READ in ──
+   * SHOW CREATE TABLE answers in the server's own quoting style, and the header
+   * this dump writes restores under NO_AUTO_VALUE_ON_ZERO, which does not
+   * include ANSI_QUOTES. DigitalOcean runs with ANSI_QUOTES by default, so
+   * without pinning the session (dumpDatabase does) every name would come back
+   * as "table" instead of `table`, and on restore each one would be read as a
+   * string literal and the file would not load.
+   *
+   * Asserted here rather than trusted to the host, because a dump that cannot
+   * be restored looks exactly like a good one until the day it is needed.
+   */
+  it("quotes names with backticks whatever the server's quoting mode", async () => {
+    const dump = await dumpDatabase(databaseUrl);
+    expect(dump.sql).toContain("CREATE TABLE `");
+    expect(dump.sql).not.toContain('CREATE TABLE "');
+  });
+
   it("backs up drizzle's own migration ledger", async () => {
     // Restoring without it leaves a database that looks unmigrated and invites
     // someone to re-run every migration over live data.

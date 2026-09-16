@@ -102,6 +102,20 @@ export async function dumpDatabase(databaseUrl: string): Promise<DumpResult> {
   });
 
   try {
+    // ── The dump must be written in the dialect it will be restored under ────
+    // SHOW CREATE TABLE answers in the SERVER's quoting style. DigitalOcean
+    // runs with ANSI_QUOTES by default, where identifiers come back as
+    // CREATE TABLE "assemblies" ("id" int …) — and the header this file writes
+    // sets SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO', which does NOT include
+    // ANSI_QUOTES, so on restore every one of those double-quoted names is read
+    // as a string literal and the file will not load. A backup that cannot be
+    // restored is not a backup, and nothing would have said so until the day it
+    // was needed.
+    //
+    // So the session is pinned to the same mode the header restores under,
+    // before anything is read. Backticks either way, on any host.
+    await connection.query("SET SESSION sql_mode = 'NO_AUTO_VALUE_ON_ZERO'");
+
     const [dbRows] = await connection.query<mysql.RowDataPacket[]>(
       "SELECT DATABASE() AS db"
     );
