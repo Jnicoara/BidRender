@@ -3252,3 +3252,67 @@ export type AssemblyHourSuggestion =
   typeof assemblyHourSuggestions.$inferSelect;
 export type InsertAssemblyHourSuggestion =
   typeof assemblyHourSuggestions.$inferInsert;
+
+// ─── AI usage ─────────────────────────────────────────────────────────────────
+
+/**
+ * One row per user, per UTC day, per feature: how many AI calls and what they
+ * cost.
+ *
+ * ── Why a table and not just a log line ──────────────────────────────────────
+ * Two jobs, and the second is why this exists. The daily limit needs a counter
+ * that survives a restart, and a log file is not a counter. Having paid for the
+ * counter, the cost total rides along for nothing — which turns "what is this
+ * costing?" from a grep through a hosting provider's log viewer into a number
+ * on the admin screen.
+ *
+ * ── What is deliberately NOT here ────────────────────────────────────────────
+ * No prompt, no question, no sheet image, no extracted drawing text, no reply.
+ * The point of the table is arithmetic, and keeping the content out means a
+ * spend report can never become an accidental archive of what contractors
+ * asked about their jobs. Token counts describe size and nothing else.
+ */
+export const aiUsageDaily = mysqlTable(
+  "ai_usage_daily",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** `2026-09-16`, UTC. A string because it is only ever grouped and compared. */
+    day: varchar("day", { length: 10 }).notNull(),
+    /** `plan-read`, `navigation`, … — see shared/aiLimits.ts. */
+    feature: varchar("feature", { length: 40 }).notNull(),
+    /** The model id as sent, so a cost can be re-derived if a rate changes. */
+    model: varchar("model", { length: 80 }).notNull(),
+
+    calls: int("calls").default(0).notNull(),
+    /**
+     * BIGINT because tokens accumulate. A busy month of plan reading is tens
+     * of millions, which fits an INT — but the same mistake as bid_pdfs.byteSize
+     * costs an insert that fails at the end of a month rather than the start,
+     * and there is no reason to find out the hard way twice.
+     */
+    inputTokens: bigint("inputTokens", { mode: "number" }).default(0).notNull(),
+    outputTokens: bigint("outputTokens", { mode: "number" })
+      .default(0)
+      .notNull(),
+    /** Millionths of a dollar. See shared/aiPricing.ts for why. */
+    costMicros: bigint("costMicros", { mode: "number" }).default(0).notNull(),
+
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    // One row per user/day/feature/model, so recording a call is an upsert
+    // rather than a read-then-write that two concurrent calls could both win.
+    unique("ai_usage_daily_unique").on(t.userId, t.day, t.feature, t.model),
+    // The limit check reads exactly this.
+    index("ai_usage_daily_user_day_idx").on(t.userId, t.day),
+    // The admin total reads this.
+    index("ai_usage_daily_day_idx").on(t.day),
+  ]
+);
+
+export type AiUsageDaily = typeof aiUsageDaily.$inferSelect;
+export type InsertAiUsageDaily = typeof aiUsageDaily.$inferInsert;

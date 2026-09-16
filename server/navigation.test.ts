@@ -151,12 +151,15 @@ describe("the navigation allowlist", () => {
  * log nothing — a test that inverts depending on the environment it runs in is
  * worse than no test, since it teaches people the suite is unreliable.
  */
-vi.mock("./_core/llm", () => ({
-  invokeLLM: vi.fn(async () => {
-    throw new Error("simulated gateway rejection: unknown model");
-  }),
-  listLLMModels: vi.fn(async () => ({ object: "list", data: [] })),
-}));
+vi.mock("./llm", async () => {
+  const actual = await vi.importActual<typeof import("./llm")>("./llm");
+  return {
+    ...actual,
+    invokeLLM: vi.fn(async () => {
+      throw new Error("simulated gateway rejection: unknown model");
+    }),
+  };
+});
 
 describe("when the helper cannot reach a model", () => {
   const caller = () =>

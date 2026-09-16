@@ -23,10 +23,14 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 
-vi.mock("./_core/llm", () => ({
-  invokeLLM: vi.fn(),
-  listLLMModels: vi.fn(),
-}));
+// The metered dispatcher, not the raw gateway: every AI call goes through
+// server/llm now, which is also where the daily limit and the cost line live.
+// AiLimitReached is re-exported so the router's `instanceof` check still works
+// against the same class the mock would throw.
+vi.mock("./llm", async () => {
+  const actual = await vi.importActual<typeof import("./llm")>("./llm");
+  return { ...actual, invokeLLM: vi.fn() };
+});
 
 import { appRouter } from "./routers";
 import {
@@ -35,7 +39,7 @@ import {
   seedBaselineMaterials,
   getStampsForSheet,
 } from "./db";
-import { invokeLLM } from "./_core/llm";
+import { invokeLLM } from "./llm";
 import { bidPdfs, bids, symbolLinks, users } from "../drizzle/schema";
 import { PLAN_COPILOT_MODEL } from "./routers/planCopilotRouter";
 import { NAVIGATION_MODEL } from "./routers/navigationRouter";

@@ -852,3 +852,13 @@ left as written rather than rewritten to match the rename.
 - [ ] `references/deploying.md` § 8 says login is "OAuth-only; no password flow is wired up despite `passwordHash` existing on `users`" — untrue since v5.127/5.128. `server/routers/authRouter.ts` has bcrypt signup, login and change-password. That table is what someone reads to size the work of leaving Manus, and it currently overstates it by a whole login system.
 - [ ] `server/backup.test.ts` uses `"bidrender-backups"` as a fixture bucket name. Harmless test data — the real bucket is `bidsoftware` — but it is now the last place that string survives, so it will read like the configured value to whoever finds it next.
 - [ ] Decide whether v5.129 (the docs-only R2 key-replacement commit) belongs in `CHANGELOG.md`. Skipped at the time because nothing about the app's behaviour changed, which is the exemption CLAUDE.md allows.
+
+## Migration cutover — DigitalOcean App Platform
+
+- [ ] Delete the old HelixBid Anthropic API key once the app is live on DigitalOcean and Manus is shut off.
+- [x] Set a monthly spend limit on the Anthropic workspace — BidRender production, $50/month with an email alert at $25 (set 2026-09-16). The app's own limits cap one person per day; this is the only one that caps the account.
+- [ ] Set `ANTHROPIC_API_KEY` in the DigitalOcean environment.
+- [ ] Set `CRON_SECRET` on DigitalOcean and, byte-identical, via `wrangler secret put CRON_SECRET`.
+- [ ] Fill in `APP_BASE_URL` in `workers/cron/wrangler.toml` and `wrangler deploy` the cron worker — until then neither the backup nor the archived-bid purge ever runs.
+- [ ] Set `PLAN_STORAGE=r2` plus the `R2_PLANS_*` values, so plan files go to Cloudflare rather than Manus.
+- [ ] Add a CORS rule on `bidrender-plans` for the live origin, exposing `ETag` — an upload in pieces cannot be reassembled without it.

@@ -222,11 +222,48 @@ resolves that id against the same list before anything reaches the client, so an
 invented target degrades to a text answer rather than a dead link. One list, so
 there is no prompt and validator that can disagree.
 
-Pick the model tier by the work: lookup-and-route runs on the fast tier
-(`NAVIGATION_MODEL`, env-overridable), not the tier reserved for plan reading.
+Pick the model tier by the work: lookup-and-route and alias suggestions run on
+the fast tier (`NAVIGATION_MODEL`, `MATERIAL_ALIAS_MODEL`), not the tier
+reserved for plan reading (`PLAN_COPILOT_MODEL`). All three are env-overridable,
+so a model id that turns out to be wrong is a setting rather than a deploy.
 And every AI feature degrades to useful-without-it — no key, a refusal, a
-timeout and a malformed reply all return the same graceful fallback, because
-navigation and search must never depend on an LLM being reachable.
+timeout, a malformed reply and a used-up daily allowance all return a graceful
+answer, because navigation and search must never depend on an LLM being
+reachable.
+
+**Every call goes through `server/llm`, never `server/_core/llm` directly.**
+That one door is where the daily limit, the cost line and the provider choice
+live, so a feature added later cannot forget them. It talks to Anthropic when
+`ANTHROPIC_API_KEY` is set and falls back to the Manus gateway when only that is
+configured; `server/llm/anthropic.ts` translates between the OpenAI-shaped
+protocol the callers speak and Anthropic's, which is why the routers changed by
+one import line rather than being rewritten. Take that file seriously — every
+mistake it can make is silent and produces an app that still answers.
+
+**Three cost controls, and they are not equally useful.**
+
+- **`maxTokens` on every call, always.** `invokeAnthropic` refuses a call
+  without one; an unbounded reply is the thing that turns a bug into a bill. But
+  a cap is a weak cost control: tighten it enough to save real money and you
+  start truncating replies, which produces a failed call you still paid for.
+- **A daily per-PERSON limit** (`shared/aiLimits.ts`) is what actually controls
+  spend. Set generously — it clears the heaviest genuine day and still stops a
+  loop in about a minute — because a limit people work around protects nothing.
+  Per person rather than per company, so one runaway tab cannot stop a
+  colleague working. The refusal message names the number, says when it resets,
+  and says what still works; a limit that reads as "the app is broken" costs
+  more than the calls it saved.
+- **`ai_usage_daily`** counts calls and money per user per day. It stores sizes
+  and never contents — no prompt, no question, no drawing text, no reply — so a
+  spend report cannot become an archive of what contractors asked about their
+  jobs. The same row serves the limit and the admin screen.
+
+Cost figures come from a local copy of published rates (`shared/aiPricing.ts`)
+in millionths of a dollar, because a single call costs less than a cent and
+cents would round every one of them to zero. They go stale silently, so say
+"indicative" anywhere they are shown: the console has the bill. An unpriced
+model records **zero** and logs that it did, rather than guessing — a visible
+zero gets fixed and a plausible wrong number does not.
 
 ## Editing fields — standing rules for every input
 

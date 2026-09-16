@@ -40,7 +40,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
-import { invokeLLM, type Tool } from "../_core/llm";
+import type { Tool } from "../_core/llm";
+import { AiLimitReached, invokeLLM } from "../llm";
 import { aiFeaturesEnabled } from "../aiFeatures";
 import {
   COPILOT_ACTIONS,
@@ -492,6 +493,8 @@ export const planCopilotRouter = router({
       let result;
       try {
         result = await invokeLLM({
+          feature: "plan-read",
+          user: ctx.user,
           model: PLAN_COPILOT_MODEL,
           messages: [
             { role: "system", content: readingPrompt(symbols, sheet.name) },
@@ -513,9 +516,25 @@ export const planCopilotRouter = router({
           ],
           tools: [reportTool()],
           toolChoice: "auto",
-          maxTokens: 8000,
+          /**
+           * Halved from 8000. A dense sheet's findings run 1,500-2,500 tokens,
+           * so this keeps roughly double the headroom while cutting the worst
+           * case per sheet from about 9.5c to 5.5c.
+           *
+           * Not lower, and the reason is worth stating: hitting this cap
+           * truncates the JSON, parsing fails, and the user gets nothing for a
+           * call that was still paid for. A cap tight enough to save real money
+           * is a cap tight enough to turn readings into failures — the daily
+           * limit in shared/aiLimits.ts is what actually controls spend.
+           */
+          maxTokens: 4000,
         });
       } catch (error) {
+        // Out of allowance is not a failure to hide behind a generic message —
+        // it has its own sentence, and it is the one case the user can act on.
+        if (error instanceof AiLimitReached) {
+          return record("failed", null, error.message, []);
+        }
         // No key, a bad model id, a timeout and a refusal all land here and are
         // indistinguishable on screen. The run is still stored so the panel can
         // say what happened instead of looking like it never ran.
@@ -684,6 +703,8 @@ export const planCopilotRouter = router({
 
       try {
         const result = await invokeLLM({
+          feature: "plan-ask",
+          user: ctx.user,
           model: PLAN_COPILOT_MODEL,
           messages: [
             {
@@ -719,6 +740,9 @@ export const planCopilotRouter = router({
         if (text) return { answer: text };
         noteFailure("ask returned no text");
       } catch (error) {
+        // The allowance has its own sentence. Everything else gets the generic
+        // one, because the difference is not the user's to act on.
+        if (error instanceof AiLimitReached) return { answer: error.message };
         noteFailure(
           "ask request rejected",
           error instanceof Error ? error.message : error

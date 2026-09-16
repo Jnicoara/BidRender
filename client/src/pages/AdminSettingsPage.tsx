@@ -22,6 +22,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Shield, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import EarlyAccessSignups from "@/components/EarlyAccessSignups";
+import { AiSpendPanel } from "@/components/AiSpendPanel";
 
 export default function AdminSettingsPage() {
   const { user } = useAuth();
@@ -60,6 +61,10 @@ export default function AdminSettingsPage() {
         {/* First, because it is the one section here with new information in it
             on any given day. */}
         <EarlyAccessSignups />
+
+        {/* Second, because "what is this costing" is the other question with a
+            different answer every day. */}
+        <AiSpendPanel />
 
         {/* Role reference */}
         <div>

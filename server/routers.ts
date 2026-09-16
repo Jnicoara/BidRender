@@ -32,6 +32,7 @@ import { navigationRouter } from "./routers/navigationRouter";
 import { planCopilotRouter } from "./routers/planCopilotRouter";
 import { earlyAccessRouter } from "./routers/earlyAccessRouter";
 import { backupRouter } from "./routers/backupRouter";
+import { aiUsageRouter } from "./routers/aiUsageRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -89,6 +90,7 @@ export const appRouter = router({
   // Admin-only. Exports everything to Cloudflare R2, independent of Manus —
   // scripts/backup.mts is the same job without needing the app to be up.
   backup: backupRouter,
+  aiUsage: aiUsageRouter,
 });
 
 export type AppRouter = typeof appRouter;

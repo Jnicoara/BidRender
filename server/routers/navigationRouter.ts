@@ -22,7 +22,8 @@
  */
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import { invokeLLM, type Tool } from "../_core/llm";
+import type { Tool } from "../_core/llm";
+import { AiLimitReached, invokeLLM } from "../llm";
 import { aiFeaturesEnabled } from "../aiFeatures";
 import {
   NAVIGATION_TARGETS,
@@ -150,11 +151,13 @@ function fallbackAfter(reason: string, detail?: unknown): NavigationAnswer {
 export const navigationRouter = router({
   ask: protectedProcedure
     .input(z.object({ question: z.string().trim().min(1).max(300) }))
-    .mutation(async ({ input }): Promise<NavigationAnswer> => {
+    .mutation(async ({ input, ctx }): Promise<NavigationAnswer> => {
       if (!aiFeaturesEnabled()) return SWITCHED_OFF;
       let result;
       try {
         result = await invokeLLM({
+          feature: "navigation",
+          user: ctx.user,
           model: NAVIGATION_MODEL,
           messages: [
             { role: "system", content: systemPrompt() },
@@ -165,6 +168,11 @@ export const navigationRouter = router({
           maxTokens: 200,
         });
       } catch (error) {
+        // Running out of today's allowance is not a failure — it has its own
+        // sentence, and it is the one case here the user can act on.
+        if (error instanceof AiLimitReached) {
+          return { message: error.message, target: null };
+        }
         // The one that matters: a bad model id, a missing key and a timeout all
         // land here and are indistinguishable on screen. The message carries
         // the reason, so the log can tell them apart.

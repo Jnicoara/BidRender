@@ -18,7 +18,18 @@ import {
   MATERIAL_CATEGORIES,
   MATERIAL_UNITS_OF_SALE,
 } from "../../drizzle/schema";
-import { invokeLLM } from "../_core/llm";
+import { AiLimitReached, invokeLLM } from "../llm";
+
+/**
+ * The model that suggests trade slang for a material.
+ *
+ * The fast tier, because this is a short text-in/text-out job whose output a
+ * human reads and edits before it is saved — CLAUDE.md's rule about picking the
+ * cheapest tier that does the work. Env-overridable, like the other two, so a
+ * model id that turns out to be wrong is a setting rather than a deploy.
+ */
+export const MATERIAL_ALIAS_MODEL =
+  process.env.MATERIAL_ALIAS_MODEL?.trim() || "claude-haiku-4-5-20251001";
 import { aiFeaturesEnabled } from "../aiFeatures";
 import {
   aliasPromptFor,
@@ -118,6 +129,9 @@ export const materialsRouter = router({
       let raw: string[] = [];
       try {
         const result = await invokeLLM({
+          feature: "material-aliases",
+          user: ctx.user,
+          model: MATERIAL_ALIAS_MODEL,
           messages: [
             {
               role: "user",
@@ -135,9 +149,15 @@ export const materialsRouter = router({
               : "";
         raw = parseAliasResponse(text);
       } catch (error) {
-        // Not an error the user needs to see. The manual field is right there,
-        // and a failed suggestion is a missing convenience, not a broken save.
-        console.warn("[suggestAliases] unavailable:", error);
+        // Not an error the user needs to see, allowance included. The manual
+        // field is right there, and a failed suggestion is a missing
+        // convenience rather than a broken save — so this is the one AI feature
+        // whose limit needs no message of its own.
+        if (error instanceof AiLimitReached) {
+          console.warn("[suggestAliases] daily allowance reached");
+        } else {
+          console.warn("[suggestAliases] unavailable:", error);
+        }
         return { suggestions: [], available: false };
       }
 

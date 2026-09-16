@@ -69,6 +69,8 @@ const UNGATED: Record<string, string> = {
 const ADMIN_ONLY: Record<string, string> = {
   "backupRouter.ts":
     "Runs and reports the platform-wide R2 backup. Not a contractor's data at all.",
+  "aiUsageRouter.ts":
+    "Reports AI spend across every account, so seeing it is seeing across companies. It reads only counts and money — never a prompt, a question or a reply — so there is no contractor data here to scope.",
 };
 
 describe("every data router is company-scoped", () => {

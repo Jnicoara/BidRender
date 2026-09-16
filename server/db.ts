@@ -144,6 +144,7 @@ import {
   projectAssemblyItems,
   projectItems,
   bidSummary,
+  aiUsageDaily,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import {
@@ -7125,4 +7126,115 @@ export async function getEarliestBidDate(userId: number): Promise<Date | null> {
     .orderBy(asc(bids.createdAt))
     .limit(1);
   return row?.createdAt ?? null;
+}
+
+// ─── AI usage ─────────────────────────────────────────────────────────────────
+
+/**
+ * Record one AI call against a user's day.
+ *
+ * An upsert, not a read-then-write. Two calls finishing at the same moment
+ * would both read the same count and both write count+1, losing one — which
+ * matters because this counter is what enforces the daily limit, and a limit
+ * that undercounts is a limit that can be walked past. The unique key on
+ * (user, day, feature, model) makes the database do the adding.
+ */
+export async function recordAiUsage(entry: {
+  userId: number;
+  day: string;
+  feature: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  costMicros: number;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .insert(aiUsageDaily)
+    .values({
+      userId: entry.userId,
+      day: entry.day,
+      feature: entry.feature,
+      model: entry.model,
+      calls: 1,
+      inputTokens: entry.inputTokens,
+      outputTokens: entry.outputTokens,
+      costMicros: entry.costMicros,
+    })
+    .onDuplicateKeyUpdate({
+      set: {
+        calls: sql`${aiUsageDaily.calls} + 1`,
+        inputTokens: sql`${aiUsageDaily.inputTokens} + ${entry.inputTokens}`,
+        outputTokens: sql`${aiUsageDaily.outputTokens} + ${entry.outputTokens}`,
+        costMicros: sql`${aiUsageDaily.costMicros} + ${entry.costMicros}`,
+      },
+    });
+}
+
+/**
+ * How many calls this user has made today in each feature group's worth of
+ * features — returned per feature, so the caller can sum the group it cares
+ * about without this function knowing what the groups are.
+ */
+export async function getAiCallsToday(
+  userId: number,
+  day: string
+): Promise<{ feature: string; calls: number }[]> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const rows = await db
+    .select({
+      feature: aiUsageDaily.feature,
+      calls: sql<number>`SUM(${aiUsageDaily.calls})`,
+    })
+    .from(aiUsageDaily)
+    .where(and(eq(aiUsageDaily.userId, userId), eq(aiUsageDaily.day, day)))
+    .groupBy(aiUsageDaily.feature);
+  return rows.map(r => ({ feature: r.feature, calls: Number(r.calls) }));
+}
+
+/**
+ * Everyone's AI spend over a range of days, broken down by feature and model.
+ *
+ * `from` and `to` are inclusive `YYYY-MM-DD` strings. Comparing dates as text
+ * works because the format sorts chronologically, and it keeps the query off
+ * any timezone conversion the database might apply to a real date column.
+ */
+export async function getAiSpend(
+  from: string,
+  to: string
+): Promise<
+  {
+    feature: string;
+    model: string;
+    calls: number;
+    inputTokens: number;
+    outputTokens: number;
+    costMicros: number;
+  }[]
+> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const rows = await db
+    .select({
+      feature: aiUsageDaily.feature,
+      model: aiUsageDaily.model,
+      calls: sql<number>`SUM(${aiUsageDaily.calls})`,
+      inputTokens: sql<number>`SUM(${aiUsageDaily.inputTokens})`,
+      outputTokens: sql<number>`SUM(${aiUsageDaily.outputTokens})`,
+      costMicros: sql<number>`SUM(${aiUsageDaily.costMicros})`,
+    })
+    .from(aiUsageDaily)
+    .where(and(gte(aiUsageDaily.day, from), lte(aiUsageDaily.day, to)))
+    .groupBy(aiUsageDaily.feature, aiUsageDaily.model);
+
+  return rows.map(r => ({
+    feature: r.feature,
+    model: r.model,
+    calls: Number(r.calls),
+    inputTokens: Number(r.inputTokens),
+    outputTokens: Number(r.outputTokens),
+    costMicros: Number(r.costMicros),
+  }));
 }
