@@ -3,10 +3,39 @@ import fs from "fs";
 import { type Server } from "http";
 import { nanoid } from "nanoid";
 import path from "path";
-import { createServer as createViteServer } from "vite";
-import viteConfig from "../../vite.config";
 
+/**
+ * Vite is loaded DYNAMICALLY, and that is not a style choice.
+ *
+ * The server is bundled with `esbuild --packages=external`, so every bare
+ * import stays an import in dist/index.js. A top-level `import ... from "vite"`
+ * is therefore evaluated the moment the module loads — in production, where
+ * `setupVite` is never called and vite is not installed at all, because the
+ * host strips devDependencies after the build.
+ *
+ * The result was a server that built perfectly and then died on startup with
+ * "Cannot find package 'vite'". It does not reproduce locally unless you prune
+ * dev dependencies first, which is exactly why it reached a deploy.
+ *
+ * Importing inside the function means production never touches vite.
+ *
+ * vite.config.ts is left to VITE to load, rather than imported here. Importing
+ * it — even dynamically — is a RELATIVE import, which esbuild bundles rather
+ * than leaving external, and bundling it hoists its own top-level plugin
+ * imports (@vitejs/plugin-react, @tailwindcss/vite,
+ * @builder.io/vite-plugin-jsx-loc) back into dist/index.js as static imports.
+ * Three more devDependencies, three more startup failures in production.
+ * Handing vite the path lets it resolve and load the config in development,
+ * where those packages exist.
+ */
 export async function setupVite(app: Express, server: Server) {
+  const { createServer: createViteServer } = await import("vite");
+  const configFile = path.resolve(
+    import.meta.dirname,
+    "../..",
+    "vite.config.ts"
+  );
+
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
@@ -14,8 +43,7 @@ export async function setupVite(app: Express, server: Server) {
   };
 
   const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
+    configFile,
     server: serverOptions,
     appType: "custom",
   });

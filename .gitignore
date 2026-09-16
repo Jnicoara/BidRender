@@ -17,6 +17,13 @@ build/
 # DigitalOcean Managed MySQL connection settings (host, logins, certificate path)
 .env.digitalocean
 
+# Every production setting in one file, ready to paste into the App Platform UI.
+# It contains the database password, the session secret, the cron secret, the
+# Anthropic key and all three R2 credentials — i.e. everything, in one place,
+# which is exactly why it must never be committed. Delete it once the settings
+# are entered; the values all live in .env.production.local and .env.digitalocean.
+app-platform-settings.txt
+
 # Personal working notes. Kept on the machine, never in a public repo: they name
 # real email addresses, local file paths and the state of one laptop, and they
 # go stale fast. Anything durable belongs in references/ instead.
