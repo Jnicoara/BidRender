@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { ENV } from "./env";
 import { serveStatic, setupVite } from "./vite";
 import { purgeArchivedBidsHandler } from "../scheduled/purgeArchivedBids";
 import { BACKUP_PATH, backupToR2Handler } from "../scheduled/backupToR2";
@@ -37,6 +38,50 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
     }
   }
   throw new Error(`No available port found starting from ${startPort}`);
+}
+
+/**
+ * Which port to listen on — and in production, only that one.
+ *
+ * ── Why hunting for a free port is wrong once this is hosted ─────────────────
+ * A hosting platform ASSIGNS the port and then probes it. Moving to the next
+ * free one is the worst possible response: the app comes up healthy on 8081
+ * while the health check knocks on 8080, so the deploy fails with a container
+ * whose own logs say "Server running". That is a long evening.
+ *
+ * Failing immediately is the useful behaviour there. Something else holding the
+ * assigned port in a container means something is genuinely wrong, and the
+ * platform's restart is more likely to fix it than a quiet sidestep.
+ *
+ * ── Development keeps the old behaviour, on purpose ─────────────────────────
+ * Locally a stale `pnpm dev` holding 3000 is ordinary, and the hunt is a small
+ * kindness — the startup line prints the port it actually took. The cost of
+ * being wrong is re-reading one line of output, not a failed deploy.
+ */
+async function resolvePort(): Promise<number> {
+  const configured = process.env.PORT?.trim();
+  const preferred = parseInt(configured || "3000", 10);
+
+  if (!Number.isInteger(preferred) || preferred <= 0 || preferred > 65535) {
+    throw new Error(
+      `PORT is set to "${configured}", which is not a port number.`
+    );
+  }
+
+  if (ENV.isProduction) {
+    if (await isPortAvailable(preferred)) return preferred;
+    throw new Error(
+      `Port ${preferred} is already in use. In production the port is not ` +
+        `negotiable — the platform assigns it and health-checks exactly it, ` +
+        `so listening anywhere else would look healthy here and fail there.`
+    );
+  }
+
+  const port = await findAvailablePort(preferred);
+  if (port !== preferred) {
+    console.log(`Port ${preferred} is busy, using port ${port} instead`);
+  }
+  return port;
 }
 
 async function startServer() {
@@ -87,12 +132,7 @@ async function startServer() {
     serveStatic(app);
   }
 
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
-
-  if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
-  }
+  const port = await resolvePort();
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
@@ -119,4 +159,20 @@ async function startServer() {
   });
 }
 
-startServer().catch(console.error);
+/**
+ * A server that failed to start must EXIT NON-ZERO.
+ *
+ * `catch(console.error)` printed the reason and then let the process fall off
+ * the end of its event loop with status 0 — so a container that never bound a
+ * port reported success. A hosting platform reads the exit code: a clean exit
+ * looks like an app that chose to stop, and the useful signals (a crash loop, a
+ * failed deploy rather than a silently dead one) all hang off a non-zero code.
+ *
+ * Found while testing the port change: refusing a taken port printed exactly
+ * the right sentence and then exited 0, which is the failure mode this whole
+ * change set was trying to remove.
+ */
+startServer().catch(error => {
+  console.error("[startup] the server could not start:", error);
+  process.exit(1);
+});
