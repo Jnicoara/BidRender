@@ -1,0 +1,27 @@
+# The scheduler for BidRender's two nightly jobs. See worker.js.
+#
+# The two cron expressions below must match BACKUP_CRON and PURGE_CRON in
+# server/scheduled/*.ts. TOML cannot import from TypeScript, so they are
+# restated here — and server/scheduledBackup.test.ts asserts the two agree,
+# because a schedule that silently drifts is a job that runs at the wrong time
+# and never says so.
+#
+# FIVE fields, UTC. Standard cron, no seconds field: a six-field expression
+# left over from the Manus scheduler would be rejected at deploy time, which is
+# the good case, or silently misread, which is not.
+
+name = "bidrender-cron"
+main = "worker.js"
+compatibility_date = "2026-09-16"
+
+[triggers]
+crons = ["0 2 * * *", "30 3 * * *"]
+
+[vars]
+# The deployed app. No trailing slash needed — worker.js strips one.
+# Set this to the real DigitalOcean URL before deploying.
+APP_BASE_URL = "https://REPLACE-ME.ondigitalocean.app"
+
+# CRON_SECRET is NOT here on purpose. It is a secret, so it is set with
+#   npx wrangler secret put CRON_SECRET
+# which stores it with Cloudflare instead of in a file that gets committed.

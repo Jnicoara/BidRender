@@ -1,8 +1,32 @@
 # Periodic Updates — Reference
 
+> **This file describes the MANUS platform scheduler, which is no longer how
+> this app runs scheduled work.** It is kept because the shape of a handler, the
+> idempotence rules and the reasoning about retries all still apply, and because
+> it records why those rules exist. Everything below about `manus-heartbeat`,
+> AGENT cron, `sdk.authenticateRequest`, `user.isCron`, `taskUid` and
+> six-field cron expressions is **historical**.
+>
+> **How it works now:**
+>
+> - A handler at `/api/scheduled/*`, mounted explicitly in
+>   `server/_core/index.ts` before the Vite/static fallthrough.
+> - Authorised by a shared secret in the `x-cron-secret` header, compared in
+>   constant time — `server/cronAuth.ts`. No secret configured means refuse
+>   everything, including the real caller.
+> - Triggered by the Cloudflare Worker in `workers/cron/`, deployed once with
+>   `wrangler deploy`.
+> - **Cron is FIVE fields, UTC** — standard crontab, no seconds. Every six-field
+>   expression in this document is in the old format.
+> - The Worker retries the backup (3 attempts) and not the purge (1), for the
+>   reasons in `workers/cron/worker.js`.
+> - Whether a job is actually running is established by MEASURING — see
+>   `backup.health`, which asks when a backup last succeeded — not by waiting to
+>   be told one failed. A schedule that was never registered reports nothing.
+
 Scope: any recurring or scheduled work for this site (digests, refreshes, cleanups, end-user-defined schedules, periodic notifications).
 
-Forbidden: `setInterval`, `node-cron`, or any in-process timer. Cloud Run terminates idle instances; in-process timers will not survive.
+Forbidden: `setInterval`, `node-cron`, or any in-process timer. A hosted app's instances are stopped and replaced; in-process timers will not survive. (Still true, on any host.)
 
 ---
 

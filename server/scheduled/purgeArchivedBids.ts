@@ -16,36 +16,47 @@
  * the app open.
  *
  * ── Registering it (a deploy-time step, not a code step) ─────────────────────
- * The handler below is only half the job. The cron itself is created ON the
- * Manus platform, once, from a sandbox terminal after the site is deployed —
- * a dev machine is unreachable from the platform, so this cannot be done from
- * a local checkout:
+ * The handler below is only half the job. The other half is the Cloudflare
+ * Worker in workers/cron/, deployed once with `wrangler deploy`, which holds
+ * the same CRON_SECRET and POSTs here at PURGE_CRON.
  *
- *     manus-heartbeat create \
- *       --name purge-archived-bids \
- *       --cron "0 30 3 * * *" \
- *       --path /api/scheduled/purgeArchivedBids \
- *       --description "Delete bids whose 30-day archive window has closed"
+ * 03:30 UTC daily. Hourly would be needless load for a 30-day window; daily
+ * means a bid is destroyed within a day of its deadline, which is the
+ * resolution the countdown promises anyway. It runs AFTER the 02:00 backup, on
+ * purpose — see backupToR2.ts.
  *
- * Six fields, seconds first, UTC — 03:30 UTC daily. Hourly would be needless
- * load for a 30-day window; daily means a bid is destroyed within a day of its
- * deadline, which is the resolution the countdown promises anyway.
- *
- * UNTIL THAT COMMAND IS RUN, NOTHING IS EVER PURGED. The app stays correct in
- * the meantime — `daysRemaining` still counts down and the archive still lists
- * everything — it simply keeps expired bids instead of destroying them, and one
- * sweep clears the backlog whenever the cron is finally registered. That is the
- * safe direction for the failure to point.
+ * UNTIL THAT WORKER IS DEPLOYED, NOTHING IS EVER PURGED. The app stays correct
+ * in the meantime — `daysRemaining` still counts down and the archive still
+ * lists everything — it simply keeps expired bids instead of destroying them,
+ * and one sweep clears the backlog whenever the cron is finally registered.
+ * That is the safe direction for the failure to point, and it is why this job
+ * needs no alerting of its own while the backup does.
  *
  * ── Idempotence ──────────────────────────────────────────────────────────────
- * The platform retries 5xx and 429 up to three times. A second run finds no
- * expired rows, deletes nothing and returns 200, because the query is driven by
- * stored state rather than by anything in the request body.
+ * The Worker may retry. A second run finds no expired rows, deletes nothing and
+ * returns 200, because the query is driven by stored state rather than by
+ * anything in the request body.
  */
 import type { Request, Response } from "express";
-import { sdk } from "../_core/sdk";
+import {
+  CRON_REFUSAL_BODY,
+  CRON_SECRET_HEADER,
+  checkCronSecret,
+} from "../cronAuth";
 import { RETENTION_DAYS, systemClock } from "../../shared/retention";
 import * as db from "../db";
+
+/**
+ * When the purge runs. Five fields, UTC — standard cron, no seconds.
+ *
+ * Deliberately after the 02:00 backup: this job permanently destroys bids, and
+ * running it second means the night's export still contains what it is about to
+ * remove. Reverse the order and the backup would faithfully record the deletion.
+ */
+export const PURGE_CRON = "30 3 * * *";
+
+/** The path the Worker POSTs to. Mounted in server/_core/index.ts. */
+export const PURGE_PATH = "/api/scheduled/purgeArchivedBids";
 
 export type PurgeResult = {
   /** How many bids were destroyed. */
@@ -94,18 +105,20 @@ export async function purgeExpiredBids(
 /**
  * `POST /api/scheduled/purgeArchivedBids` — mounted in server/_core/index.ts.
  *
- * Cron-only. `sdk.authenticateRequest` sets `isCron` for platform-triggered
- * calls; a logged-in user hitting this URL is refused, because "delete everyone
- * else's expired bids" is not a user-facing operation.
+ * Cron-only, proved by the shared secret in the `x-cron-secret` header — see
+ * server/cronAuth.ts. A logged-in user hitting this URL is refused too, because
+ * "delete everyone else's expired bids" is not a user-facing operation.
  *
  * Takes no clock: express reserves the third argument for `next`, and the seam
  * worth testing is `purgeExpiredBids` above, which the tests drive directly.
  */
 export async function purgeArchivedBidsHandler(req: Request, res: Response) {
   try {
-    const user = await sdk.authenticateRequest(req);
-    if (!user?.isCron) {
-      return res.status(403).json({ error: "cron-only" });
+    const allowed = checkCronSecret(req.headers[CRON_SECRET_HEADER]);
+    if (!allowed.ok) {
+      // The reason stays here, where the person who can fix it will look.
+      console.warn(`[PurgeArchivedBids] refused a trigger: ${allowed.reason}`);
+      return res.status(403).json(CRON_REFUSAL_BODY);
     }
 
     const result = await purgeExpiredBids(systemClock());

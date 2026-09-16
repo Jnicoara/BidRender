@@ -27,6 +27,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import SettingsPage from "@/pages/SettingsPage";
 import MaterialDatabasePage from "@/pages/MaterialDatabasePage";
 import DashboardPage from "@/pages/DashboardPage";
+import { BackupHealthBanner } from "@/components/BackupHealthBanner";
 import AdminSettingsPage from "@/pages/AdminSettingsPage";
 import MaterialsLibraryPage from "@/pages/MaterialsLibraryPage";
 import LaborRatesPage from "@/pages/LaborRatesPage";
@@ -216,12 +217,15 @@ export default function BidRenderShell() {
   );
 
   const dashboard = (
-    <DashboardPage
-      onOpenBid={openBid}
-      onOpenArchive={() => navigate("bid-archive")}
-      onOpenPlans={id => navigate("takeoff", { id })}
-      onCount={id => navigate("count", { id })}
-    />
+    <>
+      <BackupHealthBanner isAdmin={isAdmin} />
+      <DashboardPage
+        onOpenBid={openBid}
+        onOpenArchive={() => navigate("bid-archive")}
+        onOpenPlans={id => navigate("takeoff", { id })}
+        onCount={id => navigate("count", { id })}
+      />
+    </>
   );
 
   // ── Content renderer ───────────────────────────────────────────────────────

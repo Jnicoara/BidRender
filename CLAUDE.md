@@ -285,27 +285,47 @@ still applies — attach `selectOnFocus`.
 The app has one background job, and it is the template for any future one.
 Read this before adding a second.
 
-**Never use `setInterval` or `node-cron`.** The app runs on Cloud Run, which
-terminates idle instances, so an in-process timer dies with the instance and
-takes the guarantee with it. `references/periodic-updates.md` is the full
-reference; the short version follows.
+**Never use `setInterval` or `node-cron`.** A hosted app's instances are stopped
+and replaced, so an in-process timer dies with the instance and takes the
+guarantee with it. `references/periodic-updates.md` is the full reference; the
+short version follows.
 
 A scheduled job is **two pieces that ship separately**:
 
 1. **A handler in the app**, at a path starting `/api/scheduled/`, mounted
    explicitly in `server/_core/index.ts` _before_ the Vite/static fallthrough
    (`/api/scheduled/*` is not auto-registered, and without the explicit mount
-   the platform's POST lands on the SPA index). It authenticates with
-   `sdk.authenticateRequest` and refuses anything without `user.isCron`. It must
-   be idempotent — the platform retries 5xx/429 three times.
-2. **The cron itself, created on the Manus platform**, once, from a sandbox
-   terminal _after the site is deployed_ — a dev machine is unreachable from the
-   platform, so this cannot be done from a local checkout. The exact command is
-   in the handler's header comment.
+   the POST lands on the SPA index and records a cheerful 200 for a job that
+   never ran). It authorises with `checkCronSecret` (`server/cronAuth.ts`) and
+   must be idempotent, because the caller retries.
+2. **The Cloudflare Worker in `workers/cron/`**, deployed once with
+   `wrangler deploy` after the site is up. It holds the same `CRON_SECRET`.
+
+**The secret is the whole gate, so three rules are not negotiable.** Compare it
+in constant time, never `===` — a comparison that stops at the first wrong
+character leaks the secret one character at a time. Refuse when no secret is
+configured, rather than waving everything through so a fresh environment "just
+works"; that is how a bid-deleting endpoint ends up open on the one host where
+the variable was missed. And give every refusal the same answer, so nobody
+learns whether the endpoint is protected without ever guessing right.
+
+**Cloudflare cron is FIVE fields, UTC — no seconds.** Manus took six with
+seconds leading, so every expression moved. `wrangler.toml` has to restate what
+`BACKUP_CRON` / `PURGE_CRON` declare, because TOML cannot import from
+TypeScript; `server/scheduledBackup.test.ts` asserts they agree, since a drifted
+schedule fires at the wrong time and nothing anywhere reports it.
+
+**A job that needs watching is watched by MEASURING, not by being told.** The
+backup's health check (`backup.health`) asks when a backup last actually
+succeeded, and the Dashboard says so after two quiet days. A failure-reporting
+design catches the failures it knows about and misses the one that matters — a
+schedule that was never registered, or that silently stopped, where nothing
+fails so nothing is reported and the backups just end. Anything added here with
+the same "you only find out when you need it" shape wants the same treatment.
 
 The working example is `server/scheduled/purgeArchivedBids.ts`
-(`0 30 3 * * *`, six fields with seconds first, UTC). Note the shape it uses,
-because it is the shape that makes this testable and safe:
+(`30 3 * * *`, five fields, UTC). Note the shape it uses, because it is the
+shape that makes this testable and safe:
 
 - **The work function is exported separately from the HTTP handler.**
   `purgeExpiredBids(now)` takes the clock as a parameter; the handler passes

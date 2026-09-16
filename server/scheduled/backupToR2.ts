@@ -1,34 +1,26 @@
 /**
  * The nightly backup to Cloudflare R2.
  *
- * ── Why a platform cron rather than a timer ──────────────────────────────────
+ * ── Why an outside caller rather than a timer ────────────────────────────────
  * `setInterval` / `node-cron` are forbidden here (CLAUDE.md § Scheduled work,
- * references/periodic-updates.md): the app runs on Cloud Run, which terminates
- * idle instances, so an in-process timer dies with the instance and takes the
+ * references/periodic-updates.md): a hosted app's instances are stopped and
+ * replaced, so an in-process timer dies with the instance and takes the
  * guarantee with it. A backup that silently stopped running months ago is the
  * exact failure this whole tool exists to prevent, so it cannot be scheduled by
  * anything that lives inside a process.
  *
  * ── Registering it (a deploy-time step, not a code step) ─────────────────────
- * The handler below is only half the job. The cron is created ON the Manus
- * platform, once, from a sandbox terminal after the site is deployed — a dev
- * machine is unreachable from the platform, so this cannot be done from a local
- * checkout:
+ * The handler below is only half the job. The other half is the Cloudflare
+ * Worker in workers/cron/, deployed once with `wrangler deploy`, which holds
+ * the same CRON_SECRET and POSTs here on a schedule.
  *
- *     manus-heartbeat create \
- *       --name nightly-backup-to-r2 \
- *       --cron "0 0 2 * * *" \
- *       --path /api/scheduled/backupToR2 \
- *       --description "Export every table and stored file to Cloudflare R2"
- *
- * Six fields, seconds first, UTC. The expression is BACKUP_CRON below rather
- * than only a string in this comment, so the test suite and the command a human
- * pastes cannot drift apart.
- *
- * UNTIL THAT COMMAND IS RUN, NOTHING IS BACKED UP AUTOMATICALLY. The manual
+ * UNTIL THAT WORKER IS DEPLOYED, NOTHING IS BACKED UP AUTOMATICALLY. The manual
  * trigger keeps working throughout (scripts/backup.mts), which is the safe
  * direction for the failure to point: a missing cron means backups must be
- * taken by hand, not that they silently appear to be happening.
+ * taken by hand, not that they silently appear to be happening. And the app
+ * says so on its own — see `backup.health`, which goes by how long it has been
+ * since a backup actually succeeded rather than by whether anything reported a
+ * failure. A cron that was never registered reports nothing at all.
  *
  * ── Why 02:00 UTC ───────────────────────────────────────────────────────────
  * Daily, because the data is one contractor's working day and an hourly export
@@ -41,15 +33,18 @@
  * order and the backup would faithfully record the deletion.
  *
  * ── Idempotence ──────────────────────────────────────────────────────────────
- * The platform retries 5xx and 429 up to three times. A full backup is not
- * cheap, so retrying blindly would mean three complete exports after one
- * timeout. Instead the run checks the bucket first: if a SUCCESSFUL backup
- * already exists for today it returns 200 having done nothing. A failed or
- * half-finished run leaves no successful manifest, so the retry does the work —
- * which is what a retry is for.
+ * The Worker retries a 5xx. A full backup is not cheap, so retrying blindly
+ * would mean several complete exports after one timeout. Instead the run checks
+ * the bucket first: if a SUCCESSFUL backup already exists for today it returns
+ * 200 having done nothing. A failed or half-finished run leaves no successful
+ * manifest, so the retry does the work — which is what a retry is for.
  */
 import type { Request, Response } from "express";
-import { sdk } from "../_core/sdk";
+import {
+  CRON_REFUSAL_BODY,
+  CRON_SECRET_HEADER,
+  checkCronSecret,
+} from "../cronAuth";
 import { readR2Config } from "../backup/config";
 import { createR2Target, type BackupTarget } from "../backup/target";
 import { dayKey, findSuccessfulRunForDay } from "../backup/history";
@@ -61,12 +56,20 @@ import {
 } from "../backup/runBackup";
 
 /**
- * When the backup runs. Six fields, seconds first, UTC.
+ * When the backup runs. FIVE fields, UTC — standard cron, no seconds.
  *
- * Exported so server/scheduledBackup.test.ts can assert the cadence, and so the
- * registration command above is quoting a value rather than restating one.
+ * It was six fields with a leading seconds field while Manus scheduled it.
+ * Cloudflare Workers takes five, and a six-field expression there is not an
+ * error that gets reported — `wrangler` rejects it at deploy time, but an
+ * expression that happens to parse as five fields would simply run at the
+ * wrong time, quietly, forever. Hence the field-count assertion in
+ * server/scheduledBackup.test.ts.
+ *
+ * Exported so the test can check the cadence. workers/cron/wrangler.toml has to
+ * restate it — TOML cannot import from TypeScript — so the test asserts the two
+ * agree rather than trusting them to.
  */
-export const BACKUP_CRON = "0 0 2 * * *";
+export const BACKUP_CRON = "0 2 * * *";
 
 /** The path the platform POSTs to. Mounted in server/_core/index.ts. */
 export const BACKUP_PATH = "/api/scheduled/backupToR2";
@@ -171,14 +174,15 @@ export async function runScheduledBackup(options: {
 /**
  * `POST /api/scheduled/backupToR2` — mounted in server/_core/index.ts.
  *
- * Cron-only. `sdk.authenticateRequest` sets `isCron` for platform-triggered
- * calls; a logged-in user hitting this URL is refused, because a backup reads
- * every row belonging to every user.
+ * Cron-only, proved by the shared secret in the `x-cron-secret` header — see
+ * server/cronAuth.ts. A logged-in user hitting this URL is refused too, because
+ * a backup reads every row belonging to every user; being signed in is not the
+ * same as being the scheduler.
  *
  * ── Failure is a 500; partial is a 200 ──────────────────────────────────────
- * A 500 makes the platform retry and puts the run in its Investigate flow, and
- * that is right when retrying could help: a timeout, an unreachable bucket, a
- * dump that did not finish.
+ * A 500 makes the caller retry and is worth surfacing, and that is right when
+ * retrying could help: a timeout, an unreachable bucket, a dump that did not
+ * finish. The Cloudflare Worker that calls this retries a 5xx (workers/cron).
  *
  * It is wrong for a partial run. Those stored-file reads fail deterministically
  * — a storage 403 is still a 403 ninety seconds later — so a 500 buys three
@@ -195,9 +199,11 @@ export async function runScheduledBackup(options: {
  */
 export async function backupToR2Handler(req: Request, res: Response) {
   try {
-    const user = await sdk.authenticateRequest(req);
-    if (!user?.isCron) {
-      return res.status(403).json({ error: "cron-only" });
+    const allowed = checkCronSecret(req.headers[CRON_SECRET_HEADER]);
+    if (!allowed.ok) {
+      // The reason stays here, where the person who can fix it will look.
+      console.warn(`[BackupToR2] refused a trigger: ${allowed.reason}`);
+      return res.status(403).json(CRON_REFUSAL_BODY);
     }
 
     const outcome = await runScheduledBackup({ now: new Date() });

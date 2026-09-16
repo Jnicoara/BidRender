@@ -20,17 +20,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import type { Request, Response } from "express";
 
-vi.mock("./_core/sdk", () => ({
-  sdk: { authenticateRequest: vi.fn() },
-}));
-
-import { sdk } from "./_core/sdk";
 import {
   BACKUP_CRON,
   BACKUP_PATH,
   backupToR2Handler,
   runScheduledBackup,
 } from "./scheduled/backupToR2";
+import { PURGE_CRON, PURGE_PATH } from "./scheduled/purgeArchivedBids";
 import { dayKey, runIdsForDay } from "./backup/history";
 import type { BackupTarget } from "./backup/target";
 
@@ -82,27 +78,36 @@ function fakeRes() {
   return { res, captured };
 }
 
-const cronRequest = { originalUrl: BACKUP_PATH } as unknown as Request;
+/** A long-enough secret, set for the whole file in beforeEach below. */
+const SECRET = "test-cron-secret-long-enough-to-be-accepted";
+
+const requestWith = (headers: Record<string, string | string[]>) =>
+  ({ originalUrl: BACKUP_PATH, headers }) as unknown as Request;
+
+/** What the Worker sends. */
+const cronRequest = requestWith({ "x-cron-secret": SECRET });
 
 beforeEach(() => {
-  vi.mocked(sdk.authenticateRequest).mockReset();
+  process.env.CRON_SECRET = SECRET;
 });
 
 // ── The schedule itself ──────────────────────────────────────────────────────
 
 describe("the schedule is configured correctly", () => {
-  it("is a six-field expression, seconds first", () => {
-    // The platform takes six fields with seconds leading. A five-field crontab
-    // expression is silently a different time, which is the kind of mistake
-    // nobody notices until they look for a backup that was never taken.
+  it("is a five-field expression, as standard cron", () => {
+    // Six fields with a leading seconds field was the Manus scheduler's format.
+    // Cloudflare takes five. A leftover six-field expression is either rejected
+    // at deploy time, which is the good case, or silently a different time —
+    // the kind of mistake nobody notices until they look for a backup that was
+    // never taken.
     const fields = BACKUP_CRON.trim().split(/\s+/);
-    expect(fields, `BACKUP_CRON="${BACKUP_CRON}"`).toHaveLength(6);
+    expect(fields, `BACKUP_CRON="${BACKUP_CRON}"`).toHaveLength(5);
+    expect(PURGE_CRON.trim().split(/\s+/)).toHaveLength(5);
   });
 
   it("runs once a day, at a fixed time", () => {
-    const [second, minute, hour, dayOfMonth, month, dayOfWeek] =
+    const [minute, hour, dayOfMonth, month, dayOfWeek] =
       BACKUP_CRON.split(/\s+/);
-    expect(second).toBe("0");
     expect(minute).toBe("0");
     // A specific hour, not a wildcard or a step — hourly would be cost without
     // benefit for one contractor's working day.
@@ -118,15 +123,11 @@ describe("the schedule is configured correctly", () => {
      * recoverable for a day. Reversed, the backup would faithfully record the
      * deletion and the data would be gone from both.
      */
-    const purge = readFileSync("server/scheduled/purgeArchivedBids.ts", "utf8");
-    const purgeCron = /--cron "([^"]+)"/.exec(purge)?.[1];
-    expect(purgeCron, "could not find the purge's cron").toBeTruthy();
-
     const minutesOf = (cron: string) => {
-      const [, minute, hour] = cron.split(/\s+/);
+      const [minute, hour] = cron.split(/\s+/);
       return Number(hour) * 60 + Number(minute);
     };
-    expect(minutesOf(BACKUP_CRON)).toBeLessThan(minutesOf(purgeCron!));
+    expect(minutesOf(BACKUP_CRON)).toBeLessThan(minutesOf(PURGE_CRON));
   });
 
   it("is mounted at the path the registration command names", () => {
@@ -147,36 +148,68 @@ describe("the schedule is configured correctly", () => {
     expect(mount).toBeLessThan(trpc === -1 ? Number.MAX_SAFE_INTEGER : trpc);
   });
 
-  it("quotes the same cron in the registration command a human will paste", () => {
-    // The comment tells someone what to type. If it drifts from BACKUP_CRON,
-    // the schedule the tests assert is not the schedule that gets created.
-    const source = readFileSync("server/scheduled/backupToR2.ts", "utf8");
-    const documented = /--cron "([^"]+)"/.exec(source)?.[1];
-    expect(documented).toBe(BACKUP_CRON);
-    const documentedPath = /--path (\S+)/.exec(source)?.[1];
-    expect(documentedPath).toBe(BACKUP_PATH);
+  it("matches the schedule the Worker is actually deployed with", () => {
+    /*
+     * wrangler.toml is what Cloudflare reads, and TOML cannot import from
+     * TypeScript — so the expressions are restated there. If the two drift, the
+     * schedule these tests assert is not the schedule that runs, and nothing
+     * reports it: the job fires at the wrong time, quietly, forever.
+     */
+    const toml = readFileSync("workers/cron/wrangler.toml", "utf8");
+    const crons = /crons\s*=\s*\[([^\]]+)\]/.exec(toml)?.[1] ?? "";
+    const declared = Array.from(crons.matchAll(/"([^"]+)"/g)).map(m => m[1]);
+    expect(declared, `wrangler.toml crons = [${crons}]`).toContain(BACKUP_CRON);
+    expect(declared).toContain(PURGE_CRON);
+  });
+
+  it("calls the same paths the app mounts", () => {
+    const worker = readFileSync("workers/cron/worker.js", "utf8");
+    expect(worker).toContain(BACKUP_PATH);
+    expect(worker).toContain(PURGE_PATH);
   });
 });
 
 // ── Only the platform may trigger it ─────────────────────────────────────────
 
 describe("access", () => {
-  it("refuses anyone who is not the cron", async () => {
-    // A backup reads every row belonging to every user.
-    vi.mocked(sdk.authenticateRequest).mockResolvedValue({
-      id: 1,
-      isCron: false,
-    } as never);
+  // A backup reads every row belonging to every user, so the header is the
+  // whole gate. The cases live in server/cronAuth.test.ts; these check the
+  // handler is actually wired to them.
+  it("refuses a request with no secret", async () => {
+    const { res, captured } = fakeRes();
+    await backupToR2Handler(requestWith({}), res);
+    expect(captured.status).toBe(403);
+  });
+
+  it("refuses the wrong secret", async () => {
+    const { res, captured } = fakeRes();
+    await backupToR2Handler(
+      requestWith({ "x-cron-secret": "not-it-but-long-enough-to-try" }),
+      res
+    );
+    expect(captured.status).toBe(403);
+  });
+
+  it("refuses everything when the server has no secret configured", async () => {
+    // The case that would otherwise leave this open on a misconfigured host.
+    delete process.env.CRON_SECRET;
     const { res, captured } = fakeRes();
     await backupToR2Handler(cronRequest, res);
     expect(captured.status).toBe(403);
   });
 
-  it("refuses an unauthenticated request", async () => {
-    vi.mocked(sdk.authenticateRequest).mockResolvedValue(null as never);
+  it("says nothing useful about why it refused", async () => {
+    const { res, captured } = fakeRes();
+    await backupToR2Handler(requestWith({}), res);
+    expect(JSON.stringify(captured.body)).not.toMatch(/secret|config|header/i);
+  });
+
+  it("lets the right secret through", async () => {
+    // Nothing is configured in the test environment, so it gets as far as
+    // failing on that — which is proof it got past the gate.
     const { res, captured } = fakeRes();
     await backupToR2Handler(cronRequest, res);
-    expect(captured.status).toBe(403);
+    expect(captured.status).not.toBe(403);
   });
 });
 
@@ -207,10 +240,6 @@ describe("a failed scheduled run reports failure", () => {
   });
 
   it("returns 500 with the report, never a quiet 200", async () => {
-    vi.mocked(sdk.authenticateRequest).mockResolvedValue({
-      id: 1,
-      isCron: true,
-    } as never);
     const { res, captured } = fakeRes();
     await backupToR2Handler(cronRequest, res);
 
