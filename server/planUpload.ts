@@ -45,7 +45,8 @@ import { Readable } from "node:stream";
 import { sdk } from "./_core/sdk";
 import { resolveScope } from "./_core/companyScope";
 import { storagePresignPut } from "./storage";
-import { diskStorageRoot, writeDiskObjectStream } from "./diskStorage";
+import { writeDiskObjectStream } from "./diskStorage";
+import { selectStorageBackend } from "./storageBackend";
 import { checkPdfUpload, formatBytes } from "../shared/uploadLimits";
 import * as db from "./db";
 
@@ -243,7 +244,13 @@ export async function planUploadHandler(req: Request, res: Response) {
 
     // On-disk storage has no upload URL to forward to: write the stream out
     // here, capped at the size the request declared.
-    if (diskStorageRoot()) {
+    //
+    // Asked of the backend selector rather than of LOCAL_STORAGE_DIR, which is
+    // not the same question once there are three backends. `pnpm dev:r2` runs
+    // with LOCAL_STORAGE_DIR still set in .env, so a test for the folder alone
+    // would write the file to disk having just signed an upload URL for R2 —
+    // and the bid would then point at an object the bucket never received.
+    if (selectStorageBackend() === "disk") {
       await writeDiskObjectStream(key, req, byteSize);
       res.status(200).json({ storageKey: key, byteSize });
       return;

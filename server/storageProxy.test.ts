@@ -20,13 +20,50 @@
  * configured"; one that fails it answers 403 without ever getting there. So
  * "did it reach storage" is directly readable from the status.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { Express, Request, Response } from "express";
 import { registerStorageProxy } from "./_core/storageProxy";
 import { mintStorageToken, storageTokenExpiry } from "./storageTokens";
 
 const KEY = "bid-plans/1/42/Electrical Plans_a1b2c3d4.pdf";
 const NOW = new Date("2026-08-15T12:00:00Z");
+
+/**
+ * Say which backend is under test instead of inheriting the developer's.
+ *
+ * These cases are about the TOKEN, and every one of them is meant to be
+ * answered before any store is contacted. Left to `.env`, the backend was
+ * whatever the machine happened to be set up for — a laptop with
+ * LOCAL_STORAGE_DIR set sent the valid-token case down the on-disk path, where
+ * it failed on a stand-in response object that has no `sendFile`. The test was
+ * reporting the machine, not the code.
+ *
+ * Pinned to Manus with no credentials, which is the state that makes the
+ * ordering readable: clearing the token reaches the config check and answers
+ * 500, failing it answers 403 without getting there.
+ */
+const saved: Record<string, string | undefined> = {};
+const PINNED = [
+  "PLAN_STORAGE",
+  "LOCAL_STORAGE_DIR",
+  "BUILT_IN_FORGE_API_URL",
+  "BUILT_IN_FORGE_API_KEY",
+];
+
+beforeEach(() => {
+  for (const name of PINNED) {
+    saved[name] = process.env[name];
+    delete process.env[name];
+  }
+  process.env.PLAN_STORAGE = "manus";
+});
+
+afterEach(() => {
+  for (const name of PINNED) {
+    if (saved[name] === undefined) delete process.env[name];
+    else process.env[name] = saved[name];
+  }
+});
 
 /** Capture the handler the proxy registers, without standing up a server. */
 function proxyHandler() {

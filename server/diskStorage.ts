@@ -18,7 +18,7 @@
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -67,6 +67,23 @@ function absolutePath(key: string): string {
     throw new Error(`Not a storable key: ${key}`);
   }
   return full;
+}
+
+/**
+ * Is this key a file in the storage folder?
+ *
+ * Only used to decide whether a read falls back to here from R2 (see
+ * `resolveReadBackend` in storage.ts). A key that could escape the folder
+ * answers false rather than throwing: the caller is choosing between stores,
+ * not yet serving anything.
+ */
+export async function diskObjectExists(key: string): Promise<boolean> {
+  try {
+    const info = await stat(absolutePath(key));
+    return info.isFile();
+  } catch {
+    return false;
+  }
 }
 
 /** Write a whole object at once — the server-side `storagePut` path. */

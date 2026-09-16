@@ -1,7 +1,9 @@
 import type { Express } from "express";
 import { ENV } from "./env";
 import { verifyStorageToken } from "../storageTokens";
-import { diskStorageRoot, serveDiskObject } from "../diskStorage";
+import { serveDiskObject } from "../diskStorage";
+import { resolveReadBackend } from "../storage";
+import { r2PresignGet } from "../r2Storage";
 
 /**
  * Serve a stored object, to a caller holding a token for it.
@@ -41,10 +43,40 @@ export function registerStorageProxy(app: Express) {
       return;
     }
 
+    // Which store actually has it. With R2 live this can fall back to an older
+    // one for a file stored before the switch — see resolveReadBackend.
+    let backend: Awaited<ReturnType<typeof resolveReadBackend>>;
+    try {
+      backend = await resolveReadBackend(key);
+    } catch (err) {
+      console.error("[StorageProxy] could not resolve a backend:", err);
+      res.status(502).send("Storage backend error");
+      return;
+    }
+
+    if (backend === null) {
+      res.status(404).send("Not found");
+      return;
+    }
+
     // On-disk storage (LOCAL_STORAGE_DIR): serve the file itself. sendFile
     // answers the byte-range requests pdf.js makes, so nothing is redirected.
-    if (diskStorageRoot()) {
+    if (backend === "disk") {
       serveDiskObject(key, res);
+      return;
+    }
+
+    // R2: redirect to a signed URL, the same shape as the Forge path below.
+    // Range requests survive the redirect, so a plan set still streams.
+    if (backend === "r2") {
+      try {
+        const signed = await r2PresignGet(key);
+        res.set("Cache-Control", "no-store");
+        res.redirect(307, signed);
+      } catch (err) {
+        console.error("[StorageProxy] R2 signing failed:", err);
+        res.status(502).send("Storage backend error");
+      }
       return;
     }
 

@@ -30,6 +30,11 @@ export default defineConfig({
       "server/**/*.test.ts",
       "server/**/*.spec.ts",
       "client/src/lib/**/*.test.ts",
+      // One script is in here on purpose: scripts/loadPlansEnv.mts decides
+      // which secrets a local dev run may borrow from the production env file,
+      // and letting the wrong one through would hand a watching dev server the
+      // LIVE database with nothing on screen to say so.
+      "scripts/**/*.test.ts",
     ],
     // dotenv first, so vitest.setup.ts fills only what .env did not supply.
     setupFiles: ["dotenv/config", "./vitest.setup.ts"],

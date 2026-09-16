@@ -2,11 +2,31 @@
 // Uploads via Forge Server presigned URL to S3 (PUT direct).
 // Downloads return /manus-storage/{key} paths served via 307 redirect.
 //
-// With LOCAL_STORAGE_DIR set, every function here uses a folder on this machine
-// instead of Forge — see diskStorage.ts.
+// This file is the socket the three storage backends plug into: the Forge
+// presign proxy, a folder on this machine (diskStorage.ts) and Cloudflare R2
+// (r2Storage.ts). `selectStorageBackend` says which one is live — see
+// storageBackend.ts for how that is chosen and why it is never inferred.
+//
+// Every function returns the same shapes whichever backend answered, which is
+// what keeps the routers, the client and the database columns out of it.
 
 import { ENV } from "./_core/env";
-import { diskStorageRoot, diskUploadUrl, writeDiskObject } from "./diskStorage";
+import {
+  diskObjectExists,
+  diskUploadUrl,
+  writeDiskObject,
+} from "./diskStorage";
+import {
+  r2ObjectExists,
+  r2PresignGet,
+  r2PresignPut,
+  r2PutObject,
+} from "./r2Storage";
+import {
+  legacyReadBackends,
+  selectStorageBackend,
+  type StorageBackendName,
+} from "./storageBackend";
 
 function getForgeConfig() {
   const forgeUrl = ENV.forgeApiUrl;
@@ -38,8 +58,13 @@ export async function storagePut(
   contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
   const key = appendHashSuffix(normalizeKey(relKey));
-  if (diskStorageRoot()) {
+  const backend = selectStorageBackend();
+  if (backend === "disk") {
     await writeDiskObject(key, data);
+    return { key, url: `/manus-storage/${key}` };
+  }
+  if (backend === "r2") {
+    await r2PutObject(key, data, contentType);
     return { key, url: `/manus-storage/${key}` };
   }
   const { forgeUrl, forgeKey } = getForgeConfig();
@@ -97,9 +122,13 @@ export async function storagePresignPut(
   contentType = "application/octet-stream"
 ): Promise<{ key: string; uploadUrl: string }> {
   const key = appendHashSuffix(normalizeKey(relKey));
+  const backend = selectStorageBackend();
   // An upload URL on this server — same-origin, so no bucket CORS rule.
-  if (diskStorageRoot()) {
+  if (backend === "disk") {
     return { key, uploadUrl: diskUploadUrl(key, new Date()) };
+  }
+  if (backend === "r2") {
+    return { key, uploadUrl: await r2PresignPut(key, contentType) };
   }
   const { forgeUrl, forgeKey } = getForgeConfig();
 
@@ -129,14 +158,52 @@ export async function storageGet(
   return { key, url: `/manus-storage/${key}` };
 }
 
+/**
+ * Which backend actually holds this key.
+ *
+ * Only interesting when R2 is live, and then it is what stops the switch from
+ * being a flag day: a file stored before the switch is not in R2, so the read
+ * falls through to whichever older store still has it. New writes go to R2
+ * regardless, so the old stores drain rather than needing a migration first.
+ *
+ * Manus is always the terminal guess and is never verified. There is no cheap
+ * way to ask it whether a key exists — the presign endpoint signs first and
+ * discovers nothing is there when the browser follows the URL — and a wrong
+ * guess there costs a 404 on a file that was missing anyway.
+ *
+ * Returns null only when R2 is live, the object is not in it, and there is no
+ * older store configured to have kept it.
+ */
+export async function resolveReadBackend(
+  relKey: string
+): Promise<StorageBackendName | null> {
+  const backend = selectStorageBackend();
+  if (backend !== "r2") return backend;
+
+  const key = normalizeKey(relKey);
+  if (await r2ObjectExists(key)) return "r2";
+
+  for (const legacy of legacyReadBackends()) {
+    if (legacy === "disk" && (await diskObjectExists(key))) return "disk";
+    if (legacy === "manus") return "manus";
+  }
+  return null;
+}
+
 export async function storageGetSignedUrl(relKey: string): Promise<string> {
-  if (diskStorageRoot()) {
+  const key = normalizeKey(relKey);
+  const backend = await resolveReadBackend(key);
+
+  if (backend === "r2") return r2PresignGet(key);
+  if (backend === "disk") {
     throw new Error(
       "Stored files are in LOCAL_STORAGE_DIR on this machine; there is no signed URL to fetch them from."
     );
   }
+  if (backend === null) {
+    throw new Error(`No configured storage holds ${key}.`);
+  }
   const { forgeUrl, forgeKey } = getForgeConfig();
-  const key = normalizeKey(relKey);
 
   const getUrl = new URL("v1/storage/presign/get", forgeUrl + "/");
   getUrl.searchParams.set("path", key);

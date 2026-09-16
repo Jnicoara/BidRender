@@ -22,7 +22,7 @@
  * Fixture ids are distinct from every other suite — vitest runs files in
  * parallel and shared ids delete each other's rows mid-run.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, afterAll, beforeAll, beforeEach } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
@@ -232,6 +232,31 @@ describe("recognising a PDF by its bytes", () => {
 // ── Through the API ──────────────────────────────────────────────────────────
 
 describe.skipIf(!hasDb)("asking for an upload ticket", () => {
+  /**
+   * Pin the storage backend, so these assert the app and not the machine.
+   *
+   * On-disk is the one backend that needs no credentials and touches no
+   * network: its upload URL points at this server, so a ticket can be issued
+   * and inspected anywhere. Nothing is written — a ticket is only a signed
+   * URL — so the folder named here never has to exist.
+   */
+  const savedStorage: Record<string, string | undefined> = {};
+
+  beforeAll(() => {
+    for (const name of ["PLAN_STORAGE", "LOCAL_STORAGE_DIR"]) {
+      savedStorage[name] = process.env[name];
+    }
+    process.env.PLAN_STORAGE = "disk";
+    process.env.LOCAL_STORAGE_DIR ||= "./.local-storage";
+  });
+
+  afterAll(() => {
+    for (const [name, value] of Object.entries(savedStorage)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  });
+
   it("refuses an oversized file before it ever reaches storage", async () => {
     // The distinction that matters: this comes back as the SIZE message, not
     // as a storage error. Validation has to happen first, or an oversized
@@ -265,17 +290,24 @@ describe.skipIf(!hasDb)("asking for an upload ticket", () => {
   });
 
   it("gets PAST validation for a file just under the limit", async () => {
-    // Storage is not configured in tests, so the ticket cannot actually be
-    // issued — but the failure it produces proves the size check passed, which
-    // is the thing being asserted. `confirmAttach` below covers the rest.
+    /**
+     * Asserted by the ticket being ISSUED, not by the failure that follows.
+     *
+     * This used to read "storage is not configured in tests, so the ticket
+     * cannot be issued — the failure proves the size check passed". That made
+     * the test depend on the developer's machine being unconfigured: on one
+     * with LOCAL_STORAGE_DIR set, a ticket came back and the test failed
+     * having proved the very thing it was asserting. A size check that passes
+     * is a ticket, so that is what is checked.
+     */
     const bid = await newBid();
-    await expect(
-      caller().bidPdfs.createUploadTicket({
-        bidId: bid.id,
-        filename: "Big but fine.pdf",
-        byteSize: MAX_PDF_BYTES - 1,
-      })
-    ).rejects.toThrow(/storage/i);
+    const ticket = await caller().bidPdfs.createUploadTicket({
+      bidId: bid.id,
+      filename: "Big but fine.pdf",
+      byteSize: MAX_PDF_BYTES - 1,
+    });
+    expect(ticket.storageKey).toContain("Big but fine");
+    expect(ticket.uploadUrl).toBeTruthy();
   });
 
   it("refuses another user's bid", async () => {

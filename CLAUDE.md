@@ -18,10 +18,12 @@ The product is **BidRender**. It was called **BidPhase** until v5.75 and **Helix
 
 ```bash
 pnpm dev              # start dev server (tsx watch, Vite middleware) — NODE_ENV=development
+pnpm dev:r2           # same, but plan files go to the Cloudflare R2 bucket bidrender-plans
+pnpm r2:ls [prefix]   # list what is actually in that bucket
 pnpm build            # vite build (client) + esbuild bundle (server) -> dist/
 pnpm start            # run production build (NODE_ENV=production)
 pnpm check            # tsc --noEmit — run after any nontrivial change
-pnpm test             # vitest run (server/**/*.test.ts only — see vitest.config.ts)
+pnpm test             # vitest run (server/**, client/src/lib/**, scripts/** — see vitest.config.ts)
 pnpm format           # prettier --write .
 pnpm db:push          # drizzle-kit generate, then scripts/migrate.mts, against DATABASE_URL
 ```
@@ -348,6 +350,56 @@ refetch.
 These are forward-looking. Screens built before this section predate the rules —
 do not retrofit them as a side effect of unrelated work; that is its own task and
 its own commit.
+
+## Stored files — three backends behind one socket
+
+Plan PDFs, the legacy per-project PDF and company logos all go through
+`server/storage.ts`, which can point at three places: the Manus presign proxy,
+a folder on this machine (`diskStorage.ts`), or the Cloudflare R2 bucket
+`bidrender-plans` (`r2Storage.ts`). Nothing above that file knows which — no
+router, no client code, no database column. **Add a fourth by implementing the
+same four operations, not by teaching a router about storage.**
+
+**`PLAN_STORAGE` names the backend** (`manus` | `disk` | `r2`). Unset, the
+answer is what it was before R2 existed: disk when `LOCAL_STORAGE_DIR` is set,
+Manus otherwise. **Do not make it infer R2 from the presence of credentials.**
+Credentials arriving in an environment is usually someone adding a secret for a
+later step, not a decision to move every contractor's plans; where files live
+has to be something a person turned on. `selectStorageBackend` throws, naming
+the missing variable, rather than quietly degrading — a server told to use R2
+that used a folder instead would scatter one contractor's plans across two
+stores, and the symptom would be plans that open today and not after the next
+deploy.
+
+**The credentials are `R2_PLANS_*`, never the backup `R2_*`.** Different bucket,
+different API token, deliberately: the plans token signs URLs a browser
+touches, so if it leaks the backups must still be untouchable. Nothing may fall
+back from one to the other, however convenient.
+
+**The object key IS the storage key** — `bid-plans/<user>/<bid>/<file>` — with
+no bucket prefix. The backup tool prefixes because it shares a bucket; this one
+has a bucket to itself. Adding a prefix later would look harmless and would
+orphan every stored file at once, because the key recorded against a bid would
+stop naming the object. `r2Storage.test.ts` pins this.
+
+**Switching backends moves nothing that is already stored.** `resolveReadBackend`
+falls through to an older store on a miss, so a file written before the switch
+still opens while new writes go to R2 — the old stores drain instead of needing
+a migration before the switch can happen. The "is it in R2?" answer is cached
+per key because pdf.js re-requests the same URL for every byte range, and an
+uncached check would cost a billable HEAD hundreds of times per plan set.
+
+**Testing against the real bucket locally:** `pnpm dev:r2`. It borrows only the
+`R2_PLANS_*` lines from `.env.production.local` and drops everything else in
+that file — `DATABASE_URL` above all. `pnpm dev` does not load that file at
+all, deliberately, so no local run can point itself at the live database; the
+filter in `scripts/loadPlansEnv.mts` is what keeps that true while borrowing,
+and it is tested for exactly that. `pnpm r2:ls` lists what is actually in the
+bucket.
+
+A cross-origin PUT is always preflighted, so the bucket needs a CORS rule for
+the app's origin. Without one the client falls back to the same-origin route in
+`planUpload.ts`, which works but is capped by the platform's request body limit.
 
 ## Architecture
 
