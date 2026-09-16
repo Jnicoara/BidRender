@@ -12,6 +12,8 @@ This is the human-readable companion to the git history — read this to see wha
 
 - **An upload that goes quiet now says so instead of looking frozen.** If nothing has moved for about ten seconds, the upload row greys out and reads "Connection lost — waiting…". This fills a real gap: Windows can take most of a minute to admit a Wi-Fi connection has dropped, and until it does the browser insists everything is fine — so the bar just sat there in its live colour, which is indistinguishable from the app having hung. Nothing is cancelled or given up on; the upload keeps trying and picks up on its own when the connection returns. The speed and time-left figures are hidden while it waits, because both would be describing a connection that is no longer there.
 
+- **A failed upload no longer leaves an empty file behind.** When an upload is refused partway through, the half-written file is supposed to be deleted — a plan that opens as a truncated drawing is worse than one that is plainly missing. On Windows the deletion was quietly failing, because the file was still open at the moment it was tried, leaving an empty file in its place. Only affected the local-storage mode used when running the app on your own machine, never Cloudflare.
+
 - **Fixed a limit that would have let a 2GB plan fail at the very end.** The field recording a file's size could not hold a number that large, so a 2GB set would have uploaded perfectly and then failed to attach — after twenty minutes of transfer rather than before it. Found by a test that tried the exact limit.
 
 ## [2026-09-15]

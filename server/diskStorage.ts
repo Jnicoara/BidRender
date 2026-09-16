@@ -17,6 +17,7 @@
  * One process, one disk, no replication: for running locally, not for hosting.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { once } from "node:events";
 import { createWriteStream } from "node:fs";
 import { mkdir, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -111,6 +112,7 @@ export async function writeDiskObjectStream(
   const full = absolutePath(key);
   await mkdir(path.dirname(full), { recursive: true });
   let received = 0;
+  const sink = createWriteStream(full);
   try {
     await pipeline(
       body,
@@ -125,9 +127,24 @@ export async function writeDiskObjectStream(
           yield chunk;
         }
       },
-      createWriteStream(full)
+      sink
     );
   } catch (error) {
+    // Close the file handle before removing the partial file.
+    //
+    // Windows refuses to unlink a file that is still open, and `pipeline` does
+    // not finish closing the stream synchronously — so the unlink failed, its
+    // rejection was swallowed by the `.catch` below, and a zero-byte file
+    // survived. That is precisely the truncated-plan outcome this cleanup
+    // exists to prevent, and it showed up as a test failing about one run in
+    // three.
+    //
+    // `destroy()` first, and that is the load-bearing half: when `pipeline`
+    // rejects on its SOURCE — a body that is not a stream at all — it never
+    // touches the sink, so nothing else will ever close it and waiting for
+    // `close` alone hangs forever. Destroying makes the event certain to come.
+    sink.destroy();
+    if (!sink.closed) await once(sink, "close").catch(() => {});
     await unlink(full).catch(() => {});
     throw error;
   }

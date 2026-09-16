@@ -91,4 +91,27 @@ describe("on-disk storage", () => {
     ).rejects.toThrow(/larger/);
     await expect(readFile(onDisk(root, key))).rejects.toThrow();
   });
+
+  /**
+   * A body that is not a stream must fail, and must fail QUICKLY.
+   *
+   * This is here because a fix for the cleanup above introduced exactly this
+   * hang. Removing the partial file means closing the handle first — Windows
+   * will not unlink an open file — but when the failure happens on the SOURCE,
+   * the destination stream was never touched, so nothing else was ever going
+   * to close it and waiting for it to close waited forever.
+   *
+   * A rejected upload is recoverable. A request that never answers is not: it
+   * holds a connection open until something else times it out, and the user is
+   * left watching a bar that will never move again.
+   */
+  it("rejects a body that is not a stream, rather than hanging", async () => {
+    const key = "bid-plans/1/42/NotAStream_a1b2c3d4.pdf";
+    const started = Date.now();
+    await expect(
+      writeDiskObjectStream(key, {} as unknown as Readable, 1024)
+    ).rejects.toThrow();
+    expect(Date.now() - started).toBeLessThan(1000);
+    await expect(readFile(onDisk(root, key))).rejects.toThrow();
+  });
 });
