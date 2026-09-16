@@ -862,3 +862,4 @@ left as written rather than rewritten to match the rename.
 - [ ] Fill in `APP_BASE_URL` in `workers/cron/wrangler.toml` and `wrangler deploy` the cron worker — until then neither the backup nor the archived-bid purge ever runs.
 - [ ] Set `PLAN_STORAGE=r2` plus the `R2_PLANS_*` values, so plan files go to Cloudflare rather than Manus.
 - [ ] Add a CORS rule on `bidrender-plans` for the live origin, exposing `ETag` — an upload in pieces cannot be reassembled without it.
+- [ ] Set `R2_PLANS_READONLY_ACCESS_KEY_ID` and `R2_PLANS_READONLY_SECRET_ACCESS_KEY` on DigitalOcean, so the backup reads plans from R2 rather than buffering them through Manus. Verify with `pnpm tsx scripts/checkPlansReadOnly.mts`.

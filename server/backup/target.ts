@@ -21,13 +21,43 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
+import type { Readable } from "node:stream";
 import type { R2Config } from "./config";
+
+/**
+ * How much of a streamed file is held in memory at once.
+ *
+ * 8MB per part, four parts in flight — about 32MB, whatever the file's size.
+ * That is the whole point of the streaming path: the ceiling is a property of
+ * this constant rather than of the largest plan anybody uploads.
+ */
+const STREAM_PART_BYTES = 8 * 1024 * 1024;
+const STREAM_CONCURRENCY = 4;
 
 export type BackupTarget = {
   /** Shown in the report, so a manifest says where it actually went. */
   readonly name: string;
   /** Fails loudly. Every caller treats a rejection as a failed backup. */
   put(key: string, body: Buffer, contentType: string): Promise<void>;
+  /**
+   * The same, for a body too big to hold in memory.
+   *
+   * Separate from `put` rather than replacing it. The database dump and the
+   * manifest are small, already in memory, and are built as Buffers — routing
+   * them through a multipart uploader would add machinery for no benefit. A
+   * plan file is the opposite case: it can be 2GB, and buffering it is how a
+   * nightly job gets killed on a small instance.
+   *
+   * `contentLength` is passed on when storage told us, because it lets the
+   * uploader size its parts sensibly; null is fine and simply means it cannot.
+   */
+  putStream(
+    key: string,
+    body: Readable,
+    contentType: string,
+    contentLength: number | null
+  ): Promise<void>;
   /**
    * Cheap reachability check, run BEFORE the database is read.
    *
@@ -62,6 +92,26 @@ export function createR2Target(config: R2Config): BackupTarget {
 
     async check() {
       await client.send(new HeadBucketCommand({ Bucket: config.bucket }));
+    },
+
+    async putStream(key, body, contentType, contentLength) {
+      const upload = new Upload({
+        client,
+        params: {
+          Bucket: config.bucket,
+          Key: `${config.prefix}/${key}`.replace(/\/+/g, "/"),
+          Body: body,
+          ContentType: contentType,
+          ...(contentLength !== null ? { ContentLength: contentLength } : {}),
+        },
+        queueSize: STREAM_CONCURRENCY,
+        partSize: STREAM_PART_BYTES,
+        // A failed multipart upload leaves parts behind that do not show in a
+        // listing but do cost storage. Abort on failure rather than waiting for
+        // the bucket's expiry rule to notice.
+        leavePartsOnError: false,
+      });
+      await upload.done();
     },
 
     async put(key, body, contentType) {

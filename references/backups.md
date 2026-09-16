@@ -11,25 +11,65 @@ R2, deliberately independent of Manus.
 without. One of them holds every plan PDF and every company logo. If access to
 that account ends, the database might be recoverable and the files would not be.
 
-This tool copies both somewhere Manus has no involvement in. It reads through
-Manus — that is where the files are, and there is no other way to reach them —
-but it writes to a bucket reachable with nothing but four credentials and the
-public internet.
+This tool copies both somewhere Manus has no involvement in, and since v5.136
+neither half of it needs Manus at all: plan files are read straight out of the
+`bidrender-plans` R2 bucket. The Manus reader is still there for anything
+stored there before the move, and falls away on its own once nothing is.
 
-**The read path is the deadline.** Once a backup is in R2 it is independent; up
-until then it depends on Manus access still working. That asymmetry is the whole
-reason to run this sooner rather than later.
+**Plan files stream through; they are never assembled in memory.** The backup
+used to pull each file fully into memory before uploading it, which was
+invisible at 20MB a plan and untenable once the app started accepting 2GB: a
+nightly job that allocates 2GB on a small instance gets killed, and a backup
+that gets killed is no backup. Measured on a real 400MB object, the process
+grew by **9MB**. See `server/backup/planFileSource.ts`.
+
+## 1a. The three R2 tokens, and why there are three
+
+| Token                 | Scope                              | Used by                   |
+| --------------------- | ---------------------------------- | ------------------------- |
+| `R2_*`                | `bidsoftware`, Object Read & Write | the backup, writing       |
+| `R2_PLANS_*`          | `bidrender-plans`, Read & Write    | the app: uploads, viewer  |
+| `R2_PLANS_READONLY_*` | `bidrender-plans`, **Read only**   | the backup, reading plans |
+
+**Why not one token for the copy.** A server-side bucket-to-bucket copy — bytes
+never touching our machine — needs one credential with read on the source and
+write on the destination. An R2 token's permission level applies to the whole
+token, not per bucket, so that credential would be Read & Write on
+`bidrender-plans`: the backup job holding write access to every contractor's
+plans. Two tokens instead, streaming down with one and up with the other. The
+cost is bandwidth and time through the backup host. What it buys is that a leak
+of the copying credential lets someone READ plans but never alter or destroy
+one.
+
+**`R2_PLANS_*` must never gain access to the backups.** It signs URLs a
+browser touches, which makes it the most exposed secret in the system.
+
+`pnpm tsx scripts/checkPlansReadOnly.mts` proves the read-only token can read
+plans, cannot write or delete them, and cannot see `bidsoftware` — because
+"Object Read only, one bucket" is a claim made in a dashboard, and a token
+accidentally created Read & Write would work perfectly while carrying far more
+authority than intended.
 
 ## 2. Configuration
 
-Four variables, server-side only, `.env` (which is gitignored):
+Server-side only, in `.env.production.local` (which is gitignored):
 
 ```bash
+# Where the backup goes
 R2_ACCOUNT_ID=...
 R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
 R2_BUCKET=bidsoftware
+
+# Reading plan files to copy. Object Read ONLY, bidrender-plans only.
+# The bucket and endpoint come from the R2_PLANS_* values the app already has.
+R2_PLANS_READONLY_ACCESS_KEY_ID=...
+R2_PLANS_READONLY_SECRET_ACCESS_KEY=...
 ```
+
+Without the read-only pair the backup falls back to reading through Manus, which
+still works and buffers whole files — fine for what is left there, not fine for
+a 2GB plan.
 
 **The bucket is `bidsoftware`.** This said `bidrender-backups` for a while,
 which is not a bucket — it is the name someone gave an API token. The backups

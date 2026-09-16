@@ -501,6 +501,24 @@ file size needs the same treatment.
 `pnpm dev:r2` plus a real several-hundred-MB PDF is the only way to exercise
 this properly; the pure modules carry the cases that can be written down.
 
+**The backup reads plans with a THIRD token, and the reason is not obvious.** An
+R2 token's permission level applies to the whole token, not per bucket — so one
+credential able to read `bidrender-plans` and write `bidsoftware` would also
+have write access to every contractor's plans. So `R2_PLANS_READONLY_*` is
+Object Read only on the plan bucket, the backup streams down with it and up with
+`R2_*`, and the bytes pass through the backup host rather than being copied
+inside Cloudflare. That costs bandwidth and buys a copying credential that
+cannot alter or destroy a plan. **`R2_PLANS_*` must never gain access to the
+backups** — it signs URLs a browser touches.
+
+**Nothing on the backup's file path may buffer a whole file.** `putStream` and
+`FileStreamSource` exist so a 2GB plan is handed from source to destination a
+few MB at a time; the small SQL dump and manifest keep the plain Buffer `put`
+because routing them through a multipart uploader is machinery for no benefit.
+Measured on a real 400MB object the process grows by 9MB, and
+`server/backupStreaming.test.ts` asserts only one chunk is ever live — which is
+what would catch someone quietly reintroducing `await collect(stream)`.
+
 ## Architecture
 
 **Stack:** Express + tRPC (v11, superjson transformer) on the server, React 19 + Vite + Wouter (hash-based routing) on the client, Drizzle ORM against MySQL. Single dev process — Vite runs as Express middleware in development (`server/_core/vite.ts`), and the client is served statically in production.

@@ -30,6 +30,8 @@ import { collectFiles, FILE_SOURCES } from "./backup/collectFiles";
 import { runBackup, runIdFor, summarise } from "./backup/runBackup";
 import { readR2Config, describeConfig, REQUIRED_VARS } from "./backup/config";
 import type { BackupTarget } from "./backup/target";
+import type { FileStreamSource } from "./backup/planFileSource";
+import { Readable } from "node:stream";
 import {
   newestRunId,
   summariseVerify,
@@ -55,6 +57,15 @@ function fakeTarget(
       if (options.failOn?.test(key)) throw new Error(`refused ${key}`);
       written.set(key, body);
     },
+    async putStream(key, body) {
+      if (options.failOn?.test(key)) throw new Error(`refused ${key}`);
+      // Collected so the assertions can still look at what was written. The
+      // real target hands the stream to a multipart uploader instead; what
+      // matters to these tests is that the same bytes arrive under the same key.
+      const chunks: Buffer[] = [];
+      for await (const chunk of body) chunks.push(Buffer.from(chunk));
+      written.set(key, Buffer.concat(chunks));
+    },
     async get(key) {
       const body = written.get(key);
       if (!body) throw new Error(`no such object: ${key}`);
@@ -62,6 +73,33 @@ function fakeTarget(
     },
     async list(prefix) {
       return Array.from(written.keys()).filter(k => k.startsWith(prefix));
+    },
+  };
+}
+
+/**
+ * A file source that hands back the same bytes for every key.
+ *
+ * A stream rather than a Buffer, because that is the shape the backup now
+ * takes — a 2GB plan must never be assembled in memory on its way through.
+ */
+function streamOf(text: string): FileStreamSource {
+  return {
+    name: "fake://files",
+    async open() {
+      const body = Buffer.from(text);
+      return { body: Readable.from(body), contentLength: body.byteLength };
+    },
+  };
+}
+
+/** A file source driven by a function, for the ones that fail on purpose. */
+function sourceThat(read: (key: string) => Promise<Buffer>): FileStreamSource {
+  return {
+    name: "fake://files",
+    async open(key: string) {
+      const body = await read(key);
+      return { body: Readable.from(body), contentLength: body.byteLength };
     },
   };
 }
@@ -310,7 +348,7 @@ runIf("empty tables", () => {
     const report = await runBackup({
       databaseUrl,
       target,
-      fetchFile: async () => Buffer.from("x"),
+      fileSource: streamOf("x"),
     });
     expect(report.ok).toBe(true);
     expect(report.database?.tableCount).toBeGreaterThan(20);
@@ -390,7 +428,7 @@ runIf("the report says what actually happened", () => {
     const report = await runBackup({
       databaseUrl,
       target,
-      fetchFile: async () => Buffer.from("pdf bytes"),
+      fileSource: streamOf("pdf bytes"),
       now: new Date("2026-08-13T22:41:07.000Z"),
     });
 
@@ -415,7 +453,7 @@ runIf("the report says what actually happened", () => {
     await runBackup({
       databaseUrl,
       target,
-      fetchFile: async () => Buffer.from("x"),
+      fileSource: streamOf("x"),
       now: new Date("2026-08-13T22:41:07.000Z"),
     });
     const manifest = JSON.parse(
@@ -436,11 +474,11 @@ runIf("the report says what actually happened", () => {
     const report = await runBackup({
       databaseUrl,
       target,
-      fetchFile: async key => {
+      fileSource: sourceThat(async key => {
         call += 1;
         if (call === 1) throw new Error("403 from storage");
         return Buffer.from(`bytes for ${key}`);
-      },
+      }),
     });
 
     const { files } = await collectFiles(databaseUrl);
@@ -477,7 +515,7 @@ runIf("the report says what actually happened", () => {
     const report = await runBackup({
       databaseUrl,
       target,
-      fetchFile: async () => Buffer.from("x"),
+      fileSource: streamOf("x"),
     });
 
     expect(report.ok).toBe(false);
@@ -531,7 +569,7 @@ runIf("verifying a backup end to end", () => {
     const report = await runBackup({
       databaseUrl,
       target,
-      fetchFile: async () => Buffer.from("file bytes"),
+      fileSource: streamOf("file bytes"),
     });
     expect(report.ok).toBe(true);
 
@@ -561,7 +599,7 @@ runIf("verifying a backup end to end", () => {
     const report = await runBackup({
       databaseUrl,
       target,
-      fetchFile: async () => Buffer.from("x"),
+      fileSource: streamOf("x"),
     });
 
     const key = `${report.runId}/database.sql.gz`;
@@ -592,7 +630,7 @@ runIf("verifying a backup end to end", () => {
     const report = await runBackup({
       databaseUrl,
       target,
-      fetchFile: async () => Buffer.from("x"),
+      fileSource: streamOf("x"),
     });
 
     const manifestKey = `${report.runId}/manifest.json`;

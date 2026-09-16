@@ -107,3 +107,78 @@ export function describeConfig(result: ConfigResult): {
     prefix: result.config.prefix,
   };
 }
+
+/**
+ * The credentials that READ plan files, for copying into the backup.
+ *
+ * ── Why this is a second, separate token ─────────────────────────────────────
+ * The backup has to read from `bidrender-plans` and write to `bidsoftware`, and
+ * a Cloudflare R2 token's permission level applies to the WHOLE token, not per
+ * bucket. So a single token scoped to both would have to be Read & Write on
+ * both — which means write access to every contractor's plans, held by the
+ * backup job, in order to copy them.
+ *
+ * Two tokens instead. This one is Object Read ONLY on the plan bucket; the
+ * R2_* pair above stays Read & Write on the backup bucket alone. The copy then
+ * streams down with one and up with the other.
+ *
+ * The cost of that choice, stated plainly: the bytes pass through whatever
+ * machine runs the backup rather than being copied bucket-to-bucket inside
+ * Cloudflare. That is bandwidth and time a server-side copy would not spend.
+ * What it buys is that if this credential leaks, someone can READ plans — bad —
+ * but cannot alter or destroy a single one. The one-token version would put the
+ * plan store one leaked secret away from being overwritten.
+ *
+ * ── And the invariant that does not move ─────────────────────────────────────
+ * The PLANS token (R2_PLANS_*, in server/storageBackend.ts) gains nothing from
+ * any of this. It stays scoped to `bidrender-plans` alone. It is the token that
+ * signs URLs a browser touches, so it is the most exposed secret in the system,
+ * and it must never be able to reach the backups.
+ */
+export const PLANS_READONLY_VARS = [
+  "R2_PLANS_READONLY_ACCESS_KEY_ID",
+  "R2_PLANS_READONLY_SECRET_ACCESS_KEY",
+] as const;
+
+export type PlansReadConfig = {
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+  endpoint: string;
+};
+
+export type PlansReadResult =
+  | { ok: true; config: PlansReadConfig }
+  | { ok: false; missing: string[] };
+
+/**
+ * Read them, or say what is absent.
+ *
+ * The bucket, account and endpoint come from the existing R2_PLANS_* values —
+ * they name the same bucket, and restating them would be two places to keep in
+ * step. Only the credential itself is new.
+ */
+export function readPlansReadConfig(
+  env: NodeJS.ProcessEnv = process.env
+): PlansReadResult {
+  const missing: string[] = PLANS_READONLY_VARS.filter(
+    name => !env[name]?.trim()
+  );
+  if (!env.R2_PLANS_BUCKET?.trim()) missing.push("R2_PLANS_BUCKET");
+  if (!env.R2_PLANS_ACCOUNT_ID?.trim() && !env.R2_PLANS_ENDPOINT?.trim()) {
+    missing.push("R2_PLANS_ACCOUNT_ID");
+  }
+  if (missing.length > 0) return { ok: false, missing };
+
+  return {
+    ok: true,
+    config: {
+      accessKeyId: env.R2_PLANS_READONLY_ACCESS_KEY_ID!.trim(),
+      secretAccessKey: env.R2_PLANS_READONLY_SECRET_ACCESS_KEY!.trim(),
+      bucket: env.R2_PLANS_BUCKET!.trim(),
+      endpoint:
+        env.R2_PLANS_ENDPOINT?.trim() ||
+        `https://${env.R2_PLANS_ACCOUNT_ID!.trim()}.r2.cloudflarestorage.com`,
+    },
+  };
+}

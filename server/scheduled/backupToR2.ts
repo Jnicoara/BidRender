@@ -52,7 +52,7 @@ import {
   runBackup,
   summarise,
   type BackupReport,
-  type FileFetcher,
+  type FileStreamSource,
 } from "../backup/runBackup";
 
 /**
@@ -93,7 +93,7 @@ export async function runScheduledBackup(options: {
   databaseUrl?: string;
   /** Injected by tests; production builds one from the environment. */
   target?: BackupTarget;
-  fetchFile?: FileFetcher;
+  fileSource?: FileStreamSource;
 }): Promise<ScheduledBackupOutcome> {
   const databaseUrl = options.databaseUrl ?? process.env.DATABASE_URL?.trim();
   if (!databaseUrl) {
@@ -143,7 +143,7 @@ export async function runScheduledBackup(options: {
   const report = await runBackup({
     databaseUrl,
     target,
-    fetchFile: options.fetchFile,
+    fileSource: options.fileSource,
     now: options.now,
   });
 

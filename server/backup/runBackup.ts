@@ -28,6 +28,7 @@ import { APP_VERSION } from "../../shared/version";
 import { collectFiles, FILE_SOURCES } from "./collectFiles";
 import { dumpDatabase, type TableDump } from "./dumpDatabase";
 import type { BackupTarget } from "./target";
+import { defaultFileSource, type FileStreamSource } from "./planFileSource";
 
 export type FileFailure = { key: string; reason: string };
 
@@ -84,24 +85,19 @@ export type BackupReport = {
 };
 
 /**
- * How the bytes of a stored file are fetched.
+ * How the bytes of a stored file are read.
  *
- * A parameter rather than an import so the tests can run the whole pipeline
- * without Manus, and so the day this project leaves Manus, only this function
- * changes rather than the backup.
+ * A parameter rather than an import, so the tests can run the whole pipeline
+ * without a network or a credential — see server/backup/planFileSource.ts for
+ * the R2 and Manus implementations.
+ *
+ * It yields a STREAM rather than a Buffer, and that is the point: the previous
+ * shape pulled each file fully into memory before uploading it, which was fine
+ * at 20MB a plan and untenable once the limit became 2GB. A nightly job that
+ * allocates 2GB on a small instance is a nightly job that gets killed, and a
+ * backup that gets killed is no backup.
  */
-export type FileFetcher = (key: string) => Promise<Buffer>;
-
-/** Fetch through the Manus presign proxy — the only way to read these today. */
-export async function manusFileFetcher(key: string): Promise<Buffer> {
-  const { storageGetSignedUrl } = await import("../storage");
-  const url = await storageGetSignedUrl(key);
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`storage returned ${response.status}`);
-  }
-  return Buffer.from(await response.arrayBuffer());
-}
+export type { FileStreamSource };
 
 /** `2026-08-13T22-41-07Z` — sorts chronologically, legal in an object key. */
 export function runIdFor(now: Date): string {
@@ -114,14 +110,14 @@ export function runIdFor(now: Date): string {
 export async function runBackup(options: {
   databaseUrl: string;
   target: BackupTarget;
-  fetchFile?: FileFetcher;
+  fileSource?: FileStreamSource;
   /** Injected so the run id is testable; defaults to now. */
   now?: Date;
   /** Called after each step, for the CLI's progress output. */
   onProgress?: (message: string) => void;
 }): Promise<BackupReport> {
   const now = options.now ?? new Date();
-  const fetchFile = options.fetchFile ?? manusFileFetcher;
+  const fileSource = options.fileSource ?? defaultFileSource();
   const say = options.onProgress ?? (() => {});
   const runId = runIdFor(now);
   const startedAt = now.toISOString();
@@ -208,14 +204,21 @@ export async function runBackup(options: {
     for (let index = 0; index < files.length; index++) {
       const file = files[index];
       try {
-        const body = await fetchFile(file.key);
-        await options.target.put(
+        // Streamed straight through: opened at the source, handed to the
+        // destination's multipart uploader, never assembled in memory here.
+        const { body, contentLength } = await fileSource.open(file.key);
+        await options.target.putStream(
           `${runId}/files/${file.key}`,
           body,
-          "application/octet-stream"
+          "application/octet-stream",
+          contentLength
         );
         report.files.copied += 1;
-        report.files.bytes += body.byteLength;
+        // From the source's own Content-Length. Counting the bytes as they
+        // passed would mean holding or tapping the stream, and the figure is
+        // for a report rather than for verification — the verifier reads the
+        // objects back (scripts/verifyBackup.mts).
+        report.files.bytes += contentLength ?? 0;
       } catch (error) {
         report.files.failed.push({ key: file.key, reason: message(error) });
       }

@@ -29,10 +29,39 @@ import {
 import { PURGE_CRON, PURGE_PATH } from "./scheduled/purgeArchivedBids";
 import { dayKey, runIdsForDay } from "./backup/history";
 import type { BackupTarget } from "./backup/target";
+import type { FileStreamSource } from "./backup/planFileSource";
+import { Readable } from "node:stream";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
 const hasDb = Boolean(databaseUrl);
 const runIf = hasDb ? describe : describe.skip;
+
+/**
+ * File sources, so nothing here needs a credential or a network.
+ *
+ * Streams rather than Buffers, matching the shape the backup now takes — it
+ * hands a stream from source to destination so a 2GB plan is never assembled
+ * in memory on the way through.
+ */
+function streamOf(text: string): FileStreamSource {
+  return {
+    name: "fake://files",
+    async open() {
+      const body = Buffer.from(text);
+      return { body: Readable.from(body), contentLength: body.byteLength };
+    },
+  };
+}
+
+/** A source that refuses every read, for the partial-run cases. */
+function refusingSource(): FileStreamSource {
+  return {
+    name: "fake://refusing",
+    async open() {
+      throw new Error("403 from storage");
+    },
+  };
+}
 
 /** An in-memory bucket, so nothing here needs a credential or a network. */
 function fakeTarget(seed: Record<string, string> = {}) {
@@ -46,6 +75,13 @@ function fakeTarget(seed: Record<string, string> = {}) {
     async check() {},
     async put(key, body) {
       written.set(key, body);
+    },
+    async putStream(key, body) {
+      // Collected, so the assertions can still look at what was written. The
+      // real target hands the stream to a multipart uploader.
+      const chunks: Buffer[] = [];
+      for await (const chunk of body) chunks.push(Buffer.from(chunk));
+      written.set(key, Buffer.concat(chunks));
     },
     async get(key) {
       const body = written.get(key);
@@ -284,9 +320,7 @@ runIf("a failed scheduled run against a real database", () => {
       now,
       databaseUrl,
       target,
-      fetchFile: async () => {
-        throw new Error("403 from storage");
-      },
+      fileSource: refusingSource(),
     });
 
     if (outcome.status === "completed") {
@@ -321,9 +355,7 @@ runIf("a failed scheduled run against a real database", () => {
       now,
       databaseUrl,
       target,
-      fetchFile: async () => {
-        throw new Error("403 from storage");
-      },
+      fileSource: refusingSource(),
     });
     // Only meaningful when the fixture database actually references files.
     if (first.status !== "partial") return;
@@ -332,9 +364,7 @@ runIf("a failed scheduled run against a real database", () => {
       now,
       databaseUrl,
       target,
-      fetchFile: async () => {
-        throw new Error("403 from storage");
-      },
+      fileSource: refusingSource(),
     });
     expect(second.status).toBe("skipped");
     if (second.status !== "skipped") return;
@@ -347,7 +377,7 @@ runIf("a failed scheduled run against a real database", () => {
       now,
       databaseUrl,
       target,
-      fetchFile: async () => Buffer.from("bytes"),
+      fileSource: streamOf("bytes"),
     });
     expect(outcome.status).toBe("completed");
     if (outcome.status !== "completed") return;
@@ -408,7 +438,7 @@ runIf("retry behaviour", () => {
       now,
       databaseUrl,
       target,
-      fetchFile: async () => Buffer.from("bytes"),
+      fileSource: streamOf("bytes"),
     });
 
     expect(outcome.status).toBe("completed");
@@ -423,7 +453,7 @@ runIf("retry behaviour", () => {
       now,
       databaseUrl,
       target,
-      fetchFile: async () => Buffer.from("bytes"),
+      fileSource: streamOf("bytes"),
     });
     expect(outcome.status).toBe("completed");
   });
@@ -439,7 +469,7 @@ runIf("retry behaviour", () => {
       now,
       databaseUrl,
       target,
-      fetchFile: async () => Buffer.from("bytes"),
+      fileSource: streamOf("bytes"),
     });
     expect(outcome.status).toBe("completed");
   });
