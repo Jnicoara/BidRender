@@ -846,3 +846,9 @@ left as written rather than rewritten to match the rename.
 - [x] Inspect production logs and the bid 420001 database plan record for the failed plan request
 - [x] Probe the recorded plan key through the configured server-side storage read path
 - [x] Document the storage access-denied finding and the non-destructive recovery path
+
+## Follow-ups from v5.129 — Docs & Changelog
+
+- [ ] `references/deploying.md` § 8 says login is "OAuth-only; no password flow is wired up despite `passwordHash` existing on `users`" — untrue since v5.127/5.128. `server/routers/authRouter.ts` has bcrypt signup, login and change-password. That table is what someone reads to size the work of leaving Manus, and it currently overstates it by a whole login system.
+- [ ] `server/backup.test.ts` uses `"bidrender-backups"` as a fixture bucket name. Harmless test data — the real bucket is `bidsoftware` — but it is now the last place that string survives, so it will read like the configured value to whoever finds it next.
+- [ ] Decide whether v5.129 (the docs-only R2 key-replacement commit) belongs in `CHANGELOG.md`. Skipped at the time because nothing about the app's behaviour changed, which is the exemption CLAUDE.md allows.
