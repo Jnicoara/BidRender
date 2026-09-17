@@ -862,7 +862,7 @@ left as written rather than rewritten to match the rename.
 - [ ] Fill in `APP_BASE_URL` in `workers/cron/wrangler.toml` and `wrangler deploy` the cron worker — until then neither the backup nor the archived-bid purge ever runs.
 - [x] Set `PLAN_STORAGE=r2` plus the `R2_PLANS_*` values, so plan files go to Cloudflare rather than Manus.
 - [x] Add a CORS rule on `bidrender-plans` for the live origin, exposing `ETag` — an upload in pieces cannot be reassembled without it. Verified 2026-09-16: a preflight from `https://bidrender.com`, `https://www.bidrender.com`, the `ondigitalocean.app` host and `http://localhost:3000` returns 204 with the origin allowed, and a real ranged GET exposes `ETag,Content-Range,Accept-Ranges,Content-Length`.
-- [ ] Set `R2_PLANS_READONLY_ACCESS_KEY_ID` and `R2_PLANS_READONLY_SECRET_ACCESS_KEY` on DigitalOcean, so the backup reads plans from R2 rather than buffering them through Manus. Verify with `pnpm tsx scripts/checkPlansReadOnly.mts`.
+- [x] Set `R2_PLANS_READONLY_ACCESS_KEY_ID` and `R2_PLANS_READONLY_SECRET_ACCESS_KEY` on DigitalOcean, so the backup reads plans from R2 rather than buffering them through Manus. Confirmed 2026-09-16 in the App Platform settings: both present, encrypted, Run-time scope. This was the gate on v5.141 reaching `main` — group C removed the backup's fallback route for reading plans, so without these two keys the first nightly backup after the deploy would refuse outright.
 
 ## Manus removal — what is left
 
