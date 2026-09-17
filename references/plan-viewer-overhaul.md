@@ -1,8 +1,12 @@
 # Plan viewer overhaul — the plan
 
-Written 2026-09-17. **Nothing here is built yet.** This is the agreed shape of
-the work, the order it happens in, and the decisions already made, so that none
-of it has to be re-derived in six weeks.
+Written 2026-09-17. **Phase 1 is shipped; everything else is still plan.** This
+is the agreed shape of the work, the order it happens in, and the decisions
+already made, so that none of it has to be re-derived in six weeks.
+
+**§ 4.1 is the most current part of this document** — it records what changed
+after Phase 1 was tested on the live site, which was more than the planning
+predicted.
 
 The viewer is the heart of the product. Everything else prices what this screen
 counts.
@@ -263,25 +267,116 @@ before the user has seen the thing work, and it is the most likely reason a new
 user gives up. Counting first and pricing later is the natural order of the
 job.
 
+### 3.1 The small version that ships early — and what it is not
+
+Live testing found the real prerequisite is worse than "pick an assembly
+first": the stamp tool can **only** be armed from a captured legend symbol that
+has already been linked to an assembly. On a set whose legend has not been
+captured, there is no way to stamp anything at all.
+
+**The small version (Phase 1a, no schema change):** arm the stamp tool by
+choosing an assembly straight from a list, the way every other assembly picker
+in the app works. Legend capture stays as the fast path for a symbol used over
+and over, but stops being the only door. `assemblyId` and `assemblyName` are
+filled exactly as they are today, so nothing in the data model moves.
+
+**Be clear about what this is not.** It is still level 3 — a stamp carrying a
+priced assembly. **True level 1, dropping plain points that carry no assembly
+and no price, needs `takeoff_stamps.assemblyName` to stop being required AND
+needs the group concept**, so that a group counted today can have an assembly
+attached next week with every click intact. That is Phase 6, and it must not be
+smuggled in early by making a column nullable and hoping: the group is the
+thing that lets clicks survive being priced later, which is the entire point of
+the three levels.
+
 ---
 
 ## 4. Phase order
 
 Each phase ships and gets used before the next starts.
 
-| Phase  | What                                                   | DB change                |
-| ------ | ------------------------------------------------------ | ------------------------ |
-| **1**  | Zoom, pan, and the three viewer bugs                   | **No**                   |
-| **2**  | Full-screen layout                                     | **No**                   |
-| **3**  | Two-point scale calibration                            | No (reuses `scaleRatio`) |
-| **4**  | Measure-only tool                                      | **No**                   |
-| **5**  | **Verticals on runs — the money phase**                | **Yes**                  |
-| **6**  | Three levels of effort                                 | **Yes** — groups         |
-| **7**  | Run settings: allowances, materials, sizes, ground     | **Yes**                  |
-| **8**  | **Verticals on stamps**                                | **Yes** (small)          |
-| **9**  | Editing runs: drag a vertex, insert/remove points      | No                       |
-| **10** | AI reader tiling, and the daily-limit question with it | No                       |
-| **11** | Tablet and touch                                       | No                       |
+> **Re-ordered 2026-09-17 after testing Phase 1 on the live site.** The order
+> below is the current one; § 4.1 records what the testing changed and why.
+
+| Phase  | What                                                    | DB change                |
+| ------ | ------------------------------------------------------- | ------------------------ |
+| **1**  | ~~Zoom, pan, and the three viewer bugs~~ **shipped**    | No                       |
+| **1a** | Page-flip fit bug + tool discoverability                | **No**                   |
+| **2**  | Two-point scale calibration                             | No (reuses `scaleRatio`) |
+| **3**  | Sharp re-render of the visible area                     | **No**                   |
+| **4**  | The layout: full screen, top toolbar, collapsing panels | **No**                   |
+| **4b** | Measure-only tool                                       | **No**                   |
+| **5**  | **Verticals on runs — the money phase**                 | **Yes**                  |
+| **6**  | Three levels of effort                                  | **Yes** — groups         |
+| **7**  | Run settings: allowances, materials, sizes, ground      | **Yes**                  |
+| **8**  | **Verticals on stamps**                                 | **Yes** (small)          |
+| **9**  | Editing runs: drag a vertex, insert/remove points       | No                       |
+| **10** | AI reader tiling, and the daily-limit question with it  | No                       |
+| **11** | Tablet and touch                                        | No                       |
+
+### 4.1 What live testing of Phase 1 changed
+
+Zoom, pan and measurement invariance all held. Everything below came out of
+using it on a real drawing set, which found things no amount of planning had.
+
+**The blocker: most real sheets do not state a scale ratio.** So the only scale
+tool that exists is useless on them, and the consequences cascade — no scale
+means tracing is off, which means the trace buttons are hidden, which means the
+screen offers nothing to do at all. **Two-point calibration is not a
+nice-to-have, it is the thing that makes the screen work**, and it moved from
+Phase 3 to Phase 2.
+
+**Sharp re-render moved in and got bigger.** 260% is already too soft to read a
+power pole callout. Worse, the whole-page approach hits a wall exactly there:
+
+| Render scale | Sharp to | Bitmap RAM (36×24 sheet) |
+| ------------ | -------- | ------------------------ |
+| 1.5× (today) | 100%     | 38 MB                    |
+| 3×           | 200%     | 154 MB                   |
+| 4×           | 267%     | **273 MB**               |
+| 6×           | 400%     | **615 MB**               |
+
+So it **must render only the visible area**, not the whole page. That is
+bounded by the viewport — roughly 6 MB at any magnification — instead of
+growing with the square of the zoom. It is also the machinery the AI tiling
+needs (§ tiling), so building it here pays twice. Poor image quality will hurt
+the reader for exactly the same reason it hurts a human.
+
+**Tool discoverability was the real felt problem.** On an unscaled sheet there
+was no tool to find: trace buttons hidden, stamp tool unarmable because the
+legend was empty. Two fixes, both small, both moved to the front:
+
+- **Show disabled tools with a reason, never hide them.** A hidden tool looks
+  like a tool that does not exist.
+- **Arm the stamp tool by picking an assembly directly**, without capturing a
+  legend symbol first. See § 3.1 — this is a UI change with no schema work, and
+  it is NOT the same thing as true level-1 counting.
+
+**The page-flip fit bug.** Phase 1 re-fits on canvas size, on the reasoning that
+a new raster is what changes. Every sheet in a set is usually the SAME size, so
+it never re-fires and the zoom carries over. It must key on the page and the
+document, not the geometry.
+
+**The no-scale notice still is not right.** Out of the drawing was an
+improvement; a large black box in the corner is not the answer. It belongs in
+the top toolbar as a status item with its own "Set scale" button, which means
+it is part of the layout phase rather than a thing to patch again first.
+
+### 4.2 Why calibration comes BEFORE sharp zoom
+
+The obvious objection: you must click a known dimension accurately, so surely
+sharpness comes first. **Checked, and it does not hold** — because calibration
+error is set by the SPAN you calibrate over, not by how sharp the pixels are.
+
+Calibrating over a 100 ft dimension at 1/8" = 1'-0" spans about 1,350 px. Click
+each end 3 px out and the scale is 0.4% wrong. Calibrate over a 10 ft span and
+the same sloppiness is **4.4% wrong** — on every measurement on that sheet,
+because a calibration error multiplies into all of them.
+
+**So the mitigation is a long span, not a sharp one**, and that is a design
+requirement on Phase 2 rather than a dependency on Phase 3: the calibration UI
+must push toward the longest available dimension, show the span it is about to
+use, and say plainly when a short one will not be trustworthy.
 
 ### Why verticals moved to Phase 5
 
