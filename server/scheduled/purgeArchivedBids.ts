@@ -20,10 +20,10 @@
  * Worker in workers/cron/, deployed once with `wrangler deploy`, which holds
  * the same CRON_SECRET and POSTs here at PURGE_CRON.
  *
- * 03:30 UTC daily. Hourly would be needless load for a 30-day window; daily
- * means a bid is destroyed within a day of its deadline, which is the
- * resolution the countdown promises anyway. It runs AFTER the 02:00 backup, on
- * purpose — see backupToR2.ts.
+ * 10:30 UTC daily — 3:30am Pacific in summer, 2:30am in winter. Hourly would be
+ * needless load for a 30-day window; daily means a bid is destroyed within a
+ * day of its deadline, which is the resolution the countdown promises anyway.
+ * It runs AFTER the 09:00 backup, on purpose — see backupToR2.ts.
  *
  * UNTIL THAT WORKER IS DEPLOYED, NOTHING IS EVER PURGED. The app stays correct
  * in the meantime — `daysRemaining` still counts down and the archive still
@@ -49,11 +49,14 @@ import * as db from "../db";
 /**
  * When the purge runs. Five fields, UTC — standard cron, no seconds.
  *
- * Deliberately after the 02:00 backup: this job permanently destroys bids, and
+ * Deliberately after the 09:00 backup: this job permanently destroys bids, and
  * running it second means the night's export still contains what it is about to
  * remove. Reverse the order and the backup would faithfully record the deletion.
+ *
+ * The 90-minute gap is the load-bearing part, not the absolute times. Moving
+ * either job means moving both and keeping this one second.
  */
-export const PURGE_CRON = "30 3 * * *";
+export const PURGE_CRON = "30 10 * * *";
 
 /** The path the Worker POSTs to. Mounted in server/_core/index.ts. */
 export const PURGE_PATH = "/api/scheduled/purgeArchivedBids";

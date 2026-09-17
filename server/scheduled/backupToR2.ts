@@ -69,7 +69,7 @@ import {
  * restate it — TOML cannot import from TypeScript — so the test asserts the two
  * agree rather than trusting them to.
  */
-export const BACKUP_CRON = "0 2 * * *";
+export const BACKUP_CRON = "0 9 * * *";
 
 /** The path the platform POSTs to. Mounted in server/_core/index.ts. */
 export const BACKUP_PATH = "/api/scheduled/backupToR2";

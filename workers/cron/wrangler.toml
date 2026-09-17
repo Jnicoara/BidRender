@@ -14,13 +14,54 @@ name = "bidrender-cron"
 main = "worker.js"
 compatibility_date = "2026-09-16"
 
+# On, matching what is deployed. The Worker is published at
+# bidrender-cron.bidrender.workers.dev.
+#
+# ── What the first deploys were really complaining about (2026-09-17) ─────────
+# The account had never registered a workers.dev subdomain, and Cloudflare will
+# not attach a cron schedule until one exists. That is the whole story, but it
+# took four attempts to see, because the error arrives in two different disguises
+# depending on this setting:
+#
+#   workers_dev = false  →  the upload succeeds, then the schedules call fails
+#                           with error 10063. The Worker is left existing with
+#                           NO schedule, which looks deployed and never runs.
+#   workers_dev unset    →  it fails earlier and far more plainly, at publish
+#                           time, saying the subdomain needs registering.
+#
+# So `workers_dev = false` was NOT the cause, despite being the one thing that
+# changed before the failures started — it only moved the same complaint to a
+# later and more confusing stage. It was tried on the theory that a Worker with
+# no target cannot hold a schedule; that theory was wrong.
+#
+# ── Registering the subdomain needs a real terminal ──────────────────────────
+# `wrangler deploy` offers to register it interactively. A non-interactive shell
+# — CI, or an agent session — answers "no" to that prompt on its own and fails,
+# no matter how many times it is retried. It has to be done from a terminal a
+# human can type into, or from the dashboard, where the suggested name sits in a
+# form that must actually be submitted; reload the page to confirm it saved,
+# because an unsubmitted suggestion reads exactly like a registered subdomain.
+#
+# ── The public address is inert, but it is not nothing ───────────────────────
+# worker.js exports `scheduled` and no fetch handler, so a request to that
+# address finds no code to run and errors. It cannot trigger a backup, reach the
+# app, or expose CRON_SECRET. Setting this back to false would be tidier and
+# should now work, since the blocker was the missing subdomain rather than this
+# flag — but do not change it without checking Cron Triggers afterwards. The
+# deploy half-succeeds on failure, so the Worker keeps looking healthy while
+# silently never running again.
+workers_dev = true
+
+# 09:00 and 10:30 UTC — 2:00am and 3:30am Pacific in summer, an hour earlier
+# in winter, because UTC does not observe daylight saving and Pacific does.
+# Both are chosen to fall in the middle of the night for the app's users, and
+# the 90-minute gap keeps the purge behind the backup.
 [triggers]
-crons = ["0 2 * * *", "30 3 * * *"]
+crons = ["0 9 * * *", "30 10 * * *"]
 
 [vars]
 # The deployed app. No trailing slash needed — worker.js strips one.
-# Set this to the real DigitalOcean URL before deploying.
-APP_BASE_URL = "https://REPLACE-ME.ondigitalocean.app"
+APP_BASE_URL = "https://bidrender.com"
 
 # CRON_SECRET is NOT here on purpose. It is a secret, so it is set with
 #   npx wrangler secret put CRON_SECRET

@@ -28,7 +28,7 @@
 
 /** Paths on the app. These must match server/scheduled/*.ts. */
 const JOBS = {
-  "0 2 * * *": {
+  "0 9 * * *": {
     name: "backup",
     path: "/api/scheduled/backupToR2",
     /**
@@ -40,7 +40,7 @@ const JOBS = {
      */
     attempts: 3,
   },
-  "30 3 * * *": {
+  "30 10 * * *": {
     name: "purge",
     path: "/api/scheduled/purgeArchivedBids",
     /**

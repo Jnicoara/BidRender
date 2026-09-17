@@ -3,10 +3,15 @@
 Calls the app's two scheduled jobs on a timer. The app cannot schedule itself —
 its instances are stopped and replaced, so an in-process timer dies with them.
 
-| Job                | When (UTC)   | Local                        | Retries |
-| ------------------ | ------------ | ---------------------------- | ------- |
-| Backup             | `0 2 * * *`  | 7pm Pacific, previous day    | 3       |
-| Archived-bid purge | `30 3 * * *` | 8:30pm Pacific, previous day | 1       |
+| Job                | When (UTC)    | Pacific (summer / winter) | Retries |
+| ------------------ | ------------- | ------------------------- | ------- |
+| Backup             | `0 9 * * *`   | 2:00am / 1:00am           | 3       |
+| Archived-bid purge | `30 10 * * *` | 3:30am / 2:30am           | 1       |
+
+The Pacific column has two values because UTC does not observe daylight saving
+and Pacific does. The UTC times never move; what shifts each November and March
+is the local hour they land on. Both are the middle of the night either way,
+which is the point — nobody is estimating at 1am.
 
 The purge runs _after_ the backup on purpose: it permanently deletes bids, and
 going second means the night's backup still contains what it is about to remove.
@@ -29,7 +34,7 @@ never in this repo.
 ## Checking it works
 
 - **Right now:** `npx wrangler dev --test-scheduled`, then
-  `curl "http://localhost:8787/__scheduled?cron=0+2+*+*+*"`.
+  `curl "http://localhost:8787/__scheduled?cron=0+9+*+*+*"`.
 - **Afterwards:** Cloudflare dashboard → Workers → `bidrender-cron` → Cron
   Triggers → past events. A failed run shows there because the Worker throws
   rather than swallowing the error.

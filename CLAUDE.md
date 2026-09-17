@@ -361,7 +361,7 @@ fails so nothing is reported and the backups just end. Anything added here with
 the same "you only find out when you need it" shape wants the same treatment.
 
 The working example is `server/scheduled/purgeArchivedBids.ts`
-(`30 3 * * *`, five fields, UTC). Note the shape it uses, because it is the
+(`30 10 * * *`, five fields, UTC). Note the shape it uses, because it is the
 shape that makes this testable and safe:
 
 - **The work function is exported separately from the HTTP handler.**
