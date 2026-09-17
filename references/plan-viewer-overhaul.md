@@ -122,11 +122,12 @@ percentage.
    two. More is left at a panel than at a device.
 
    Getting this unit right is the difference between a number an estimator
-   trusts and one they work around. **Open question:** makeup is almost
-   certainly wire-only — pipe is cut to fit and has no tail. Confirm before
-   building, because applying it to conduit would inflate every run.
+   trusts and one they work around.
 
-### 2.2a Starter values — shipped, labelled, and dated
+   **Makeup is WIRE ONLY.** Confirmed 2026-09-17. Pipe gets cut to fit and has
+   no tail. Applying it to conduit would inflate every run on every bid.
+
+### 2.3 Starter values — shipped, labelled, and dated
 
 **These ship with real numbers, NOT zero.** This is a deliberate exception to
 `CLAUDE.md` § Starter content, and the reasoning is worth keeping:
@@ -175,7 +176,12 @@ about that run. So it is solved by **mounting heights, applied automatically**.
 #### The model
 
 - **A distribution height** — the elevation the raceway actually runs at. Set
-  per company, overridable per job.
+  per company, overridable per job. **Called that, never "ceiling height"**:
+  the pipe may run at the ceiling, above it, or at the deck, and three people
+  will enter three different numbers under an ambiguous label. Ceiling height
+  stays out of the model entirely unless something genuinely needs it.
+  **Stored in inches, displayed in feet and inches** — `formatFeetInches`
+  already exists, and 18" typed as `1.5` is the obvious mistake to design out.
 - **A mounting height per device type** — receptacle 18", switch 48", panel,
   ceiling junction box, and so on. Set per company, overridable per job.
 - **Each run carries a START elevation and an END elevation, separately**,
@@ -202,10 +208,14 @@ A vertical belongs to **either the run or the stamp, never both.** If a run's
 end drop is counted and the receptacle stamped at that same point also carries
 its own drop, the footage is counted twice and nothing catches it.
 
-**The rule:** a traced run owns the verticals at its own two ends. A stamp's
-vertical is for devices **not** on a traced run. The UI has to make which one is
-carrying it obvious, and the run breakdown showing its verticals explicitly is
-half of that protection.
+**The rule, and it goes in the CODE, not only in this document:** a traced run
+owns the verticals at its own two ends. A stamp's vertical is for devices
+**not** on a traced run. Enforce it where the quantities are computed, so a
+future change cannot quietly reintroduce the double count; a rule that lives
+only in prose is a rule that survives exactly as long as the person who read it.
+
+The UI makes which one is carrying it obvious, and the run breakdown showing its
+verticals explicitly is the other half of the protection.
 
 #### Verticals flow through the per-conductor maths
 
@@ -213,7 +223,7 @@ A drop adds to conduit **once** and to wire **once per conductor**. Vertical
 footage must go through the same multiplication as traced footage, or the wire
 number is wrong by however many conductors there are.
 
-### 2.3 How the settings behave
+### 2.5 How the settings behave
 
 **Defaults set once, inherited by every new run, overridden only where a run
 differs.** Six controls on forty runs is forty times six decisions, and nobody
@@ -265,30 +275,48 @@ Each phase ships and gets used before the next starts.
 | **2**  | Full-screen layout                                     | **No**                   |
 | **3**  | Two-point scale calibration                            | No (reuses `scaleRatio`) |
 | **4**  | Measure-only tool                                      | **No**                   |
-| **5**  | Three levels of effort                                 | **Yes** — groups         |
-| **6**  | Run settings: allowances, materials, sizes, ground     | **Yes**                  |
-| **7**  | **Verticals: mounting heights on runs**                | **Yes**                  |
+| **5**  | **Verticals on runs — the money phase**                | **Yes**                  |
+| **6**  | Three levels of effort                                 | **Yes** — groups         |
+| **7**  | Run settings: allowances, materials, sizes, ground     | **Yes**                  |
 | **8**  | **Verticals on stamps**                                | **Yes** (small)          |
 | **9**  | Editing runs: drag a vertex, insert/remove points      | No                       |
 | **10** | AI reader tiling, and the daily-limit question with it | No                       |
 | **11** | Tablet and touch                                       | No                       |
 
-**Why verticals are 7 and 8 rather than earlier, despite mattering most.** They
-depend on two things built just before them: the defaults-inheritance plumbing
-from Phase 6 (null means "follow the setting"), and the per-conductor wire maths
-that vertical footage has to flow through. Building verticals first means
-building both twice.
+### Why verticals moved to Phase 5
 
-**Runs before stamps, deliberately.** Run verticals carry most of the missed
-footage and need no group concept. Stamp verticals are the smaller half and sit
-on top of Phase 5's groups. Splitting them means the big win ships a phase
-earlier.
+**Moved 2026-09-17, and the reasoning first given for holding them back was
+wrong.**
 
-**If verticals need to come sooner**, the minimum standalone version is:
-company distribution height, per-device-type mounting heights, run start and
-end elevation, and the breakdown that shows them. That does not need Phase 5 at
-all — only Phase 6's inheritance pattern, which already exists elsewhere in the
-app for overhead and profit.
+They were placed after groups and run settings on the claim that they depended
+on two things those phases would build. Checking the code rather than assuming:
+
+- **The per-conductor wire maths already exists.** `wireFeetByCircuit` is
+  documented as _"the full run length once per conductor"_. Vertical footage can
+  flow through it today.
+- **The defaults-inheritance pattern already exists**, for overhead, profit and
+  the productivity factor. It is a pattern to copy, not one to build.
+
+So the dependency was overstated. Verticals are the single largest source of
+missed footage, and groups and run settings are the two largest phases in the
+plan — holding the money item behind them cost weeks for no technical reason.
+
+**Runs before stamps, still.** Run verticals carry most of the missed footage
+and need no group concept at all. Stamp verticals are the smaller half and sit
+on top of Phase 6's groups, so they stay at Phase 8.
+
+**What the reorder costs, named precisely so nobody has to guess later:**
+`shared/takeoffQuantities.ts` gets restructured twice instead of once — first to
+add verticals to a run's length, then again when allowances arrive and the
+composition order has to be settled. That is one module of pure functions with
+tests against them, which is the cheap kind of rework: no data migration, no UI
+rebuild, and the tests say immediately if the second change breaks the first.
+The breakdown UI is extended rather than rebuilt, and mounting heights and
+allowances would be separate settings sections either way.
+
+**The minimum Phase 5 is:** company distribution height, per-device-type
+mounting heights, run start and end elevation with the end device type picked by
+the user, the vertical maths, and the breakdown that shows it.
 
 **Why the AI tiling is late:** it needs the render-at-resolution machinery from
 Phase 1, so building it earlier means writing that twice. And manual mode has
@@ -347,25 +375,39 @@ the screen around it, and drop it first if Phase 5 runs long.
 **Dragging a vertex stays last and is cuttable.** Undo-and-re-click already
 works. If it competes with anything in Phases 5–8, it loses.
 
-## 7. Open questions
+## 7. Settled — answered 2026-09-17
+
+- **Makeup applies to WIRE ONLY.** Pipe is cut to fit and has no tail.
+- **The height is called "distribution height".** Ceiling height stays out of
+  the model entirely unless something genuinely needs it later.
+- **Run extras need no sheet awareness.** A run already belongs to a sheet, and
+  a riser is traced as separate runs per sheet — which is how it would be
+  estimated by hand anyway. No new work.
+- **Elevations stored in inches, displayed in feet and inches.**
+- **No per-area heights.** Per-run override is enough; per-area is a demo
+  feature that gets used twice.
+- **The double-count rule goes in the CODE**, not only in this document.
+- **The run end device type is picked by the user, never guessed** from a nearby
+  stamp.
+- **A vertical belongs to the GROUP, not each stamp.** Thirty receptacles in a
+  room share one height, and storing it thirty times is thirty places for it to
+  disagree with itself.
+- **The run breakdown stays long.** Five or six rows per run is the honest
+  version and it is not to be shortened to save space — the estimator has to see
+  where every foot came from. It gets designed properly when Phase 5 arrives,
+  never compressed to fit.
+
+## 8. Still open
 
 - **How far should sharp zoom go?** Re-rendering at high zoom costs render time
   on dense sheets (0.5–13s). There is a real trade between "sharp at 800%" and
   "instant". Suggested: sharp to ~400%, stretch beyond. Needs a look at a real
-  E-sheet.
-- **Do run extras need to know which sheet they are on?** A riser has drops on
-  one sheet and rises on another. Affects the Phase 6 columns.
-- **Does makeup apply to conduit, or wire only?** Almost certainly wire only —
-  pipe is cut to fit and has no tail. Applying it to conduit would inflate every
-  run. Confirm before Phase 6.
-- **What is the height called?** "Ceiling height" is ambiguous: the pipe may run
-  at the ceiling, above it, or at the deck, and three people will enter three
-  different numbers under one label. Suggest **distribution height** — the
-  elevation the raceway actually runs at — with ceiling height kept separate if
-  it is ever needed for anything else.
-- **Mixed heights on one sheet.** An office at 10 ft and a warehouse at 18 ft on
-  the same drawing. Per-run override covers it. **Resist per-area heights** —
-  that is a zoning feature and it is a lot of machinery for a case the override
-  already answers.
-- **Store elevations in inches, display in feet and inches.** `formatFeetInches`
-  already exists. A mounting height of 18" typed as 1.5 is the obvious mistake.
+  E-sheet. **A Phase 1 decision.**
+- **Do the allowance percentages apply to verticals, or only to traced length?**
+  Surfaced by moving verticals ahead of allowances. The conduit allowance covers
+  ROUTE UNCERTAINTY — the jog around a duct, the offset that was not on the
+  plan. But a drop from a known distribution height to a known mounting height
+  has no route uncertainty in it: it is arithmetic between two numbers the
+  estimator supplied. There is a good argument that the percentage applies to
+  traced length only. **Must be answered before Phase 7**, and it is the one
+  place the reorder genuinely changed a question rather than deferring it.
