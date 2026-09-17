@@ -93,7 +93,7 @@ export const NAVIGATION_TARGETS: NavigationTarget[] = [
   },
   {
     id: "labor-rates",
-    label: "Labor Rates",
+    label: "Labor rates",
     path: "#/library/labor-rates",
     purpose:
       "Set or edit hourly and salaried labor rates for roles like apprentice, journeyman, foreman. Change what an hour costs. Crew pay rates.",

@@ -119,7 +119,7 @@ export function StartBidCards({
         accent
         title="Upload a plan"
         body="Start from a drawing set and take it off"
-        footnote={`PDF, up to ${formatBytes(MAX_PDF_BYTES)}. Creates the bid for you.`}
+        footnote={`PDF, up to ${formatBytes(MAX_PDF_BYTES)}. Starts a bid named from the file.`}
         disabled={busy}
         onClick={() => fileInput.current?.click()}
       />

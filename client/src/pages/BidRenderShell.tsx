@@ -496,8 +496,8 @@ export default function BidRenderShell() {
               onClick={() => navigate("library-labor-rates")}
               isActive={isInLaborRates}
               icon={HardHat}
-              label="Labor Rates"
-              title="Labor Rates — what an hour costs, by role"
+              label="Labor rates"
+              title="Labor rates — what an hour costs, by role"
             />
             {/* Kits and Modifiers are tabs in here: a kit contains assemblies
                 and nothing else, and a modifier adjusts an assembly's labor,
@@ -542,7 +542,7 @@ export default function BidRenderShell() {
                 isActive={isInAdmin}
                 icon={Shield}
                 label="Admin"
-                title="Admin Settings"
+                title="Admin settings"
               />
             )}
           </NavSection>

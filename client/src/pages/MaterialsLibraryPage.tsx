@@ -588,7 +588,7 @@ export default function MaterialsLibraryPage() {
   const archiveMaterial = trpc.materials.archive.useMutation({
     onError,
     onSuccess: () => {
-      toast.success("Archived — restore it any time.");
+      toast.success("Archived — restore it any time from the Archived tab");
       refreshAll();
     },
   });
@@ -813,7 +813,7 @@ export default function MaterialsLibraryPage() {
         return result.suggestions;
       } catch {
         toast.error(
-          "Couldn't fetch suggestions — type the terms people use for it yourself."
+          "Could not fetch suggestions — type the terms people use for it yourself."
         );
         return [];
       }

@@ -219,7 +219,7 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
                     : "bg-muted/30 text-muted-foreground hover:text-foreground"
                 )}
               >
-                {m === "login" ? "Sign In" : "Create Account"}
+                {m === "login" ? "Sign in" : "Create account"}
               </button>
             ))}
           </div>
@@ -348,9 +348,9 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
                   <Loader2 size={15} className="animate-spin" /> Please wait…
                 </>
               ) : mode === "login" ? (
-                "Sign In"
+                "Sign in"
               ) : (
-                "Create Account"
+                "Create account"
               )}
             </button>
           </form>

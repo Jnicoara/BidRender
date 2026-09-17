@@ -591,7 +591,7 @@ export default function LaborRatesPage() {
         <div className="flex items-center gap-3">
           <HardHat className="w-5 h-5 text-primary" />
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-semibold">Labor Rates</h1>
+            <h1 className="text-lg font-semibold">Labor rates</h1>
             <p className="text-xs text-muted-foreground">
               What each role costs you per hour. Starter rates are placeholders,
               not market data — replace them with your own.

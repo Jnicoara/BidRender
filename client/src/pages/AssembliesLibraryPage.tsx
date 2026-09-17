@@ -1228,7 +1228,7 @@ export default function AssembliesLibraryPage() {
   const archiveAssembly = trpc.assemblies.archive.useMutation({
     onError: error => toast.error(error.message),
     onSuccess: () =>
-      toast.success("Archived — restore it any time from the Archived tab."),
+      toast.success("Archived — restore it any time from the Archived tab"),
     onSettled: refresh,
   });
 

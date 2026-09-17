@@ -34,7 +34,7 @@ export function NavigationHelper({ className }: { className?: string }) {
     onError: () =>
       setAnswer({
         message:
-          "Couldn't reach the helper just now. The sidebar has everything too.",
+          "Could not reach the helper just now. The sidebar has everything too.",
         target: null,
       }),
   });

@@ -223,7 +223,9 @@ export function BrandingSection() {
       toast.success("Logo saved — it is on every proposal from now on.");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "That logo did not upload."
+        error instanceof Error
+          ? error.message
+          : "That logo did not upload. Your current logo is unchanged."
       );
     } finally {
       setUploading(false);

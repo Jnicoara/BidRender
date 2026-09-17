@@ -448,7 +448,9 @@ function PlanPane({
         }
 
         setError(
-          err instanceof Error ? err.message : "That plan could not be opened."
+          err instanceof Error
+            ? err.message
+            : "That plan could not be opened. Your takeoff is saved — try opening it again."
         );
         setLoading(false);
       }
@@ -481,7 +483,9 @@ function PlanPane({
       .catch(err => {
         if (cancelled) return;
         setError(
-          err instanceof Error ? err.message : "That page could not be drawn."
+          err instanceof Error
+            ? err.message
+            : "That page could not be drawn. Move to another sheet and back."
         );
         setRendering(false);
       });
@@ -1718,7 +1722,7 @@ export default function TakeoffPage({
         const message =
           err instanceof Error
             ? err.message
-            : "That file could not be attached.";
+            : "That file could not be attached. Nothing was added to this bid.";
         const detail =
           err instanceof Error
             ? ((err as Error & { detail?: string | null }).detail ?? null)

@@ -383,7 +383,7 @@ export function ProposalDesignControls({
               }
             }}
             inputMode="numeric"
-            aria-label="Days the quoted price stands"
+            aria-label="Days the price stands"
             className="h-8 w-20 text-sm text-right"
           />
           <span className="text-xs text-muted-foreground">

@@ -513,7 +513,7 @@ export default function KitsPage() {
   const archiveKit = trpc.kits.archive.useMutation({
     onError: error => toast.error(error.message),
     onSuccess: () =>
-      toast.success("Archived — restore it any time from the Archived tab."),
+      toast.success("Archived — restore it any time from the Archived tab"),
     onSettled: refresh,
   });
 

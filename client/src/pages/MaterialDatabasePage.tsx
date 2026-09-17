@@ -144,7 +144,7 @@ export default function MaterialDatabasePage() {
             which is not a place this header can name. */}
         <div className="flex items-center gap-3">
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-semibold">Supplier Pricing</h1>
+            <h1 className="text-lg font-semibold">Supplier pricing</h1>
             <p className="text-xs text-muted-foreground">
               Your supply house's prices, on the same catalog everything else
               uses. Set a price here and every assembly that uses it follows.

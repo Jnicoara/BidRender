@@ -440,7 +440,7 @@ export default function ClientsPage() {
                 ? `Nothing matches “${query}”.`
                 : view === "archived"
                   ? "Nothing archived."
-                  : "No clients yet."}
+                  : "No clients yet. Add one and its details fill in the proposal."}
             </p>
             {!query && view === "active" && (
               <p className="text-xs text-muted-foreground/70 mt-1">
