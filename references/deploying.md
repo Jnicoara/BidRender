@@ -6,76 +6,106 @@ Reference for the deploy sequence summarised in `CLAUDE.md` § Deploying.
 
 ## 1. The one fact that explains everything
 
-**GitHub is not connected to the live site.** There is no CI, no GitHub Actions
-workflow, no Dockerfile, no cloud build config, and `origin` is the only remote.
-Nothing observes a push.
+**Pushing `main` deploys the live site.** DigitalOcean App Platform watches the
+`main` branch of `Jnicoara/BidRender` and rebuilds on every push. There is no
+button to press afterwards and no second step to remember.
 
-The live site runs from the **Manus project's own copy** of this repo, deployed
-by a human pressing **Deploy** in the Manus UI. Getting code live is therefore
-two separate acts: push it to GitHub, then go make Manus pull it.
+That means there is no dry run. A push to `main` reaches the people using the
+app, usually within five minutes.
 
-| Action                                         | Effect on the live site              |
-| ---------------------------------------------- | ------------------------------------ |
-| `git push origin main`                         | None.                                |
-| Commit in the local checkout                   | None.                                |
-| Manus session: `git pull origin main` + Deploy | This is the only thing that deploys. |
+| Action                       | Effect on the live site                       |
+| ---------------------------- | --------------------------------------------- |
+| Commit in the local checkout | None.                                         |
+| `git push origin local-dev`  | None. This is the safe place to put work.     |
+| **`git push origin main`**   | **Deploys.** Builds and goes live on its own. |
 
-## 2. Direction of travel — GitHub → Manus, never the reverse
+> **This reversed on 2026-09-16.** It used to be the opposite — pushing did
+> nothing, and a human pressed Deploy inside Manus. Anything you read anywhere
+> that describes a Manus session, a sandbox pre-flight or a checkpoint is from
+> that era and no longer applies. The one thing that did NOT change: migrations
+> still do not travel with a deploy (§ 5).
 
-The local checkout plus GitHub is the source of truth. Manus is a deployment
-target that pulls.
+## 2. The habit: land on `local-dev` first
 
-This is a rule rather than a preference because the repo has already diverged
-once. The project began inside Manus — that is what the 197 `Checkpoint:`
-commits are — and the last of them is `ff469cb` (2026-08-10). Work then moved to
-a local checkout driven by Claude Code, which pushes to GitHub and nothing else.
-51 commits later the live site was still serving the pre-`ff469cb` build. No
-error was raised at any point, because from each side's perspective nothing was
-wrong.
+Work goes to `local-dev`, which deploys nothing. It moves to `main` only when
+you have decided it should be live.
 
-Editing directly in the Manus workspace re-opens the same gap from the other
-end. If it happens anyway, **push that work to GitHub first**, then deploy — do
-not merge GitHub into the Manus copy and leave the two reconciled only there.
+This is a habit rather than a rule enforced anywhere, and it is the only thing
+standing between a routine push and an unplanned deploy. `main` has no branch
+protection; nothing will stop you.
 
-## 3. Pre-flight: has Manus got anything GitHub hasn't?
-
-Run this in the Manus sandbox **before** pulling. It is the whole safety check.
+**Merging `local-dev` into `main` is the deploy.** Do it deliberately:
 
 ```bash
-git status --porcelain          # uncommitted edits — expect empty
-git log origin/main..HEAD       # local-only commits — expect empty
-git stash list                  # stashed work — expect empty
-git fetch origin && git log HEAD..origin/main --oneline | wc -l   # how far behind
+git checkout main
+git merge --ff-only local-dev     # refuses if it is not a clean fast-forward
+git push origin main              # ← this is the moment it goes live
+git checkout local-dev            # go back, so the next edit is not on main
 ```
 
-Interpretation:
+`--ff-only` is worth keeping. If it refuses, `main` has something `local-dev`
+does not, and you want to find out before deploying rather than after.
 
-- **All empty except the last** → clean. Manus has nothing unique; pulling is
-  lossless. Proceed.
-- **Anything in the first three** → **stop.** That is work that exists only in
-  Manus. Push it to GitHub (`git push origin HEAD:a-rescue-branch`) and sort out
-  the merge before deploying. A `git pull` or checkout here can bury it.
+## 3. Before you push `main`
 
-Also worth capturing before you touch anything, so "what was live" is answerable
-later:
+Three questions, and they take about a minute.
 
 ```bash
-git rev-parse --short HEAD      # the commit the Manus copy is sitting on
-git log -1 --format='%ad %s'    # and what it was
+git log main..local-dev --oneline    # what is about to go live
+git status --porcelain               # uncommitted edits — expect empty
+pnpm check                           # TypeScript, the correctness gate
+```
+
+- **Read the first list.** It is the entire change set the deploy carries. If
+  anything in it surprises you, stop.
+- **Does it add a migration?** (`drizzle/` changed.) Then § 5 applies and the
+  migration has to be run by hand — it does not ride along.
+- **Write down what is live now**, so "roll back to what?" has an answer:
+
+```bash
+git log --oneline -1 origin/main
 ```
 
 ## 4. Deploy sequence
 
-1. **Pre-flight** — § 3 above. Do not skip it; it is the only thing standing
-   between an unpushed change and permanent loss.
-2. **`git pull origin main`** — the bridge that does not otherwise exist.
-3. **`pnpm install`** — only if `package.json` / the lockfile moved.
-4. **`pnpm db:push`** — apply pending migrations. **Before deploying, not
-   after.**
-5. **Save a checkpoint** in Manus.
-6. **Deploy.**
-7. **Verify** — § 6.
-8. **Register any new scheduled job** — § 7.
+1. **Pre-flight** — § 3 above.
+2. **Merge and push `main`** — § 2. The build starts by itself.
+3. **Watch the Activity tab** — § 4a. Do not walk away; a failed build is
+   quiet unless you are looking at it.
+4. **Run migrations if there are any** — § 5. They do **not** deploy with the
+   code, and a missed one does not crash the app, it serves wrong data.
+5. **Verify** — § 6.
+6. **Deploy any new scheduled job separately** — § 7. The cron Worker is not
+   part of this deploy and never has been.
+
+### 4a. Watching it, and rolling back
+
+**DigitalOcean dashboard → your app → Activity.** Every deploy is listed with
+its status. A normal one takes roughly three to six minutes and finishes as
+**Deployed**. Watch it rather than assuming: a build that fails leaves the
+previous version running, so the site stays up and nothing tells you the new
+code never arrived.
+
+**To roll back — same tab.** Find the last deployment that succeeded and press
+**Rollback**. It restores that build in a couple of minutes and touches neither
+GitHub nor your local checkout. **This is the fastest way out of a bad deploy**
+and the first thing to reach for.
+
+Rolling back the code as well, when you want `main` to match what is running:
+
+```bash
+git revert --no-commit <bad-commit>...<bad-commit>
+git commit -m "Revert <what>"
+git push origin main
+```
+
+That undoes the change as a _new_ commit and triggers a fresh deploy. Slower
+than the Activity-tab rollback, but it keeps the history honest — prefer it
+over force-pushing `main`, which rewrites what everyone else has.
+
+**A rollback does not undo a migration.** Migrations are forward-only here, so
+rolling the code back to before a schema change leaves the database ahead of it.
+Usually harmless — extra columns nothing reads — but check § 5 before assuming.
 
 ## 5. Migrations are the sharp edge
 
@@ -174,11 +204,18 @@ missing foreign keys and the nine indexes are on the retired `master_*` /
 A deploy that silently didn't take looks identical to one that did, so check
 something that could only be true of the new build:
 
-- **The navigation helper** (Dashboard → "Ask where to find something") is the
-  cheapest probe. It exercises `BUILT_IN_FORGE_API_KEY`, which exists **only on
-  deployed infrastructure** — it is absent from every local `.env`, so this
-  feature can never be verified on a dev machine. If it returns a screen and a
-  button, the platform wiring is intact.
+- **The navigation helper** (Dashboard → "Ask where to find something") is still
+  the cheapest probe, because it needs `ANTHROPIC_API_KEY` — which is set in the
+  deployed environment and is switched off locally by `DISABLE_AI_FEATURES=true`
+  in `.env`. A working answer proves the deployed environment has its secrets,
+  not just its code. It used to be recommended for reaching the Manus gateway;
+  that is no longer what it exercises.
+
+  Read the result carefully. Every AI feature here degrades to something useful
+  rather than erroring, so a **plain text answer with no button** may be the
+  graceful fallback — which means the key is missing or the daily allowance is
+  spent. A returned screen **and** a button is the pass.
+
 - **The version tag** in the sidebar footer (hover to reveal) reads
   `APP_VERSION` from `shared/version.ts`. If it shows an older number than the
   one on `main`, the deploy did not take.
@@ -231,20 +268,36 @@ in the comment at the top of `workers/cron/wrangler.toml`.
 `CLAUDE.md` § Scheduled work explains why failure here points at "keeps too
 much" rather than "deletes too early".
 
-## 8. Platform services the app cannot run without
+## 8. Outside services the app cannot run without
 
-Relevant when anyone proposes hosting this elsewhere. Four Manus services are
-load-bearing:
+Relevant when anyone proposes hosting this elsewhere. **The app no longer
+depends on any Manus service** — the move completed in September 2026, and
+nothing here is a platform lock-in any more. What it does depend on:
 
-| Service          | Env / endpoint                                                         | What breaks without it                                                                                    |
-| ---------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| OAuth login      | `OAUTH_SERVER_URL`                                                     | All sign-in. Auth is OAuth-only; no password flow is wired up despite `passwordHash` existing on `users`. |
-| LLM gateway      | `BUILT_IN_FORGE_API_KEY` / `BUILT_IN_FORGE_API_URL` → `forge.manus.im` | The navigation helper and the material alias suggester. Both degrade gracefully, so this fails quietly.   |
-| S3 presign proxy | `server/_core/storage.ts`, `storageProxy.ts`                           | Plan PDF upload and cross-device sync.                                                                    |
-| Cron             | Manus platform scheduler                                               | The archive purge (§ 7).                                                                                  |
+| Service               | Env                                    | What breaks without it                                                                                       |
+| --------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| MySQL database        | `DATABASE_URL`, `DATABASE_CA_CERT`     | Everything.                                                                                                  |
+| Cloudflare R2, plans  | `R2_PLANS_*` (4) + `PLAN_STORAGE=r2`   | Plan upload and viewing. Logos too — they ride the same pipe.                                                |
+| Cloudflare R2, backup | `R2_*` (4) + `R2_PLANS_READONLY_*` (2) | Backups. Missing the read-only pair makes the backup **refuse to start** rather than silently skip files.    |
+| Anthropic             | `ANTHROPIC_API_KEY`                    | The plan reader, navigation helper and alias suggester. All three degrade gracefully, so this fails quietly. |
+| Cloudflare Worker     | `CRON_SECRET`, matching the Worker's   | Both scheduled jobs (§ 7).                                                                                   |
 
-Leaving Manus means replacing all four, including building a login system.
-It is not a configuration change.
+**Sign-in is not on this list, and that is the point.** Email and password with
+bcrypt, in our own `users` table (`server/routers/authRouter.ts` — `signup`,
+`login`, `changePassword`), shipped in v5.127/5.128. It moves with the database
+and needs no outside service at all. The legacy OAuth path still exists in
+`server/_core/sdk.ts` but nothing depends on it.
+
+Earlier versions of this section said leaving the old platform meant building a
+login system. It did not, and it was the single most expensive wrong sentence in
+these docs — it is the line someone reads to size the job.
+
+**`JWT_SECRET` serves files as well as sessions.** Storage URLs carry a signed,
+expiring token in the path (`server/storageTokens.ts`) because the proxy would
+otherwise hand any stored object to any caller. The same secret signs both, so
+an environment missing it does not merely fail to log people in — it cannot
+serve a plan sheet or a logo either, and says so rather than serving them
+unsigned.
 
 **`JWT_SECRET` now serves files as well as sessions.** Storage URLs carry a
 signed, expiring token in the path (`server/storageTokens.ts`) because the
@@ -253,17 +306,27 @@ signs both, so an environment missing it does not merely fail to log people in
 — it cannot serve a plan sheet or a logo either, and says so rather than
 serving them unsigned.
 
-**Gotcha:** when the gateway key is missing, the platform's own error message
-reads `OPENAI_API_KEY is not configured` (`server/_core/llm.ts`). That string is
-mislabelled — the variable it actually wants is `BUILT_IN_FORGE_API_KEY`, and
-the app has no OpenAI dependency of any kind. It has sent one investigation down
-the wrong path already.
+**Gotcha:** an error reading `OPENAI_API_KEY is not configured` can still appear
+(`server/_core/llm.ts`). **There is no OpenAI dependency anywhere in this app**
+and no such variable is wanted. It comes from the old Manus gateway shim, which
+is still present but dead on this host — the app runs on `ANTHROPIC_API_KEY`
+through `server/llm`, and only falls through to that shim when the Anthropic key
+is absent. So the message means "no Anthropic key", worded by the wrong layer.
+It has sent one investigation down the wrong path already. Removing the shim is
+tracked in `todo.md`.
 
 ## 9. Storage needs a CORS rule, and without it no plan uploads
 
-**This is a live issue.** Plan PDF upload fails for every file at every size,
-having transferred zero bytes, because the storage bucket does not publish a
-CORS rule for the site's origin.
+> **Configured and verified 2026-09-16 — this is no longer an outstanding
+> issue.** The rule is on the `bidrender-plans` R2 bucket and covers
+> `https://bidrender.com`, `https://www.bidrender.com`, the `ondigitalocean.app`
+> host and `http://localhost:3000`. Kept because it explains a failure that
+> looks like an app bug and is not, and because a new origin — a staging site, a
+> renamed domain — needs the same rule adding.
+
+Without it, plan PDF upload fails for every file at every size, having
+transferred zero bytes, because the bucket does not publish a CORS rule for the
+site's origin.
 
 ### Why a bucket setting breaks the app
 
@@ -281,8 +344,9 @@ now reports the two differently, so the message on screen says which.
 
 ### The configuration required
 
-The bucket behind `BUILT_IN_FORGE_API_URL` needs a rule permitting the deployed
-origin to PUT, and exposing nothing it does not need to:
+The `bidrender-plans` R2 bucket needs a rule permitting the deployed origin to
+PUT, and exposing nothing it does not need to. Set it in the Cloudflare
+dashboard under R2 → `bidrender-plans` → Settings → CORS policy:
 
 ```json
 [
@@ -301,11 +365,16 @@ origin to PUT, and exposing nothing it does not need to:
 preflight in the first place. Logo upload (`BrandingSection`) uses the identical
 mechanism and is fixed by the same rule.
 
-This is a Manus-side setting. It is not in this repo, there is no file here that
-can change it, and it cannot be tested from a local checkout — the storage
-credentials exist only on deployed infrastructure.
+**`ExposeHeaders` must include `ETag`.** A large plan goes up in 16MB pieces,
+and each piece's `ETag` is the receipt R2 returns for it; without those receipts
+the pieces cannot be reassembled and the upload fails at the end, after the
+transfer rather than before it.
 
-### Until it is configured
+This is a Cloudflare bucket setting, not something in this repo — no file here
+can change it. It **can** be tested from a local checkout: `pnpm dev:r2` points
+a local run at the real bucket, borrowing only the `R2_PLANS_*` credentials.
+
+### If it is ever missing again
 
 `server/planUpload.ts` is a fallback: the browser POSTs the file to
 `/api/plan-upload` on our own origin, which cannot be refused by a bucket
@@ -315,14 +384,32 @@ added the app returns to the direct path on its own** with nothing to switch
 back.
 
 The fallback is capped at 25MB (`PROXY_UPLOAD_MAX_BYTES`) because it goes
-through the platform's request body limit — the very ceiling the direct upload
-was built to avoid. So while CORS is unconfigured, plan sets over 25MB cannot be
+through the host's request body limit — the very ceiling the direct upload was
+built to avoid. So whenever CORS is missing, plan sets over 25MB cannot be
 attached at all, and the app says so in those words rather than claiming the
 file is too large.
 
-### Verifying the fix
+That cap is also why a working upload is **not** proof the CORS rule exists: a
+small file succeeds either way, quietly taking the slow path. § "Verifying"
+below has a probe that actually distinguishes them.
 
-Attach a plan of any size after changing the bucket policy. If it uploads with
-the progress bar moving from 0%, the direct path is working. A quicker probe
-needing no large file: upload a company logo in Settings § Branding, which uses
-the same presign-and-PUT mechanism.
+### Verifying
+
+**A successful upload does not prove the rule is there** — without it the client
+silently falls back to the same-origin route, which works for anything under
+25MB. To actually check, ask the bucket directly:
+
+```bash
+curl -i -X OPTIONS "https://<account>.r2.cloudflarestorage.com/bidrender-plans/probe" \
+  -H "Origin: https://bidrender.com" \
+  -H "Access-Control-Request-Method: PUT" \
+  -H "Access-Control-Request-Headers: content-type"
+```
+
+A `204` naming the origin back means the rule covers it. Then make a real ranged
+`GET` and look for `ETag` in `Access-Control-Expose-Headers` — **exposed headers
+never appear on the preflight**, so a preflight alone cannot tell you whether a
+large multi-part upload will reassemble.
+
+Failing that, attach a plan **over 25MB**. Under that size the fallback hides
+the answer; over it, only the direct path can succeed.

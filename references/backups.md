@@ -1,20 +1,24 @@
 # Backups
 
 An export of everything — every table and every uploaded file — to Cloudflare
-R2, deliberately independent of Manus.
+R2, deliberately independent of the app's own hosting.
 
 ---
 
 ## 1. Why this exists
 
-`references/deploying.md` § 8 lists four Manus services this app cannot run
-without. One of them holds every plan PDF and every company logo. If access to
-that account ends, the database might be recoverable and the files would not be.
+`references/deploying.md` § 8 lists the outside services this app cannot run
+without. Two of them hold everything that matters: the database, and the bucket
+holding every plan PDF and every company logo. Losing access to either account
+loses one half of the business, and the plan files are the half that cannot be
+rebuilt from anywhere else.
 
-This tool copies both somewhere Manus has no involvement in, and since v5.136
-neither half of it needs Manus at all: plan files are read straight out of the
-`bidrender-plans` R2 bucket. The Manus reader is still there for anything
-stored there before the move, and falls away on its own once nothing is.
+This tool copies both into a **third** place — a separate bucket, reached with
+separate credentials — so no single account holds the only copy.
+
+Both halves read from Cloudflare directly: the database over `DATABASE_URL`, and
+plan files straight out of the `bidrender-plans` bucket using a read-only key.
+**There is no fallback path, and that is deliberate** — see § 2.
 
 **Plan files stream through; they are never assembled in memory.** The backup
 used to pull each file fully into memory before uploading it, which was
@@ -67,9 +71,17 @@ R2_PLANS_READONLY_ACCESS_KEY_ID=...
 R2_PLANS_READONLY_SECRET_ACCESS_KEY=...
 ```
 
-Without the read-only pair the backup falls back to reading through Manus, which
-still works and buffers whole files — fine for what is left there, not fine for
-a 2GB plan.
+**Without the read-only pair the backup refuses to start.** Not "skips the
+files", not "warns and carries on" — it stops before doing anything and names
+the two settings to fix.
+
+That is deliberate, and it is the more useful behaviour by some distance. There
+used to be a fallback that read plan files the long way round through the old
+platform; it went with that platform in v5.141. The tempting replacement was to
+carry on and list every unreadable drawing under "warnings" — which produces a
+backup that reports success every night with every contractor's plans missing
+from it, discovered on the day somebody needs one back. **A loud failure tonight
+is cheaper than a quiet useless backup for a month.**
 
 **The bucket is `bidsoftware`.** This said `bidrender-backups` for a while,
 which is not a bucket — it is the name someone gave an API token. The backups

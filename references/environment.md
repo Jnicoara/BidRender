@@ -44,22 +44,35 @@ catches people out is `JWT_SECRET`, which signs two different things.
 > whole-app error boundary. You get a red `Invalid URL` page and no route renders
 > at all. It looks like a broken build; it is a missing variable.
 
-## 2. Manus-specific — these do not move
+## 2. Legacy — read but no longer load-bearing
 
-| Name                     | Where the value comes from today | On a new host                                                            |
-| ------------------------ | -------------------------------- | ------------------------------------------------------------------------ |
-| `BUILT_IN_FORGE_API_URL` | Manus environment settings       | **Gone.** Replace with your own object storage — see § 5.                |
-| `BUILT_IN_FORGE_API_KEY` | Manus environment settings       | **Gone.** Same.                                                          |
-| `OWNER_OPEN_ID`          | Manus environment settings       | **Regenerate.** Your own user id in whatever login system replaces this. |
+| Name                     | Where the value comes from today | On a new host                                |
+| ------------------------ | -------------------------------- | -------------------------------------------- |
+| `BUILT_IN_FORGE_API_URL` | Not set on DigitalOcean          | **Leave unset.** Dead code path.             |
+| `BUILT_IN_FORGE_API_KEY` | Not set on DigitalOcean          | **Leave unset.** Same.                       |
+| `OWNER_OPEN_ID`          | Your own account id              | **Regenerate.** Owner-tier features need it. |
 
-These two Forge values do double duty — object storage **and** the LLM gateway
-behind the navigation helper and the alias suggester. Losing them takes both.
-The AI features degrade quietly and on purpose; storage does not.
+**These two used to do double duty — object storage AND the LLM gateway. They do
+neither now.**
 
-> **A missing gateway key reports `OPENAI_API_KEY is not configured`.** That
-> message is wrong. There is no OpenAI dependency anywhere in this app; the
-> variable it actually wants is `BUILT_IN_FORGE_API_KEY`. It has already sent one
-> investigation down the wrong path.
+- **Storage moved out in v5.141.** Files go to a folder or to Cloudflare R2
+  through `server/storage.ts`, chosen by `PLAN_STORAGE`. See § 6, which used to
+  describe replacing Forge storage and now describes what actually exists.
+- **AI moved out earlier.** Every call goes through `server/llm` on
+  `ANTHROPIC_API_KEY`. The Forge gateway survives only as a fallback in
+  `server/_core/llm.ts` for when no Anthropic key is set, and since neither
+  variable is configured on DigitalOcean, that fallback is already dead on the
+  live site.
+
+Removing them entirely is tracked in `todo.md` § Manus removal. They are still
+read by `server/_core/env.ts`, which is the only reason they are listed at all.
+
+> **An error reading `OPENAI_API_KEY is not configured` means no Anthropic key.**
+> The message is wrong twice over: there is no OpenAI dependency anywhere in this
+> app, and the variable it names does not exist here. It is thrown by the old
+> gateway shim in `server/_core/llm.ts`, which is only reached when
+> `ANTHROPIC_API_KEY` is absent — so the thing to go and set is that. It has
+> already sent one investigation down the wrong path.
 
 ## 3. Cloudflare R2 — yours already, and the ones that matter most
 
@@ -81,16 +94,24 @@ Two buckets, two tokens, and they must stay two. See § 3.1 for why.
 > no longer authenticate anywhere. `R2_ACCOUNT_ID` and `R2_BUCKET` did not
 > change — only the key pair did.
 >
-> Replacing them broke no automatic backup, because there was never one to
-> break. The nightly handler shipped four days after the last commit that
-> reached Manus, so the deployed site has no route for a cron to call and the
-> job has never run. **Every backup was taken by hand, and stays that way until
-> the new host is running** (`references/backups.md` § 4).
+> Replacing them broke no automatic backup, because at the time there was never
+> one to break — the nightly handler shipped four days after the last commit
+> that ever reached Manus, so no deployed site had a route for a cron to call.
+>
+> **That changed on 2026-09-17: backups are automatic now.** A Cloudflare Worker
+> calls the app nightly at `0 9 * * *` UTC — 2:00am Pacific, an hour earlier in
+> winter (`references/backups.md` § 4). The manual trigger still works and is
+> still the one to reach for before anything destructive.
 
 ### Plan files — bucket `bidrender-plans`
 
-New on 2026-09-15, for the move off Manus storage. Nothing reads these yet;
-they are slots for the R2 storage backend.
+**These are live production credentials.** Added 2026-09-15 as unused slots, and
+switched on with `PLAN_STORAGE=r2` shortly after — every plan PDF and company
+logo uploaded since goes through them. Earlier versions of this file called them
+slots that nothing read; treat them as the real thing.
+
+`PLAN_STORAGE=r2` must be set alongside these. The credentials alone do nothing
+— where files live is never inferred from credentials appearing (§ 6).
 
 | Name                         | Where the value comes from   | On a new host     |
 | ---------------------------- | ---------------------------- | ----------------- |
@@ -172,19 +193,44 @@ fails immediately and names this setting. DigitalOcean's URL ends in
 mysql2 does not understand it, ignores it, and would connect unencrypted — which
 the server then refuses with an error that says nothing about the real cause.
 
-## 6. What replacing Forge storage actually means
+## 6. How stored files actually work
 
-Not a variable swap. `server/storage.ts` asks Forge to presign an S3 operation
-rather than talking to S3 itself, so two functions change to sign against your
-own bucket: `storagePresignPut` and `storageGetSignedUrl`.
+**This section used to describe rewriting two functions to replace Forge
+storage. Those functions are gone — do not go looking for them.**
 
-Everything in front of them carries over unchanged — `server/_core/storageProxy.ts`
-only redirects to whatever URL those return, and the signed-token scheme in
-`server/storageTokens.ts` is ours, not Manus's.
+`server/storage.ts` is a socket with two backends behind it: a folder on this
+machine (`diskStorage.ts`) and the Cloudflare R2 bucket `bidrender-plans`
+(`r2Storage.ts`). Nothing above that file knows which is live — no router, no
+client code, no database column. Plan PDFs, the legacy per-project PDF and
+company logos all go through it.
 
-The new bucket needs a CORS rule permitting `PUT` from the app's origin, or plan
-uploads fail with nothing useful in the log. `references/deploying.md` § 9 has
-the shape.
+**`PLAN_STORAGE` names the backend** — `disk` or `r2`. Unset, the answer is disk
+if `LOCAL_STORAGE_DIR` says where, and otherwise an error. It is never inferred
+from credentials appearing, deliberately: credentials arriving in an environment
+is usually somebody preparing a later step, not a decision to move every
+contractor's plans. A server told to use R2 that quietly used a folder instead
+would scatter one contractor's files across two stores, and the symptom would be
+plans that open today and not after the next deploy.
+
+**Adding a third backend means implementing the same four operations**, not
+teaching a router about storage. That is the whole point of the shape.
+
+**Switching backends moves nothing already stored.** A miss in R2 falls through
+to whichever older store is still configured, so files written before a switch
+still open while new writes go to the new one — the old stores drain instead of
+needing a migration before the switch can happen.
+
+Two things in front of it carry over unchanged: `server/_core/storageProxy.ts`
+only redirects to whatever URL the backend produces, and the signed-token scheme
+in `server/storageTokens.ts` is ours. The read route is
+`/manus-storage/<token>/<key>` — **the name is historical and must not be
+changed**, because it is written into `bid_pdfs.url` and the legacy
+`projects.pdfUrl` for every file already stored.
+
+An R2 bucket needs a CORS rule permitting `PUT` from the app's origin and
+exposing `ETag`, or large plan uploads take a capped fallback path.
+`references/deploying.md` § 9 has the shape; it is configured for the live
+origins as of 2026-09-16.
 
 ---
 
