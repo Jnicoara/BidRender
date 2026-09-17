@@ -35,14 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { RETENTION_DAYS, type RetentionUrgency } from "@shared/retention";
-
-const money = (value: number) =>
-  value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
+import { moneyWhole } from "@/lib/money";
 
 /** Only a deadline worth acting on gets colour. The rest stays quiet. */
 const URGENCY_STYLE: Record<RetentionUrgency, string> = {
@@ -171,7 +164,7 @@ export default function BidArchivePage({
                     </span>
                     <span className="text-xs text-muted-foreground/50">·</span>
                     <span className="text-xs font-mono text-muted-foreground">
-                      {money(bid.finalPrice)}
+                      {moneyWhole(bid.finalPrice)}
                     </span>
                   </div>
                 </div>

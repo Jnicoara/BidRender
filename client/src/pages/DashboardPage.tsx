@@ -58,14 +58,7 @@ import {
   groupBidsByStatus,
   type DueUrgency,
 } from "@/lib/bidDashboard";
-
-const money = (value: number) =>
-  value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
+import { moneyWhole } from "@/lib/money";
 
 /** Deadlines read as a weekday and date — "Fri 14 Aug" scans faster than a slashed number. */
 const formatDue = (value: string | Date | null) => {
@@ -349,7 +342,7 @@ export default function DashboardPage({
               Out for bid ({summary.openCount})
             </div>
             <div className="font-mono text-base text-[#F5C518]">
-              {money(summary.openValue)}
+              {moneyWhole(summary.openValue)}
             </div>
           </div>
           {/* Only offered once there is something in it — an always-visible
@@ -522,7 +515,7 @@ export default function DashboardPage({
                       {stats.count}
                     </span>
                     <span className="ml-auto font-mono text-xs text-muted-foreground">
-                      {money(stats.value)}
+                      {moneyWhole(stats.value)}
                     </span>
                   </div>
 
@@ -566,7 +559,7 @@ export default function DashboardPage({
                                 )}
                               </span>
                               <span className="font-mono text-sm shrink-0">
-                                {money(bid.finalPrice)}
+                                {moneyWhole(bid.finalPrice)}
                               </span>
                               {/* Quiet until the card is hovered or focused —
                                   the dashboard is for reading, and a delete-ish

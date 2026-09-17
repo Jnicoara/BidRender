@@ -35,9 +35,9 @@ import {
   MEASURE_COLOR,
   OUTCOME_COLORS,
   compactMoney,
-  money,
   percent,
 } from "@/lib/analyticsChart";
+import { moneyWhole } from "@/lib/money";
 
 type Period = {
   bucket: string;
@@ -169,14 +169,14 @@ export function OutcomesPanel({ report }: { report: Report }) {
         <StatTile
           label="Won"
           value={String(totals.counts.won)}
-          delta={money(totals.wonValue)}
+          delta={moneyWhole(totals.wonValue)}
           tone="good"
           hint="bids that came back yes"
         />
         <StatTile
           label="Lost"
           value={String(totals.counts.lost)}
-          delta={money(totals.lostValue)}
+          delta={moneyWhole(totals.lostValue)}
           tone="bad"
           hint="bids that came back no"
         />
@@ -188,7 +188,7 @@ export function OutcomesPanel({ report }: { report: Report }) {
         <StatTile
           label="Still out"
           value={String(totals.pending)}
-          delta={money(totals.pendingValue)}
+          delta={moneyWhole(totals.pendingValue)}
           hint="drafted or active — not in the rate"
         />
       </div>
@@ -340,13 +340,13 @@ export function OutcomesPanel({ report }: { report: Report }) {
                     <td className="py-1.5 pr-3">{period.label}</td>
                     <td className="py-1.5 pr-3 text-right">{period.total}</td>
                     <td className="py-1.5 pr-3 text-right">
-                      {money(period.totalValue)}
+                      {moneyWhole(period.totalValue)}
                     </td>
                     <td className="py-1.5 pr-3 text-right">
-                      {money(period.wonValue)}
+                      {moneyWhole(period.wonValue)}
                     </td>
                     <td className="py-1.5 text-right">
-                      {money(period.lostValue)}
+                      {moneyWhole(period.lostValue)}
                     </td>
                   </tr>
                 ))}
@@ -401,12 +401,12 @@ export function OutcomesPanel({ report }: { report: Report }) {
                         rows={[
                           {
                             label: "Won",
-                            value: `${period.counts.won} · ${money(period.wonValue)}`,
+                            value: `${period.counts.won} · ${moneyWhole(period.wonValue)}`,
                             color: OUTCOME_COLORS.won,
                           },
                           {
                             label: "Lost",
-                            value: `${period.counts.lost} · ${money(period.lostValue)}`,
+                            value: `${period.counts.lost} · ${moneyWhole(period.lostValue)}`,
                             color: OUTCOME_COLORS.lost,
                           },
                           {
@@ -416,7 +416,7 @@ export function OutcomesPanel({ report }: { report: Report }) {
                           },
                           {
                             label: "Quoted",
-                            value: money(period.totalValue),
+                            value: moneyWhole(period.totalValue),
                           },
                         ]}
                       />

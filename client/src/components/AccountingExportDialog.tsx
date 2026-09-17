@@ -33,14 +33,7 @@ import {
   toQuickBooksCsv,
   type AccountingExport,
 } from "@shared/accountingExport";
-
-const money = (value: number) =>
-  value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+import { money } from "@/lib/money";
 
 export function AccountingExportDialog({
   bidId,

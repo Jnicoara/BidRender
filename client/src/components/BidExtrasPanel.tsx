@@ -32,14 +32,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { ScopeNotesPanel } from "@/components/ScopeNotesPanel";
 import { CollapsiblePanel } from "@/components/CollapsiblePanel";
-
-const money = (value: number) =>
-  value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+import { money } from "@/lib/money";
 
 const PICK_NONE = "__none__";
 

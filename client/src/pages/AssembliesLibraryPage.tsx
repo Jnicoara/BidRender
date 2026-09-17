@@ -95,6 +95,7 @@ import {
   isPlaceholderHours,
 } from "@shared/laborHourDefaults";
 import { HourSuggestions } from "@/components/HourSuggestions";
+import { money } from "@/lib/money";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -146,14 +147,6 @@ type Draft = {
   materials: MaterialLine[];
   modifierIds: number[];
 };
-
-const money = (value: number) =>
-  value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 
 const round = (value: number, places = 2) => {
   const factor = 10 ** places;

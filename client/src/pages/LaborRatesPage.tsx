@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/select";
 import { DEFAULT_ANNUAL_HOURS, effectiveHourlyRate } from "@shared/pricing";
 import { countNeedingRate, needsRate } from "@shared/laborRatePricing";
+import { money, moneyWhole } from "@/lib/money";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -73,14 +74,6 @@ type LaborRate = {
 const MAX_HOURLY = 999999.9999;
 const MAX_SALARY = 9999999999.99;
 const MAX_ANNUAL_HOURS = 8760;
-
-const money = (value: number, digits = 2) =>
-  value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
 
 const hours = (value: number) =>
   value.toLocaleString("en-US", { maximumFractionDigits: 0 });
@@ -327,7 +320,7 @@ function LaborRateRow({
         </div>
         {rate.rateType === "salary" && (
           <div className="text-xs text-muted-foreground mt-0.5">
-            {rate.annualSalary != null && money(Number(rate.annualSalary), 0)}
+            {rate.annualSalary != null && moneyWhole(Number(rate.annualSalary))}
             /yr
             {rate.annualHours != null && (
               <> ÷ {hours(Number(rate.annualHours))} h</>

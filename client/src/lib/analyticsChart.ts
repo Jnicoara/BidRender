@@ -44,21 +44,11 @@ export const AXIS_TEXT = "var(--muted-foreground)";
 
 // ─── Numbers ──────────────────────────────────────────────────────────────────
 
-/** Money as a contractor writes it: whole dollars, no cents on a total. */
-export function money(value: number): string {
-  return value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
-}
-
 /**
  * Money short enough for an axis tick — $0, $12K, $4.2M.
  *
  * Axis ticks only. A figure someone might read out loud, or check against their
- * books, is written in full by `money`.
+ * books, is written in full by `moneyWhole`.
  */
 export function compactMoney(value: number): string {
   const abs = Math.abs(value);

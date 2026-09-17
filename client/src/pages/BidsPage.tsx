@@ -71,19 +71,12 @@ import { CloseoutPanel } from "@/components/CloseoutPanel";
 import { CollapsiblePanel } from "@/components/CollapsiblePanel";
 import { SampleBidNotice } from "@/components/SampleBidNotice";
 import { countUnpricedLaborLines } from "@shared/laborRatePricing";
+import { money } from "@/lib/money";
 
 const STATUSES = ["Draft", "Active", "Won", "Lost"] as const;
 type Status = (typeof STATUSES)[number];
 
 const INHERIT = "__inherit__";
-
-const money = (value: number) =>
-  value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 
 const round = (value: number, places = 2) => {
   const factor = 10 ** places;

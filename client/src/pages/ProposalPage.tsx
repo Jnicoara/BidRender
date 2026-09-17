@@ -39,14 +39,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ProposalSheet } from "@/components/proposal/ProposalSheet";
 import { ProposalDesignControls } from "@/components/proposal/ProposalDesignControls";
-
-const money = (value: number) =>
-  value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+import { money } from "@/lib/money";
 
 /** A per-bid text field for the proposal: client, site address, opening note. */
 function BidField({

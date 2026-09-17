@@ -67,14 +67,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { smartSearch } from "@/lib/smartSearch";
-
-const money = (value: number) =>
-  value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+import { money } from "@/lib/money";
 
 const round = (value: number, places = 2) => {
   const factor = 10 ** places;

@@ -25,11 +25,11 @@ import { Legend } from "./OutcomesPanel";
 import {
   OUTCOME_COLORS,
   hours,
-  money,
   percent,
   signedPercent,
   varianceTone,
 } from "@/lib/analyticsChart";
+import { moneyWhole } from "@/lib/money";
 
 type Group = {
   key: string;
@@ -105,12 +105,12 @@ export function ProfitabilityPanel({
         <StatTile
           label="Jobs closed out"
           value={String(overall.jobs)}
-          hint={`${money(overall.revenue)} of work`}
+          hint={`${moneyWhole(overall.revenue)} of work`}
         />
         <StatTile
           label="Quoted margin"
           value={percent(overall.estimatedMargin, 1)}
-          hint={`${money(overall.estimatedProfit)} expected`}
+          hint={`${moneyWhole(overall.estimatedProfit)} expected`}
         />
         <StatTile
           label="Delivered margin"
@@ -121,7 +121,7 @@ export function ProfitabilityPanel({
               : `${signedPercent(overall.marginDelta)} against quoted`
           }
           tone={varianceTone(overall.marginDelta, true)}
-          hint={`${money(overall.actualProfit)} once labor is re-costed`}
+          hint={`${moneyWhole(overall.actualProfit)} once labor is re-costed`}
         />
         <StatTile
           label="Hours against estimate"
@@ -184,7 +184,7 @@ export function ProfitabilityPanel({
                 <td className="py-2 pr-3">All jobs</td>
                 <td className="py-2 pr-3 text-right">{overall.jobs}</td>
                 <td className="py-2 pr-3 text-right">
-                  {money(overall.revenue)}
+                  {moneyWhole(overall.revenue)}
                 </td>
                 <td className="py-2 pr-3 text-right">
                   {percent(overall.estimatedMargin, 1)}
@@ -252,7 +252,7 @@ export function ProfitabilityPanel({
                     >
                       <td className="py-1.5 pr-3 font-sans">{job.name}</td>
                       <td className="py-1.5 pr-3 text-right">
-                        {money(job.revenue)}
+                        {moneyWhole(job.revenue)}
                       </td>
                       <td className="py-1.5 pr-3 text-right">
                         {job.actualHours} / {job.estimatedHours}
@@ -268,7 +268,7 @@ export function ProfitabilityPanel({
                         )}
                       >
                         {moved < 0 ? "−" : "+"}
-                        {money(Math.abs(moved))}
+                        {moneyWhole(Math.abs(moved))}
                       </td>
                     </tr>
                   );
@@ -289,7 +289,7 @@ function TradeRow({ group }: { group: Group }) {
         {group.key.replace(/-/g, " ")}
       </td>
       <td className="py-1.5 pr-3 text-right">{group.jobs}</td>
-      <td className="py-1.5 pr-3 text-right">{money(group.revenue)}</td>
+      <td className="py-1.5 pr-3 text-right">{moneyWhole(group.revenue)}</td>
       <td className="py-1.5 pr-3 text-right">
         {percent(group.estimatedMargin, 1)}
       </td>

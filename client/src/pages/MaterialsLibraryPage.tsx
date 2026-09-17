@@ -64,6 +64,7 @@ import {
   type MaterialCategoryName,
 } from "@shared/materialOrder";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { unitCost } from "@/lib/money";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -115,14 +116,6 @@ const NO_CATEGORY = "__none__";
 
 /** decimal(10,4) — mirrors the bound the router enforces. */
 const MAX_COST = 999999.9999;
-
-const formatCost = (value: string) =>
-  Number(value).toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
-  });
 
 const UNIT_LABEL: Record<Material["unitOfSale"], string> = {
   each: "each",
@@ -461,7 +454,7 @@ function MaterialRow({
         </span>
       ) : (
         <span className="text-sm font-mono w-24 text-right shrink-0">
-          {formatCost(material.costPerUnit)}
+          {unitCost(material.costPerUnit)}
         </span>
       )}
 

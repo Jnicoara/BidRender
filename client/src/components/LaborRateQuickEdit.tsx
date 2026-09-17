@@ -34,14 +34,7 @@ import {
 } from "@/components/ui/popover";
 import { InlineNumberField } from "@/components/InlineNumberField";
 import { DEFAULT_ANNUAL_HOURS } from "@shared/pricing";
-
-const money = (value: number) =>
-  value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+import { money } from "@/lib/money";
 
 export type QuickEditableRate = {
   id: number;

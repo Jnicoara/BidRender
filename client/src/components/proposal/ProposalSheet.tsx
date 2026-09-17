@@ -29,14 +29,7 @@ import type {
   ProposalLayout,
   ProposalSectionId,
 } from "@shared/proposal";
-
-const money = (value: number) =>
-  value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+import { money } from "@/lib/money";
 
 const qty = (value: number) =>
   Number.isInteger(value)

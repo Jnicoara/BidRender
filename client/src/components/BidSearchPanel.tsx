@@ -46,15 +46,9 @@ import {
   type BidDateField,
   type BidSort,
 } from "@shared/bidSearch";
+import { moneyWhole } from "@/lib/money";
 
 const ANY = "__any__";
-
-const money = (value: number) =>
-  value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
 
 /** Hold a value still until it stops changing. */
 function useDebounced<T>(value: T, ms: number): T {
@@ -384,7 +378,7 @@ export function BidSearchPanel({
                   ).toLocaleDateString()}
                 </span>
                 <span className="font-mono text-sm shrink-0 w-24 text-right">
-                  {money(bid.finalPrice)}
+                  {moneyWhole(bid.finalPrice)}
                 </span>
               </button>
               {onArchive && !bid.archivedAt && (
