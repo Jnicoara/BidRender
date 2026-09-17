@@ -1,17 +1,22 @@
 /**
  * Which store holds the app's files, and the credentials for the R2 one.
  *
- * ── Three backends behind one socket ─────────────────────────────────────────
+ * ── Two backends behind one socket ───────────────────────────────────────────
  * Plan PDFs, the legacy per-project PDF and company logos all go through
- * `server/storage.ts`, which has always been able to point at two places: the
- * Manus presign proxy, or a folder on this machine (`diskStorage.ts`). R2 is a
- * third, plugged into the same socket, so nothing above the storage layer — no
- * router, no client code, no database column — knows which one is on.
+ * `server/storage.ts`, which can point at two places: a folder on this machine
+ * (`diskStorage.ts`) or the Cloudflare R2 bucket `bidrender-plans`
+ * (`r2Storage.ts`). Nothing above the storage layer — no router, no client
+ * code, no database column — knows which one is on.
+ *
+ * There used to be a third, the Manus presign proxy, and it was the default
+ * before R2 existed. It was removed once the app left that platform: the
+ * credentials it needed only ever existed on Manus infrastructure, so on any
+ * other host it was a branch that could not run.
  *
  * ── Chosen explicitly, never inferred from credentials ───────────────────────
- * `PLAN_STORAGE` names the backend. Leave it unset and the answer is exactly
- * what it was before R2 existed: disk when LOCAL_STORAGE_DIR is set, Manus
- * otherwise. So adding this file changed nothing on its own.
+ * `PLAN_STORAGE` names the backend. Leave it unset and the answer is disk, if
+ * `LOCAL_STORAGE_DIR` says where; otherwise there is nowhere to put a file and
+ * this throws rather than guessing.
  *
  * The tempting alternative — switch to R2 as soon as R2 credentials appear —
  * is the wrong shape. Credentials arriving in an environment is not a decision
@@ -30,11 +35,10 @@
  * the client bundle, so a secret named that way is published to every visitor.
  */
 
-/** The three places a file can live. */
-export type StorageBackendName = "manus" | "disk" | "r2";
+/** The two places a file can live. */
+export type StorageBackendName = "disk" | "r2";
 
 export const STORAGE_BACKENDS: readonly StorageBackendName[] = [
-  "manus",
   "disk",
   "r2",
 ] as const;
@@ -95,13 +99,6 @@ function diskConfigured(env: NodeJS.ProcessEnv): boolean {
   return Boolean(env.LOCAL_STORAGE_DIR?.trim());
 }
 
-/** Is the Manus presign proxy reachable from here? */
-function manusConfigured(env: NodeJS.ProcessEnv): boolean {
-  return Boolean(
-    env.BUILT_IN_FORGE_API_URL?.trim() && env.BUILT_IN_FORGE_API_KEY?.trim()
-  );
-}
-
 /**
  * The backend in use.
  *
@@ -111,6 +108,11 @@ function manusConfigured(env: NodeJS.ProcessEnv): boolean {
  * R2 and quietly used a folder instead would scatter a contractor's plans
  * across two stores, and the only symptom would be plans that open today and
  * not after the next deploy.
+ *
+ * Nothing set at all throws for the same reason. It used to mean Manus, which
+ * was a real answer while the app lived there and would now mean "no store" —
+ * and a server that accepts an upload with nowhere to put it is worse than one
+ * that refuses to start.
  */
 export function selectStorageBackend(
   env: NodeJS.ProcessEnv = process.env
@@ -118,8 +120,10 @@ export function selectStorageBackend(
   const named = env.PLAN_STORAGE?.trim().toLowerCase();
 
   if (!named) {
-    // Exactly the rule that existed before R2 was an option.
-    return diskConfigured(env) ? "disk" : "manus";
+    if (diskConfigured(env)) return "disk";
+    throw new Error(
+      `No file storage is configured. Set PLAN_STORAGE to one of: ${STORAGE_BACKENDS.join(", ")} — or set LOCAL_STORAGE_DIR to store files in a folder on this machine.`
+    );
   }
 
   if (!STORAGE_BACKENDS.includes(named as StorageBackendName)) {
@@ -151,14 +155,14 @@ export function selectStorageBackend(
  * Where to look for a file that is NOT in the backend now in use, in order.
  *
  * Switching to R2 does not move anything that is already stored, and this is
- * what keeps that from being a flag day: a plan uploaded to Manus last month
- * still opens, because a miss in R2 falls through to whichever older store is
- * still configured. New uploads go to R2 regardless, so the old stores drain
- * over time rather than needing a migration before the switch can happen.
+ * what keeps that from being a flag day: a plan uploaded to the local folder
+ * last month still opens, because a miss in R2 falls through to whichever older
+ * store is still configured. New uploads go to R2 regardless, so the old stores
+ * drain over time rather than needing a migration before the switch can happen.
  *
- * Only meaningful when R2 is the backend in use. Disk comes before Manus
- * because a disk hit can be confirmed cheaply and a Manus one cannot — see
- * `resolveReadBackend` in storage.ts, where Manus is the terminal guess.
+ * Only meaningful when R2 is the backend in use. Manus used to be the last
+ * entry here and was the one guess that could never be verified; with it gone,
+ * every fallback is a store this server can actually ask.
  */
 export function legacyReadBackends(
   env: NodeJS.ProcessEnv = process.env
@@ -166,7 +170,6 @@ export function legacyReadBackends(
   if (selectStorageBackend(env) !== "r2") return [];
   const order: StorageBackendName[] = [];
   if (diskConfigured(env)) order.push("disk");
-  if (manusConfigured(env)) order.push("manus");
   return order;
 }
 

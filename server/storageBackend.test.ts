@@ -105,20 +105,29 @@ describe("choosing a backend", () => {
     );
   });
 
-  it("is manus when nothing is set at all", () => {
-    expect(selectStorageBackend(env({}))).toBe("manus");
+  /**
+   * With nothing set at all there is nowhere to put a file. This used to answer
+   * "manus", which was a real store while the app lived there and would now be
+   * a name with no implementation behind it — so it refuses instead. A server
+   * that accepts an upload with nowhere to put it is worse than one that will
+   * not start.
+   */
+  it("refuses when nothing is set at all, naming what to set", () => {
+    expect(() => selectStorageBackend(env({}))).toThrow(/PLAN_STORAGE/);
+    expect(() => selectStorageBackend(env({}))).toThrow(/LOCAL_STORAGE_DIR/);
   });
 
   /**
    * The safety property of this whole change: adding these files did not move
-   * anybody's plans. With PLAN_STORAGE unset the answer is the rule that
-   * existed before R2 was an option, credentials present or not.
+   * anybody's plans. With PLAN_STORAGE unset, R2 credentials sitting in the
+   * environment do not switch anything — somebody has to turn it on.
    */
   it("does not switch to R2 just because R2 credentials exist", () => {
     expect(
       selectStorageBackend(env({ ...R2_VARS, LOCAL_STORAGE_DIR: "/tmp/files" }))
     ).toBe("disk");
-    expect(selectStorageBackend(env(R2_VARS))).toBe("manus");
+    // Credentials and no folder is not "use R2", it is "not configured".
+    expect(() => selectStorageBackend(env(R2_VARS))).toThrow(/PLAN_STORAGE/);
   });
 
   it("is r2 when asked for and configured", () => {
@@ -157,7 +166,7 @@ describe("choosing a backend", () => {
 
   it("refuses a name that is not a backend, and lists the real ones", () => {
     expect(() => selectStorageBackend(env({ PLAN_STORAGE: "s3" }))).toThrow(
-      /manus, disk, r2/
+      /disk, r2/
     );
   });
 });
@@ -168,18 +177,36 @@ describe("falling back to an older store", () => {
    * that from being a flag day — a file from before the switch still has a
    * store that holds it, so it still opens.
    */
-  it("looks in disk then manus when R2 is live", () => {
+  it("looks on disk when R2 is live", () => {
     expect(
       legacyReadBackends(
         env({
           ...R2_VARS,
           PLAN_STORAGE: "r2",
           LOCAL_STORAGE_DIR: "/tmp/files",
+        })
+      )
+    ).toEqual(["disk"]);
+  });
+
+  /**
+   * Manus used to be the last entry here, and was the one fallback that could
+   * never be verified — there was no cheap way to ask it whether a key existed,
+   * so `resolveReadBackend` returned it on faith. Now every fallback is a store
+   * this server can actually ask, which is what makes a null answer mean
+   * "nothing has it" rather than "we guessed".
+   */
+  it("offers no store it cannot actually ask", () => {
+    expect(
+      legacyReadBackends(
+        env({
+          ...R2_VARS,
+          PLAN_STORAGE: "r2",
           BUILT_IN_FORGE_API_URL: "https://forge.example.com",
           BUILT_IN_FORGE_API_KEY: "forge-key",
         })
       )
-    ).toEqual(["disk", "manus"]);
+    ).toEqual([]);
   });
 
   it("offers only the stores that are actually configured", () => {
@@ -194,8 +221,7 @@ describe("falling back to an older store", () => {
   });
 
   it("has nothing to fall back to when R2 is not the backend", () => {
-    // Disk and Manus are not each other's fallback and never were. Only the
-    // new store has anything to be behind it.
+    // Only R2 has anything behind it. Disk is not a fallback for itself.
     expect(
       legacyReadBackends(
         env({

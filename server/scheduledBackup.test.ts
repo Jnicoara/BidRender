@@ -294,7 +294,12 @@ runIf("a failed scheduled run against a real database", () => {
     target.check = async () => {
       throw new Error("bad credentials");
     };
-    const outcome = await runScheduledBackup({ now, databaseUrl, target });
+    const outcome = await runScheduledBackup({
+      now,
+      databaseUrl,
+      target,
+      fileSource: streamOf("bytes"),
+    });
 
     expect(outcome.status).toBe("failed");
     if (outcome.status !== "failed") return;

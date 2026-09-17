@@ -16,6 +16,16 @@
  * nothing else on the plan bucket. It cannot write, overwrite or delete a plan.
  * See server/backup/config.ts for the reasoning, including why this is a second
  * token rather than one credential spanning both buckets.
+ *
+ * ── There is no second route, on purpose ─────────────────────────────────────
+ * There used to be a fallback that fetched each file through the Manus presign
+ * proxy and buffered the whole thing. It went with the rest of the Manus
+ * storage code, and nothing replaced it, because the alternative is worse than
+ * a hard stop: the database dump and the manifest would still upload, so the
+ * run would report itself as a success with a list of warnings, and the one
+ * thing missing would be every contractor's drawings. Nobody reads the warnings
+ * on a backup that says it worked. So a missing credential stops the backup
+ * before it starts, and names the variable.
  */
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Readable } from "node:stream";
@@ -42,13 +52,22 @@ export type FileStreamSource = {
 
 let cached: { client: S3Client; config: PlansReadConfig } | null = null;
 
+/** The message a missing credential gets, in one place so it reads the same. */
+export function missingPlanCredentialsMessage(missing: string[]): string {
+  return (
+    `The backup cannot read plan files: the read-only plan credentials are not configured. ` +
+    `Missing: ${missing.join(", ")}. ` +
+    `Set them on the host that runs the backup — R2_PLANS_READONLY_ACCESS_KEY_ID and ` +
+    `R2_PLANS_READONLY_SECRET_ACCESS_KEY come from the "bidrender-plans-readonly" Cloudflare API token ` +
+    `(Object Read only, bidrender-plans only). Refusing rather than backing up the database without the plans.`
+  );
+}
+
 function plansClient(): { client: S3Client; config: PlansReadConfig } {
   if (cached) return cached;
   const result = readPlansReadConfig();
   if (!result.ok) {
-    throw new Error(
-      `The read-only plan credentials are not configured. Missing: ${result.missing.join(", ")}.`
-    );
+    throw new Error(missingPlanCredentialsMessage(result.missing));
   }
   cached = {
     client: new S3Client({
@@ -96,42 +115,16 @@ export function createPlanFileSource(): FileStreamSource {
 }
 
 /**
- * The old path: read a file through the Manus presign proxy.
- *
- * Kept for as long as anything is still stored there. It buffers the whole file
- * because that is all the proxy offers — which is exactly the limitation that
- * made the R2 source worth building, and the reason this one should not be used
- * for anything large.
- */
-export function createManusFileSource(): FileStreamSource {
-  return {
-    name: "manus storage proxy (buffered)",
-    async open(key: string): Promise<FileStream> {
-      const { storageGetSignedUrl } = await import("../storage");
-      const url = await storageGetSignedUrl(key);
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`storage returned ${response.status}`);
-      }
-      const buffer = Buffer.from(await response.arrayBuffer());
-      const { Readable: NodeReadable } = await import("node:stream");
-      return {
-        body: NodeReadable.from(buffer),
-        contentLength: buffer.byteLength,
-      };
-    },
-  };
-}
-
-/**
  * The source this server should use.
  *
- * R2 when its read-only credentials are present, the Manus proxy otherwise. The
- * same shape of decision the storage backend makes, and for the same reason: a
- * deployment part-way through the move must keep working.
+ * Throws, naming the variables, when the read-only credentials are absent. See
+ * the header: the failure has to happen here, before a run starts, because
+ * every later point would produce a backup that calls itself a success.
  */
 export function defaultFileSource(): FileStreamSource {
-  return planSourceConfigured()
-    ? createPlanFileSource()
-    : createManusFileSource();
+  const result = readPlansReadConfig();
+  if (!result.ok) {
+    throw new Error(missingPlanCredentialsMessage(result.missing));
+  }
+  return createPlanFileSource();
 }

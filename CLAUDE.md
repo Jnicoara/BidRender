@@ -408,25 +408,37 @@ These are forward-looking. Screens built before this section predate the rules �
 do not retrofit them as a side effect of unrelated work; that is its own task and
 its own commit.
 
-## Stored files — three backends behind one socket
+## Stored files — two backends behind one socket
 
 Plan PDFs, the legacy per-project PDF and company logos all go through
-`server/storage.ts`, which can point at three places: the Manus presign proxy,
-a folder on this machine (`diskStorage.ts`), or the Cloudflare R2 bucket
-`bidrender-plans` (`r2Storage.ts`). Nothing above that file knows which — no
-router, no client code, no database column. **Add a fourth by implementing the
-same four operations, not by teaching a router about storage.**
+`server/storage.ts`, which can point at two places: a folder on this machine
+(`diskStorage.ts`) or the Cloudflare R2 bucket `bidrender-plans`
+(`r2Storage.ts`). Nothing above that file knows which — no router, no client
+code, no database column. **Add a third by implementing the same four
+operations, not by teaching a router about storage.**
 
-**`PLAN_STORAGE` names the backend** (`manus` | `disk` | `r2`). Unset, the
-answer is what it was before R2 existed: disk when `LOCAL_STORAGE_DIR` is set,
-Manus otherwise. **Do not make it infer R2 from the presence of credentials.**
-Credentials arriving in an environment is usually someone adding a secret for a
-later step, not a decision to move every contractor's plans; where files live
-has to be something a person turned on. `selectStorageBackend` throws, naming
-the missing variable, rather than quietly degrading — a server told to use R2
-that used a folder instead would scatter one contractor's plans across two
-stores, and the symptom would be plans that open today and not after the next
-deploy.
+There was a third, the Manus presign proxy, and it was the default before R2
+existed. It was removed in v5.141 once the app left that platform: the
+credentials it needed only ever existed on Manus infrastructure, so anywhere
+else it was a branch that could not run.
+
+**`PLAN_STORAGE` names the backend** (`disk` | `r2`). Unset, the answer is disk
+if `LOCAL_STORAGE_DIR` says where, and otherwise an error — there is no store
+left to fall back to, and a server that accepts an upload with nowhere to put it
+is worse than one that refuses to start. **Do not make it infer R2 from the
+presence of credentials.** Credentials arriving in an environment is usually
+someone adding a secret for a later step, not a decision to move every
+contractor's plans; where files live has to be something a person turned on.
+`selectStorageBackend` throws, naming the missing variable, rather than quietly
+degrading — a server told to use R2 that used a folder instead would scatter one
+contractor's plans across two stores, and the symptom would be plans that open
+today and not after the next deploy.
+
+**`/manus-storage/<token>/<key>` is the read route, and the name stays.** It has
+nothing to do with Manus any more — it serves disk and R2 — but it is written
+into `bid_pdfs.url` and the legacy `projects.pdfUrl` for every file already
+stored, so renaming it would break every existing plan link at once. The proxy
+is `server/_core/storageProxy.ts`.
 
 **The credentials are `R2_PLANS_*`, never the backup `R2_*`.** Different bucket,
 different API token, deliberately: the plans token signs URLs a browser
@@ -442,9 +454,13 @@ stop naming the object. `r2Storage.test.ts` pins this.
 **Switching backends moves nothing that is already stored.** `resolveReadBackend`
 falls through to an older store on a miss, so a file written before the switch
 still opens while new writes go to R2 — the old stores drain instead of needing
-a migration before the switch can happen. The "is it in R2?" answer is cached
-per key because pdf.js re-requests the same URL for every byte range, and an
-uncached check would cost a billable HEAD hundreds of times per plan set.
+a migration before the switch can happen. Every fallback is a store this server
+can actually ask; Manus used to be the last one and was returned on faith,
+because there was no cheap way to ask it whether a key existed. With it gone, a
+null answer means every configured store was asked and none of them has the
+file. The "is it in R2?" answer is cached per key because pdf.js re-requests the
+same URL for every byte range, and an uncached check would cost a billable HEAD
+hundreds of times per plan set.
 
 **Testing against the real bucket locally:** `pnpm dev:r2`. It borrows only the
 `R2_PLANS_*` lines from `.env.production.local` and drops everything else in
@@ -523,7 +539,7 @@ what would catch someone quietly reintroducing `await collect(stream)`.
 
 **Stack:** Express + tRPC (v11, superjson transformer) on the server, React 19 + Vite + Wouter (hash-based routing) on the client, Drizzle ORM against MySQL. Single dev process — Vite runs as Express middleware in development (`server/_core/vite.ts`), and the client is served statically in production.
 
-**`_core/` directories are platform scaffolding**, generated by the Manus WebDev template — `server/_core/`, `client/src/_core/`. They handle OAuth login, JWT session cookies, tRPC boilerplate (`trpc.ts`, `context.ts`), S3-backed file storage via a Forge presign proxy (`storage.ts`, `storageProxy.ts`), and scheduled/cron callback wiring. Prefer extending app-level code over rewriting `_core` internals; `references/periodic-updates.md` documents the cron system in detail if that's ever needed.
+**`_core/` directories are platform scaffolding**, generated by the Manus WebDev template — `server/_core/`, `client/src/_core/`. They handle OAuth login, JWT session cookies, tRPC boilerplate (`trpc.ts`, `context.ts`), the route that serves a stored file (`storageProxy.ts` — see § Stored files), and scheduled/cron callback wiring. Prefer extending app-level code over rewriting `_core` internals; `references/periodic-updates.md` documents the cron system in detail if that's ever needed.
 
 **Auth:** OAuth-only (no local password flow is wired up despite `passwordHash` existing on the `users` schema). `sdk.authenticateRequest` (`server/_core/sdk.ts`) resolves the session cookie (or `Authorization: Bearer` fallback) to a `User` row, auto-provisioning on first login. tRPC procedures come in three tiers (`server/_core/trpc.ts`): `publicProcedure`, `protectedProcedure` (any logged-in user), `adminProcedure` (`user.role === "admin"`). Client-side gate is `AuthGuard` in `App.tsx`.
 

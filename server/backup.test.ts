@@ -500,7 +500,11 @@ runIf("the report says what actually happened", () => {
     // Discovering a bad credential after an hour of reading is the expensive
     // way to find a typo.
     const target = fakeTarget({ failCheck: true });
-    const report = await runBackup({ databaseUrl, target });
+    const report = await runBackup({
+      databaseUrl,
+      target,
+      fileSource: streamOf("x"),
+    });
 
     expect(report.ok).toBe(false);
     expect(report.database).toBeNull();
@@ -528,7 +532,11 @@ runIf("the report says what actually happened", () => {
     // Belt and braces over the whole shape: `ok` is derived, not set by hand
     // in each branch, so it cannot drift out of step with the failures list.
     const target = fakeTarget({ failCheck: true });
-    const report = await runBackup({ databaseUrl, target });
+    const report = await runBackup({
+      databaseUrl,
+      target,
+      fileSource: streamOf("x"),
+    });
     expect(report.ok).toBe(
       report.errors.length === 0 && report.files.failed.length === 0
     );

@@ -14,10 +14,10 @@
  * detail: an unauthorised caller must not be able to make this server do work
  * on their behalf, and must learn nothing about whether a key exists.
  *
- * There are no Forge credentials outside deployed infrastructure, and that is
- * what makes the ordering observable here. A request that clears the token
- * check reaches the config check and answers 500 "Storage proxy not
- * configured"; one that fails it answers 403 without ever getting there. So
+ * A backend that is named but not configured is what makes the ordering
+ * observable here. A request that clears the token check goes on to ask which
+ * store holds the key, cannot answer, and returns 502 "Storage backend error";
+ * one that fails the token check answers 403 without ever getting there. So
  * "did it reach storage" is directly readable from the status.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -38,16 +38,21 @@ const NOW = new Date("2026-08-15T12:00:00Z");
  * it failed on a stand-in response object that has no `sendFile`. The test was
  * reporting the machine, not the code.
  *
- * Pinned to Manus with no credentials, which is the state that makes the
- * ordering readable: clearing the token reaches the config check and answers
- * 500, failing it answers 403 without getting there.
+ * Pinned to R2 with no credentials, which is the state that makes the ordering
+ * readable: clearing the token gets as far as asking which store holds the key
+ * and answers 502, failing it answers 403 without getting there. (It used to be
+ * pinned to Manus, which was the same trick with the store that no longer
+ * exists.)
  */
 const saved: Record<string, string | undefined> = {};
 const PINNED = [
   "PLAN_STORAGE",
   "LOCAL_STORAGE_DIR",
-  "BUILT_IN_FORGE_API_URL",
-  "BUILT_IN_FORGE_API_KEY",
+  "R2_PLANS_ACCOUNT_ID",
+  "R2_PLANS_ACCESS_KEY_ID",
+  "R2_PLANS_SECRET_ACCESS_KEY",
+  "R2_PLANS_BUCKET",
+  "R2_PLANS_ENDPOINT",
 ];
 
 beforeEach(() => {
@@ -55,7 +60,7 @@ beforeEach(() => {
     saved[name] = process.env[name];
     delete process.env[name];
   }
-  process.env.PLAN_STORAGE = "manus";
+  process.env.PLAN_STORAGE = "r2";
 });
 
 afterEach(() => {
@@ -122,10 +127,10 @@ describe("serving a stored file", () => {
   /**
    * Clearing the token check is visible as "tried to reach storage".
    *
-   * 500 is the local answer, because there is no Forge configuration outside
-   * deployed infrastructure. What matters is that it is not 403.
+   * 502 is the answer here, because the backend is named but has no credentials
+   * to resolve a key with. What matters is that it is not 403.
    */
-  const REACHED_STORAGE = 500;
+  const REACHED_STORAGE = 502;
 
   it("lets a valid token through to storage", async () => {
     const handler = proxyHandler();

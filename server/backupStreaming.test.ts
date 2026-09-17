@@ -15,7 +15,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Readable } from "node:stream";
 import { readPlansReadConfig, PLANS_READONLY_VARS } from "./backup/config";
-import type { FileStreamSource } from "./backup/planFileSource";
+import {
+  defaultFileSource,
+  planSourceConfigured,
+  resetPlanSourceForTests,
+  type FileStreamSource,
+} from "./backup/planFileSource";
 
 const PLANS_ENV = {
   R2_PLANS_ACCOUNT_ID: "acct123",
@@ -92,6 +97,80 @@ describe("the read-only plan credentials", () => {
     expect(result.ok && result.config.endpoint).toBe(
       "https://custom.example.com"
     );
+  });
+});
+
+/**
+ * What happens when the read-only credentials are simply absent.
+ *
+ * ── Why this refuses instead of coping ──────────────────────────────────────
+ * There used to be a fallback here that fetched each file through the Manus
+ * presign proxy, buffering the whole thing. It went with the rest of the Manus
+ * storage code, and NOTHING replaced it on purpose.
+ *
+ * Coping would look like the kinder option and is the dangerous one. A backup
+ * run that cannot read plans still dumps the database and still writes its
+ * manifest, so it finishes, reports a success, and lists every contractor's
+ * drawings under "warnings" — which nobody reads on a run that says it worked.
+ * The gap would then sit there until somebody needed a plan back.
+ *
+ * So the run stops before it starts, and the message names the variables. The
+ * cost of being wrong in this direction is a loud failed backup tonight; the
+ * cost of being wrong in the other is a backup with no plans in it, discovered
+ * on the day it is needed.
+ */
+describe("a missing read-only credential", () => {
+  const PINNED = [
+    "R2_PLANS_READONLY_ACCESS_KEY_ID",
+    "R2_PLANS_READONLY_SECRET_ACCESS_KEY",
+    "R2_PLANS_BUCKET",
+    "R2_PLANS_ACCOUNT_ID",
+    "R2_PLANS_ENDPOINT",
+  ];
+  const saved: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const name of PINNED) {
+      saved[name] = process.env[name];
+      delete process.env[name];
+    }
+    resetPlanSourceForTests();
+  });
+
+  afterEach(() => {
+    for (const name of PINNED) {
+      if (saved[name] === undefined) delete process.env[name];
+      else process.env[name] = saved[name];
+    }
+    resetPlanSourceForTests();
+  });
+
+  it("refuses to build a source at all, rather than returning a broken one", () => {
+    expect(() => defaultFileSource()).toThrow();
+  });
+
+  it("names both read-only variables, so the fix needs no source-reading", () => {
+    let message = "";
+    try {
+      defaultFileSource();
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toContain("R2_PLANS_READONLY_ACCESS_KEY_ID");
+    expect(message).toContain("R2_PLANS_READONLY_SECRET_ACCESS_KEY");
+  });
+
+  it("says why it refused, not just what is missing", () => {
+    // A message that only lists variables reads like a misconfiguration to
+    // shrug at. This one has to say that the alternative was a backup without
+    // the plans in it, because that is the decision being made.
+    expect(() => defaultFileSource()).toThrow(/cannot read plan files/i);
+    expect(() => defaultFileSource()).toThrow(/refusing/i);
+  });
+
+  it("reports itself as not configured before anything tries to use it", () => {
+    // What a caller checks when it wants to decide rather than be thrown at.
+    expect(planSourceConfigured()).toBe(false);
   });
 });
 
