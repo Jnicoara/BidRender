@@ -4,7 +4,7 @@
  * ── Kept behind an interface on purpose ─────────────────────────────────────
  * R2 is the confirmed choice and this is not built to be provider-agnostic for
  * its own sake. But everything else in this folder — enumerating tables,
- * dumping rows, copying files, reporting — is about BidRender's data and has no
+ * dumping rows, copying files, reporting — is about BidRidge's data and has no
  * opinion about the destination. Putting the destination behind three methods
  * means swapping it later is one new file rather than a rewrite, and it is what
  * lets the tests prove the whole pipeline works without a network or a

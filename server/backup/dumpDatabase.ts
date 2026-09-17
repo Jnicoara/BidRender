@@ -134,7 +134,7 @@ export async function dumpDatabase(databaseUrl: string): Promise<DumpResult> {
 
     parts.push(
       [
-        `-- BidRender database backup`,
+        `-- BidRidge database backup`,
         `-- database: ${databaseName}`,
         `-- taken:    ${new Date().toISOString()}`,
         `-- tables:   ${tableNames.length}`,

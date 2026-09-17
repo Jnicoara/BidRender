@@ -61,7 +61,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <Loader2 size={28} className="animate-spin text-[#F5C518]" />
-          <p className="text-sm text-muted-foreground">Loading BidRender…</p>
+          <p className="text-sm text-muted-foreground">Loading BidRidge…</p>
         </div>
       </div>
     );

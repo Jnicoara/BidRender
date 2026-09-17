@@ -1,5 +1,5 @@
 /**
- * Platform administration — for whoever runs BidRender, not for a contractor.
+ * Platform administration — for whoever runs BidRidge, not for a contractor.
  *
  * ── What used to be here, and why it went ────────────────────────────────────
  * This screen's main section was a Feature Flags panel: a list of toggles
@@ -34,7 +34,7 @@ export default function AdminSettingsPage() {
         <AlertTriangle className="w-12 h-12 text-destructive/60" />
         <p className="text-lg font-semibold">Admins only</p>
         <p className="text-sm text-muted-foreground">
-          This screen is for whoever runs BidRender, not for your company's
+          This screen is for whoever runs BidRidge, not for your company's
           account.
         </p>
       </div>
@@ -77,7 +77,7 @@ export default function AdminSettingsPage() {
               <div>
                 <p className="text-xs font-medium">Administrator</p>
                 <p className="text-xs text-muted-foreground">
-                  BidRender staff. Reaches this screen and the platform-wide
+                  BidRidge staff. Reaches this screen and the platform-wide
                   routes behind it.
                 </p>
               </div>

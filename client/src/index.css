@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================================
-   BidRender Design System — Tactical SaaS
+   BidRidge Design System — Tactical SaaS
    Signature accent: Safety Yellow #F5C518
    Fonts: Space Grotesk (headers), Inter (body), JetBrains Mono (numbers)
    Supports: Light mode (default) + Dark mode (.dark class on <html>)
@@ -49,7 +49,7 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* ── DARK THEME (default BidRender look) ─────────────────────────────────── */
+/* ── DARK THEME (default BidRidge look) ─────────────────────────────────── */
 :root {
   --radius: 0.5rem;
   color-scheme: dark;
@@ -108,7 +108,7 @@
   --sidebar-border: oklch(0.22 0.012 265);
   --sidebar-ring: oklch(0.84 0.18 88);
 
-  /* BidRender custom tokens */
+  /* BidRidge custom tokens */
   --bp-yellow: #f5c518;
   --bp-yellow-dim: rgba(245, 197, 24, 0.15);
   --bp-surface: #1a1d27;
@@ -193,7 +193,7 @@
   --sidebar-border: oklch(0.82 0.008 265);
   --sidebar-ring: oklch(0.84 0.18 88);
 
-  /* BidRender custom tokens — light overrides */
+  /* BidRidge custom tokens — light overrides */
   --bp-yellow: #d4a900; /* slightly darker yellow for light bg contrast */
   --bp-yellow-dim: rgba(212, 169, 0, 0.12);
   --bp-surface: #ffffff;
@@ -296,7 +296,7 @@
     }
   }
 
-  /* BidRender card */
+  /* BidRidge card */
   .bp-card {
     position: relative;
     background: var(--bp-surface);

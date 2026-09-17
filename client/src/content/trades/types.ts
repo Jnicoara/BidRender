@@ -2,7 +2,7 @@
  * The contract between the marketing page and a trade.
  *
  * ── The seam ────────────────────────────────────────────────────────────────
- * BidRender is electrical-first by sequencing, not electrical-only by design
+ * BidRidge is electrical-first by sequencing, not electrical-only by design
  * (CLAUDE.md § Project): a plumbing or HVAC launch is meant to be content plus
  * an unlock, not a refactor. The landing page has to be able to make the same
  * promise, and a page with "electrician" typed into its headline cannot.
@@ -16,7 +16,7 @@
  * ── Deliberately small ──────────────────────────────────────────────────────
  * This type used to carry a problem section, a differentiator grid and a
  * credibility block. They are gone. The page is a headline, three steps and a
- * signup, because that is what the rest of BidRender looks like — dense screens
+ * signup, because that is what the rest of BidRidge looks like — dense screens
  * with restrained chrome — and a marketing page with six sections of cards did
  * not look like the product it was selling.
  *
@@ -109,7 +109,7 @@ export type TradeContent = {
     /**
      * One line saying what the app does.
      *
-     * Not the product name on its own — "BidRender" tells a first-time visitor
+     * Not the product name on its own — "BidRidge" tells a first-time visitor
      * nothing, and someone who bounces off this line never learns what was on
      * offer.
      */

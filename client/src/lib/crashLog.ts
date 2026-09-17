@@ -93,7 +93,7 @@ export function addCrash(
  */
 export function formatCrash(crash: CrashRecord): string {
   const lines = [
-    `BidRender crash report`,
+    `BidRidge crash report`,
     `When:    ${crash.at}`,
     `Screen:  ${crash.where}`,
     `Version: ${crash.version}`,
@@ -156,7 +156,7 @@ export function readCrashes(): CrashRecord[] {
 export function recordCrash(crash: CrashRecord): void {
   // First, because it is the one that works when storage does not.
   console.error(
-    `[BidRender crash] ${crash.message} — on ${crash.where} (${crash.version})`,
+    `[BidRidge crash] ${crash.message} — on ${crash.where} (${crash.version})`,
     crash.stack || crash
   );
   try {

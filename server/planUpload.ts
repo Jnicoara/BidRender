@@ -75,7 +75,7 @@ export const PLAN_UPLOAD_PATH = "/api/plan-upload";
  * beats being cut off silently at 32.
  *
  * ── This ceiling is the fallback's, not the app's ────────────────────────────
- * A file between this and MAX_PDF_BYTES is not too big for BidRender. It is too
+ * A file between this and MAX_PDF_BYTES is not too big for BidRidge. It is too
  * big to rescue this way, and the message says so and names the actual fix,
  * because "your 200MB plan set is too large" would be false and would send the
  * user away to split a file that does not need splitting.
@@ -141,7 +141,7 @@ export function checkProxyUpload(raw: {
       ok: false,
       status: 413,
       message:
-        `${filename} is ${formatBytes(byteSize)}. BidRender accepts plans this large, but the browser is currently ` +
+        `${filename} is ${formatBytes(byteSize)}. BidRidge accepts plans this large, but the browser is currently ` +
         `blocked from uploading straight to storage, and the stand-in route tops out at ${formatBytes(PROXY_UPLOAD_MAX_BYTES)}. ` +
         `This is a storage configuration problem, not a problem with your file — do not split it. ` +
         `Until it is fixed, only sets under ${formatBytes(PROXY_UPLOAD_MAX_BYTES)} can be attached.`,

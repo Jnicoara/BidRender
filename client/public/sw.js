@@ -1,5 +1,5 @@
 /*
- * BidRender service worker — fast repeat loads, and nothing else.
+ * BidRidge service worker — fast repeat loads, and nothing else.
  *
  * ── What this deliberately does NOT do ───────────────────────────────────────
  * It does not cache the API. Not one response, not for a second. Every number

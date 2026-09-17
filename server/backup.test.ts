@@ -445,7 +445,7 @@ runIf("the report says what actually happened", () => {
       target.written.get("2026-08-13T22-41-07Z/database.sql.gz")!
     ).toString("utf8");
     expect(dumped).toContain("CREATE TABLE");
-    expect(dumped).toContain("BidRender database backup");
+    expect(dumped).toContain("BidRidge database backup");
   });
 
   it("puts the outcome in the manifest, beside the data", async () => {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 /**
- * BidRender — useLocalStorage hook
+ * BidRidge — useLocalStorage hook
  * Persists state to localStorage so data survives page refreshes.
  *
  * Key-change behaviour: when `key` changes (e.g. switching projects),

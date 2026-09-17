@@ -28,7 +28,7 @@
  * and the Dashboard grew the two real entry points. A major is the honest label
  * for a foundation change plus a new entity plus a new front door.
  */
-export const APP_VERSION = "v6.0";
+export const APP_VERSION = "v6.1";
 
 /** Edition suffix — the app is field-first, and the tag has always said so. */
 export const APP_EDITION = "Field Edition";

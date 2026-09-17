@@ -402,7 +402,7 @@ export default function BidRenderShell() {
         <div
           onClick={() => navigate("dashboard")}
           className="flex items-center justify-center gap-2 px-3 py-4 h-16 border-b border-sidebar-border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-          title="BidRender — Dashboard"
+          title="BidRidge — Dashboard"
         >
           <span
             className="font-bold text-[#F5C518] text-sm shrink-0 group-hover:hidden"
@@ -415,7 +415,7 @@ export default function BidRenderShell() {
             style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           >
             <span className="text-foreground">Bid</span>
-            <span className="text-[#F5C518]">Render</span>
+            <span className="text-[#F5C518]">Ridge</span>
           </span>
         </div>
 
@@ -565,7 +565,7 @@ export default function BidRenderShell() {
             style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             onClick={() => navigate("dashboard")}
           >
-            BidRender
+            BidRidge
           </span>
           <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground font-mono">
             <ChevronRight size={12} />

@@ -4,7 +4,7 @@
  * ── Why it looks like this ──────────────────────────────────────────────────
  * The previous version had six sections, a gradient wash, a dot grid, pills,
  * icon cards and a differentiator matrix — a normal SaaS marketing page, and
- * nothing like the product it was selling. BidRender's own screens are quiet:
+ * nothing like the product it was selling. BidRidge's own screens are quiet:
  * `bg-background`, one border weight, `text-muted-foreground` for anything
  * secondary, and the safety yellow spent only on the thing you are meant to
  * press. A visitor who lands here and then signs in should not feel like they
@@ -80,7 +80,7 @@ function Wordmark({ className }: { className?: string }) {
       style={{ fontFamily: "'Space Grotesk', sans-serif" }}
     >
       <span className="text-foreground">Bid</span>
-      <span className="text-[#F5C518]">Render</span>
+      <span className="text-[#F5C518]">Ridge</span>
     </span>
   );
 }
@@ -308,7 +308,7 @@ export function LandingPage({
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-5xl flex-col gap-2 px-6 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>Estimating software for {trade.vocabulary.tradespeople}.</p>
-          <p>© {new Date().getFullYear()} BidRender</p>
+          <p>© {new Date().getFullYear()} BidRidge</p>
         </div>
       </footer>
     </div>

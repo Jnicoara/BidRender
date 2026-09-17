@@ -4,13 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-BidRender — a trade-contractor bid/estimating tool. Users build a personal catalog of materials and labor rates, assemble them into reusable assemblies, attach them to project bids, and upload plan PDFs to take off quantities against a live crosshair viewer.
+BidRidge — a trade-contractor bid/estimating tool. Users build a personal catalog of materials and labor rates, assemble them into reusable assemblies, attach them to project bids, and upload plan PDFs to take off quantities against a live crosshair viewer.
 
 **Electrical-first by sequencing, not electrical-only by design.** Multiple trades are in the data model from the ground up: every assembly carries a `trade` (`drizzle/schema.ts`, defaulting to `"electrical"`), and a bid carries a `trades` array — one bid may mix line items from several unlocked trades. Unlocking is gated at the app layer rather than in the schema, deliberately, so a new trade needs no migration. Electrical is simply the first trade to ship, which is why the seeded catalog, the trade slang and the starter assemblies are all electrical today. Do not read that focus as a constraint and bake an electrical-only assumption into anything new — adding plumbing or HVAC should be content plus an unlock, not a refactor.
 
 `trade` is a different axis from `projectType` (residential/commercial/both), which is only a filter on the assembly library. The schema says so explicitly; do not wire the two together.
 
-The product is **BidRender**. It was called **BidPhase** until v5.75 and **HelixBid** until v5.119, renamed that time because HelixBid clashed with an existing company. The GitHub repo was renamed to match on 2026-09-14 (`Jnicoara/BidRender`); only the local checkout directory (`BidPhase`) still carries an old name. Anywhere else, either old name is stale or a historical record — the `todo.md` entries that record a past rename are the latter and stay as written.
+The product is **BidRidge**. It was called **BidPhase** until v5.75, **HelixBid** until v5.119 (renamed because HelixBid clashed with an existing company), and **BidRender** until v6.1. `bidridge.com` is registered and trademark clearance came back clear.
+
+**The v6.1 rename was deliberately user-visible ONLY, and the split is the point.** What a person reads now says BidRidge: the wordmark, the tab title, on-screen copy, the landing page, exported filenames. What only a machine reads still says `bidrender`, on purpose — the repo and local folder, the database `bidrender` and login `bidrender_app`, the buckets `bidrender-plans` and `bidsoftware`, the `R2_PLANS_*` names, the DigitalOcean app, the Cloudflare worker `bidrender-cron`, the `BidRenderShell` component, and `package.json`'s `name`. Several of those are baked into stored rows or live infrastructure, and renaming them is churn with real risk and no user benefit. **Do not "finish the job" by renaming them.**
+
+**Domains and URLs are untouched and are their own task** — `bidrender.com` still serves the app, so the sign-in page reads BidRidge while the address bar reads bidrender.com. That gap is expected, not a bug to fix in passing.
+
+The `/manus-storage` route, the `helixbid:` localStorage keys and the `helixbid-` cache prefix survive from earlier names for the reasons given above and below; they are not oversights. `todo.md` and `CHANGELOG.md` entries recording past renames are historical record and stay as written.
 
 **A few `helixbid` names are kept on purpose — do not rename them.** The localStorage keys (`helixbid:trace-draft:`, `helixbid:stamp-queue:`, `helixbid.crashes`, `helixbid.planReader.autoRead`) and the service worker's `helixbid-` cache prefix, because a browser may already hold unsent work or caches under them and a renamed key never finds them. The seed lock names in `server/db.ts`, because an old and a new build must take the same lock during a deploy. And the R2 backup prefix default `helixbid` in `server/backup/config.ts`, because that is the folder the existing backups live in.
 

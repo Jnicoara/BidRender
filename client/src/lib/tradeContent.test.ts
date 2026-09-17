@@ -425,8 +425,8 @@ describe("the trade registry", () => {
 
 describe("the electrical content itself", () => {
   it("leads the headline with what the product does, not the name", () => {
-    // "BidRender" explains nothing to someone meeting it for the first time.
-    expect(electrical.hero.headline.toLowerCase()).not.toContain("bidrender");
+    // "BidRidge" explains nothing to someone meeting it for the first time.
+    expect(electrical.hero.headline.toLowerCase()).not.toContain("bidridge");
     expect(electrical.hero.headline.toLowerCase()).toContain("estimating");
   });
 
@@ -450,7 +450,7 @@ describe("the electrical content itself", () => {
   });
 
   it("names the product and what it does in the page title", () => {
-    expect(electrical.meta.title).toContain("BidRender");
+    expect(electrical.meta.title).toContain("BidRidge");
     expect(electrical.meta.title.toLowerCase()).toContain("estimating");
     // Search results truncate; a title past ~75 characters loses its tail.
     expect(electrical.meta.title.length).toBeLessThanOrEqual(75);

@@ -94,7 +94,7 @@ export default function FirstRunPage() {
       <div className="mx-auto w-full max-w-2xl px-6 py-12">
         <div className="flex items-center gap-3 mb-2">
           <HardHat className="w-6 h-6 text-primary" />
-          <h1 className="text-2xl font-semibold">Welcome to BidRender</h1>
+          <h1 className="text-2xl font-semibold">Welcome to BidRidge</h1>
         </div>
         <p className="text-sm text-muted-foreground mb-8">
           One thing before you start bidding, and then you are straight into it.

@@ -194,7 +194,7 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
             style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           >
             <span className="text-foreground">Bid</span>
-            <span className="text-[#F5C518]">Render</span>
+            <span className="text-[#F5C518]">Ridge</span>
           </h1>
           <p className="text-muted-foreground text-sm">
             Electrical estimating for the field

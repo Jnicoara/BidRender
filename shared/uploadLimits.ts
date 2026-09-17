@@ -24,7 +24,7 @@
  * a number is realistic or merely generous: Procore and Autodesk Construction
  * Cloud accept multi-gigabyte files, Bluebeam Studio and PlanGrid land around
  * 1GB per document, and the takeoff-focused tools sit in the mid hundreds of
- * megabytes. 2GB puts BidRender at the top of that range rather than the bottom,
+ * megabytes. 2GB puts BidRidge at the top of that range rather than the bottom,
  * without pretending to be a document management system.
  *
  * ── And why not "no limit" ───────────────────────────────────────────────────

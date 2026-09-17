@@ -54,7 +54,7 @@ import {
  * or green and would rather click once than know a hex code.
  */
 const ACCENT_PRESETS = [
-  { label: "BidRender yellow", value: DEFAULT_ACCENT },
+  { label: "BidRidge yellow", value: DEFAULT_ACCENT },
   { label: "Slate blue", value: "#1F4E79" },
   { label: "Forest", value: "#1E5B3A" },
   { label: "Brick", value: "#9A3412" },
