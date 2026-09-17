@@ -860,6 +860,10 @@ left as written rather than rewritten to match the rename.
 - [ ] Set `ANTHROPIC_API_KEY` in the DigitalOcean environment.
 - [ ] Set `CRON_SECRET` on DigitalOcean and, byte-identical, via `wrangler secret put CRON_SECRET`.
 - [ ] Fill in `APP_BASE_URL` in `workers/cron/wrangler.toml` and `wrangler deploy` the cron worker — until then neither the backup nor the archived-bid purge ever runs.
-- [ ] Set `PLAN_STORAGE=r2` plus the `R2_PLANS_*` values, so plan files go to Cloudflare rather than Manus.
-- [ ] Add a CORS rule on `bidrender-plans` for the live origin, exposing `ETag` — an upload in pieces cannot be reassembled without it.
+- [x] Set `PLAN_STORAGE=r2` plus the `R2_PLANS_*` values, so plan files go to Cloudflare rather than Manus.
+- [x] Add a CORS rule on `bidrender-plans` for the live origin, exposing `ETag` — an upload in pieces cannot be reassembled without it. Verified 2026-09-16: a preflight from `https://bidrender.com`, `https://www.bidrender.com`, the `ondigitalocean.app` host and `http://localhost:3000` returns 204 with the origin allowed, and a real ranged GET exposes `ETag,Content-Range,Accept-Ranges,Content-Length`.
 - [ ] Set `R2_PLANS_READONLY_ACCESS_KEY_ID` and `R2_PLANS_READONLY_SECRET_ACCESS_KEY` on DigitalOcean, so the backup reads plans from R2 rather than buffering them through Manus. Verify with `pnpm tsx scripts/checkPlansReadOnly.mts`.
+
+## Test suite health
+
+- [ ] Fix the 35 known failing tests so the test suite is fully green. They are five files and every one is an environment problem rather than a code fault: `planCopilot` (21) and `navigation` (2) need `DISABLE_AI_FEATURES` unset, `v545` (8) and `assemblies` (1) need the `bidrender_test` schema brought up to date, and `backup` (3) needs the `bidrender` MySQL login granted rights to create `bidrender_backup_restore_test`. Worth doing because a suite that always shows red teaches people to stop reading it — which is how a real regression gets through.
