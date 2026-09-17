@@ -857,7 +857,7 @@ left as written rather than rewritten to match the rename.
 
 - [ ] Delete the old HelixBid Anthropic API key once the app is live on DigitalOcean and Manus is shut off.
 - [x] Set a monthly spend limit on the Anthropic workspace — BidRender production, $50/month with an email alert at $25 (set 2026-09-16). The app's own limits cap one person per day; this is the only one that caps the account.
-- [ ] Set `ANTHROPIC_API_KEY` in the DigitalOcean environment.
+- [x] Set `ANTHROPIC_API_KEY` in the DigitalOcean environment. Confirmed set 2026-09-16, and verified on the live site after the v5.142 deploy — "Ask about this sheet" answers questions.
 - [ ] Set `CRON_SECRET` on DigitalOcean and, byte-identical, via `wrangler secret put CRON_SECRET`.
 - [ ] Fill in `APP_BASE_URL` in `workers/cron/wrangler.toml` and `wrangler deploy` the cron worker — until then neither the backup nor the archived-bid purge ever runs.
 - [x] Set `PLAN_STORAGE=r2` plus the `R2_PLANS_*` values, so plan files go to Cloudflare rather than Manus.
@@ -872,3 +872,7 @@ left as written rather than rewritten to match the rename.
 ## Test suite health
 
 - [ ] Fix the 26 known failing tests so the test suite is fully green. They are three files and every one is an environment problem rather than a code fault: `planCopilot` (21) and `navigation` (2) need `DISABLE_AI_FEATURES` unset — it is set to `true` in `.env`, and nothing sets it on DigitalOcean — and `backup` (3) needs the `bidrender` MySQL login granted rights to create `bidrender_backup_restore_test`. (Was 35 across five files; `v545` (8) and `assemblies` (1) started passing once the `bidrender_test` schema was brought up to date.) Worth doing because a suite that always shows red teaches people to stop reading it — which is how a real regression gets through.
+
+## Plan viewer overhaul
+
+- [ ] Give the plan reader zoomed-in tiles of a sheet rather than one shrunk image. Observed on the live site 2026-09-16: on dense sheets it runs, costs a call, and comes back having found no symbols — its own answer said the symbols were not legible at the resolution it was given. So this is not a prompt problem or a model-tier problem; it is being handed a picture in which the thing it is looking for does not survive. A receptacle symbol is a few dozen pixels on a full E-sheet scaled to fit a model's input, and downscaling removes it before the model ever sees it. Likely shape of the fix: render each page at takeoff zoom, cut it into overlapping tiles, read each tile, then merge the hits back into page coordinates — overlapping because a symbol on a tile seam would otherwise be halved and missed twice. Watch the cost: one sheet becomes N calls, so the per-person daily allowance in `shared/aiLimits.ts` is counting something much larger than it was designed around, and `PLAN_COPILOT_MODEL` is the expensive tier. Do this as part of the plan viewer overhaul, not before — the tiling wants the same render path the viewer is getting.
