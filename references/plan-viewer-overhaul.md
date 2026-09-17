@@ -397,17 +397,36 @@ works. If it competes with anything in Phases 5–8, it loses.
   where every foot came from. It gets designed properly when Phase 5 arrives,
   never compressed to fit.
 
+### 7.1 Which allowance applies to verticals — and why they differ
+
+Answered 2026-09-17. **The split tracks WHY each number exists, not where the
+footage came from.** That distinction is the whole point and is the thing most
+likely to be "simplified" away by someone who sees two percentages and assumes
+they are the same idea applied twice.
+
+**CONDUIT allowance — traced length ONLY.** It exists to cover _route
+uncertainty_: the jog around a duct, the offset that was not on the plan. A drop
+from a known distribution height to a known mounting height contains none of
+that. It is arithmetic between two numbers the estimator typed. Adding a
+percentage to it is putting a fudge factor on a measurement that is not fuzzy.
+
+**WIRE allowance — EVERYTHING, verticals included.** A different reason, which
+is why it gets a different answer. Wire allowance is not only route uncertainty
+— it is **wire consumed by bends and offsets**, and a drop is full of them: the
+90 at the top, the offset into the box. Those eat wire whether or not the
+vertical distance is known exactly.
+
+**This also preserves the rule that wire always exceeds conduit** (§ 2.3), and
+now for a reason visible in the maths rather than merely asserted in a default.
+
+**Do not collapse these into one percentage applied to one total.** They measure
+two different things that happen to share a unit.
+
 ## 8. Still open
 
 - **How far should sharp zoom go?** Re-rendering at high zoom costs render time
   on dense sheets (0.5–13s). There is a real trade between "sharp at 800%" and
   "instant". Suggested: sharp to ~400%, stretch beyond. Needs a look at a real
-  E-sheet. **A Phase 1 decision.**
-- **Do the allowance percentages apply to verticals, or only to traced length?**
-  Surfaced by moving verticals ahead of allowances. The conduit allowance covers
-  ROUTE UNCERTAINTY — the jog around a duct, the offset that was not on the
-  plan. But a drop from a known distribution height to a known mounting height
-  has no route uncertainty in it: it is arithmetic between two numbers the
-  estimator supplied. There is a good argument that the percentage applies to
-  traced length only. **Must be answered before Phase 7**, and it is the one
-  place the reorder genuinely changed a question rather than deferring it.
+  E-sheet. **A Phase 1 decision, and the only question still open.**
+- **How far should sharp zoom go?** — see above. The only question left open,
+  and it is a Phase 1 decision to be made against a real E-sheet.
