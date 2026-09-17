@@ -124,94 +124,122 @@ outlast the HTTP request; that is expected, and the CLI is the answer.
 
 ## 4. Running it automatically
 
-> **The nightly backup has never run, and is not being set up on Manus.**
->
-> Not "stopped running" — never started. The handler arrived in `f87d67b` on
-> 2026-08-14, four days after `ff469cb` (2026-08-10), which is the last commit
-> that ever reached Manus. The deployed site has no `/api/scheduled/backupToR2`
-> route for a cron to call, so the registration command below was never run
-> against a build that could answer it.
->
-> The R2 credentials were replaced on 2026-09-15 and the old token deleted.
-> That changed nothing here: there was no automatic run to break. Manus is
-> being left, so neither the secret nor the cron is being fixed there.
->
-> **Every backup in the bucket was taken by hand, and that is the arrangement
-> until the new host is running.** Use the § 3 command, and run it before
-> anything destructive. It is the safe direction for the failure to point —
-> backups must be taken deliberately, rather than appearing to happen and not
-> happening — but it is only safe while somebody remembers. Registering the
-> cron on the new host is the step that ends it.
->
-> **Check what your newest backup actually contains before trusting it.** As of
-> 2026-09-15 the most recent run is database-only: it was taken against the
-> DigitalOcean database, and the plan PDFs are still behind Manus, so it holds
-> no files at all. The most recent backup containing plan files is
-> 2026-08-19, and its status is `partial`. A run that reports `clean` is
-> telling you it hit no errors, not that it captured everything you assume.
+**Live since 2026-09-17.** Before that every backup in the bucket was taken by
+hand, because the scheduler had never been set up — first on Manus, where the
+route did not exist in the deployed build, and then on DigitalOcean, where the
+app was running but nothing was knocking on it.
 
-The nightly cron is **two pieces that ship separately** (`CLAUDE.md` §
-Scheduled work). The handler is in the code:
-`server/scheduled/backupToR2.ts`, mounted at `/api/scheduled/backupToR2`.
+The nightly job is **two pieces that ship separately** (`CLAUDE.md` § Scheduled
+work), and they are deployed by different means to different places:
 
-The rest of this section describes registering it **on Manus**, and is kept as
-the worked example of the shape — a handler in the app, a cron created on the
-platform after deploy. The commands themselves are Manus-specific and will not
-be run again.
+1. **The handler, inside the app** — `server/scheduled/backupToR2.ts`, mounted
+   at `/api/scheduled/backupToR2`. It ships with the app like any other code.
+2. **The Cloudflare Worker** — `workers/cron/`, deployed separately with
+   `wrangler` from a local checkout. It holds the same `CRON_SECRET` and POSTs
+   to the handler on a timer.
 
-The cron itself is created **once, on the Manus platform, from a sandbox
-terminal, after the site is deployed** — a dev machine is unreachable from the
-platform, so this cannot be done from a local checkout:
+The Worker lives outside the app deliberately. The app's instances are stopped
+and replaced by the host, so a timer running inside one dies with it and takes
+the guarantee along. Something outside has to do the asking.
+
+### Deploying the Worker
 
 ```bash
-manus-heartbeat create \
-  --name nightly-backup-to-r2 \
-  --cron "0 0 2 * * *" \
-  --path /api/scheduled/backupToR2 \
-  --description "Export every table and stored file to Cloudflare R2"
+cd workers/cron
+npx wrangler deploy                    # 1. create the Worker
+npx wrangler secret put CRON_SECRET    # 2. then give it the secret
 ```
 
-Six fields, seconds first, UTC. **Until that command is run, nothing is backed
-up automatically** — the manual trigger keeps working throughout, which is the
-safe direction for the failure to point.
+**That order, not the other way round.** A secret cannot attach to a Worker that
+does not exist yet — `wrangler secret put` run first has nothing to attach to and
+stops to ask whether to create one, which a non-interactive shell cannot answer.
+The gap between the two commands is harmless: a Worker with no secret refuses to
+call the app and says so loudly, rather than calling it with a blank password.
+
+`CRON_SECRET` must be **byte-identical** to the app's. Prove it rather than
+assuming it — POST to the handler by hand with the value you are about to use
+(§ 3) and check you get a `200`. The app's refusal is deliberately identical to
+every other refusal, so a mismatched secret fails silently and forever.
+
+> **`.env` and `.env.production.local` hold DIFFERENT values of `CRON_SECRET`.**
+> That is correct — one is this machine, one is the live site — and it is the
+> easy mistake. The production value is the one in `.env.production.local`.
+
+**The subdomain trap is written up in `workers/cron/wrangler.toml`.** Read that
+comment before deploying to a fresh Cloudflare account. The short version: the
+account needs a workers.dev subdomain before Cloudflare will attach any timer,
+registering one is an **interactive prompt that a non-interactive shell declines
+on its own every time**, and with `workers_dev = false` the deploy half-succeeds
+— the Worker uploads, the schedule silently does not attach, and it looks
+perfectly healthy while never running. **Verify the triggers, never "deploy
+succeeded."**
+
+### The schedule
+
+Both jobs, five fields, UTC — standard cron, **no seconds field**:
+
+| Job    | Cron          | Pacific (summer / winter) | Retries |
+| ------ | ------------- | ------------------------- | ------- |
+| Backup | `0 9 * * *`   | 2:00am / 1:00am           | 3       |
+| Purge  | `30 10 * * *` | 3:30am / 2:30am           | 1       |
+
+Two Pacific columns because UTC does not observe daylight saving and Pacific
+does. The UTC times never move; the local hour they land on shifts an hour
+earlier each November and back each March. Both stay overnight either way, which
+is the only thing that was wanted — nobody is estimating at 1am.
+
+### Why daily, and why the purge stays 90 minutes behind
+
+Daily, because the data is one contractor's working day; an hourly export of the
+same few thousand rows is cost without benefit.
+
+The **order** is the load-bearing part, not the absolute times. `purgeArchivedBids`
+permanently destroys bids whose 30-day archive has closed. Backing up **first**
+means the night's export still contains what the purge is about to remove, so a
+purge that fires on the wrong row stays recoverable for a day. Reverse the order
+and the backup faithfully records the deletion.
+
+`server/scheduledBackup.test.ts` asserts the ordering AND that
+`workers/cron/wrangler.toml` still agrees with `BACKUP_CRON` / `PURGE_CRON` in
+the code. TOML cannot import from TypeScript, so the times are restated in two
+places; a drifted schedule fires at the wrong time and nothing anywhere reports
+it. **Moving either job means moving both, in both places, keeping the purge
+second.**
+
+### Checking it actually ran
+
+Cloudflare dashboard → **Compute (Workers)** → `bidrender-cron` → **Settings →
+Triggers → Cron Triggers → Past events**. A good night logs
+`[cron] backup: ok (200)`. A failure shows red there, because the Worker throws
+rather than swallowing the error.
+
+**The answer to trust is the app's own health check, not that page.** Cloudflare
+can only report failures it knows about; it cannot report a schedule that was
+deleted, or was never attached in the first place. `backup.health` asks the
+bucket when a backup last actually succeeded, and the Dashboard warns the owner
+after two quiet days — which catches all of it, including the half-successful
+deploy above. See § 8.
 
 ### Environment
 
 **Nothing changes in `.env.production.local`.** That file is local-only and is
-never read by the deployed app. The four R2 variables must exist in the
-**deployed environment**, set through Manus:
+never read by the deployed app. These must exist in the **deployed environment**
+on DigitalOcean:
 
 ```
 R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET
+R2_PLANS_READONLY_ACCESS_KEY_ID, R2_PLANS_READONLY_SECRET_ACCESS_KEY
+CRON_SECRET
 ```
 
-`DATABASE_URL`, `BUILT_IN_FORGE_API_URL` and `BUILT_IN_FORGE_API_KEY` are
-already there — they are what the app runs on.
-
-Check before registering the cron, from a sandbox terminal:
-
-```bash
-node -e "console.log(['R2_ACCOUNT_ID','R2_ACCESS_KEY_ID','R2_SECRET_ACCESS_KEY','R2_BUCKET'].filter(k=>!process.env[k]))"
-```
-
-An empty array means it is ready. Anything listed is missing, and every
-scheduled run will fail loudly until it is set.
-
-### Why 02:00, and why daily
-
-Daily, because the data is one contractor's working day; an hourly export of
-the same few thousand rows is cost without benefit.
-
-02:00 specifically, because `purgeArchivedBids` runs at **03:30** and
-permanently destroys bids whose 30-day archive has closed. Backing up first
-means the night's export still contains what the purge is about to remove, so a
-purge that fires on the wrong row stays recoverable for a day. Reverse the order
-and the backup faithfully records the deletion. `server/scheduledBackup.test.ts`
-asserts the ordering, so it cannot drift.
+The `R2_PLANS_READONLY_*` pair is what lets the backup read plan files out of
+the other bucket — see § 1a. Without it the backup **refuses to start** rather
+than quietly dumping the database alone.
 
 ### Retries
 
-The platform retries a `5xx` up to three times. A full backup is not cheap, so a
+Cloudflare retries a `5xx` up to three times (30s, then 2 minutes). A full
+backup is not cheap, so a
 retry first checks the bucket: if a **successful** backup already exists for
 today it returns 200 having done nothing — and a `partial` run counts, since its
 dump is complete. A failed or half-finished run leaves no such manifest, so the
@@ -244,8 +272,9 @@ missed.
 A `partial` run also satisfies the retry guard above: its dump is already whole,
 so re-running would re-dump the database to collect the identical refusals.
 
-A genuine failure is still loud in three places at once — a `500` so the platform
-retries and its Investigate flow shows it, the full summary in the server log,
+A genuine failure is still loud in three places at once — a `500` so the Worker
+retries and marks the run red under its Cron Triggers past events, the full
+summary in the server log,
 and a manifest recording the failure beside the data in the bucket.
 
 ## 5. What lands in the bucket

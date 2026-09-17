@@ -187,16 +187,47 @@ something that could only be true of the new build:
 
 ## 7. Scheduled jobs need a second, manual step
 
-Deploying a handler under `/api/scheduled/` does **not** schedule it. The cron
-is created once, from a Manus sandbox terminal, **after** the site is deployed —
-a dev machine is unreachable from the platform, so this cannot be done from a
-local checkout.
+Deploying a handler under `/api/scheduled/` does **not** schedule it. The thing
+that calls it on a timer is a **Cloudflare Worker in `workers/cron/`**, deployed
+separately with `wrangler` **from a local checkout** — not from the app's host,
+and not by pushing to GitHub. It ships on its own clock and is easy to forget.
 
-The exact command for each job lives in that job's own header comment. The
-working example is `server/scheduled/purgeArchivedBids.ts` (the 30-day archive
-purge, `0 30 3 * * *`, six fields with seconds first, UTC).
+```bash
+cd workers/cron
+npx wrangler deploy                    # 1. create the Worker
+npx wrangler secret put CRON_SECRET    # 2. then give it the secret
+```
 
-`references/periodic-updates.md` is the full reference for the cron system.
+**That order.** A secret cannot attach to a Worker that does not exist yet.
+
+`CRON_SECRET` must be byte-identical to the value in the DigitalOcean
+environment. Note that `.env` and `.env.production.local` hold **different**
+values — the production one is in `.env.production.local`.
+
+Both jobs, **five fields, UTC** — standard cron, no seconds field:
+
+| Job                | Cron          | Pacific (summer / winter) |
+| ------------------ | ------------- | ------------------------- |
+| Backup             | `0 9 * * *`   | 2:00am / 1:00am           |
+| Archived-bid purge | `30 10 * * *` | 3:30am / 2:30am           |
+
+The purge stays **90 minutes behind** the backup on purpose: it permanently
+destroys bids whose archive window has closed, and going second means the
+night's backup still contains what it is about to remove. Moving either job
+means moving both — the times are restated in `workers/cron/wrangler.toml`
+because TOML cannot import from TypeScript, and `server/scheduledBackup.test.ts`
+asserts the two agree.
+
+**Verify the triggers attached; do not trust "deploy succeeded."** A deploy can
+report success and leave the Worker with no timer at all, which looks healthy
+and silently never runs. Check Cloudflare → Compute (Workers) →
+`bidrender-cron` → Settings → Triggers → Cron Triggers. The subdomain trap that
+causes this — and the fact that registering a workers.dev subdomain is an
+interactive prompt a non-interactive shell declines on its own — is written up
+in the comment at the top of `workers/cron/wrangler.toml`.
+
+`references/periodic-updates.md` is the full reference for the cron system, and
+`references/backups.md` § 4 covers the backup job specifically.
 `CLAUDE.md` § Scheduled work explains why failure here points at "keeps too
 much" rather than "deletes too early".
 
