@@ -61,7 +61,13 @@ crons = ["0 9 * * *", "30 10 * * *"]
 
 [vars]
 # The deployed app. No trailing slash needed — worker.js strips one.
-APP_BASE_URL = "https://bidrender.com"
+#
+# Must be the PRIMARY domain, not a redirecting one. bidrender.com now
+# redirects here, and a redirect breaks the knock: the Worker POSTs, the
+# redirect turns it into a GET, and the handler — mounted for POST — never
+# answers. The job then fails every night, marked red on a Cloudflare page
+# nobody watches, and the app's own warning does not appear for two days.
+APP_BASE_URL = "https://bidridge.com"
 
 # CRON_SECRET is NOT here on purpose. It is a secret, so it is set with
 #   npx wrangler secret put CRON_SECRET

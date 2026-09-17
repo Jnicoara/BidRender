@@ -317,12 +317,18 @@ tracked in `todo.md`.
 
 ## 9. Storage needs a CORS rule, and without it no plan uploads
 
-> **Configured and verified 2026-09-16 — this is no longer an outstanding
-> issue.** The rule is on the `bidrender-plans` R2 bucket and covers
-> `https://bidrender.com`, `https://www.bidrender.com`, the `ondigitalocean.app`
-> host and `http://localhost:3000`. Kept because it explains a failure that
-> looks like an app bug and is not, and because a new origin — a staging site, a
-> renamed domain — needs the same rule adding.
+> **Configured — this is no longer an outstanding issue.** The rule is on the
+> `bidrender-plans` R2 bucket and covers six origins: `https://bidridge.com`
+> and `https://www.bidridge.com` (added 2026-09-17 with the domain move),
+> `https://bidrender.com` and `https://www.bidrender.com` (kept — they redirect,
+> but a rule costs nothing and removing it is a way to break an old link nobody
+> has retired yet), the `ondigitalocean.app` host, and
+> `http://localhost:3000`.
+>
+> Kept in these docs because it explains a failure that looks like an app bug
+> and is not — and because **a new origin needs the rule adding by hand.** A
+> staging site or another renamed domain will upload plans fine under 25MB via
+> the fallback and fail above it, which is the confusing way round.
 
 Without it, plan PDF upload fails for every file at every size, having
 transferred zero bytes, because the bucket does not publish a CORS rule for the
