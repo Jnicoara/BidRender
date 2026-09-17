@@ -48,6 +48,8 @@ import {
   Loader2,
   Plus,
   MapPin,
+  Maximize2,
+  Minus,
   Trash2,
   Upload,
   X,
@@ -69,6 +71,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  BUTTON_ZOOM_STEP,
+  clampView,
+  fitView,
+  formatZoom,
+  wheelZoomFactor,
+  zoomAbout,
+  type PlanView,
+  type ViewBounds,
+} from "@/lib/planView";
 import { SheetIndex } from "@/components/takeoff/SheetIndex";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
 import { UploadProgress } from "@/components/takeoff/UploadProgress";
@@ -341,6 +353,15 @@ function PlanPane({
     height: number;
     renderScale: number;
     canvas: HTMLCanvasElement | null;
+    /**
+     * Where to put anything that must stay screen-sized.
+     *
+     * The overlay is rendered INSIDE the zoom transform so its marks sit on the
+     * drawing — which is right for a stamp and wrong for a button. Chrome left
+     * in the transform is 3 pixels tall at 20% and off-screen at 400%. Portal
+     * it here instead: this layer sits over the viewport, untransformed.
+     */
+    chromeTarget: HTMLElement | null;
   }) => React.ReactNode;
   /**
    * Ask the server for a fresh URL for this document, and return it.
@@ -355,6 +376,220 @@ function PlanPane({
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const { load, loadUrl, render, outline, pageText } = usePdfWorker();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  /** State, not a ref: the overlay has to re-render once this layer exists. */
+  const [chromeLayer, setChromeLayer] = useState<HTMLElement | null>(null);
+  const [view, setView] = useState<PlanView>({ zoom: 1, x: 0, y: 0 });
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const [panning, setPanning] = useState(false);
+  /** Where the drag started, and the view it started from. */
+  const panFrom = useRef<{
+    pointerX: number;
+    pointerY: number;
+    view: PlanView;
+  } | null>(null);
+
+  /** Viewport and drawing sizes, read fresh — the pane is resizable. */
+  const readBounds = useCallback((): ViewBounds | null => {
+    const vp = viewportRef.current;
+    if (!vp || canvasSize.width === 0) return null;
+    return {
+      viewportWidth: vp.clientWidth,
+      viewportHeight: vp.clientHeight,
+      contentWidth: canvasSize.width,
+      contentHeight: canvasSize.height,
+    };
+  }, [canvasSize.width, canvasSize.height]);
+
+  const fitToView = useCallback(() => {
+    const bounds = readBounds();
+    if (bounds) setView(fitView(bounds));
+  }, [readBounds]);
+
+  /**
+   * Fit whenever a different page is drawn.
+   *
+   * Keyed on the canvas size rather than the page number, because that is what
+   * actually changes when a new raster lands — and a sheet of a different size
+   * needs a different fit, which a page number would not tell us.
+   */
+  useEffect(() => {
+    fitToView();
+  }, [canvasSize.width, canvasSize.height, fitToView]);
+
+  /** Re-clamp when the pane is resized, so a drag cannot strand the sheet. */
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      const bounds = readBounds();
+      if (bounds) setView(current => clampView(current, bounds));
+    });
+    observer.observe(vp);
+    return () => observer.disconnect();
+  }, [readBounds]);
+
+  /**
+   * Wheel zoom, attached by hand because it must not be passive.
+   *
+   * React's own onWheel is registered passively, where preventDefault is
+   * ignored — so the page behind would scroll while the drawing zoomed.
+   */
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const onWheel = (e: WheelEvent) => {
+      const bounds = readBounds();
+      if (!bounds) return;
+      e.preventDefault();
+      const rect = vp.getBoundingClientRect();
+      const anchor = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      setView(current =>
+        zoomAbout(current, bounds, wheelZoomFactor(e.deltaY), anchor)
+      );
+    };
+    vp.addEventListener("wheel", onWheel, { passive: false });
+    return () => vp.removeEventListener("wheel", onWheel);
+  }, [readBounds]);
+
+  /** Zoom a step about the middle of the viewport, for the buttons and keys. */
+  const zoomByStep = useCallback(
+    (factor: number) => {
+      const bounds = readBounds();
+      if (!bounds) return;
+      setView(current =>
+        zoomAbout(current, bounds, factor, {
+          x: bounds.viewportWidth / 2,
+          y: bounds.viewportHeight / 2,
+        })
+      );
+    },
+    [readBounds]
+  );
+
+  /**
+   * Space is the "pan regardless" modifier.
+   *
+   * Without it the only way to pan is a drag on empty drawing, which is exactly
+   * what you cannot do while a tool is armed — and mid-trace is when you most
+   * need to move the sheet.
+   */
+  useEffect(() => {
+    const typing = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+    };
+    const down = (e: KeyboardEvent) => {
+      if (typing(e.target)) return;
+      if (e.code === "Space") {
+        e.preventDefault();
+        setSpaceHeld(true);
+        return;
+      }
+      if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        zoomByStep(BUTTON_ZOOM_STEP);
+      } else if (e.key === "-" || e.key === "_") {
+        e.preventDefault();
+        zoomByStep(1 / BUTTON_ZOOM_STEP);
+      } else if (e.key === "0") {
+        e.preventDefault();
+        fitToView();
+      }
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === "Space") setSpaceHeld(false);
+    };
+    // Cleared on blur too: a Space held while the window loses focus never
+    // sends its keyup, and the cursor would stay stuck in grab mode forever.
+    const clear = () => setSpaceHeld(false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", clear);
+    };
+  }, [zoomByStep, fitToView]);
+
+  /** Mirrors `view` so the drag handlers can read it without re-subscribing. */
+  const viewRef = useRef(view);
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
+
+  const startPan = useCallback((e: PointerEvent | React.PointerEvent) => {
+    panFrom.current = {
+      pointerX: e.clientX,
+      pointerY: e.clientY,
+      view: viewRef.current,
+    };
+    setPanning(true);
+  }, []);
+
+  /**
+   * A plain left-drag pans — but only when it reaches us.
+   *
+   * No check for "is a tool armed" is needed, and that is not laziness: while
+   * tracing or stamping, TraceLayer's overlay takes the event and this never
+   * fires. If the event got here, nothing else wanted it.
+   */
+  const beginPlainPan = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.button !== 0 || spaceHeld) return;
+      startPan(e);
+    },
+    [spaceHeld, startPan]
+  );
+
+  /** Space-drag and middle-drag pan even while a tool is armed. */
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const onDown = (e: PointerEvent) => {
+      if (e.button !== 1 && !spaceHeld) return;
+      e.preventDefault();
+      e.stopPropagation();
+      startPan(e);
+    };
+    vp.addEventListener("pointerdown", onDown, true);
+    return () => vp.removeEventListener("pointerdown", onDown, true);
+  }, [spaceHeld, startPan]);
+
+  /** The drag itself, on the window so it survives leaving the viewport. */
+  useEffect(() => {
+    if (!panning) return;
+    const move = (e: PointerEvent) => {
+      const from = panFrom.current;
+      const bounds = readBounds();
+      if (!from || !bounds) return;
+      setView(
+        clampView(
+          {
+            zoom: from.view.zoom,
+            x: from.view.x + (e.clientX - from.pointerX),
+            y: from.view.y + (e.clientY - from.pointerY),
+          },
+          bounds
+        )
+      );
+    };
+    const end = () => {
+      panFrom.current = null;
+      setPanning(false);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+    };
+  }, [panning, readBounds]);
   const [pageCount, setPageCount] = useState(doc.pageCount ?? 0);
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
@@ -598,13 +833,64 @@ function PlanPane({
         </Button>
 
         {rendering && !loading && (
-          <span className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Loader2 className="w-3 h-3 animate-spin" /> Drawing…
           </span>
         )}
+
+        {/* Zoom. Sits beside the page controls because both are "where am I
+            looking", and both get reached constantly while counting. */}
+        <div className="ml-auto flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={() => zoomByStep(1 / BUTTON_ZOOM_STEP)}
+            disabled={loading}
+            aria-label="Zoom out"
+            title="Zoom out (−)"
+          >
+            <Minus className="w-4 h-4" />
+          </Button>
+          <span
+            className="font-mono text-xs tabular-nums min-w-[3.5rem] text-center text-muted-foreground"
+            aria-live="polite"
+            aria-label={`Zoom ${formatZoom(view.zoom)}`}
+          >
+            {loading ? "—" : formatZoom(view.zoom)}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={() => zoomByStep(BUTTON_ZOOM_STEP)}
+            disabled={loading}
+            aria-label="Zoom in"
+            title="Zoom in (+)"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 gap-1.5 px-2 text-xs"
+            onClick={fitToView}
+            disabled={loading}
+            title="Fit the whole sheet (0)"
+          >
+            <Maximize2 className="w-3.5 h-3.5" /> Fit
+          </Button>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-muted/20 p-4 min-h-0">
+      <div
+        ref={viewportRef}
+        className={cn(
+          "flex-1 overflow-hidden bg-muted/20 min-h-0 relative",
+          panning ? "cursor-grabbing" : spaceHeld ? "cursor-grab" : null
+        )}
+        onPointerDown={beginPlainPan}
+      >
         {loading ? (
           <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
             <Loader2 className="w-6 h-6 animate-spin" />
@@ -612,19 +898,62 @@ function PlanPane({
             <p className="text-xs">Large drawings can take a few seconds.</p>
           </div>
         ) : (
-          <div className="relative mx-auto w-fit">
-            <canvas
-              ref={canvasRef}
-              className="max-w-full h-auto rounded-lg shadow-lg bg-white block"
-            />
-            {canvasSize.width > 0 &&
-              overlay?.({
-                ...canvasSize,
-                renderScale: RENDER_SCALE,
-                canvas: canvasRef.current,
-              })}
+          /*
+            ONE transform, wrapping the page and the overlay together.
+
+            This is the load-bearing decision of the whole zoom feature: the
+            drawing and the marks on it cannot drift apart, because there is no
+            arrangement of numbers in which they are scaled differently. They
+            are one box. Transforming them separately would work on the first
+            try and go wrong on the tenth, and the symptom — every stamp sitting
+            an inch off its symbol — looks exactly like corrupted data rather
+            than a display bug.
+
+            Clicks need no adjustment for any of this: TraceLayer's
+            `pointerToPage` measures the overlay's real on-screen rectangle,
+            which already reflects the transform.
+          */
+          <div
+            className="absolute top-0 left-0 origin-top-left will-change-transform"
+            style={{
+              transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`,
+            }}
+          >
+            <div className="relative w-fit">
+              <canvas
+                ref={canvasRef}
+                className="rounded-lg shadow-lg bg-white block"
+              />
+              {canvasSize.width > 0 &&
+                overlay?.({
+                  ...canvasSize,
+                  /*
+                    STEP 5 WILL CHANGE THIS LINE. When the render resolution
+                    becomes dynamic, this must pass the scale the page was
+                    ACTUALLY drawn at, not the constant — and so must both
+                    `snapshotPage` calls further down this file, or the plan
+                    reader is told the wrong scale for the image it is given
+                    and every proposed stamp lands in the wrong place.
+
+                    Safe today precisely because the resolution is pinned:
+                    `snapshotPage` reads `canvas.width`, the bitmap's intrinsic
+                    size, which a CSS transform never touches.
+                  */
+                  renderScale: RENDER_SCALE,
+                  canvas: canvasRef.current,
+                  chromeTarget: chromeLayer,
+                })}
+            </div>
           </div>
         )}
+
+        {/* Screen-space chrome, outside the transform. Click-through by
+            default; anything inside it that needs clicking turns pointer
+            events back on for itself. */}
+        <div
+          ref={setChromeLayer}
+          className="absolute inset-0 pointer-events-none z-10"
+        />
       </div>
     </div>
   );
@@ -721,8 +1050,20 @@ export default function TakeoffPage({
     );
   const activeSheet = sheets.find(s => s.pageNumber === page) ?? null;
 
+  /**
+   * A sheet changed — usually its scale.
+   *
+   * Two queries, not one, and forgetting the second is a bug that shipped:
+   * `measurability` is derived from the sheet's scale but cached separately, so
+   * refreshing only the sheet list updated the scale control while leaving the
+   * "no scale set" warning on screen reading a stale answer. The user had set
+   * the scale and the app still said they had not.
+   *
+   * Anything else deriving from a sheet belongs here too.
+   */
   const refreshSheets = () => {
     if (doc) void utils.bidPdfs.sheets.invalidate({ bidPdfId: doc.id });
+    void utils.takeoffRuns.measurability.invalidate();
   };
 
   const createTicket = trpc.bidPdfs.createUploadTicket.useMutation();
@@ -2155,6 +2496,7 @@ export default function TakeoffPage({
                             selectedStampId={selectedStampId}
                             onSelectStamp={setSelectedStampId}
                             focusPoint={focusPoint}
+                            chromeTarget={size.chromeTarget}
                           />
                         </>
                       ) : null
@@ -2191,20 +2533,28 @@ export default function TakeoffPage({
                             <Cable className="w-3.5 h-3.5 text-emerald-400" />{" "}
                             Trace cable
                           </Button>
-                          {stampAssembly ? (
-                            <Button
-                              size="sm"
-                              className="h-7 gap-1.5 text-xs"
-                              onClick={() => setStampAssembly(null)}
-                            >
-                              <MapPin className="w-3.5 h-3.5" />
-                              Stamping {stampAssembly.name}
-                              <X className="w-3 h-3" />
-                            </Button>
-                          ) : null}
                           <div className="w-px h-4 bg-border" />
                         </>
                       )}
+
+                      {/* Outside the measurability gate on purpose. Counting
+                          devices needs no scale, so the control that says what
+                          is being stamped — and the only way to stop — must not
+                          disappear on an unscaled sheet. */}
+                      {stampAssembly ? (
+                        <>
+                          <Button
+                            size="sm"
+                            className="h-7 gap-1.5 text-xs"
+                            onClick={() => setStampAssembly(null)}
+                          >
+                            <MapPin className="w-3.5 h-3.5" />
+                            Stamping {stampAssembly.name}
+                            <X className="w-3 h-3" />
+                          </Button>
+                          <div className="w-px h-4 bg-border" />
+                        </>
+                      ) : null}
 
                       <ScaleControl
                         sheet={activeSheet}

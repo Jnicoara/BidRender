@@ -13,11 +13,23 @@
  * would reveal it.
  *
  * ── The gate ────────────────────────────────────────────────────────────────
- * When the sheet cannot be measured this renders no tools at all and says why.
- * Not a disabled cursor — an explanation and the way out, because the fix is
- * on another control and the user has to know which.
+ * When the sheet cannot be measured, TRACING is off and a note says why — an
+ * explanation and the way out rather than a disabled cursor, because the fix
+ * is on another control and the user has to know which.
+ *
+ * COUNTING is not gated, and used to be by accident. This component returned
+ * early on an unmeasurable sheet and rendered nothing at all, which took the
+ * stamp tool and every already-placed mark with it. Counting receptacles has
+ * nothing to do with distance.
+ *
+ * ── Two layers, and the split matters ───────────────────────────────────────
+ * The SVG sits inside the viewer's zoom transform, so a mark stays on its
+ * symbol at every magnification for free. The pills and buttons are portalled
+ * OUT to an untransformed layer (`chromeTarget`), because chrome that scales
+ * with the drawing is three pixels tall at 20% and off-screen at 400%.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Check, Ruler, TriangleAlert, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -94,6 +106,7 @@ export function TraceLayer({
   selectedStampId,
   onSelectStamp,
   focusPoint,
+  chromeTarget,
 }: {
   /** Canvas size in device pixels — the overlay matches it exactly. */
   width: number;
@@ -121,6 +134,8 @@ export function TraceLayer({
   onSelectStamp: (id: number | null) => void;
   /** Highlighted after a jump from the counted-items list. */
   focusPoint: { x: number; y: number } | null;
+  /** Untransformed layer for screen-sized chrome. See `withChrome` below. */
+  chromeTarget?: HTMLElement | null;
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   /** Where the pointer is, for the rubber-band segment from the last vertex. */
@@ -191,32 +206,34 @@ export function TraceLayer({
     return () => window.removeEventListener("keydown", onKey, true);
   }, [tracing, points, onPointsChange, onCancel, onFinish]);
 
-  // ── Blocked ───────────────────────────────────────────────────────────────
-  if (!measurability.ok) {
-    return (
-      <div className="absolute inset-0 flex items-start justify-center pt-10 pointer-events-none">
-        <div className="max-w-sm rounded-xl border border-[#F5C518]/40 bg-card/95 px-4 py-3 shadow-lg pointer-events-auto">
-          <div className="flex items-start gap-2">
-            <TriangleAlert className="w-4 h-4 shrink-0 mt-0.5 text-[#F5C518]" />
-            <div>
-              <p className="text-sm font-medium">
-                {measurability.reason === "not-to-scale"
-                  ? "This sheet is marked not to scale"
-                  : "No scale set for this sheet"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {measurability.message}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
-                <Ruler className="w-3 h-3" />
-                Use the scale control below the drawing.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  /**
+   * ── Not measurable ────────────────────────────────────────────────────────
+   * Only TRACING is blocked, and only tracing ever was — measuring needs a
+   * scale and counting does not. This used to return early and render nothing
+   * at all, which took the stamp tool and every already-placed mark down with
+   * it: on a sheet with no scale you could not count a receptacle, and could
+   * not see the ones you had already counted. Counting devices has nothing to
+   * do with distance.
+   *
+   * So the overlay always renders. `tracing` is gated by the caller, and this
+   * is a note rather than a wall.
+   */
+  const blocked = !measurability.ok ? measurability : null;
+
+  /**
+   * The SVG scales with the drawing; everything else must not.
+   *
+   * The marks belong ON the page — a stamp has to sit on its symbol at every
+   * zoom, which is exactly what being inside the transform gives for free. The
+   * pills and buttons belong on the SCREEN. Left in the transform they were 3
+   * pixels tall at 20% zoom and somewhere off the edge at 400%.
+   *
+   * `chromeTarget` is the untransformed layer over the viewport. Without one,
+   * chrome renders in place — which keeps this component usable on its own and
+   * is correct whenever there is no zoom to fight.
+   */
+  const withChrome = (chrome: React.ReactNode) =>
+    chromeTarget ? createPortal(chrome, chromeTarget) : chrome;
 
   return (
     <>
@@ -408,69 +425,105 @@ export function TraceLayer({
         )}
       </svg>
 
-      {stamping && stampAssemblyName && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-[#F5C518]/50 bg-card/95 px-3 py-1.5 shadow-lg">
-          <span className="text-xs text-muted-foreground">Stamping</span>
-          <span className="text-sm font-medium">{stampAssemblyName}</span>
-          <span className="text-[0.7rem] text-muted-foreground">
-            click to place · Esc to stop
-          </span>
-        </div>
-      )}
+      {withChrome(
+        <>
+          {/*
+          Out of the drawing, into a corner.
+  
+          It used to sit pinned across the top-centre of the sheet, over the
+          drawing the user is trying to read, and swallowed clicks in that whole
+          region. A warning that covers the work is a warning people learn to
+          resent. Bottom-left, narrow, and click-through except for its own text.
+        */}
+          {blocked && !stamping && (
+            <div className="absolute bottom-3 left-3 max-w-xs pointer-events-none">
+              <div className="rounded-lg border border-[#F5C518]/40 bg-card/95 px-3 py-2 shadow-lg pointer-events-auto">
+                <div className="flex items-start gap-2">
+                  <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#F5C518]" />
+                  <div>
+                    <p className="text-xs font-medium">
+                      {blocked.reason === "not-to-scale"
+                        ? "This sheet is marked not to scale"
+                        : "No scale set — tracing is off"}
+                    </p>
+                    <p className="text-[0.7rem] text-muted-foreground mt-0.5">
+                      Counting still works. {blocked.message}
+                    </p>
+                    <p className="text-[0.7rem] text-muted-foreground mt-1 flex items-center gap-1">
+                      <Ruler className="w-3 h-3" />
+                      Set it on the scale control below the drawing.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
-      {/* Live readout. Sits over the drawing because the number IS the task —
-          making the user look elsewhere to see what they are measuring is how
-          a wrong run gets committed. */}
-      {tracing && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg">
-          <span className="text-xs text-muted-foreground">
-            {pathType === "conduit" ? "Conduit run" : "Cable run"}
-          </span>
-          <span className="font-mono text-sm tabular-nums">
-            {liveInches === null ? "—" : formatFeetInches(liveInches)}
-          </span>
-          <span className="text-[0.7rem] text-muted-foreground">
-            {points.length} {points.length === 1 ? "point" : "points"}
-          </span>
-
-          <div className="w-px h-4 bg-border" />
-
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 w-6 p-0"
-            onClick={() => onPointsChange(points.slice(0, -1))}
-            disabled={points.length === 0}
-            title="Undo last point (Backspace)"
-            aria-label="Undo last point"
-          >
-            <Undo2 className="w-3.5 h-3.5" />
-          </Button>
-          <Button
-            size="sm"
-            className="h-6 gap-1 text-xs"
-            onClick={onFinish}
-            disabled={points.length < 2}
-            title="Finish this run (Enter or double-click)"
-          >
-            <Check className="w-3 h-3" /> Finish
-            {committedInches !== null && points.length >= 2 && (
-              <span className="font-mono">
-                {formatFeetInches(committedInches)}
+          {stamping && stampAssemblyName && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-[#F5C518]/50 bg-card/95 px-3 py-1.5 shadow-lg">
+              <span className="text-xs text-muted-foreground">Stamping</span>
+              <span className="text-sm font-medium">{stampAssemblyName}</span>
+              <span className="text-[0.7rem] text-muted-foreground">
+                click to place · Esc to stop
               </span>
-            )}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 w-6 p-0 text-muted-foreground"
-            onClick={onCancel}
-            title="Discard this run (Escape twice)"
-            aria-label="Discard this run"
-          >
-            <X className="w-3.5 h-3.5" />
-          </Button>
-        </div>
+            </div>
+          )}
+
+          {/* Live readout. Sits over the drawing because the number IS the task —
+            making the user look elsewhere to see what they are measuring is how
+            a wrong run gets committed. */}
+          {tracing && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg">
+              <span className="text-xs text-muted-foreground">
+                {pathType === "conduit" ? "Conduit run" : "Cable run"}
+              </span>
+              <span className="font-mono text-sm tabular-nums">
+                {liveInches === null ? "—" : formatFeetInches(liveInches)}
+              </span>
+              <span className="text-[0.7rem] text-muted-foreground">
+                {points.length} {points.length === 1 ? "point" : "points"}
+              </span>
+
+              <div className="w-px h-4 bg-border" />
+
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0"
+                onClick={() => onPointsChange(points.slice(0, -1))}
+                disabled={points.length === 0}
+                title="Undo last point (Backspace)"
+                aria-label="Undo last point"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                size="sm"
+                className="h-6 gap-1 text-xs"
+                onClick={onFinish}
+                disabled={points.length < 2}
+                title="Finish this run (Enter or double-click)"
+              >
+                <Check className="w-3 h-3" /> Finish
+                {committedInches !== null && points.length >= 2 && (
+                  <span className="font-mono">
+                    {formatFeetInches(committedInches)}
+                  </span>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0 text-muted-foreground"
+                onClick={onCancel}
+                title="Discard this run (Escape twice)"
+                aria-label="Discard this run"
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </>
   );
