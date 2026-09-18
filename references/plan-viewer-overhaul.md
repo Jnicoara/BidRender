@@ -1185,6 +1185,26 @@ scale. The bar is now:
   confusion this grouping exists to remove, so the word was handed over before
   it could be claimed.
 
+**What only showed up in the running app, and the reason this got looked at
+at all.** The regrouping typechecked, and it was wrong. Moved to the right-hand
+group, Calibrate kept the `outline` variant it had worn among the tools — and
+on that side every other control is borderless, so it became **the only bordered
+button in the bar**. On a specifications sheet, with Conduit and Cable dimmed
+and the scale chip deliberately grey, the loudest thing on screen was the button
+that starts a calibration. **The nagging this whole change set out to remove,
+arriving by a side door.** It is `ghost` now, at the weight of its neighbours.
+
+The same look found a second fault: Calibrate was carrying `Ruler`, and so is
+the scale chip immediately beside it. `Ruler` means THE SCALE everywhere in this
+app — `SheetChip`, `SheetIndex`, `ScaleControl`, the materials list — so the two
+controls sat two inches apart wearing the same glyph for different things.
+Calibrate is `MoveHorizontal` now, a dimension line, which is what is actually
+being clicked; `CalibrateLayer` changed with it so the button and the mode it
+opens still agree.
+
+> **Neither of these is visible in a diff, and both are obvious in a
+> screenshot.** A layout change is not verified by `pnpm check`.
+
 **And the two run icons are now DRAWN rather than picked.** § 4a.1 records three
 rounds of choosing the nearest thing in lucide and is superseded by this: the
 library has no picture of a length of conduit or of a cable with its conductors

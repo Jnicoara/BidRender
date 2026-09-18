@@ -3,11 +3,16 @@
  * devsession.mjs — mint a local session token for BidRender.
  *
  * WHY THIS EXISTS
- * The app is OAuth-only and there is no local OAuth server in development.
- * Without a session you cannot reach a single screen or API route. But the
- * session cookie is a plain HS256 JWT that the app signs AND verifies itself
- * (server/_core/sdk.ts: signSession / verifySession), so a token minted here
- * with the same JWT_SECRET is indistinguishable from a real login.
+ * Without a session you cannot reach a single screen or API route, and a script
+ * cannot log in: sign-in is email and password (server/routers/authRouter.ts),
+ * so there is no credential-free door. But the session cookie is a plain HS256
+ * JWT that the app signs AND verifies itself (server/_core/sdk.ts: signSession /
+ * verifySession), so a token minted here with the same JWT_SECRET is
+ * indistinguishable from a real sign-in.
+ *
+ * Corrected 2026-09-18: this said the app is OAuth-only. It is not, and has not
+ * been since v5.127. The mechanism below is unaffected — only the reason was
+ * wrong — but see CLAUDE.md on why that particular wrong sentence is costly.
  *
  * THREE THINGS THE TOKEN MUST GET RIGHT — each one silently 401s otherwise:
  *   1. Signed with the same JWT_SECRET the server is running with.
@@ -15,8 +20,9 @@
  *      rejects the whole token if any is blank, logging only
  *      "[Auth] Session payload missing required fields".
  *   3. openId must already exist in the `users` table. For an unknown openId
- *      the server tries to sync the user from the OAuth server, which is not
- *      running, so auth fails with "Failed to sync user info".
+ *      the server still takes the vestigial OAuth branch and tries to sync the
+ *      user from an OAuth server that is not running, so auth fails with
+ *      "Failed to sync user info". Use --list-users.
  *
  * Usage:
  *   node .claude/skills/run-bidrender/devsession.mjs --list-users

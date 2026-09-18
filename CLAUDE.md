@@ -38,6 +38,57 @@ Run a single test file: `pnpm vitest run server/materials.test.ts`. Tests use `a
 
 There is no separate lint script; `pnpm check` (TypeScript strict mode) is the correctness gate.
 
+## Seeing a change in the running app — the session is the hard part
+
+**You cannot reach a single screen without minting a session yourself**, and
+working that out from scratch costs half an hour. It is already solved:
+
+```bash
+node .claude/skills/run-bidrender/devsession.mjs --list-users   # which openId is real
+node .claude/skills/run-bidrender/devsession.mjs <openId>       # prints the token + snippet
+node .claude/skills/run-bidrender/smoke.mjs                     # drive the API, no browser
+```
+
+`.claude/skills/run-bidrender/SKILL.md` is the full reference — starting the
+server, driving the API, driving the browser, and the gotchas. **Read it before
+running the app**; it is a skill rather than a doc, so nothing surfaces it
+unless you go looking, and that is how it came to be re-derived by hand on
+2026-09-18.
+
+**Two things in that skill are out of date** — corrected there, repeated here
+because they are the ones that mislead:
+
+- **"The app is OAuth-only" is false.** Sign-in is email and password in our own
+  `users` table (§ Architecture). Minting still works for the same underlying
+  reason — the session cookie is a plain HS256 JWT the app signs and verifies
+  itself — but `VITE_OAUTH_PORTAL_URL` and `OAUTH_SERVER_URL` are no longer
+  needed, and `pnpm dev` on its own is enough.
+- **`.env` is no longer just `DATABASE_URL`.** It now carries `JWT_SECRET`,
+  `VITE_APP_ID`, `LOCAL_STORAGE_DIR`, `DISABLE_AI_FEATURES`,
+  `DISABLE_SCHEDULED_JOBS` and `CRON_SECRET`, so the four-variable command line
+  the skill shows is unnecessary.
+
+**A session token is a bearer credential even locally.** Do not paste one into a
+file that outlives the check, and delete whatever you wrote it into. Setting the
+cookie from a page served on ANOTHER localhost port works and keeps the token
+out of the transcript — cookie scope ignores the port.
+
+**There is a fixture bid for exactly this: "Bar layout check" (user 1),** with
+the Old Blueridge school 5-sheet set attached from `.local-storage`. It exists
+because `bids` had nothing for user 1, so every visual check of the plan viewer
+started by building one. **Leave it.** Sheet 1 is E0.01 — general notes and
+legend, no scale — which is the sheet type most viewer changes need to be
+checked against, and sheets 2–5 are drawings. If its plan 404s, the
+`storageKey` column holds the key with real spaces; `diskStorage` percent-
+encodes them when deriving the path, so the on-disk name contains `%20` and the
+column must not.
+
+**`pnpm check` does not verify a layout change.** Established twice on
+2026-09-18: a regrouped toolbar typechecked clean and had shipped the wrong
+visual weight on its most important control, and two hand-drawn icons that
+looked right at 72px read as a plug and a bowtie at the 14px they are actually
+used at. Render it and look at it, at the size it ships.
+
 ## Changelog — do this on every meaningful commit
 
 Whenever you commit a meaningful change, **also add a one-or-two-line plain-English entry to `CHANGELOG.md`** describing what changed, in addition to the normal commit message. Do this automatically, as part of the same commit — do not wait to be asked.
@@ -291,7 +342,7 @@ fields off `InvokeParams` and ignored the rest — `thinking` sat in that gap fo
 the life of the file, advertised by the type, settable by any caller, and
 going nowhere. It was found by accident, while costing something else, because
 its only symptom was money. `toolChoice` was in the same position and is
-*passed today* by two callers; it happens not to matter only because `"auto"`
+_passed today_ by two callers; it happens not to matter only because `"auto"`
 is Anthropic's default anyway, so the change that would have been silently
 ignored is the next one somebody makes.
 

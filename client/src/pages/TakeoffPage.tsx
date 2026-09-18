@@ -59,6 +59,7 @@ import {
   Maximize2,
   Minimize2,
   Minus,
+  MoveHorizontal,
   Trash2,
   Upload,
   X,
@@ -3220,11 +3221,28 @@ export default function TakeoffPage({
               honestly. Two buttons both called some flavour of measure is the
               confusion this grouping exists to remove, so the word is handed
               over before it gets claimed.
+
+              **`ghost`, not `outline`, and that changed AFTER looking at it.**
+              It kept the outline it wore among the tools, and on the right it
+              became the only bordered control in a row of borderless ones —
+              so on a specifications sheet, the loudest thing in the whole bar
+              was the button that starts a calibration. That is the exact
+              nagging this change set out to remove, arriving by a side door.
+              Ghost puts it at the weight of its neighbours: findable, not
+              insistent.
+
+              **And it no longer borrows the Ruler.** `Ruler` means THE SCALE
+              everywhere in this app — SheetChip, SheetIndex, ScaleControl, the
+              materials list — so sitting a second one immediately beside the
+              scale chip put the same glyph twice in two inches meaning two
+              different things. `MoveHorizontal` is a dimension line, which is
+              literally what is being clicked. Changed in CalibrateLayer too,
+              so the button and the mode it opens still agree.
             */}
             {activeSheet && !tracing && !calibrating && (
               <Button
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 className="h-7 gap-1.5 text-xs"
                 onClick={() => {
                   setCalibratePoints([]);
@@ -3233,7 +3251,8 @@ export default function TakeoffPage({
                 }}
                 title="Set this sheet's scale by clicking two points you know the distance between"
               >
-                <Ruler className="w-3.5 h-3.5 text-[#38BDF8]" /> Calibrate
+                <MoveHorizontal className="w-3.5 h-3.5 text-[#38BDF8]" />{" "}
+                Calibrate
               </Button>
             )}
 

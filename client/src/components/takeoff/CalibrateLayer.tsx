@@ -27,7 +27,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { CrosshairGuides } from "./CrosshairGuides";
-import { Check, Ruler, RotateCcw, TriangleAlert, X } from "lucide-react";
+import {
+  Check,
+  MoveHorizontal,
+  RotateCcw,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { selectOnFocus } from "@/lib/selectOnFocus";
@@ -173,7 +179,9 @@ export function CalibrateLayer({
     <div className="absolute top-3 left-1/2 -translate-x-1/2 w-[26rem] max-w-[calc(100%-1.5rem)] pointer-events-auto">
       <div className="rounded-xl border border-border bg-card/95 shadow-xl p-3 space-y-2">
         <div className="flex items-center gap-2">
-          <Ruler className="w-4 h-4 text-[#38BDF8] shrink-0" />
+          {/* Matches the Calibrate button that opened this. NOT `Ruler`,
+              which means the scale itself everywhere else in the app. */}
+          <MoveHorizontal className="w-4 h-4 text-[#38BDF8] shrink-0" />
           <p className="text-sm font-medium flex-1">Set scale by measuring</p>
           <Button
             size="sm"

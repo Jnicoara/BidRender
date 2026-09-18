@@ -8,10 +8,22 @@ description: Build, run, drive, screenshot, or smoke-test the BidRender (formerl
 Express + tRPC server with a React/Vite client, served by a **single dev
 process** (Vite runs as Express middleware). MySQL via Drizzle.
 
-**The app is OAuth-only and there is no OAuth server in development.** You
-cannot reach a single screen or API route without minting a session yourself.
-That is the whole difficulty of running this app, and both tools here exist
-to solve it:
+**You cannot reach a single screen or API route without a session, and there is
+no way to log in from a script.** That is the whole difficulty of running this
+app, and both tools here exist to solve it.
+
+> **Corrected 2026-09-18.** This section used to say the app is OAuth-only.
+> **It is not**, and has not been since v5.127 — sign-in is email and password
+> against our own `users` table (`server/routers/authRouter.ts`). CLAUDE.md
+> names that belief as the single most expensive wrong sentence in these docs,
+> because it makes a finished job look like "first build a login system".
+>
+> **The minting below still works, for a reason that survived the change:** the
+> session cookie is a plain HS256 JWT that the app signs AND verifies itself
+> (`server/_core/sdk.ts`), so a token minted with the same `JWT_SECRET` is
+> indistinguishable from a real sign-in. What changed is that logging in
+> properly now needs a password rather than an OAuth server — which a script
+> still cannot do, so this is still the path.
 
 | Tool                                          | Use it for                                                                |
 | --------------------------------------------- | ------------------------------------------------------------------------- |
@@ -23,8 +35,14 @@ All paths below are relative to the repo root.
 ## Prerequisites
 
 - Node 20+ and `pnpm` (repo is pinned to pnpm; `npx pnpm <cmd>` works too).
-- A reachable MySQL, with `DATABASE_URL` in `.env`. **This is the only var
-  the repo ships with, and everything else below must be supplied by you.**
+- A reachable MySQL, with `DATABASE_URL` in `.env`.
+
+> **Corrected 2026-09-18.** `.env` used to ship `DATABASE_URL` and nothing
+> else. It now also carries `JWT_SECRET`, `VITE_APP_ID`, `LOCAL_STORAGE_DIR`,
+> `DISABLE_AI_FEATURES`, `DISABLE_SCHEDULED_JOBS` and `CRON_SECRET` — so
+> `pnpm dev` on its own is enough, and the four-variable command line below is
+> only needed if you are deliberately running with different values. Mint with
+> the same `JWT_SECRET` the server is using, whichever that is.
 
 ```bash
 pnpm install
@@ -53,16 +71,17 @@ them; the seeder repairs the data itself on the next start.
 
 ## Run the server (agent path)
 
-The four auth vars are **not optional** — without them the app either
-hard-crashes or refuses every request. Values are arbitrary; they only have
-to match between the server and the token you mint.
+```bash
+pnpm dev
+```
+
+`.env` supplies `JWT_SECRET` and `VITE_APP_ID`, which is all the running server
+needs today — `OAUTH_SERVER_URL` unset simply logs "Manus login is off" and
+carries on. To run with different values, set them on the command line and mint
+your token with the SAME `JWT_SECRET`; a mismatch is a silent 401.
 
 ```bash
-JWT_SECRET=local-dev-secret \
-VITE_APP_ID=local-dev \
-VITE_OAUTH_PORTAL_URL=http://localhost:9999 \
-OAUTH_SERVER_URL=http://localhost:9999 \
-pnpm dev
+JWT_SECRET=local-dev-secret VITE_APP_ID=local-dev pnpm dev
 ```
 
 Wait for `Server running on http://localhost:3000/`. **Read that line** — the
@@ -123,8 +142,18 @@ pnpm test                                   # vitest, server/**/*.test.ts only
 pnpm vitest run server/materialsRouter.test.ts
 ```
 
-`pnpm test` hits the **real database** (vitest loads `dotenv/config`). It is
-not mocked and it writes rows.
+**`pnpm test` WRITES TO WHATEVER `DATABASE_URL` POINTS AT** — `vitest.config.ts`
+loads `dotenv/config`, so every run reads `.env`, and `.env` points at the local
+dev database. Nothing is mocked; the suites create, update and delete real rows.
+There is no separate test database. To keep a run off your dev data, give it its
+own (`dotenv/config` will not overwrite a variable already set):
+
+```bash
+DATABASE_URL='mysql://user:pass@127.0.0.1:3307/bidrender_test' pnpm test
+```
+
+`pnpm db:push` against that URL once first, to create the tables. See todo.md
+§ "Working on this repo — traps".
 
 ## Gotchas
 
@@ -152,9 +181,12 @@ foreach ($p in 3000..3005) { $c = Get-NetTCPConnection -LocalPort $p -State List
 - **`materials.userId` is a real foreign key.** Inserting a material for a
   user id that does not exist fails with `ER_NO_REFERENCED_ROW_2`. Test
   suites must create their fixture users first.
-- **vitest runs test files in parallel.** Two suites sharing a fixture user id
-  will delete each other's rows mid-run. Existing suites deliberately use
-  distinct ids (4242/9999 vs 4243/9998); keep that up.
+- **vitest runs one test FILE at a time** — `fileParallelism: false` in
+  `vitest.config.ts`, set because DB-backed suites were racing each other and
+  producing lock-timeout failures that looked like noise. Tests within a file
+  still share the connection. Keep using distinct fixture user ids
+  (4242/9999 vs 4243/9998) anyway: the setting is a decision someone can
+  reverse, and colliding ids would then delete each other's rows mid-run.
 - **Don't put POSIX inline env vars in `package.json` scripts.** cmd.exe can't
   parse them and the script dies with `'NODE_ENV' is not recognized`. The repo
   uses `cross-env` for exactly this reason.

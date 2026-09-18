@@ -947,6 +947,40 @@ directory, so nothing touches the files you are working in.
       deleted. Tracked under "Test suite health" above; noted here too because
       this is the section someone reads when something inexplicable happens.
 
+**`pnpm test` WRITES TO WHATEVER `DATABASE_URL` POINTS AT, and in this
+checkout that is the local dev database.** Hit 2026-09-18 — the suite was run
+twice against `bidrender_local` before anyone read the warning `.env` carries
+in its own header.
+
+The mechanism, because it is not obvious from either file: `vitest.config.ts`
+sets `setupFiles: ["dotenv/config", ...]`, so **every test run loads `.env`**.
+`vitest.setup.ts` then fills only what `.env` did not supply (`||=`), so it
+never overrides the database. There is no test database and no mocking — the
+suites create, update and delete real rows, seed the baseline tables, and use
+fixture user ids (4242/9999, 4243/9998) that they delete on the way in.
+
+**What that costs.** Not much here, because `.env` points at the private MySQL
+on port 3307 and the fixture rows are already all over it. It would cost a great
+deal if `DATABASE_URL` ever pointed somewhere real, which is exactly why
+`pnpm dev` refuses to read `.env.production.local` and why
+`scripts/loadPlansEnv.mts` filters `DATABASE_URL` out of what a local run may
+borrow. **The test runner has no such guard.**
+
+To run the suite without touching the dev database, give the run its own
+database — the value is what matters, not where it comes from, since
+`dotenv/config` will not overwrite a variable already set:
+
+```bash
+DATABASE_URL='mysql://user:pass@127.0.0.1:3307/bidrender_test' pnpm test
+```
+
+`pnpm db:push` against that same URL first, once, to create the tables.
+
+- [ ] Create `bidrender_test` and make it the default for `pnpm test`, so the
+      safe path is the one you get by typing the obvious command. A guard that
+      has to be remembered is not a guard. Until then, treat a bare
+      `pnpm test` as "this writes to my dev data" — it does.
+
 **Audited 2026-09-18 and left alone: the Manus Forge gateway's copy of the same
 bug.** `server/_core/llm.ts` destructures a fixed list of `InvokeParams` fields
 exactly as `invokeAnthropic` did, so a field added to that type goes nowhere
