@@ -8,10 +8,11 @@
  * Protocol:
  *   Main → Worker:  { type: 'load', pdfData: ArrayBuffer, hash: string }
  *   Main → Worker:  { type: 'loadUrl', url: string, hash: string, byteSize?: number }
- *   Main → Worker:  { type: 'render', pageNum: number, scale: number, hash: string, reqId: string }
+ *   Main → Worker:  { type: 'render', pageNum: number, scale: number, hash: string, reqId: string, rect?: PageRect }
  *   Main → Worker:  { type: 'outline', hash: string, reqId: string }
  *   Main → Worker:  { type: 'text', pageNum: number, hash: string, reqId: string }
- *   Worker → Main:  { type: 'rendered', reqId: string, bitmap: ImageBitmap, pageNum: number, hash: string }
+ *   Worker → Main:  { type: 'rendered', reqId: string, bitmap: ImageBitmap, pageNum: number, hash: string,
+ *                     scale: number, rect: PageRect, pageWidth: number, pageHeight: number }
  *   Worker → Main:  { type: 'outline', reqId: string, entries: {pageNumber,title}[] }
  *   Worker → Main:  { type: 'text', reqId: string, pageNum: number, text: string }
  *   Worker → Main:  { type: 'error', reqId: string, message: string }
@@ -20,10 +21,30 @@
  * worker entry inside this one and posts a `{sourceName,targetName,action}`
  * handshake that reaches the parent — harmless, but it arrives before the
  * first real reply.
+ *
+ * ── `render` takes a REGION, and knows nothing about a viewport ──────────────
+ * `rect` is a rectangle of the page in page points (see `@shared/planRegion`),
+ * and omitting it means the whole sheet. The viewer asks for the part someone
+ * is looking at; the plan reader's tiler asks for a grid of rectangles on the
+ * same page. Neither is special here, deliberately: a worker taught about "the
+ * current view" would be useless to the tiler, and the work would be written
+ * twice.
+ *
+ * The reply carries the scale and the rect that were ACTUALLY used, which may
+ * not be what was asked for — the region is trimmed to the page, and the scale
+ * is reduced if the bitmap would be too large. Read them from the reply. Do not
+ * assume, and do not keep a constant in step by hand.
  */
 
 import * as pdfjs from "pdfjs-dist";
 import { pdfRangeLoadOptions } from "@shared/pdfRangeLoading";
+import {
+  clampRegion,
+  fitScaleToBudget,
+  regionPixelSize,
+  wholePage,
+  type PageRect,
+} from "@shared/planRegion";
 
 // pdfjs needs a real worker entry, even from inside a worker.
 //
@@ -157,7 +178,7 @@ self.onmessage = async (e: MessageEvent) => {
   }
 
   if (msg.type === "render") {
-    const { pageNum, scale, hash, reqId } = msg;
+    const { pageNum, scale, hash, reqId, rect } = msg;
     if (!pdfDoc || loadedHash !== hash) {
       self.postMessage({
         type: "error",
@@ -169,11 +190,49 @@ self.onmessage = async (e: MessageEvent) => {
     try {
       const t0 = performance.now();
       const page = await pdfDoc.getPage(pageNum);
-      const viewport = page.getViewport({ scale });
-      const offscreen = new OffscreenCanvas(
-        Math.ceil(viewport.width),
-        Math.ceil(viewport.height)
-      );
+
+      // The page's own size in points, rotation already applied. Everything
+      // below is expressed against this, never against the screen.
+      const base = page.getViewport({ scale: 1 });
+
+      // No rect means the whole sheet, so the old single-argument callers keep
+      // working unchanged.
+      const asked: PageRect = rect ?? wholePage(base.width, base.height);
+      const region = clampRegion(asked, base.width, base.height);
+      if (!region) {
+        self.postMessage({
+          type: "error",
+          reqId,
+          message: "That part of the sheet is off the page.",
+        });
+        return;
+      }
+
+      // Degrade rather than refuse: a slightly softer drawing beats an error
+      // where a drawing should be. The scale actually used travels back with
+      // the bitmap, so nobody has to assume they got what they asked for.
+      const usedScale = fitScaleToBudget(region, scale);
+      if (usedScale <= 0) {
+        self.postMessage({
+          type: "error",
+          reqId,
+          message: `Cannot draw at scale ${scale}.`,
+        });
+        return;
+      }
+
+      // Draw the page at full resolution but shifted, so only the wanted
+      // rectangle lands on a canvas the size of that rectangle. offsetX/offsetY
+      // are in device pixels and are added to the viewport's transform, so the
+      // shift is the region's origin scaled up, negated.
+      const viewport = page.getViewport({
+        scale: usedScale,
+        offsetX: -region.x * usedScale,
+        offsetY: -region.y * usedScale,
+      });
+      const size = regionPixelSize(region, usedScale);
+
+      const offscreen = new OffscreenCanvas(size.width, size.height);
       const ctx = offscreen.getContext("2d")!;
       await page.render({
         canvasContext: ctx as unknown as CanvasRenderingContext2D,
@@ -182,10 +241,25 @@ self.onmessage = async (e: MessageEvent) => {
       }).promise;
       const bitmap = await createImageBitmap(offscreen);
       const elapsed = (performance.now() - t0).toFixed(0);
-      // Transfer the bitmap to the main thread (zero-copy)
-      // Use structured transfer options for worker context
+      // Transfer the bitmap to the main thread (zero-copy).
+      //
+      // `scale` and `rect` ride along deliberately. A caller that has to
+      // remember what it asked for — or worse, read a shared constant — is one
+      // refactor away from telling the plan reader the wrong page size and
+      // putting every proposed stamp in the wrong place.
       (self as unknown as Worker).postMessage(
-        { type: "rendered", reqId, pageNum, hash, bitmap, elapsed },
+        {
+          type: "rendered",
+          reqId,
+          pageNum,
+          hash,
+          bitmap,
+          scale: usedScale,
+          rect: region,
+          pageWidth: base.width,
+          pageHeight: base.height,
+          elapsed,
+        },
         { transfer: [bitmap] }
       );
     } catch (err) {

@@ -498,21 +498,21 @@ electrical floor plan, 36×24 in, on a DPR-2 screen with a GPU-accelerated
 Chrome. Milliseconds are wall time from asking the worker to a pixel being
 readable back, which forces Chrome to actually finish drawing.
 
-| scale | pixels      | Mpx   | MB  | ms  |
-| ----- | ----------- | ----- | --- | --- |
-| 0.25  | 648×432     | 0.3   | 1   | 684 |
-| 0.5   | 1296×864    | 1.1   | 4   | 547 |
-| 1     | 2592×1728   | 4.5   | 17  | 531 |
-| 1.5   | 3888×2592   | 10.1  | 38  | 568 |
-| 2     | 5184×3456   | 17.9  | 68  | 608 |
-| 2.2   | 5703×3802   | 21.7  | 83  | 187 |
-| 2.5   | 6480×4320   | 28.0  | 107 | 195 |
-| 3     | 7776×5184   | 40.3  | 154 | 235 |
-| 4     | 10368×6912  | 71.7  | 273 | 305 |
-| 5     | 12960×8640  | 112.0 | 427 | 491 |
-| 6     | 15552×10368 | 161.2 | 615 | 757 |
-| 6.4   | 16589×11060 | 183.5 | 700 | 1656|
-| 7     | 18144×12096 | 219.5 | 837 | 2436|
+| scale | pixels      | Mpx   | MB  | ms    |
+| ----- | ----------- | ----- | --- | ----- |
+| 0.25  | 648×432     | 0.3   | 1   | 684   |
+| 0.5   | 1296×864    | 1.1   | 4   | 547   |
+| 1     | 2592×1728   | 4.5   | 17  | 531   |
+| 1.5   | 3888×2592   | 10.1  | 38  | 568   |
+| 2     | 5184×3456   | 17.9  | 68  | 608   |
+| 2.2   | 5703×3802   | 21.7  | 83  | 187   |
+| 2.5   | 6480×4320   | 28.0  | 107 | 195   |
+| 3     | 7776×5184   | 40.3  | 154 | 235   |
+| 4     | 10368×6912  | 71.7  | 273 | 305   |
+| 5     | 12960×8640  | 112.0 | 427 | 491   |
+| 6     | 15552×10368 | 161.2 | 615 | 757   |
+| 6.4   | 16589×11060 | 183.5 | 700 | 1656  |
+| 7     | 18144×12096 | 219.5 | 837 | 2436  |
 | 8     | 20736×13824 | —     | —   | FAILS |
 
 #### 1. Time barely depends on resolution — and below 5200px it gets WORSE
@@ -610,39 +610,105 @@ positions, and every one of them starting a 3-second render would queue a minute
 of work for a view nobody is looking at any more. Latest-wins, with a settle
 delay.
 
-### This IS the AI tiling machinery — build it once
+### This IS the AI tiling machinery — BUILT 2026-09-17
 
 Phase 10 needs exactly this: render a region of a page at high resolution.
 Tiling a sheet for the reader is the same call in a loop with different
 rectangles.
 
-**So the worker's contract should be a REGION, not a viewport.** Take
-`{ pageNum, scale, rect }` and return a bitmap. The viewer asks for the region a
-person is looking at; the tiler asks for a grid of them. Neither knows about the
-other.
+**So the worker's contract IS a REGION, not a viewport** — done, as step 2:
 
-Written down because the tempting shortcut — teaching the worker about "the
-current view" — would make it useless to the tiler and force the work twice.
+```
+Main → Worker   { type: "render", pageNum, scale, hash, reqId, rect? }
+Worker → Main   { type: "rendered", reqId, pageNum, hash, bitmap,
+                  scale, rect, pageWidth, pageHeight, elapsed }
+```
 
-### snapshotPage must be updated in the same change
+`rect` is `{x, y, width, height}` in page points, origin at the page's
+top-left — the same space `PagePoint` uses. Omitting it means the whole sheet,
+so every existing caller kept working untouched. The viewer asks for the part
+someone is looking at; the tiler will ask for a grid of rectangles on the same
+page. **Neither is special, and the worker knows about neither.** It was
+tempting to teach it about "the current view"; that would have made it useless
+to the tiler and forced the work to be written twice.
 
-Flagged in Phase 1 (`TakeoffPage.tsx`, the `renderScale` note) and **confirmed
-as handled here**.
+The maths lives in `shared/planRegion.ts` — pure, with 18 tests in
+`server/planRegion.test.ts` (in `server/` because `shared/**` is not in the
+vitest include list, so a test written beside the source would never run).
 
-`snapshotPage(canvas, RENDER_SCALE)` is called in **two places** — `runReader`
-and the co-pilot's `onAsk` — both passing the constant. It divides
-`canvas.width` by that scale to report the page's size in points. The moment
-resolution stops being fixed, passing a stale constant tells the reader the
-wrong size for the image it is given, and **every proposed stamp lands in the
-wrong place**.
+#### The scale travels with the bitmap, and that is not decoration
 
-Safe today only because the value is pinned. Both call sites take the scale the
-page was ACTUALLY drawn at.
+The worker returns the scale and rect it ACTUALLY used, which is not always
+what was asked for:
 
-**Better still: stop passing it separately.** The scale a bitmap was rendered at
-should travel WITH the bitmap, so the two cannot disagree — a constant that has
-to be kept in step by hand is the bug waiting to happen, and it has already been
-noted once.
+- the rect is trimmed to the page, so a pan past the edge does not render blank
+  paper — and an entirely off-page rect is refused rather than drawn;
+- the scale is reduced if the bitmap would exceed `MAX_REGION_PIXELS`
+  (96 Mpx / ~366 MB). It **degrades rather than refuses**, because a slightly
+  softer drawing beats an error where a drawing should be — and it says so
+  loudly in the console when it happens, per § 5a.
+
+`RENDER_SCALE` is no longer read by anything that converts between canvas
+pixels and page points. `PlanPane` keeps `drawnScale` beside the canvas, the
+outer page keeps `pageCanvasScale` beside `pageCanvas`, and **both
+`snapshotPage` call sites now read those.** The hazard flagged in Phase 1 is
+closed: there is no longer a constant anyone has to keep in step by hand.
+
+#### Verified against a real sheet, not just asserted
+
+Region renders were compared pixel-for-pixel against the same rectangle cropped
+out of a full-page render of the same sheet:
+
+| case                       | result                                  |
+| -------------------------- | --------------------------------------- |
+| middle of the sheet, 2x    | 21,918 ink pixels, **0 mismatched**     |
+| top-left corner, 3x        | 22,903 ink pixels, **0 mismatched**     |
+| bottom-right corner, 3x    | 65,925 ink pixels, **0 mismatched**     |
+| title block, 2.5x          | 79,753 ink pixels, **0 mismatched**     |
+| running off the right edge | trimmed to 192pt wide, **0 mismatched** |
+| entirely off the page      | refused, with a plain message           |
+
+The corners matter: pdf.js viewports carry a y-flip, so an offset with the
+wrong sign is invisible in the middle of a page and obvious at an edge.
+
+At 7.8x a full-page comparison is impossible — the whole page at that scale
+gets cut to 4.63x by the budget, which is the argument for this whole phase
+restated as a fact. So that case was checked by rendering the same rectangle at
+1.5x and 7.8x and correlating the two ink profiles: **0.844**, with mean ink
+falling from 11.5 to 9.5 exactly as thinner-lines-at-higher-resolution
+predicts. And it was looked at: fully legible specification text, against a
+visibly soft page behind it.
+
+**A screen-sized region at 7.8x took 83ms and 3198x1997 pixels (~24 MB).** The
+whole page cannot be drawn at 7.8x at all.
+
+#### What step 2 did NOT do
+
+Nothing on screen changed. The viewer still asks for the whole sheet at
+`RENDER_SCALE = 1.5`, because choosing the region and re-requesting it on
+zoom/pan is step 3. The contract is in place and proven; nothing uses it yet.
+
+### snapshotPage — DONE in step 2
+
+Flagged in Phase 1 (`TakeoffPage.tsx`, the `renderScale` note), scheduled here,
+and closed on 2026-09-17.
+
+`snapshotPage(canvas, renderScale)` is called in **two places** — `runReader`
+and the co-pilot's `onAsk` — and both passed the constant. It divides
+`canvas.width` by that scale to report the page's size in points, so the moment
+resolution stopped being fixed a stale constant would have told the reader the
+wrong size for the image it was given, and **every proposed stamp would land in
+the wrong place.**
+
+Both now pass `pageCanvasScale.current`, which is written by the same callback
+that stores the canvas — the scale and the picture it describes cannot be set
+apart. The overlay's `renderScale` reads `drawnScale`, set from the render that
+produced the bitmap.
+
+**The rule that made this safe is the one to keep:** the scale a bitmap was
+rendered at travels WITH the bitmap, so the two cannot disagree. A constant kept
+in step by hand is the bug waiting to happen, and this one had already been
+noted twice before it was fixed.
 
 ## 4a. Phase 4 — the layout. PROPOSAL, not yet approved
 

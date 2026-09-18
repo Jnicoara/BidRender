@@ -158,6 +158,7 @@ import {
   systemKeyForStamp,
   type LayerState,
 } from "@shared/takeoffLayers";
+import type { PageRect } from "@shared/planRegion";
 import type { PagePoint } from "@shared/takeoffGeometry";
 import type { RunPathType } from "@shared/takeoffQuantities";
 
@@ -175,6 +176,24 @@ type Document = {
 // ── Worker plumbing ──────────────────────────────────────────────────────────
 
 type Pending = { resolve: (value: any) => void; reject: (e: Error) => void };
+
+/**
+ * What comes back from a render: the picture, and the terms it was drawn on.
+ *
+ * `scale` and `rect` are what the worker ACTUALLY used, not what was requested.
+ * They ride with the bitmap so no caller has to hold a constant that could
+ * drift out of step — the mistake `snapshotPage` was one refactor away from
+ * making, which would have told the plan reader the wrong page size and put
+ * every proposed stamp in the wrong place.
+ */
+type RenderedRegion = {
+  bitmap: ImageBitmap;
+  scale: number;
+  rect: PageRect;
+  pageWidth: number;
+  pageHeight: number;
+  elapsed: string;
+};
 
 /**
  * One worker for this screen, torn down with it.
@@ -206,7 +225,17 @@ function usePdfWorker() {
         return;
       }
       if (msg.type === "rendered") {
-        pending.current.get(msg.reqId)?.resolve(msg.bitmap);
+        // The whole reply, not just the bitmap. The scale and the rect that
+        // were actually used travel WITH the picture so nothing downstream has
+        // to remember what it asked for — see @shared/planRegion.
+        pending.current.get(msg.reqId)?.resolve({
+          bitmap: msg.bitmap,
+          scale: msg.scale,
+          rect: msg.rect,
+          pageWidth: msg.pageWidth,
+          pageHeight: msg.pageHeight,
+          elapsed: msg.elapsed,
+        });
         pending.current.delete(msg.reqId);
         return;
       }
@@ -289,36 +318,60 @@ function usePdfWorker() {
       load,
       loadUrl,
       /**
-       * Rasterise a page, and say how long it took.
+       * Draw part of a page — or all of it, if no rect is given.
        *
-       * The worker has always measured this and posted an `elapsed` back; the
-       * main thread threw it away. Surfacing it costs nothing and turns every
-       * render anyone ever does into a data point — which is what Phase 3 needs
-       * before it can choose a design. See
-       * references/plan-viewer-overhaul.md § 4b: whether rendering a REGION is
-       * worth building depends on how much of a page's cost is parsing (paid
-       * regardless) versus rasterising (saved by clipping), and that is a
-       * question about real drawings rather than one to reason about.
+       * `rect` is in page points (see `@shared/planRegion`). The viewer passes
+       * the part someone is looking at; the plan reader's tiler will pass a
+       * grid of rectangles on the same page. This function does not know the
+       * difference and must not learn it.
        *
-       * Wall time rather than the worker's internal figure, because queueing is
-       * part of what the user waits for.
+       * Returns the bitmap together with the scale and rect the worker actually
+       * used, which may not be what was asked for — the region is trimmed to
+       * the page and the scale drops if the bitmap would be too large. Callers
+       * read those from here rather than holding a constant.
+       *
+       * The timing line is wall time rather than the worker's internal figure,
+       * because queueing is part of what the user waits through. It is cheap
+       * and it turns every sheet anyone opens into a measurement; keep it.
        */
-      render: async (pageNum: number, scale: number, hash: string) => {
+      render: async (
+        pageNum: number,
+        scale: number,
+        hash: string,
+        rect?: PageRect
+      ): Promise<RenderedRegion> => {
         const t0 = performance.now();
-        const bitmap = await ask<ImageBitmap>({
+        const result = await ask<RenderedRegion>({
           type: "render",
           pageNum,
           scale,
           hash,
+          rect,
         });
         const ms = Math.round(performance.now() - t0);
+        const { bitmap } = result;
         const mp = (bitmap.width * bitmap.height) / 1e6;
+        // Never let a reduced scale pass unmentioned. A drawing that is quietly
+        // softer than it was asked to be is exactly the kind of thing nobody
+        // notices until they are measuring off it.
+        const cut =
+          result.scale < scale - 1e-6
+            ? ` — ASKED ${scale}x, CUT TO ${result.scale.toFixed(2)}x to fit`
+            : "";
+        const where =
+          rect === undefined
+            ? "whole page"
+            : `region ${Math.round(result.rect.width)}x${Math.round(
+                result.rect.height
+              )}pt at ${Math.round(result.rect.x)},${Math.round(
+                result.rect.y
+              )}`;
         console.info(
-          `[plan] page ${pageNum} at ${scale}x — ${ms}ms, ` +
+          `[plan] page ${pageNum} ${where} at ${result.scale}x — ${ms}ms, ` +
             `${bitmap.width}x${bitmap.height} (${mp.toFixed(1)} Mpx, ` +
-            `${Math.round((mp * 4e6) / 1048576)} MB)`
+            `${Math.round((mp * 4e6) / 1048576)} MB)${cut}`
         );
-        return bitmap;
+        return result;
       },
       outline: (hash: string) =>
         ask<{ pageNumber: number; title: string }[]>({ type: "outline", hash }),
@@ -375,7 +428,12 @@ function PlanPane({
    * The plan reader is sent this raster rather than making its own — the worker
    * has already paid for it once. See lib/planSnapshot.ts.
    */
-  onPageRendered?: (pageNumber: number, canvas: HTMLCanvasElement) => void;
+  onPageRendered?: (
+    pageNumber: number,
+    canvas: HTMLCanvasElement,
+    /** The scale it was drawn at — see RenderedRegion. Do not assume it. */
+    scale: number
+  ) => void;
   /**
    * The tracing layer, drawn over the page at the same size. Given the canvas
    * dimensions so its coordinate space matches the rasterised page exactly —
@@ -407,6 +465,15 @@ function PlanPane({
   onUrlExpired?: () => Promise<string | null>;
 }) {
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  /**
+   * The scale the canvas on screen was actually drawn at.
+   *
+   * Starts at RENDER_SCALE because that is what the first render asks for, and
+   * is replaced by whatever the worker reports. Once sharp zoom lands this
+   * stops being a constant, and every conversion between canvas pixels and
+   * page points must already be reading it rather than the constant.
+   */
+  const [drawnScale, setDrawnScale] = useState(RENDER_SCALE);
   const { load, loadUrl, render, outline, pageText } = usePdfWorker();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -779,8 +846,10 @@ function PlanPane({
     let cancelled = false;
     setRendering(true);
 
+    // No rect: this is still the whole sheet at a fixed resolution. Sharp zoom
+    // is the next step and will pass one; the contract is ready for it.
     render(page, RENDER_SCALE, hash)
-      .then(bitmap => {
+      .then(({ bitmap, scale }) => {
         if (cancelled) return bitmap.close();
         const canvas = canvasRef.current;
         if (!canvas) return bitmap.close();
@@ -788,9 +857,13 @@ function PlanPane({
         canvas.height = bitmap.height;
         canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
         setCanvasSize({ width: bitmap.width, height: bitmap.height });
+        // The scale this canvas was ACTUALLY drawn at, kept beside the canvas
+        // it describes. Anything that converts between canvas pixels and page
+        // points reads this, never RENDER_SCALE.
+        setDrawnScale(scale);
         bitmap.close();
         setRendering(false);
-        onPageRendered?.(page, canvas);
+        onPageRendered?.(page, canvas, scale);
       })
       .catch(err => {
         if (cancelled) return;
@@ -804,66 +877,6 @@ function PlanPane({
 
     return () => {
       cancelled = true;
-    };
-  }, [page, pageCount, loading, error, render, hash]);
-
-  /**
-   * TEMPORARY — Phase 3 step 1 measurement hook. Remove once the numbers are
-   * recorded in references/plan-viewer-overhaul.md § 4b.
-   *
-   * Run `__planBench()` in the browser console with a dense sheet open. It
-   * renders the CURRENT page at a ladder of scales and prints what each one
-   * cost, so the choice between "re-render the whole page sharper" and "render
-   * only the region on screen" gets made against real drawings instead of
-   * against arithmetic.
-   */
-  useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    if (loading || error || pageCount === 0) return;
-    (window as unknown as Record<string, unknown>).__planBench = async (
-      scales: number[] = [1, 1.5, 2, 3, 4]
-    ) => {
-      const rows: Record<string, unknown>[] = [];
-      for (const scale of scales) {
-        try {
-          const t0 = performance.now();
-          const bitmap = await render(page, scale, hash);
-          const msIssued = Math.round(performance.now() - t0);
-          const mp = (bitmap.width * bitmap.height) / 1e6;
-          const px = `${bitmap.width}x${bitmap.height}`;
-          // Draw it and read a pixel back, still inside the clock. `render`
-          // resolving only means the drawing commands were issued; Chrome
-          // rasterises when it feels like it, so a timer that stops at the
-          // promise reports a page that has not been drawn yet. A readback
-          // forces the flush, and that is the number a user waits through.
-          const probe = new OffscreenCanvas(bitmap.width, bitmap.height);
-          const pctx = probe.getContext("2d")!;
-          pctx.drawImage(bitmap, 0, 0);
-          const sx = Math.max(0, Math.floor(bitmap.width / 2) - 400);
-          const sy = Math.max(0, Math.floor(bitmap.height / 2) - 300);
-          const data = pctx.getImageData(sx, sy, 800, 600).data;
-          const msFlushed = Math.round(performance.now() - t0);
-          let dark = 0;
-          for (let i = 0; i < data.length; i += 4) {
-            if (data[i] < 200) dark++;
-          }
-          bitmap.close();
-          rows.push({
-            scale,
-            msIssued,
-            msFlushed,
-            px,
-            Mpx: Number(mp.toFixed(1)),
-            MB: Math.round((mp * 4e6) / 1048576),
-            inkPct: Number(((dark / (data.length / 4)) * 100).toFixed(2)),
-          });
-        } catch (err) {
-          rows.push({ scale, msIssued: "FAILED", px: String(err) });
-          break;
-        }
-      }
-      console.table(rows);
-      return rows;
     };
   }, [page, pageCount, loading, error, render, hash]);
 
@@ -1065,18 +1078,17 @@ function PlanPane({
                 overlay?.({
                   ...canvasSize,
                   /*
-                    STEP 5 WILL CHANGE THIS LINE. When the render resolution
-                    becomes dynamic, this must pass the scale the page was
-                    ACTUALLY drawn at, not the constant — and so must both
-                    `snapshotPage` calls further down this file, or the plan
-                    reader is told the wrong scale for the image it is given
-                    and every proposed stamp lands in the wrong place.
+                    The scale the page was ACTUALLY drawn at, reported by the
+                    worker with the bitmap — no longer the constant. Both
+                    `snapshotPage` calls further down this file now read the
+                    same fact from `pageCanvasScale`, so there is nothing left
+                    that has to be kept in step by hand.
 
-                    Safe today precisely because the resolution is pinned:
-                    `snapshotPage` reads `canvas.width`, the bitmap's intrinsic
-                    size, which a CSS transform never touches.
+                    It still happens to equal RENDER_SCALE, because nothing
+                    asks for a region yet. That is a fact about today, not
+                    something to rely on.
                   */
-                  renderScale: RENDER_SCALE,
+                  renderScale: drawnScale,
                   canvas: canvasRef.current,
                   chromeTarget: chromeLayer,
                 })}
@@ -1411,6 +1423,16 @@ export default function TakeoffPage({
    * detection.
    */
   const pageCanvas = useRef<HTMLCanvasElement | null>(null);
+  /**
+   * The scale `pageCanvas` was drawn at, captured beside the canvas itself.
+   *
+   * `snapshotPage` divides the canvas width by this to tell the plan reader how
+   * big the sheet is in points. Read from the render that produced the canvas,
+   * never from RENDER_SCALE — the moment resolution stops being fixed, a stale
+   * constant reports the wrong page size and every proposed stamp lands in the
+   * wrong place.
+   */
+  const pageCanvasScale = useRef(RENDER_SCALE);
   const pageTextByPage = useRef<Map<number, string>>(new Map());
   const [renderedPage, setRenderedPage] = useState<number | null>(null);
   const [copilotAnswer, setCopilotAnswer] = useState<string | null>(null);
@@ -1444,8 +1466,9 @@ export default function TakeoffPage({
   }, []);
 
   const handlePageRendered = useCallback(
-    (pageNumber: number, canvas: HTMLCanvasElement) => {
+    (pageNumber: number, canvas: HTMLCanvasElement, scale: number) => {
       pageCanvas.current = canvas;
+      pageCanvasScale.current = scale;
       setRenderedPage(pageNumber);
     },
     []
@@ -1510,7 +1533,10 @@ export default function TakeoffPage({
   const runReader = useCallback(
     (force: boolean) => {
       if (!activeSheet || !canRead) return;
-      const snapshot = snapshotPage(pageCanvas.current, RENDER_SCALE);
+      const snapshot = snapshotPage(
+        pageCanvas.current,
+        pageCanvasScale.current
+      );
       if (!snapshot) {
         toast.error("The page is still drawing — give it a moment.");
         return;
@@ -2898,7 +2924,7 @@ export default function TakeoffPage({
                           if (!activeSheet) return;
                           const snapshot = snapshotPage(
                             pageCanvas.current,
-                            RENDER_SCALE
+                            pageCanvasScale.current
                           );
                           if (!snapshot) return;
                           askCopilot.mutate({
