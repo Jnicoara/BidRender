@@ -1585,15 +1585,29 @@ reader looks at. There is no other AI feature here with that ratio.
 ### 9.2 What it does, in order
 
 1. **Read the sheet's text layer first, with no model call at all.** `pageText`
-   already exists in the worker. Most plan sets are vector PDFs with a real text
-   layer, and on a legend sheet that layer contains the labels — often exactly,
-   with positions. This is the unglamorous half of the feature and probably the
-   highest-value part of it: it turns "read the label" from a task with an error
-   rate into a lookup, and it tells the model where to look, because a legend
-   symbol sits beside its label. Costs nothing and cannot hallucinate.
+   already exists in the worker. Where a set is a real vector PDF, that layer
+   contains the legend's labels with positions: it turns "read the label" from a
+   task with an error rate into a lookup, and it tells the model where to look,
+   because a legend symbol sits beside its label. Costs nothing and cannot
+   hallucinate.
 
-   Scanned sets have no text layer. So this is an accelerator, never a
-   dependency — everything below still works without it.
+   **MEASURED 2026-09-18, and this was my assumption rather than a fact.** Both
+   real sets in `.local-storage` are SCANS — one image per page, 10800x7200 at
+   300 dpi. `pine st` has no text layer at all. Old Blueridge has an OCR layer
+   and it is about two-thirds right; verbatim from its legend sheet:
+
+   ```
+   DUEX|RECEPTACLE|QUTLET     CONTRIOL|RIEFERENCE     RETERE|SHaDe
+   ```
+
+   "DUEX RECEPTACLE QUTLET" matched against `symbolLinks.lookupKey` (§ 9.3
+   Stage 1) finds nothing and falls straight through to the expensive stages.
+   **Measured saving on both real sets: $0.**
+
+   Still build it — it costs nothing and some sets will be clean. But it is an
+   accelerator, never a dependency, and it is **not a line item in a cost plan**.
+   Everything below has to work as though the text layer were absent, because on
+   the evidence available it usually is.
 
 2. **Ask the model for boxes.** One call per legend region, on a region render
    (§ 4b) at a scale where the symbols are legible — the same machinery the
@@ -1860,15 +1874,53 @@ is 25–96ms measured (§ 4b) against seconds for a model call.
 **Bounded concurrency, not unbounded.** Four in flight is the same number the
 multipart uploader settled on for the same reasons: it saturates a normal
 connection without turning one user into a thundering herd. Unbounded fan-out
-over a 40-tile sheet would also collide with the provider's rate limits and with
-the per-person daily allowance (`shared/aiLimits.ts`), and the failure mode
-there is a half-read sheet.
+over a sheet would also collide with the provider's rate limits and with the
+per-person daily allowance (`shared/aiLimits.ts`), and the failure mode there is
+a half-read sheet.
 
-### 11.2 Skip empty tiles — check for ink before spending a call
+**The allowance has to change its unit in the same commit as this work, and
+must not change before it.** `DAILY_LIMITS` allows 150 CALLS, sized when one
+sheet was one call. At six calls a sheet that becomes 25 sheets a day, and a
+40-sheet set fails two-thirds of the way through. The replacement is a count of
+SHEETS plus a dollar backstop — 40 sheets and $6 per person per day — because
+once a sheet is several calls, "calls" no longer tracks spend and the whole
+point of the number is to be a circuit breaker on spend. Reasoning and numbers
+in `references/ai-reader-cost.md` § 7.
+
+### 11.2 Skip empty tiles — MEASURED 2026-09-18, and it saves nothing
+
+**This was my assumption and it did not survive being measured. Keep the check,
+budget zero for it.** The reasoning below is preserved because the RULE about
+what may be skipped is still right; only the expected saving was wrong.
 
 A lot of a floor plan is white paper. The check is cheap and it runs on a bitmap
 already in hand: draw the tile down to something small, count pixels that are
 not background, skip the tile if the count is zero.
+
+**The white paper is real. It is just not in tile-sized pieces.** Only 3.4% of
+sheet E1.02 is ink — but the blank space is scattered through the drawing rather
+than gathered in blocks. Counting blocks with not one dark pixel, across all
+five Old Blueridge sheets:
+
+| Block size | p1  | p2  | p3  | p4  | p5  |
+| ---------- | --- | --- | --- | --- | --- |
+| 1 in       | 30% | 16% | 37% | 45% | 43% |
+| 4 in       | 6%  | 0%  | 13% | 19% | 13% |
+| 6.4 in     | 0%  | 0%  | 4%  | 4%  | 4%  |
+
+A tile worth shipping covers **12.9 inches** (§ 11.5). At that size:
+
+> **Blank tiles across all five sheets, at every resolution tested: ZERO.**
+
+Every 13-inch square of a construction sheet touches something — the border, a
+grid bubble, a dimension string, a keynote, wall hatching. The only case where
+skipping saved anything at all was Haiku's smaller tiles at 200 px/in: 2–5 of 35.
+
+So the reason to keep it changes. It is no longer a cost control; it is a
+**fault detector**, which is what the "say how many were skipped" note below is
+really for. At a shippable tile size the honest answer is always zero, so any
+other answer means the renderer produced a blank tile — and that is worth
+knowing immediately.
 
 **Skip only tiles that are genuinely blank.** A threshold set to "nearly blank"
 will eventually skip a tile containing one faint symbol, and that is a silent
@@ -1894,24 +1946,68 @@ automatic. Not a new legend link, not a page re-render, not a new app version. A
 re-read is an action the estimator takes, because a reading that changes under
 somebody who has already confirmed half of it is a § 5c violation.
 
-### 11.5 The cost numbers, so the trade-offs above are arguable
+### 11.5 The cost numbers — MEASURED 2026-09-18, and the old table was wrong
 
-From `shared/aiPricing.ts`, Sonnet 5 at $2 per million input tokens and $10 per
-million output. An image costs roughly (width x height) / 750 tokens.
+**Full workings in `references/ai-reader-cost.md`.** This section is the
+summary; that document is the arithmetic, the measurements it came from, and
+the three options priced against each other.
 
-| Work                             | Rough cost |
-| -------------------------------- | ---------- |
-| One 1100x1100 tile, in           | ~$0.003    |
-| A dense 36x24 sheet, 16 tiles    | ~$0.05 in  |
-| The same sheet's findings, out   | ~$0.13 out |
-| **One dense sheet, all in**      | **~$0.18** |
-| A 40-sheet set, every sheet read | ~$7        |
-| **A legend sheet, once per set** | **~$0.01** |
+**What the old table got wrong, because it is worth naming.** It said "an image
+costs roughly (width x height) / 750 tokens". That is roughly right per pixel
+and has **no ceiling in it**, and the ceiling is the fact that decides the
+design:
 
-Indicative, and they go stale silently — the console has the bill. Two things
-follow from the shape rather than the precision: **empty-tile skipping is worth
-real money** on a floor plan that is half white paper, and **§ 9.6's ordering
-argument holds by an order of magnitude**, not by a hair.
+> A vision model cuts an image into 28x28 patches and charges one token per
+> patch — `ceil(w/28) * ceil(h/28)`. **Past its budget the image is not
+> rejected, it is silently SHRUNK**, and nothing reports that it happened.
+
+Sonnet 5 allows 4784 patches and a 2576px edge; Haiku 4.5 allows 1568 and
+1568px. `shared/visionImageLimits.ts` does this arithmetic, with Anthropic's own
+published examples as its tests.
+
+Three consequences the old table could not express:
+
+- **A whole 36x24 sheet as one image is capped at 2352x1568 — 65 px per paper
+  inch — however big a picture you send.** Tiling is not an optimisation, it is
+  the only way past that wall.
+- **A tile has a natural size**: 1932x1932 on Sonnet 5, 1092x1092 on Haiku.
+  Bigger is shrunk back; smaller wastes a call.
+- **Haiku needs four times the tiles** for the same detail, which cancels most
+  of its lower per-token price.
+
+From `shared/aiPricing.ts`, Sonnet 5 at $2/$10 per million in/out. MEASURED on
+the Old Blueridge sheets: 36x24in, a receptacle symbol's circle 0.17in across,
+78 device symbols on E1.02, one finding ≈ 40 output tokens.
+
+| Work                                            | Cost       |
+| ----------------------------------------------- | ---------- |
+| One 1932x1932 tile, in                          | $0.0095    |
+| One 1092x1092 tile on Haiku, in                 | $0.0015    |
+| A 36x24 sheet, Sonnet 5, 150 px/in, **6 tiles** | $0.057 in  |
+| The same sheet's findings, out                  | $0.040 out |
+| **One sheet, all in — THE DEFAULT**             | **$0.101** |
+| The same on Haiku at 100 px/in, 12 tiles        | $0.046     |
+| The same at 200 px/in with thinking, 15 tiles   | $0.278     |
+| A 40-sheet set, every sheet read, default       | $4.05      |
+| **A legend sheet, once per set**                | **~$0.03** |
+
+Indicative, and they go stale silently — the console has the bill.
+
+Three things follow, and the first two replace what the old table concluded:
+
+- **Empty-tile skipping is worth nothing at shippable tile sizes.** Measured:
+  zero blank tiles on all five sheets. See § 11.2, which now carries the
+  numbers.
+- **A cheaper model is worth 27%, not 50%**, unless the detail level drops with
+  it. § 10.2's ordering is unaffected; the saving is just smaller than it looks.
+- **§ 9.6's ordering argument holds by an order of magnitude**, not by a hair —
+  3c once per set against 10c for every dense sheet. Unchanged, and if anything
+  strengthened.
+
+**Decided 2026-09-18:** the default is Sonnet 5 at 150 px/in with thinking off,
+10.1c a sheet, with 150 sheets a month included in the $99 flat price. Thorough
+mode (200 px/in, thinking on, 27.8c) does not fit inside a flat fee and is sold
+as paid overage.
 
 ---
 
@@ -1926,17 +2022,23 @@ Covered in § 10.4. Correlated passes, a persuasive-looking badge over no extra
 information, and double the bill. Keep the offset-grid variant, restricted to
 tiles that flagged.
 
-### ADD: read the legend's TEXT LAYER before spending a token
+### ADD: read the legend's TEXT LAYER before spending a token — DOWNGRADED
 
-Folded into § 9.2 step 1, and called out again here because it is the item most
-likely to be skipped as unglamorous. `pageText` already exists in the worker and
-already runs on every sheet for scale detection. On a vector plan set — which is
-most of them — the legend's labels are in that layer exactly, with positions.
+Folded into § 9.2 step 1. Still worth building; **no longer worth counting on**,
+and the original wording here was the thing that needed correcting most.
 
-That converts the highest-error part of the feature (reading a label) into a
-lookup, and it hands the model a strong prior for WHERE symbols are, since a
-legend symbol sits beside its label. It costs nothing, cannot hallucinate, and
-degrades to nothing on a scanned set.
+It said: _"On a vector plan set — which is most of them — the legend's labels
+are in that layer exactly, with positions."_ That was an assumption, and
+measuring it on 2026-09-18 did not support it. Both real sets are scans; one has
+no text layer, the other has OCR that renders DUPLEX as "DUEX" and drops a
+Korean character into the middle of the symbol schedule. See § 9.2 step 1 and
+`references/ai-reader-cost.md` § 0.
+
+The mechanism is still right where it applies: it converts the highest-error
+part of the feature (reading a label) into a lookup, and hands the model a prior
+for WHERE symbols are. It costs nothing and cannot hallucinate. It just
+degrades to nothing far more often than this section claimed, so **build it as a
+bonus and design as though it were absent.**
 
 ### NO OBJECTION: manual capture as the backup rather than the front door
 

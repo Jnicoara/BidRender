@@ -897,10 +897,60 @@ left as written rather than rewritten to match the rename.
 
 ## Test suite health
 
+**HOW TO RUN THE SUITE HONESTLY, until the entry below is done.** `pnpm test` on
+a clean checkout fails 26 tests before anyone has changed a line, because `.env`
+carries `DISABLE_AI_FEATURES=true`. That has been the "known baseline" for long
+enough to have become a trap: it is indistinguishable from a regression you just
+caused, and the natural reaction is to spend an hour chasing your own change.
+So, before trusting a run that touches anything AI-related:
+
+```bash
+sed -i 's/^DISABLE_AI_FEATURES=true/DISABLE_AI_FEATURES=false/' .env
+pnpm test
+sed -i 's/^DISABLE_AI_FEATURES=false/DISABLE_AI_FEATURES=true/' .env   # PUT IT BACK
+```
+
+With the flag off the real baseline is **2,399 passing, 102 of 103 files** — the
+only failures are the 3 `backup` tests, which need R2 credentials and a database
+grant rather than a flag. Verified 2026-09-18. Put the flag back afterwards:
+leaving it off is how a local run starts making real AI calls nobody asked for,
+which is the rule at the top of CLAUDE.md's AI section.
+
 - [ ] Fix the 26 known failing tests so the test suite is fully green. They are three files and every one is an environment problem rather than a code fault: `planCopilot` (21) and `navigation` (2) need `DISABLE_AI_FEATURES` unset — it is set to `true` in `.env`, and nothing sets it on DigitalOcean — and `backup` (3) needs the `bidrender` MySQL login granted rights to create `bidrender_backup_restore_test`. (Was 35 across five files; `v545` (8) and `assemblies` (1) started passing once the `bidrender_test` schema was brought up to date.) Worth doing because a suite that always shows red teaches people to stop reading it — which is how a real regression gets through.
+
+## Working on this repo — traps
+
+**`git stash` is not safe in this checkout. Do not use it.** Hit 2026-09-18:
+`git stash push --include-untracked` reported failure, and left a state where
+the stash entry EXISTED, the tracked modifications were still in the working
+tree, and the untracked files had been **deleted from disk**. Half-applied in
+the one direction that loses work — the files it removed were the only copies.
+Almost certainly OneDrive: the folder is inside `OneDrive\Documents`, and the
+sync client holds handles on files while git is trying to move them.
+
+**If it has already happened, the work is recoverable and here is where.** An
+untracked file lives in the stash's third parent, which `git stash show` does
+not list:
+
+```bash
+git show --name-only --format="" stash@{0}^3      # what was taken
+git checkout stash@{0}^3 -- path/to/file          # bring one back
+git reset -q HEAD path/to/file                    # un-stage it again
+git diff stash@{0} --stat                         # empty = tracked files match too
+```
+
+Check that last one before dropping the stash. Then don't reach for stash again:
+to test something against a clean tree, use `git worktree add` — a separate
+directory, so nothing touches the files you are working in.
+
+- [ ] Make `pnpm test` pass on a clean checkout so the workaround above can be
+      deleted. Tracked under "Test suite health" above; noted here too because
+      this is the section someone reads when something inexplicable happens.
 
 ## Plan viewer overhaul
 
-- [ ] Give the plan reader zoomed-in tiles of a sheet rather than one shrunk image. Observed on the live site 2026-09-16: on dense sheets it runs, costs a call, and comes back having found no symbols — its own answer said the symbols were not legible at the resolution it was given. So this is not a prompt problem or a model-tier problem; it is being handed a picture in which the thing it is looking for does not survive. A receptacle symbol is a few dozen pixels on a full E-sheet scaled to fit a model's input, and downscaling removes it before the model ever sees it. Likely shape of the fix: render each page at takeoff zoom, cut it into overlapping tiles, read each tile, then merge the hits back into page coordinates — overlapping because a symbol on a tile seam would otherwise be halved and missed twice. Watch the cost: one sheet becomes N calls, so the per-person daily allowance in `shared/aiLimits.ts` is counting something much larger than it was designed around, and `PLAN_COPILOT_MODEL` is the expensive tier. Do this as part of the plan viewer overhaul, not before — the tiling wants the same render path the viewer is getting.
+- [ ] Give the plan reader zoomed-in tiles of a sheet rather than one shrunk image. Observed on the live site 2026-09-16: on dense sheets it runs, costs a call, and comes back having found no symbols — its own answer said the symbols were not legible at the resolution it was given. So this is not a prompt problem or a model-tier problem; it is being handed a picture in which the thing it is looking for does not survive. A receptacle symbol is a few dozen pixels on a full E-sheet scaled to fit a model's input, and downscaling removes it before the model ever sees it. Likely shape of the fix: render each page at takeoff zoom, cut it into overlapping tiles, read each tile, then merge the hits back into page coordinates — overlapping because a symbol on a tile seam would otherwise be halved and missed twice. Watch the cost: one sheet becomes N calls, so the per-person daily allowance in `shared/aiLimits.ts` is counting something much larger than it was designed around, and `PLAN_COPILOT_MODEL` is the expensive tier. Do this as part of the plan viewer overhaul, not before — the tiling wants the same render path the viewer is getting. **N is 6, and the rest of the cost question is answered: `references/ai-reader-cost.md` (2026-09-18) prices it on the real Old Blueridge sheets.** Decided there: Sonnet 5 at 150 px per paper inch, thinking off, 6 tiles, ~10.1c a sheet, 150 sheets a month inside the $99 flat price.
+
+- [ ] Change `DAILY_LIMITS` in `shared/aiLimits.ts` from counting CALLS to counting SHEETS, plus a dollar backstop — 40 sheets and $6 per person per day. **In the same commit as the tiling above, and not before it.** Today one sheet is one call, so the current 150 is correct for how the app actually spends; changing it early would make the limit describe an app that does not exist yet. The moment a sheet is six calls, 150 calls means 25 sheets and a 40-sheet set dies two-thirds of the way through. Reasoning in `references/ai-reader-cost.md` § 7; the point is that once a sheet is several calls, "calls" stops tracking spend and spend is the only thing the breaker is for.
 
 - [ ] Give the conduit and cable layer swatches in `LayersPanel` the conduit-yellow and cable-emerald that every other surface uses. Noticed 2026-09-18 while making the run icons agree (v6.22). `layerColor` in `shared/takeoffLayers.ts` derives a colour by hashing the layer key against a fixed palette, so the Conduit-runs and Cable-runs swatches come out at whatever the hash lands on — while the tool buttons, the counted-items rows and the traced lines on the drawing itself all use `#F5C518` for conduit and emerald for cable. The panel that exists to say which of those lines you are looking at is the one surface that does not match them. **The fix touches how EVERY layer colour is derived, not just these two** — the same function colours the location layers, which have no natural colour of their own and want to stay visually distinct from each other, so it probably becomes "named colours for the keys that have one, hash for the rest" rather than a two-line change. That is why it is its own pass and not a tidy-up inside an icon commit. Same family as the icon mismatch it was found beside: one thing per concept, and this one is colour rather than shape.

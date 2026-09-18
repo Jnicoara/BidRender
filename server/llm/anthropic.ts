@@ -221,12 +221,41 @@ export async function invokeAnthropic(
 
   const { system, turns } = splitMessages(params.messages);
 
+  /**
+   * ── Thinking is ON unless a caller says otherwise, and that is easy to miss ─
+   * On the current models, OMITTING `thinking` does not mean "no thinking" — it
+   * means adaptive thinking runs. Those tokens bill at the OUTPUT rate, which
+   * is five times the input rate, and they arrive folded into
+   * `usage.output_tokens` with nothing distinguishing them. So a caller that
+   * simply never mentioned thinking has been paying for it invisibly.
+   *
+   * Measured on a real 36x24 electrical sheet, that was roughly three cents per
+   * sheet read that nobody chose. Hence this passthrough: a caller that wants
+   * thinking asks for it, and a caller that does not sends
+   * `{ type: "disabled" }` and gets a bill it can predict.
+   *
+   * Only sent when the caller set it, because the accepted shape differs by
+   * model generation and an unasked-for `thinking` is exactly the kind of
+   * silent default this comment exists to complain about. A model that rejects
+   * the shape a caller chose fails the call, which lands in that caller's
+   * existing catch and degrades gracefully — visible, not silent.
+   */
   const message = await client().messages.create({
     model: params.model,
     max_tokens: maxTokens,
     ...(system ? { system } : {}),
     messages: turns,
     ...(toTools(params.tools) ? { tools: toTools(params.tools)! } : {}),
+    // Cast through `unknown`: the caller's shape is an open record by design
+    // (see _core/llm.ts), and the SDK's union covers only the shapes the
+    // pinned version knows about. Narrowing it here would mean this file
+    // having an opinion about which thinking modes exist, which is the one
+    // thing the translation layer is supposed not to have.
+    ...(params.thinking
+      ? {
+          thinking: params.thinking as unknown as Anthropic.ThinkingConfigParam,
+        }
+      : {}),
   });
 
   return toInvokeResult(message);

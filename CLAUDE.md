@@ -233,6 +233,32 @@ added the column stamped every existing user so nobody who already uses the app
 sees a welcome screen. `checklistDismissedAt` is separate and clears both ways —
 "dismissible" is a promise that has to be keepable.
 
+## AI features — two standing rules, before anything else
+
+These two come first because everything below is detail and these two are not.
+
+**Never spend an AI call the user did not ask for.** No AI feature may fire from
+a page load, a sheet opening, a tab change, or any other effect. A call is a
+button. Auto-read, prefetch, speculative reads and "while we're here" calls are
+all the same mistake: the estimator finds out what it cost from the bill. This
+is not a cost rule, it is a trust rule — the reader spends the contractor's
+money and it has to ask first.
+
+**Manual mode is the product; AI is an accelerator on top of it.** Every job a
+bid needs — capturing a symbol, linking it to an assembly, counting, stamping,
+tracing a run, calibrating a scale — must be completable by hand, by someone who
+has never turned an AI feature on. Not "degrades gracefully when the model
+fails" — that is a separate and weaker promise, and it is the one the section
+below makes. A feature that only exists in the AI path is not shipped.
+
+Two notes on keeping the second one honest. A local run with
+`DISABLE_AI_FEATURES=true` renders a SMALLER app than the live one, so "manual
+mode looked fine" tested that way is weak evidence — test with the flag off and
+the feature present but untouched. And the manual path is genuinely separate
+today: `createSymbolLink` (`server/routers/takeoffStampsRouter.ts`) has no model
+call, no allowance check and no AI gate of any kind. Keep it that way; the
+moment the manual path needs the reader to have run, the rule is broken.
+
 ## AI features — closed action sets, cheapest tier that works
 
 The navigation helper is the pattern to copy. The model never constructs a
@@ -265,6 +291,17 @@ mistake it can make is silent and produces an app that still answers.
   without one; an unbounded reply is the thing that turns a bug into a bill. But
   a cap is a weak cost control: tighten it enough to save real money and you
   start truncating replies, which produces a failed call you still paid for.
+  When a cap IS hit, say so in its own sentence — the plan reader checks
+  `finish_reason === "max_tokens"` before parsing, because the alternative is
+  telling the user their answer "could not be understood", which is true,
+  useless, and sends them to re-read the sheet into the same wall.
+- **`thinking` is ON unless a caller turns it off, and that is easy to miss.**
+  Omitting the parameter does not mean no thinking on the current models — it
+  means adaptive thinking runs, billed at the OUTPUT rate and folded invisibly
+  into `usage.output_tokens`. The plan reader sends `{ type: "disabled" }`
+  explicitly and measured about three cents a sheet for doing so. Any new AI
+  feature makes that choice deliberately; if thinking turns out to be worth it,
+  `output_config: { effort: "low" }` is the middle setting, not deletion.
 - **A daily per-PERSON limit** (`shared/aiLimits.ts`) is what actually controls
   spend. Set generously — it clears the heaviest genuine day and still stops a
   loop in about a minute — because a limit people work around protects nothing.
@@ -285,6 +322,18 @@ totals in half on the live site could not be reproduced on a dev machine and
 looked, honestly, fine. **"It looks right here" is weak evidence for anything
 about layout.** Either test with the flag off, or reason about the structure
 rather than about what happens to fit today.
+
+**An image has a ceiling, and going past it is silent.** A vision model charges
+one token per 28x28 patch and refuses to look at more patches than its budget
+allows — so an oversized image is not rejected, it is SHRUNK, and nothing
+reports that it happened. `shared/visionImageLimits.ts` does the arithmetic
+before anything is sent, and the server tells the client which model it will
+call (`planCopilot.state.readerModel`) rather than the client assuming, because
+a picture sized for the wrong tier is burnt upload with no symptom. Measured
+consequence on a real 36x24 sheet: the old flat 1600px cap delivered 44 pixels
+per paper inch and a 7.6-pixel receptacle symbol, where the model would have
+looked at 65 and 11 for about half a cent more. Full workings in
+`references/ai-reader-cost.md`.
 
 Cost figures come from a local copy of published rates (`shared/aiPricing.ts`)
 in millionths of a dollar, because a single call costs less than a cent and

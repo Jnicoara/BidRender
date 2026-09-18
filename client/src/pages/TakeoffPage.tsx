@@ -438,6 +438,21 @@ function usePdfWorker() {
 const RENDER_SCALE = 1.5;
 
 /**
+ * What to assume the plan reader runs on before the server has said.
+ *
+ * The server names the real one in `planCopilot.state.readerModel`, because it
+ * is the side that holds `PLAN_COPILOT_MODEL`. This only stands in for the
+ * instant before that query answers, and it deliberately names the SMALLER
+ * tier's behaviour by naming a model this client does not recognise — an
+ * unknown id falls back to standard-tier limits in
+ * `shared/visionImageLimits.ts`, which under-sends rather than over-sends. A
+ * snapshot that is smaller than it could have been loses a little detail; one
+ * that is larger than the model will look at is silently shrunk on arrival and
+ * the extra upload is simply burnt.
+ */
+const PLAN_READER_FALLBACK_MODEL = "unknown";
+
+/**
  * How wide a sheet thumbnail is drawn, in pixels.
  *
  * Generously sized on purpose. The grid shows them about 160 CSS pixels wide,
@@ -2003,19 +2018,33 @@ export default function TakeoffPage({
   /**
    * Read each sheet as it is opened, rather than on a button press.
    *
-   * Remembered per browser rather than per account: it is a preference about
-   * how this one machine works, and a contractor on a metered connection in a
-   * truck may well want it off there and on at the office. Each sheet is still
-   * read at most once — the server returns a stored reading unless the user
-   * asks for a re-read — so leaving it on cannot run away with the bill.
+   * ── OFF until somebody turns it on, and that is a rule not a preference ────
+   * This defaulted ON, and the reasoning written here at the time was that
+   * "each sheet is still read at most once — the server returns a stored
+   * reading unless the user asks for a re-read — so leaving it on cannot run
+   * away with the bill." That argument was about the SIZE of the bill, and it
+   * answered the wrong question. Opening a sheet spent the contractor's money
+   * on a call they had not asked for, and they found out from the invoice.
+   *
+   * CLAUDE.md now states the rule plainly: a call is a button. The default is
+   * `=== "on"` rather than `!== "off"` precisely so that "no saved preference"
+   * means off — a browser that has never been asked has never consented.
+   *
+   * The cost argument has since stopped holding anyway. At one call per sheet,
+   * clicking through a forty-sheet submission to find the electrical drawings
+   * spent forty calls. Under the tiling work (references/ai-reader-cost.md)
+   * one sheet is six, so the same click-through would spend two hundred and
+   * forty and about four dollars, all of it unasked.
+   *
+   * Still remembered per browser rather than per account: it is a preference
+   * about how this one machine works, and a contractor on a metered connection
+   * in a truck may well want it off there and on at the office.
    */
   // The storage key keeps the product's old name on purpose, so a choice a
   // browser has already saved still applies.
   const [autoRead, setAutoRead] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return (
-      window.localStorage.getItem("helixbid.planReader.autoRead") !== "off"
-    );
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("helixbid.planReader.autoRead") === "on";
   });
   const setAutoReadPersisted = useCallback((on: boolean) => {
     setAutoRead(on);
@@ -2099,7 +2128,8 @@ export default function TakeoffPage({
       if (!activeSheet || !canRead) return;
       const snapshot = snapshotPage(
         pageCanvas.current,
-        pageCanvasScale.current
+        pageCanvasScale.current,
+        copilot?.readerModel ?? PLAN_READER_FALLBACK_MODEL
       );
       if (!snapshot) {
         toast.error("The page is still drawing — give it a moment.");
@@ -2115,7 +2145,7 @@ export default function TakeoffPage({
         force,
       });
     },
-    [activeSheet?.id, canRead, bidId, page, readSheet]
+    [activeSheet?.id, canRead, bidId, page, readSheet, copilot?.readerModel]
   );
 
   /**
@@ -3566,7 +3596,8 @@ export default function TakeoffPage({
                         if (!activeSheet) return;
                         const snapshot = snapshotPage(
                           pageCanvas.current,
-                          pageCanvasScale.current
+                          pageCanvasScale.current,
+                          copilot?.readerModel ?? PLAN_READER_FALLBACK_MODEL
                         );
                         if (!snapshot) return;
                         askCopilot.mutate({

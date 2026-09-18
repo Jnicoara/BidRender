@@ -101,6 +101,15 @@ const MAX_IMAGE_CHARS = 4_000_000;
 /** Ceiling on extracted sheet text handed to the model. */
 const MAX_TEXT_CHARS = 12_000;
 
+/**
+ * Ceiling on one sheet reading's reply. See the call site for the arithmetic.
+ *
+ * Named rather than inlined because `hitTheCeiling` below has to recognise the
+ * case, and a truncation check comparing against a different number than the
+ * request used is a check that silently stops working.
+ */
+const PLAN_READ_MAX_TOKENS = 16_000;
+
 const imageSchema = z
   .string()
   .max(MAX_IMAGE_CHARS, "That page image is too large to read.")
@@ -283,6 +292,17 @@ export type CopilotSheetState = {
   summary: string | null;
   message: string | null;
   model: string | null;
+  /**
+   * The model the NEXT read would use, as opposed to `model` above, which is
+   * the one a past run happened to use and is null before the first read.
+   *
+   * The client needs this before it can send anything: the size of image worth
+   * sending is a property of the model (`shared/visionImageLimits.ts`), the
+   * model is chosen by a server environment variable, and an image sized for
+   * the wrong one is silently shrunk on arrival with nothing reporting it. So
+   * the server says which model it will call rather than the client assuming.
+   */
+  readerModel: string;
   sourceKey: string | null;
   readAt: Date | null;
   findings: CopilotFindingView[];
@@ -295,6 +315,7 @@ const EMPTY_STATE: CopilotSheetState = {
   summary: null,
   message: null,
   model: null,
+  readerModel: PLAN_COPILOT_MODEL,
   sourceKey: null,
   readAt: null,
   findings: [],
@@ -344,6 +365,7 @@ async function stateForRun(
     summary: run.summary,
     message: run.message,
     model: run.model,
+    readerModel: PLAN_COPILOT_MODEL,
     sourceKey: run.sourceKey,
     readAt: run.createdAt,
     findings,
@@ -517,17 +539,45 @@ export const planCopilotRouter = router({
           tools: [reportTool()],
           toolChoice: "auto",
           /**
-           * Halved from 8000. A dense sheet's findings run 1,500-2,500 tokens,
-           * so this keeps roughly double the headroom while cutting the worst
-           * case per sheet from about 9.5c to 5.5c.
+           * No thinking, explicitly.
            *
-           * Not lower, and the reason is worth stating: hitting this cap
-           * truncates the JSON, parsing fails, and the user gets nothing for a
-           * call that was still paid for. A cap tight enough to save real money
-           * is a cap tight enough to turn readings into failures — the daily
-           * limit in shared/aiLimits.ts is what actually controls spend.
+           * Leaving this out does not mean "off" on the current models — it
+           * means adaptive thinking runs and bills at the output rate, folded
+           * invisibly into `output_tokens`. Measured on a real 36x24 sheet that
+           * was about three cents a sheet nobody had chosen.
+           *
+           * Counting symbols against a legend the user supplied is recognition,
+           * not reasoning, so there is little here for thinking to buy. If
+           * findings ever get noticeably worse, the replacement is NOT to
+           * delete this line — it is `output_config: { effort: "low" }` with
+           * adaptive thinking, which keeps a little reasoning at a fraction of
+           * the spend. Deleting the line returns to paying an unknown amount.
            */
-          maxTokens: 4000,
+          thinking: { type: "disabled" },
+          /**
+           * MEASURED, not guessed. Counted on the real Old Blueridge sheets:
+           * one finding serialises to a 117-character JSON object, which is
+           * about 40 output tokens, and sheet E1.02 carries 78 device symbols.
+           * So a real sheet's answer is roughly 3,270 tokens — 82% of the old
+           * 4,000 cap, on a small school remodel.
+           *
+           * That cap was therefore already one dense commercial sheet away from
+           * truncating every read, and truncation here is the worst shape of
+           * failure available: the tool arguments are cut mid-JSON, the parse
+           * fails, the user gets nothing, and the call is paid for in full.
+           *
+           * 16,000 covers about 380 findings — denser than any single E-sheet
+           * in either sample set — and is the documented default ceiling for a
+           * non-streaming request, so it cannot collide with an HTTP timeout.
+           * It raises the WORST case to about 16c of output on a sheet that
+           * would have failed outright before; it does not raise the typical
+           * cost at all, because the model stops when it has finished.
+           *
+           * Spend is controlled by the daily allowance in shared/aiLimits.ts,
+           * not by this number. A cap tight enough to save real money is a cap
+           * tight enough to turn readings into failures.
+           */
+          maxTokens: PLAN_READ_MAX_TOKENS,
         });
       } catch (error) {
         // Out of allowance is not a failure to hide behind a generic message —
@@ -546,6 +596,36 @@ export const planCopilotRouter = router({
           "failed",
           null,
           "The plan reader could not be reached. Nothing was changed — carry on stamping by hand and try again later.",
+          []
+        );
+      }
+
+      /**
+       * ── Ran out of room. Say so, rather than blaming the answer ───────────
+       * A reply stopped by the token ceiling comes back with its tool arguments
+       * cut off mid-JSON. Without this check that falls through to the parse
+       * failure below, which tells the user the reader's answer "could not be
+       * understood" — a sentence that is true, useless, and points at the wrong
+       * thing. They would re-read the sheet, hit the same ceiling, and get the
+       * same sentence.
+       *
+       * So it is checked first and separately: a distinct message that names
+       * the cause, and a `console.error` rather than the usual warn, because
+       * the fix is a constant in this file and nobody will go looking for it
+       * unless something shouts. This should be unreachable at 16,000 tokens
+       * on any single E-sheet — if it ever fires, a sheet denser than either
+       * sample set exists and PLAN_READ_MAX_TOKENS needs revisiting.
+       */
+      if (result.choices?.[0]?.finish_reason === "max_tokens") {
+        console.error(
+          `[plan-copilot] reply hit the ${PLAN_READ_MAX_TOKENS}-token ceiling ` +
+            `on sheet=${sheet.id} — the reading was truncated and discarded. ` +
+            `Raise PLAN_READ_MAX_TOKENS in server/routers/planCopilotRouter.ts.`
+        );
+        return record(
+          "failed",
+          null,
+          "There was more on this sheet than the reader could report in one go, so nothing was proposed for it — a partial list would have looked complete. Count this one by hand, and tell us about it so the limit can be raised.",
           []
         );
       }
