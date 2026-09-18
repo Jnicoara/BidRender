@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-17]
 
+- **You can now set a sheet's scale by measuring something you already know.** Most real drawing sets state no scale ratio anywhere the app can read, and a set that does may have been shrunk on its way to you — which makes the printed ratio confidently wrong. Either way, typing a scale was useless. Now you click two points you know the distance between, type the distance, and the scale falls out. A plain number means feet; inches need a mark.
+
+- **It tells you how much to trust the calibration, while you are still choosing where to click.** A scale error does not spoil one measurement, it multiplies into every measurement on that sheet — and how wrong it can be depends almost entirely on how LONG a distance you measured, not on how carefully you clicked. So the panel rates your span live and says what it implies: a good span barely moves the scale, a short one is flagged in orange with a warning that a small slip there moves everything. It also speaks up when the answer lands well off any standard scale, which usually means either the set was printed off-scale or you clicked the ends of something other than what you meant.
+
+- **What it will never do is quietly round in your favour.** The scale it shows is the scale it measured, even when that is an untidy number. Padding belongs in the allowances where it appears as its own line and you can change it — not buried in a measurement where nobody would find it.
+
 - **The plan screen no longer offers you nothing to do.** On a sheet with no scale set the trace buttons were hidden entirely and the stamp tool could only be armed by first capturing a symbol from the plan's legend and linking it to an assembly — so on a fresh drawing set there was no tool on screen at all. The trace buttons now stay put and are greyed out with the reason, because a tool you cannot see does not read as unavailable, it reads as non-existent. And counting now starts from a plain Stamp button that lists your assemblies: pick one and click. Capturing legend symbols still works and is still the quick way for a symbol you count on every job.
 
 - **Flipping to the next sheet zooms back out again.** It was keeping whatever zoom and position you had left, so you would land somewhere arbitrary on a drawing you had not seen yet. It was supposed to fit each new page and did not, because it watched the page size — and every sheet in a set is usually the same size, so it never noticed the change.

@@ -48,6 +48,7 @@ import {
   Loader2,
   Plus,
   MapPin,
+  Ruler,
   Maximize2,
   Minus,
   Trash2,
@@ -83,6 +84,7 @@ import {
 } from "@/lib/planView";
 import { SheetIndex } from "@/components/takeoff/SheetIndex";
 import { StampPicker } from "@/components/takeoff/StampPicker";
+import { CalibrateLayer } from "@/components/takeoff/CalibrateLayer";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
 import { UploadProgress } from "@/components/takeoff/UploadProgress";
 import { describePlanRemoval } from "@shared/planRemoval";
@@ -1019,6 +1021,15 @@ export default function TakeoffPage({
   >({});
 
   // ── Tracing (phase 2b) ────────────────────────────────────────────────────
+  /**
+   * Calibration is its own mode, not a kind of tracing.
+   *
+   * Exactly two points, nothing reaches the bid, and finishing changes what
+   * every other measurement on the sheet means.
+   */
+  const [calibrating, setCalibrating] = useState(false);
+  const [calibratePoints, setCalibratePoints] = useState<PagePoint[]>([]);
+
   const [tracing, setTracing] = useState(false);
   const [tracePathType, setTracePathType] = useState<RunPathType>("conduit");
   const [tracePoints, setTracePoints] = useState<PagePoint[]>([]);
@@ -2454,6 +2465,35 @@ export default function TakeoffPage({
                     overlay={size =>
                       measurability ? (
                         <>
+                          {/* Calibration takes the drawing while it is on: two
+                              clicks that mean something different from every
+                              other click on this screen. */}
+                          {calibrating && activeSheet && (
+                            <CalibrateLayer
+                              width={size.width}
+                              height={size.height}
+                              renderScale={size.renderScale}
+                              chromeTarget={size.chromeTarget}
+                              points={calibratePoints}
+                              onPointsChange={setCalibratePoints}
+                              busy={setSheetScale.isPending}
+                              onApply={scaleText => {
+                                setSheetScale.mutate(
+                                  { id: activeSheet.id, scaleText },
+                                  {
+                                    onSuccess: () => {
+                                      setCalibrating(false);
+                                      setCalibratePoints([]);
+                                    },
+                                  }
+                                );
+                              }}
+                              onCancel={() => {
+                                setCalibrating(false);
+                                setCalibratePoints([]);
+                              }}
+                            />
+                          )}
                           {capturingSymbol && (
                             <SymbolCaptureLayer
                               width={size.width}
@@ -2623,6 +2663,32 @@ export default function TakeoffPage({
                           <div className="w-px h-4 bg-border" />
                         </>
                       ) : null}
+
+                      {/*
+                        The second way to set a scale, and on a real set often
+                        the ONLY one that works: most sheets state no ratio, and
+                        a set that does may have been scaled in printing, which
+                        makes the stated ratio confidently wrong.
+
+                        Beside the ratio control rather than hidden behind it —
+                        neither is a fallback for the other.
+                      */}
+                      {!tracing && !calibrating && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 gap-1.5 text-xs"
+                          onClick={() => {
+                            setCalibratePoints([]);
+                            setCalibrating(true);
+                            setStampAssembly(null);
+                          }}
+                          title="Click two points you know the distance between"
+                        >
+                          <Ruler className="w-3.5 h-3.5 text-[#38BDF8]" />
+                          Measure a known distance
+                        </Button>
+                      )}
 
                       <ScaleControl
                         sheet={activeSheet}
