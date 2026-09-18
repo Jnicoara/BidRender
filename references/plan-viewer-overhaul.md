@@ -307,7 +307,7 @@ Each phase ships and gets used before the next starts.
 | **4**   | ~~The layout: top bar, collapsing panels, focus mode~~ **shipped**         | **No**                   |
 | **4b**  | Measure-only tool                                                          | **No**                   |
 | **5**   | **Verticals on runs — the money phase**                                    | **Yes**                  |
-| **6**   | Three levels of effort                                                     | **Yes** — groups         |
+| **6**   | Three levels of effort, and marks you can tell apart — § 5e                | **Yes** — stamp kinds    |
 | **7**   | Run settings: allowances, materials, sizes, ground                         | **Yes**                  |
 | **8**   | **Verticals on stamps**                                                    | **Yes** (small)          |
 | **9**   | Editing runs: drag a vertex, insert/remove points                          | No                       |
@@ -2012,6 +2012,101 @@ produces, so a future "helpful" default of 10 feet turns it red.
 - **Allowances on verticals** — Phase 7, under § 7.1's split.
 - **The sheet-kind flag** — trap 3.
 - **Per-area heights** — settled against in § 7 and still settled.
+
+## 5e. Phase 6 — three levels of effort, and marks you can tell apart
+
+**Decided 2026-09-18, not built.** Four things came out of using the app after
+Phase 5 step 4. One is a bug fix that belongs nowhere in particular; the other
+three are Phase 6.
+
+### The panning bug — NOT Phase 6, no database change
+
+**The fault:** `clampView` (`client/src/lib/planView.ts`) applies one `axis()`
+function to x and y independently, and its first branch forces an axis to centre
+whenever the drawing is smaller than the viewport on THAT axis. So at a zoom
+where the sheet is wider than the pane but shorter than it, sideways drags pan
+and vertical drags are ignored. One gesture, two behaviours.
+
+**The fix: decide per VIEW, not per axis.** If the whole sheet fits, centre both
+— that behaviour is deliberate and stays. If EITHER axis overflows, apply the
+overlap rule to both.
+
+**Why, and this is the part worth keeping:** the code's own comment justifies
+the centring with _"a sheet small enough to see whole is not one anybody is
+repositioning"_. That reasoning is true when the whole sheet fits and false in
+the in-between state, where the sheet is not small enough to see whole and the
+user is demonstrably repositioning it — that is what the sideways drag IS. The
+lock also contradicts the change shipped the same week that let a zoomed-in
+corner sit in the middle of the screen instead of jammed against an edge.
+
+Allowing it costs nothing that can be lost: `MIN_VISIBLE_FRACTION` still bounds
+the drag. `fitView` is untouched, because at fit zoom the whole sheet fits by
+definition and still centres.
+
+### Stamps have to look different from each other
+
+Every stamp is a 10px circle in `#F5C518` (`TraceLayer.tsx`). **That is the same
+yellow as a conduit run and the same yellow as every warning in the app** — so
+it is not only that stamps cannot be told apart from each other, a field of
+stamps and a traced conduit run are currently the same colour. **Stamps and
+traced runs must never share a colour.**
+
+- **Shape comes from the CATEGORY, which every stamp already stores.** Five
+  categories, five shapes, no setup. Making the estimator pick a shape per
+  assembly is a setup chore that gets skipped, and a feature nobody configures
+  is a feature that does nothing.
+- **Colour is derived from the assembly**, deterministically, from a fixed
+  palette. **No override in the first pass** — ship it and see whether anyone
+  asks.
+- **NOT the captured legend symbol.** It is the real symbol off the real
+  drawing and it is tempting, but it is a raster crop that turns to mush at
+  14px and only exists for symbols captured on that job. It belongs in the
+  legend panel at 40px, not on the drawing at 14.
+- **How many stay readable:** about five shapes (circle, square, triangle,
+  diamond, hexagon) and six colours — the drawing underneath is black on white
+  and three colours are already spoken for: conduit yellow, cable green, and
+  the blue used for selection. Thirty combinations is more distinct marks than
+  a sheet can usefully carry.
+- **Marks must scale with zoom, in the same pass.** They are drawn at a fixed
+  pixel size today, so at 19% on a dense sheet they already overlap each other.
+  Shapes do not help if they are all on top of one another.
+
+**No database change.** The category is already on the stamp; the colour is
+derived. Only an override would need storage, and it is not in the first pass.
+
+### Counting without an assembly — this is § 3, in four levels
+
+Stamping demands an assembly today, so counting exit signs means borrowing an
+unrelated assembly as a placeholder. That is backwards. The blocker is one
+column: `takeoff_stamps.assemblyName` is NOT NULL and the whole stamp path
+assumes an assembly behind it.
+
+| Level                   | What it is                                    | What it needs                                                                 |
+| ----------------------- | --------------------------------------------- | ----------------------------------------------------------------------------- |
+| **1. Plain count**      | A typed name, nothing else. "Exit signs: 14." | A `kind` column and a label. **Never reaches the bid** — a number on screen   |
+| **2. Count + price**    | A name and a dollar amount per item           | `unitCost` / `unitHours`, **plus a way to become a bid line** — the real work |
+| **3. Count = material** | The part, no labour                           | A `materialId` link                                                           |
+| **4. Count = assembly** | What exists today                             | Nothing. Stays as the fullest option                                          |
+
+**Level 2 ships with a warning on the screen**, and the reasoning is the
+unpriced-material rule (`CLAUDE.md` § Starter content) applied one level along:
+a stamp carrying its own dollar amount is **a price that lives outside the
+materials library**, so it is never re-priced when supplier costs move and never
+appears in "what needs pricing". So it says so where it is set, and those stamps
+go in the needs-attention list — findable rather than forgotten. A price nobody
+can find again is the quiet kind of wrong.
+
+**Database change: yes.** `kind`, a label, `materialId`, `unitCost`,
+`unitHours` on `takeoff_stamps` — all additive and nullable, so the same
+migrate-first-deploy-second shape as Phase 5.
+
+### Why the appearance work belongs WITH the levels, not after
+
+It is not in the phase table and is being added rather than confirmed. The
+argument is causal: **the moment you can count "exit signs" without building an
+assembly, the number of different kinds of mark on one sheet jumps.** Telling
+them apart stops being polish at exactly the point level 1 ships, which is why
+it goes in the same phase rather than the next one.
 
 ## 6. Decisions already made — do not re-open without saying why
 

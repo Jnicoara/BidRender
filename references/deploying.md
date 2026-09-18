@@ -199,6 +199,157 @@ So: `pnpm db:push` against the empty DigitalOcean database first, confirm 44 of
 missing foreign keys and the nine indexes are on the retired `master_*` /
 `project_*` tables and come back for free the same way.
 
+### 5a. Running a migration against production — the checklist
+
+Written 2026-09-18, for the Phase 5 verticals migrations (0046–0052) and every
+one after them. **Read it as a procedure, not as background.** Each step has one
+command and one thing to look at; do them in order and stop at the first one
+that does not say what it should.
+
+**It is a fresh-morning job.** Seven steps that each want your full attention is
+not an end-of-day task, and nothing about a migration is urgent — an additive
+migration can wait as long as you like, because the site runs perfectly well
+without it.
+
+#### Before step 1: this machine cannot reach production yet
+
+`.env.production.local` has **`DATABASE_URL=`** — empty — and no
+`DATABASE_CA_CERT` at all. Both are required (§ 3 of
+`references/database-digitalocean.md`), and both live **only in DigitalOcean's
+environment**: App Platform → the app → Settings → App-Level Environment
+Variables.
+
+Copy them into `.env.production.local`. That file is gitignored and already
+holds the R2 secrets, so it is the right home; it is also a file full of
+credentials, so do not paste its contents anywhere, and consider blanking
+`DATABASE_URL` again when you are done.
+
+Everything below assumes those two values are in place. Every command names the
+file explicitly rather than relying on the shell, because a migration that runs
+against the wrong database is the one mistake here with no undo.
+
+#### The order, and why it is not the obvious one
+
+**Migrate FIRST. Deploy SECOND.** Nearly every read in this app is a bare
+`select()` that expands to every column the RUNNING build knows about, so:
+
+- new code against an old database → `Unknown column`, and the whole takeoff
+  screen dies;
+- old code against a new database → the extra columns are simply ignored.
+
+So the database goes first and the site carries on unchanged until you choose
+to deploy. They are two separate decisions on two separate days if you like.
+
+#### 1. Take a fresh backup
+
+```bash
+DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/backup.mts
+```
+
+Minutes before, not last night's. Note the run id it prints.
+
+#### 2. Prove that backup actually restores
+
+```bash
+DOTENV_CONFIG_PATH=.env.production.local \
+VERIFY_DATABASE_URL=mysql://root:pass@localhost:3306/mysql \
+pnpm tsx scripts/verifyBackup.mts
+```
+
+`VERIFY_DATABASE_URL` is a MySQL server **you** control — the local one is
+fine. It downloads what is really in the bucket, restores it into a scratch
+database and compares the result against the manifest.
+
+**What this step does NOT do is rehearse the migration.** It drops its scratch
+database when it finishes (`server/backup/verifyBackup.ts`), so there is
+nothing left to migrate. That is step 3, and it is a separate job.
+
+#### 3. Rehearse the migrations on production's DATA
+
+The point of this step is not the schema — the local database already proved
+all seven apply cleanly to an empty-ish one. The point is **production's rows**:
+statements 0051 and 0052 add foreign keys, and MySQL validates a foreign key
+against every existing row. Local has a handful of runs; production has real
+ones.
+
+So: restore the dump from step 1 into a scratch database that PERSISTS, point
+`DATABASE_URL` at it, and run
+
+```bash
+pnpm tsx scripts/migrate.mts
+pnpm tsx scripts/schemaDrift.mts
+```
+
+Expect seven applied and no drift.
+
+> **Worth building before the next migration:** a `KEEP_SCRATCH=1` flag on
+> `verifyBackup.mts` would make steps 2 and 3 one command instead of a manual
+> restore. It drops the schema unconditionally today.
+
+#### 4. Ask production what it is missing
+
+```bash
+DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/schemaDrift.mts
+```
+
+Expect it to name exactly what you are about to add. For Phase 5 that is three
+tables and the columns on `bids` and `takeoff_runs`.
+
+#### 5. Run it
+
+```bash
+DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/migrate.mts
+```
+
+`pnpm db:push` also works, but it runs `drizzle-kit generate` first, which can
+write a new migration file you did not ask for. **Prefer `migrate.mts` on
+production**: it applies what is already in `drizzle/` and nothing else.
+
+Expect `Applied 7 migrations: 0046_magical_electro to 0052_windy_sunspot.`
+
+#### 6. Ask again
+
+```bash
+DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/schemaDrift.mts
+```
+
+Expect `Database matches the schema.` **If it still names something, stop here
+and do not deploy.** The site is fine — it is running the old code, which does
+not know about any of this.
+
+#### 7. Open the live site, still on the OLD code
+
+Check a bid's takeoff totals read the numbers they read yesterday. **This step
+has to be boring.** Old code against a new database should be completely
+unremarkable, and if it is not, you have found something worth knowing before
+any new code ships.
+
+Only then is the deploy a separate decision — § 4 of this document.
+
+#### If a step fails
+
+Every migration in this set is **one statement in one file**, deliberately (see
+the header comment in `drizzle/0046_magical_electro.sql`). So a failure can only
+mean "that statement failed and nothing was applied":
+
+- `scripts/migrate.mts` names the file, the statement and MySQL's own reason —
+  unlike `drizzle-kit migrate`, which redraws its spinner and exits 1.
+- The files before it stay applied and are harmless on their own.
+- Nothing live depends on any of it, because the code has not shipped.
+- Fix the one file and run step 5 again. It resumes where it stopped.
+
+**Rollback is not on the menu, and that is by design.** Migrations here are
+forward-only. If the code is later rolled back, the columns stay behind — empty,
+read by nothing. That is why step 3 exists.
+
+#### The two statements most likely to fail
+
+`0051` and `0052` each add a foreign key from `takeoff_runs` to
+`takeoff_stamps`. A foreign key is checked against every existing row, and this
+database is **already missing five foreign keys** from the 0004 incident in July
+— so it is the statement type with history here. Both are in their own file for
+exactly that reason.
+
 ## 6. Verifying a deploy actually took
 
 A deploy that silently didn't take looks identical to one that did, so check
