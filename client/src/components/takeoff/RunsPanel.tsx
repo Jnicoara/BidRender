@@ -110,6 +110,23 @@ export function RunsPanel({
         </div>
       </div>
 
+      {/*
+        ONE scroll region, holding the list AND the legend beneath it.
+
+        The legend used to sit outside this, as a plain flex child between the
+        scrolling list and the pinned totals — no shrink-0, no scroller, and
+        therefore no way to be shorter than its own contents. With the reader
+        panel, the layer checklist and a legend of captured symbols stacked
+        inside it, that is easily taller than the pane, and everything after
+        it gets pushed out of the bottom of the window: the bid totals cut in
+        half, the footage numbers gone entirely, and nothing on screen saying
+        there was more.
+
+        Putting it INSIDE the scroller rather than giving it a second one of
+        its own is deliberate. Two stacked scroll areas in a 400px column means
+        a wheel that does different things two inches apart, and a legend you
+        can only reach by first scrolling something else to the bottom.
+      */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {/* Stamped assemblies first: an estimator drops dozens per sheet and
             traces a handful of runs, so the thing they are actively adding to
@@ -391,11 +408,17 @@ export function RunsPanel({
             );
           })
         )}
+
+        {legend}
       </div>
 
-      {legend}
+      {/*
+        Bid totals. Conduit, cable and wire never merge into one number.
 
-      {/* Bid totals. Conduit, cable and wire never merge into one number. */}
+        Pinned below the scroller and NEVER inside it: this is the number the
+        panel exists to show, and a total you have to go looking for is a total
+        that gets read off stale. shrink-0 is what keeps its last row whole.
+      */}
       {totals && (
         <div className="border-t border-border px-3 py-2.5 shrink-0 space-y-1">
           <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1">

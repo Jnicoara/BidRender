@@ -277,6 +277,15 @@ mistake it can make is silent and produces an app that still answers.
   spend report cannot become an archive of what contractors asked about their
   jobs. The same row serves the limit and the admin screen.
 
+**A local run with `DISABLE_AI_FEATURES=true` renders a SMALLER app than the
+live one, and that has already produced a wrong conclusion.** The plan reader's
+panel is simply absent locally, so the viewer's work pane is several hundred
+pixels shorter than a user's — which is why a layout fault that cut the bid
+totals in half on the live site could not be reproduced on a dev machine and
+looked, honestly, fine. **"It looks right here" is weak evidence for anything
+about layout.** Either test with the flag off, or reason about the structure
+rather than about what happens to fit today.
+
 Cost figures come from a local copy of published rates (`shared/aiPricing.ts`)
 in millionths of a dollar, because a single call costs less than a cent and
 cents would round every one of them to zero. They go stale silently, so say
@@ -422,6 +431,43 @@ nothing, and let the optimistic result stand in. Real work — PDF page renderin
 progress rather than an indeterminate spinner. Prefer skeletons over spinners
 for a first load, and never replace already-rendered content with a spinner on
 refetch.
+
+**4. Nothing important may sit under the bottom edge.** A screen is a column of
+fixed rows around one part that gives, and getting that wrong hides a number
+rather than looking untidy. Three rules, each of which has already been broken
+once:
+
+- **Height comes from `h-dvh`, never `h-screen`.** `100vh` is the viewport with
+  a phone's address bar RETRACTED — the largest it ever gets — so a shell sized
+  that way hangs off the bottom by the height of the bar, permanently, and takes
+  whatever is pinned to the bottom of a panel with it. `dvh` tracks the real
+  height as the bar slides. Same for `min-h-dvh` on a full-page state. And avoid
+  `w-screen`: `100vw` does not subtract a vertical scrollbar, which buys
+  horizontal overflow, which buys a horizontal scrollbar, which then eats
+  pixels off the BOTTOM.
+
+- **In a flex column, exactly one child gives.** That child carries
+  `flex-1 min-h-0 overflow-y-auto`; every other child carries `shrink-0`. A
+  child with neither cannot be shorter than its own contents, so it pushes
+  everything after it out of the window — and because the container clips,
+  nothing on screen says there is more. This is what cut the bid totals in half
+  in the plan viewer's work pane: the legend slot sat between the scrolling list
+  and the pinned totals with no constraint on it. **`min-h-0` is not optional**;
+  a flex child defaults to `min-height: auto` and will refuse to shrink without
+  it. Prefer ONE scroll region over two stacked ones — two scrollers in a narrow
+  column means a wheel that does different things two inches apart.
+
+- **Do not animate the position of a full-height container that clips.** A
+  `translateY` on a pane exactly as tall as its parent moves its bottom past the
+  clip for the length of the animation — and not only for that long. Animations
+  do not advance in a throttled or backgrounded tab, so with `animation-fill-mode:
+both` the pane holds the FROM frame indefinitely. A `tab-enter` keyframe that
+  slid 6px did exactly this. Fade instead; a fade cannot move anything.
+
+Worth knowing how this gets checked: walk every leaf element on the page and
+flag any with text whose bottom is past `innerHeight` with no scrollable
+ancestor. That is the test that matches what a user actually loses, and it
+found the fault on the one screen that had it and cleared the other thirteen.
 
 These are forward-looking. Screens built before this section predate the rules —
 do not retrofit them as a side effect of unrelated work; that is its own task and

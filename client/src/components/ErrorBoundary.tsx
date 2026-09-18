@@ -94,7 +94,7 @@ class ErrorBoundary extends Component<Props, State> {
     const { crash, copied } = this.state;
 
     return (
-      <div className="flex items-center justify-center min-h-screen p-6 bg-background">
+      <div className="flex items-center justify-center min-h-dvh p-6 bg-background">
         <div className="w-full max-w-md">
           <div className="rounded-xl border border-border bg-card p-6">
             <AlertTriangle className="w-8 h-8 text-[#F5C518] mb-4" />

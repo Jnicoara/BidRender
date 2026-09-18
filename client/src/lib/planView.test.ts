@@ -14,6 +14,7 @@ import {
   REGION_MARGIN,
   SHARP_SCALE_TOLERANCE,
   snapToDevicePixel,
+  MIN_VISIBLE_FRACTION,
   clampView,
   clampZoom,
   fitView,
@@ -71,18 +72,62 @@ describe("fitView", () => {
   });
 });
 
-describe("clampView — the drawing cannot be dragged off screen", () => {
-  it("refuses to open a gutter on the left or top", () => {
+/** How much of the viewport still has drawing on it, on one axis. */
+function overlap(offset: number, scaled: number, viewport: number): number {
+  return Math.min(viewport, offset + scaled) - Math.max(0, offset);
+}
+
+describe("clampView — the drawing can be pushed aside but never away", () => {
+  it("lets the drawing be pushed past the left and top edges", () => {
+    // The old rule pinned both of these to 0, which is what made the corner of
+    // a zoomed sheet unreachable anywhere but jammed against the bezel.
+    // x: 500 is now simply allowed — it is inside the stop at 800 - 200.
+    // y: 500 lands ON the stop, because a 600-tall viewport keeps 150.
     const view = clampView({ zoom: 1, x: 500, y: 500 }, bounds);
-    expect(view.x).toBe(0);
-    expect(view.y).toBe(0);
+    expect(view.x).toBe(500);
+    expect(view.y).toBe(450);
   });
 
-  it("refuses to open a gutter on the right or bottom", () => {
+  it("stops once only a quarter of the viewport still has drawing on it", () => {
+    const shoved = clampView({ zoom: 1, x: 9999, y: 9999 }, bounds);
+    expect(shoved.x).toBe(800 - 800 * MIN_VISIBLE_FRACTION);
+    expect(shoved.y).toBe(600 - 600 * MIN_VISIBLE_FRACTION);
+    expect(overlap(shoved.x, 2000, 800)).toBeCloseTo(200, 6);
+    expect(overlap(shoved.y, 1500, 600)).toBeCloseTo(150, 6);
+  });
+
+  it("stops at the same fraction going the other way", () => {
     const view = clampView({ zoom: 1, x: -5000, y: -5000 }, bounds);
-    // 2000 wide in an 800 viewport: the furthest left is -1200.
-    expect(view.x).toBe(800 - 2000);
-    expect(view.y).toBe(600 - 1500);
+    expect(view.x).toBe(800 * MIN_VISIBLE_FRACTION - 2000);
+    expect(view.y).toBe(600 * MIN_VISIBLE_FRACTION - 1500);
+    expect(overlap(view.x, 2000, 800)).toBeCloseTo(200, 6);
+  });
+
+  it("keeps that guarantee at every zoom, however hard it is shoved", () => {
+    // The safety net itself, rather than the arithmetic that implements it:
+    // there is ALWAYS a large piece of drawing on screen to drag back.
+    for (const zoom of [0.6, 1, 2.5, 4, 8]) {
+      for (const push of [-99999, -4000, -1, 1, 4000, 99999]) {
+        const view = clampView({ zoom, x: push, y: push }, bounds);
+        const scaledWidth = bounds.contentWidth * zoom;
+        const scaledHeight = bounds.contentHeight * zoom;
+        if (scaledWidth > bounds.viewportWidth) {
+          expect(overlap(view.x, scaledWidth, 800)).toBeGreaterThanOrEqual(
+            800 * MIN_VISIBLE_FRACTION - 1e-6
+          );
+        }
+        if (scaledHeight > bounds.viewportHeight) {
+          expect(overlap(view.y, scaledHeight, 600)).toBeGreaterThanOrEqual(
+            600 * MIN_VISIBLE_FRACTION - 1e-6
+          );
+        }
+      }
+    }
+  });
+
+  it("leaves Fit as the way home — a fitted view is never moved by clamping", () => {
+    const fitted = fitView(bounds);
+    expect(clampView(fitted, bounds)).toEqual(fitted);
   });
 
   it("centres a drawing smaller than the viewport and ignores the pan", () => {
@@ -151,13 +196,16 @@ describe("zoomAbout — the point under the cursor must not move", () => {
   });
 
   it("never lets a zoom leave the drawing off screen", () => {
+    // Zooming hard into the top-left corner is the case that used to push the
+    // offset furthest. The drawing may now sit past the edge; what it may not
+    // do is leave.
     let view = fitView(bounds);
     for (let i = 0; i < 20; i++) {
       view = zoomAbout(view, bounds, BUTTON_ZOOM_STEP, { x: 0, y: 0 });
     }
     const scaledWidth = bounds.contentWidth * view.zoom;
-    expect(view.x).toBeLessThanOrEqual(0);
-    expect(view.x).toBeGreaterThanOrEqual(800 - scaledWidth);
+    const onScreen = Math.min(800, view.x + scaledWidth) - Math.max(0, view.x);
+    expect(onScreen).toBeGreaterThanOrEqual(800 * MIN_VISIBLE_FRACTION - 1e-6);
   });
 });
 

@@ -64,6 +64,34 @@ export const MAX_ZOOM = 8;
 const FIT_PADDING = 24;
 
 /**
+ * How much of the viewport the drawing must still cover, per axis, once it has
+ * been panned past its own edge.
+ *
+ * **Panning past the edge is the point.** A sheet pinned so its edge can never
+ * leave the pane cannot put its own corner where your eyes are — the middle of
+ * the screen, which is the part anyone actually reads from — so the corner of a
+ * zoomed drawing was only ever readable jammed against a bezel. It can be
+ * dragged into the middle now, with empty ground behind it.
+ *
+ * **0.25, and per AXIS rather than by area.** A quarter of the width and a
+ * quarter of the height must still have drawing on them:
+ *
+ * - Generous enough to do the job. Putting a corner of the sheet in the dead
+ *   centre of the screen only needs half the viewport covered, so a quarter
+ *   leaves real headroom past what the job asks for.
+ * - Tight enough that the drawing is never a sliver. On the 1436x750 viewport
+ *   focus mode gives, a quarter is 359 x 187 pixels — a large, obvious thing to
+ *   grab and drag back, not a hairline against an edge.
+ * - Per axis, because an AREA rule at the same number would permit a quarter of
+ *   the width AND a quarter of the height at once: six percent of the screen, in
+ *   one corner. Per axis always leaves a band across a whole edge.
+ *
+ * Fit still recentres exactly as it did, so there is always a way home — the
+ * button, and the 0 key.
+ */
+export const MIN_VISIBLE_FRACTION = 0.25;
+
+/**
  * Only NaN falls back to 1 — an infinity is clamped like any other overshoot.
  *
  * The distinction is deliberate. NaN carries no direction, so there is nothing
@@ -83,14 +111,19 @@ export function clampZoom(zoom: number): number {
  * Two cases, and they want opposite behaviour:
  *
  *   Drawing SMALLER than the viewport — centre it, and ignore any pan. Letting
- *   someone shove a small sheet into a corner looks like a bug, not a feature.
+ *   someone shove a small sheet into a corner looks like a bug, not a feature,
+ *   and a sheet small enough to see whole is not one anybody is repositioning.
  *
- *   Drawing LARGER — allow panning anywhere within it, but never past an edge.
- *   No empty gutters, and no dragging the sheet off into nowhere and wondering
- *   where it went.
+ *   Drawing LARGER — pan anywhere within it AND past its edges, with empty
+ *   ground showing, until only `MIN_VISIBLE_FRACTION` of the viewport still has
+ *   drawing on it. That last clause is the entire safety net: the drawing can
+ *   be pushed aside but never away, so there is always a large piece of it on
+ *   screen to drag back.
  *
- * Strict rather than elastic, deliberately. A rubber-band overshoot reads as
- * slack on a screen whose whole job is precision.
+ * Strict rather than elastic, still. The limit is a stop, not a rubber band —
+ * an overshoot that springs back reads as slack on a screen whose whole job is
+ * precision. What moved is where the stop is, not what happens when you reach
+ * it.
  */
 export function clampView(view: PlanView, bounds: ViewBounds): PlanView {
   const zoom = clampZoom(view.zoom);
@@ -101,8 +134,23 @@ export function clampView(view: PlanView, bounds: ViewBounds): PlanView {
     if (!Number.isFinite(offset)) return 0;
     // Smaller than the viewport: centred, and the offset is not negotiable.
     if (scaled <= viewport) return (viewport - scaled) / 2;
-    // Larger: anywhere from "right edge flush" to "left edge flush".
-    return Math.min(0, Math.max(viewport - scaled, offset));
+
+    /*
+      Larger. The drawing occupies [offset, offset + scaled] and the viewport is
+      [0, viewport], so what has to stay above `keep` is the overlap between
+      them. Reading that requirement backwards on each side gives both stops:
+
+        pushed right — the overlap is (viewport - offset),
+                       so offset <= viewport - keep
+        pushed left  — the overlap is (offset + scaled),
+                       so offset >= keep - scaled
+
+      Setting keep = viewport reduces this to exactly the old clamp,
+      [viewport - scaled, 0]. Edge-pinning was never a different rule — it was
+      this one with the fraction set to all of it.
+    */
+    const keep = viewport * MIN_VISIBLE_FRACTION;
+    return Math.min(viewport - keep, Math.max(keep - scaled, offset));
   };
 
   return {

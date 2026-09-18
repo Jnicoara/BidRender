@@ -340,14 +340,28 @@
   }
 
   /* Tab entrance animation */
+  /*
+     Opacity only. There WAS a 6px translateY here, and it was quietly costing
+     6px off the bottom of every screen it ran on.
+
+     The element it is applied to is the full-height workspace pane, inside a
+     <main> that clips. Translating a pane that is exactly as tall as its
+     container moves its bottom 6px past the clip, so for the length of the
+     animation the last 6px of whatever is pinned to the bottom is cut off —
+     and it is not always just the length of the animation. Measured in a
+     browser tab that was not in front: playState "running", currentTime stuck
+     at 0, fill-mode both holding the FROM frame, and the pane 6px low for as
+     long as it was open. Animations do not advance in a throttled tab; a
+     layout that depends on one finishing is a layout that sometimes does not.
+
+     A fade says the same thing and cannot move anything.
+  */
   @keyframes tab-enter {
     from {
       opacity: 0;
-      transform: translateY(6px);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
     }
   }
   .tab-enter {

@@ -33,7 +33,7 @@ function ToasterWithTheme() {
 /** Shown only while the app chunk arrives — never on the landing page. */
 function AppChunkFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-dvh flex items-center justify-center bg-background">
       <Loader2 size={28} className="animate-spin text-[#F5C518]" />
     </div>
   );

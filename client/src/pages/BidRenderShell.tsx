@@ -390,7 +390,25 @@ export default function BidRenderShell() {
 
   return (
     <div
-      className="flex h-screen w-screen overflow-hidden bg-background"
+      /*
+        h-dvh, not h-screen, and w-full, not w-screen.
+
+        h-screen is 100vh, which on a phone or tablet is the height the window
+        has with the address bar RETRACTED — the largest it ever gets. The bar
+        is showing most of the time, so a shell sized that way hangs off the
+        bottom of the screen by the height of the bar, permanently, and takes
+        whatever is pinned to the bottom of a panel with it. h-dvh tracks the
+        real height as the bar slides in and out. The page itself never
+        scrolls (overflow-hidden here, scrollers inside), so the resize
+        thrash that makes dvh awkward on a long article does not arise.
+
+        w-screen is 100vw, which does NOT subtract a vertical scrollbar. On any
+        platform with classic scrollbars that is a few pixels of horizontal
+        overflow, which buys a horizontal scrollbar, which then eats a few
+        pixels off the BOTTOM. w-full is the parent width, scrollbar already
+        accounted for.
+      */
+      className="flex h-dvh w-full overflow-hidden bg-background"
       style={{ zoom: uiFontScale }}
     >
       {/* ── Desktop Sidebar ─────────────────────────────────────── */}

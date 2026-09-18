@@ -176,7 +176,7 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <div className="min-h-dvh flex items-center justify-center bg-background px-4">
       {/* Subtle grid background */}
       <div
         className="fixed inset-0 pointer-events-none"

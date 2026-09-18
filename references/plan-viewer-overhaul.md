@@ -1046,6 +1046,84 @@ and adding a bid name, Materials list and Add PDF would make it wrap on any
 laptop. One keystroke removes it entirely, which is better than making it
 smaller.
 
+### 4a.1 What live testing of Phase 4 changed
+
+Phase 4 went live and was used. Three things came back, and only one of them was
+about the layout.
+
+#### Panning is no longer pinned to the sheet's edge
+
+**The clamp allowed no overshoot, and that made the corner of a zoomed drawing
+unreadable.** The sheet's edge stayed flush against the pane, so the only place
+a corner could ever sit was jammed against the edge of the glass — never in the
+middle of the screen, which is the part anyone actually reads from.
+
+`MIN_VISIBLE_FRACTION = 0.25` in `planView.ts`. The drawing may be pushed past
+its own edges with empty ground showing, until only a quarter of the viewport's
+width and a quarter of its height still have drawing on them. Measured live at
+47% zoom: the stop lands at exactly 199 x 172 on a 796 x 689 viewport.
+
+**Per AXIS, not by area** — an area rule at the same number would allow a
+quarter of the width and a quarter of the height at once, which is six percent
+of the screen in one corner. Per axis always leaves a band across a whole edge.
+
+The pleasing part is that it is the same rule as before with one number changed:
+`keep = viewport` reduces the arithmetic to exactly the old edge-pinned clamp.
+Edge-pinning was never a separate rule. Fit still recentres, so there is always
+a way home.
+
+#### Things were cut off at the bottom of the window — three separate faults
+
+Reported as the counted-items panel covering the drawing; it was nothing of the
+kind. The standing rules that came out of it are in CLAUDE.md § Responsiveness
+rule 4. What happened here:
+
+1. **`RunsPanel` had an unconstrained flex child.** The legend slot sat between
+   the scrolling list and the pinned totals with no `shrink-0` and no scroller,
+   so it could never be shorter than its contents. Past a threshold it pushed
+   the bid totals out of the window — cut in half, footage numbers gone, and
+   nothing on screen saying there was more. The legend now lives inside the
+   scroll region. One scroller, not two.
+
+2. **`.tab-enter` slid the workspace pane down 6px.** The pane is exactly as
+   tall as the container that clips it, so the slide moved its bottom past the
+   clip. Worse than transient: caught in a backgrounded tab with `playState`
+   "running", `currentTime` stuck at 0 and fill-mode `both` holding the FROM
+   frame, the pane sat 6px low for as long as it was open. Opacity only now.
+
+3. **`h-screen w-screen` on the shell.** The `100vh` hazard, pre-empted rather
+   than suffered — see the rule. Now `h-dvh w-full`.
+
+**The instrument mattered more than any one fix.** A detector that walks every
+leaf element and flags text below the window with no scrollable ancestor was run
+over all fourteen routes, at full height and with the shell squeezed to 480px.
+It found the one screen that had the fault and cleared the other thirteen, which
+is a far better answer than reading thirteen files.
+
+#### Why it could not be reproduced locally
+
+`DISABLE_AI_FEATURES=true` in a dev `.env` means the plan reader's panel is
+absent, so the work pane is several hundred pixels shorter than a real user's
+and the legend never got tall enough to push anything off. Written up in
+CLAUDE.md § AI features, because the lesson generalises: **a local run renders a
+smaller app than the live one, and "it looks right here" is weak evidence about
+layout.**
+
+#### The trade tool icons, third attempt
+
+`Route` (two dots and an S-bend — a journey) and `Spline` (a bezier with control
+handles — a drawing tool) both read as something other than what they arm.
+
+Now `GitCommitHorizontal as ConduitIcon` — a straight line with a ring in the
+middle, which is a run of pipe with a coupling on it — and `Cable as CableIcon`.
+
+**Cable won on consistency rather than on the picture.** It is the same icon
+already drawn beside every MC/Romex row in the counted-items list, so the tool
+and the rows it produces finally say the same thing. `Shell`, a tight spiral,
+is the better drawing of MC's spiral armour and was passed over for exactly that
+reason: matching what is already on screen beat a cleverer picture that matched
+nothing.
+
 ## 4c. Typed-length runs — draw the path, type the length
 
 **Proposed 2026-09-17. Recommended as Phase 3a, and it may deserve to jump the

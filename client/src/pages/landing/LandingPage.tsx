@@ -105,7 +105,7 @@ export function LandingPage({
   const done = status.kind === "joined" || status.kind === "already";
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-dvh bg-background text-foreground">
       {/* This page is long enough that a keyboard user should not have to tab
           the nav to reach the one thing it asks of them. */}
       <a

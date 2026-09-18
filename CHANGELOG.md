@@ -4,6 +4,16 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-18]
+
+- **You can drag the drawing past its own edge now.** The sheet used to stay pinned so its edge could never leave the pane, which meant the corner of a zoomed-in drawing could only ever sit jammed against the edge of the screen — never in the middle, where you actually read. Drag it wherever you like: the drawing moves past the edge with empty space behind it, and stops only once a quarter of the pane still has drawing on it, so there is always a big piece of it to grab and drag back. Fit still recentres the sheet exactly as before, so there is always a way home.
+
+- **Fixed things being cut off at the bottom of the screen.** On the plans screen the bid totals under THIS BID, ALL SHEETS could be sliced in half by the bottom of the window, taking the footage numbers with them and giving no sign there was anything more to see. Three separate faults were doing it: the legend and reader panels could grow taller than their column and shove the totals out of view; the animation that fades a screen in was also sliding it down six pixels and sometimes never finished sliding back; and the app measured itself against the full height of the window rather than the height actually available. All three are fixed, and every panel that can outgrow its space now scrolls inside itself with its last row fully visible. Checked on all fourteen screens, at normal height and squeezed down to a short window — nothing else in the app had the problem.
+
+- **This matters most on phones and tablets**, where the address bar slides in and out and the window height changes while you scroll. Touch is still a later phase, but the app no longer has the fault built into it waiting to be unpicked.
+
+- **New icons for the conduit and cable tools.** Conduit is now a straight run with a coupling on it, instead of a winding path between two dots that read more like a journey than a pipe. Cable is now the same cable icon already shown beside every MC/Romex run in the counted-items list — so the button you press and the rows it produces finally look like the same thing.
+
 ## [2026-09-17]
 
 - **The drawing now gets the screen.** The plans workspace had the drawing squeezed into 44% of the window, with a sheet list eating the left side, the counted-items panel eating the right, and a tool bar underneath — so the only way to read a callout was to zoom, and then the sheet ran off its own pane and disappeared behind the panel, cut off mid-column with nothing to say the rest was still there. Both side panels now fold away with a chevron on their inner edge, the tools have moved into a single bar across the top, and one key — **F** — puts both panels away at once and brings them back. Measured on a 1536x791 laptop screen: 44% of the window before, 81% with both panels folded, **89% in focus mode**. The panels remember how you left them and can be dragged wider; a new user still starts with everything open, because you have to be shown what is there before you can decide to hide it.
