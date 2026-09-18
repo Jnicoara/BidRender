@@ -76,6 +76,7 @@ export type AssemblyView = (typeof ASSEMBLY_VIEWS)[number];
  */
 export const SETTINGS_SECTIONS = [
   "pricing",
+  "heights",
   "branding",
   "tax",
   "proposal",

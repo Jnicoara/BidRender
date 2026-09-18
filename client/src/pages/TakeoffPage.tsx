@@ -114,6 +114,7 @@ import {
 import { StampPicker } from "@/components/takeoff/StampPicker";
 import { CalibrateLayer } from "@/components/takeoff/CalibrateLayer";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
+import { JobHeightsChip } from "@/components/takeoff/JobHeightsChip";
 import { UploadProgress } from "@/components/takeoff/UploadProgress";
 import { describePlanRemoval } from "@shared/planRemoval";
 import {
@@ -3287,6 +3288,14 @@ export default function TakeoffPage({
                 onClear={() => clearSheetScale.mutate({ id: activeSheet.id })}
               />
             )}
+
+            {/*
+              The heights this job measures its DROPS from, beside the scale it
+              measures its LENGTHS against. Same kind of setting, same bar: one
+              makes flat distance measurable, the other makes vertical distance
+              measurable, and neither of them counts anything until it is set.
+            */}
+            <JobHeightsChip bidId={bidId} />
 
             <div className="w-px h-4 bg-border" />
 

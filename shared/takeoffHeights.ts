@@ -88,10 +88,34 @@ export type ShippedHeightType = {
  * in this feature, and wrong. A CEILING BOX is the same argument: often at
  * distribution height, often not.
  *
- * This list is the app-owned half of `takeoff_mounting_heights`. A company's
- * own rows override these by key and their own types are added alongside —
- * same table, same read, separated only by whether the row has an owner. See
- * § 5d, and `seedBaselineMaterials` for the pattern this copies.
+ * ── These live in CODE, and deliberately NOT as rows. Do not "fix" this ──────
+ * The obvious move is the baseline-materials pattern: seed every shipped type
+ * into `takeoff_mounting_heights` with a NULL `userId`, re-stamp it on startup,
+ * and let a company's edit fork it (`server/db.ts`, `seedBaselineMaterials`).
+ * That pattern is right for materials and wrong here, for three reasons, and
+ * the third is the one that settles it:
+ *
+ *   1. **A new type would need a seed.** Here it needs nothing — adding an
+ *      entry to this list ships it to every company the moment the code
+ *      deploys, with no migration and no backfill.
+ *   2. **"Reset to shipped" would be a remembered number.** It is a DELETE
+ *      instead: with no company row, resolution falls through to this list, so
+ *      a reset cannot drift from what the app actually ships.
+ *   3. **MySQL ignores NULLs in a unique index.** App-owned rows with a NULL
+ *      `userId` would make `unique(userId, typeKey)` stop protecting exactly
+ *      the rows nobody owns — two shipped receptacles, and no complaint. That
+ *      is the hole `dedupeBaselineRows` exists to patch for materials, and it
+ *      is patched at seed time in application code rather than by the database.
+ *      Not recreating a known flaw is worth more than matching the pattern
+ *      that has it.
+ *
+ * What the two designs share is the part that matters: reading is ONE path.
+ * `heightList` merges this list with the company's rows, and a type a company
+ * added behaves exactly like a shipped one — same picker, same inheritance to
+ * job and run, same live re-pricing. The table holds only what somebody has
+ * actually decided.
+ *
+ * See `references/plan-viewer-overhaul.md` § 5d.
  */
 export const SHIPPED_HEIGHT_TYPES: readonly ShippedHeightType[] = [
   {
@@ -342,6 +366,152 @@ export function verticalsForRun(
     end: endVertical,
     feet: round2(feet),
   };
+}
+
+// ── The merged list, which is what every screen reads ────────────────────────
+/**
+ * One row of the heights list, as the settings screen and the run pickers both
+ * see it.
+ *
+ * ── One merge, in one place ──────────────────────────────────────────────────
+ * The shipped types live in code and a company's decisions live in a table, and
+ * the whole design rests on those being INDISTINGUISHABLE once merged: a type
+ * the estimator added behaves exactly like a shipped one — same picker, same
+ * inheritance down to job and run, same live re-pricing. So the merge happens
+ * here, once, and both the server and the client read the result. Two merges
+ * would be two chances to order or resolve them differently, and the symptom
+ * would be a picker that disagrees with the settings screen about what a
+ * receptacle is.
+ */
+export type HeightRow = {
+  typeKey: string;
+  label: string;
+  /** The height in effect. NULL is "not set", which counts no vertical. */
+  heightInches: number | null;
+  /** Which level that number came from, for the "company / this job" note. */
+  source: HeightSource;
+  /** This type ships with the app, so it has something to reset back to. */
+  isShipped: boolean;
+  /** Retired types stay out of pickers and keep resolving for existing runs. */
+  isActive: boolean;
+  /** Above the fold. A company's own types are ALWAYS above it — see below. */
+  common: boolean;
+  /** Entered as a positive depth below the floor; stored negative. */
+  belowFloor: boolean;
+  note?: string;
+  /**
+   * What "reset" would give back. NULL for a type the company invented, which
+   * has nothing to fall back to and is retired rather than reset.
+   */
+  shippedInches: number | null;
+};
+
+/**
+ * Every height type this company can use, with the number in effect.
+ *
+ * ── The fold hides OURS, never THEIRS ────────────────────────────────────────
+ * A type the estimator added is always `common`, whatever else is true of it.
+ * They added it because they use it, and demoting it below a fold to keep our
+ * shipped list tidy is backwards. Only shipped types the trade meets rarely —
+ * a floor box, an underground stub — sit behind "show all". See `CLAUDE.md`
+ * § Customization available, but never in the way.
+ */
+export function heightList(input: {
+  /** Rows from `takeoff_mounting_heights` for this company. */
+  company: readonly {
+    typeKey: string;
+    label: string;
+    heightInches: number | null;
+    isActive: boolean;
+  }[];
+  /** Rows from `bid_mounting_heights`, when a job is in view. */
+  job?: readonly { typeKey: string; heightInches: number }[];
+}): HeightRow[] {
+  const companyByKey = new Map(input.company.map(row => [row.typeKey, row]));
+  const layers: HeightLayers = {
+    company: new Map(
+      input.company
+        .filter(row => row.heightInches !== null)
+        .map(row => [row.typeKey, row.heightInches as number])
+    ),
+    job: new Map((input.job ?? []).map(row => [row.typeKey, row.heightInches])),
+  };
+
+  const rows: HeightRow[] = [];
+
+  // Shipped types first, in the order they ship — that order is a decision
+  // about what an estimator reaches for most, not an accident of insertion.
+  for (const shipped of SHIPPED_HEIGHT_TYPES) {
+    const own = companyByKey.get(shipped.key);
+    const resolved = resolveMountingHeight(shipped.key, layers, null);
+    rows.push({
+      typeKey: shipped.key,
+      label: shipped.label,
+      heightInches: resolved.inches,
+      source: resolved.source,
+      isShipped: true,
+      isActive: own?.isActive ?? true,
+      common: shipped.common,
+      belowFloor: shipped.belowFloor ?? false,
+      note: shipped.note,
+      shippedInches: shipped.startingInches,
+    });
+  }
+
+  // Then the company's own, alphabetically — there is no shipped order to
+  // borrow, and insertion order would put the oldest first, which is not what
+  // anybody is looking for.
+  const own = input.company
+    .filter(row => !SHIPPED_BY_KEY.has(row.typeKey))
+    .sort((a, b) => a.label.localeCompare(b.label));
+  for (const row of own) {
+    const resolved = resolveMountingHeight(row.typeKey, layers, null);
+    rows.push({
+      typeKey: row.typeKey,
+      label: row.label || row.typeKey,
+      heightInches: resolved.inches,
+      source: resolved.source,
+      isShipped: false,
+      isActive: row.isActive,
+      // Always above the fold. See the header.
+      common: true,
+      belowFloor: false,
+      shippedInches: null,
+    });
+  }
+
+  return rows;
+}
+
+/**
+ * A stable key for a type the estimator has just named.
+ *
+ * Derived from the label so it reads plainly in a run row and in a log, and
+ * made unique against what this company already has. A RENAME keeps the key, so
+ * renaming a type never breaks a run pointing at it — which is why the key is
+ * generated once, here, and never recomputed from the label afterwards.
+ *
+ * A label that slugs onto a shipped key, or onto one the company already has,
+ * gets a numbered suffix rather than silently overriding what it collided with.
+ */
+export function slugForHeightType(
+  label: string,
+  taken: ReadonlySet<string>
+): string {
+  const base =
+    label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "type";
+  if (!taken.has(base) && !SHIPPED_BY_KEY.has(base)) return base;
+  for (let n = 2; n < 1000; n++) {
+    const candidate = `${base}-${n}`;
+    if (!taken.has(candidate) && !SHIPPED_BY_KEY.has(candidate))
+      return candidate;
+  }
+  // 999 types with the same name is not a real state; refusing beats looping.
+  throw new Error(`Cannot make a unique key for "${label}"`);
 }
 
 // ── The double-count rule ────────────────────────────────────────────────────

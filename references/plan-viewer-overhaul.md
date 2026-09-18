@@ -1636,25 +1636,38 @@ silently at whatever the setting was that afternoon.
 ### Device types: one table, shipped rows and the user's own. ANSWERED 2026-09-18
 
 **Asked:** does a user-added type need to be stored differently from a shipped
-one, or can they be the same rows with a flag? **Answer: the same rows, and the
-flag already exists in this codebase — a NULL `userId`.**
+one, or can they be the same rows with a flag?
 
-This is the baseline-materials pattern, unchanged (`server/db.ts`,
-`seedBaselineMaterials`):
+**First answer, given 2026-09-18: the same rows, flagged by a NULL `userId` —
+the baseline-materials pattern. REVISED the same day, while building it, and the
+revision is the one that shipped.**
 
-- **`userId` NULL** — an app-owned row. Shipped, shared by every company,
-  re-stamped from the seed file on startup. Adding a type in a later version
-  therefore reaches every existing company for free, with **no migration and no
-  backfill**.
-- **`userId` set** — the company's own row. Either an override of a shipped type
-  (same `key`) or a type they added (a new `key`). A user editing a shipped
-  height writes their own row; the shipped row is never touched, which is what
-  makes "reset to the shipped value" a delete rather than a remembered number.
+**What shipped: the shipped types live in CODE (`SHIPPED_HEIGHT_TYPES`), and the
+table holds only what a company has actually decided** — an override, a type of
+their own, or a retirement. Three reasons, and the third settles it:
 
-One path, and it is honest: the same table, the same read, the same resolution
-order. A type the user added behaves exactly like a shipped one — it appears in
-the run pickers, it inherits company → job → run, and changing its height
-re-prices every run pointing at it, live.
+1. **A new shipped type needs no seed at all.** Adding an entry to the list
+   ships it to every company the moment the code deploys — no migration, no
+   backfill, and no startup re-stamp pass.
+2. **"Reset to shipped" is a DELETE**, not a remembered number. With no company
+   row, resolution falls through to the shipped list, so a reset cannot drift
+   from what the app actually ships.
+3. **MySQL ignores NULLs in a unique index.** App-owned rows with a NULL
+   `userId` would make `unique(userId, typeKey)` stop protecting exactly the
+   rows nobody owns — two shipped receptacles, and no complaint from the
+   database. That is the hole `dedupeBaselineRows` exists to patch for
+   materials, in application code, at seed time. **Not recreating a known flaw
+   is worth more than matching the pattern that has it.**
+
+**What did not change is the part that was actually being asked about.** Reading
+is ONE path: `heightList` merges the shipped list with the company's rows, and a
+type the user added behaves exactly like a shipped one — it appears in the run
+pickers, it inherits company → job → run, and changing its height re-prices
+every run pointing at it, live.
+
+The reasoning is written at `SHIPPED_HEIGHT_TYPES` in `shared/takeoffHeights.ts`
+as well, because the baseline-materials pattern is what a reader will expect and
+"fixing" this to match it would quietly reintroduce the unique-index hole.
 
 **The key is a string, not a row id.** Shipped types use fixed keys
 (`distribution`, `receptacle`, `switch`); a user-added type gets a slug of its
@@ -1662,13 +1675,11 @@ label, made unique within the company. Renaming a type keeps its key, so a renam
 never breaks a run pointing at it. A key also reads plainly in a run row when
 something has to be debugged, which an id does not.
 
-**The unique index cannot protect the shipped rows, and that is a known gap
-rather than an oversight.** `unique(userId, key)` is ignored by MySQL wherever
-`userId` is NULL, so nothing at the database level stops two shipped rows sharing
-a key. Materials has exactly this hole and closes it at seed time with
-`dedupeBaselineRows`; heights do the same, in the same place, for the same
-reason. Do not "fix" it by making `userId` NOT NULL with a sentinel — that breaks
-the fork pattern the whole design rests on.
+**`userId` is NOT NULL, and that is what makes the unique index real.** Every row
+in `takeoff_mounting_heights` has an owner, because the unowned ones do not
+exist — they are the code list. So `unique(userId, typeKey)` is enforced by the
+database rather than by a startup pass, and there is nothing here for a
+`dedupeBaselineRows` equivalent to clean up.
 
 ### Retire, never delete. CONFIRMED 2026-09-18
 

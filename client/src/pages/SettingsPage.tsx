@@ -36,6 +36,7 @@ import {
   Settings as SettingsIcon,
 } from "lucide-react";
 import { BidPricingDefaultsSection } from "@/components/BidPricingDefaultsSection";
+import { HeightsSection } from "@/components/HeightsSection";
 import { BrandingSection } from "@/components/BrandingSection";
 import { SalesTaxSection } from "@/components/SalesTaxSection";
 import { ProposalDesignControls } from "@/components/proposal/ProposalDesignControls";
@@ -59,6 +60,11 @@ const SECTION_INFO: Record<SettingsSection, { label: string; blurb: string }> =
       label: "Pricing",
       blurb:
         "Overhead, profit and productivity. These reach every new bid and every existing bid still following the default.",
+    },
+    heights: {
+      label: "Heights",
+      blurb:
+        "What a traced line cannot see. Tracing measures flat distance only, so every drop and rise on a run comes from these numbers.",
     },
     branding: {
       label: "Branding",
@@ -360,6 +366,7 @@ export default function SettingsPage({
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-2xl">
           {section === "pricing" && <BidPricingDefaultsSection />}
+          {section === "heights" && <HeightsSection />}
           {section === "branding" && <BrandingSection />}
           {section === "tax" && <SalesTaxSection />}
           {section === "proposal" && <ProposalDesignControls />}

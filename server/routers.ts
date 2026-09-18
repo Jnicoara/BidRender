@@ -24,6 +24,7 @@ import { analyticsRouter } from "./routers/analyticsRouter";
 import { sampleRouter } from "./routers/sampleRouter";
 import { proposalsRouter } from "./routers/proposalsRouter";
 import { bidPdfsRouter } from "./routers/bidPdfsRouter";
+import { takeoffHeightsRouter } from "./routers/takeoffHeightsRouter";
 import { takeoffRunsRouter } from "./routers/takeoffRunsRouter";
 import { takeoffStampsRouter } from "./routers/takeoffStampsRouter";
 import { kitsRouter } from "./routers/kitsRouter";
@@ -77,6 +78,7 @@ export const appRouter = router({
   proposals: proposalsRouter,
   bidPdfs: bidPdfsRouter,
   takeoffRuns: takeoffRunsRouter,
+  takeoffHeights: takeoffHeightsRouter,
   takeoffStamps: takeoffStampsRouter,
   kits: kitsRouter,
   onboarding: onboardingRouter,

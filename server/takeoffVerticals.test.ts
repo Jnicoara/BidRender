@@ -22,6 +22,8 @@ import { describe, it, expect } from "vitest";
 import {
   DISTRIBUTION_KIND,
   SHIPPED_HEIGHT_TYPES,
+  heightList,
+  slugForHeightType,
   resolveDistributionHeight,
   resolveMountingHeight,
   shippedHeightType,
@@ -652,5 +654,154 @@ describe("a bid with no heights set reads exactly as it did before", () => {
     ]);
     expect(totals.unmeasurableCount).toBe(1);
     expect(totals.flatOnlyCount).toBe(1);
+  });
+});
+
+// ── The list both the settings screen and the pickers read ───────────────────
+
+describe("the merged heights list", () => {
+  it("is the shipped list when a company has decided nothing", () => {
+    const rows = heightList({ company: [] });
+    expect(rows).toHaveLength(SHIPPED_HEIGHT_TYPES.length);
+    expect(rows.every(r => r.isShipped)).toBe(true);
+    const receptacle = rows.find(r => r.typeKey === "receptacle")!;
+    expect(receptacle).toMatchObject({ heightInches: 18, source: "shipped" });
+  });
+
+  it("shows a panel as not set rather than as zero", () => {
+    // Zero is a real height — a floor box is at zero — so an unset type cannot
+    // be reported as one. The screen says "not set, no vertical counted".
+    const rows = heightList({ company: [] });
+    expect(rows.find(r => r.typeKey === "panel")).toMatchObject({
+      heightInches: null,
+      source: "unset",
+    });
+    expect(rows.find(r => r.typeKey === "floor-box")).toMatchObject({
+      heightInches: 0,
+      source: "shipped",
+    });
+  });
+
+  it("says which level the number in effect came from", () => {
+    const company = [
+      { typeKey: "receptacle", label: "", heightInches: 16, isActive: true },
+    ];
+    expect(
+      heightList({ company }).find(r => r.typeKey === "receptacle")
+    ).toMatchObject({ heightInches: 16, source: "company" });
+
+    expect(
+      heightList({
+        company,
+        job: [{ typeKey: "receptacle", heightInches: 24 }],
+      }).find(r => r.typeKey === "receptacle")
+    ).toMatchObject({ heightInches: 24, source: "job" });
+  });
+
+  it("keeps what resetting would give back, for a shipped type", () => {
+    const rows = heightList({
+      company: [
+        { typeKey: "receptacle", label: "", heightInches: 16, isActive: true },
+      ],
+    });
+    // The screen offers "reset to 1'-6"" by reading this, rather than by
+    // remembering a number that could drift from what the app ships.
+    expect(rows.find(r => r.typeKey === "receptacle")!.shippedInches).toBe(18);
+  });
+
+  it("puts a company's OWN type above the fold, always", () => {
+    // The fold hides ours, never theirs — CLAUDE.md § Customization available,
+    // but never in the way. They added it because they use it.
+    const rows = heightList({
+      company: [
+        {
+          typeKey: "exit-sign",
+          label: "Exit sign",
+          heightInches: 90,
+          isActive: true,
+        },
+      ],
+    });
+    const exit = rows.find(r => r.typeKey === "exit-sign")!;
+    expect(exit).toMatchObject({
+      label: "Exit sign",
+      heightInches: 90,
+      source: "company",
+      isShipped: false,
+      common: true,
+      shippedInches: null,
+    });
+    // ...and behind the shipped ones in the list, sorted by name among its own.
+    const own = rows.filter(r => !r.isShipped).map(r => r.typeKey);
+    expect(own).toEqual(["exit-sign"]);
+  });
+
+  it("sorts a company's own types by name, not by when they were added", () => {
+    const rows = heightList({
+      company: [
+        {
+          typeKey: "thermostat",
+          label: "Thermostat",
+          heightInches: 56,
+          isActive: true,
+        },
+        {
+          typeKey: "exit-sign",
+          label: "Exit sign",
+          heightInches: 90,
+          isActive: true,
+        },
+      ],
+    });
+    expect(rows.filter(r => !r.isShipped).map(r => r.label)).toEqual([
+      "Exit sign",
+      "Thermostat",
+    ]);
+  });
+
+  it("carries the retired flag through, for both kinds of type", () => {
+    const rows = heightList({
+      company: [
+        {
+          typeKey: "floor-box",
+          label: "",
+          heightInches: null,
+          isActive: false,
+        },
+        {
+          typeKey: "exit-sign",
+          label: "Exit sign",
+          heightInches: 90,
+          isActive: false,
+        },
+      ],
+    });
+    expect(rows.find(r => r.typeKey === "floor-box")!.isActive).toBe(false);
+    expect(rows.find(r => r.typeKey === "exit-sign")!.isActive).toBe(false);
+    // Retired, not gone: a run pointing at it still resolves its height.
+    expect(rows.find(r => r.typeKey === "exit-sign")!.heightInches).toBe(90);
+  });
+});
+
+describe("naming a new height type", () => {
+  it("makes a readable key from the label", () => {
+    expect(slugForHeightType("Exit sign", new Set())).toBe("exit-sign");
+    expect(slugForHeightType('Stub-up @ 6"', new Set())).toBe("stub-up-6");
+  });
+
+  it("never lands on a shipped key", () => {
+    // Otherwise "Panel" typed as a new type would silently become an override
+    // of the shipped panel, and every run pointing at one would move.
+    expect(slugForHeightType("Panel", new Set())).toBe("panel-2");
+  });
+
+  it("never lands on one this company already has", () => {
+    expect(slugForHeightType("Exit sign", new Set(["exit-sign"]))).toBe(
+      "exit-sign-2"
+    );
+  });
+
+  it("still produces a key for a label with nothing usable in it", () => {
+    expect(slugForHeightType("!!!", new Set())).toBe("type");
   });
 });

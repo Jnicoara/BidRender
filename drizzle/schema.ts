@@ -1729,6 +1729,17 @@ export const bids = mysqlTable(
     productivityPct: decimal("productivityPct", { precision: 6, scale: 4 }),
 
     /**
+     * The elevation the raceway runs at ON THIS JOB, in inches. NULL inherits
+     * the company's, from `takeoff_height_defaults`.
+     *
+     * A single column rather than a group, like `productivityPct` above and for
+     * the same reason: there is no second field it could be half-overridden
+     * against. Per bid because a ceiling height is a fact about a building, and
+     * the next job has different ones.
+     */
+    distributionHeightInches: int("distributionHeightInches"),
+
+    /**
      * The client this bid is for, if one has been assigned.
      *
      * ── Nullable, and it stays that way ──────────────────────────────────────
@@ -2116,6 +2127,57 @@ export const takeoffRuns = mysqlTable(
      */
     isSuggestion: boolean("isSuggestion").default(false).notNull(),
 
+    // ── Verticals (phase 5) ───────────────────────────────────────────────
+    //
+    // What is at each END of this run, and how far the pipe travels up or down
+    // to reach it. A traced line measures flat overhead distance only; these
+    // are the drops and rises it cannot see. See shared/takeoffHeights.ts and
+    // references/plan-viewer-overhaul.md § 5d.
+    //
+    // THE KIND IS STORED, THE HEIGHT IS NOT. A run remembers WHAT is at each
+    // end forever; how high that thing sits is resolved live through
+    // run → job → company → shipped every time a number is shown. Copying the
+    // height down at trace time would freeze forty runs at whatever the setting
+    // happened to say that afternoon, and changing the setting would then
+    // silently stop re-pricing them.
+
+    /**
+     * The height type at the start — "panel", "receptacle", "distribution".
+     *
+     * NULL means nobody has said, and nothing is counted. That is DIFFERENT
+     * from "distribution", which means the pipe carries straight on at run
+     * height — an answer rather than an absence. Collapsing the two would hide
+     * every unanswered run among the deliberate ones.
+     */
+    startKind: varchar("startKind", { length: 64 }),
+    endKind: varchar("endKind", { length: 64 }),
+
+    /** This run's own elevations, in inches. NULL follows the setting. */
+    startHeightInches: int("startHeightInches"),
+    endHeightInches: int("endHeightInches"),
+    /** This run does not sit at the job's run height. NULL follows it. */
+    distributionHeightInches: int("distributionHeightInches"),
+
+    /**
+     * The stamp at each end, once the estimator has linked them.
+     *
+     * THE DOUBLE-COUNT RULE READS THESE. A vertical belongs to either the run
+     * or the stamp and never both: a stamp a run claims does not carry its own
+     * drop, because the run already did. Ownership is CLAIMED by a person
+     * accepting the one-tap suggestion, never inferred from how close the two
+     * happen to be — proximity is right most of the time and silently wrong the
+     * rest, with nothing on screen looking wrong.
+     *
+     * `set null`: deleting a stamp must not delete the run or its vertical. The
+     * run keeps its own end kind and goes on counting its drop.
+     */
+    startStampId: int("startStampId").references(() => takeoffStamps.id, {
+      onDelete: "set null",
+    }),
+    endStampId: int("endStampId").references(() => takeoffStamps.id, {
+      onDelete: "set null",
+    }),
+
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -2169,6 +2231,174 @@ export const takeoffRunCircuits = mysqlTable(
 
 export type TakeoffRunCircuit = typeof takeoffRunCircuits.$inferSelect;
 export type InsertTakeoffRunCircuit = typeof takeoffRunCircuits.$inferInsert;
+
+// ─── Mounting heights and verticals (takeoff phase 5) ─────────────────────────
+/**
+ * The elevation the raceway actually runs at, for one company.
+ *
+ * ── This one number is the gate on the whole feature ─────────────────────────
+ * A vertical is the distance between two elevations. Until this is set, only
+ * one of them is ever known, so no drop and no rise is counted anywhere, on any
+ * run, whatever the device heights say. Nothing appears in a bid that nobody
+ * asked for, and a company that never opens this screen keeps counting exactly
+ * what it counted before Phase 5 existed.
+ *
+ * ── "Distribution height", never "ceiling height" ────────────────────────────
+ * The pipe may run at the ceiling, above it, or at the deck, and three people
+ * will enter three different numbers under an ambiguous label. Ceiling height
+ * stays out of the model entirely.
+ *
+ * ── Its own table rather than columns on pricing_defaults ────────────────────
+ * A height is a MEASURING setting, not a money one. Keeping them apart means a
+ * mistake here cannot reach overhead and profit, and it keeps `pricing_defaults`
+ * — which is per trade — from implying that a distribution height is too.
+ *
+ * Inches, like every elevation in this feature: `formatFeetInches` displays it,
+ * and 18" typed as `1.5` is the obvious mistake to design out.
+ */
+export const takeoffHeightDefaults = mysqlTable(
+  "takeoff_height_defaults",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    /** NULL means never set, which is what keeps the gate shut. Not 0 — a run
+     * at floor level is a real answer and has to be distinguishable from one
+     * nobody has given. */
+    distributionHeightInches: int("distributionHeightInches"),
+
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [unique("takeoff_height_defaults_user_uq").on(t.userId)]
+);
+
+export type TakeoffHeightDefaults = typeof takeoffHeightDefaults.$inferSelect;
+export type InsertTakeoffHeightDefaults =
+  typeof takeoffHeightDefaults.$inferInsert;
+
+/**
+ * A company's own mounting heights: overrides of the shipped types, types they
+ * added themselves, and types they have retired.
+ *
+ * ── The shipped types are NOT rows here, and that is the design ──────────────
+ * `SHIPPED_HEIGHT_TYPES` in `shared/takeoffHeights.ts` is the last layer of the
+ * resolver, read from code. So this table holds only what a company has
+ * actually decided, and three things follow that are worth having:
+ *
+ *   - **A new shipped type reaches every company with no migration and no
+ *     seed.** It appears the moment the code deploys.
+ *   - **"Reset to the shipped value" is deleting a row**, not remembering a
+ *     number that could drift from the one the app ships.
+ *   - **There is no NULL-owner row**, so `unique(userId, typeKey)` actually
+ *     protects what it claims to — MySQL ignores NULLs in a unique index, and
+ *     an app-owned row with a NULL `userId` would have left the same hole
+ *     `dedupeBaselineRows` exists to plug for materials.
+ *
+ * Reading is still ONE path: `resolveMountingHeight` merges this table with the
+ * shipped list, and a company's own type behaves exactly like a shipped one —
+ * same picker, same inheritance to job and run, same live re-pricing.
+ *
+ * ── Retire, never delete ─────────────────────────────────────────────────────
+ * A run stores a type's KEY and resolves its height live. Deleting a type would
+ * silently shorten every run pointing at it — the footage falls, nothing says
+ * why, and the bid gets quietly cheaper. `isActive = false` takes it out of
+ * every picker and keeps it resolving for runs that already use it, which is
+ * `retireBaselineMaterials` applied to the same problem.
+ */
+export const takeoffMountingHeights = mysqlTable(
+  "takeoff_mounting_heights",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    /**
+     * Which type this is about. A shipped key (`receptacle`) when it overrides
+     * or retires one; a slug of the label (`exit-sign`) for the company's own.
+     *
+     * Named `typeKey` rather than `key` because KEY is reserved in MySQL, and a
+     * column that only works while every query remembers to quote it is a trap
+     * for the first person who writes raw SQL against this table.
+     *
+     * A rename keeps the key, so renaming a type never breaks a run using it.
+     */
+    typeKey: varchar("typeKey", { length: 64 }).notNull(),
+
+    /**
+     * What it is called. Blank for a row that only overrides a shipped type's
+     * height — the shipped label still applies, and storing a copy would let
+     * the two disagree after the shipped one is reworded.
+     */
+    label: varchar("label", { length: 64 }).notNull().default(""),
+
+    /**
+     * Inches from the finished floor. NULL means "no height set", which counts
+     * no vertical and says so on screen.
+     *
+     * Negative is below the floor and is ordinary — an underground stub-up. The
+     * UI asks for a positive DEPTH on those and applies the sign itself, because
+     * `18` typed for a stub-up below slab is an 11.5 ft error.
+     */
+    heightInches: int("heightInches"),
+
+    /** Retire, never delete. See the header. */
+    isActive: boolean("isActive").default(true).notNull(),
+
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    // One row per type per company. Safe as a real unique index precisely
+    // because `userId` is NOT NULL here — see the header.
+    unique("takeoff_mounting_heights_user_type_uq").on(t.userId, t.typeKey),
+  ]
+);
+
+export type TakeoffMountingHeight = typeof takeoffMountingHeights.$inferSelect;
+export type InsertTakeoffMountingHeight =
+  typeof takeoffMountingHeights.$inferInsert;
+
+/**
+ * One job's mounting heights, where the job does not match the company's.
+ *
+ * A row exists only for a type actually overridden on this bid; absent means
+ * "follow the company", never "set to nothing". Rows die with the bid.
+ *
+ * A job can override a height. It cannot invent a TYPE — a one-off belongs on
+ * the run that needs it, and a type that exists on one bid and nowhere else is
+ * a picker entry nobody can find again.
+ */
+export const bidMountingHeights = mysqlTable(
+  "bid_mounting_heights",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    bidId: int("bidId")
+      .notNull()
+      .references(() => bids.id, { onDelete: "cascade" }),
+    /** Denormalised for one-query ownership checks, as on bid_pdfs. */
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    typeKey: varchar("typeKey", { length: 64 }).notNull(),
+    /** NOT NULL: a row here IS an override, so it always carries a number. */
+    heightInches: int("heightInches").notNull(),
+
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    unique("bid_mounting_heights_bid_type_uq").on(t.bidId, t.typeKey),
+    index("bid_mounting_heights_userId_idx").on(t.userId),
+  ]
+);
+
+export type BidMountingHeight = typeof bidMountingHeights.$inferSelect;
+export type InsertBidMountingHeight = typeof bidMountingHeights.$inferInsert;
 
 // ─── Stamps (takeoff phase 2c) ────────────────────────────────────────────────
 /**

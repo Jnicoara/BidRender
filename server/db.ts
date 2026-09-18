@@ -145,6 +145,13 @@ import {
   projectItems,
   bidSummary,
   aiUsageDaily,
+  takeoffHeightDefaults,
+  takeoffMountingHeights,
+  bidMountingHeights,
+  type TakeoffHeightDefaults,
+  type TakeoffMountingHeight,
+  type BidMountingHeight,
+  type InsertTakeoffMountingHeight,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import {
@@ -7237,4 +7244,256 @@ export async function getAiSpend(
     outputTokens: Number(r.outputTokens),
     costMicros: Number(r.costMicros),
   }));
+}
+
+// ── Mounting heights and verticals (takeoff phase 5) ─────────────────────────
+/**
+ * The company's distribution height row, or undefined if they have never set
+ * one.
+ *
+ * Undefined is returned rather than a created row with a NULL height, and the
+ * difference matters: no row is the gate being shut, and the caller renders
+ * that as "not set" rather than as a height of nothing. Nothing is created on
+ * read — a settings screen being opened is not a decision.
+ */
+export async function getHeightDefaults(
+  userId: number
+): Promise<TakeoffHeightDefaults | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db
+    .select()
+    .from(takeoffHeightDefaults)
+    .where(eq(takeoffHeightDefaults.userId, userId));
+  return rows[0];
+}
+
+/**
+ * Set — or clear — the company's distribution height.
+ *
+ * NULL clears it, which shuts the gate again and stops every vertical on every
+ * job. That is a real thing to want (a number entered by mistake) and it has to
+ * be reachable, so it is a value this function accepts rather than a deletion
+ * the UI has to find another way to ask for.
+ */
+export async function setCompanyDistributionHeight(
+  userId: number,
+  inches: number | null
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db
+      .insert(takeoffHeightDefaults)
+      .values({ userId, distributionHeightInches: inches });
+    return;
+  } catch (error) {
+    // Another request created the row between our read and our write.
+    if (!isDuplicateKey(error)) throw error;
+  }
+  await db
+    .update(takeoffHeightDefaults)
+    .set({ distributionHeightInches: inches })
+    .where(eq(takeoffHeightDefaults.userId, userId));
+}
+
+/** Every mounting-height row this company has: overrides, their own, retired. */
+export async function getMountingHeights(
+  userId: number
+): Promise<TakeoffMountingHeight[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(takeoffMountingHeights)
+    .where(eq(takeoffMountingHeights.userId, userId));
+}
+
+/**
+ * Set one mounting height, creating the row if this is the first time.
+ *
+ * `label` is stored only for a company's OWN type. A row overriding a shipped
+ * type keeps the empty string, so the shipped label stays the single source of
+ * what that type is called and the two cannot drift apart after a rewording.
+ */
+export async function upsertMountingHeight(
+  userId: number,
+  entry: {
+    typeKey: string;
+    heightInches: number | null;
+    label?: string;
+    isActive?: boolean;
+  }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const values = {
+    userId,
+    typeKey: entry.typeKey,
+    heightInches: entry.heightInches,
+    label: entry.label ?? "",
+    isActive: entry.isActive ?? true,
+  };
+  try {
+    await db.insert(takeoffMountingHeights).values(values);
+    return;
+  } catch (error) {
+    if (!isDuplicateKey(error)) throw error;
+  }
+  // The row exists. Only the fields the caller supplied are written, so
+  // setting a height cannot silently clear a label or un-retire a type.
+  const patch: Partial<InsertTakeoffMountingHeight> = {
+    heightInches: entry.heightInches,
+  };
+  if (entry.label !== undefined) patch.label = entry.label;
+  if (entry.isActive !== undefined) patch.isActive = entry.isActive;
+  await db
+    .update(takeoffMountingHeights)
+    .set(patch)
+    .where(
+      and(
+        eq(takeoffMountingHeights.userId, userId),
+        eq(takeoffMountingHeights.typeKey, entry.typeKey)
+      )
+    );
+}
+
+/**
+ * Reset a SHIPPED type back to the value the app ships.
+ *
+ * Deleting the row is the whole of it: with nothing stored, the resolver falls
+ * through to `SHIPPED_HEIGHT_TYPES`, so "reset" cannot drift from what the app
+ * actually ships the way a copied-back number would.
+ *
+ * This is for shipped keys only. A company's OWN type has nothing to fall back
+ * to, so deleting its row would delete the type itself and silently shorten
+ * every run pointing at it — those are RETIRED instead, through
+ * `upsertMountingHeight` with `isActive: false`.
+ */
+export async function resetMountingHeightToShipped(
+  userId: number,
+  typeKey: string
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .delete(takeoffMountingHeights)
+    .where(
+      and(
+        eq(takeoffMountingHeights.userId, userId),
+        eq(takeoffMountingHeights.typeKey, typeKey)
+      )
+    );
+}
+
+/** This job's overrides. Absent rows mean "follow the company". */
+export async function getBidMountingHeights(
+  bidId: number,
+  userId: number
+): Promise<BidMountingHeight[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(bidMountingHeights)
+    .where(
+      and(
+        eq(bidMountingHeights.bidId, bidId),
+        eq(bidMountingHeights.userId, userId)
+      )
+    );
+}
+
+/** Override one height on one job. */
+export async function upsertBidMountingHeight(
+  bidId: number,
+  userId: number,
+  typeKey: string,
+  heightInches: number
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db
+      .insert(bidMountingHeights)
+      .values({ bidId, userId, typeKey, heightInches });
+    return;
+  } catch (error) {
+    if (!isDuplicateKey(error)) throw error;
+  }
+  await db
+    .update(bidMountingHeights)
+    .set({ heightInches })
+    .where(
+      and(
+        eq(bidMountingHeights.bidId, bidId),
+        eq(bidMountingHeights.userId, userId),
+        eq(bidMountingHeights.typeKey, typeKey)
+      )
+    );
+}
+
+/** Drop a job's override, so it follows the company again. */
+export async function clearBidMountingHeight(
+  bidId: number,
+  userId: number,
+  typeKey: string
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .delete(bidMountingHeights)
+    .where(
+      and(
+        eq(bidMountingHeights.bidId, bidId),
+        eq(bidMountingHeights.userId, userId),
+        eq(bidMountingHeights.typeKey, typeKey)
+      )
+    );
+}
+
+/** Set or clear this job's own distribution height. NULL inherits again. */
+export async function setBidDistributionHeight(
+  bidId: number,
+  userId: number,
+  inches: number | null
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(bids)
+    .set({ distributionHeightInches: inches })
+    .where(and(eq(bids.id, bidId), eq(bids.userId, userId)));
+}
+
+/**
+ * How many live bids would move if the company's heights changed.
+ *
+ * Settings here are inherited rather than copied, so changing a company height
+ * re-prices every bid that has not overridden it — including ones already sent
+ * to a customer. That is the behaviour the estimator asked for, and it is also
+ * the one nobody expects, so the screen says how many bids a change reaches
+ * before it is made rather than afterwards.
+ *
+ * Counts only what a person would count: live bids, excluding the archived and
+ * the shipped sample, and excluding bids that have set their own height and so
+ * would not move.
+ */
+export async function countBidsInheritingHeights(
+  userId: number
+): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const rows = await db
+    .select({ n: sql<number>`COUNT(*)` })
+    .from(bids)
+    .where(
+      and(
+        eq(bids.userId, userId),
+        isNull(bids.archivedAt),
+        eq(bids.isSample, false),
+        isNull(bids.distributionHeightInches)
+      )
+    );
+  return Number(rows[0]?.n ?? 0);
 }

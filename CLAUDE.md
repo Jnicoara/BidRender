@@ -83,11 +83,55 @@ checked against, and sheets 2–5 are drawings. If its plan 404s, the
 encodes them when deriving the path, so the on-disk name contains `%20` and the
 column must not.
 
-**`pnpm check` does not verify a layout change.** Established twice on
-2026-09-18: a regrouped toolbar typechecked clean and had shipped the wrong
-visual weight on its most important control, and two hand-drawn icons that
-looked right at 72px read as a plug and a bowtie at the 14px they are actually
-used at. Render it and look at it, at the size it ships.
+## A layout or copy change is NOT verified until somebody has looked at it
+
+**`pnpm check` cannot see a screen.** Neither can a diff, a test, or a careful
+read of your own code. If a change alters what a person sees — layout, wording,
+an icon, the state a control shows — **render it and look at it, at the size it
+actually ships**, before calling it done.
+
+This is a rule rather than advice because it has now paid for itself three
+times in one day, 2026-09-18, on three different kinds of fault that every
+other check passed:
+
+- **Visual weight.** A regrouped toolbar typechecked clean and had shipped the
+  most eye-catching control on a sheet where that control was the least useful
+  thing present.
+- **Size.** Two hand-drawn icons looked right at 72px and read as a plug and a
+  bowtie at the 14px they are used at.
+- **State, and this one was a wrong NUMBER rather than an ugly screen.** The
+  job heights popover rendered `0 ft 0 in` under a caption reading "not set" —
+  in the feature whose entire purpose is that an unset height must never look
+  like a zero. Nothing failed. It just said something false.
+
+The third is the one to remember: **the failures worth catching here do not
+look like breakage.** A broken screen gets reported by whoever hits it. A
+screen that quietly states a wrong number gets believed.
+
+Reaching a screen needs a session, which is the genuinely hard part and is
+already solved — see the block above, and
+`.claude/skills/run-bidrender/SKILL.md`.
+
+## Copying a layout does not copy the behaviour with it
+
+Two similar-looking pieces of UI in two files WILL drift, and the drift shows
+up as a wrong number rather than as a broken screen.
+
+The `0 ft 0 in` fault above is the worked example. A settings row and a popover
+row displayed the same thing, so the second was written by copying the first's
+markup — and the "not set" handling, which was the whole point, stayed behind.
+Both screens looked fine. One of them lied.
+
+**So when two places show the same thing, they share the component, not the
+shape of it.** `HeightFields` exists for exactly this reason and says so at the
+top. A prop for the size difference is cheaper than a second copy of the
+behaviour, every time — and when the behaviour later changes, one file changes
+rather than one file and one nobody remembered.
+
+The same instinct applies below the UI: `shared/takeoffHeights.ts` merges the
+shipped height list with a company's rows in ONE function that both the server
+and the client read, because two merges are two chances to resolve the same
+height differently.
 
 ## Changelog — do this on every meaningful commit
 
@@ -313,7 +357,7 @@ every picker and kept, so anything already pointing at it still resolves what it
 was priced or measured from (`retireBaselineMaterials`). Deleting it instead
 changes a number on somebody's finished work and says nothing.
 
-**Where this already applies:** Settings is six addressable sections rather than
+**Where this already applies:** Settings is seven addressable sections rather than
 one scroll; the run panel shows what differs from the defaults and keeps the
 rest behind "more" (`references/plan-viewer-overhaul.md` § 6); materials ship as
 baseline rows a user forks rather than as a fixed list. The heights screen in
@@ -799,7 +843,7 @@ tRPC routers live in `server/routers/*Router.ts` and are composed in `server/rou
 
 **The route model is `client/src/lib/appRoutes.ts`, not the shell.** `pathToRoute` / `routeToPath` / `retiredAddress` are pure functions with `appRoutes.test.ts` against them, and that is deliberate: the sidebar carries **eight** destinations, down from fourteen, because several screens were folded into others as `?view=` tabs — Kits and Modifiers into Assemblies, Supplier Pricing into Materials, the Bids list and Quick bid's chooser into the Dashboard.
 
-Settings is six addressable panels at `/settings/:section` (`SETTINGS_SECTIONS`), not one scroll — link to the panel, never to `/settings` and a scroll position.
+Settings is seven addressable panels at `/settings/:section` (`SETTINGS_SECTIONS`), not one scroll — link to the panel, never to `/settings` and a scroll position.
 
 A bid carries three surfaces of its own — `/bids/:id/plans`, `/bids/:id/count`, `/bids/:id/proposal` — and **none of them is in the nav, deliberately**: each needs a bid, so a top-level entry would dead-end on "which one?". That is the fault that removed Bids and Quick bid from the sidebar; both were pages whose whole job was asking which bid you meant. When a screen needs a bid, reach it from the bid.
 
