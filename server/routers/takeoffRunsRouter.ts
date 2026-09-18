@@ -28,6 +28,7 @@ import {
 } from "../../drizzle/schema";
 import { pathRealInches, toBillableFeet } from "../../shared/takeoffGeometry";
 import {
+  NO_VERTICALS,
   measurabilityOf,
   quantitiesForRun,
   totalQuantities,
@@ -158,7 +159,17 @@ export const takeoffRunsRouter = router({
           location: run.location,
           circuits: runCircuits,
           /** Null whenever the sheet cannot be measured — never a fallback 0. */
-          quantities: quantitiesForRun(traced, runCircuits, ratio),
+          /*
+           * No heights yet: the settings tables arrive with Phase 5 step 2, and
+           * a run has nowhere to read a distribution height from until they
+           * do. Stated rather than defaulted — see NO_VERTICALS.
+           */
+          quantities: quantitiesForRun(
+            traced,
+            runCircuits,
+            ratio,
+            NO_VERTICALS
+          ),
           /**
            * The sheet's scale has changed since this was traced. The length
            * shown is against the CURRENT scale; this flags that it differs
@@ -437,6 +448,8 @@ export const takeoffRunsRouter = router({
             .filter(c => c.runId === run.id)
             .map(c => ({ name: c.name, conductorCount: c.conductorCount })),
           ratio: ratioBySheet.get(run.sheetId) ?? null,
+          // No heights yet — see the note in listForSheet.
+          verticals: NO_VERTICALS,
         }))
       );
     }),

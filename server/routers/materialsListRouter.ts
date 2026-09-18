@@ -35,7 +35,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import { groupStamps } from "../../shared/takeoffCounts";
-import { totalQuantities } from "../../shared/takeoffQuantities";
+import { NO_VERTICALS, totalQuantities } from "../../shared/takeoffQuantities";
 import {
   aggregateMaterials,
   measuredEntries,
@@ -182,6 +182,9 @@ export const materialsListRouter = router({
               conductorCount: circuit.conductorCount,
             })),
             ratio: usable,
+            // No heights yet: Phase 5 step 2 brings the settings a vertical is
+            // resolved from. Stated rather than defaulted — see NO_VERTICALS.
+            verticals: NO_VERTICALS,
           };
         })
       );

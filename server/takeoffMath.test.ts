@@ -31,6 +31,7 @@ import {
   type PagePoint,
 } from "../shared/takeoffGeometry";
 import {
+  NO_VERTICALS,
   cableFeet,
   conduitFeet,
   measurabilityOf,
@@ -487,7 +488,12 @@ describe("cable runs", () => {
   });
 
   it("produce no conduit line at all", () => {
-    const quantities = quantitiesForRun(CABLE_100FT, [], QUARTER_INCH)!;
+    const quantities = quantitiesForRun(
+      CABLE_100FT,
+      [],
+      QUARTER_INCH,
+      NO_VERTICALS
+    )!;
     expect(quantities.conduitFeet).toBeNull();
     expect(quantities.cableFeet).toBe(100);
   });
@@ -496,7 +502,8 @@ describe("cable runs", () => {
     const quantities = quantitiesForRun(
       CABLE_100FT,
       [{ name: "Ckt 1", conductorCount: 3 }],
-      QUARTER_INCH
+      QUARTER_INCH,
+      NO_VERTICALS
     )!;
     expect(quantities.totalWireFeet).toBe(0);
     expect(quantities.wireByCircuit).toEqual([]);
@@ -519,6 +526,7 @@ describe("a shared run across a whole takeoff", () => {
           { name: "Ckt 2", conductorCount: 3 },
         ],
         ratio: QUARTER_INCH,
+        verticals: NO_VERTICALS,
       },
     ]);
     expect(totals.conduitFeet).toBe(100);
@@ -535,11 +543,13 @@ describe("a shared run across a whole takeoff", () => {
         run: RUN_100FT,
         circuits: [{ name: "A", conductorCount: 2 }],
         ratio: QUARTER_INCH,
+        verticals: NO_VERTICALS,
       },
       {
         run: shortRun,
         circuits: [{ name: "B", conductorCount: 3 }],
         ratio: QUARTER_INCH,
+        verticals: NO_VERTICALS,
       },
     ]);
     expect(totals.conduitFeet).toBe(150);
@@ -553,8 +563,14 @@ describe("a shared run across a whole takeoff", () => {
         run: RUN_100FT,
         circuits: [{ name: "A", conductorCount: 3 }],
         ratio: QUARTER_INCH,
+        verticals: NO_VERTICALS,
       },
-      { run: cableRun, circuits: [], ratio: QUARTER_INCH },
+      {
+        run: cableRun,
+        circuits: [],
+        ratio: QUARTER_INCH,
+        verticals: NO_VERTICALS,
+      },
     ]);
     expect(totals.conduitFeet).toBe(100);
     expect(totals.cableFeet).toBe(100);
@@ -568,11 +584,13 @@ describe("a shared run across a whole takeoff", () => {
         run: RUN_100FT,
         circuits: [{ name: "A", conductorCount: 2 }],
         ratio: QUARTER_INCH,
+        verticals: NO_VERTICALS,
       },
       {
         run: RUN_100FT,
         circuits: [{ name: "B", conductorCount: 2 }],
         ratio: null,
+        verticals: NO_VERTICALS,
       },
     ]);
     expect(totals.conduitFeet).toBe(100);
@@ -585,7 +603,11 @@ describe("a shared run across a whole takeoff", () => {
       conduitFeet: 0,
       cableFeet: 0,
       wireFeet: 0,
+      conduitVerticalFeet: 0,
+      cableVerticalFeet: 0,
+      wireVerticalFeet: 0,
       unmeasurableCount: 0,
+      flatOnlyCount: 0,
     });
   });
 
@@ -594,8 +616,18 @@ describe("a shared run across a whole takeoff", () => {
     // The same traced geometry means very different footages, and each run
     // must use its own sheet's ratio.
     const totals = totalQuantities([
-      { run: RUN_100FT, circuits: [], ratio: QUARTER_INCH },
-      { run: { ...RUN_100FT }, circuits: [], ratio: ENG_100 },
+      {
+        run: RUN_100FT,
+        circuits: [],
+        ratio: QUARTER_INCH,
+        verticals: NO_VERTICALS,
+      },
+      {
+        run: { ...RUN_100FT },
+        circuits: [],
+        ratio: ENG_100,
+        verticals: NO_VERTICALS,
+      },
     ]);
     // 25 paper inches: 100ft at quarter-inch, 2500ft at 1"=100'.
     expect(totals.conduitFeet).toBe(2600);
@@ -606,7 +638,12 @@ describe("the full breakdown for one run", () => {
   it("returns null when the run cannot be measured", () => {
     // Not a partial answer a caller could show as a total.
     expect(
-      quantitiesForRun(RUN_100FT, [{ name: "A", conductorCount: 3 }], null)
+      quantitiesForRun(
+        RUN_100FT,
+        [{ name: "A", conductorCount: 3 }],
+        null,
+        NO_VERTICALS
+      )
     ).toBeNull();
   });
 
@@ -617,7 +654,8 @@ describe("the full breakdown for one run", () => {
         { name: "A", conductorCount: 3 },
         { name: "B", conductorCount: 3 },
       ],
-      QUARTER_INCH
+      QUARTER_INCH,
+      NO_VERTICALS
     )!;
     expect(quantities.runFeet).toBe(100);
     expect(quantities.conduitFeet).toBe(100);
@@ -630,11 +668,17 @@ describe("the full breakdown for one run", () => {
     const quantities = quantitiesForRun(
       RUN_100FT,
       [{ name: "Panel A-12", conductorCount: 4 }],
-      QUARTER_INCH
+      QUARTER_INCH,
+      NO_VERTICALS
     )!;
     expect(quantities.wireByCircuit[0]).toEqual({
       name: "Panel A-12",
       conductorCount: 4,
+      // Flat and vertical stay apart all the way to the bid — see § 7.1, which
+      // gives the two allowances different reach over them. No verticals were
+      // supplied here, so the traced length is the whole of it.
+      flatFeet: 400,
+      verticalFeet: 0,
       feet: 400,
     });
   });
@@ -665,13 +709,19 @@ describe("a realistic takeoff, checked by hand", () => {
         { name: "Ckt 2", conductorCount: 4 },
         { name: "Ckt 3", conductorCount: 4 },
       ],
-      EIGHTH_INCH
+      EIGHTH_INCH,
+      NO_VERTICALS
     )!;
 
     expect(feederQuantities.conduitFeet).toBe(80);
     expect(feederQuantities.totalWireFeet).toBe(960);
 
-    const branchQuantities = quantitiesForRun(branch, [], EIGHTH_INCH)!;
+    const branchQuantities = quantitiesForRun(
+      branch,
+      [],
+      EIGHTH_INCH,
+      NO_VERTICALS
+    )!;
     expect(branchQuantities.cableFeet).toBe(40);
     expect(branchQuantities.conduitFeet).toBeNull();
 
@@ -684,14 +734,27 @@ describe("a realistic takeoff, checked by hand", () => {
           { name: "Ckt 3", conductorCount: 4 },
         ],
         ratio: EIGHTH_INCH,
+        verticals: NO_VERTICALS,
       },
-      { run: branch, circuits: [], ratio: EIGHTH_INCH },
+      {
+        run: branch,
+        circuits: [],
+        ratio: EIGHTH_INCH,
+        verticals: NO_VERTICALS,
+      },
     ]);
 
     expect(totals).toEqual({
       conduitFeet: 80,
       cableFeet: 40,
       wireFeet: 960,
+      // No heights set anywhere, so this hand-checked takeoff comes to exactly
+      // what it came to before verticals existed. Both runs are flat-only, and
+      // the panel says so rather than leaving a low total to be noticed.
+      conduitVerticalFeet: 0,
+      cableVerticalFeet: 0,
+      wireVerticalFeet: 0,
+      flatOnlyCount: 2,
       unmeasurableCount: 0,
     });
   });
