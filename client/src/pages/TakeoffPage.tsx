@@ -288,8 +288,38 @@ function usePdfWorker() {
     () => ({
       load,
       loadUrl,
-      render: (pageNum: number, scale: number, hash: string) =>
-        ask<ImageBitmap>({ type: "render", pageNum, scale, hash }),
+      /**
+       * Rasterise a page, and say how long it took.
+       *
+       * The worker has always measured this and posted an `elapsed` back; the
+       * main thread threw it away. Surfacing it costs nothing and turns every
+       * render anyone ever does into a data point — which is what Phase 3 needs
+       * before it can choose a design. See
+       * references/plan-viewer-overhaul.md § 4b: whether rendering a REGION is
+       * worth building depends on how much of a page's cost is parsing (paid
+       * regardless) versus rasterising (saved by clipping), and that is a
+       * question about real drawings rather than one to reason about.
+       *
+       * Wall time rather than the worker's internal figure, because queueing is
+       * part of what the user waits for.
+       */
+      render: async (pageNum: number, scale: number, hash: string) => {
+        const t0 = performance.now();
+        const bitmap = await ask<ImageBitmap>({
+          type: "render",
+          pageNum,
+          scale,
+          hash,
+        });
+        const ms = Math.round(performance.now() - t0);
+        const mp = (bitmap.width * bitmap.height) / 1e6;
+        console.info(
+          `[plan] page ${pageNum} at ${scale}x — ${ms}ms, ` +
+            `${bitmap.width}x${bitmap.height} (${mp.toFixed(1)} Mpx, ` +
+            `${Math.round((mp * 4e6) / 1048576)} MB)`
+        );
+        return bitmap;
+      },
       outline: (hash: string) =>
         ask<{ pageNumber: number; title: string }[]>({ type: "outline", hash }),
       pageText: (pageNum: number, hash: string) =>
@@ -774,6 +804,66 @@ function PlanPane({
 
     return () => {
       cancelled = true;
+    };
+  }, [page, pageCount, loading, error, render, hash]);
+
+  /**
+   * TEMPORARY — Phase 3 step 1 measurement hook. Remove once the numbers are
+   * recorded in references/plan-viewer-overhaul.md § 4b.
+   *
+   * Run `__planBench()` in the browser console with a dense sheet open. It
+   * renders the CURRENT page at a ladder of scales and prints what each one
+   * cost, so the choice between "re-render the whole page sharper" and "render
+   * only the region on screen" gets made against real drawings instead of
+   * against arithmetic.
+   */
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    if (loading || error || pageCount === 0) return;
+    (window as unknown as Record<string, unknown>).__planBench = async (
+      scales: number[] = [1, 1.5, 2, 3, 4]
+    ) => {
+      const rows: Record<string, unknown>[] = [];
+      for (const scale of scales) {
+        try {
+          const t0 = performance.now();
+          const bitmap = await render(page, scale, hash);
+          const msIssued = Math.round(performance.now() - t0);
+          const mp = (bitmap.width * bitmap.height) / 1e6;
+          const px = `${bitmap.width}x${bitmap.height}`;
+          // Draw it and read a pixel back, still inside the clock. `render`
+          // resolving only means the drawing commands were issued; Chrome
+          // rasterises when it feels like it, so a timer that stops at the
+          // promise reports a page that has not been drawn yet. A readback
+          // forces the flush, and that is the number a user waits through.
+          const probe = new OffscreenCanvas(bitmap.width, bitmap.height);
+          const pctx = probe.getContext("2d")!;
+          pctx.drawImage(bitmap, 0, 0);
+          const sx = Math.max(0, Math.floor(bitmap.width / 2) - 400);
+          const sy = Math.max(0, Math.floor(bitmap.height / 2) - 300);
+          const data = pctx.getImageData(sx, sy, 800, 600).data;
+          const msFlushed = Math.round(performance.now() - t0);
+          let dark = 0;
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i] < 200) dark++;
+          }
+          bitmap.close();
+          rows.push({
+            scale,
+            msIssued,
+            msFlushed,
+            px,
+            Mpx: Number(mp.toFixed(1)),
+            MB: Math.round((mp * 4e6) / 1048576),
+            inkPct: Number(((dark / (data.length / 4)) * 100).toFixed(2)),
+          });
+        } catch (err) {
+          rows.push({ scale, msIssued: "FAILED", px: String(err) });
+          break;
+        }
+      }
+      console.table(rows);
+      return rows;
     };
   }, [page, pageCount, loading, error, render, hash]);
 

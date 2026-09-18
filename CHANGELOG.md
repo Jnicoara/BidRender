@@ -6,6 +6,8 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-17]
 
+- **Plan pages now say how long they took to draw.** The worker that draws a sheet has always measured this and the app threw the number away; it now prints the page, the scale, the size and the memory to the browser console. Nothing on screen changes, but it means every sheet anyone opens becomes a measurement — which is what the sharp-zoom work needs before it can be designed.
+
 - **You can move around the drawing while part-way through tracing a run.** Right-click and drag pans the sheet at any time, including mid-trace — which is exactly when you need it, because a run that leaves the screen cannot be finished otherwise. Middle-drag and space-drag do the same. None of them drops a point, and the browser's right-click menu no longer appears over the drawing.
 
 - **The Finish button on a run works again.** It had stopped being clickable: a change in the previous release put the small toolbar holding Finish, Undo and Cancel into a layer that passed clicks straight through it, so pressing Finish quietly dropped another point on the drawing instead of finishing the run.

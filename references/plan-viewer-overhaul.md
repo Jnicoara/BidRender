@@ -462,43 +462,138 @@ half, which is exactly why zooming into it went soft.
 
 ### Whole-page re-rendering does not work, and the numbers say so
 
-For the 36×24 E-sheet tested:
+For the 36×24 E-sheet tested. **"Sharp to" depends on the screen**, because
+device pixels per bitmap pixel = zoom × devicePixelRatio — so a Retina or 4K
+laptop, where DPR is 2, needs twice the render scale for the same zoom. The
+table below gives both, and the DPR-2 column is the one to design against,
+because that is what the measuring machine had and what most new laptops have.
 
-| Render scale | Sharp to | Bitmap RAM |
-| ------------ | -------- | ---------- |
-| 1.5× (today) | 100%     | 38 MB      |
-| 3×           | 200%     | 154 MB     |
-| 4×           | 267%     | **273 MB** |
-| 6×           | 400%     | **615 MB** |
+| Render scale | Sharp to (DPR 1) | Sharp to (DPR 2) | Bitmap RAM |
+| ------------ | ---------------- | ---------------- | ---------- |
+| 1.5× (today) | 100%             | **50%**          | 38 MB      |
+| 3×           | 200%             | 100%             | 154 MB     |
+| 4×           | 267%             | 133%             | **273 MB** |
+| 6×           | 400%             | **200%**         | **615 MB** |
+| 7×           | 467%             | 233%             | **837 MB** |
+| 8×           | —                | —                | **fails**  |
 
-Sharpness at 400% would cost 615 MB **for one page**, on a laptop with a plan
-set open. **So it must render the VISIBLE REGION only** — bounded by the
-viewport at roughly 6 MB whatever the magnification, instead of growing with the
-square of the zoom.
+Sharpness at 400% on an ordinary screen costs 615 MB **for one page**, on a
+laptop with a plan set open — and on a DPR-2 screen 400% is not reachable at
+all, because the scale it would need does not allocate. **So it must render the
+VISIBLE REGION only** — bounded by the viewport at roughly 26 MB whatever the
+magnification, instead of growing with the square of the zoom.
 
 pdf.js does this with `viewport.clone({ offsetX, offsetY })` onto a
 viewport-sized canvas: the page is drawn at the high scale but translated so
 only the wanted region lands on the bitmap.
 
-### Render time: MEASURE FIRST, and do not guess
+### Render time: MEASURED 2026-09-17, and the answer is not what the plan assumed
 
-**This is step 1 of the phase, not an assumption inside it.**
+**Step 1 is done.** The worker's `elapsed` is no longer discarded — every render
+now logs its page, scale, pixel size and megabytes to the console — and a
+dev-only `__planBench()` hook renders the current page at a ladder of scales.
 
-What is known: `CLAUDE.md` records 0.5–13s for a full page at 1.5× on a dense
-drawing, and the worker already times every render and posts `elapsed` back —
-which the main thread currently throws away. Surfacing that is nearly free and
-turns every future render into a data point.
+Measured on **Old Blueridge school.pdf, sheet 5 (E1.3)** — a real dense
+electrical floor plan, 36×24 in, on a DPR-2 screen with a GPU-accelerated
+Chrome. Milliseconds are wall time from asking the worker to a pixel being
+readable back, which forces Chrome to actually finish drawing.
 
-What is NOT known, and matters: how much of that time is **parsing the content
-stream** (paid regardless of the region) versus **rasterising** (saved by
-clipping). Clipping a region cuts the second and not the first, so the saving is
-real but is NOT proportional to area. Anyone assuming "a quarter of the page is
-a quarter of the time" will be wrong.
+| scale | pixels      | Mpx   | MB  | ms  |
+| ----- | ----------- | ----- | --- | --- |
+| 0.25  | 648×432     | 0.3   | 1   | 684 |
+| 0.5   | 1296×864    | 1.1   | 4   | 547 |
+| 1     | 2592×1728   | 4.5   | 17  | 531 |
+| 1.5   | 3888×2592   | 10.1  | 38  | 568 |
+| 2     | 5184×3456   | 17.9  | 68  | 608 |
+| 2.2   | 5703×3802   | 21.7  | 83  | 187 |
+| 2.5   | 6480×4320   | 28.0  | 107 | 195 |
+| 3     | 7776×5184   | 40.3  | 154 | 235 |
+| 4     | 10368×6912  | 71.7  | 273 | 305 |
+| 5     | 12960×8640  | 112.0 | 427 | 491 |
+| 6     | 15552×10368 | 161.2 | 615 | 757 |
+| 6.4   | 16589×11060 | 183.5 | 700 | 1656|
+| 7     | 18144×12096 | 219.5 | 837 | 2436|
+| 8     | 20736×13824 | —     | —   | FAILS |
 
-**An attempt to measure this on 2026-09-17 failed** — a standalone worker driven
-from the page console would not load the document, probably the signed-URL
-session. The measurement is therefore the phase's first task, done through the
-app rather than around it.
+#### 1. Time barely depends on resolution — and below 5200px it gets WORSE
+
+A 648×432 canvas takes **684ms**. A 6480×4320 canvas — **93 times the pixels** —
+takes **195ms**. That is not a warm-up artefact: the ladder was run ascending,
+descending, and with repeats, and the cliff sits in the same place every time,
+between 5184px and 5703px wide.
+
+The cause is Chrome's GPU-accelerated canvas. Below roughly 5200px a side the
+canvas is GPU-backed and `page.render()` pays a fixed **~500–680ms** of overhead
+that has nothing to do with the drawing. Above it Chrome gives up on
+acceleration and rasterises in software, which for a sparse line drawing is
+~**40ms to issue the commands plus ~4.3ms per megapixel**. Canvas allocation
+itself is free at every size (15ms at 15552×10368), so the cost is genuinely
+inside `page.render()`.
+
+**`RENDER_SCALE = 1.5` sits in the slow zone.** Today every page flip pays about
+550ms of pure GPU-canvas overhead for a picture that is already too soft.
+
+#### 2. Parsing is paid once per page, then cached
+
+Cold first render of each sheet at 1.5× (straight from the sheet list): 1849ms,
+1155ms, 1045ms, 951ms, 862ms. Warm re-render of the same sheet at 1.5×: ~570ms.
+So **parsing the content stream costs roughly 300–600ms, once per page**, and
+pdf.js keeps the operator list afterwards. Sheet 1's extra second is the
+document opening, not the sheet.
+
+This is the question § 4b said had to be answered before the design could be
+chosen, and the answer is: **the parse is a one-time cost per page, not a
+per-render one.** Repeated region renders of a page the user is already looking
+at do NOT re-pay it.
+
+#### 3. So region rendering is NOT primarily a speed optimisation
+
+Extrapolating the software path at ~4.3ms/Mpx, a viewport-sized region on this
+screen (1600×1000 CSS → 3200×2000 device → 6.4 Mpx) costs about **30ms of
+rasterising plus ~40ms of issuing — under 100ms** — and about **26MB**.
+
+Against 757ms and 615MB for the whole page at 6×. The time saving is real but it
+is not the argument. **The argument is memory and the allocation ceiling**, and
+those are hard walls rather than slow paths.
+
+#### 4. The ceiling is real, and whole-page rendering cannot reach the zoom the user already uses
+
+8× fails cleanly — `createImageBitmap ... could not be allocated` — at
+20736×13824. 7× works, at 837MB and 2.4 seconds. So the wall is somewhere near a
+gigabyte of bitmap, and the last usable rung is slow enough to feel broken.
+
+Now put that against sharpness. The canvas is displayed at its own pixel size in
+CSS pixels, so device pixels per bitmap pixel = **zoom × devicePixelRatio**. The
+picture is 1:1 only while that product is ≤ 1. On the DPR-2 screen measured, at
+`RENDER_SCALE = 1.5`:
+
+- sharp at 100% zoom needs **3×** — 154MB, fine
+- sharp at 200% zoom needs **6×** — 615MB, the last comfortable rung
+- sharp at **260%** — the zoom that was reported as too soft — needs **7.8×**,
+  which **does not allocate**
+- sharp at 400% needs 12×, which is not close to possible
+
+**Whole-page re-rendering cannot reach the sharpness that was already asked
+for.** That is a stronger proof than the memory table in the section above, and
+it settles the design: the region is not an optimisation, it is the only way to
+get there.
+
+#### 5. What must NOT be concluded from this
+
+**Do not build anything that depends on "bigger renders are faster."** That is
+one machine, one GPU, one Chrome build, and the threshold is a driver decision.
+On a laptop with acceleration blocklisted the software path would be used
+everywhere and the ordinary shape returns — 1.5× fast, 6× slow. The safe reading
+is the one that holds either way:
+
+> In the range this feature cares about, **time is not the binding constraint.
+> Memory and the allocation ceiling are.**
+
+Raising `RENDER_SCALE` past the GPU threshold looks like a free win on this
+machine — sharper AND three times faster — but it would cost 107MB per page
+instead of 38MB, and it would be a pessimisation on any machine already using
+the software path. **Not a change to make on one measurement.** Worth re-testing
+on the real work laptop before it is considered.
 
 ### Panning
 
