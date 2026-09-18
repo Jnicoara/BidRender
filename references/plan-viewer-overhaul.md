@@ -298,22 +298,28 @@ Each phase ships and gets used before the next starts.
 > **Re-ordered 2026-09-17 after testing Phase 1 on the live site.** The order
 > below is the current one; § 4.1 records what the testing changed and why.
 
-| Phase  | What                                                                       | DB change                |
-| ------ | -------------------------------------------------------------------------- | ------------------------ |
-| **1**  | ~~Zoom, pan, and the three viewer bugs~~ **shipped**                       | No                       |
-| **1a** | ~~Page-flip fit bug + tool discoverability~~ **shipped**                   | **No**                   |
-| **2**  | ~~Two-point scale calibration~~ **shipped**                                | No (reuses `scaleRatio`) |
-| **3**  | ~~Sharp re-render of the visible area~~ **shipped**                        | **No**                   |
-| **4**  | ~~The layout: top bar, collapsing panels, focus mode~~ **shipped**         | **No**                   |
-| **4b** | Measure-only tool                                                          | **No**                   |
-| **5**  | **Verticals on runs — the money phase**                                    | **Yes**                  |
-| **6**  | Three levels of effort                                                     | **Yes** — groups         |
-| **7**  | Run settings: allowances, materials, sizes, ground                         | **Yes**                  |
-| **8**  | **Verticals on stamps**                                                    | **Yes** (small)          |
-| **9**  | Editing runs: drag a vertex, insert/remove points                          | No                       |
-| **9a** | **AI-assisted legend capture** — see § 9, and § 9.6 for why it precedes 10 | **Yes** (small)          |
-| **10** | AI reader tiling, and the daily-limit question with it                     | No                       |
-| **11** | Tablet and touch                                                           | No                       |
+| Phase   | What                                                                       | DB change                |
+| ------- | -------------------------------------------------------------------------- | ------------------------ |
+| **1**   | ~~Zoom, pan, and the three viewer bugs~~ **shipped**                       | No                       |
+| **1a**  | ~~Page-flip fit bug + tool discoverability~~ **shipped**                   | **No**                   |
+| **2**   | ~~Two-point scale calibration~~ **shipped**                                | No (reuses `scaleRatio`) |
+| **3**   | ~~Sharp re-render of the visible area~~ **shipped**                        | **No**                   |
+| **4**   | ~~The layout: top bar, collapsing panels, focus mode~~ **shipped**         | **No**                   |
+| **4b**  | Measure-only tool                                                          | **No**                   |
+| **5**   | **Verticals on runs — the money phase**                                    | **Yes**                  |
+| **6**   | Three levels of effort                                                     | **Yes** — groups         |
+| **7**   | Run settings: allowances, materials, sizes, ground                         | **Yes**                  |
+| **8**   | **Verticals on stamps**                                                    | **Yes** (small)          |
+| **9**   | Editing runs: drag a vertex, insert/remove points                          | No                       |
+| **9a**  | **AI-assisted legend capture** — see § 9, and § 9.6 for why it precedes 10 | **Yes** (small)          |
+| **10**  | AI reader tiling, and the daily-limit question with it — **gated on § 15** | No                       |
+| **10b** | **AI-suggested known distances for calibration** — see § 13                | No                       |
+| **11**  | Tablet and touch                                                           | No                       |
+
+> **Phase 10 is gated.** Nobody has measured whether the reader counts
+> accurately at the detail level it is priced at. § 15 specifies the bake-off
+> that settles it and what it costs to run. It is an afternoon, and tiling is
+> the biggest build on this list.
 
 ### 4.1 What live testing of Phase 1 changed
 
@@ -1124,6 +1130,79 @@ is the better drawing of MC's spiral armour and was passed over for exactly that
 reason: matching what is already on screen beat a cleverer picture that matched
 nothing.
 
+### 4a.2 The top bar, second pass — BUILT 2026-09-18
+
+Three complaints from live use, all about the same bar, all fixed together.
+
+**The scale warned twice and warned everywhere.** An amber "No scale" chip sat
+next to a ScaleControl that said "Set scale" under a second warning triangle —
+the same complaint, twice, in one bar, on every sheet without a scale. Including
+specification and legend sheets, where there is nothing to measure at all.
+
+Now there is **one chip**, and it is **plain grey until a measuring tool is
+reached for**. Hovering, focusing or clicking a gated trace button raises it to
+amber with its triangle, as does starting a calibration. The ScaleControl also
+absorbed the not-to-scale note, so nothing was lost by deleting the second chip.
+
+> **The principle, because it generalises past this bar:** a warning shown where
+> there is no problem teaches people to skip warnings, including the one that
+> matters. The scale is not a problem on a sheet nobody will measure — it is
+> only a problem at the moment somebody tries.
+
+**The disabled trace buttons could not deliver their own explanation, and
+nobody had noticed for a whole phase.** They carried a `title` naming exactly
+why they were off — and `disabled` brings `pointer-events: none` with it from
+the button variants, which kills the tooltip along with the click. The reason
+was written down and then made unreachable: no hover, no keyboard focus, no
+response to a click.
+
+They are `aria-disabled` now, so all three work, and clicking one says why in
+words. **This matters more than a tooltip normally would**, because the quiet
+scale chip above is only defensible if the explanation is genuinely available
+somewhere — which it was assumed to be, and was not.
+
+**Four tools in one row read as four peers, and they are three different
+kinds.** Conduit and Cable measure distance, Stamp counts, and "Measure" set the
+scale. The bar is now:
+
+```
+[ sheet ▾ ] │ [ Stamp ] │ [ Conduit ] [ Cable ] ⋯ [ Calibrate ] [ 1/4"=1'-0" ] │ zoom │ Focus
+             └ counts ┘   └──── measure ────┘      └─ sets the scale ─┘
+```
+
+- **Stamp leads, alone.** It is the tool that always works, so on an unscaled
+  sheet it should not have to be found among two dimmed buttons that do not.
+- **A divider, and no words.** Group labels were specified and dropped: the bar
+  already wraps on a narrow drawing pane, and wrapping is what pushed the scale
+  control off the edge in the first place. On an unscaled sheet everything left
+  of the divider is live and everything right of it is dimmed, which says the
+  same thing for no width.
+- **Calibrate moved to the right-hand group and was RENAMED from "Measure".**
+  It does not measure anything — it sets the scale the other two measure
+  against, so it belongs beside the scale chip it writes to. The rename is for
+  the sake of **Phase 4b**, the measure-only tool, which needs that word
+  honestly; two buttons both called some flavour of measure is the exact
+  confusion this grouping exists to remove, so the word was handed over before
+  it could be claimed.
+
+**And the two run icons are now DRAWN rather than picked.** § 4a.1 records three
+rounds of choosing the nearest thing in lucide and is superseded by this: the
+library has no picture of a length of conduit or of a cable with its conductors
+showing, because outside this trade nobody needs one. `runIcons.tsx` draws both
+on lucide's own grid — 24x24, stroke 2, round caps — so they carry the same
+optical weight as `MapPin` and `Ruler` beside them.
+
+Two things only showed up by rendering candidates at the real 14px, and both are
+recorded in that file because neither is guessable from the path data:
+
+- **Conduit needs pipe on BOTH sides of the coupling.** With the fitting on the
+  very end, the two parallel lines become prongs and the icon reads as a PLUG
+  going into a socket. A short tail past the coupling fixes it — and a coupling
+  sits mid-run anyway, so the truthful picture is also the legible one.
+- **Cable's jacket must be roughly twice the length of its conductors.** At
+  similar lengths — the obvious proportions — it reads as a bowtie or a pair of
+  scissors. A closed rounded rectangle for the jacket reads as a battery.
+
 ## 4c. Typed-length runs — draw the path, type the length
 
 **Proposed 2026-09-17. Recommended as Phase 3a, and it may deserve to jump the
@@ -1488,6 +1567,43 @@ the screen around it, and drop it first if Phase 5 runs long.
 **Dragging a vertex stays last and is cuttable.** Undo-and-re-click already
 works. If it competes with anything in Phases 5–8, it loses.
 
+**NEVER CALIBRATE OFF THE GRAPHIC SCALE BAR.** Decided 2026-09-18, and this one
+is filed here because it is the single most likely thing in this document to be
+undone by somebody being sensible.
+
+The scale bar is the obvious answer. It is a ruler, printed on the drawing, by
+the people who drew it, with no text to misread. Every instinct says use it.
+
+**It is the worst candidate on the sheet, and the reason is arithmetic, not
+taste.** A printed scale bar is one to two inches of paper. § 4.2: calibration
+error comes from the SPAN, and § 5b rates a span that short at **over 3%
+implied error** — where a slip of a few pixels moves every measurement on the
+sheet. A 100 ft dimension string with the same slop is 0.4% wrong. **The scale
+bar is ten times less accurate than the dimension string printed beside it**,
+and it looks ten times more authoritative.
+
+So: the bar may be used as a plausibility CHECK on a ratio calibrated from
+something longer. It is never the span. Anyone proposing otherwise — including
+a later version of whoever wrote this — should be shown § 5b's table first.
+
+**THE TWO 150s ARE DIFFERENT COUNTERS AND MUST NEVER BE MERGED.** Decided
+2026-09-18. Stated in full in § 14.1; repeated here because the coincidence of
+the number is a trap and merging them will look like tidying up.
+
+- **150 per person per DAY** (`shared/aiLimits.ts`) is a **safety brake**. It
+  exists to stop a retry loop costing a thousand calls at 3am. It is keyed to
+  the individual on purpose, so one runaway browser tab cannot stop a colleague
+  working, and it is set generously because a limit people work around protects
+  nothing.
+- **150 per account per MONTH** is the **entitlement being sold** — the thing
+  inside the $99, the thing a pack tops up, the thing a meter shows.
+
+One is about loops, the other about money; one is per person, the other per
+company; one resets nightly, the other monthly. **Merging them either lets a
+five-estimator company read 750 sheets a month inside one $99 fee, or stops a
+solo estimator at 150 a day when they had bought 500.** If the shared number is
+confusing, change the brake's number. Never the price.
+
 ## 7. Settled — answered 2026-09-17
 
 - **Makeup applies to WIRE ONLY.** Pipe is cut to fit and has no tail.
@@ -1547,6 +1663,15 @@ two different things that happen to share a unit.
   A design target is set in § 9.5 and the instrumentation to settle it is
   specified there, but the number itself cannot be decided from a chair — it
   needs real sets in front of a real estimator.
+- **Does the reader actually count accurately at 150 px/in? — NOT MEASURED, and
+  it gates Phase 10.** The cost of a sheet read is measured (§ 11.5); its worth
+  is not. Specified as a bake-off in § 15. DECIDED 2026-09-18: run the SMALL
+  version — 5 sheets, two levels, single runs, about $3 and two hours — and run
+  it when Phase 10 is actually next, not before. The two hours are the cost, and
+  the answer goes stale if the model or the detail level moves in between.
+- **Should AI suggest the known distance for calibration?** Proposed in § 13 as
+  Phase 10b, behind both legend capture and tiling, with the risk it carries and
+  the four things about it that would be mistakes.
 
 ## 9. AI-assisted legend capture — PROPOSAL, Phase 9a
 
@@ -2062,3 +2187,605 @@ this product deliberately does not use that knowledge, because symbol meaning
 comes from the user's legend links and nowhere else
 (`shared/copilotConfidence.ts` says so explicitly). It will be tempting when a
 sheet has no legend. The answer to a sheet with no legend is to ask for one.
+
+---
+
+## 13. AI-suggested known distances for calibration — PROPOSAL, Phase 10b
+
+**Proposed 2026-09-18. Recommended AFTER tiling, not before it — see § 13.6.**
+
+Press a button on a sheet with no scale. The app reads the printed dimension
+strings on the drawing, finds the LONGEST one it can read with confidence, and
+offers it: the crop it read, the two endpoints it would calibrate between, and
+the ratio that falls out. You check it and accept, or you ignore it and
+calibrate by hand as you do today.
+
+Governed by § 5c throughout: **the app suggests, the estimator confirms.** And
+by § 5a: the offered ratio is the measured one, never a tidied one.
+
+### 13.1 Why this is a better idea than it first sounds
+
+Reading small printed text off a scan is precisely what a vision model is good
+at and what a human on a 27-inch monitor is bad at. That alone would make it a
+convenience. The reason it is more than a convenience is § 4.2's arithmetic:
+
+> **Calibration error comes from the SPAN, not from the sharpness of the
+> clicks.** A 100 ft dimension with 3 px of slop is 0.4% wrong. A 10 ft span
+> with the same slop is 4.4% wrong.
+
+A person calibrating by hand picks a dimension they can find, which in practice
+is a short one near where they happen to be looking. **A model can read every
+dimension string on the sheet at once and offer the longest.** That is easier
+for the estimator AND more accurate than what they would have chosen — the two
+usually trade against each other, and here they do not.
+
+So the ranking rule is explicit: **longest usable span first, always.** Not the
+clearest, not the nearest, not the highest-confidence read. Length is the thing
+that governs the error, and confidence is a gate rather than a sort key.
+
+### 13.2 THE RISK, which is the largest in the product
+
+**A wrong calibration multiplies into every measurement on the sheet.** Every
+run, every vertical, every foot of wire, all wrong by one constant factor, with
+nothing on screen looking broken. It is the same failure `detectSheetScale`
+already guards against in `bidPdfsRouter.ts`, and it is the reason only a HIGH
+confidence reading auto-applies there.
+
+**And the OCR evidence is actively discouraging.** § 12 records it: on the real
+scanned set, the text layer renders DUPLEX as "DUEX" and drops a Korean
+character into the symbol schedule. A model that mangles a word has a dictionary
+working against the error and still lost. **A number has no dictionary.**
+`124'-0"` misread as `124'-6"` is 0.3% — invisible and harmless. The same string
+misread as `12'-4"` is off by a factor of ten and produces a plausible-looking
+sheet where every run is ten times too short.
+
+The consequence for the design: **the verification the estimator performs must
+be VISUAL, not arithmetic.** A number on its own to nod at is not verification,
+because the wrong number looks exactly like the right one.
+
+### 13.3 What it shows before anything is accepted
+
+Four things, all at once, for each candidate:
+
+1. **The crop of the drawing where it read the number**, rendered at a zoom
+   where the estimator can read the same characters themselves. The region
+   renderer from § 4b already does exactly this — it takes a region and a
+   scale, and 300 px/in over a 4in crop is well inside the sizes it handles.
+2. **The two endpoints it would calibrate between, drawn on the drawing**, so
+   it is visible at a glance whether they land on the right extension lines or
+   on something else entirely.
+3. **The ratio in plain terms** — "one inch of paper is 8 feet of building" —
+   beside the notation, because the notation is what people skim and the
+   sentence is what people check.
+4. **How far off a standard scale it lands**, the same check manual calibration
+   already performs, and **the span rating from § 5b** so a short offer is
+   labelled short rather than silently accepted.
+
+**A wildly non-standard ratio is treated as evidence of a misread, not as a
+finding.** If the read number implies something like `1:63.5` on an
+architectural sheet, the most likely explanation is that a digit was wrong. It
+is not offered with a warning — it is **not offered**. See § 13.5.
+
+**Note the boundary against § 5b:** standard-scale proximity is used here as a
+PLAUSIBILITY FILTER on whether to speak at all. It is never used to adjust the
+number. What gets offered, and what gets stored if accepted, is always the
+measured ratio.
+
+### 13.4 The endpoints come from the estimator, not from the model
+
+**The single most important design decision in this section**, and it departs
+slightly from the ask in a way that removes most of the risk.
+
+Vision models read text well and report precise pixel coordinates badly. Asking
+one for the exact endpoints of an extension line is asking it for the thing it
+is worst at, and a 40 px error on a 3000 px span is 1.3% — silently, on the
+number that multiplies into everything.
+
+So the split is:
+
+- **The model supplies the NUMBER and the NEIGHBOURHOOD** — what the dimension
+  string says, and roughly where on the sheet it is. Both are text-reading
+  tasks.
+- **The existing two-point calibration tool supplies the GEOMETRY**, pre-seeded
+  with the model's approximate endpoints as draggable handles, at the zoom the
+  crop was read at.
+
+The estimator sees the two markers exactly as asked for, and nudging them is the
+same two clicks they would have made anyway — except the sheet is already at the
+right place and the distance is already typed in. **The unverifiable half of the
+model's answer is never stored.**
+
+This is also much less to build: it is a pre-seed of a tool that already exists,
+not a second calibration path.
+
+### 13.5 How confident it has to be before saying anything
+
+**Silence beats a wrong number here**, and the thresholds are set accordingly.
+An offer requires ALL of:
+
+| Gate                  | Rule                                                                                                                                                                                   |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Corroboration**     | Two independent dimension strings imply ratios within **1%** of each other, OR (single reading) the implied ratio lands within **2%** of a standard architectural or engineering scale |
+| **Span**              | Rates `good` by `shared/planCalibration.ts` — under 1% implied error. A `usable` or `short` candidate is not offered at all                                                            |
+| **Character clarity** | The model reports no ambiguous character in the number. Any hedge on a digit drops the candidate silently                                                                              |
+| **Sanity**            | The implied ratio is inside the range real drawings occupy. Outside it, discard rather than warn                                                                                       |
+
+**If nothing clears all four, the panel says "Nothing I could read with
+confidence — calibrate by hand" and stops.** It does not fall back to the best
+of a bad set. A feature that always produces an answer teaches people the answer
+is always worth something.
+
+**At most three candidates, longest first.** Eight candidates is not more
+thorough, it is a chore, and a list people scroll turns into a list where people
+click the first row without reading it. Three is enough for corroboration and
+short enough to actually check.
+
+**It never auto-applies, at any confidence.** This is deliberately stricter than
+`detectSheetScale`, which does auto-apply a high-confidence reading, and the
+difference is worth stating because the precedent will be raised. A printed
+`1/4" = 1'-0"` note is a STATEMENT BY THE DRAFTER that the app is repeating. A
+suggested calibration is the app's OWN arithmetic over its own reading of a
+number and its own guess at two endpoints — three places to be wrong instead of
+one, and no author to have checked it.
+
+### 13.6 Where it belongs: after legend capture AND after tiling
+
+**Phase 10b.** Both of the other two come first, and neither ordering is close.
+
+**Behind legend capture (Phase 9a)** for the reason § 9.6 already establishes:
+legend capture is the highest-value AI work in the product, it is once per set,
+and it is the cheapest place to learn how suggest-and-confirm should feel before
+that pattern is applied to something riskier.
+
+**Behind tiling (Phase 10)** for three reasons:
+
+1. **It is the same machinery.** Reading a dimension string means rendering a
+   zoomed region and asking the model to read small text in it. That is tiling's
+   problem statement with a different prompt. Built after tiling, this is a
+   prompt, a schema and a panel. Built before it, it is a second, parallel
+   region-dispatch mechanism that tiling then has to be reconciled with.
+2. **Manual calibration already works.** This replaces about fifteen seconds of
+   work, once per sheet, on a path that is shipped and correct. Tiling replaces
+   counting seventy-eight symbols by eye. The value gap is not subtle.
+3. **It is the riskiest of the three and should be built last on purpose.** A
+   bad legend suggestion is visibly wrong and gets rejected. A bad count is
+   checkable against the drawing. A bad calibration is a plausible number that
+   poisons everything downstream. Build the pattern where mistakes are cheap
+   before applying it where they are not.
+
+### 13.7 What it costs per call
+
+Two stages, because one stage cannot work. Rates and the patch arithmetic from
+§ 11.5 and `shared/visionImageLimits.ts`.
+
+| Stage                                                                                           | Cost        |
+| ----------------------------------------------------------------------------------------------- | ----------- |
+| **Locate** — whole sheet at the vision cap (2352x1568, 4704 patches), out ≈ 6 candidate regions | ~$0.013     |
+| **Read** — 3 crops at 300 px/in (≈1200x450 each), out ≈ the numbers and hedges                  | ~$0.010     |
+| **One sheet, all in**                                                                           | **~$0.023** |
+
+Roughly **2 to 3 cents a sheet** — about a quarter of a full sheet read (10.1c),
+and it only runs on sheets somebody intends to measure on. A 40-sheet set where
+ten sheets get traced is about 30 cents.
+
+**Why the locate stage cannot be skipped.** A whole 36x24 sheet is capped at
+2352x1568 however big a picture is sent — 65 px per paper inch (§ 11.5). Text
+printed 3/32" tall is six pixels tall at that size. The number is not readable
+at the scale the sheet is readable at, which is the same wall tiling exists to
+get past, so the first pass finds WHERE the dimension strings are and the second
+pass reads them at a zoom that has the characters in it.
+
+### 13.8 The text layer: a cross-check, never a source
+
+**On the real scanned sets, no.** § 12 downgraded this for legend capture and
+the downgrade applies harder here, because a digit error has nothing to catch
+it. Build as though the text layer is absent.
+
+**Where it does apply, it applies as agreement rather than as input.** If the
+text layer contains a number at the location the model read, and the two match,
+that is a genuine second witness and satisfies the corroboration gate in § 13.5.
+If they disagree, the candidate is dropped. The text layer never supplies a
+number that vision did not also read.
+
+**One genuinely better path, for vector sets, with no model in it at all.** On a
+true vector plan set the dimension string's text is in the text layer WITH its
+position, and the extension lines are vector paths with exact coordinates. The
+paper distance between a dimension's terminators can be computed outright —
+exactly, free, offline, with nothing to hallucinate. **If that is ever built it
+outranks this entire section on a vector set**, and this section becomes the
+scanned-set fallback rather than the primary path. It is not scheduled, both
+real sets measured so far are scans, and it should not hold this up — but it is
+the better answer where it works and it belongs written down.
+
+### 13.9 Four things about this that would be bad ideas
+
+**1. Calibrating off the graphic scale bar. Filed in § 6 as a decision not to
+re-open, because this is the one that will be undone by somebody being
+sensible.**
+
+It is the most tempting candidate on the sheet and the worst one available, and
+the gap between those two facts is why it needs writing down plainly rather than
+noting in passing.
+
+**Why it is tempting:** it is a ruler. Printed on the drawing, by the people who
+drew it, expressly so it can be measured against. No text to misread, no digit
+that could be a 6 or a 0, no extension lines to find. Anyone looking at this
+problem for the first time will reach for it, and will be right to wonder why
+this document does not.
+
+**Why it is wrong, in one line:** a printed scale bar is one to two inches of
+paper, and § 5b rates a span that short at **over 3% implied error** — the
+band where a slip of a few pixels moves every measurement on the sheet. The
+100 ft dimension string printed a few inches away is **0.4%**.
+
+**So the bar is roughly ten times less accurate than the dimension beside it,
+while looking considerably more official.** Offering it as the calibration
+source does not merely fail to help — it contradicts the one insight (§ 13.1)
+that makes this whole feature worth building, which is that the model should
+find the LONGEST span because length is what governs the error.
+
+Use it as a plausibility check on a ratio calibrated from something longer.
+**Never as the span.**
+
+**2. Station marks, in version one.** The span is excellent, which is exactly
+what makes them attractive. But stations run along an alignment, and the paper
+distance between two stations equals their difference only where that alignment
+is straight. A model cannot reliably tell a straight run from a long flat curve,
+and the failure is a plausible number again. Civil sheets are a later,
+deliberate piece of work, not a bonus candidate type.
+
+**3. Running it when a sheet opens.** Forbidden already by the standing rule in
+CLAUDE.md — no AI call from a page load, ever — and worth restating here
+specifically, because this is the feature where "it would be so helpful if it
+just knew" will be most persuasive. It is a button.
+
+**4. A confidence score shown as a percentage.** "87% confident" invites the
+estimator to accept 87 and reject 61, which is a judgement neither of them can
+actually make from the number. The gates in § 13.5 are binary for that reason:
+either it is worth showing or it is not, and what gets shown is the evidence —
+the crop, the endpoints, the ratio, the span rating — not a self-assessment.
+
+---
+
+## 14. Paid extra sheets when the monthly allowance runs out
+
+**Planned 2026-09-18. Nothing here is built.** $99 a month includes 150 sheets
+of AI reading (§ 11.5). This is what happens at 151.
+
+**The rule that governs all of it: nobody is ever charged without opting in.**
+That is not softened anywhere below, including by the auto-refill option, which
+is off until switched on and asks again the first time it fires.
+
+### 14.1 READ THIS FIRST: the 150 that exists is not the 150 being sold
+
+`shared/aiLimits.ts` has a plan-reader allowance of **150 — per person, per
+DAY** — and it is a **circuit breaker, not a budget**. Its own comment is
+explicit: it exists to stop a retry loop costing a thousand calls at 3am, it is
+set generously on purpose, and it is keyed to `ctx.user.id` rather than the
+billing account precisely so one person's runaway cannot stop their colleagues
+working.
+
+The 150 in the price is **per account, per MONTH, and it is an entitlement**.
+
+**These are two different counters on two different axes that happen to share a
+number, and conflating them would be a genuinely expensive mistake** — it would
+either let a five-estimator company read 750 sheets a month inside one $99 fee,
+or stop a solo estimator at 150 a day when they had bought 500.
+
+**Both stay.** The breaker keeps its job and its number. The entitlement is new.
+If the coincidence is confusing, change the breaker's number, not the price.
+
+### 14.2 The currency: credits, so thorough mode does not need a second meter
+
+One unit — a **sheet credit** — and different reads cost different numbers of
+them:
+
+| Read                                  | Cost to run | Credits |
+| ------------------------------------- | ----------- | ------- |
+| **Default** — Sonnet 5, 150 px/in     | 10.1c       | **1**   |
+| **Thorough** — 200 px/in, thinking on | 27.8c       | **3**   |
+
+Thorough is 2.75x the cost to run and charges 3, which rounds in the right
+direction and needs no second balance, no second meter and no second purchase
+flow.
+
+**Thorough draws only from PURCHASED credits, never from the included 150.**
+That is § 11.5's decision — it does not fit inside a flat fee — carried through
+literally. The alternative, one pool that thorough spends 3 of, is simpler and
+was rejected: it lets a subscriber turn $99 of included reading into 50 thorough
+sheets costing $13.90 to serve, which is the flat fee's whole exposure showing
+up through a side door.
+
+### 14.3 What to charge, and the reasoning
+
+**Recommendation: packs, not per sheet.** Three reasons, the first of which is
+decisive on its own:
+
+1. **Stripe's fee floor makes per-sheet absurd.** 2.9% + 30c. A single 25c
+   charge costs 31c to collect. Per-sheet pricing is not a pricing choice, it is
+   a way of paying Stripe more than the product earns.
+2. **A pack is one consent, honestly given.** Buying 150 sheets is a decision
+   made once, with a number attached. Per-sheet billing is either a charge per
+   click — unusable — or a running tab, which is exactly the "found out from the
+   bill" failure the standing AI rules exist to prevent.
+3. **It is one purchase to reconcile**, in the app and on the card statement.
+
+**The packs:**
+
+| Pack           | Price    | Per sheet | Cost to serve | Gross margin |
+| -------------- | -------- | --------- | ------------- | ------------ |
+| 50 sheets      | **$15**  | 30.0c     | $5.05         | ~61%         |
+| **150 sheets** | **$39**  | 26.0c     | $15.15        | ~57%         |
+| 500 sheets     | **$119** | 23.8c     | $50.50        | ~54%         |
+
+Margins are after Stripe (2.9% + 30c) and after the 10.1c-a-sheet serving cost.
+**The 150 pack is the recommended default** — it is one more month's worth,
+which is a quantity somebody can reason about without arithmetic.
+
+**Why roughly 2.5x cost and not 2x or 5x.** Three anchors, and they agree:
+
+- **Against the cost to serve**, 26c on 10.1c is a 57% gross margin. Below
+  typical software margins, comfortably above cost recovery, and defensible out
+  loud to a customer who has read Anthropic's price list — which is the real
+  test, because that customer exists and 5x would be indefensible to them.
+- **Against what it replaces**, a dense sheet counted by hand is twenty to forty
+  minutes of estimator time. At $60 an hour that is $20 to $40 of labour. 26c
+  is not within two orders of magnitude of the value, which is why this does not
+  feel like gouging from the buying side.
+- **Against the flat fee**, $99 for 150 included works out at 66c a sheet if the
+  whole subscription is attributed to reading — which it should not be, since
+  the subscription is the whole product. **Overage priced BELOW the implied
+  included rate is the right direction**: the person buying more is the
+  product's best customer, and charging them a premium for being successful with
+  it is how good accounts get resented.
+
+**Auto-refill exists and is OFF.** An explicit opt-in toggle — "when I run out,
+buy another 150 pack automatically" — with its own confirmation, an email the
+first time it fires, and a visible way to switch it off in the same place. It is
+the only mechanism that could charge somebody who was not looking, so it gets
+the strictest treatment in the feature.
+
+### 14.4 What happens at the limit if they do not buy
+
+**AI pauses. Everything else works. Manual mode is untouched.** This is the
+existing behaviour and it is already correct — the requirement is to keep it,
+not to build it.
+
+**Verified in the code 2026-09-18:**
+
+- `checkDailyLimit` returns a message that already names the number, says when
+  it resets, and says what still works: _"Everything else works as normal — you
+  can still count and stamp by hand."_
+- `planCopilotRouter` catches `AiLimitReached` separately from every other
+  failure, with the comment _"Out of allowance is not a failure to hide behind a
+  generic message — it has its own sentence, and it is the one case the user can
+  act on."_ The run is still recorded so the panel can say what happened.
+- Stamping, tracing, calibration, legend capture and symbol linking have no AI
+  gate at any point. `createSymbolLink` has no model call, no allowance check
+  and nothing to fail — which CLAUDE.md names as the test of whether the
+  manual-mode rule is still being kept.
+
+**Three things the monthly version must not break**, because each is an easy
+mistake to make while adding a counter:
+
+1. **No modal, no interstitial, no app-wide banner.** Running out of AI reading
+   must not be an event that interrupts someone stamping by hand. It is a line
+   in the reader's own panel and nowhere else.
+2. **The existing sentence keeps its shape** — number, when it comes back, what
+   still works — with one thing added: a **Buy more sheets** button, in the
+   message, going straight to the packs.
+3. **The counter must fail CLOSED, like the breaker does.** `server/llm` refuses
+   when the counter cannot be read, and its comment says why: _"A limit that
+   fails open is not a limit."_ An entitlement that fails open is worse — it
+   fails open into somebody else's money.
+
+### 14.5 The usage meter
+
+**Where it lives:** the plan reader's own panel header, permanently.
+`38 of 150 sheets this month` with a thin bar. Beside it, once any have been
+bought, `+ 120 bought`. That is the whole thing when nothing is wrong.
+
+**At 80%** — `120 of 150 this month` in amber, with `Buy more` beside it. One
+line, in the place it already occupies, with no new surface appearing.
+
+**At 100%** — the existing out-of-allowance message, plus the button.
+
+**Nowhere else.** Specifically not a dashboard tile, not a login banner, and not
+an email at 80%. § 1 of this document's own complaint applies: a warning in a
+place with nothing to do about it is a warning people learn to ignore. An email
+at 100% is defensible because the work actually stopped; at 80% nothing has
+happened yet.
+
+**The data is mostly there.** `ai_usage_daily` already stores calls per user per
+day per feature, and `aiUsageRouter` already sums a month of it — but as
+`adminProcedure`, across every account, for the spend report. The meter needs
+the same SUM scoped to one billing account and readable by that account. Small,
+but it is a new query and a new procedure, not a reuse of the existing one.
+
+### 14.6 Rollover
+
+**Recommendation: the included 150 resets monthly and does not roll over.
+Purchased credits never expire.**
+
+The two halves are different things and the difference is the justification:
+
+- **The included allowance is monthly CAPACITY, not property.** Rolling it over
+  turns a subscription into a bank: somebody who skips two quiet months arrives
+  in March with 450 sheets of entitlement, and the flat fee stops covering the
+  flat cost precisely in the month when usage spikes. Every flat-rate plan that
+  rolls over unused capacity ends up capping the rollover, which is a second
+  rule to explain and the first one people get wrong.
+- **Purchased credits are prepaid goods.** They were paid for with money, in a
+  quantity the customer chose. **Expiring them is taking something already
+  bought**, it produces the single worst support conversation available, and it
+  saves the business nothing — the cost was incurred at purchase, not at use. A
+  credit sitting unspent for a year is not a liability worth managing for a
+  product at this scale.
+
+**Spend order: included first, then purchased, oldest purchase first.** Nobody
+should ever burn a credit they paid for while a free one sits unused, and the
+meter shows both balances so the order is visible rather than assumed.
+
+### 14.7 Where Stripe fits, and what must exist first
+
+**The largest thing in this section: there is no billing system.** No Stripe
+dependency, no customer records, no subscription, no webhook handler anywhere in
+the repository. **The $99 subscription this overage attaches to does not exist
+in code either.** Selling packs on top of a subscription that is not yet billed
+is building the first floor before the ground floor.
+
+**So the order is: subscription billing first, packs second.** Most of what
+packs need is machinery the subscription needs anyway.
+
+**What has to exist, in order:**
+
+1. **A billing account concept**, keyed to `ctx.scope.dataUserId` rather than
+   `ctx.user.id`. The whole company shares an entitlement even though they do
+   not share the per-person breaker (§ 14.1).
+2. **A Stripe customer per billing account**, and the $99 subscription itself.
+3. **A monthly entitlement counter** — read against `ai_usage_daily` summed over
+   the billing period, not a stored decrementing number. A counter derived from
+   the usage rows cannot drift away from what was actually spent; a stored one
+   can, and reconciling it afterwards is guesswork.
+4. **A credits ledger**, append-only: granted, spent, refunded, with the Stripe
+   object that caused each row. Append-only so a disputed charge can be
+   reconstructed rather than argued about.
+5. **Stripe Checkout for the packs** — one-time payments, not subscription
+   items. Hosted checkout rather than a card form in the app: it moves PCI scope
+   and 3DS handling to Stripe, and there is nothing to gain by owning it.
+6. **A webhook on `checkout.session.completed`** that grants the credits,
+   **idempotent by session id**. Stripe retries; a duplicate grant is free money
+   and a missing grant is a paid customer with nothing to show for it. This is
+   the one place in the feature where getting it wrong is silent.
+7. **Refunds and disputes.** A refunded pack claws back its UNSPENT credits and
+   leaves the spent ones alone — the reading was performed and cost money. A
+   chargeback pauses AI until settled, and says so plainly.
+8. **Stripe Tax on from the first charge.** US sales tax on software is
+   state-by-state and retrofitting it means reopening past invoices.
+9. **A receipt and a purchase history in the app**, not only in Stripe's email.
+   Somebody will need it for a job's books.
+
+**One thing to decide before building, not during:** whether packs are available
+to accounts without an active subscription. **Recommendation: no.** Credits on a
+lapsed account are a support problem with no upside, and "resubscribe to use the
+sheets you bought" is a sentence nobody should have to read.
+
+---
+
+## 15. THE GATE: nobody has measured whether the reader counts accurately
+
+**Open, and it blocks Phase 10.** Flagged 2026-09-18 as the missing measurement
+under everything above.
+
+### 15.1 What is not known
+
+§ 11.5 measured what a sheet read **costs**: 10.1 cents at the default of
+Sonnet 5, 150 px/in, thinking off. That number is solid — it came from real
+sheets and the patch arithmetic in `shared/visionImageLimits.ts`.
+
+**Nobody has measured what it is WORTH.** There is no figure anywhere in this
+document for how many of the 78 device symbols on E1.02 the reader actually
+finds at 150 px/in, how many it invents, or whether 200 px/in finds materially
+more. The detail level was chosen by cost and by the patch ceiling, which is a
+reasonable way to choose a starting point and not a measurement of anything.
+
+**Three decisions already rest on that unmeasured number:**
+
+- **Tiling (Phase 10) is the largest AI build in the plan**, and § 10.1 ranks it
+  first by value on the argument that a symbol invisible at full-sheet scale is
+  recoverable at tile scale. True as far as it goes, and it does not say
+  recoverable _how completely_.
+- **§ 14's economics assume the default is the right default.** If 150 px/in
+  turns out to be materially worse than 200, the real per-sheet cost is 27.8c,
+  not 10.1c, and every margin in § 14.3 is wrong by a factor of nearly three.
+- **Thorough mode is priced as a premium.** If it finds nothing the default
+  misses, it should not be sold at all; if it finds substantially more, it may
+  belong in the default rather than in the overage.
+
+### 15.2 The bake-off
+
+**Read the same real sheets at each detail level, and compare every reading
+against a hand count of the same sheet.**
+
+- **5 to 10 sheets**, weighted toward dense ones — E1.02 and its equivalents,
+  not a title sheet. The dense sheet is where the reader either earns its price
+  or does not.
+- **Three levels:** Haiku at 100 px/in, the default (Sonnet 5, 150 px/in), and
+  thorough (200 px/in, thinking on).
+- **Each sheet read TWICE at each level.** A single run cannot distinguish "the
+  reader missed three" from "the reader misses three _sometimes_", and the
+  second of those is a different product. Run-to-run variance is a result, not
+  noise to be averaged away.
+- **Hand count first, with the readings unseen.** A count made after seeing the
+  model's answer is not an independent count, and everyone who has ever done it
+  says otherwise.
+
+**What comes out of it**, per level: **recall** (how many real devices found),
+**precision** (how many proposed that are not there), **variance** between the
+two runs, and a **breakdown by symbol type** — because a reader that finds every
+receptacle and no junction box is a different problem from one that misses 8%
+evenly, and only the first one has a fix.
+
+### 15.3 What it costs, so it can be authorised knowingly
+
+**The API spend is trivial. The time is the real price, and it is the estimator's
+own.**
+
+| Item                                               | Cost          |
+| -------------------------------------------------- | ------------- |
+| 10 sheets x Haiku 100 px/in x 2 runs               | $0.92         |
+| 10 sheets x default 150 px/in x 2 runs             | $2.02         |
+| 10 sheets x thorough 200 px/in + thinking x 2 runs | $5.56         |
+| Legend capture, once per set, two sets             | $0.06         |
+| **API total**                                      | **~$8.56**    |
+| With re-runs after a prompt fix, and slack         | **under $15** |
+
+**The hand counts are 4 to 7 hours.** Ten dense sheets at twenty to forty
+minutes each, done carefully enough that the result can be trusted as the answer
+key — and done BEFORE the readings are seen. Against an estimator's own time
+that is $250 to $500 of real cost, which is thirty times the API bill.
+
+**So the thing being authorised is an afternoon and a half, not fifteen
+dollars.** A smaller version — 5 sheets, two levels, single runs — is about $3
+and two hours, and would settle the largest question (is the default good enough
+to build tiling on) while leaving the variance question open.
+
+### 15.4 DECIDED 2026-09-18: the small version, and not yet
+
+**Not authorised tonight, and deliberately so.** When Phase 10 is actually the
+next thing to build, run the SMALL version:
+
+- **5 sheets**, weighted to dense ones.
+- **Two levels** — the default (Sonnet 5, 150 px/in) and thorough (200 px/in,
+  thinking on). Haiku is dropped: § 11.5 already measured that it saves 27%
+  rather than 50%, which is not enough to justify a third of the hand-counting.
+- **Single runs.** The variance question stays open and is worth reopening only
+  if the recall numbers come back close to the line.
+
+**About $3 of API spend and two hours of hand-counting.** It settles the one
+question that gates the build — is the default detail level good enough to
+build tiling on — and leaves run-to-run variance for later.
+
+**The reason for waiting is the two hours, not the three dollars.** The
+measurement is only worth taking when its answer changes what gets built next,
+and the answer goes stale if the model, the detail level or the prompt moves in
+between. Running it early buys a number that has to be re-earned.
+
+### 15.5 The gate
+
+**Phase 10 should not start until this is run.** Not because the answer is
+expected to be bad — the reasoning behind tiling is sound — but because tiling
+is the biggest build on the list and it is currently justified by an argument
+rather than by a measurement, and the measurement costs an afternoon.
+
+**What each outcome would mean:**
+
+- **Default reaches high recall with few false positives** — build tiling as
+  planned, § 14's pricing stands, thorough stays as paid overage.
+- **Default is materially worse than thorough** — the default detail level is
+  wrong, the real cost per sheet is closer to 27.8c, and § 14.3's prices need
+  recomputing before anything is sold.
+- **Neither level is accurate enough to act on** — the most valuable possible
+  result, and the one worth spending an afternoon to find out before spending
+  weeks. The reader becomes a first pass that speeds up a human count rather
+  than a count, and it should be described that way in the product.

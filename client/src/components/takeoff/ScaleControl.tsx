@@ -13,8 +13,16 @@
  *                    with high confidence, and labelled so nobody mistakes it
  *                    for something they chose.
  *   set + manual   — the same, with no badge. The user's own answer.
- *   not set        — an amber prompt, because measuring cannot begin without
- *                    it and a quiet grey "—" would read as merely cosmetic.
+ *   not set        — plain grey, saying "Set scale" and nothing more. It is
+ *                    only a problem on a sheet somebody wants to measure, and
+ *                    on a specifications or legend sheet there is nothing to
+ *                    measure at all. A warning shown where there is no
+ *                    problem is a warning people learn to scroll past.
+ *
+ * The amber and the triangle come back the moment a measuring tool is
+ * reached for — `wanted` — because that is the moment the missing scale is
+ * actually in the way. See TakeoffPage: hovering, focusing or clicking a
+ * gated trace button raises it, as does starting a two-point measure.
  *
  * When detection found something it was not sure enough to apply, that reading
  * is offered as a one-click suggestion. Faster than typing, and it cannot be
@@ -54,12 +62,18 @@ export function ScaleControl({
   onSet,
   onClear,
   notToScale,
+  wanted,
 }: {
   sheet: ScaleSheet;
   onSet: (scaleText: string) => void;
   onClear: () => void;
   /** The sheet states NOT TO SCALE — worth saying rather than nagging. */
   notToScale?: boolean;
+  /**
+   * A measuring tool is being reached for, so a missing scale is in the way
+   * RIGHT NOW. Only then does this go amber and grow a warning triangle.
+   */
+  wanted?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -128,16 +142,27 @@ export function ScaleControl({
               "h-7 gap-1.5 text-xs transition-colors",
               flash &&
                 "border border-emerald-500 bg-emerald-500/10 text-emerald-300",
-              !isSet && !flash && "text-[#F5C518] hover:text-[#F5C518]"
+              !isSet && !flash && !wanted && "text-muted-foreground",
+              !isSet &&
+                !flash &&
+                wanted &&
+                "text-[#F5C518] hover:text-[#F5C518]"
             )}
-            title="Set the drawing scale for this sheet"
+            title={
+              isSet
+                ? "The scale this sheet is drawn at — click to change it"
+                : wanted
+                  ? "Measuring needs a scale — click to set one for this sheet"
+                  : "No scale set. Counting works without one; only measuring needs it."
+            }
           >
             <Ruler className="w-3.5 h-3.5" />
             {isSet ? (
               <span className="font-mono">{sheet.scaleText}</span>
             ) : (
               <span className="flex items-center gap-1">
-                <TriangleAlert className="w-3 h-3" /> Set scale
+                {wanted && <TriangleAlert className="w-3 h-3" />}
+                {notToScale ? "Not to scale" : "Set scale"}
               </span>
             )}
           </Button>

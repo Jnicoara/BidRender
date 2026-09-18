@@ -60,7 +60,6 @@ import {
   Minimize2,
   Minus,
   Trash2,
-  TriangleAlert,
   Upload,
   X,
 } from "lucide-react";
@@ -1737,6 +1736,15 @@ export default function TakeoffPage({
    */
   const [calibrating, setCalibrating] = useState(false);
   const [calibratePoints, setCalibratePoints] = useState<PagePoint[]>([]);
+  /**
+   * A gated measuring tool is under the pointer or holds focus.
+   *
+   * The scale chip is plain until this or calibration is true. On a
+   * specifications or legend sheet there is nothing to measure, so a standing
+   * warning there is a warning about a non-problem — and one learned to be
+   * ignored is worse than none at all.
+   */
+  const [reachingForMeasure, setReachingForMeasure] = useState(false);
 
   const [tracing, setTracing] = useState(false);
   const [tracePathType, setTracePathType] = useState<RunPathType>("conduit");
@@ -1936,7 +1944,7 @@ export default function TakeoffPage({
     if (measurability.ok) return null;
     return measurability.reason === "not-to-scale"
       ? "This sheet is marked not to scale — set a scale by hand to trace on it"
-      : "No scale set for this sheet — set one below before tracing";
+      : "No scale set for this sheet — set one to trace on it";
   }, [measurability]);
 
   const refreshRuns = useCallback(() => {
@@ -3073,64 +3081,28 @@ export default function TakeoffPage({
           <div className="w-px h-4 bg-border" />
 
           {/*
-            Always rendered, disabled with a reason when the sheet cannot be
-            measured. Hiding them was worse than it sounds: on an unscaled
-            sheet the screen offered NO tool at all, and a tool that is not on
-            screen does not read as unavailable, it reads as non-existent.
-          */}
-          {activeSheet && !tracing && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 gap-1.5 text-xs"
-                onClick={() => startTracing("conduit")}
-                disabled={!measurability?.ok}
-                title={traceBlockedReason ?? "Trace a conduit run"}
-              >
-                <ConduitIcon className={cn("w-3.5 h-3.5", CONDUIT_COLOR)} />{" "}
-                Conduit
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 gap-1.5 text-xs"
-                onClick={() => startTracing("cable")}
-                disabled={!measurability?.ok}
-                title={
-                  traceBlockedReason ??
-                  "Trace a run of self-contained cable — MC or Romex"
-                }
-              >
-                <CableIcon className={cn("w-3.5 h-3.5", CABLE_COLOR)} /> Cable
-              </Button>
+            ── COUNT ────────────────────────────────────────────────────────
 
-              {/* Counting needs no scale, so this is never gated on one. */}
-              {!stampAssembly && (
-                <StampPicker
-                  assemblies={allAssemblies.map(a => ({
-                    id: a.id,
-                    name: a.name,
-                    category: a.category ?? null,
-                  }))}
-                  disabled={allAssemblies.length === 0}
-                  onPick={assembly => {
-                    setStampAssembly({ id: assembly.id, name: assembly.name });
-                    toast.success(
-                      `Stamping ${assembly.name} — click to place.`
-                    );
-                  }}
-                />
-              )}
-            </>
-          )}
+            First, and alone in its group, because it is the tool that ALWAYS
+            works. Counting is not measuring and needs no scale, so on a sheet
+            with none this is the whole of what the bar still offers — and it
+            should not have to be found among two dimmed buttons that do.
 
-          {/*
-            Outside the measurability gate on purpose. Counting devices needs
-            no scale, so the control that says what is being stamped — and the
-            only way to stop — must not disappear on an unscaled sheet.
+            The divider after it is the only label this grouping gets. Words
+            were considered and dropped: the bar already wraps to a second row
+            on a narrow drawing pane, and wrapping is what used to push the
+            scale control off the edge. The dimming does the explaining on the
+            sheets where it matters — on an unscaled sheet everything left of
+            the divider is live and everything right of it is not, which says
+            "these two are a kind, and they need something" without spending a
+            pixel of width on saying so.
           */}
           {stampAssembly ? (
+            /*
+              Outside the measurability gate on purpose. The control that says
+              what is being stamped — and the only way to stop — must not
+              disappear on an unscaled sheet.
+            */
             <Button
               size="sm"
               className="h-7 gap-1.5 text-xs"
@@ -3140,54 +3112,155 @@ export default function TakeoffPage({
               Stamping {stampAssembly.name}
               <X className="w-3 h-3" />
             </Button>
-          ) : null}
+          ) : (
+            activeSheet &&
+            !tracing && (
+              <StampPicker
+                assemblies={allAssemblies.map(a => ({
+                  id: a.id,
+                  name: a.name,
+                  category: a.category ?? null,
+                }))}
+                disabled={allAssemblies.length === 0}
+                onPick={assembly => {
+                  setStampAssembly({ id: assembly.id, name: assembly.name });
+                  toast.success(`Stamping ${assembly.name} — click to place.`);
+                }}
+              />
+            )
+          )}
 
-          {activeSheet && !tracing && !calibrating && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => {
-                setCalibratePoints([]);
-                setCalibrating(true);
-                setStampAssembly(null);
-              }}
-              title="Click two points you know the distance between"
-            >
-              <Ruler className="w-3.5 h-3.5 text-[#38BDF8]" /> Measure
-            </Button>
+          {activeSheet && !tracing && <div className="w-px h-4 bg-border" />}
+
+          {/*
+            ── MEASURE ──────────────────────────────────────────────────────
+
+            Always rendered, disabled with a reason when the sheet cannot be
+            measured. Hiding them was worse than it sounds: on an unscaled
+            sheet the screen offered NO tool at all, and a tool that is not on
+            screen does not read as unavailable, it reads as non-existent.
+          */}
+          {activeSheet && !tracing && (
+            <>
+              {/*
+                aria-disabled, not disabled. A truly disabled button gets
+                pointer-events: none from the button variants, which takes the
+                title tooltip with it — so the reason these were off was
+                written down and then made unhoverable, unfocusable and
+                unclickable. The quiet scale chip leans on that reason being
+                reachable, so it has to actually be reachable: hovering or
+                focusing one raises the chip, and clicking says why in words.
+              */}
+              <Button
+                size="sm"
+                variant="outline"
+                className={cn(
+                  "h-7 gap-1.5 text-xs",
+                  !measurability?.ok && "opacity-50"
+                )}
+                aria-disabled={!measurability?.ok}
+                onClick={() => {
+                  if (!measurability?.ok) {
+                    if (traceBlockedReason) toast.info(traceBlockedReason);
+                    return;
+                  }
+                  startTracing("conduit");
+                }}
+                onMouseEnter={() => setReachingForMeasure(true)}
+                onMouseLeave={() => setReachingForMeasure(false)}
+                onFocus={() => setReachingForMeasure(true)}
+                onBlur={() => setReachingForMeasure(false)}
+                title={traceBlockedReason ?? "Trace a conduit run"}
+              >
+                <ConduitIcon className={cn("w-3.5 h-3.5", CONDUIT_COLOR)} />{" "}
+                Conduit
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className={cn(
+                  "h-7 gap-1.5 text-xs",
+                  !measurability?.ok && "opacity-50"
+                )}
+                aria-disabled={!measurability?.ok}
+                onClick={() => {
+                  if (!measurability?.ok) {
+                    if (traceBlockedReason) toast.info(traceBlockedReason);
+                    return;
+                  }
+                  startTracing("cable");
+                }}
+                onMouseEnter={() => setReachingForMeasure(true)}
+                onMouseLeave={() => setReachingForMeasure(false)}
+                onFocus={() => setReachingForMeasure(true)}
+                onBlur={() => setReachingForMeasure(false)}
+                title={
+                  traceBlockedReason ??
+                  "Trace a run of self-contained cable — MC or Romex"
+                }
+              >
+                <CableIcon className={cn("w-3.5 h-3.5", CABLE_COLOR)} /> Cable
+              </Button>
+            </>
           )}
 
           <div className="ml-auto flex items-center gap-2">
             {/*
-              ── The scale, as a STATUS CHIP with its remedy beside it ───────
+              ── CALIBRATE — beside the thing it changes, not among the tools ─
+
+              It used to sit fourth in the tool row, after Conduit, Cable and
+              Stamp, reading as a fourth drawing tool. It is not one. **It does
+              not measure anything — it SETS the scale**, which is what the
+              other two then measure against, so its home is next to the scale
+              chip it writes to rather than next to its consumers.
+
+              And it is called Calibrate now, not Measure, for a reason that is
+              about the NEXT thing to be built rather than about this button:
+              Phase 4b is a measure-only tool, which needs the word "Measure"
+              honestly. Two buttons both called some flavour of measure is the
+              confusion this grouping exists to remove, so the word is handed
+              over before it gets claimed.
+            */}
+            {activeSheet && !tracing && !calibrating && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => {
+                  setCalibratePoints([]);
+                  setCalibrating(true);
+                  setStampAssembly(null);
+                }}
+                title="Set this sheet's scale by clicking two points you know the distance between"
+              >
+                <Ruler className="w-3.5 h-3.5 text-[#38BDF8]" /> Calibrate
+              </Button>
+            )}
+
+            {/*
+              ── The scale, as ONE status chip ──────────────────────────────
 
               Out of the drawing entirely. It used to be a panel floating over
               the bottom-left of the sheet — over the work — and a warning that
               covers the work is a warning people learn to resent.
 
-              When a scale is set, the ScaleControl chip IS the status: it
-              reads the scale, and clicking it is how you change it. When there
-              is none, an amber chip says so and the button beside it is what
-              to do about it, permanently, in the same place.
+              There used to be TWO things here: an amber "No scale" warning and
+              the ScaleControl beside it saying "Set scale" under a second
+              warning triangle. The same complaint, twice, in one bar. The
+              ScaleControl chip IS the status now — it reads the scale when
+              there is one, says "Set scale" plainly when there is not, and
+              carries the not-to-scale note itself.
+
+              And it stays plain until measuring is actually being attempted.
+              Counting needs no scale, and a specifications or legend sheet has
+              nothing on it to measure at all.
             */}
-            {activeSheet && !measurability?.ok && (
-              <span
-                className="flex items-center gap-1.5 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2 py-1 text-[0.7rem] text-[#F5C518]"
-                title={
-                  traceBlockedReason ??
-                  "Counting still works without a scale — only measuring needs one."
-                }
-              >
-                <TriangleAlert className="w-3 h-3" />
-                {notToScaleBySheet[activeSheet.id]
-                  ? "Marked not to scale"
-                  : "No scale"}
-              </span>
-            )}
             {activeSheet && (
               <ScaleControl
                 sheet={activeSheet}
+                wanted={
+                  !measurability?.ok && (reachingForMeasure || calibrating)
+                }
                 notToScale={notToScaleBySheet[activeSheet.id] ?? false}
                 onSet={scaleText =>
                   setSheetScale.mutate({ id: activeSheet.id, scaleText })
