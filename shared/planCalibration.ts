@@ -164,6 +164,26 @@ export function ratioFromCalibration(
   return Number.isFinite(ratio) && ratio > 0 ? ratio : null;
 }
 
+/**
+ * What an error percentage means on a run you would actually price.
+ *
+ * "±4.6%" is a number an estimator has to do arithmetic on before it means
+ * anything. "A 1,000 ft run could be off by about 46 ft" is the same fact,
+ * already in the units of the decision.
+ *
+ * A round 1,000 ft is used on purpose rather than the job's real footage: it is
+ * a yardstick, and a yardstick that changes size is no use for comparing two
+ * sheets against each other.
+ */
+export const IMPACT_REFERENCE_FEET = 1000;
+
+export function describeErrorImpact(errorPercent: number): string {
+  if (!Number.isFinite(errorPercent) || errorPercent <= 0) return "";
+  const feet = (errorPercent / 100) * IMPACT_REFERENCE_FEET;
+  const rounded = feet >= 10 ? Math.round(feet) : Math.round(feet * 10) / 10;
+  return `A ${IMPACT_REFERENCE_FEET.toLocaleString("en-US")} ft run could be off by about ${rounded} ft.`;
+}
+
 export type SpanQuality = "good" | "fair" | "short";
 
 export type SpanAssessment = {
@@ -216,9 +236,23 @@ export function assessSpan(spanPagePoints: number): SpanAssessment | null {
     paperInches,
     errorPercent,
     message:
-      "Short span — a small slip here moves EVERY measurement on this sheet. Use the longest dimension you can find.",
+      "Short span — a small slip here moves EVERY measurement on this sheet. Use the longest dimension you can find if there is one.",
   };
 }
+
+/**
+ * ── A short span is a WARNING, never a block ─────────────────────────────────
+ *
+ * There is no `canApply` here, and there must never be one. Sometimes a graphic
+ * scale bar is the only known distance printed on a sheet — plans arrive with
+ * hardly any information on them, and a bar two inches long is then the best
+ * measurement available, not a mistake to be prevented.
+ *
+ * Refusing it would leave the estimator with no scale at all, which is strictly
+ * worse than a scale they have been told is soft. The app's job is to make the
+ * softness visible and durable (see `scaleSpanPaperInches` on the sheet), not
+ * to decide on their behalf.
+ */
 
 export type StandardScaleCheck = {
   /** The closest architect's or engineer's scale, as text. */

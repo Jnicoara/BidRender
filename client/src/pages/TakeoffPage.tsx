@@ -40,7 +40,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
-  Cable,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -48,13 +47,14 @@ import {
   Loader2,
   Plus,
   MapPin,
+  Route,
+  Spline,
   Ruler,
   Maximize2,
   Minus,
   Trash2,
   Upload,
   X,
-  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -560,19 +560,51 @@ function PlanPane({
     [spaceHeld, startPan]
   );
 
-  /** Space-drag and middle-drag pan even while a tool is armed. */
+  /**
+   * Pan without putting the tool down: RIGHT-drag, middle-drag, or space-drag.
+   *
+   * Right-drag is the one people reach for, and it has to work mid-trace — the
+   * moment you most need to move the sheet is halfway along a run that leaves
+   * the screen. Capture phase with `stopPropagation`, so the overlay never sees
+   * the event and cannot mistake it for a point.
+   *
+   * `spaceHeld` is read from a ref rather than the closure. As state it was
+   * stale here often enough to look broken: the listener is re-registered on
+   * every change, and a keydown landing between render and re-registration
+   * left the old handler still saying "space is not held".
+   */
+  const spaceHeldRef = useRef(spaceHeld);
+  useEffect(() => {
+    spaceHeldRef.current = spaceHeld;
+  }, [spaceHeld]);
+
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp) return;
     const onDown = (e: PointerEvent) => {
-      if (e.button !== 1 && !spaceHeld) return;
+      const wants =
+        e.button === 2 ||
+        e.button === 1 ||
+        (e.button === 0 && spaceHeldRef.current);
+      if (!wants) return;
       e.preventDefault();
       e.stopPropagation();
       startPan(e);
     };
+    /**
+     * The menu is suppressed for the whole viewport, not just during a drag.
+     * A right-click that opens a context menu over the drawing is never what
+     * was wanted here, and suppressing it only after a drag has begun still
+     * flashes the menu on a click that does not move.
+     */
+    const onMenu = (e: MouseEvent) => e.preventDefault();
     vp.addEventListener("pointerdown", onDown, true);
-    return () => vp.removeEventListener("pointerdown", onDown, true);
-  }, [spaceHeld, startPan]);
+    vp.addEventListener("contextmenu", onMenu);
+    return () => {
+      vp.removeEventListener("pointerdown", onDown, true);
+      vp.removeEventListener("contextmenu", onMenu);
+    };
+  }, [startPan]);
 
   /** The drag itself, on the window so it survives leaving the viewport. */
   useEffect(() => {
@@ -2570,11 +2602,18 @@ export default function TakeoffPage({
                       ) : null
                     }
                   />
-                  {/* Rendered under the pager rather than inside PlanPane so
-                      the sheet row (and its mutations) stay owned here. */}
+                  {/*
+                    Rendered under the pager rather than inside PlanPane so the
+                    sheet row (and its mutations) stay owned here.
+
+                    It WRAPS rather than clipping. It did not, and the rightmost
+                    control was the SCALE — so on a narrow drawing pane the one
+                    control you need when a sheet has no scale was the first
+                    thing to slide off the edge, with nothing to say it existed.
+                  */}
                   {activeSheet && (
-                    <div className="border-t border-border bg-card px-3 py-1.5 shrink-0 flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground truncate max-w-[14rem]">
+                    <div className="border-t border-border bg-card px-3 py-1.5 shrink-0 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                      <span className="text-xs text-muted-foreground truncate max-w-[14rem] shrink">
                         {activeSheet.name}
                       </span>
                       <div className="w-px h-4 bg-border" />
@@ -2605,8 +2644,8 @@ export default function TakeoffPage({
                             disabled={!measurability?.ok}
                             title={traceBlockedReason ?? "Trace a conduit run"}
                           >
-                            <Zap className="w-3.5 h-3.5 text-[#F5C518]" /> Trace
-                            conduit
+                            <Route className="w-3.5 h-3.5 text-[#F5C518]" />{" "}
+                            Trace conduit
                           </Button>
                           <Button
                             size="sm"
@@ -2614,10 +2653,13 @@ export default function TakeoffPage({
                             className="h-7 gap-1.5 text-xs"
                             onClick={() => startTracing("cable")}
                             disabled={!measurability?.ok}
-                            title={traceBlockedReason ?? "Trace a cable run"}
+                            title={
+                              traceBlockedReason ??
+                              "Trace a run of self-contained cable — MC or Romex"
+                            }
                           >
-                            <Cable className="w-3.5 h-3.5 text-emerald-400" />{" "}
-                            Trace cable
+                            <Spline className="w-3.5 h-3.5 text-emerald-400" />{" "}
+                            Trace cable (MC/Romex)
                           </Button>
 
                           {/* Counting needs no scale, so this is never gated on

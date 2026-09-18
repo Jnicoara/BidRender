@@ -166,13 +166,22 @@ product rule as much as a writing one — see `CLAUDE.md` § Starter content.
 
 ## 9. Words — pick one and keep it
 
-| Use           | Not                           | Why                                                                           |
-| ------------- | ----------------------------- | ----------------------------------------------------------------------------- |
-| **takeoff**   | take-off, take off (noun)     | One word, the way the trade writes it                                         |
-| **bid**       | job, project, estimate (noun) | The thing you build and the number you send                                   |
-| **proposal**  | quote, quotation              | The document the customer receives                                            |
-| **quote**     | —                             | Reserved for what a **supplier** gives **you**. Never the customer's document |
-| **estimated** | quoted (of your own hours)    | `estimated hours`; "quoted" belongs to suppliers                              |
+| Use                | Not                             | Why                                                                             |
+| ------------------ | ------------------------------- | ------------------------------------------------------------------------------- |
+| **takeoff**        | take-off, take off (noun)       | One word, the way the trade writes it                                           |
+| **bid**            | job, project, estimate (noun)   | The thing you build and the number you send                                     |
+| **proposal**       | quote, quotation                | The document the customer receives                                              |
+| **quote**          | —                               | Reserved for what a **supplier** gives **you**. Never the customer's document   |
+| **estimated**      | quoted (of your own hours)      | `estimated hours`; "quoted" belongs to suppliers                                |
+| **labor**          | labour                          | US spelling throughout                                                          |
+| **cable**          | wire (for a self-contained run) | A run that **is its own raceway** — MC, Romex. No pipe around it                |
+| **wire**           | cable (for conductors in pipe)  | The **conductors pulled through** a conduit. Counted per conductor, per circuit |
+| **material**       | item, product, part             | The catalog row                                                                 |
+| **assembly**       | recipe, template                | Materials plus hours for one installed thing                                    |
+| **kit**            | bundle, package                 | A group of assemblies                                                           |
+| **modifier**       | adjustment, factor              | A job condition that changes hours                                              |
+| **crew**           | team, staff, users              | The people in your company                                                      |
+| **archive** (verb) | hide, remove, disable           | Reversible. **delete** is forever, and says so                                  |
 
 > **"Quote" is a labelling rule, not a comprehension rule.** Contractors say
 > "I quoted that job at $13k" and always will. So the word is kept off buttons,
@@ -182,13 +191,17 @@ product rule as much as a writing one — see `CLAUDE.md` § Starter content.
 > vocabulary that only accepts the house term is a vocabulary that fails the
 > people it was written for. Same principle as trade slang on materials: the
 > label is what it is, the slang is how it is found.
-> | **labor** | labour | US spelling throughout |
-> | **material** | item, product, part | The catalog row |
-> | **assembly** | recipe, template | Materials plus hours for one installed thing |
-> | **kit** | bundle, package | A group of assemblies |
-> | **modifier** | adjustment, factor | A job condition that changes hours |
-> | **crew** | team, staff, users | The people in your company |
-> | **archive** (verb) | hide, remove, disable | Reversible. **delete** is forever, and says so |
+
+> **Cable and wire are two different things, and the app means both.** A
+> **cable** run is self-contained — MC or Romex, its own raceway, one line on the
+> bid. A **wire** run is the conductors pulled through a conduit, counted per
+> conductor per circuit, with the pipe counted separately. The totals panel
+> shows Conduit / Cable / Wire for exactly this reason and the three are not
+> interchangeable.
+>
+> On its own, the word "cable" on a button is ambiguous enough to be worth
+> disambiguating — hence `Trace cable (MC/Romex)` rather than `Trace cable`. The
+> fix was the ambiguity, not the word.
 
 **Trade slang belongs in search, not in labels.** A material is found by "1900"
 and "gem box"; it is _labelled_ `4" square box`. The label is what it is, the

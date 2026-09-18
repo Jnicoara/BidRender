@@ -31,6 +31,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { CrosshairGuides } from "./CrosshairGuides";
 import { Check, Ruler, TriangleAlert, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -271,6 +272,17 @@ export function TraceLayer({
           }
         }}
       >
+        {/* Underneath every mark, so a guide never sits on top of a stamp. */}
+        {tracing && (
+          <CrosshairGuides
+            at={hover}
+            width={width}
+            height={height}
+            renderScale={renderScale}
+            color={RUN_COLOR[pathType]}
+          />
+        )}
+
         {/* Runs already traced */}
         {existingRuns.map(run => {
           const screen = run.points.map(toScreen);
@@ -460,7 +472,7 @@ export function TraceLayer({
           )}
 
           {stamping && stampAssemblyName && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-[#F5C518]/50 bg-card/95 px-3 py-1.5 shadow-lg">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-[#F5C518]/50 bg-card/95 px-3 py-1.5 shadow-lg pointer-events-auto">
               <span className="text-xs text-muted-foreground">Stamping</span>
               <span className="text-sm font-medium">{stampAssemblyName}</span>
               <span className="text-[0.7rem] text-muted-foreground">
@@ -473,7 +485,7 @@ export function TraceLayer({
             making the user look elsewhere to see what they are measuring is how
             a wrong run gets committed. */}
           {tracing && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-auto">
               <span className="text-xs text-muted-foreground">
                 {pathType === "conduit" ? "Conduit run" : "Cable run"}
               </span>

@@ -26,6 +26,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { CrosshairGuides } from "./CrosshairGuides";
 import { Check, Ruler, RotateCcw, TriangleAlert, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ import {
 import {
   assessSpan,
   compareToStandardScales,
+  describeErrorImpact,
   parseLengthText,
   ratioFromCalibration,
 } from "@shared/planCalibration";
@@ -249,6 +251,18 @@ export function CalibrateLayer({
             >
               {span.message}
             </p>
+            {/*
+              The percentage turned into feet.
+
+              "±4.6%" needs arithmetic before it means anything; "a 1,000 ft run
+              could be off by about 46 ft" is the same fact already in the units
+              of the decision being made.
+            */}
+            {span.quality !== "good" && (
+              <p className="text-[0.7rem] text-muted-foreground">
+                {describeErrorImpact(span.errorPercent)}
+              </p>
+            )}
           </div>
         )}
 
@@ -281,12 +295,26 @@ export function CalibrateLayer({
           </div>
         )}
 
+        {/*
+          A short span NEVER blocks applying, and this button is never dimmed
+          for it — only for "there is no number yet".
+
+          Sometimes a graphic scale bar is the only known distance printed on a
+          sheet. Refusing a short span would leave the estimator with no scale
+          at all, which is strictly worse than a scale they have been told is
+          soft. The warning sits BESIDE this button, not in place of it.
+        */}
         <div className="flex items-center gap-2 pt-0.5">
           <Button
             size="sm"
             className="h-7 gap-1.5 text-xs flex-1"
             onClick={apply}
             disabled={ratio === null || busy}
+            title={
+              span?.quality === "short"
+                ? "Applies the scale. It is on the soft side — the sheet will be marked so you remember."
+                : "Applies this scale to the sheet"
+            }
           >
             <Check className="w-3.5 h-3.5" />
             {busy ? "Saving…" : "Use this scale"}
@@ -321,16 +349,35 @@ export function CalibrateLayer({
         viewBox={`0 0 ${width} ${height}`}
         className="absolute inset-0 w-full h-full cursor-crosshair"
         onPointerMove={e => {
-          if (points.length !== 1) return;
+          // Tracked from the first move, not just between the two clicks: the
+          // guides have to be there while the FIRST end is being lined up,
+          // which is the click that has no rubber-band line to help it.
           setHover(pointerToPage(e));
         }}
+        onPointerLeave={() => setHover(null)}
         onPointerDown={e => {
+          // Left button only. Right and middle are pan, and a pan that also
+          // dropped a calibration point would be maddening — you would move the
+          // sheet and silently set one end of the measurement at the same time.
+          if (e.button !== 0) return;
           if (points.length >= 2) return;
           const p = pointerToPage(e);
           if (!p) return;
           onPointsChange([...points, p]);
         }}
       >
+        {/* Lining up on the end of a dimension line is exactly what these are
+            for — and here the alignment IS the accuracy of the whole sheet. */}
+        {points.length < 2 && (
+          <CrosshairGuides
+            at={hover}
+            width={width}
+            height={height}
+            renderScale={renderScale}
+            color={SPAN_COLOR}
+          />
+        )}
+
         {first && live && (
           <line
             x1={first.x}

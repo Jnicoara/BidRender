@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-17]
 
+- **You can move around the drawing while part-way through tracing a run.** Right-click and drag pans the sheet at any time, including mid-trace — which is exactly when you need it, because a run that leaves the screen cannot be finished otherwise. Middle-drag and space-drag do the same. None of them drops a point, and the browser's right-click menu no longer appears over the drawing.
+
+- **The Finish button on a run works again.** It had stopped being clickable: a change in the previous release put the small toolbar holding Finish, Undo and Cancel into a layer that passed clicks straight through it, so pressing Finish quietly dropped another point on the drawing instead of finishing the run.
+
+- **Faint guide lines now run the full width and height of the sheet from the crosshair**, while tracing and while setting a scale by measuring. Placing a point is an alignment job — you are lining up with a wall across the room, not aiming at a pixel — and the lines show what you are lined up with. They stay hairline-thin at every zoom.
+
+- **Clearer labels on the two run tools.** The second one now reads "Trace cable (MC/Romex)", because "cable" on its own was ambiguous next to the wire pulled through a conduit. Both icons were replaced with ones matching the weight of everything else on screen.
+
+- **A short measuring span warns you, and never stops you.** Sometimes a scale bar is the only known distance printed on a sheet, and refusing it would leave you with no scale at all — worse than one you have been told is approximate. The warning now also says what it means in feet: roughly how far out a 1,000 ft run could be.
+
 - **You can now set a sheet's scale by measuring something you already know.** Most real drawing sets state no scale ratio anywhere the app can read, and a set that does may have been shrunk on its way to you — which makes the printed ratio confidently wrong. Either way, typing a scale was useless. Now you click two points you know the distance between, type the distance, and the scale falls out. A plain number means feet; inches need a mark.
 
 - **It tells you how much to trust the calibration, while you are still choosing where to click.** A scale error does not spoil one measurement, it multiplies into every measurement on that sheet — and how wrong it can be depends almost entirely on how LONG a distance you measured, not on how carefully you clicked. So the panel rates your span live and says what it implies: a good span barely moves the scale, a short one is flagged in orange with a warning that a small slip there moves everything. It also speaks up when the answer lands well off any standard scale, which usually means either the set was printed off-scale or you clicked the ends of something other than what you meant.
