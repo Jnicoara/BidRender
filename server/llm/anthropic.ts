@@ -27,7 +27,13 @@
  * named that way is published to every visitor.
  */
 import Anthropic from "@anthropic-ai/sdk";
-import type { InvokeParams, InvokeResult, Message, Tool } from "../_core/llm";
+import type {
+  InvokeParams,
+  InvokeResult,
+  Message,
+  Tool,
+  ToolChoice,
+} from "../_core/llm";
 
 /** How long one call may take before it is abandoned. */
 const REQUEST_TIMEOUT_MS = 120_000;
@@ -101,8 +107,20 @@ function toContentBlocks(
       continue;
     }
     // `file_url` was a Forge extension with no Anthropic equivalent in use
-    // here. Dropped rather than guessed at: a silently mistranslated document
-    // would produce a confidently wrong reading.
+    // here. It was previously DROPPED, on the reasoning that a silently
+    // mistranslated document would produce a confidently wrong reading. That
+    // reasoning is right and the conclusion was one option short: a silently
+    // dropped document produces a reading of a message that is missing its
+    // attachment, which also looks fine and is also wrong.
+    //
+    // So it throws. Nothing in this app sends `file_url` today; the caller who
+    // first tries will find out immediately, from the call, rather than from a
+    // plausible answer about a PDF the model never received.
+    throw new Error(
+      `The Anthropic adapter cannot send "${part.type}" content. ` +
+        `Anthropic takes documents as their own block type — implement the ` +
+        `translation in server/llm/anthropic.ts rather than passing this.`
+    );
   }
 
   return blocks;
@@ -200,26 +218,134 @@ export function toInvokeResult(message: Anthropic.Message): InvokeResult {
 }
 
 /**
+ * The app's tool_choice as Anthropic's.
+ *
+ * `"auto"` is Anthropic's own default when tools are present, so forwarding it
+ * changes nothing TODAY — which is precisely why it went unnoticed that it was
+ * not being forwarded at all. The one that matters is the change somebody makes
+ * next: a reader that comes back without calling `report_sheet` has an obvious
+ * fix, `"required"`, and before this function that fix would have been typed,
+ * committed, deployed, and done absolutely nothing.
+ *
+ * `"required"` becomes `"any"` rather than naming a tool, so it keeps meaning
+ * "call one of them" when a caller has several. Naming the single tool when
+ * there is only one would be the same thing with more ways to be wrong.
+ */
+export function toToolChoice(
+  choice: ToolChoice | undefined
+): Anthropic.ToolChoice | undefined {
+  if (!choice) return undefined;
+  if (choice === "auto") return { type: "auto" };
+  if (choice === "none") return { type: "none" };
+  if (choice === "required") return { type: "any" };
+  const name = "name" in choice ? choice.name : choice.function.name;
+  return { type: "tool", name };
+}
+
+/**
  * Make one call.
  *
  * `max_tokens` is required by Anthropic and is never left to a default here:
  * every caller sets its own ceiling, because an unbounded reply is the one
  * thing that turns a bug into a bill. See shared/aiLimits.ts.
+ *
+ * ── Every field of InvokeParams is accounted for HERE, deliberately ──────────
+ * This function used to read six fields off `params` and ignore the rest. The
+ * rest were not documented as unsupported anywhere; they were simply absent
+ * from the object literal below, which reads identically to code that handles
+ * them. `thinking` sat in that gap for as long as the file existed: the type
+ * advertised it, a caller could set it, and it went nowhere.
+ *
+ * The lesson is not "remember to add the next one". It is that a translation
+ * layer which can accept a field and drop it has a type that LIES, and no
+ * amount of care fixes a lying type. So every key is now destructured by name
+ * and `rest` is asserted empty — **adding a field to `InvokeParams` without
+ * deciding about it here is a compile error**, not a surprise in production.
+ * Same shape as `unhandledBackend` in server/storage.ts, and for the same
+ * reason.
+ *
+ * A field that cannot be honoured throws rather than being forwarded wrong. A
+ * mistranslated parameter is worse than a rejected one: it produces an answer
+ * that looks fine. And a throw here is not a crash — every AI call site in this
+ * app already catches and degrades, so an unsupported parameter surfaces as a
+ * graceful failure with a named reason in the log, on the first call, in
+ * development.
  */
 export async function invokeAnthropic(
   params: InvokeParams
 ): Promise<InvokeResult> {
-  const maxTokens = params.maxTokens ?? params.max_tokens;
+  const {
+    // ── Honoured ──
+    messages,
+    model,
+    maxTokens: maxTokensCamel,
+    max_tokens: maxTokensSnake,
+    tools,
+    toolChoice,
+    tool_choice,
+    thinking,
+    // ── Not honoured. Named so they throw rather than vanish ──
+    outputSchema,
+    output_schema,
+    responseFormat,
+    response_format,
+    reasoning,
+    ...rest
+  } = params;
+
+  /**
+   * Compile-time exhaustiveness. If `InvokeParams` grows a field and it is not
+   * destructured above, `rest` stops being empty and this line stops compiling.
+   * It is the whole point of the destructure — delete it and the next parameter
+   * goes the way `thinking` did.
+   */
+  const _allFieldsAccountedFor: Record<string, never> = rest;
+  void _allFieldsAccountedFor;
+
+  /**
+   * Runtime rejection, for the fields with no faithful Anthropic equivalent.
+   *
+   * Not translated speculatively, and that is a considered choice rather than
+   * laziness. `response_format`/`outputSchema` map onto Anthropic's structured
+   * outputs and `reasoning` onto nothing at all — writing those mappings now,
+   * for zero callers, means shipping untested translation code whose failure
+   * mode is a confidently wrong answer. When a caller genuinely needs one, it
+   * gets written against that caller and tested with it. Until then, asking for
+   * it is a mistake and says so.
+   */
+  const unsupported = (
+    [
+      ["outputSchema", outputSchema],
+      ["output_schema", output_schema],
+      ["responseFormat", responseFormat],
+      ["response_format", response_format],
+      ["reasoning", reasoning],
+    ] as const
+  )
+    .filter(([, value]) => value !== undefined)
+    .map(([name]) => name);
+
+  if (unsupported.length > 0) {
+    throw new Error(
+      `The Anthropic adapter cannot honour: ${unsupported.join(", ")}. ` +
+        `It was silently ignoring these. Implement the translation in ` +
+        `server/llm/anthropic.ts rather than passing them.`
+    );
+  }
+
+  const maxTokens = maxTokensCamel ?? maxTokensSnake;
   if (!maxTokens || maxTokens <= 0) {
     throw new Error(
       "An AI call must set maxTokens. An unbounded reply has no cost ceiling."
     );
   }
-  if (!params.model) {
+  if (!model) {
     throw new Error("An AI call must name a model.");
   }
 
-  const { system, turns } = splitMessages(params.messages);
+  const { system, turns } = splitMessages(messages);
+  const anthropicTools = toTools(tools);
+  const anthropicToolChoice = toToolChoice(toolChoice ?? tool_choice);
 
   /**
    * ── Thinking is ON unless a caller says otherwise, and that is easy to miss ─
@@ -241,19 +367,25 @@ export async function invokeAnthropic(
    * existing catch and degrades gracefully — visible, not silent.
    */
   const message = await client().messages.create({
-    model: params.model,
+    model,
     max_tokens: maxTokens,
     ...(system ? { system } : {}),
     messages: turns,
-    ...(toTools(params.tools) ? { tools: toTools(params.tools)! } : {}),
+    ...(anthropicTools ? { tools: anthropicTools } : {}),
+    // Only alongside tools: Anthropic rejects a tool_choice with nothing to
+    // choose from, and a caller that sets one without tools has made a mistake
+    // the model should not be asked to interpret.
+    ...(anthropicToolChoice && anthropicTools
+      ? { tool_choice: anthropicToolChoice }
+      : {}),
     // Cast through `unknown`: the caller's shape is an open record by design
     // (see _core/llm.ts), and the SDK's union covers only the shapes the
     // pinned version knows about. Narrowing it here would mean this file
     // having an opinion about which thinking modes exist, which is the one
     // thing the translation layer is supposed not to have.
-    ...(params.thinking
+    ...(thinking
       ? {
-          thinking: params.thinking as unknown as Anthropic.ThinkingConfigParam,
+          thinking: thinking as unknown as Anthropic.ThinkingConfigParam,
         }
       : {}),
   });

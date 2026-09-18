@@ -947,6 +947,23 @@ directory, so nothing touches the files you are working in.
       deleted. Tracked under "Test suite health" above; noted here too because
       this is the section someone reads when something inexplicable happens.
 
+**Audited 2026-09-18 and left alone: the Manus Forge gateway's copy of the same
+bug.** `server/_core/llm.ts` destructures a fixed list of `InvokeParams` fields
+exactly as `invokeAnthropic` did, so a field added to that type goes nowhere
+there either. It was NOT given the compile-time guard, for two reasons: `_core/`
+is generated platform scaffolding that CLAUDE.md says to extend rather than
+rewrite, and the branch is dead in production — `server/llm/index.ts` picks
+Anthropic whenever `ANTHROPIC_API_KEY` is set, and it is set in
+`.env.production.local`. Worth knowing rather than worth fixing; if the Forge
+path is ever revived, give it the same treatment first.
+
+- [ ] Delete the Manus Forge gateway path entirely (`server/_core/llm.ts`, the
+      `BUILT_IN_FORGE_API_KEY` env var, and the lazy import in
+      `server/llm/index.ts`). It cannot run in production and it carries a
+      second, unguarded copy of the parameter-dropping bug that cost real money
+      in the Anthropic adapter. Part of the "Manus removal" work above rather
+      than its own job — noted here because the audit is what found it.
+
 ## Plan viewer overhaul
 
 - [ ] Give the plan reader zoomed-in tiles of a sheet rather than one shrunk image. Observed on the live site 2026-09-16: on dense sheets it runs, costs a call, and comes back having found no symbols — its own answer said the symbols were not legible at the resolution it was given. So this is not a prompt problem or a model-tier problem; it is being handed a picture in which the thing it is looking for does not survive. A receptacle symbol is a few dozen pixels on a full E-sheet scaled to fit a model's input, and downscaling removes it before the model ever sees it. Likely shape of the fix: render each page at takeoff zoom, cut it into overlapping tiles, read each tile, then merge the hits back into page coordinates — overlapping because a symbol on a tile seam would otherwise be halved and missed twice. Watch the cost: one sheet becomes N calls, so the per-person daily allowance in `shared/aiLimits.ts` is counting something much larger than it was designed around, and `PLAN_COPILOT_MODEL` is the expensive tier. Do this as part of the plan viewer overhaul, not before — the tiling wants the same render path the viewer is getting. **N is 6, and the rest of the cost question is answered: `references/ai-reader-cost.md` (2026-09-18) prices it on the real Old Blueridge sheets.** Decided there: Sonnet 5 at 150 px per paper inch, thinking off, 6 tiles, ~10.1c a sheet, 150 sheets a month inside the $99 flat price.

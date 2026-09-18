@@ -14,7 +14,12 @@
  */
 import { describe, it, expect } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { splitMessages, toInvokeResult } from "./llm/anthropic";
+import {
+  invokeAnthropic,
+  splitMessages,
+  toInvokeResult,
+  toToolChoice,
+} from "./llm/anthropic";
 import type { Message } from "./_core/llm";
 
 const PNG_1x1 =
@@ -252,5 +257,121 @@ describe("reading the reply back", () => {
     );
     expect(result.choices?.[0]?.message?.content).toBe("Reading it.");
     expect(result.choices?.[0]?.message?.tool_calls).toHaveLength(1);
+  });
+});
+
+/**
+ * ── The bug class this whole block exists for ────────────────────────────────
+ * `thinking` was declared on `InvokeParams`, settable by any caller, and
+ * discarded by this adapter for as long as the file existed. It was found by
+ * accident, while costing something else, because its only symptom was money.
+ *
+ * Four more fields were in exactly that position — `toolChoice` (passed by two
+ * callers TODAY), `outputSchema`, `responseFormat` and `reasoning`. The tests
+ * below pin both halves of the fix: the one that can be translated is, and the
+ * ones that cannot say so out loud instead of evaporating.
+ */
+describe("tool_choice, which was being passed and dropped", () => {
+  it("translates every shape the app can express", () => {
+    expect(toToolChoice("auto")).toEqual({ type: "auto" });
+    expect(toToolChoice("none")).toEqual({ type: "none" });
+    // "required" means "call SOMETHING", which is Anthropic's "any". Naming the
+    // single tool instead would mean something subtly different as soon as a
+    // caller has two.
+    expect(toToolChoice("required")).toEqual({ type: "any" });
+    expect(toToolChoice({ name: "report_sheet" })).toEqual({
+      type: "tool",
+      name: "report_sheet",
+    });
+    expect(
+      toToolChoice({ type: "function", function: { name: "go_to_screen" } })
+    ).toEqual({ type: "tool", name: "go_to_screen" });
+  });
+
+  it("stays undefined when the caller said nothing", () => {
+    expect(toToolChoice(undefined)).toBeUndefined();
+  });
+
+  /**
+   * The regression that matters. `"auto"` is Anthropic's own default, so
+   * forwarding it changes nothing today — which is exactly why nobody noticed
+   * it was not being forwarded. The change that would have been silently
+   * ignored is the NEXT one: a reader that comes back without calling
+   * `report_sheet` has an obvious fix, and before this it did nothing at all.
+   */
+  it("does not quietly turn a forced call back into an optional one", () => {
+    expect(toToolChoice("required")).not.toEqual({ type: "auto" });
+    expect(toToolChoice({ name: "report_sheet" })).not.toEqual({
+      type: "auto",
+    });
+  });
+});
+
+describe("a parameter it cannot honour fails loudly", () => {
+  const base = {
+    model: "claude-sonnet-5",
+    maxTokens: 100,
+    messages: [{ role: "user" as const, content: "hello" }],
+  };
+
+  // These run without an API key on purpose: the rejection happens before the
+  // client is ever constructed, which is what makes it a fast, local failure a
+  // developer meets on the first call rather than in production.
+  for (const field of [
+    "outputSchema",
+    "output_schema",
+    "responseFormat",
+    "response_format",
+    "reasoning",
+  ]) {
+    it(`names \`${field}\` in the error instead of ignoring it`, async () => {
+      await expect(
+        invokeAnthropic({ ...base, [field]: { type: "text" } } as never)
+      ).rejects.toThrow(field);
+    });
+  }
+
+  it("lists every unsupported field at once, not just the first", async () => {
+    await expect(
+      invokeAnthropic({
+        ...base,
+        reasoning: { effort: "low" },
+        responseFormat: { type: "json_object" },
+      } as never)
+    ).rejects.toThrow(
+      /responseFormat[\s\S]*reasoning|reasoning[\s\S]*responseFormat/
+    );
+  });
+
+  it("still refuses a call with no token ceiling", async () => {
+    await expect(
+      invokeAnthropic({ ...base, maxTokens: undefined } as never)
+    ).rejects.toThrow(/maxTokens/);
+  });
+
+  it("still refuses a call that names no model", async () => {
+    await expect(
+      invokeAnthropic({ ...base, model: undefined } as never)
+    ).rejects.toThrow(/model/);
+  });
+
+  /**
+   * `file_url` used to be dropped, with a comment arguing that a silently
+   * MISTRANSLATED document is worse than none. True, and one option short: a
+   * silently DROPPED document produces an answer about an attachment the model
+   * never received, which looks just as fine and is just as wrong.
+   */
+  it("refuses to send a document it cannot translate", () => {
+    expect(() =>
+      splitMessages([
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "What does this say?" },
+            { type: "file_url", file_url: { url: "https://x/y.pdf" } },
+          ],
+        },
+      ])
+    ).toThrow(/file_url/);
   });
 });

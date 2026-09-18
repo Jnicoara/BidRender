@@ -285,6 +285,29 @@ protocol the callers speak and Anthropic's, which is why the routers changed by
 one import line rather than being rewritten. Take that file seriously — every
 mistake it can make is silent and produces an app that still answers.
 
+**A translation layer that can accept a field and drop it has a type that
+LIES, and no amount of care fixes a lying type.** `invokeAnthropic` read six
+fields off `InvokeParams` and ignored the rest — `thinking` sat in that gap for
+the life of the file, advertised by the type, settable by any caller, and
+going nowhere. It was found by accident, while costing something else, because
+its only symptom was money. `toolChoice` was in the same position and is
+*passed today* by two callers; it happens not to matter only because `"auto"`
+is Anthropic's default anyway, so the change that would have been silently
+ignored is the next one somebody makes.
+
+So the adapter now destructures **every** key of `InvokeParams` by name and
+asserts the remainder empty. Adding a field to that type without deciding about
+it in the adapter is a **compile error**, which is the only version of this rule
+that survives contact with a hurry. Same shape as `unhandledBackend` in
+`server/storage.ts`. A field with no faithful mapping throws, naming itself,
+rather than being forwarded wrong — a mistranslated parameter is worse than a
+rejected one because it produces an answer that looks fine, and a throw here is
+not a crash, since every AI call site already catches and degrades.
+
+The general rule, for any adapter added later: **do not write a branch that
+accepts input and does nothing with it.** If it cannot be honoured, say so
+where the mistake is, not where the symptom eventually appears.
+
 **Three cost controls, and they are not equally useful.**
 
 - **`maxTokens` on every call, always.** `invokeAnthropic` refuses a call

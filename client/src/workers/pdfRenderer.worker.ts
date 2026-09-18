@@ -347,5 +347,27 @@ self.onmessage = async (e: MessageEvent) => {
     } catch (err) {
       self.postMessage({ type: "error", reqId, message: String(err) });
     }
+    return;
   }
+
+  /**
+   * A message this worker does not understand.
+   *
+   * Unreachable today — every type the page sends has a branch above. It exists
+   * because of what happens WITHOUT it: `e.data` is untyped, so there is no
+   * compile-time check that a new message type got a handler here, and a
+   * message that falls off the end of this chain posts nothing at all. The
+   * page's `pending` map has no timeout, so its promise never settles: the
+   * sheet simply never draws, with no error, no log, and nothing on screen
+   * saying what is being waited for.
+   *
+   * Same failure this whole change is about — something accepted, silently
+   * dropped, no symptom at the point of the mistake. Rejecting instead costs
+   * nothing and the page already knows how to surface an `error`.
+   */
+  self.postMessage({
+    type: "error",
+    reqId: msg?.reqId,
+    message: `pdfRenderer.worker has no handler for message type "${msg?.type}"`,
+  });
 };
