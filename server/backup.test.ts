@@ -377,7 +377,15 @@ describe("stored files", () => {
       // Lookup/grouping keys are not files. Named explicitly so that adding a
       // real file column cannot hide behind a broad pattern.
       if (
-        ["lookupKey", "sourceKey", "rawLabelKey", "flagKey"].includes(column)
+        [
+          "lookupKey",
+          "sourceKey",
+          "rawLabelKey",
+          "flagKey",
+          // A mounting-height TYPE key — "receptacle", "exit-sign". An
+          // identifier for a row, not a file in storage.
+          "typeKey",
+        ].includes(column)
       ) {
         continue;
       }
