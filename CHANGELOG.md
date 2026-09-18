@@ -6,6 +6,18 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-18]
 
+- **Every footage that has vertical in it now shows its own arithmetic.** A run reads `87.40 + 8.50 = 95.90 ft` rather than `95.90 ft`, on the run and again on the bid totals, for conduit, cable and wire alike. The alternative was a single number with "includes 8.50 vertical" beside it, and that still makes you do the subtraction to check it — the whole point of this phase is that the drops stop being invisible. A run with no vertical footage shows just its number, because `87.40 + 0.00 = 87.40` is noise standing where a figure goes.
+
+- **A run counting no vertical footage says which of the four reasons it is** — nobody has said what is at the ends, no run height is set for the job, no height is set for one of those types, or the pipe genuinely stays at run height. A blank would make all four look the same, and only one of them is finished.
+
+- **The bid totals say so when nothing vertical is counted at all**: "No vertical footage is in these numbers. 23 runs are counted flat only." An unpriced material shouts because it shows as $0; an unset height would otherwise just make a total quietly low with nothing on screen to say so.
+
+- **The materials list carries it too** — "Includes 8.5 ft of vertical raceway — the drops and rises at the ends of traced runs, which a traced line does not measure", or, when there is none, that there is none and where the heights come from. That list gets printed and read by somebody who cannot ask the screen a question, so the number has to travel with its own explanation.
+
+- **A run that cannot be measured now says which problem it has**: "Flat length not measurable — no scale on this sheet, so this run is not in the totals." Its drops are known — that is arithmetic, not measurement — but showing them alone would put a partial figure on screen, and a partial total reads as a complete one.
+
+- **The finish message stopped disagreeing with the panel next to it.** Committing a run announced "Run finished — 87.4 ft" while the panel three inches away already read 95.90 with the drop added. Two numbers for the same run, in the same second, one of them unlabelled. It now says "87.4 ft traced".
+
 - **Runs now know what is at each end, and their drops are counted.** The conduit and cable tools carry a pair of pickers — from what, to what — that stay where you leave them, so thirty homeruns to receptacles is one decision rather than sixty. Finish a run and it keeps that answer; the height itself stays a live setting, so changing a mounting height still re-prices every run that uses it. Open a run and it shows each end in full: the two elevations and the footage between them, or, where nothing is counted, which of the four reasons it is — nobody said what is there, no run height set for the job, no height set for that type, or the pipe simply carries straight on. That last one is what the start of a run defaults to, deliberately: a run passing through a junction box must not collect a drop into it and a rise back out, which would be four feet of pipe per box that does not exist.
 
 - **A run that does not match the job can sit at its own elevation** without touching the job or the company settings, and it says which one it is following when it is not overridden.

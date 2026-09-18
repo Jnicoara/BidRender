@@ -215,6 +215,38 @@ export const materialsListRouter = router({
           ).join(", ")}.`
         );
       }
+      /*
+       * Say what the vertical share of these totals is, or that there is none.
+       *
+       * This list leaves the app — it gets printed, mailed, and read by
+       * somebody who cannot ask the screen a question. A number that travels
+       * has to carry its own explanation, and "no drops are in this" is the
+       * half a reader would never think to ask about.
+       */
+      const verticalFeet =
+        Math.round(
+          (totals.conduitVerticalFeet + totals.cableVerticalFeet) * 100
+        ) / 100;
+      if (verticalFeet > 0) {
+        notes.push(
+          "Includes " +
+            verticalFeet.toLocaleString("en-US", {
+              maximumFractionDigits: 2,
+            }) +
+            " ft of vertical raceway — the drops and rises at the ends of " +
+            "traced runs, which a traced line does not measure."
+        );
+      } else if (totals.flatOnlyCount > 0) {
+        notes.push(
+          "No vertical footage is included: " +
+            totals.flatOnlyCount +
+            (totals.flatOnlyCount === 1
+              ? " traced run is"
+              : " traced runs are") +
+            " counted flat only. Drops and rises come from the mounting " +
+            "heights in Settings."
+        );
+      }
       notes.push(
         "Quantities are taken off the drawings and carry no allowance for waste, " +
           "spoilage or cut lengths unless the assemblies already include it."

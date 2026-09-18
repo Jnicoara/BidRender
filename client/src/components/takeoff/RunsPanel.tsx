@@ -62,6 +62,97 @@ const feet = (value: number) =>
     maximumFractionDigits: 2,
   })} ft`;
 
+/** Guards the subtraction below from floating-point dust like 1239.9999998. */
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
+/** Two decimals, always, so a column of sums lines up while being added. */
+const exact = (value: number) =>
+  value.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+/**
+ * A footage that SHOWS ITS ARITHMETIC: `87.40 + 8.50 = 95.90 ft`.
+ *
+ * The whole point of this phase is that vertical footage stops being
+ * invisible, and `95.90 ft` with the drop folded in is exactly as invisible
+ * as not counting it. "incl. 8.50 vertical" was the alternative and was
+ * rejected: it still makes the reader do the subtraction to check it.
+ *
+ * When there is no vertical the sum is not shown, because `87.40 + 0.00 =
+ * 87.40` is noise standing where a number goes. A run counting nothing
+ * vertical says so in its own line instead — see the row below.
+ */
+function Footage({
+  label,
+  flat,
+  vertical,
+  total,
+}: {
+  label: React.ReactNode;
+  flat: number;
+  vertical: number;
+  total: number;
+}) {
+  return (
+    <div className="flex items-baseline justify-between text-xs gap-2">
+      <span className="text-muted-foreground shrink-0">{label}</span>
+      <span className="font-mono text-right">
+        {vertical > 0 ? (
+          <>
+            <span className="text-muted-foreground/70">
+              {exact(flat)} + {exact(vertical)} ={" "}
+            </span>
+            {exact(total)} ft
+          </>
+        ) : (
+          feet(total)
+        )}
+      </span>
+    </div>
+  );
+}
+
+/** The traced share of a run's wire: every circuit's flat feet. */
+function wireFlat(run: PanelRun): number {
+  const total = (run.quantities?.wireByCircuit ?? []).reduce(
+    (sum, circuit) => sum + circuit.flatFeet,
+    0
+  );
+  return Math.round(total * 100) / 100;
+}
+
+/** The vertical share: the run's drops, once per conductor of every circuit. */
+function wireVertical(run: PanelRun): number {
+  const total = (run.quantities?.wireByCircuit ?? []).reduce(
+    (sum, circuit) => sum + circuit.verticalFeet,
+    0
+  );
+  return Math.round(total * 100) / 100;
+}
+
+/**
+ * Why this run counts no vertical footage, in the estimator's words.
+ *
+ * Four different situations with four different fixes, and a blank would
+ * make them one. "Nothing to add" and "nobody said" are not the same state,
+ * and only one of them is finished.
+ */
+function verticalsMissingReason(run: PanelRun): string {
+  const verticals = run.quantities?.verticals;
+  if (!verticals) return "not set";
+  const reasons = [verticals.start, verticals.end]
+    .filter(end => !end.counted)
+    .map(end => (end.counted ? null : end.reason));
+  if (reasons.includes("no-distribution-height"))
+    return "no run height set for this job";
+  if (reasons.includes("height-not-set"))
+    return "no height set for one of these types";
+  if (reasons.includes("no-kind")) return "not set — say what is at each end";
+  return "none — this run stays at run height";
+}
+
 /** Stamped assemblies, grouped, as the list shows them. */
 export type PanelStampGroup = {
   assemblyId: number | null;
@@ -106,7 +197,11 @@ export function RunsPanel({
         conduitFeet: number;
         cableFeet: number;
         wireFeet: number;
+        conduitVerticalFeet: number;
+        cableVerticalFeet: number;
+        wireVerticalFeet: number;
         unmeasurableCount: number;
+        flatOnlyCount: number;
       }
     | undefined;
   selectedRunId: number | null;
@@ -272,42 +367,62 @@ export function RunsPanel({
                 {run.quantities === null ? (
                   <p className="text-xs text-[#F5C518] mt-1.5 flex items-start gap-1.5">
                     <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-                    Not measured — this sheet needs a scale before this run
-                    counts for anything.
+                    Flat length not measurable — no scale on this sheet, so this
+                    run is not in the totals.
                   </p>
                 ) : (
                   <div className="mt-1.5 space-y-0.5">
                     {/* Conduit and wire kept visually separate: they are two
                       different purchases measured along one line. */}
                     {run.quantities.conduitFeet !== null && (
-                      <div className="flex items-baseline justify-between text-xs">
-                        <span className="text-muted-foreground">Conduit</span>
-                        <span className="font-mono">
-                          {feet(run.quantities.conduitFeet)}
-                        </span>
-                      </div>
+                      <Footage
+                        label="Conduit"
+                        flat={run.quantities.runFeet}
+                        vertical={run.quantities.verticalFeet}
+                        total={run.quantities.conduitFeet}
+                      />
                     )}
                     {run.quantities.cableFeet !== null && (
-                      <div className="flex items-baseline justify-between text-xs">
-                        <span className="text-muted-foreground">Cable</span>
-                        <span className="font-mono">
-                          {feet(run.quantities.cableFeet)}
-                        </span>
-                      </div>
+                      <Footage
+                        label="Cable"
+                        flat={run.quantities.runFeet}
+                        vertical={run.quantities.verticalFeet}
+                        total={run.quantities.cableFeet}
+                      />
                     )}
                     {run.pathType === "conduit" && (
+                      <Footage
+                        label={
+                          <>
+                            Wire
+                            <span className="text-muted-foreground/60">
+                              {" "}
+                              ({run.circuits.length}{" "}
+                              {run.circuits.length === 1
+                                ? "circuit"
+                                : "circuits"}
+                              )
+                            </span>
+                          </>
+                        }
+                        flat={wireFlat(run)}
+                        vertical={wireVertical(run)}
+                        total={run.quantities.totalWireFeet}
+                      />
+                    )}
+
+                    {/*
+                      The zero has to shout. An unset height makes a total
+                      quietly low and nothing on screen says so — the same
+                      argument § 2.3 makes about an unset allowance. A blank
+                      where a drop belongs is indistinguishable from a run
+                      that genuinely has none.
+                    */}
+                    {run.quantities.verticalFeet === 0 && (
                       <div className="flex items-baseline justify-between text-xs">
-                        <span className="text-muted-foreground">
-                          Wire
-                          <span className="text-muted-foreground/60">
-                            {" "}
-                            ({run.circuits.length}{" "}
-                            {run.circuits.length === 1 ? "circuit" : "circuits"}
-                            )
-                          </span>
-                        </span>
-                        <span className="font-mono">
-                          {feet(run.quantities.totalWireFeet)}
+                        <span className="text-muted-foreground">Verticals</span>
+                        <span className="text-[0.7rem] text-[#F5C518]">
+                          {verticalsMissingReason(run)}
                         </span>
                       </div>
                     )}
@@ -471,18 +586,45 @@ export function RunsPanel({
           <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1">
             This bid, all sheets
           </div>
-          <div className="flex items-baseline justify-between text-xs">
-            <span className="text-muted-foreground">Conduit</span>
-            <span className="font-mono">{feet(totals.conduitFeet)}</span>
-          </div>
-          <div className="flex items-baseline justify-between text-xs">
-            <span className="text-muted-foreground">Cable</span>
-            <span className="font-mono">{feet(totals.cableFeet)}</span>
-          </div>
-          <div className="flex items-baseline justify-between text-xs">
-            <span className="text-muted-foreground">Wire</span>
-            <span className="font-mono">{feet(totals.wireFeet)}</span>
-          </div>
+          <Footage
+            label="Conduit"
+            flat={round2(totals.conduitFeet - totals.conduitVerticalFeet)}
+            vertical={totals.conduitVerticalFeet}
+            total={totals.conduitFeet}
+          />
+          <Footage
+            label="Cable"
+            flat={round2(totals.cableFeet - totals.cableVerticalFeet)}
+            vertical={totals.cableVerticalFeet}
+            total={totals.cableFeet}
+          />
+          <Footage
+            label="Wire"
+            flat={round2(totals.wireFeet - totals.wireVerticalFeet)}
+            vertical={totals.wireVerticalFeet}
+            total={totals.wireFeet}
+          />
+
+          {/*
+            THE ZERO HAS TO SHOUT.
+
+            § 2.3 makes the argument about an unset allowance and it applies
+            here unchanged: an unpriced material shouts, because it renders as
+            $0 and a screen filters to it. An unset HEIGHT whispers — it makes
+            a total quietly a little low and nothing says so. On a commercial
+            job the missing footage is a large share of the total, and a bid
+            that is under is the mistake that gets won.
+          */}
+          {totals.flatOnlyCount > 0 && (
+            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+              {totals.conduitVerticalFeet === 0 &&
+              totals.cableVerticalFeet === 0 &&
+              totals.wireVerticalFeet === 0
+                ? `No vertical footage is in these numbers. ${totals.flatOnlyCount} run${totals.flatOnlyCount === 1 ? " is" : "s are"} counted flat only.`
+                : `${totals.flatOnlyCount} run${totals.flatOnlyCount === 1 ? " is" : "s are"} counted flat only — no drop or rise on ${totals.flatOnlyCount === 1 ? "it" : "them"}.`}
+            </p>
+          )}
           {totals.unmeasurableCount > 0 && (
             <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
               <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />

@@ -2530,7 +2530,11 @@ export default function TakeoffPage({
   const commitRun = trpc.takeoffRuns.commit.useMutation({
     onError: e => toast.error(e.message),
     onSuccess: result =>
-      toast.success(`Run finished — ${result.lengthFeet} ft.`),
+      // "traced", because this is the FLAT length and the panel two inches
+      // away may already be showing a larger number with the drops added.
+      // Two figures for the same run in the same second, one of them
+      // unlabelled, is the confusion this phase exists to remove.
+      toast.success(`Run finished — ${result.lengthFeet} ft traced.`),
     onSettled: refreshRuns,
   });
   const removeRun = trpc.takeoffRuns.remove.useMutation({
