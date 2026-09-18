@@ -133,6 +133,26 @@ shipped height list with a company's rows in ONE function that both the server
 and the client read, because two merges are two chances to resolve the same
 height differently.
 
+**And the sharp edge of sharing one component: what EMPTY means changes with
+where it is used, so its wording has to be an input, not a constant.** A shared
+control cannot decide this for itself, because the two cases are identical in
+code and opposite on screen:
+
+- **Nothing is set**, and nothing is being counted. That is a warning, and it
+  says so — amber, and the consequence spelled out: "not set — no vertical
+  counted".
+- **This level is inheriting**, and a real value IS in effect from the level
+  above. That is ordinary, not a warning, and the words name what it is
+  following: "the job's run height".
+
+Calling the second one "not set" tells the estimator nothing applies when
+something does, which is the same wrong-number-shaped fault as showing an unset
+height as `0 ft 0 in`. It is the third instance of this root cause in one day,
+all from one control reused across levels, which is why it is written down
+rather than fixed three times. `HeightFields` takes `unsetLabel` and `setLabel`
+for exactly this; anything else that renders an inheritable value needs the
+same seam.
+
 ## Changelog — do this on every meaningful commit
 
 Whenever you commit a meaningful change, **also add a one-or-two-line plain-English entry to `CHANGELOG.md`** describing what changed, in addition to the normal commit message. Do this automatically, as part of the same commit — do not wait to be asked.

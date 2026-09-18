@@ -35,7 +35,8 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import { groupStamps } from "../../shared/takeoffCounts";
-import { NO_VERTICALS, totalQuantities } from "../../shared/takeoffQuantities";
+import { totalQuantities } from "../../shared/takeoffQuantities";
+import { heightContextForBid, verticalsForRunRow } from "../runVerticals";
 import {
   aggregateMaterials,
   measuredEntries,
@@ -168,6 +169,13 @@ export const materialsListRouter = router({
       // A suggested run is not counted, for the same reason it is not counted
       // anywhere else: it is the app's guess until a person accepts it.
       const realRuns = runs.filter(run => !run.isSuggestion);
+      // Verticals reach the bill of materials through the same resolver the
+      // takeoff panel uses, so the two cannot report different footage.
+      const heights = await heightContextForBid(
+        input.bidId,
+        ctx.scope.dataUserId,
+        bid.distributionHeightInches
+      );
       const totals = totalQuantities(
         realRuns.map(run => {
           const sheet = scales.get(run.sheetId);
@@ -182,9 +190,7 @@ export const materialsListRouter = router({
               conductorCount: circuit.conductorCount,
             })),
             ratio: usable,
-            // No heights yet: Phase 5 step 2 brings the settings a vertical is
-            // resolved from. Stated rather than defaulted — see NO_VERTICALS.
-            verticals: NO_VERTICALS,
+            verticals: verticalsForRunRow(run, heights),
           };
         })
       );

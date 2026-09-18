@@ -37,7 +37,23 @@
  * depth at the UI boundary and stored negative here. Nothing downstream has to
  * know.
  */
-import { toBillableFeet } from "./takeoffGeometry";
+import { formatFeetInches, toBillableFeet } from "./takeoffGeometry";
+
+/**
+ * An elevation as it reads on screen: `1'-6"`, or `1'-6" below floor`.
+ *
+ * A below-floor elevation is stored negative, and `-1'-6"` on screen is the
+ * same confusion the storage design exists to avoid — a minus sign in front of
+ * a height is something to decode rather than something to read. Keyed off the
+ * SIGN rather than the type's `belowFloor` flag, so a negative height typed on
+ * a type nobody marked below-floor still reads correctly instead of showing a
+ * minus nobody expected.
+ */
+export function formatElevation(inches: number): string {
+  return inches < 0
+    ? `${formatFeetInches(-inches)} below floor`
+    : formatFeetInches(inches);
+}
 
 /**
  * The end of a run that carries on at run height — a pipe passing through,
@@ -512,6 +528,46 @@ export function slugForHeightType(
   }
   // 999 types with the same name is not a real state; refusing beats looping.
   throw new Error(`Cannot make a unique key for "${label}"`);
+}
+
+/**
+ * How close a stamp must sit to a run's end before the app asks about it.
+ *
+ * In REAL inches, because a distance in page points means something different
+ * on every sheet: three feet at 1/4" = 1'-0" is forty feet at 1" = 100'.
+ */
+export const SUGGEST_WITHIN_INCHES = 24;
+
+/**
+ * Should the app ASK whether a nearby stamp is this run's own device?
+ *
+ * ── The distance decides whether to ask, never what the answer is ────────────
+ * The nearest mark is not evidence. Two receptacles a foot apart, a homerun
+ * ending beside a device it does not feed, a stamp dropped to mark something
+ * else — all of them look identical to a distance check. So proximity opens a
+ * question and a person closes it (§ 5c).
+ *
+ * ── It only asks where a double count is actually possible ───────────────────
+ * Both conditions matter and neither is cosmetic:
+ *
+ *   - the run must actually COUNT a drop at that end. If it counts nothing
+ *     there, no footage can be duplicated and the chip would be noise on a
+ *     decision that does not exist;
+ *   - nothing may be linked yet. Once a stamp is claimed the question is
+ *     answered, and re-asking is how a confirmed answer gets un-confirmed.
+ */
+export function shouldSuggestStampLink(input: {
+  /** Is this run counting a vertical at the end in question? */
+  endVerticalCounted: boolean;
+  /** The stamp already claimed by this end, if any. */
+  endStampId: number | null;
+  /** Real inches from the run's end to the nearest stamp; null if unknown. */
+  distanceInches: number | null;
+}): boolean {
+  if (!input.endVerticalCounted) return false;
+  if (input.endStampId !== null) return false;
+  if (input.distanceInches === null) return false;
+  return input.distanceInches <= SUGGEST_WITHIN_INCHES;
 }
 
 // ── The double-count rule ────────────────────────────────────────────────────

@@ -24,6 +24,8 @@ import {
   SHIPPED_HEIGHT_TYPES,
   heightList,
   slugForHeightType,
+  shouldSuggestStampLink,
+  SUGGEST_WITHIN_INCHES,
   resolveDistributionHeight,
   resolveMountingHeight,
   shippedHeightType,
@@ -41,6 +43,11 @@ import {
   type RunCircuit,
 } from "../shared/takeoffQuantities";
 import type { PagePoint } from "../shared/takeoffGeometry";
+import {
+  EMPTY_HEIGHT_CONTEXT,
+  verticalsForRunRow,
+  type HeightContext,
+} from "./runVerticals";
 
 const QUARTER_INCH = 48; // 1/4" = 1'-0"
 
@@ -803,5 +810,165 @@ describe("naming a new height type", () => {
 
   it("still produces a key for a label with nothing usable in it", () => {
     expect(slugForHeightType("!!!", new Set())).toBe("type");
+  });
+});
+
+// ── When the app asks about a nearby stamp ───────────────────────────────────
+
+describe("suggesting that a stamp is this run's own device", () => {
+  const NEARBY = {
+    endVerticalCounted: true,
+    endStampId: null,
+    distanceInches: 6,
+  };
+
+  it("asks when a run counts a drop and a stamp sits on that end", () => {
+    expect(shouldSuggestStampLink(NEARBY)).toBe(true);
+  });
+
+  it("stays quiet when the run counts nothing at that end", () => {
+    // No drop, no possible double count, nothing to decide. A chip here would
+    // be asking about a problem that does not exist.
+    expect(
+      shouldSuggestStampLink({ ...NEARBY, endVerticalCounted: false })
+    ).toBe(false);
+  });
+
+  it("stays quiet once a stamp is already linked", () => {
+    // The question is answered. Re-asking is how a confirmed answer gets
+    // un-confirmed — see § 5c on not re-opening what somebody has said yes to.
+    expect(shouldSuggestStampLink({ ...NEARBY, endStampId: 41 })).toBe(false);
+  });
+
+  it("stays quiet when the nearest stamp is not near", () => {
+    expect(shouldSuggestStampLink({ ...NEARBY, distanceInches: 25 })).toBe(
+      false
+    );
+    expect(shouldSuggestStampLink({ ...NEARBY, distanceInches: 24 })).toBe(
+      true
+    );
+  });
+
+  it("stays quiet when the distance cannot be known", () => {
+    // No scale on the sheet. A run can still carry a vertical — that is pure
+    // arithmetic — but nothing can say what is NEAR it.
+    expect(shouldSuggestStampLink({ ...NEARBY, distanceInches: null })).toBe(
+      false
+    );
+  });
+
+  it("measures in real inches, so the range means the same on every sheet", () => {
+    // Two feet is two feet whether the sheet is 1/4" = 1'-0" or 1" = 100'.
+    expect(SUGGEST_WITHIN_INCHES).toBe(24);
+  });
+});
+
+// ── The four levels, as the routers actually resolve them ────────────────────
+
+describe("resolving a stored run's verticals", () => {
+  /** Company runs at 10 ft; receptacles at the shipped 18". */
+  const COMPANY: HeightContext = {
+    companyInches: 120,
+    jobInches: null,
+    layers: { company: new Map(), job: new Map() },
+  };
+
+  const PANEL_TO_RECEPTACLE = {
+    startKind: DISTRIBUTION_KIND,
+    endKind: "receptacle",
+    startHeightInches: null,
+    endHeightInches: null,
+    distributionHeightInches: null,
+  };
+
+  it("drops to a receptacle from the company's run height", () => {
+    const verticals = verticalsForRunRow(PANEL_TO_RECEPTACLE, COMPANY);
+    expect(verticals.feet).toBe(8.5);
+  });
+
+  it("counts nothing at all while the gate is shut", () => {
+    // Every run on the job says panel → receptacle and no height is set
+    // anywhere. This is what every existing bid looks like.
+    expect(
+      verticalsForRunRow(PANEL_TO_RECEPTACLE, EMPTY_HEIGHT_CONTEXT).feet
+    ).toBe(0);
+  });
+
+  it("lets the job's run height beat the company's", () => {
+    // 12 ft ceilings on this job: the drop grows by the difference, on every
+    // run, without anybody editing a run.
+    const verticals = verticalsForRunRow(PANEL_TO_RECEPTACLE, {
+      ...COMPANY,
+      jobInches: 144,
+    });
+    expect(verticals.feet).toBe(10.5);
+  });
+
+  it("lets one run sit at its own elevation", () => {
+    const verticals = verticalsForRunRow(
+      { ...PANEL_TO_RECEPTACLE, distributionHeightInches: 96 },
+      { ...COMPANY, jobInches: 144 }
+    );
+    expect(verticals.feet).toBe(6.5);
+  });
+
+  it("lets the job override one device height", () => {
+    // Receptacles at 2 ft on this job. 10 ft down to 2 ft is 8 ft, not 8.5.
+    const verticals = verticalsForRunRow(PANEL_TO_RECEPTACLE, {
+      ...COMPANY,
+      layers: { company: new Map(), job: new Map([["receptacle", 24]]) },
+    });
+    expect(verticals.feet).toBe(8);
+  });
+
+  it("lets ONE run override the height without touching the settings", () => {
+    const verticals = verticalsForRunRow(
+      { ...PANEL_TO_RECEPTACLE, endHeightInches: 48 },
+      COMPANY
+    );
+    expect(verticals.feet).toBe(6);
+  });
+
+  it("adds nothing at an end nobody has answered", () => {
+    const verticals = verticalsForRunRow(
+      { ...PANEL_TO_RECEPTACLE, endKind: null },
+      COMPANY
+    );
+    expect(verticals.feet).toBe(0);
+    expect(verticals.end.counted).toBe(false);
+  });
+
+  it("adds nothing at a junction box the run passes through", () => {
+    // Trap 2: a continuing run must not collect a phantom rise out of the box
+    // the previous run dropped into.
+    const verticals = verticalsForRunRow(
+      { ...PANEL_TO_RECEPTACLE, endKind: DISTRIBUTION_KIND },
+      COMPANY
+    );
+    expect(verticals.feet).toBe(0);
+  });
+
+  it("says which problem a panel with no height is", () => {
+    const verticals = verticalsForRunRow(
+      { ...PANEL_TO_RECEPTACLE, endKind: "panel" },
+      COMPANY
+    );
+    expect(verticals.end.counted).toBe(false);
+    expect(!verticals.end.counted && verticals.end.reason).toBe(
+      "height-not-set"
+    );
+  });
+
+  it("counts both ends of a panel-to-receptacle run", () => {
+    const verticals = verticalsForRunRow(
+      { ...PANEL_TO_RECEPTACLE, startKind: "panel" },
+      {
+        ...COMPANY,
+        layers: { company: new Map([["panel", 72]]), job: new Map() },
+      }
+    );
+    expect(verticals.start.counted && verticals.start.feet).toBe(4);
+    expect(verticals.end.counted && verticals.end.feet).toBe(8.5);
+    expect(verticals.feet).toBe(12.5);
   });
 });

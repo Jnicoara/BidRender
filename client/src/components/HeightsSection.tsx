@@ -39,7 +39,7 @@ import { Label } from "@/components/ui/label";
 import { HeightFields } from "@/components/HeightFields";
 import { CompanyDefaultNotice } from "@/components/CompanyDefaultNotice";
 import { selectOnFocus } from "@/lib/selectOnFocus";
-import { formatFeetInches } from "@shared/takeoffGeometry";
+import { formatElevation } from "@shared/takeoffHeights";
 import type { HeightRow } from "@shared/takeoffHeights";
 
 /**
@@ -84,7 +84,7 @@ function HeightRowView({
         <div className="text-[0.7rem] text-muted-foreground">
           {row.heightInches !== null && (
             <span className="font-mono mr-2">
-              {formatFeetInches(row.heightInches)}
+              {formatElevation(row.heightInches)}
             </span>
           )}
           <span>{sourceLabel(row)}</span>

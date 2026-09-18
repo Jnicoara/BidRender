@@ -115,6 +115,13 @@ import { StampPicker } from "@/components/takeoff/StampPicker";
 import { CalibrateLayer } from "@/components/takeoff/CalibrateLayer";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
 import { JobHeightsChip } from "@/components/takeoff/JobHeightsChip";
+import { RunEndsEditor, TraceEndsPickers } from "@/components/takeoff/runEnds";
+import {
+  DISTRIBUTION_KIND,
+  SUGGEST_WITHIN_INCHES,
+  shouldSuggestStampLink,
+} from "@shared/takeoffHeights";
+import { pointsToRealInches, segmentLength } from "@shared/takeoffGeometry";
 import { UploadProgress } from "@/components/takeoff/UploadProgress";
 import { describePlanRemoval } from "@shared/planRemoval";
 import {
@@ -1594,6 +1601,9 @@ function PlanPane({
   );
 }
 
+/** Where the sticky trace ends are remembered. Machine-only name. */
+const TRACE_ENDS_KEY = "helixbid:trace-ends";
+
 // ── The page ─────────────────────────────────────────────────────────────────
 
 export default function TakeoffPage({
@@ -1738,6 +1748,44 @@ export default function TakeoffPage({
    */
   const [calibrating, setCalibrating] = useState(false);
   const [calibratePoints, setCalibratePoints] = useState<PagePoint[]>([]);
+
+  /**
+   * What the next run starts and ends at. STICKY: forty runs is eighty ends,
+   * and nobody answers eighty questions — so this is set once and every run
+   * traced afterwards carries it, exactly like the stamp tool staying armed.
+   *
+   * The START defaults to carrying on at run height, which is a defence rather
+   * than a convenience: a run continuing through a junction box must not
+   * collect a phantom drop into it and a rise back out, which is four feet of
+   * pipe per box that does not exist.
+   *
+   * Kept in localStorage under the same prefix as its siblings — the prefix is
+   * machine-only and CLAUDE.md keeps it that way.
+   */
+  const [traceEnds, setTraceEnds] = useState<{
+    startKind: string | null;
+    endKind: string | null;
+  }>(() => {
+    try {
+      const held = window.localStorage.getItem(TRACE_ENDS_KEY);
+      if (held) return JSON.parse(held);
+    } catch {
+      // A blocked or corrupt store is not a reason to fail to trace.
+    }
+    return { startKind: DISTRIBUTION_KIND, endKind: null };
+  });
+
+  const updateTraceEnds = useCallback(
+    (next: { startKind: string | null; endKind: string | null }) => {
+      setTraceEnds(next);
+      try {
+        window.localStorage.setItem(TRACE_ENDS_KEY, JSON.stringify(next));
+      } catch {
+        // Remembering it is a convenience; tracing still works without it.
+      }
+    },
+    []
+  );
   /**
    * A gated measuring tool is under the pointer or holds focus.
    *
@@ -2415,6 +2463,67 @@ export default function TakeoffPage({
     [visibleStamps]
   );
 
+  /**
+   * A stamp sitting on a run's end that nothing has claimed yet.
+   *
+   * ── When this appears, and why that rule is narrow ────────────────────
+   * Only when the run ACTUALLY COUNTS a drop at that end and no stamp is
+   * linked to it. That is exactly the situation where the same drop could be
+   * counted twice once stamps carry their own verticals — and nowhere else,
+   * so the chip never appears on a run where there is nothing to decide.
+   *
+   * ── It proposes; it never applies itself ─────────────────────────────
+   * The nearest mark is not evidence of anything. Two receptacles a foot
+   * apart, a homerun ending beside a device it does not feed, a stamp
+   * dropped to mark something else entirely — all of them look identical to
+   * a distance check. So the distance only decides whether to ASK.
+   *
+   * ── The range is in real feet, not page points ───────────────────────
+   * A fixed number of page points means something different on every sheet:
+   * three feet at 1/4 inch scale is forty at 1 inch = 100 feet. Two real
+   * feet is two real feet on any drawing.
+   */
+  const suggestionForRun = useCallback(
+    (runId: number) => {
+      const ratio = measurability?.ok ? measurability.ratio : null;
+      if (ratio === null) return null;
+      const run = visibleRuns.find(r => r.id === runId);
+      if (!run) return null;
+
+      const last = run.points[run.points.length - 1];
+      if (!last) return null;
+
+      let best: { id: number; name: string; inches: number } | null = null;
+      for (const stamp of visibleStamps) {
+        const inches = pointsToRealInches(
+          segmentLength(last, { x: stamp.x, y: stamp.y }),
+          ratio
+        );
+        if (inches === null || inches > SUGGEST_WITHIN_INCHES) continue;
+        if (!best || inches < best.inches)
+          best = { id: stamp.id, name: stamp.assemblyName, inches };
+      }
+      if (
+        !best ||
+        !shouldSuggestStampLink({
+          endVerticalCounted: Boolean(run.quantities?.verticals?.end.counted),
+          endStampId: run.ends?.endStampId ?? null,
+          distanceInches: best.inches,
+        })
+      )
+        return null;
+      return {
+        stampId: best.id,
+        label: best.name,
+        // Nothing links an assembly to a height type yet, so accepting sets
+        // the LINK and leaves the kind alone. Guessing the type from the
+        // assembly's name would be the inference this feature refuses.
+        typeKey: null as string | null,
+      };
+    },
+    [measurability, visibleStamps, visibleRuns]
+  );
+
   const saveRun = trpc.takeoffRuns.save.useMutation({
     onError: e => toast.error(e.message),
   });
@@ -2538,6 +2647,10 @@ export default function TakeoffPage({
         pathType: tracePathType,
         points: tracePoints,
         status: "draft",
+        // What the pickers said at the moment this run was finished. The
+        // KIND is copied down; the HEIGHT stays a live setting.
+        startKind: traceEnds.startKind,
+        endKind: traceEnds.endKind,
       },
       {
         onSuccess: result => {
@@ -2551,7 +2664,15 @@ export default function TakeoffPage({
         },
       }
     );
-  }, [activeSheet, tracePoints, tracePathType, bidId, saveRun, commitRun]);
+  }, [
+    activeSheet,
+    tracePoints,
+    tracePathType,
+    bidId,
+    saveRun,
+    commitRun,
+    traceEnds,
+  ]);
 
   const cancelTrace = useCallback(() => {
     if (activeSheet) clearDraft(activeSheet.id);
@@ -3240,6 +3361,23 @@ export default function TakeoffPage({
               literally what is being clicked. Changed in CalibrateLayer too,
               so the button and the mode it opens still agree.
             */}
+            {/*
+              The sticky ends, shown while a run is being traced. They sit with
+              the trace tools rather than in the runs panel because this is the
+              moment the answer is known — you are looking at the thing you are
+              tracing to.
+            */}
+            {tracing && (
+              <>
+                <TraceEndsPickers
+                  bidId={bidId}
+                  value={traceEnds}
+                  onChange={updateTraceEnds}
+                />
+                <div className="w-px h-4 bg-border" />
+              </>
+            )}
+
             {activeSheet && !tracing && !calibrating && (
               <Button
                 size="sm"
@@ -3656,6 +3794,25 @@ export default function TakeoffPage({
                 window.setTimeout(() => setFocusPoint(null), 2200);
               }}
               onRemoveStamp={id => removeStamp.mutate({ id })}
+              renderRunEnds={run => (
+                <RunEndsEditor
+                  bidId={bidId}
+                  runId={run.id}
+                  ends={
+                    run.ends ?? {
+                      startKind: null,
+                      endKind: null,
+                      startHeightInches: null,
+                      endHeightInches: null,
+                      distributionHeightInches: null,
+                      startStampId: null,
+                      endStampId: null,
+                    }
+                  }
+                  verticals={run.quantities?.verticals ?? null}
+                  suggestion={suggestionForRun(run.id)}
+                />
+              )}
               legend={
                 <>
                   {/* Above the layers and the legend: what the reader found

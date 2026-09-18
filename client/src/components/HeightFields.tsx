@@ -44,6 +44,8 @@ export function HeightFields({
   onSave,
   onClear,
   clearLabel = "Reset",
+  unsetLabel,
+  setLabel,
   compact = false,
   onDismiss,
 }: {
@@ -60,6 +62,18 @@ export function HeightFields({
    * CLEARS, and clearing it stops every vertical on every job.
    */
   clearLabel?: string;
+  /**
+   * What an empty value MEANS here, in words.
+   *
+   * Not always "no height set". On an OVERRIDE — this run's own elevation, a
+   * job's own — empty means "follows the level above", and a real height is
+   * already in effect. Calling that "not set" reads as "nothing applies",
+   * which is the opposite of what is true and is the same zero-versus-unset
+   * confusion this component exists to prevent, one level up.
+   */
+  unsetLabel?: string;
+  /** The button that reveals the fields. "Set a height", or "Override". */
+  setLabel?: string;
   /** Tighter sizing, for a popover rather than a settings page. */
   compact?: boolean;
   /** Rule 5: on a panel, the LAST field commits and closes. */
@@ -70,8 +84,18 @@ export function HeightFields({
   if (value === null && !revealed) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-xs text-[#F5C518]">
-          {compact ? "Not set" : "Not set — no vertical counted"}
+        <span
+          className={
+            // Amber is for "nothing is being counted here". An override that
+            // is simply following the level above is not a warning — a real
+            // height IS in effect — so it reads as ordinary muted text.
+            unsetLabel
+              ? "text-xs text-muted-foreground"
+              : "text-xs text-[#F5C518]"
+          }
+        >
+          {unsetLabel ??
+            (compact ? "Not set" : "Not set — no vertical counted")}
         </span>
         <Button
           size="sm"
@@ -79,7 +103,7 @@ export function HeightFields({
           className="h-6 px-2 text-xs"
           onClick={() => setRevealed(true)}
         >
-          {compact ? "Set" : "Set a height"}
+          {setLabel ?? (compact ? "Set" : "Set a height")}
         </Button>
       </div>
     );

@@ -41,6 +41,16 @@ export type PanelRun = {
   isSuggestion: boolean;
   circuits: { id: number; name: string; conductorCount: number }[];
   quantities: RunQuantities | null;
+  /** What is at each end. Undefined only for a suggestion the AI proposed. */
+  ends?: {
+    startKind: string | null;
+    endKind: string | null;
+    startHeightInches: number | null;
+    endHeightInches: number | null;
+    distributionHeightInches: number | null;
+    startStampId: number | null;
+    endStampId: number | null;
+  };
   scaleChangedSinceTraced: boolean;
   /** Where the run starts, so a click can jump the viewer to it. */
   firstPoint: { x: number; y: number } | null;
@@ -75,6 +85,7 @@ export function RunsPanel({
   onJumpTo,
   onRemoveStamp,
   legend,
+  renderRunEnds,
 }: {
   runs: PanelRun[];
   /** Counted stamps, grouped by assembly. Quantities are derived, not typed. */
@@ -84,6 +95,12 @@ export function RunsPanel({
   onRemoveStamp: (id: number) => void;
   /** The legend panel, rendered beneath the list. */
   legend?: React.ReactNode;
+  /**
+   * The ends editor for the open run. A render prop for the same reason
+   * `legend` is one: this panel takes data and gives back clicks, and the
+   * ends editor needs queries and mutations of its own.
+   */
+  renderRunEnds?: (run: PanelRun) => React.ReactNode;
   totals:
     | {
         conduitFeet: number;
@@ -302,6 +319,17 @@ export function RunsPanel({
                     The sheet's scale changed since this was traced — check the
                     length.
                   </p>
+                )}
+
+                {/*
+                  What is at each end, and the verticals they produce. Shown
+                  only on the open run: nine controls on every row is a panel
+                  people stop reading.
+                */}
+                {isSelected && renderRunEnds && !run.isSuggestion && (
+                  <div onClick={e => e.stopPropagation()}>
+                    {renderRunEnds(run)}
+                  </div>
                 )}
 
                 {/* Circuits, only for conduit and only when this run is open */}

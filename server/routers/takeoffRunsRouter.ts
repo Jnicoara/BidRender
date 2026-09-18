@@ -28,13 +28,21 @@ import {
 } from "../../drizzle/schema";
 import { pathRealInches, toBillableFeet } from "../../shared/takeoffGeometry";
 import {
-  NO_VERTICALS,
+  DISTRIBUTION_KIND,
+  shippedHeightType,
+} from "../../shared/takeoffHeights";
+import {
   measurabilityOf,
   quantitiesForRun,
   totalQuantities,
   type RunPathType,
 } from "../../shared/takeoffQuantities";
 import * as db from "../db";
+import {
+  EMPTY_HEIGHT_CONTEXT,
+  heightContextForBid,
+  verticalsForRunRow,
+} from "../runVerticals";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -44,6 +52,33 @@ import * as db from "../db";
 const procedure = scoped("bids.view", "bids.edit");
 
 const nameSchema = z.string().trim().min(1).max(255);
+
+/** A height type key, or null for "nobody has said what is at this end". */
+const kindSchema = z.string().trim().min(1).max(64).nullable();
+
+/** An elevation override on one run, in inches. Same range as the settings. */
+const runInchesSchema = z.number().int().min(-240).max(600).nullable();
+
+/**
+ * Refuse a height type this company does not have.
+ *
+ * An unknown key is not harmless: it resolves to "not set", so the run quietly
+ * counts no vertical and nothing on screen says why. Refusing the save beats
+ * storing something that silently means nothing.
+ */
+async function requireKnownKind(
+  kind: string | null,
+  userId: number
+): Promise<void> {
+  if (kind === null || kind === DISTRIBUTION_KIND) return;
+  if (shippedHeightType(kind)) return;
+  const own = await db.getMountingHeights(userId);
+  if (own.some(row => row.typeKey === kind)) return;
+  throw new TRPCError({
+    code: "BAD_REQUEST",
+    message: "That is not one of your height types.",
+  });
+}
 
 /**
  * A traced vertex, in PDF page points.
@@ -136,6 +171,23 @@ export const takeoffRunsRouter = router({
         ctx.scope.dataUserId
       );
 
+      // The heights, loaded ONCE for the whole sheet rather than per run. The
+      // bid comes from the runs rather than the sheet: a sheet belongs to a
+      // PDF, and only a run knows which bid it is counted against.
+      const bidId = runs[0]?.bidId ?? null;
+      const bid =
+        bidId === null
+          ? null
+          : await db.getBidById(bidId, ctx.scope.dataUserId);
+      const heights =
+        bidId === null
+          ? EMPTY_HEIGHT_CONTEXT
+          : await heightContextForBid(
+              bidId,
+              ctx.scope.dataUserId,
+              bid?.distributionHeightInches ?? null
+            );
+
       return runs.map(run => {
         const runCircuits = circuits
           .filter(c => c.runId === run.id)
@@ -159,17 +211,22 @@ export const takeoffRunsRouter = router({
           location: run.location,
           circuits: runCircuits,
           /** Null whenever the sheet cannot be measured — never a fallback 0. */
-          /*
-           * No heights yet: the settings tables arrive with Phase 5 step 2, and
-           * a run has nowhere to read a distribution height from until they
-           * do. Stated rather than defaulted — see NO_VERTICALS.
-           */
           quantities: quantitiesForRun(
             traced,
             runCircuits,
             ratio,
-            NO_VERTICALS
+            verticalsForRunRow(run, heights)
           ),
+          /** What is at each end, so the panel can show it and change it. */
+          ends: {
+            startKind: run.startKind,
+            endKind: run.endKind,
+            startHeightInches: run.startHeightInches,
+            endHeightInches: run.endHeightInches,
+            distributionHeightInches: run.distributionHeightInches,
+            startStampId: run.startStampId,
+            endStampId: run.endStampId,
+          },
           /**
            * The sheet's scale has changed since this was traced. The length
            * shown is against the CURRENT scale; this flags that it differs
@@ -205,6 +262,16 @@ export const takeoffRunsRouter = router({
         isSuggestion: z.boolean().default(false),
         /** Where the raceway sits — the Location layer. Taggable later too. */
         location: z.enum(TAKEOFF_LOCATIONS).nullable().default(null),
+        /**
+         * What is at each end, from the sticky pickers on the trace toolbar.
+         *
+         * OPTIONAL, and omitting one means "leave what is there" rather than
+         * "clear it" — unlike the location field above, which the client always
+         * sends. An autosave part-way through a trace must not be able to wipe
+         * the ends off a run that already has them.
+         */
+        startKind: kindSchema.optional(),
+        endKind: kindSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -232,7 +299,16 @@ export const takeoffRunsRouter = router({
         status: input.status,
         isSuggestion: input.isSuggestion,
         location: input.location,
+        ...(input.startKind !== undefined
+          ? { startKind: input.startKind }
+          : {}),
+        ...(input.endKind !== undefined ? { endKind: input.endKind } : {}),
       };
+
+      if (input.startKind !== undefined)
+        await requireKnownKind(input.startKind, ctx.scope.dataUserId);
+      if (input.endKind !== undefined)
+        await requireKnownKind(input.endKind, ctx.scope.dataUserId);
 
       if (input.id) {
         const existing = await requireRun(input.id, ctx.scope.dataUserId);
@@ -438,6 +514,12 @@ export const takeoffRunsRouter = router({
         );
       }
 
+      const heights = await heightContextForBid(
+        input.bidId,
+        ctx.scope.dataUserId,
+        bid.distributionHeightInches
+      );
+
       return totalQuantities(
         runs.map(run => ({
           run: {
@@ -448,9 +530,84 @@ export const takeoffRunsRouter = router({
             .filter(c => c.runId === run.id)
             .map(c => ({ name: c.name, conductorCount: c.conductorCount })),
           ratio: ratioBySheet.get(run.sheetId) ?? null,
-          // No heights yet — see the note in listForSheet.
-          verticals: NO_VERTICALS,
+          verticals: verticalsForRunRow(run, heights),
         }))
       );
+    }),
+
+  /**
+   * Change what is at a run's ends, after it has been traced.
+   *
+   * ── Every field is optional, and omitted means "leave it" ────────────────
+   * The panel edits one thing at a time — a kind, a height, a stamp link — and
+   * a mutation that took the whole shape would make each of those a chance to
+   * clear the other two by forgetting them. Sending `null` is how a caller
+   * clears something deliberately; sending nothing changes nothing.
+   *
+   * ── The stamp link is the double-count rule's teeth ──────────────────────
+   * Linking a stamp to a run end is what tells the quantity code that this
+   * drop belongs to the RUN, so the stamp must not carry it as well. It is set
+   * by a person accepting the suggestion — never inferred from how close the
+   * two happen to sit, which is right most of the time and silently wrong the
+   * rest, with nothing on screen looking wrong.
+   */
+  setEnds: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        startKind: kindSchema.optional(),
+        endKind: kindSchema.optional(),
+        startHeightInches: runInchesSchema.optional(),
+        endHeightInches: runInchesSchema.optional(),
+        distributionHeightInches: runInchesSchema.optional(),
+        startStampId: z.number().int().positive().nullable().optional(),
+        endStampId: z.number().int().positive().nullable().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const run = await requireRun(input.id, userId);
+
+      if (input.startKind !== undefined)
+        await requireKnownKind(input.startKind, userId);
+      if (input.endKind !== undefined)
+        await requireKnownKind(input.endKind, userId);
+
+      // A stamp may only be claimed by a run on its OWN sheet. Linking across
+      // sheets would suppress a vertical somewhere the estimator is not
+      // looking, which is the one thing this link must never do quietly.
+      const claiming = [input.startStampId, input.endStampId].filter(
+        (id): id is number => typeof id === "number"
+      );
+      if (claiming.length > 0) {
+        const onSheet = await db.getStampsForSheet(run.sheetId, userId);
+        const ids = new Set(onSheet.map(stamp => stamp.id));
+        for (const stampId of claiming) {
+          if (!ids.has(stampId)) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "That mark is not on this sheet.",
+            });
+          }
+        }
+      }
+
+      const patch: Record<string, unknown> = {};
+      const fields = [
+        "startKind",
+        "endKind",
+        "startHeightInches",
+        "endHeightInches",
+        "distributionHeightInches",
+        "startStampId",
+        "endStampId",
+      ] as const;
+      for (const field of fields) {
+        if (input[field] !== undefined) patch[field] = input[field];
+      }
+      if (Object.keys(patch).length === 0) return { ok: true };
+
+      await db.updateRun(input.id, userId, patch);
+      return { ok: true };
     }),
 });
