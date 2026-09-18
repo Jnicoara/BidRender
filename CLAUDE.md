@@ -46,43 +46,56 @@ Whenever you commit a meaningful change, **also add a one-or-two-line plain-Engl
 - Write for a non-programmer reading it months later: what changed and why it matters, not which functions moved. "Fixed a security gap that let any logged-in user read another contractor's bid pricing" beats "added ownership checks to projectItemsRouter".
 - Skip it for trivial changes — typo fixes, formatting, comment-only edits.
 
-## Deploying — GitHub is the source of truth, Manus pulls from it
+## Deploying — pushing `main` IS the deploy
 
-**Pushing to GitHub does not deploy anything.** There is no pipeline between
-the two: no CI, no build hook, no deploy config, and GitHub is the only git
-remote. The live site is deployed from the **Manus project's own copy** of this
-repo, by a human clicking **Deploy** in the Manus UI.
+**`git push origin main` puts code in front of users, on its own, within about
+five minutes.** DigitalOcean App Platform watches `main` and rebuilds on every
+push. There is no button afterwards, no dry run, and no branch protection to
+stop you.
 
-That gap is not theoretical — it has already caused one silent divergence. The
-project was originally built inside Manus (the `Checkpoint:` commits, up to
-`ff469cb` on 2026-08-10), and the work then moved to a local checkout driven by
-Claude Code. Every commit after `ff469cb` reached GitHub and nothing else, so
-the live site kept serving the old build while `main` moved 51 commits ahead.
-Nothing was broken; the two copies simply had no reason to meet.
+> **This reversed on 2026-09-16.** It used to be the opposite — pushing did
+> nothing and a human pressed Deploy inside Manus. Anything you read anywhere
+> describing a Manus session, a sandbox pre-flight or a checkpoint is from that
+> era and does not apply.
 
-**The direction is fixed: GitHub → Manus, never the reverse.** The local
-checkout plus GitHub is where real work happens. Manus is a deployment target
-that pulls, not a place to edit. Editing in the Manus workspace re-opens the
-same divergence from the other side — if it happens anyway, push that work to
-GitHub before deploying, never merge GitHub into it.
+**Work lands on `local-dev`, which deploys nothing.** It moves to `main` when
+someone has decided it should be live. That habit is the only thing between a
+routine push and an unplanned deploy, so **ask before pushing `main`
+specifically**, not just before pushing.
 
-Before every deploy, in a Manus session:
+| Action                      | Effect on the live site                   |
+| --------------------------- | ----------------------------------------- |
+| Commit locally              | None.                                     |
+| `git push origin local-dev` | None. The safe place to put work.         |
+| **`git push origin main`**  | **Deploys.** Builds and goes live itself. |
 
-1. **Check for anything Manus has that GitHub does not** — `git status` and
-   `git log origin/main..HEAD` in the sandbox. Expect both to be empty. If they
-   are not, stop: that is unpushed work, and pulling will bury it.
-2. **`git pull origin main`** — this is the bridge that does not otherwise exist.
-3. **`pnpm db:push`** — apply pending migrations **before** deploying, not after.
-   A skipped migration does not crash the app; it starts, serves pages and shows
-   wrong data, which is the expensive way to find out (see § Commands).
-4. **Save a checkpoint**, then **Deploy**.
-5. **Verify a feature that needs the platform** — the navigation helper is the
-   cheapest probe, because it exercises `BUILT_IN_FORGE_API_KEY`, which only
-   exists on deployed infrastructure and never locally.
+The deploy:
 
-`references/deploying.md` has the same sequence with the exact commands, the
-platform services the app depends on, and what to check when a deploy looks
-like it worked but didn't.
+1. **Pre-flight** — `git log main..local-dev --oneline` is the entire change set
+   about to go live; read it. Plus `git status --porcelain` (expect empty) and
+   `pnpm check`. Note what is live now (`git log --oneline -1 origin/main`), so
+   "roll back to what?" has an answer.
+2. **Merge and push** — `git merge --ff-only local-dev`, then push `main`, then
+   `git checkout local-dev` so the next edit is not on `main`. `--ff-only`
+   refusing means `main` has something you have not seen.
+3. **Watch DigitalOcean → Activity.** Three to six minutes. Do not walk away: a
+   failed build leaves the previous version running, so the site stays up and
+   nothing tells you the new code never arrived. **Rollback is a button in that
+   same tab**, and it is the fastest way out of a bad deploy.
+4. **Run migrations by hand if `drizzle/` changed** — `pnpm db:push`. They do
+   **not** ride along with a deploy. A missed one does not crash the app; it
+   serves wrong data, and because nearly every read is a bare `select()` it can
+   also take a whole screen down with `Unknown column`. Ask the database
+   directly with `scripts/schemaDrift.mts`.
+5. **Verify the new build is the one running** — the version tag in the sidebar
+   footer (hover) reads `APP_VERSION`; an older number means the deploy did not
+   take.
+6. **A new scheduled job is a separate deploy** — the Cloudflare Worker in
+   `workers/cron/` ships with `wrangler` from a local checkout, not by pushing.
+
+`references/deploying.md` is the full version: exact commands, rollback, the
+migration traps, verifying secrets reached the deployed environment, and the
+outside services the app cannot run without.
 
 ## Materials — always ship trade slang with a new material
 
@@ -545,9 +558,13 @@ what would catch someone quietly reintroducing `await collect(stream)`.
 
 **Stack:** Express + tRPC (v11, superjson transformer) on the server, React 19 + Vite + Wouter (hash-based routing) on the client, Drizzle ORM against MySQL. Single dev process — Vite runs as Express middleware in development (`server/_core/vite.ts`), and the client is served statically in production.
 
-**`_core/` directories are platform scaffolding**, generated by the Manus WebDev template — `server/_core/`, `client/src/_core/`. They handle OAuth login, JWT session cookies, tRPC boilerplate (`trpc.ts`, `context.ts`), the route that serves a stored file (`storageProxy.ts` — see § Stored files), and scheduled/cron callback wiring. Prefer extending app-level code over rewriting `_core` internals; `references/periodic-updates.md` documents the cron system in detail if that's ever needed.
+**`_core/` directories are platform scaffolding**, generated by the Manus WebDev template — `server/_core/`, `client/src/_core/`. They handle the JWT session token and its cookie (`sdk.createSessionToken` / `sdk.verifySession`, `cookies.ts`), tRPC boilerplate (`trpc.ts`, `context.ts`), the route that serves a stored file (`storageProxy.ts` — see § Stored files), and scheduled/cron callback wiring. Prefer extending app-level code over rewriting `_core` internals; `references/periodic-updates.md` documents the cron system in detail if that's ever needed.
 
-**Auth:** OAuth-only (no local password flow is wired up despite `passwordHash` existing on the `users` schema). `sdk.authenticateRequest` (`server/_core/sdk.ts`) resolves the session cookie (or `Authorization: Bearer` fallback) to a `User` row, auto-provisioning on first login. tRPC procedures come in three tiers (`server/_core/trpc.ts`): `publicProcedure`, `protectedProcedure` (any logged-in user), `adminProcedure` (`user.role === "admin"`). Client-side gate is `AuthGuard` in `App.tsx`.
+**Signing in is NOT in `_core`, and this is the sentence to get right.** Email and password with bcrypt, in our own `users` table — `server/routers/authRouter.ts` (`signup`, `login`, `changePassword`), shipped in v5.127/5.128. It moves with the database and needs no outside service. `_core` issues the session cookie afterwards; it does not decide who you are. The OAuth path in `_core/oauth.ts` and `_core/sdk.ts` still compiles but nothing app-level imports it.
+
+This matters because the older version of this note said `_core` handled OAuth login, and `references/deploying.md` § 8 calls the belief behind it the single most expensive wrong sentence in these docs: it is the line someone reads to size a hosting move, and it makes a done job look like "first build a login system". Anything claiming this app needs an OAuth server is from the Manus era.
+
+**Auth:** email and password (`users.passwordHash`, `users.loginMethod` — both live columns, not vestigial). `sdk.authenticateRequest` (`server/_core/sdk.ts`) resolves the session cookie (or `Authorization: Bearer` fallback) to a `User` row; the row itself is created by `authRouter.signup`, not on first request. The OAuth branch in there still tries to sync an unknown `openId` from an OAuth server, which is why an invented `openId` fails with `Failed to sync user info` rather than being provisioned. tRPC procedures come in three tiers (`server/_core/trpc.ts`): `publicProcedure`, `protectedProcedure` (any logged-in user), `adminProcedure` (`user.role === "admin"`). Client-side gate is `AuthGuard` in `App.tsx`.
 
 **Data model** (`drizzle/schema.ts`) — everything is scoped by `userId` with cascade deletes:
 
