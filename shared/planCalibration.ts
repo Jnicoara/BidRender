@@ -1,0 +1,319 @@
+/**
+ * Setting a sheet's scale by measuring something you already know.
+ *
+ * ── Why this exists ──────────────────────────────────────────────────────────
+ * Most real drawing sets do not state a scale ratio anywhere the app can read,
+ * and a set that does may have been scaled on its way to you, which makes the
+ * stated ratio a lie told confidently. Typing `1/4" = 1'-0"` is useless on both.
+ *
+ * So: click two points whose real distance you know — a dimension line, a
+ * column grid, a known wall — type the distance, and the ratio falls out.
+ *
+ * ── It produces the SAME number as typing a ratio ─────────────────────────────
+ * `ratio` is the real-world distance covered by one unit of paper, exactly as
+ * `shared/planScale.ts` defines it. Calibration is a different way of arriving
+ * at that one number, not a second kind of scale, so everything downstream —
+ * every measurement, every stored run — is unchanged and unaware.
+ *
+ * The old PlanPanel stored pixels-per-foot instead, which was tied to the
+ * resolution the page happened to be rendered at. Do not go back to that.
+ *
+ * ── The span is what governs accuracy, not the zoom ──────────────────────────
+ * This is the part worth understanding, because it is counter-intuitive and it
+ * decides whether a sheet's numbers are trustworthy.
+ *
+ * A calibration error does not affect one measurement. It multiplies into EVERY
+ * measurement on the sheet. And the error is set by the SPAN you calibrate
+ * over, not by how carefully you clicked:
+ *
+ *   a 100 ft dimension at 1/8" scale spans ~1,350 px — 3 px of slop is 0.4%
+ *   a 10 ft dimension at the same scale spans ~135 px — the SAME slop is 4.4%
+ *
+ * So the mitigation is a long span. `assessSpan` exists to push toward one, and
+ * to say plainly when a short one will not be trustworthy — rather than
+ * accepting it silently and letting the sheet be quietly 4% wrong.
+ *
+ * ── MEASURE HONEST, PAD VISIBLY ──────────────────────────────────────────────
+ * **Nothing in this file may bias the scale in the estimator's favour.** Not a
+ * span nudged long "to be safe", not a ratio rounded up, not a margin of any
+ * kind. This function returns what was measured.
+ *
+ * The tempting version — a small safety margin, here, where the numbers are —
+ * feels prudent and is corrosive. It would inflate EVERY measurement on the
+ * sheet by an amount the estimator cannot see, cannot inspect and cannot dial
+ * back, and it would double-count against the allowances, which exist for
+ * exactly that and do it in the open where they can be argued with.
+ *
+ * Padding belongs to the conduit and wire allowances, makeup, and the verticals
+ * — each its own line in the run breakdown, each adjustable. See
+ * references/plan-viewer-overhaul.md § 5a, and the same rule already stated in
+ * `toBillableFeet`: _"inventing them inside a measuring function"_ is the
+ * mistake.
+ *
+ * Pushing toward a LONGER SPAN is not a violation of this — that is better
+ * input, with no bias in it, which is the whole distinction.
+ */
+import { POINTS_PER_INCH } from "./takeoffGeometry";
+
+const INCHES_PER_FOOT = 12;
+
+/**
+ * How far a click is assumed to land from where it was aimed, in inches OF
+ * PAPER, for one click.
+ *
+ * A stand-in for human precision rather than a measurement of it. Deliberately
+ * pessimistic: the rating it drives should read as cautious, because the cost
+ * of being wrong here is every number on the sheet. Zooming in before clicking
+ * beats this assumption comfortably, which is why the UI says so.
+ */
+const ASSUMED_SLIP_INCHES = 1 / 32;
+
+/** Two clicks, so two chances to slip. */
+const TOTAL_SLIP_INCHES = ASSUMED_SLIP_INCHES * 2;
+
+/**
+ * Read a distance a person typed.
+ *
+ * Accepts what an estimator would actually write, including how a dimension
+ * reads on the drawing itself:
+ *
+ *   20            20 feet — a BARE NUMBER IS FEET, see below
+ *   20'           20 feet
+ *   20 ft         20 feet
+ *   20.5'         20 feet 6 inches
+ *   20'-6"        20 feet 6 inches
+ *   20' 6"        the same, written the other common way
+ *   24'-6 1/2"    as printed on a dimension line
+ *   246"          246 inches
+ *   246 in        246 inches
+ *
+ * **A bare number means FEET.** Calibration distances are building dimensions,
+ * and nobody calibrates against something 20 inches long. Guessing inches would
+ * be wrong twelve times out of twelve and would produce a scale wrong by a
+ * factor of 12 — which is large enough to notice, but the UI states the unit
+ * anyway rather than relying on the error being obvious.
+ *
+ * Returns inches, or null for anything it cannot read. Never guesses.
+ */
+export function parseLengthText(input: string): number | null {
+  const text = input.trim().toLowerCase();
+  if (!text) return null;
+
+  // Feet and inches together: 20'-6", 20' 6", 24'-6 1/2", 20 ft 6 in
+  const combined =
+    /^(\d+(?:\.\d+)?)\s*(?:'|ft|feet|foot)\s*[-\s]?\s*(\d+(?:\.\d+)?)?(?:\s+(\d+)\/(\d+))?\s*(?:"|in|inch|inches)?$/.exec(
+      text
+    );
+  if (combined) {
+    const feet = Number(combined[1]);
+    const inches = combined[2] ? Number(combined[2]) : 0;
+    const fraction =
+      combined[3] && combined[4]
+        ? Number(combined[3]) / Number(combined[4])
+        : 0;
+    if (!Number.isFinite(feet) || !Number.isFinite(inches)) return null;
+    if (combined[4] && Number(combined[4]) === 0) return null;
+    const total = feet * INCHES_PER_FOOT + inches + fraction;
+    return total > 0 ? total : null;
+  }
+
+  // Inches only: 246", 246 in
+  const inchesOnly =
+    /^(\d+(?:\.\d+)?)(?:\s+(\d+)\/(\d+))?\s*(?:"|in|inch|inches)$/.exec(text);
+  if (inchesOnly) {
+    const whole = Number(inchesOnly[1]);
+    const fraction =
+      inchesOnly[2] && inchesOnly[3]
+        ? Number(inchesOnly[2]) / Number(inchesOnly[3])
+        : 0;
+    if (!Number.isFinite(whole)) return null;
+    if (inchesOnly[3] && Number(inchesOnly[3]) === 0) return null;
+    const total = whole + fraction;
+    return total > 0 ? total : null;
+  }
+
+  // A bare number. Feet, per the note above.
+  const bare = /^(\d+(?:\.\d+)?)$/.exec(text);
+  if (bare) {
+    const feet = Number(bare[1]);
+    return Number.isFinite(feet) && feet > 0 ? feet * INCHES_PER_FOOT : null;
+  }
+
+  return null;
+}
+
+/**
+ * The sheet's scale ratio, from a measured span and the distance it represents.
+ *
+ * `ratio` = real inches per paper inch, matching `shared/planScale.ts`. The
+ * span arrives in PDF page points, which are 1/72 inch of paper and are
+ * independent of how the page was rendered — so a calibration done zoomed in
+ * and one done zoomed out give the same answer.
+ *
+ * Returns null rather than a wrong number for a degenerate input: a zero-length
+ * span is a double-click, not a measurement.
+ */
+export function ratioFromCalibration(
+  spanPagePoints: number,
+  realInches: number
+): number | null {
+  if (!Number.isFinite(spanPagePoints) || spanPagePoints <= 0) return null;
+  if (!Number.isFinite(realInches) || realInches <= 0) return null;
+  const paperInches = spanPagePoints / POINTS_PER_INCH;
+  const ratio = realInches / paperInches;
+  return Number.isFinite(ratio) && ratio > 0 ? ratio : null;
+}
+
+export type SpanQuality = "good" | "fair" | "short";
+
+export type SpanAssessment = {
+  quality: SpanQuality;
+  /** The span in inches of paper — what the rating is actually about. */
+  paperInches: number;
+  /** Roughly how wrong the scale could be, as a percentage. */
+  errorPercent: number;
+  /** One sentence, ready to show. */
+  message: string;
+};
+
+/**
+ * How trustworthy a calibration over this span will be.
+ *
+ * The thresholds are the error the assumed slip produces, not arbitrary
+ * lengths: 1% and 3%. On a 36-inch sheet that works out at roughly a sixth of
+ * the sheet for "good", which matches the instinct to calibrate against the
+ * longest dimension printed rather than the nearest one.
+ *
+ * Returns null when there is nothing to assess yet.
+ */
+export function assessSpan(spanPagePoints: number): SpanAssessment | null {
+  if (!Number.isFinite(spanPagePoints) || spanPagePoints <= 0) return null;
+
+  const paperInches = spanPagePoints / POINTS_PER_INCH;
+  const errorPercent = (TOTAL_SLIP_INCHES / paperInches) * 100;
+
+  if (errorPercent <= 1) {
+    return {
+      quality: "good",
+      paperInches,
+      errorPercent,
+      message: "Good span — a small slip here barely moves the scale.",
+    };
+  }
+
+  if (errorPercent <= 3) {
+    return {
+      quality: "fair",
+      paperInches,
+      errorPercent,
+      message:
+        "Usable, but a longer dimension would be steadier. Zoom in before clicking each end.",
+    };
+  }
+
+  return {
+    quality: "short",
+    paperInches,
+    errorPercent,
+    message:
+      "Short span — a small slip here moves EVERY measurement on this sheet. Use the longest dimension you can find.",
+  };
+}
+
+export type StandardScaleCheck = {
+  /** The closest architect's or engineer's scale, as text. */
+  nearestText: string;
+  nearestRatio: number;
+  /** How far the measured ratio sits from it, as a percentage. */
+  percentOff: number;
+  /**
+   * Far enough off that it is worth saying out loud.
+   *
+   * NOT an error, and never a reason to change the number — see § MEASURE
+   * HONEST. A drawing genuinely can be off-scale, and a calibrated ratio is the
+   * truth about the paper in front of you.
+   */
+  worthMentioning: boolean;
+};
+
+/**
+ * How the calibrated ratio compares with the scales drawings are usually drawn
+ * at — so the app can say when something looks odd, and let the user decide.
+ *
+ * Uncertainty shown beats uncertainty hidden. Three things this catches, all of
+ * which look identical on screen otherwise:
+ *
+ *   A few percent off   The sheet was probably scaled in printing or scanning.
+ *                       The calibration is RIGHT and the stated ratio is wrong,
+ *                       which is exactly why calibration exists.
+ *   Roughly double or   A dimension was misread, or feet were typed where the
+ *   half               drawing meant something else. Worth a hard look.
+ *   Nowhere near        A detail blow-up, a not-to-scale sheet, or two points
+ *                       clicked on the wrong things.
+ *
+ * **This never changes the ratio.** It only gives the estimator something to
+ * check against, which is the honest half of the bargain: measure what is
+ * there, and be loud when it looks surprising.
+ *
+ * ── Two things about the comparison itself ───────────────────────────────────
+ * Nearness is measured on a LOG scale, because scales are a geometric ladder:
+ * 115 is nearer 128 than 96 in the sense that matters, even though plain
+ * subtraction says otherwise.
+ *
+ * And the ladder is denser than it looks, because it mixes architect's and
+ * engineer's scales — 96, 120, 128 sit within a whisker of each other. Measured
+ * against the real list, the worst any ratio can be from its nearest rung is
+ * 41%, and almost everything is far closer. So **"off standard" is a weaker
+ * signal than it sounds**: the threshold is set to catch a misread dimension,
+ * not to audit the drawing. A prompt to look, never a verdict.
+ */
+export function compareToStandardScales(
+  ratio: number,
+  scales: readonly { text: string; ratio: number }[]
+): StandardScaleCheck | null {
+  if (!Number.isFinite(ratio) || ratio <= 0 || scales.length === 0) return null;
+
+  let nearest = scales[0];
+  let bestGap = Infinity;
+  for (const scale of scales) {
+    const gap = Math.abs(Math.log(ratio / scale.ratio));
+    if (gap < bestGap) {
+      bestGap = gap;
+      nearest = scale;
+    }
+  }
+
+  const percentOff = ((ratio - nearest.ratio) / nearest.ratio) * 100;
+
+  return {
+    nearestText: nearest.text,
+    nearestRatio: nearest.ratio,
+    percentOff,
+    // 5% is comfortably wider than print stretch and comfortably narrower than
+    // a misread dimension, which is the gap worth flagging.
+    worthMentioning: Math.abs(percentOff) > 5,
+  };
+}
+
+/**
+ * The scale as text, for storing beside the ratio.
+ *
+ * Deliberately NOT forced into an architect's notation. A calibrated sheet
+ * rarely lands exactly on `1/4" = 1'-0"`, and rounding it to the nearest
+ * familiar-looking scale would throw away the accuracy just bought — while
+ * looking more authoritative than the honest number. `planScale.formatRatio`
+ * already falls back to `1:nnn` for exactly this case.
+ */
+export function describeCalibration(
+  realInches: number,
+  spanPagePoints: number
+): string {
+  const feet = realInches / INCHES_PER_FOOT;
+  const paperInches = spanPagePoints / POINTS_PER_INCH;
+  return `${round(feet, 2)} ft measured over ${round(paperInches, 2)} in of paper`;
+}
+
+function round(value: number, places: number): number {
+  const factor = 10 ** places;
+  return Math.round(value * factor) / factor;
+}

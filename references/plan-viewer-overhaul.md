@@ -443,6 +443,73 @@ distance. A missing scale currently disables a tool that does not need one.
 
 ---
 
+## 5a. MEASURE HONEST, PAD VISIBLY
+
+**The governing rule for every number this screen produces.** Decided
+2026-09-17. It is short, and it is not negotiable.
+
+**Nothing in the measuring path may be biased in the estimator's favour.** Not
+the calibration, not a traced length, not a vertical, not a rounding. A
+measurement reports what it measured.
+
+**All padding is explicit, named, and adjustable** — the conduit and wire
+allowances, makeup, the verticals. Every one of them appears as its own line in
+the run breakdown (§ 2.4), and every one can be turned up by an estimator who
+wants to be conservative on a particular job.
+
+### Why this is a rule and not a preference
+
+The tempting version is a small safety margin somewhere in the measuring —
+calibration rounding a span slightly long "to be safe", a length rounding up to
+the next foot. It feels prudent and it is corrosive:
+
+- **It inflates every measurement on the sheet by an amount the estimator
+  cannot see**, cannot inspect, and cannot dial back.
+- It is **a fudge factor buried where nobody would look for it**. On a big job
+  it loses a bid for a reason that cannot be found afterwards.
+- It **double-counts against the allowances**, which already exist to cover
+  exactly this and do it in the open.
+
+**The codebase already carries this rule in one place**, and the reasoning
+generalises exactly — `toBillableFeet` in `shared/takeoffGeometry.ts`:
+
+> _"Deliberately NOT rounded up to a whole foot here. Waste and rounding are a
+> pricing decision, and inventing them inside a measuring function would make
+> the same run price differently depending on where it was rounded."_
+
+### What to do instead when unsure: say so, loudly
+
+**Uncertainty shown beats uncertainty hidden.** Where the app cannot be
+confident, it says so plainly and lets the estimator decide, rather than
+quietly leaning one way:
+
+- A **short calibration span** is called out with the error it implies (§ 5b).
+- A calibrated result that lands **well off any standard scale** should say so —
+  it may be right, and it may mean the sheet was scaled in printing or the
+  wrong dimension was clicked.
+- A **sheet marked not-to-scale** refuses rather than measuring anyway.
+
+**Pushing toward a longer calibration span is not a violation of this rule** —
+it is free accuracy with no bias in it, which is exactly the distinction. Better
+input, not a thumb on the scale.
+
+## 5b. The calibration span warning
+
+Accuracy is governed by the SPAN calibrated over, not by how carefully the
+clicks were made — see § 4.2 for the arithmetic. `shared/planCalibration.ts`
+rates a span by the error it implies rather than by an arbitrary length:
+
+| Rating     | Implied error | What it says                                        |
+| ---------- | ------------- | --------------------------------------------------- |
+| **good**   | under 1%      | A small slip barely moves the scale                 |
+| **usable** | 1–3%          | Longer would be steadier; zoom in before each click |
+| **short**  | over 3%       | A slip moves EVERY measurement on this sheet        |
+
+**A calibrated ratio is never rounded to the nearest architect's scale.** A real
+sheet lands on something like `1:97.3`, and rounding it to `1/8" = 1'-0"` would
+throw away the accuracy just bought while looking more authoritative than the
+honest number. `formatRatio` already falls back to `1:nnn` for this.
+
 ## 6. Decisions already made — do not re-open without saying why
 
 **NO CONDUIT FILL CHECKING. EVER.** Decided 2026-09-17. The app prices what the
