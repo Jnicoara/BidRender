@@ -1560,6 +1560,448 @@ drag, a batch instead of a queue, a yes/no instead of a form. § 9 is that idea
 applied to the legend, and it is the shape every future AI feature here should
 take.
 
+## 5d. Phase 5 — verticals on runs. PLANNED 2026-09-18, not built
+
+The money phase, and the first database change since the viewer work started.
+Everything below is governed by § 5a: measure honest, pad visibly. A vertical is
+a measurement, not a pad, and it is shown as its own number everywhere it is
+counted.
+
+### The shape decision everything else follows from
+
+**A vertical is never added into the traced length.** It is carried alongside
+it — flat, vertical, total — all the way through to the bid.
+
+Two reasons, and the second is the one that would be expensive to discover
+later:
+
+1. The estimator asked to see it separately, and a number folded in early can
+   never be shown apart afterwards.
+2. **§ 7.1 needs it separate.** The conduit allowance applies to traced length
+   ONLY; the wire allowance applies to everything including verticals. If the
+   vertical has disappeared into the run length by the time allowances arrive,
+   that rule cannot be written without unpicking this phase.
+
+So `runFeet` keeps meaning exactly what it means today, and the vertical footage
+rides beside it as its own field. This is the thing most likely to be
+"simplified" by someone who sees two numbers that could be added together.
+
+Cable runs get verticals too. An MC whip drops off a ceiling like anything else,
+and `cableFeet` takes the same treatment as `conduitFeet`.
+
+### The data model
+
+**Four levels, each one empty until somebody fills it, each empty level meaning
+"ask the level above":** shipped → company → job → run. The same inheritance the
+pricing defaults already use, one level deeper.
+
+**Three new tables.**
+
+`takeoff_height_defaults` — one row per company, holding the **distribution
+height** and nothing else. Ships with no row at all, and no row means no
+verticals anywhere. Its own table rather than two more columns on
+`pricing_defaults`, because a height is a measuring setting and not a money one:
+keeping them apart means a mistake here cannot reach overhead and profit.
+
+`takeoff_mounting_heights` — the device types AND their heights, for both the
+shipped list and the user's own. See the next heading; this is one table doing
+one job, not two.
+
+`bid_mounting_heights` — a job's overrides. A row exists only for a type actually
+overridden on that job, and the rows die with the bid. A job can override a
+height; it cannot invent a type. The one-off belongs on the run.
+
+**One new column on `bids`** — `distributionHeightInches`, NULL to inherit. Same
+shape as `productivityPct`, which is already the single-column override on that
+table.
+
+**Seven new columns on `takeoff_runs`:**
+
+| Column                     | What it holds                                                           |
+| -------------------------- | ----------------------------------------------------------------------- |
+| `startKind`                | The height type key at the start. NULL = not answered, so no vertical   |
+| `endKind`                  | The same for the end                                                    |
+| `startHeightInches`        | This run's own start height. NULL = follow the setting                  |
+| `endHeightInches`          | The same for the end                                                    |
+| `distributionHeightInches` | This run runs at a different elevation. NULL = follow job, then company |
+| `startStampId`             | The stamp at this end, once linked. The double-count rule reads this    |
+| `endStampId`               | The same for the other end                                              |
+
+**The run remembers WHAT is at each end, never HOW HIGH it is.** The height is
+resolved live, every time a number is shown. That is the whole of § 2.5 applied
+here: change the company receptacle height and every run ending at a receptacle
+re-prices. Copy the height onto the run at trace time and forty runs freeze
+silently at whatever the setting was that afternoon.
+
+### Device types: one table, shipped rows and the user's own. ANSWERED 2026-09-18
+
+**Asked:** does a user-added type need to be stored differently from a shipped
+one, or can they be the same rows with a flag? **Answer: the same rows, and the
+flag already exists in this codebase — a NULL `userId`.**
+
+This is the baseline-materials pattern, unchanged (`server/db.ts`,
+`seedBaselineMaterials`):
+
+- **`userId` NULL** — an app-owned row. Shipped, shared by every company,
+  re-stamped from the seed file on startup. Adding a type in a later version
+  therefore reaches every existing company for free, with **no migration and no
+  backfill**.
+- **`userId` set** — the company's own row. Either an override of a shipped type
+  (same `key`) or a type they added (a new `key`). A user editing a shipped
+  height writes their own row; the shipped row is never touched, which is what
+  makes "reset to the shipped value" a delete rather than a remembered number.
+
+One path, and it is honest: the same table, the same read, the same resolution
+order. A type the user added behaves exactly like a shipped one — it appears in
+the run pickers, it inherits company → job → run, and changing its height
+re-prices every run pointing at it, live.
+
+**The key is a string, not a row id.** Shipped types use fixed keys
+(`distribution`, `receptacle`, `switch`); a user-added type gets a slug of its
+label, made unique within the company. Renaming a type keeps its key, so a rename
+never breaks a run pointing at it. A key also reads plainly in a run row when
+something has to be debugged, which an id does not.
+
+**The unique index cannot protect the shipped rows, and that is a known gap
+rather than an oversight.** `unique(userId, key)` is ignored by MySQL wherever
+`userId` is NULL, so nothing at the database level stops two shipped rows sharing
+a key. Materials has exactly this hole and closes it at seed time with
+`dedupeBaselineRows`; heights do the same, in the same place, for the same
+reason. Do not "fix" it by making `userId` NOT NULL with a sentinel — that breaks
+the fork pattern the whole design rests on.
+
+### Retire, never delete. CONFIRMED 2026-09-18
+
+**Asked:** what happens to runs pointing at a custom type when it is deleted?
+**Answer: it is retired, never deleted, and the reason is money rather than
+tidiness.**
+
+A run stores the type's key and resolves the height live. Delete the type and
+every run pointing at it silently loses its drop — the footage falls, nothing on
+screen says why, and the bid gets quietly cheaper. That is precisely the failure
+§ 5a exists to forbid, arriving through the back door of a library edit.
+
+So a retired type:
+
+- leaves every picker, so it cannot be chosen again,
+- keeps resolving its height for runs that already point at it,
+- is labelled **retired** on those runs, so the estimator can see it and change it
+  deliberately,
+- reappears under "show all" in the heights screen, where it can be brought back.
+
+This is the materials rule verbatim (`retireBaselineMaterials` sets
+`isActive = false` and keeps the row, so a bid priced from it last month still
+resolves the part it was priced from). Shipped types retire through a seed-file
+list; the user's own retire through a status column on their row.
+
+### The heights screen — simple by default, deep when asked
+
+The general form of this is written up in `CLAUDE.md` § Customization available,
+but never in the way. Here is what it means on this screen:
+
+```
+  Distribution height        10'-0"              the gate — see below
+
+  Common
+  Receptacle                  1'-6"   starter
+  Switch                      4'-0"   starter
+  Panel                       not set — no vertical counted
+  Ceiling box / fixture       not set — no vertical counted
+  Junction box, wall          8'-0"   starter, a guess
+  Disconnect / equipment      5'-0"   starter
+  Exit sign                   7'-6"   yours
+  Thermostat                  4'-8"   yours
+
+  › Show all heights (2 more)
+  + Add a type
+```
+
+**The fold hides ours, never yours.** A type the user added is always visible,
+because they added it and they are the one who uses it. Only shipped types the
+trade meets rarely — floor box, underground — sit behind "show all", along with
+anything retired.
+
+**The fold hides two rows today, and it is built anyway.** That is deliberate and
+worth writing down so nobody deletes it as dead weight: it exists so the screen is
+the same shape when it is hiding twelve. A control added later, once the list is
+already long, arrives after the screen has already taught people that this is a
+screen with a lot on it.
+
+**"Add a type" and "Custom height" are different things and must never be worded
+as if they were the same.** One is permanent and lives in settings; the other is
+one number on one run.
+
+| Wording in the picker         | What it does                                    |
+| ----------------------------- | ----------------------------------------------- |
+| `Custom height for this run…` | One-off. Lives on the run, appears nowhere else |
+| `Add a type to my heights…`   | Permanent. Appears in every picker from then on |
+
+### The distribution height is the single gate
+
+Everything is off until one number is set. No distribution height means no
+vertical anywhere, on any run, whatever the device heights say — because a
+vertical is the distance between two elevations and only one of them is known.
+
+That is the answer to "nothing appears in a bid I did not ask for": one number,
+typed once, turns the whole feature on, and until it is typed the app counts
+exactly what it counts today.
+
+### Starter values — shipped as conventions, dated, never as facts. SET 2026-09-18
+
+| Type                   | Ships at              | Note                                               |
+| ---------------------- | --------------------- | -------------------------------------------------- |
+| Distribution           | **not set**           | The gate. Nothing is counted until this is entered |
+| Receptacle             | 1'-6"                 | Convention                                         |
+| Switch                 | 4'-0"                 | Convention, and the reach limit is why             |
+| **Panel**              | **not set**           | Varies too much to guess — see below               |
+| Ceiling box / fixture  | **not set**           | Often at distribution height, often not            |
+| Junction box, wall     | 8'-0"                 | **Labelled a guess**, not a convention             |
+| Disconnect / equipment | 5'-0"                 | Mounted for a reachable handle. 4'-0" reads low    |
+| Floor box              | 0'-0"                 | Convention                                         |
+| Underground / slab     | 1'-6" **below floor** | Entered as a positive depth — see trap 4           |
+
+Every one of these carries the label and the date, exactly as a starter material
+price does. **A convention is shown as a convention.**
+
+**Panels ship with no vertical, and this is the correction that matters most.** A
+panel is fed top, bottom or back depending on how the can is set, and a
+surface-mounted panel with pipe entering the top may drop a foot from ceiling
+height, or nothing at all. A shipped 6'-0" would have added invented footage to
+the end of **every homerun on every job** — the largest single number in the
+phase, and wrong. It ships not set, with a line asking for the estimator's own
+number.
+
+**Zero and not-set are different here, and that inverts a house rule.**
+`references/writing-style.md` § 8 says a price nobody set shows `$0` and is
+flagged, because blank reads as "not applicable". Heights cannot do that: `0'-0"`
+is a real, correct height for a floor box. So an unset height shows the words
+**"not set — no vertical counted"** and is flagged that way. Never a zero.
+
+### What a run knows about its ends
+
+**Picked by the user, never guessed from a nearby stamp** (§ 7). Guessing is right
+most of the time, and the rest of the time it attaches a wrong height to a run
+where nothing on screen looks wrong.
+
+**The pickers are sticky.** The trace toolbar carries `From [ Panel ] → To
+[ Receptacle ]` and they stay where they were left, exactly like the stamp tool
+staying armed with an assembly. Thirty homeruns is one decision, not sixty. Each
+finished run is stamped with what the pickers said when it was finished, and
+changing them afterwards does not reach back and rewrite runs already traced.
+
+What is copied down is the **kind**, never the height. That is not a violation of
+§ 2.5 — it is the distinction § 2.5 rests on.
+
+**`Distribution` is what the START picker defaults to**, and that default is a
+defence rather than a convenience. See trap 2.
+
+**The stamp suggestion, one tap, never automatic.** When a run is finished with a
+stamp already sitting on its endpoint, a chip appears: `Receptacle stamped here —
+use it?` Accepting sets the end kind and writes `endStampId`. This is § 5c in its
+smallest possible form, and that link is what the double-count rule reads.
+
+### The double-count rule, in code
+
+**The rule:** a traced run owns the verticals at its own two ends. A stamp's
+vertical is for a device that is NOT on a traced run.
+
+**Where it lives:** one function in `shared/`, taking runs and stamps together and
+deciding ownership before either is totalled. Not in the run path and again in the
+stamp path — a rule enforced in two places is a rule that survives until somebody
+edits one of them.
+
+**The test has to be able to fail.** Stamps carry no verticals until Phase 8, so a
+test written the obvious way would pass today without being capable of failing,
+which is worse than no test at all. So it hands the ownership function a stamp
+that DOES carry a vertical, sitting at a run's linked end, and asserts the footage
+does not appear in the total. It fails today if the rule is missing, and it goes
+on failing when Phase 8 gives stamps real heights.
+
+**The gap, stated plainly:** ownership is knowable because the estimator tapped the
+chip. A stamp sitting on a run end that was never linked is a possible double
+count, and resolving it by distance is the guessing this section just refused. So
+Phase 8 flags it — `this drop may be counted twice` — shown, never silently
+resolved. One tap per run avoids it entirely.
+
+### What is shown
+
+A run, opened:
+
+```
+  Flat, traced                                   142.50 ft
+  Rise at start   panel        10'-0" → 6'-0"      4.00 ft
+  Drop at end     receptacle   10'-0" → 1'-6"      8.50 ft
+  ──────────────────────────────────────────────────────
+  Conduit                                        155.00 ft
+  Wire            3 circuits, 3 conductors     1,395.00 ft
+```
+
+Each vertical names the device, both elevations and the answer, so it can be
+checked in the estimator's head. That is the only test that matters.
+
+A run, closed — **the full arithmetic, not a summary.** DECIDED 2026-09-18:
+
+```
+  Conduit      142.50 + 12.50 = 155.00 ft
+  Wire       1,282.50 + 112.50 = 1,395.00 ft
+```
+
+`incl. 12.50 vertical` was the alternative and was rejected: it still makes the
+reader do the subtraction to check it, and the entire point of the phase is that
+vertical footage stops being invisible. Phase 4 bought the panel the room; this is
+what it is spent on.
+
+Bid totals, all sheets — flat and vertical named separately, never merged.
+
+**The zero has to shout.** § 2.3 makes the argument and it applies here unchanged:
+an unpriced material shouts, an unset height whispers. So:
+
+- Distribution height not set, runs traced → the totals panel says so, plainly,
+  with the count: `No vertical footage is in these numbers. 23 runs are counted
+flat only.`
+- Height set but a run has no ends picked → that run's row says `Verticals — not
+set`. Not a blank, not a zero. "Nothing to add" and "nobody said" are different
+  states and only one of them is finished.
+- A run whose sheet has no scale → **nothing in the totals**, and the row says
+  `Flat length not measurable — no scale on this sheet`. DECIDED 2026-09-18: the
+  verticals are known for that run and could be shown alone, but a partial total
+  reads as a complete one, and that is the failure that costs money. It stays out
+  of the totals and says why on its own row rather than going quiet.
+
+The materials list note gains a sentence naming the vertical total, so a number
+that leaves the app carries its own explanation.
+
+### Decided 2026-09-18 — the estimator's answers
+
+1. **A company height change warns with a count** rather than freezing or silently
+   re-pricing. Smallest change, and it keeps the inheritance that was asked for.
+   **Freezing a bid's heights when it goes Active is the better long-term answer
+   and should be revisited once win-rate tracking matters** — by then the number
+   shown to a customer is a number worth being able to look back at, and
+   inheritance cannot give that.
+2. **Panels ship with no vertical.** See the starter table.
+3. **Starter values as listed**, with disconnect at 5'-0" and the wall junction box
+   labelled a guess.
+4. **An unmeasurable run shows nothing in the totals** and says so on its row.
+5. **The closed run row shows the full arithmetic.**
+6. **Custom device types**: one table, shipped and user rows side by side, retired
+   and never deleted.
+
+### The traps
+
+**1. A company height change re-prices jobs already quoted.** Inheritance means a
+bid sent last week moves if the company height changes today. Answered above: warn
+with a count.
+
+**2. A run continuing through a box gets a phantom drop AND rise.** Panel →
+junction box, then junction box → receptacle. Name the box at both ends and the
+app adds a drop to it and a rise back out of it. If the pipe really goes down and
+back up, correct. If it carries on at ceiling height, that is four feet of pipe
+per box that does not exist, and twenty boxes is eighty feet in the wrong
+direction. **Defence: `Distribution` is the START picker's default**, and the run
+reads `Rise at start — none, continues at run height`.
+
+**3. A riser already IS vertical footage.** Trace a riser on an elevation and its
+height is in the traced length; give it end kinds and it is counted twice. **The
+sheet-kind flag is NOT in Phase 5, and here is why** — it needs a new column on
+`bid_pdf_sheets`, a UI home, and a concept the app does not otherwise have, and
+the protection only fires if somebody remembered to tag the sheet, which is
+exactly what they will not do. It is small code and a big concept, which is the
+wrong trade. What ships instead costs nothing: both ends default to unanswered, so
+a riser traced normally gets no verticals at all, and the ends control carries one
+line at the point of the decision — `if this run IS the vertical, leave both ends
+at distribution`. The sheet-kind column becomes worth having when something else
+needs it too, most likely the reader skipping elevations.
+
+**4. Below-floor heights are entered as a positive depth.** Underground and floor
+boxes sit below the finished floor. The arithmetic handles a negative elevation
+fine; the typing does not — `18` meant as a stub-up below slab would read as
+eighteen inches above it, and the error is eleven and a half feet on every one.
+**So those rows ask for depth below floor as a positive number and store the sign
+themselves.** The field says `below floor` in its label, not in a hint.
+
+**5. Settings belong to the company, not the person logged in.** New tables scope
+to `ctx.scope.dataUserId`, as `server/scopeDiscipline.test.ts` requires. Otherwise
+a foreman gets a private set of ceiling heights and nobody finds out until two
+bids disagree.
+
+**6. The vertical must stay separate for § 7.1.** Restated because it is the thing
+a later tidy-up would break. See the top of this section.
+
+### The migration
+
+Seven statements, seven files, **one statement per file**.
+
+That shape is the whole answer to "what if it half-fails". MySQL cannot undo a
+table change, and drizzle records a file as applied only when the entire file
+succeeds — so one six-statement file that dies on the fourth leaves three changes
+made, nothing recorded, and a re-run that fails on `Duplicate column`. One
+statement per file means a failure can only mean "that statement failed and
+nothing was applied", and running again resumes exactly there.
+
+Indexes and foreign keys are folded INTO each `CREATE TABLE` by hand, which MySQL
+allows and drizzle-kit does not generate. A whole new table then arrives or does
+not arrive, with nothing in between. The hand-edited SQL must keep drizzle's own
+constraint names verbatim — `server/migrationRun.test.ts` checks them, including
+the 64-character limit that broke 0004 on TiDB in July.
+
+| #   | Statement                                                       |
+| --- | --------------------------------------------------------------- |
+| 1   | `CREATE TABLE takeoff_height_defaults` with its index and FK    |
+| 2   | `CREATE TABLE takeoff_mounting_heights` with its indexes and FK |
+| 3   | `CREATE TABLE bid_mounting_heights` with its indexes and FK     |
+| 4   | `ALTER TABLE bids ADD distributionHeightInches`                 |
+| 5   | `ALTER TABLE takeoff_runs` — all seven columns, one statement   |
+| 6   | `ALTER TABLE takeoff_runs ADD CONSTRAINT` — startStampId        |
+| 7   | `ALTER TABLE takeoff_runs ADD CONSTRAINT` — endStampId          |
+
+**Migrate FIRST, deploy SECOND.** Not the other way round. Nearly every read in
+this app is a bare `select()` that expands to every column the RUNNING build knows
+about, so new code against an old database takes the whole takeoff screen down
+with `Unknown column`, while old code against a new database simply ignores columns
+it has never heard of. See § 5 of `references/deploying.md`, which is where this
+was learned the hard way on the bid archive.
+
+The order, watched:
+
+1. **A fresh backup**, minutes before — not last night's.
+   `DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/backup.mts`, then
+   `verifyBackup.mts`.
+2. **Rehearse on a copy.** Restore that backup into a scratch database and run all
+   seven there. This is the only way to find out that statement 6 fails before it
+   fails on real data.
+3. `pnpm tsx scripts/schemaDrift.mts` — expect it to name the seven pending.
+4. `pnpm db:push`.
+5. `schemaDrift.mts` again — expect none. If it still names something, **stop and
+   do not deploy.**
+6. **Open the live site on the OLD code** and check a takeoff's totals are the
+   numbers they were. This step has to be boring.
+7. **Then deploy.** Merge, push `main`, watch Activity for three to six minutes,
+   confirm the version tag moved.
+
+**Statements 6 and 7 are the slow ones** — a foreign key makes MySQL check every
+existing row. Seconds on a table this size, but they are the two to watch, and the
+two most likely to fail: the live database is already missing five foreign keys
+from the 0004 incident.
+
+**Rollback:** migrations here are forward-only. If the code is rolled back the
+columns stay behind, empty, read by nothing. "Undo the database change" is not on
+the menu, which is the real reason for step 2.
+
+**Existing bids read exactly the same afterwards.** Every new column is NULL on
+every existing row, the two per-company tables start empty, and the shipped height
+rows do nothing without a distribution height and an end kind. A test asserts it
+directly: a run with every new field empty produces the quantities the current code
+produces, so a future "helpful" default of 10 feet turns it red.
+
+### Not in this phase
+
+- **Stamp and group verticals** — Phase 8, on top of Phase 6's groups. A vertical
+  belongs to the GROUP, not to each stamp (§ 7).
+- **Allowances on verticals** — Phase 7, under § 7.1's split.
+- **The sheet-kind flag** — trap 3.
+- **Per-area heights** — settled against in § 7 and still settled.
+
 ## 6. Decisions already made — do not re-open without saying why
 
 **NO CONDUIT FILL CHECKING. EVER.** Decided 2026-09-17. The app prices what the

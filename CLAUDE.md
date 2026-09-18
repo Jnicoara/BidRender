@@ -272,6 +272,54 @@ modifier sum — the breakdown returns `modifierPct`, `productivityPct` and
 is applied at calculation time only and writes nothing back, so setting it to 0
 returns every number exactly where it was.
 
+## Customization available, but never in the way
+
+**Simple by default, deep when asked.** A screen opens on the few controls most
+people need, with everything else one control away. Never the other way round.
+
+The failure this prevents is not a missing feature, it is an unread screen. A
+settings panel showing twenty rows gets closed; one showing six and a way to
+reach the rest gets used. Both hold the same twenty settings — only one of them
+is ever read, and an unread setting is a setting nobody has configured.
+
+**Three rules, and the third is the one that gets skipped:**
+
+1. **The common few are visible, the rest sits behind ONE control.** One, not a
+   hierarchy. "Show all", "More", a single disclosure. A second level of hiding
+   is a filing cabinet.
+2. **Hide OURS, never THEIRS.** Anything the user added stays visible. They
+   added it because they use it, and demoting it below a fold to keep our
+   shipped list tidy is backwards.
+3. **The fold ships before the list needs it.** A disclosure added later, once
+   the screen is already crowded, arrives after the screen has taught people
+   that this is a crowded screen. Build it while it is hiding two rows so the
+   screen is the same shape when it is hiding twelve — and do not delete it as
+   dead weight in the meantime.
+
+**A user's own entry behaves exactly like a shipped one.** Same table, same
+read, same inheritance, same live re-pricing. One path, not a parallel one for
+"custom" things — the moment there are two paths, one of them starts lagging the
+other in small ways nobody lists.
+
+The flag that separates them already exists here and is a **NULL `userId`**: an
+app-owned row is shared by every company and re-stamped from the seed file on
+startup; a company's own row is a fork that the seed never touches
+(`server/db.ts`, `seedBaselineMaterials`). That is what makes "reset to the
+shipped value" a delete rather than a remembered number, and it is what lets a
+later version ship a new entry to every existing company with no migration.
+
+**Retire, never delete.** A library row other rows point at is withdrawn from
+every picker and kept, so anything already pointing at it still resolves what it
+was priced or measured from (`retireBaselineMaterials`). Deleting it instead
+changes a number on somebody's finished work and says nothing.
+
+**Where this already applies:** Settings is six addressable sections rather than
+one scroll; the run panel shows what differs from the defaults and keeps the
+rest behind "more" (`references/plan-viewer-overhaul.md` § 6); materials ship as
+baseline rows a user forks rather than as a fixed list. The heights screen in
+§ 5d of that document is the worked example — six common rows, a fold, an "add
+a type", and a user's own type pinned above the fold forever.
+
 ## Onboarding — tracked from data, never from page views
 
 The getting-started checklist (`shared/onboarding.ts`) decides every step from
