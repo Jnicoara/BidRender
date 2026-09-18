@@ -13,7 +13,6 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
-  Cable,
   Check,
   Plus,
   Sparkles,
@@ -22,6 +21,12 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  CABLE_COLOR,
+  CONDUIT_COLOR,
+  CableIcon,
+  ConduitIcon,
+} from "@/components/takeoff/runIcons";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { InlineNumberField } from "@/components/InlineNumberField";
@@ -192,10 +197,24 @@ export function RunsPanel({
                 }}
               >
                 <div className="flex items-start gap-2">
+                  {/*
+                    The same two icons the tool buttons use — imported from
+                    runIcons so they cannot drift apart again. This row used a
+                    lightning bolt for conduit, which says "electrical": not
+                    information inside an electrical estimating app, and not
+                    what the button that produced the row looked like.
+                  */}
                   {run.pathType === "conduit" ? (
-                    <Zap className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[#F5C518]" />
+                    <ConduitIcon
+                      className={cn(
+                        "w-3.5 h-3.5 mt-0.5 shrink-0",
+                        CONDUIT_COLOR
+                      )}
+                    />
                   ) : (
-                    <Cable className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-400" />
+                    <CableIcon
+                      className={cn("w-3.5 h-3.5 mt-0.5 shrink-0", CABLE_COLOR)}
+                    />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate">{run.name}</p>

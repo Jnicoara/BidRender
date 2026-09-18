@@ -55,27 +55,6 @@ import {
   Loader2,
   Plus,
   MapPin,
-  /*
-    The trade tools, aliased at the import so the JSX reads as what it means.
-
-    ConduitIcon is lucide's GitCommitHorizontal — a straight line with a ring
-    in the middle, which is a run of pipe with a coupling on it. The name is a
-    quirk of the icon set, not of the picture, and leaving it unaliased would
-    put the word "GitCommit" in the middle of a conduit button for ever.
-
-    CableIcon is lucide's Cable, and it is the SAME icon already drawn beside
-    every MC/Romex row in the counted-items list (RunsPanel). That is why it
-    beat a cleverer picture: the tool and the rows it produces now say the same
-    thing, and matching what is already on screen is worth more than a better
-    drawing that matches nothing.
-
-    What they replaced, and why neither read: Route was two dots joined by an
-    S-bend, which says "a journey from A to B" rather than "pipe"; Spline was a
-    bezier curve with control handles, which says "drawing tool" and, as the
-    report that prompted this put it, reads like nothing at all.
-  */
-  GitCommitHorizontal as ConduitIcon,
-  Cable as CableIcon,
   Ruler,
   Maximize2,
   Minimize2,
@@ -111,6 +90,13 @@ import {
   type ViewBounds,
 } from "@/lib/planView";
 import { SheetIndex } from "@/components/takeoff/SheetIndex";
+// The tool button and the row it produces draw the same icon, from one place.
+import {
+  CABLE_COLOR,
+  CONDUIT_COLOR,
+  CableIcon,
+  ConduitIcon,
+} from "@/components/takeoff/runIcons";
 import { SheetChip } from "@/components/takeoff/SheetChip";
 import { SidePanel } from "@/components/takeoff/SidePanel";
 import {
@@ -3072,7 +3058,8 @@ export default function TakeoffPage({
                 disabled={!measurability?.ok}
                 title={traceBlockedReason ?? "Trace a conduit run"}
               >
-                <ConduitIcon className="w-3.5 h-3.5 text-[#F5C518]" /> Conduit
+                <ConduitIcon className={cn("w-3.5 h-3.5", CONDUIT_COLOR)} />{" "}
+                Conduit
               </Button>
               <Button
                 size="sm"
@@ -3085,7 +3072,7 @@ export default function TakeoffPage({
                   "Trace a run of self-contained cable — MC or Romex"
                 }
               >
-                <CableIcon className="w-3.5 h-3.5 text-emerald-400" /> Cable
+                <CableIcon className={cn("w-3.5 h-3.5", CABLE_COLOR)} /> Cable
               </Button>
 
               {/* Counting needs no scale, so this is never gated on one. */}
