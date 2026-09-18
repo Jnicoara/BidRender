@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-17]
 
+- **Plans stay sharp when you zoom in.** This is the one people asked for. Zoom past about 100% and the drawing used to go soft — callouts, wire tags and specification notes turning to mush exactly when you lean in to read them. The viewer now redraws the part you are looking at properly, the moment you stop moving, and lays it over the sheet already on screen. It is sharp all the way to 800%, which is as far as the zoom goes, and the text at that magnification is as crisp as the screen can physically show it.
+
+  The reason this took a plan and three steps to build: drawing the WHOLE sheet sharply enough for a 260% zoom needs a picture so large the browser refuses to make it, so the old approach could never have got there at any speed. Drawing only what fits on your screen costs the same 11 to 15 MB and about 40 milliseconds whether you are at 120% or 800%, because the screen does not get bigger when you zoom in. Nothing waits on it — the sheet stretches instantly as always and the sharp version arrives a moment later, so there is never a blank hole or a spinner between you and the drawing. Measured live on the Old Blueridge school E-sheet at every zoom from 120% to 800%, panning, flipping sheets and out at the corners of the paper.
+
+  Nothing about counting or tracing changes. Every stamp and every traced run still measures against the same page, so a bid opened before this and after it reads identically.
+
 - **Groundwork for sharp zoom: the viewer can now draw just the part of a sheet you are looking at.** Drawing a whole 36x24 sheet sharply enough for a 260% zoom is impossible — the picture would be bigger than the browser can hold, which is why plans have always gone soft when you zoom in. Drawing only the part on screen sidesteps that completely: measured at 83 milliseconds for a screen-sized piece at a sharpness the full sheet can never reach. Nothing looks different yet; this is the machinery, and the next step is the viewer actually using it. The same machinery is what the plan reader will need to look at dense sheets close up.
 
 - **Plan pages now say how long they took to draw.** The worker that draws a sheet has always measured this and the app threw the number away; it now prints the page, the scale, the size and the memory to the browser console. Nothing on screen changes, but it means every sheet anyone opens becomes a measurement — which is what the sharp-zoom work needs before it can be designed.

@@ -33,7 +33,14 @@
  * scale still opens, still lists every sheet, and still measures once the user
  * sets a scale by hand.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { trpc } from "@/lib/trpc";
 import { useCompany } from "@/hooks/useCompany";
 import { toast } from "sonner";
@@ -74,9 +81,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   BUTTON_ZOOM_STEP,
+  REGION_SETTLE_MS,
   clampView,
   fitView,
   formatZoom,
+  regionStillGood,
+  wantedRegion,
   wheelZoomFactor,
   zoomAbout,
   type PlanView,
@@ -384,6 +394,19 @@ function usePdfWorker() {
 
 // ── The drawing pane ─────────────────────────────────────────────────────────
 
+/**
+ * What the backdrop is drawn at — the whole sheet, once per page.
+ *
+ * Not the resolution anything is finally read at. It is the picture that has
+ * to exist before the user has aimed at anything: it fits the pane, it is what
+ * the plan reader is handed, and it is the layer the sharp region sits on top
+ * of so there is never a blank hole while a region is being drawn.
+ *
+ * Left at 1.5 deliberately. Raising it looks free on a machine whose Chrome
+ * hands big canvases to the software rasteriser — sharper AND faster — but it
+ * would cost 107MB a page instead of 38MB and be a pessimisation on any
+ * machine without that behaviour. See references/plan-viewer-overhaul.md § 4b.
+ */
 const RENDER_SCALE = 1.5;
 
 /**
@@ -474,6 +497,35 @@ function PlanPane({
    * page points must already be reading it rather than the constant.
    */
   const [drawnScale, setDrawnScale] = useState(RENDER_SCALE);
+
+  /**
+   * The sharp patch drawn over the backdrop, and the terms it was drawn on.
+   *
+   * `rect` and `scale` are what the worker ACTUALLY used — the rect trimmed to
+   * the page, the scale reduced if the bitmap would have been too big. They
+   * are what positions the patch, so reading back the request instead of the
+   * reply would put it in the wrong place at every page edge.
+   *
+   * `key` is the sheet it belongs to. A patch of sheet 5 laid over sheet 6
+   * looks like corrupted data rather than a stale bitmap, and page flips are
+   * exactly when a render is most likely to be in flight.
+   */
+  const [sharp, setSharp] = useState<{
+    key: string;
+    rect: PageRect;
+    scale: number;
+  } | null>(null);
+  const sharpCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  /**
+   * The bitmap waiting for the canvas that the next commit will create.
+   *
+   * It cannot be drawn where it arrives: the canvas element does not exist
+   * until `sharp` has rendered. Drawing it in a layout effect instead means
+   * the pixels and the position land in the same frame — draw first and
+   * position after and the patch is visibly in the wrong place for a frame.
+   */
+  const pendingSharp = useRef<ImageBitmap | null>(null);
+
   const { load, loadUrl, render, outline, pageText } = usePdfWorker();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -840,14 +892,14 @@ function PlanPane({
     };
   }, [doc.id, doc.url, hash, load, loadUrl, outline]);
 
-  // Paint the current page.
+  // Paint the backdrop: the whole sheet, once per page, at RENDER_SCALE.
   useEffect(() => {
     if (loading || error || pageCount === 0) return;
     let cancelled = false;
     setRendering(true);
 
-    // No rect: this is still the whole sheet at a fixed resolution. Sharp zoom
-    // is the next step and will pass one; the contract is ready for it.
+    // No rect: the backdrop is the whole sheet. The sharp patch below asks
+    // for a rectangle of the same page, on top of this.
     render(page, RENDER_SCALE, hash)
       .then(({ bitmap, scale }) => {
         if (cancelled) return bitmap.close();
@@ -879,6 +931,136 @@ function PlanPane({
       cancelled = true;
     };
   }, [page, pageCount, loading, error, render, hash]);
+
+  /**
+   * ── Sharp zoom ────────────────────────────────────────────────────────────
+   *
+   * The backdrop is drawn once per sheet and stretched by the CSS transform,
+   * which is instant and goes soft the moment the magnification passes the
+   * resolution it was drawn at. What follows draws the part being looked at
+   * again, properly, and lays it on top.
+   *
+   * The whole sheet cannot simply be redrawn sharper. Measured on a real 36x24
+   * E-sheet, the 260% that was reported as too soft needs 7.8x, and the whole
+   * page at 7.8x does not allocate — the browser refuses near a gigabyte of
+   * bitmap. The same rectangle, screen-sized, took 83ms and 24MB. See
+   * references/plan-viewer-overhaul.md § 4b.
+   */
+
+  /** This sheet, for stamping requests so a page flip cannot mismatch them. */
+  const pageKey = `${hash}:${page}`;
+
+  /**
+   * What to ask for, once movement has stopped.
+   *
+   * The settle delay is the coalescing. A wheel zoom or a drag throws off a
+   * stream of positions and rendering for each one would queue a minute of
+   * work for views nobody is looking at any more — so nothing is requested
+   * until the view has held still for `REGION_SETTLE_MS`.
+   *
+   * Then the identity check is what stops the rest. `regionStillGood` compares
+   * the new want against the LAST ASK rather than against what is on screen,
+   * deliberately: a request already in flight should not be sent twice, and a
+   * nudge that lands inside the margin already being drawn needs nothing at
+   * all. Returning the same object means no new state, so the effect below
+   * does not re-run.
+   */
+  const [ask, setAsk] = useState<{
+    key: string;
+    rect: PageRect;
+    scale: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (loading || error || canvasSize.width === 0) return;
+    const timer = setTimeout(() => {
+      const bounds = readBounds();
+      if (!bounds) return;
+      // devicePixelRatio is not decoration: on a Retina or 4K laptop it is 2,
+      // which doubles the resolution the same zoom needs.
+      const want = wantedRegion(
+        view,
+        bounds,
+        drawnScale,
+        window.devicePixelRatio || 1
+      );
+      setAsk(current => {
+        // Zoomed back out far enough that the backdrop is already sharper than
+        // the screen shows it — there is nothing to add.
+        if (!want) return null;
+        const next = { key: pageKey, ...want };
+        if (current?.key === pageKey && regionStillGood(current, want)) {
+          return current;
+        }
+        return next;
+      });
+    }, REGION_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [
+    view,
+    canvasSize.width,
+    canvasSize.height,
+    drawnScale,
+    readBounds,
+    loading,
+    error,
+    pageKey,
+  ]);
+
+  /**
+   * Draw the asked-for region, latest wins.
+   *
+   * The cleanup is the cancellation. There is no way to recall a render
+   * already started in the worker, and none is needed — a reply nobody wants
+   * is closed rather than shown, which costs one wasted render at most,
+   * because the settle delay means asks do not arrive in a stream.
+   */
+  useEffect(() => {
+    if (!ask || ask.key !== pageKey) {
+      pendingSharp.current?.close();
+      pendingSharp.current = null;
+      setSharp(null);
+      return;
+    }
+    let cancelled = false;
+    render(page, ask.scale, hash, ask.rect)
+      .then(({ bitmap, scale, rect }) => {
+        if (cancelled) return bitmap.close();
+        pendingSharp.current?.close();
+        pendingSharp.current = bitmap;
+        setSharp({ key: ask.key, rect, scale });
+      })
+      .catch(() => {
+        // A region that will not draw is not worth an error screen. The
+        // backdrop is still there and still correct — just soft — which is
+        // exactly what the viewer looked like before this existed.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ask, pageKey, page, hash, render]);
+
+  /**
+   * Put the pixels in the canvas the commit above just created, before paint.
+   */
+  useLayoutEffect(() => {
+    const bitmap = pendingSharp.current;
+    const canvas = sharpCanvasRef.current;
+    if (!bitmap || !canvas) return;
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    pendingSharp.current = null;
+  }, [sharp]);
+
+  /** An ImageBitmap holds its memory until it is closed, mounted or not. */
+  useEffect(() => {
+    return () => {
+      pendingSharp.current?.close();
+      pendingSharp.current = null;
+    };
+  }, []);
 
   // Pull the page's text once, for scale detection.
   useEffect(() => {
@@ -1074,6 +1256,34 @@ function PlanPane({
                 ref={canvasRef}
                 className="rounded-lg shadow-lg bg-white block"
               />
+              {/*
+                The sharp patch, laid over the backdrop.
+
+                Its POSITION and SIZE are given in backdrop-canvas pixels —
+                the rect in page points multiplied by the scale the backdrop
+                was drawn at. That is what makes it land exactly right under
+                any zoom or pan without knowing about either: it is inside the
+                same single transform as the drawing and the marks, so the
+                three cannot drift apart. Only its pixel DENSITY is higher,
+                which is the entire trick.
+
+                The backdrop stays underneath rather than being replaced, so
+                there is never a blank hole while a region is being drawn, and
+                so a sheet at rest looks the same as it always did.
+              */}
+              {sharp && sharp.key === pageKey && (
+                <canvas
+                  ref={sharpCanvasRef}
+                  aria-hidden
+                  className="absolute block pointer-events-none"
+                  style={{
+                    left: sharp.rect.x * drawnScale,
+                    top: sharp.rect.y * drawnScale,
+                    width: sharp.rect.width * drawnScale,
+                    height: sharp.rect.height * drawnScale,
+                  }}
+                />
+              )}
               {canvasSize.width > 0 &&
                 overlay?.({
                   ...canvasSize,

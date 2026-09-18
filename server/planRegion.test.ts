@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import {
   clampRegion,
+  containsRegion,
   fitScaleToBudget,
   regionPixelSize,
   wholePage,
@@ -236,5 +237,66 @@ describe("fitScaleToBudget", () => {
     const size = regionPixelSize(page, fitted);
     expect(size.width * size.height).toBeLessThanOrEqual(10_000_000 * 1.001);
     expect(fitted).toBeLessThan(4);
+  });
+});
+
+describe("containsRegion", () => {
+  const outer: PageRect = { x: 100, y: 200, width: 400, height: 300 };
+
+  it("covers a rect wholly inside it", () => {
+    expect(
+      containsRegion(outer, { x: 150, y: 250, width: 100, height: 100 })
+    ).toBe(true);
+  });
+
+  it("covers itself — which is the case that runs on every mouse move", () => {
+    expect(containsRegion(outer, outer)).toBe(true);
+  });
+
+  it("covers a rect flush against each edge in turn", () => {
+    expect(
+      containsRegion(outer, { x: 100, y: 200, width: 400, height: 300 })
+    ).toBe(true);
+    expect(
+      containsRegion(outer, { x: 400, y: 400, width: 100, height: 100 })
+    ).toBe(true);
+  });
+
+  it("does not cover one that escapes past any single edge", () => {
+    // Each of the four on its own, because a sign error shows on one side only
+    // and the other three keep answering correctly.
+    expect(
+      containsRegion(outer, { x: 99, y: 250, width: 10, height: 10 })
+    ).toBe(false);
+    expect(
+      containsRegion(outer, { x: 150, y: 199, width: 10, height: 10 })
+    ).toBe(false);
+    expect(
+      containsRegion(outer, { x: 495, y: 250, width: 10, height: 10 })
+    ).toBe(false);
+    expect(
+      containsRegion(outer, { x: 150, y: 495, width: 10, height: 10 })
+    ).toBe(false);
+  });
+
+  it("tolerates a rect that has been through a divide and a multiply", () => {
+    // What the viewer actually compares: a rect reconstructed from screen
+    // coordinates against the one the worker sent back. Without the tolerance
+    // this answers false and every settled view re-renders forever.
+    const roundTripped: PageRect = {
+      x: (outer.x * 1.5 * 2.3) / (1.5 * 2.3),
+      y: (outer.y * 1.5 * 2.3) / (1.5 * 2.3),
+      width: (outer.width * 1.5 * 2.3) / (1.5 * 2.3),
+      height: (outer.height * 1.5 * 2.3) / (1.5 * 2.3),
+    };
+    expect(containsRegion(outer, roundTripped)).toBe(true);
+  });
+
+  it("does not let the tolerance hide a real miss", () => {
+    // A point is a 72nd of an inch; the tolerance is a fifth of that. Nothing
+    // on a drawing is thin enough for this to be a judgement call.
+    expect(
+      containsRegion(outer, { x: 150, y: 250, width: 400, height: 10 })
+    ).toBe(false);
   });
 });

@@ -6,14 +6,14 @@
  * Instant and free, and it goes soft once magnified past the resolution the
  * page was drawn at.
  *
- * RENDER resolution is the other one — what the worker actually rasterises at,
- * `RENDER_SCALE` in TakeoffPage. Sharp at any magnification and costs 0.5–13s
- * on a dense sheet. **It is deliberately NOT part of this phase.** The plan
- * (references/plan-viewer-overhaul.md) holds it back until the ceiling can be
- * chosen against a real E-sheet.
+ * RENDER resolution is the other one — what the worker actually rasterises at.
+ * Sharp at any magnification, and it costs real time.
  *
- * Keeping them separate is the whole design. The old PlanPanel had only the
- * first, which is exactly why zooming into it went blurry.
+ * Keeping them separate is the whole design: stretch while moving, re-render
+ * sharp once still. The old PlanPanel had only the first, which is exactly why
+ * zooming into it went blurry. The bottom of this file is the second half —
+ * which rectangle to redraw and at what resolution — and it deliberately knows
+ * nothing about workers, React or canvases.
  *
  * ── Why the maths lives here ─────────────────────────────────────────────────
  * Zoom-toward-the-cursor and pan clamping are the two things that feel wrong
@@ -30,6 +30,8 @@
  * is taken from the overlay's own coordinate space (see `screenToPagePoints`),
  * which is why zooming cannot change a traced length.
  */
+
+import { containsRegion, type PageRect } from "@shared/planRegion";
 
 export type PlanView = {
   /** Screen pixels per drawing pixel. */
@@ -188,4 +190,151 @@ export const BUTTON_ZOOM_STEP = 1.25;
 /** For the readout. 1 → "100%". */
 export function formatZoom(zoom: number): string {
   return `${Math.round(zoom * 100)}%`;
+}
+
+// ── Sharp re-render: which rectangle, at what resolution ─────────────────────
+//
+// Everything above is DISPLAY zoom — stretching a picture already drawn. What
+// follows decides what to ask the worker to draw properly, and it is the other
+// half of the design: stretch while moving, re-render sharp once still.
+//
+// The whole sheet cannot be the answer. Measured on a real 36x24 E-sheet, a
+// page sharp enough for 260% zoom on an ordinary laptop needs 7.8x, which does
+// not allocate at all — the browser refuses somewhere near a gigabyte of
+// bitmap. A rectangle the size of the viewport costs about 26MB whatever the
+// magnification, because the screen does not get bigger when you zoom in.
+// See references/plan-viewer-overhaul.md § 4b.
+
+/**
+ * How much beyond the viewport to draw, as a fraction of the visible extent
+ * added to each side.
+ *
+ * Purely about how often a render is triggered. Zero would re-render on every
+ * pixel of pan; too much throws away the reason for drawing a region at all.
+ * At 0.15 the bitmap is 1.69x the viewport's pixels — about 41MB on a 4K
+ * screen at devicePixelRatio 2, comfortably inside `MAX_REGION_PIXELS` — and a
+ * nudge of up to 15% of the screen costs nothing.
+ */
+export const REGION_MARGIN = 0.15;
+
+/**
+ * Wait this long after the last movement before asking for a sharp render.
+ *
+ * A wheel zoom or a drag throws off a stream of positions, and rendering for
+ * each one would queue a minute of work for views nobody is looking at any
+ * more. Long enough to sit out a gesture, short enough that stopping to read
+ * something does not feel like waiting.
+ */
+export const REGION_SETTLE_MS = 150;
+
+/**
+ * Render scales are rounded up to a multiple of this.
+ *
+ * Without it, a one-notch wheel zoom would change the wanted scale by a few
+ * percent and invalidate a perfectly good bitmap. Rounding UP — never down —
+ * keeps the picture at least as sharp as asked for.
+ */
+export const SHARP_SCALE_STEP = 0.25;
+
+/**
+ * The part of the page on screen right now, in page points, grown by a margin.
+ *
+ * `baseScale` is the scale the backdrop canvas was drawn at, which is also what
+ * turns its pixels into page points. Read it from the render that produced the
+ * bitmap — never from a constant, which is the mistake this whole phase was
+ * careful to design out.
+ *
+ * Returns a rect that may run past the page; the worker trims it, and reports
+ * back what it actually drew.
+ */
+export function visibleRegion(
+  view: PlanView,
+  bounds: ViewBounds,
+  baseScale: number,
+  margin = REGION_MARGIN
+): PageRect | null {
+  if (!Number.isFinite(baseScale) || baseScale <= 0) return null;
+  if (!Number.isFinite(view.zoom) || view.zoom <= 0) return null;
+  if (!Number.isFinite(view.x) || !Number.isFinite(view.y)) return null;
+  if (bounds.viewportWidth <= 0 || bounds.viewportHeight <= 0) return null;
+
+  // A drawing point `p` lands at `view.x + p * zoom`, so the visible span is
+  // that relationship read backwards — and then divided by `baseScale`, which
+  // is how many canvas pixels one page point became.
+  const toPoints = view.zoom * baseScale;
+  const left = -view.x / toPoints;
+  const top = -view.y / toPoints;
+  const width = bounds.viewportWidth / toPoints;
+  const height = bounds.viewportHeight / toPoints;
+
+  return {
+    x: left - width * margin,
+    y: top - height * margin,
+    width: width * (1 + margin * 2),
+    height: height * (1 + margin * 2),
+  };
+}
+
+/**
+ * The render scale that makes the drawing 1:1 with the screen's real pixels.
+ *
+ * The backdrop canvas is displayed at its own pixel size in CSS pixels, so one
+ * page point occupies `baseScale * zoom * devicePixelRatio` device pixels. A
+ * bitmap drawn at exactly that is as sharp as the screen can show; anything
+ * less is the softness this phase exists to remove.
+ *
+ * **devicePixelRatio is not optional here.** On a Retina or 4K laptop it is 2,
+ * which doubles the scale needed for the same zoom — and it is why 260% looked
+ * soft on the machine this was measured on while the arithmetic for a DPR-1
+ * screen said it should have been fine.
+ */
+export function sharpRenderScale(
+  baseScale: number,
+  zoom: number,
+  devicePixelRatio: number,
+  step = SHARP_SCALE_STEP
+): number {
+  const wanted = baseScale * zoom * devicePixelRatio;
+  if (!Number.isFinite(wanted) || wanted <= 0) return 0;
+  return Math.ceil(wanted / step) * step;
+}
+
+/**
+ * What the sharp layer should be showing, or null when it should show nothing.
+ *
+ * Null is the ordinary case for a sheet fitted to the pane: the backdrop is
+ * already drawn at a higher resolution than the screen is showing it at, so a
+ * region render would cost seconds to change nothing. Zoomed out, there is
+ * nothing to sharpen.
+ */
+export function wantedRegion(
+  view: PlanView,
+  bounds: ViewBounds,
+  baseScale: number,
+  devicePixelRatio: number
+): { rect: PageRect; scale: number } | null {
+  const scale = sharpRenderScale(baseScale, view.zoom, devicePixelRatio);
+  // Not sharper than the backdrop already is — nothing to gain.
+  if (scale <= baseScale) return null;
+  const rect = visibleRegion(view, bounds, baseScale);
+  if (!rect) return null;
+  return { rect, scale };
+}
+
+/**
+ * Is the region already drawn good enough for what is wanted now?
+ *
+ * Both halves matter: a bitmap that covers the view but was drawn for half
+ * this zoom is soft, and one drawn sharply enough for a view 3,000 points
+ * away is not on screen. The scale test allows a little slack so that
+ * quantising cannot leave a request perpetually one ULP short of its own
+ * answer.
+ */
+export function regionStillGood(
+  have: { rect: PageRect; scale: number } | null,
+  want: { rect: PageRect; scale: number }
+): boolean {
+  if (!have) return false;
+  if (have.scale < want.scale - 1e-6) return false;
+  return containsRegion(have.rect, want.rect);
 }

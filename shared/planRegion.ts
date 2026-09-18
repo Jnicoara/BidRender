@@ -129,3 +129,29 @@ export function fitScaleToBudget(
   if (wanted <= maxPixels) return desiredScale;
   return Math.sqrt(maxPixels / area);
 }
+
+/**
+ * Does `outer` cover all of `inner`?
+ *
+ * This is what stops a viewer re-rendering on every small movement: a nudge
+ * that stays inside the margin already drawn needs no new picture. Without it
+ * the settle delay would still fire a render for a view that is already sharp,
+ * which on a dense sheet is a visible stall for no change on screen.
+ *
+ * The tolerance is a fifth of a point — well under the width of any line on a
+ * drawing, and enough that a rect reconstructed through a divide and a
+ * multiply does not read as "moved". Without it, floating-point noise alone
+ * would answer "no" to a region compared against itself.
+ */
+export function containsRegion(
+  outer: PageRect,
+  inner: PageRect,
+  tolerance = 0.2
+): boolean {
+  return (
+    inner.x >= outer.x - tolerance &&
+    inner.y >= outer.y - tolerance &&
+    inner.x + inner.width <= outer.x + outer.width + tolerance &&
+    inner.y + inner.height <= outer.y + outer.height + tolerance
+  );
+}

@@ -1,8 +1,8 @@
 # Plan viewer overhaul — the plan
 
-Written 2026-09-17. **Phase 1 is shipped; everything else is still plan.** This
-is the agreed shape of the work, the order it happens in, and the decisions
-already made, so that none of it has to be re-derived in six weeks.
+Written 2026-09-17. **Phases 1, 1a, 2 and 3 are shipped; everything else is
+still plan.** This is the agreed shape of the work, the order it happens in, and
+the decisions already made, so that none of it has to be re-derived in six weeks.
 
 **§ 4.1 is the most current part of this document** — it records what changed
 after Phase 1 was tested on the live site, which was more than the planning
@@ -298,21 +298,21 @@ Each phase ships and gets used before the next starts.
 > **Re-ordered 2026-09-17 after testing Phase 1 on the live site.** The order
 > below is the current one; § 4.1 records what the testing changed and why.
 
-| Phase  | What                                                    | DB change                |
-| ------ | ------------------------------------------------------- | ------------------------ |
-| **1**  | ~~Zoom, pan, and the three viewer bugs~~ **shipped**    | No                       |
-| **1a** | Page-flip fit bug + tool discoverability                | **No**                   |
-| **2**  | Two-point scale calibration                             | No (reuses `scaleRatio`) |
-| **3**  | Sharp re-render of the visible area                     | **No**                   |
-| **4**  | The layout: full screen, top toolbar, collapsing panels | **No**                   |
-| **4b** | Measure-only tool                                       | **No**                   |
-| **5**  | **Verticals on runs — the money phase**                 | **Yes**                  |
-| **6**  | Three levels of effort                                  | **Yes** — groups         |
-| **7**  | Run settings: allowances, materials, sizes, ground      | **Yes**                  |
-| **8**  | **Verticals on stamps**                                 | **Yes** (small)          |
-| **9**  | Editing runs: drag a vertex, insert/remove points       | No                       |
-| **10** | AI reader tiling, and the daily-limit question with it  | No                       |
-| **11** | Tablet and touch                                        | No                       |
+| Phase  | What                                                     | DB change                |
+| ------ | -------------------------------------------------------- | ------------------------ |
+| **1**  | ~~Zoom, pan, and the three viewer bugs~~ **shipped**     | No                       |
+| **1a** | ~~Page-flip fit bug + tool discoverability~~ **shipped** | **No**                   |
+| **2**  | ~~Two-point scale calibration~~ **shipped**              | No (reuses `scaleRatio`) |
+| **3**  | ~~Sharp re-render of the visible area~~ **shipped**      | **No**                   |
+| **4**  | The layout: full screen, top toolbar, collapsing panels  | **No**                   |
+| **4b** | Measure-only tool                                        | **No**                   |
+| **5**  | **Verticals on runs — the money phase**                  | **Yes**                  |
+| **6**  | Three levels of effort                                   | **Yes** — groups         |
+| **7**  | Run settings: allowances, materials, sizes, ground       | **Yes**                  |
+| **8**  | **Verticals on stamps**                                  | **Yes** (small)          |
+| **9**  | Editing runs: drag a vertex, insert/remove points        | No                       |
+| **10** | AI reader tiling, and the daily-limit question with it   | No                       |
+| **11** | Tablet and touch                                         | No                       |
 
 ### 4.1 What live testing of Phase 1 changed
 
@@ -443,7 +443,7 @@ distance. A missing scale currently disables a tool that does not need one.
 
 ---
 
-## 4b. Phase 3 — sharp re-render. PLAN, not yet built
+## 4b. Phase 3 — sharp re-render. BUILT 2026-09-17
 
 ### How it works
 
@@ -610,6 +610,10 @@ positions, and every one of them starting a 3-second render would queue a minute
 of work for a view nobody is looking at any more. Latest-wins, with a settle
 delay.
 
+Built exactly that way — `REGION_SETTLE_MS = 150` in `planView.ts`, and
+`regionStillGood` on top of it so that even after the delay a view still inside
+the margin asks for nothing. Ten zoom steps in a row produced **one** render.
+
 ### This IS the AI tiling machinery — BUILT 2026-09-17
 
 Phase 10 needs exactly this: render a region of a page at high resolution.
@@ -684,9 +688,102 @@ whole page cannot be drawn at 7.8x at all.
 
 #### What step 2 did NOT do
 
-Nothing on screen changed. The viewer still asks for the whole sheet at
+Nothing on screen changed. The viewer still asked for the whole sheet at
 `RENDER_SCALE = 1.5`, because choosing the region and re-requesting it on
-zoom/pan is step 3. The contract is in place and proven; nothing uses it yet.
+zoom/pan was step 3 — done below on the same day.
+
+### Step 3 — the viewer uses it. DONE 2026-09-17
+
+Four pieces, all on the viewer side, none of them in the worker.
+
+**1. Which rectangle** — `visibleRegion` in `client/src/lib/planView.ts`. The
+transform is `translate(x, y) scale(zoom)`, so a drawing point `p` lands at
+`x + p * zoom`; reading that backwards and dividing by the scale the backdrop
+was drawn at gives the visible span in page points. Grown by `REGION_MARGIN`
+(0.15 of the visible extent on every side) so a nudge costs nothing. **It is
+left unclamped deliberately** — the worker trims it, because a rect trimmed
+twice against two different ideas of the page size is how a patch ends up a
+line off at an edge.
+
+**2. Which scale** — `sharpRenderScale`: `baseScale x zoom x devicePixelRatio`,
+rounded UP to a 0.25 step so a one-notch zoom does not invalidate a good
+bitmap. The DPR term is the whole of the original complaint: 260% on a DPR-2
+screen wants 7.8x, which is the number § 4b measured as unreachable for a whole
+page. `wantedRegion` returns null when that scale is not above the backdrop's
+own — which is every fitted sheet, so a zoomed-out viewer asks for nothing at
+all.
+
+**3. Drawing it** — a second canvas, absolutely positioned **inside the same
+single transform** as the backdrop and the trace overlay, with its CSS box given
+in backdrop-canvas pixels: the returned rect in points times `drawnScale`. That
+is what makes it land right under any zoom or pan without knowing about either.
+Only its pixel DENSITY is higher, and that is the entire trick. The backdrop
+stays underneath rather than being replaced, so there is never a blank hole.
+DOM order is backdrop → patch → overlay, and the patch is `pointer-events-none`,
+so clicks reach the trace layer exactly as before.
+
+**4. Coalescing** — the settle delay, plus an identity check against the last
+ask, plus effect-cleanup cancellation. There is no way to recall a render
+already running in the worker and none is needed: an unwanted reply is closed
+rather than shown, and the settle delay means asks do not arrive in a stream.
+
+The scale the patch is positioned by is the one that came BACK, never the one
+asked for. At a page corner the worker trims the rect and the patch has to sit
+on the trimmed rectangle or it lands in the wrong place.
+
+#### Measured live, 2026-09-17 — Old Blueridge school, sheets 4 and 5
+
+| zoom | render scale | region      | bitmap    | MB  | ms  |
+| ---- | ------------ | ----------- | --------- | --- | --- |
+| 20%  | —            | none wanted | —         | —   | —   |
+| 121% | 3.75x        | 600x456pt   | 2249x1709 | 15  | 34  |
+| 151% | 4.75x        | 480x365pt   | 2279x1732 | 15  | 96  |
+| 189% | 5.75x        | 384x292pt   | 2207x1677 | 14  | 74  |
+| 224% | 6.75x        | 291x223pt   | 1968x1503 | 11  | 40  |
+| 800% | 24x          | 91x69pt     | 2177x1654 | 14  | 43  |
+
+**The cost does not move.** 11–15 MB and 25–96ms across the entire zoom range,
+because the region shrinks exactly as fast as the resolution grows — the screen
+does not get bigger when you zoom in. Against the whole-page numbers in the
+table above: 6x alone is 615 MB and 757ms, and 8x does not allocate. **24x was
+reached here for 14 MB.**
+
+Checked at 800%: **one device pixel per bitmap pixel, exactly.** Sharp to the
+limit of the glass at the maximum zoom the viewer allows.
+
+#### What was verified in the running app, not just asserted
+
+- **Sharp vs soft, same frame.** Hiding the patch at 189% and re-screenshotting
+  gives the old blurry drawing in identical framing — so the patch is both
+  doing the work and perfectly registered. No seam, no offset.
+- **Panning** re-requests and re-lands; 49–60ms each.
+- **A page flip drops the patch in the same commit as the page change.** A patch
+  of sheet 5 over sheet 4 reads as corrupted data rather than a stale bitmap,
+  and a flip is exactly when a render is most likely to be in flight. Every
+  request carries the sheet it was made for.
+- **Zooming back out removes it** and frees the bitmap, rather than leaving a
+  sharp rectangle sitting on a fitted sheet.
+- **At the sheet's top-left corner** the worker trimmed the rect to `0,0` and
+  the patch sat on the corner with the border lines unbroken.
+- **The overlay's on-screen rectangle still equals the backdrop's exactly** at
+  every zoom tested. That is the invariant every traced length depends on, and
+  this phase does not touch it: the overlay still reads `drawnScale`, which is
+  still the backdrop's.
+- No `CUT TO` warnings — nothing came near `MAX_REGION_PIXELS`, as intended.
+
+23 new tests (17 in `planView.test.ts`, 6 for `containsRegion`). `pnpm check`
+clean; suite at the known baseline of 26 failures / 3 files.
+
+#### What step 3 did NOT do
+
+`RENDER_SCALE` stays at 1.5. Raising it looks free on a machine whose Chrome
+hands big canvases to the software rasteriser — sharper AND three times faster
+— but it costs 107 MB a page instead of 38 MB and is a pessimisation anywhere
+without that behaviour. Unchanged, per § 4b point 5.
+
+Nothing prefetches. A region is asked for when the view settles, not before, so
+moving to a new part of a sheet is a stretch followed by a sharpen rather than
+an instantly-sharp arrival. Worth revisiting only if it is ever actually felt.
 
 ### snapshotPage — DONE in step 2
 
