@@ -443,6 +443,303 @@ distance. A missing scale currently disables a tool that does not need one.
 
 ---
 
+## 4b. Phase 3 — sharp re-render. PLAN, not yet built
+
+### How it works
+
+Two things are happening, and keeping them apart is the whole design.
+
+**Display zoom** is a CSS stretch of a picture already drawn. Instant, free, and
+soft once magnified past the resolution that picture was drawn at. That is all
+Phase 1 shipped, and why 260% is already too blurry to read a callout.
+
+**Render resolution** is what the worker actually rasterises at. Sharp at any
+magnification, and it costs real time.
+
+**The design: stretch while moving, re-render sharp once still.** The user never
+waits for a zoom, and never stays blurry. The old PlanPanel had only the stretch
+half, which is exactly why zooming into it went soft.
+
+### Whole-page re-rendering does not work, and the numbers say so
+
+For the 36×24 E-sheet tested:
+
+| Render scale | Sharp to | Bitmap RAM |
+| ------------ | -------- | ---------- |
+| 1.5× (today) | 100%     | 38 MB      |
+| 3×           | 200%     | 154 MB     |
+| 4×           | 267%     | **273 MB** |
+| 6×           | 400%     | **615 MB** |
+
+Sharpness at 400% would cost 615 MB **for one page**, on a laptop with a plan
+set open. **So it must render the VISIBLE REGION only** — bounded by the
+viewport at roughly 6 MB whatever the magnification, instead of growing with the
+square of the zoom.
+
+pdf.js does this with `viewport.clone({ offsetX, offsetY })` onto a
+viewport-sized canvas: the page is drawn at the high scale but translated so
+only the wanted region lands on the bitmap.
+
+### Render time: MEASURE FIRST, and do not guess
+
+**This is step 1 of the phase, not an assumption inside it.**
+
+What is known: `CLAUDE.md` records 0.5–13s for a full page at 1.5× on a dense
+drawing, and the worker already times every render and posts `elapsed` back —
+which the main thread currently throws away. Surfacing that is nearly free and
+turns every future render into a data point.
+
+What is NOT known, and matters: how much of that time is **parsing the content
+stream** (paid regardless of the region) versus **rasterising** (saved by
+clipping). Clipping a region cuts the second and not the first, so the saving is
+real but is NOT proportional to area. Anyone assuming "a quarter of the page is
+a quarter of the time" will be wrong.
+
+**An attempt to measure this on 2026-09-17 failed** — a standalone worker driven
+from the page console would not load the document, probably the signed-URL
+session. The measurement is therefore the phase's first task, done through the
+app rather than around it.
+
+### Panning
+
+Panning changes the visible region exactly as zooming does, so it uses the same
+path: the stretched bitmap moves instantly, and a new sharp region is requested
+once movement stops.
+
+**Render the viewport plus a margin**, so a small nudge is already covered and
+does not trigger a fresh render. A render is only requested when the view leaves
+what the current bitmap covers.
+
+**Requests must be cancellable and coalesced.** A drag produces a stream of
+positions, and every one of them starting a 3-second render would queue a minute
+of work for a view nobody is looking at any more. Latest-wins, with a settle
+delay.
+
+### This IS the AI tiling machinery — build it once
+
+Phase 10 needs exactly this: render a region of a page at high resolution.
+Tiling a sheet for the reader is the same call in a loop with different
+rectangles.
+
+**So the worker's contract should be a REGION, not a viewport.** Take
+`{ pageNum, scale, rect }` and return a bitmap. The viewer asks for the region a
+person is looking at; the tiler asks for a grid of them. Neither knows about the
+other.
+
+Written down because the tempting shortcut — teaching the worker about "the
+current view" — would make it useless to the tiler and force the work twice.
+
+### snapshotPage must be updated in the same change
+
+Flagged in Phase 1 (`TakeoffPage.tsx`, the `renderScale` note) and **confirmed
+as handled here**.
+
+`snapshotPage(canvas, RENDER_SCALE)` is called in **two places** — `runReader`
+and the co-pilot's `onAsk` — both passing the constant. It divides
+`canvas.width` by that scale to report the page's size in points. The moment
+resolution stops being fixed, passing a stale constant tells the reader the
+wrong size for the image it is given, and **every proposed stamp lands in the
+wrong place**.
+
+Safe today only because the value is pinned. Both call sites take the scale the
+page was ACTUALLY drawn at.
+
+**Better still: stop passing it separately.** The scale a bitmap was rendered at
+should travel WITH the bitmap, so the two cannot disagree — a constant that has
+to be kept in step by hand is the bug waiting to happen, and it has already been
+noted once.
+
+## 4a. Phase 4 — the layout. PROPOSAL, not yet approved
+
+**The whole point of this phase is that the drawing gets much bigger.**
+Everything below serves that and nothing else.
+
+### What it is today, measured
+
+|                      | Pixels        | Share of a 1536×791 screen |
+| -------------------- | ------------- | -------------------------- |
+| Whole window         | 1536 × 791    | 100%                       |
+| **Drawing viewport** | **827 × 646** | **44%**                    |
+
+The drawing — the reason the screen exists — gets **under half the screen**,
+with a 240px document column on the left, a 400px work pane on the right, a
+pager row, and a tool bar along the bottom.
+
+**With both side panels collapsed and the tools in one top bar: 1472 × 681,
+83% of the screen — 88% more drawing.** That is the prize.
+
+### The shape
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ ← Bid   [E1.01 ▾] ‹ ›   tools…            zoom   scale   ⇤ ⇥ │  one top bar
+├───────┬──────────────────────────────────────────────┬───────┤
+│ sheets│                                              │ work  │
+│ (◂)   │              THE DRAWING                     │ (▸)   │
+│       │                                              │       │
+└───────┴──────────────────────────────────────────────┴───────┘
+```
+
+**One top bar, replacing the pager row AND the bottom bar.** Tools where the
+old tool had them. Removing the bottom bar alone gives back 41px of height
+across the full width, and it is the bar that was clipping.
+
+### The sheet list stays on the LEFT, and here is why
+
+Moving it to the top was considered and rejected. Sheet names are long —
+`E1.01 POWER PLAN — LEVEL 2` — so horizontal chips either truncate to
+uselessness or eat the width the tools need. A 40-sheet set scrolled sideways
+is worse than the same set scrolled down, and a vertical list shows fifteen
+names at once where a horizontal strip shows four.
+
+**So: keep it vertical and collapsible, and make it unnecessary to keep open.**
+The top bar always carries a **sheet chip** — current sheet name, prev/next
+arrows, and a click that drops the full list down. Collapsing the panel
+therefore costs nothing: the sheet you are on is always named, and moving one
+sheet either way is always one click.
+
+**Plus a thumbnail grid** behind that chip, for "which sheet had the panel
+schedule on it" — the question a list of names answers badly and a page of
+pictures answers instantly. The deleted PlanPanel had this and it was right.
+
+**The thumbnails must be big enough to recognise a sheet by its SHAPE.** On a
+40-sheet set the names all blur together — `E2.01 POWER PLAN — LEVEL 2` against
+`E2.02 POWER PLAN — LEVEL 3` — but a panel schedule looks nothing like a floor
+plan, and a riser diagram looks like neither. Shape is what people actually
+navigate by, so a postage-stamp grid would waste the whole idea. Fewer, larger
+thumbnails beat more, smaller ones.
+
+### Collapsing
+
+**A chevron tab on each panel's inner edge**, always visible, pointing the way
+it will move. Not a menu item, not a keyboard-only affordance: the control has
+to be on the thing it controls, or nobody finds it.
+
+State is remembered per user. Collapsing is the common case on a laptop, so it
+must not need redoing every time a bid opens.
+
+**A NEW user starts with both panels OPEN.** Remembering the choice is right;
+defaulting to the collapsed end of it is not. Someone seeing this screen for the
+first time has to be shown what is there before they can decide to hide it, and
+a first impression of a bare drawing with two chevrons teaches nothing about
+sheets, layers, the legend or the counted-items list. Hiding is a thing you
+learn once you know what you are hiding.
+
+### The no-scale notice becomes a status chip
+
+Out of the drawing entirely, into the top bar beside the zoom: either the scale
+itself (`1/4" = 1'-0"`) or **`No scale` with a `Set scale` button right next to
+it**. Status and its remedy in the same place, permanently, rather than a panel
+that appears over the work and has to be dismissed.
+
+### Focus mode: yes, and it is one key
+
+Both panels collapsed, top bar only. Worth having as its OWN control rather
+than "collapse two things", because mid-takeoff the point is to get maximum
+drawing without hunting for two separate chevrons — and to get it all back the
+same way. One key on, same key off.
+
+### Not in this phase
+
+Sharp re-render is Phase 3 and lands first. Tablet and touch stay at Phase 11 —
+this is laptop and desktop only.
+
+## 4c. Typed-length runs — draw the path, type the length
+
+**Proposed 2026-09-17. Recommended as Phase 3a, and it may deserve to jump the
+queue — see below.**
+
+Draw the polyline to show WHERE the conduit goes, then type `60 ft` because you
+know the pull. The line records the route; the number comes from the estimator,
+not the geometry.
+
+### Why this matters more than it sounds
+
+Today a sheet with no usable scale means **conduit cannot be counted at all**,
+and that is not an edge case:
+
+- **Riser diagrams** — never to scale, and full of conduit.
+- **Detail blow-ups** — drawn at a different scale from the sheet around them,
+  so the sheet's own ratio measures them wrong.
+- **A homerun** where the plan shows the path and the estimator knows the length.
+- **One-line diagrams.**
+
+Calibration (Phase 2) fixes a sheet whose scale is merely _unstated_. It cannot
+fix a sheet that **has no single scale**, and a riser never will.
+
+### What it takes
+
+**One nullable column**, `takeoff_runs.typedLengthInches`. Null means "measured
+from the points", which is today's behaviour and needs no backfill. Non-null
+means the estimator supplied it and the geometry is decoration.
+
+This is necessary rather than avoidable: `lengthInches` is documented as
+_"Cached from the points at save time. Recomputed on read"_, so a typed value
+stored there would be silently overwritten the next time anything recalculated.
+
+**`shared/takeoffQuantities.ts`** — `runFeet` returns the typed length when
+there is one, without consulting the ratio. Everything downstream (conduit,
+cable, wire per conductor, allowances, verticals) is unchanged, because they all
+take a length and do not care where it came from.
+
+**The gate changes meaning, and this is the real win.** Tracing is currently
+disabled outright on an unscaled sheet. It becomes available with the condition
+attached: _you can draw this, you will just have to type the length._ The tool
+stops being absent and starts being conditional.
+
+**UI**: after drawing, "or type the length" beside the measured figure; on an
+existing run, the ability to switch. A typed run must be **visibly** typed
+wherever its footage appears, for the same reason a short-span calibration is
+marked — a number the estimator supplied and a number the app measured are
+different kinds of fact and should not look identical.
+
+### Where it belongs
+
+**Phase 3a, sharing ONE migration with the short-span marker.** Both are small
+nullable additions, and a migration needs a manual production step — so two of
+them is two chances to forget, for no benefit.
+
+**It may deserve to go first.** It is independent of the rendering work
+entirely, it is mostly UI because the maths is maths being SKIPPED, and it
+unblocks real work today. If the Phase 3 measurement comes back badly — if
+parsing rather than painting is the cost, and region rendering saves little —
+then Phase 3 needs rethinking and this is ready to go in the meantime.
+
+## 4d. Photos and sketches as plans — IDEA ONLY, not scheduled
+
+Let the uploader take a photo or an image, not only a PDF. A hand sketch, or a
+phone photo of one: count lights and outlets on it, draw runs on it. Mostly
+smaller residential work.
+
+**The scale problem is already solved.** A sketch states no scale, but if the
+estimator knows one wall is 12 feet they click it and everything measures.
+That is Phase 2, built.
+
+### The real catch: a photo is not flat
+
+**A page shot at an angle does not have one scale.** Perspective makes the near
+edge larger than the far edge, so calibrating on the left makes the right read
+long. A flatbed scan is fine. A casual snapshot is not.
+
+**And the span rating cannot catch this.** `assessSpan` rates how much a click
+slip matters; it assumes a single linear mapping across the whole image, which
+is exactly the assumption perspective breaks. A photo can produce a "good span"
+calibration that is confidently wrong everywhere except where it was measured.
+
+**But the VERIFY step would catch it**, and this is the argument for building
+that first: calibrate on one known distance, then check against another
+somewhere else on the image. On a flat scan the two agree. On an angled photo
+they disagree, and by how much and in which direction says how badly it is
+skewed. The feature the estimator wanted for confidence turns out to be the
+detector for this.
+
+So: flag an image that looks angled rather than measuring it silently, and lean
+on verification rather than trying to judge the photo itself.
+
+**Hand sketches are usually COUNTED rather than measured anyway**, which means a
+useful first version could ship with counting only and measuring withheld until
+verification exists.
+
 ## 5a. MEASURE HONEST, PAD VISIBLY
 
 **The governing rule for every number this screen produces.** Decided
