@@ -740,6 +740,114 @@ on verification rather than trying to judge the photo itself.
 useful first version could ship with counting only and measuring withheld until
 verification exists.
 
+### Can an angled photo be detected? Honestly: not reliably
+
+Three approaches, and all of them fail in the cases this feature is for:
+
+- **Find the page's four corners** and check for a rectangle rather than a
+  trapezoid. Works for a whole sheet on a contrasting surface. Fails on a
+  close-up of part of a plan, a sheet on a similar-coloured desk, or a sketch on
+  a page with no clean border.
+- **Find long straight lines and test whether parallels converge.** Convergence
+  means perspective. But a hand sketch has no straight lines worth the name, and
+  a real drawing legitimately contains converging lines — an isometric or a
+  one-line diagram would trip it constantly.
+- **EXIF.** Phones record their own orientation, not the angle to the subject.
+  Useless here.
+
+So a detector would be right most of the time on a number that **multiplies into
+every measurement on the sheet** — which is the same shape as conduit fill
+checking, and gets the same answer. **Do not build a detector that is usually
+right.** 95% right is worse than absent once somebody starts trusting it.
+
+**Instead: warn once, plainly, on every photo upload.** Something to the effect
+of _measuring on a photo is only as good as how square the photo is; a scan is
+fine, a snapshot taken at an angle will read long on one side._ One clear
+sentence, every time, no cleverness.
+
+**And lean on verification, which is a measurement rather than a guess.**
+Calibrate on one known distance, check against another elsewhere in the image.
+Flat scan: they agree. Angled photo: they disagree, and the size and direction
+of the disagreement says how badly. The estimator performs it deliberately and
+reads a real result, instead of the app guessing on their behalf.
+
+### Formats, and the HEIC problem
+
+**JPG and PNG are straightforward.** HEIC is not: iPhones shoot it by default
+and Chrome, Firefox and Edge will not display it.
+
+**The good news is that the common path already avoids it.** Picking a photo
+through a file input on iOS Safari usually hands over a JPEG, because iOS
+converts on the way out. HEIC mostly arrives when someone AirDrops the original
+to a desktop and uploads it from there.
+
+**So v1: detect HEIC and refuse it precisely.** Sniff the magic bytes
+(`ftypheic`, `ftypheix`, `ftypmif1`) rather than trusting the extension, and say
+exactly what to do — open it and share as JPEG, or set Settings → Camera →
+Formats → Most Compatible. A named problem with a named fix beats a file that
+uploads and then will not display.
+
+**Converting HEIC server-side is the piece most likely to cost more than it is
+worth.** Native `libheif` is a deployment dependency on a platform where the
+build is already delicate; a wasm decoder avoids that but is slow and wants the
+whole image in memory, which runs straight into the rule that nothing on the
+file path may buffer a whole file. Worth revisiting only if refusal turns out to
+be a real irritation in practice.
+
+### The four questions, for both ideas
+
+**1. Where in the order?**
+
+- **Typed-length runs: Phase 3a**, possibly jumping ahead — see § 4c.
+- **Photos: Phase 12, after touch.** It is a new INPUT type, and the viewer it
+  would be viewed in is still being rebuilt. Adding a second kind of document
+  mid-rebuild means doing the layout, the rendering and the tiling work twice.
+
+**2. Database changes?**
+
+- **Typed lengths: yes** — one nullable `takeoff_runs.typedLengthInches`.
+- **Photos: yes, but small** — one column on `bid_pdfs` saying what kind of
+  document it is. Everything else is untouched, which is the next answer.
+
+**3. Does an image share the sheet and stamp model? YES, and not as a fudge.**
+
+The model already fits, because nothing downstream knows what a "page point"
+physically is. For a PDF it happens to be 1/72 inch of paper. For an image it
+can simply be one image pixel — and **calibration establishes the ratio
+empirically either way**, which is exactly what it was built to do.
+
+So an image is a one-page document. `bid_pdf_sheets`, `takeoff_stamps` and
+`takeoff_runs` are unchanged, and every tool built for PDFs works on it. Only
+two things differ, and both are at the very bottom:
+
+- **Rendering** — decode an image instead of asking pdf.js for a page.
+- **Scale detection from text** — does not apply, and falls straight through to
+  "no scale set", which is already a handled state.
+
+**One path is the honest answer here, not the convenient one.**
+
+**The table stays called `bid_pdfs`.** It will hold images too, and renaming it
+is churn on a table referenced by every stamp and run — the same reasoning that
+keeps the `/manus-storage` route. Noted so nobody later "tidies" it.
+
+**4. What is a bad idea, said now**
+
+- **Automatic perspective correction — no.** De-skewing a photo is a real
+  computer-vision problem, and a half-corrected image is worse than an
+  uncorrected one the user was warned about, because the warning stops applying.
+- **HEIC conversion in v1 — no**, per above.
+- **Measuring on photos in v1 — hold it back.** Counting is safe and is most of
+  the value for a sketch. Measuring should wait for verification to exist, so
+  there is a way to find out whether the image is flat.
+- **On typed lengths, one real hazard:** the drawn line becomes decoration, and
+  `lengthInches` is documented as recomputed on read. Something will eventually
+  "helpfully" recompute a typed run from its geometry and silently replace a
+  number the estimator typed. **That must be guarded in the code, not only
+  here** — a test that fails if a typed length is ever overwritten.
+- **And typed runs must look different from measured ones** wherever their
+  footage appears. A number the estimator supplied and a number the app measured
+  are different kinds of fact.
+
 ## 5a. MEASURE HONEST, PAD VISIBLY
 
 **The governing rule for every number this screen produces.** Decided
