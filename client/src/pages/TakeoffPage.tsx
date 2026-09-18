@@ -82,6 +82,7 @@ import {
   type ViewBounds,
 } from "@/lib/planView";
 import { SheetIndex } from "@/components/takeoff/SheetIndex";
+import { StampPicker } from "@/components/takeoff/StampPicker";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
 import { UploadProgress } from "@/components/takeoff/UploadProgress";
 import { describePlanRemoval } from "@shared/planRemoval";
@@ -406,16 +407,28 @@ function PlanPane({
     if (bounds) setView(fitView(bounds));
   }, [readBounds]);
 
+  /** The page this view was last fitted for, as `docId:page`. */
+  const fittedFor = useRef<string | null>(null);
+
   /**
-   * Fit whenever a different page is drawn.
+   * Fit once per page, on arrival.
    *
-   * Keyed on the canvas size rather than the page number, because that is what
-   * actually changes when a new raster lands — and a sheet of a different size
-   * needs a different fit, which a page number would not tell us.
+   * Keyed on the DOCUMENT AND PAGE, not on the canvas size. Keying on size was
+   * the obvious choice and was wrong in the ordinary case: every sheet in a
+   * drawing set is usually the same size, so the size never changed, the effect
+   * never re-fired, and flipping pages carried the previous zoom and pan across
+   * — landing the reader somewhere arbitrary on a sheet they have not seen.
+   *
+   * Still waits for a raster, because fitting needs the sheet's dimensions. The
+   * ref is what stops a re-render refitting a page the user has since zoomed.
    */
   useEffect(() => {
+    if (canvasSize.width === 0) return;
+    const key = `${doc.id}:${page}`;
+    if (fittedFor.current === key) return;
+    fittedFor.current = key;
     fitToView();
-  }, [canvasSize.width, canvasSize.height, fitToView]);
+  }, [doc.id, page, canvasSize.width, canvasSize.height, fitToView]);
 
   /** Re-clamp when the pane is resized, so a drag cannot strand the sheet. */
   useEffect(() => {
@@ -1186,6 +1199,21 @@ export default function TakeoffPage({
     { enabled: Boolean(activeSheet) }
   );
   const { data: totals } = trpc.takeoffRuns.totals.useQuery({ bidId });
+
+  /**
+   * Why tracing is off, in the words a disabled button needs.
+   *
+   * Null when tracing is available. Says "no scale set" rather than naming
+   * calibration, because calibration does not exist yet — this wants revisiting
+   * when it does, since there will then be two ways out rather than one.
+   */
+  const traceBlockedReason = useMemo(() => {
+    if (!measurability) return "Checking this sheet…";
+    if (measurability.ok) return null;
+    return measurability.reason === "not-to-scale"
+      ? "This sheet is marked not to scale — set a scale by hand to trace on it"
+      : "No scale set for this sheet — set one below before tracing";
+  }, [measurability]);
 
   const refreshRuns = useCallback(() => {
     if (activeSheet)
@@ -2513,13 +2541,29 @@ export default function TakeoffPage({
                       {/* Tracing is offered only when the sheet can actually
                           be measured — an enabled tool that produces no number
                           teaches people the app is broken. */}
-                      {measurability?.ok && !tracing && (
+                      {/*
+                        Always rendered, disabled with a reason when the sheet
+                        cannot be measured.
+
+                        Hiding them was worse than it sounds: on an unscaled
+                        sheet the screen offered NO tool at all, and a tool that
+                        is not on screen does not read as unavailable, it reads
+                        as non-existent. A disabled control with a reason at
+                        least tells the user what to go and fix.
+
+                        The wording says "no scale set" today. Once two-point
+                        calibration exists it should mention calibrating too,
+                        since there will be a second way out.
+                      */}
+                      {!tracing && (
                         <>
                           <Button
                             size="sm"
                             variant="outline"
                             className="h-7 gap-1.5 text-xs"
                             onClick={() => startTracing("conduit")}
+                            disabled={!measurability?.ok}
+                            title={traceBlockedReason ?? "Trace a conduit run"}
                           >
                             <Zap className="w-3.5 h-3.5 text-[#F5C518]" /> Trace
                             conduit
@@ -2529,10 +2573,34 @@ export default function TakeoffPage({
                             variant="outline"
                             className="h-7 gap-1.5 text-xs"
                             onClick={() => startTracing("cable")}
+                            disabled={!measurability?.ok}
+                            title={traceBlockedReason ?? "Trace a cable run"}
                           >
                             <Cable className="w-3.5 h-3.5 text-emerald-400" />{" "}
                             Trace cable
                           </Button>
+
+                          {/* Counting needs no scale, so this is never gated on
+                              one — see StampPicker. */}
+                          {!stampAssembly && (
+                            <StampPicker
+                              assemblies={allAssemblies.map(a => ({
+                                id: a.id,
+                                name: a.name,
+                                category: a.category ?? null,
+                              }))}
+                              disabled={allAssemblies.length === 0}
+                              onPick={assembly => {
+                                setStampAssembly({
+                                  id: assembly.id,
+                                  name: assembly.name,
+                                });
+                                toast.success(
+                                  `Stamping ${assembly.name} — click to place.`
+                                );
+                              }}
+                            />
+                          )}
                           <div className="w-px h-4 bg-border" />
                         </>
                       )}
