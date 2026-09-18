@@ -228,13 +228,28 @@ export const REGION_MARGIN = 0.15;
 export const REGION_SETTLE_MS = 150;
 
 /**
- * Render scales are rounded up to a multiple of this.
+ * How far the scale a bitmap was drawn at may sit from the scale wanted now
+ * before it is redrawn, as a fraction.
  *
- * Without it, a one-notch wheel zoom would change the wanted scale by a few
- * percent and invalidate a perfectly good bitmap. Rounding UP — never down —
- * keeps the picture at least as sharp as asked for.
+ * **This replaced rounding the scale up to a 0.25 step, and the reason was
+ * measured rather than reasoned.** The step looked free: it kept a one-notch
+ * wheel zoom from throwing away a perfectly good bitmap, and rounding UP meant
+ * the picture was never coarser than asked for. But a bitmap DENSER than the
+ * screen displays it is not sharper — the browser resamples it down, and a
+ * one-pixel hairline resampled by a few percent turns grey. Measured live at
+ * 97% zoom on a DPR-2 screen: the wanted scale was 2.91, the step gave 3.0,
+ * and the patch was displayed at **1.0335 bitmap pixels per device pixel**.
+ * Every line on the drawing softly resampled, on the one layer whose entire
+ * job is to be sharp.
+ *
+ * So the scale asked for is exact now, and a bitmap counts as good only while
+ * it is within this tolerance EITHER WAY. The tolerance exists so floating
+ * point noise cannot make a region fail to match itself; it is deliberately
+ * far tighter than a wheel notch, because a region render costs 25–96ms
+ * (references/plan-viewer-overhaul.md § 4b) and a soft drawing costs the
+ * estimator a miscount.
  */
-export const SHARP_SCALE_STEP = 0.25;
+export const SHARP_SCALE_TOLERANCE = 0.005;
 
 /**
  * The part of the page on screen right now, in page points, grown by a margin.
@@ -287,16 +302,43 @@ export function visibleRegion(
  * which doubles the scale needed for the same zoom — and it is why 260% looked
  * soft on the machine this was measured on while the arithmetic for a DPR-1
  * screen said it should have been fine.
+ *
+ * **Exact, never rounded.** Asking for more resolution than the screen can
+ * show is not free insurance: the browser resamples the surplus away and the
+ * drawing goes soft in the other direction. See `SHARP_SCALE_TOLERANCE`.
  */
 export function sharpRenderScale(
   baseScale: number,
   zoom: number,
-  devicePixelRatio: number,
-  step = SHARP_SCALE_STEP
+  devicePixelRatio: number
 ): number {
   const wanted = baseScale * zoom * devicePixelRatio;
   if (!Number.isFinite(wanted) || wanted <= 0) return 0;
-  return Math.ceil(wanted / step) * step;
+  return wanted;
+}
+
+/**
+ * Put a length in the untransformed drawing space onto a whole device pixel.
+ *
+ * `perDrawingPixel` is how many device pixels one unit of that space becomes
+ * on screen — `zoom * devicePixelRatio` for anything inside the viewer's
+ * single transform.
+ *
+ * **A bitmap drawn at exactly screen resolution is still resampled if its EDGE
+ * falls between two device pixels.** Getting the scale right is half of 1:1;
+ * getting the offset whole is the other half, and it is the half that is easy
+ * to miss because all the arithmetic looks correct without it. Moving the
+ * sharp patch by up to half a device pixel to land it on the grid is
+ * invisible — it is a fraction of one screen pixel — and it is the difference
+ * between a crisp line and a grey one.
+ */
+export function snapToDevicePixel(
+  value: number,
+  perDrawingPixel: number
+): number {
+  if (!Number.isFinite(value)) return 0;
+  if (!Number.isFinite(perDrawingPixel) || perDrawingPixel <= 0) return value;
+  return Math.round(value * perDrawingPixel) / perDrawingPixel;
 }
 
 /**
@@ -326,15 +368,25 @@ export function wantedRegion(
  *
  * Both halves matter: a bitmap that covers the view but was drawn for half
  * this zoom is soft, and one drawn sharply enough for a view 3,000 points
- * away is not on screen. The scale test allows a little slack so that
- * quantising cannot leave a request perpetually one ULP short of its own
- * answer.
+ * away is not on screen.
+ *
+ * **The scale test is two-sided**, which it was not. It used to accept
+ * anything at least as sharp as wanted, and that quietly left an over-dense
+ * bitmap on screen being resampled down — soft, for the opposite reason.
+ * See `SHARP_SCALE_TOLERANCE`.
+ *
+ * `have` is the last ASK, never the bitmap that came back. The worker is
+ * allowed to hand back a coarser scale than it was given when the budget says
+ * so, and comparing against that would ask for the same impossible render for
+ * ever.
  */
 export function regionStillGood(
   have: { rect: PageRect; scale: number } | null,
-  want: { rect: PageRect; scale: number }
+  want: { rect: PageRect; scale: number },
+  tolerance = SHARP_SCALE_TOLERANCE
 ): boolean {
   if (!have) return false;
-  if (have.scale < want.scale - 1e-6) return false;
+  if (!(have.scale > 0) || !(want.scale > 0)) return false;
+  if (Math.abs(have.scale / want.scale - 1) > tolerance) return false;
   return containsRegion(have.rect, want.rect);
 }

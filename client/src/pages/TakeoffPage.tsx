@@ -41,6 +41,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { trpc } from "@/lib/trpc";
 import { useCompany } from "@/hooks/useCompany";
 import { toast } from "sonner";
@@ -58,17 +59,14 @@ import {
   Spline,
   Ruler,
   Maximize2,
+  Minimize2,
   Minus,
   Trash2,
+  TriangleAlert,
   Upload,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,6 +84,7 @@ import {
   fitView,
   formatZoom,
   regionStillGood,
+  snapToDevicePixel,
   wantedRegion,
   wheelZoomFactor,
   zoomAbout,
@@ -93,6 +92,20 @@ import {
   type ViewBounds,
 } from "@/lib/planView";
 import { SheetIndex } from "@/components/takeoff/SheetIndex";
+import { SheetChip } from "@/components/takeoff/SheetChip";
+import { SidePanel } from "@/components/takeoff/SidePanel";
+import {
+  PANELS_DEFAULT,
+  PANELS_STORAGE_KEY,
+  PANEL_LIMITS,
+  isFocusMode,
+  parsePanelState,
+  serialisePanelState,
+  setPanelWidth,
+  toggleFocus,
+  togglePanel,
+  type PanelState,
+} from "@/lib/takeoffPanels";
 import { StampPicker } from "@/components/takeoff/StampPicker";
 import { CalibrateLayer } from "@/components/takeoff/CalibrateLayer";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
@@ -364,9 +377,17 @@ function usePdfWorker() {
         // Never let a reduced scale pass unmentioned. A drawing that is quietly
         // softer than it was asked to be is exactly the kind of thing nobody
         // notices until they are measuring off it.
+        // Never let a reduced scale pass unmentioned, and say what it COSTS
+        // rather than only what it was: a bitmap drawn at 0.61 of the asked
+        // resolution is displayed stretched by 1/0.61, and "soft" is the only
+        // thing the user will notice about it.
         const cut =
           result.scale < scale - 1e-6
-            ? ` — ASKED ${scale}x, CUT TO ${result.scale.toFixed(2)}x to fit`
+            ? ` — ASKED ${scale.toFixed(2)}x, CUT TO ${result.scale.toFixed(
+                2
+              )}x to fit, so this patch is ${(scale / result.scale).toFixed(
+                2
+              )}x softer than the screen`
             : "";
         const where =
           rect === undefined
@@ -377,7 +398,9 @@ function usePdfWorker() {
                 result.rect.y
               )}`;
         console.info(
-          `[plan] page ${pageNum} ${where} at ${result.scale}x — ${ms}ms, ` +
+          `[plan] page ${pageNum} ${where} at ${result.scale.toFixed(
+            2
+          )}x — ${ms}ms, ` +
             `${bitmap.width}x${bitmap.height} (${mp.toFixed(1)} Mpx, ` +
             `${Math.round((mp * 4e6) / 1048576)} MB)${cut}`
         );
@@ -410,6 +433,44 @@ function usePdfWorker() {
 const RENDER_SCALE = 1.5;
 
 /**
+ * How wide a sheet thumbnail is drawn, in pixels.
+ *
+ * Generously sized on purpose. The grid shows them about 160 CSS pixels wide,
+ * and on a DPR-2 screen that is 320 device pixels — a thumbnail drawn at 160
+ * would be visibly mushy on exactly the machines this app is used on. The
+ * point of the grid is recognising a sheet by its SHAPE, and a blurred shape
+ * is no shape.
+ */
+const THUMBNAIL_PIXELS = 360;
+
+/**
+ * How many device pixels one CSS pixel is, kept current.
+ *
+ * Read once and cached it would be wrong for the rest of the session the
+ * moment a laptop is plugged into an external monitor or the browser's own
+ * zoom is changed — both of which change devicePixelRatio, and both of which
+ * are ordinary things to do mid-takeoff. A stale value makes every sharp
+ * render ask for the wrong resolution, which is invisible except that the
+ * drawing is soft.
+ *
+ * The media query is the only event browsers give for this. It matches only
+ * the CURRENT ratio, so it has to be re-armed after each change.
+ */
+function useDevicePixelRatio(): number {
+  const [dpr, setDpr] = useState(() =>
+    typeof window === "undefined" ? 1 : window.devicePixelRatio || 1
+  );
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const query = window.matchMedia(`(resolution: ${dpr}dppx)`);
+    const onChange = () => setDpr(window.devicePixelRatio || 1);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, [dpr]);
+  return dpr;
+}
+
+/**
  * Storage refused the plan's URL, which almost always means it simply aged out.
  *
  * Carries the same message the plain failure would, so if the retry does not
@@ -433,9 +494,28 @@ function PlanPane({
   onPageRendered,
   overlay,
   onUrlExpired,
+  controlsTarget,
+  drawThumbnails,
+  onThumbnail,
 }: {
   doc: Document;
   page: number;
+  /**
+   * Where this pane's own zoom controls go — the one top bar.
+   *
+   * Null keeps them in a strip of their own, so the component still works on
+   * its own and a bar that has not mounted yet does not swallow the controls.
+   */
+  controlsTarget?: HTMLElement | null;
+  /**
+   * Draw a thumbnail of every sheet, one at a time, while this is true.
+   *
+   * Gated rather than eager because the worker draws one thing at a time: a
+   * grid rendered in the background would queue itself in front of the sharp
+   * patch for the sheet somebody is reading. See SheetChip.
+   */
+  drawThumbnails?: boolean;
+  onThumbnail?: (pageNumber: number, dataUrl: string) => void;
   onPageCount: (pageCount: number) => void;
   onPage: (page: number) => void;
   /** Fires once per document, with the page count and outline. */
@@ -514,6 +594,17 @@ function PlanPane({
     key: string;
     rect: PageRect;
     scale: number;
+    /**
+     * The bitmap's own pixel size, which is what the patch is SIZED from.
+     *
+     * Not the same as `rect.width * scale`: the worker rounds a region's pixel
+     * size up to whole pixels, and a canvas displayed a fraction of a pixel
+     * narrower than its own bitmap is resampled — the exact softness this
+     * layer exists to remove. Sizing from the bitmap makes the ratio exactly
+     * one; the geometric error left over is under half a device pixel.
+     */
+    bitmapWidth: number;
+    bitmapHeight: number;
   } | null>(null);
   const sharpCanvasRef = useRef<HTMLCanvasElement | null>(null);
   /**
@@ -526,6 +617,7 @@ function PlanPane({
    */
   const pendingSharp = useRef<ImageBitmap | null>(null);
 
+  const dpr = useDevicePixelRatio();
   const { load, loadUrl, render, outline, pageText } = usePdfWorker();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -553,9 +645,38 @@ function PlanPane({
     };
   }, [canvasSize.width, canvasSize.height]);
 
+  /**
+   * True while the view is still exactly the one fit last produced.
+   *
+   * The moment the user zooms or pans it goes false and stays false until the
+   * next fit — which is what makes re-fitting on a resize safe. Re-fitting a
+   * view somebody has aimed would throw their position away every time a
+   * panel opened.
+   */
+  const viewIsFitted = useRef(true);
+
+  /**
+   * Set the view because the USER aimed it — a wheel, a drag, a zoom button.
+   *
+   * Everything that moves the view on the user's behalf goes through here, so
+   * that "is this still a fit?" is answered by one fact rather than by
+   * comparing numbers after the event. Fit itself, the page-flip fit and the
+   * resize handler set the view directly, because they are the ones deciding
+   * what the flag should say.
+   */
+  const aimView = useCallback(
+    (next: PlanView | ((current: PlanView) => PlanView)) => {
+      viewIsFitted.current = false;
+      setView(next);
+    },
+    []
+  );
+
   const fitToView = useCallback(() => {
     const bounds = readBounds();
-    if (bounds) setView(fitView(bounds));
+    if (!bounds) return;
+    viewIsFitted.current = true;
+    setView(fitView(bounds));
   }, [readBounds]);
 
   /** The page this view was last fitted for, as `docId:page`. */
@@ -581,13 +702,36 @@ function PlanPane({
     fitToView();
   }, [doc.id, page, canvasSize.width, canvasSize.height, fitToView]);
 
-  /** Re-clamp when the pane is resized, so a drag cannot strand the sheet. */
+  /**
+   * The pane changed size — re-fit if the view was a fit, otherwise re-clamp.
+   *
+   * **Re-clamping alone was not enough, and the symptom did not look like a
+   * fit bug.** `clampView` only pulls the offsets back inside the sheet; it
+   * cannot make a sheet smaller. So a fit computed against a wider pane
+   * survived the pane getting narrower, and the drawing carried on being
+   * drawn at the old zoom — running off its own pane and disappearing behind
+   * whatever is beside it, cut off mid-column with nothing to say the rest was
+   * still there. It reads as the panel covering the drawing rather than as a
+   * stale zoom, which is why it went unexplained.
+   *
+   * It happens on both axes and for ordinary reasons: collapsing or opening a
+   * side panel, dragging the split, the window being resized, and the tool bar
+   * wrapping to a second line as controls are added.
+   *
+   * Only while the view is still the fitted one. Somebody who has zoomed in
+   * has chosen where they are looking, and a resize must not take it away.
+   */
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => {
       const bounds = readBounds();
-      if (bounds) setView(current => clampView(current, bounds));
+      if (!bounds) return;
+      if (viewIsFitted.current) {
+        setView(fitView(bounds));
+        return;
+      }
+      setView(current => clampView(current, bounds));
     });
     observer.observe(vp);
     return () => observer.disconnect();
@@ -608,27 +752,27 @@ function PlanPane({
       e.preventDefault();
       const rect = vp.getBoundingClientRect();
       const anchor = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-      setView(current =>
+      aimView(current =>
         zoomAbout(current, bounds, wheelZoomFactor(e.deltaY), anchor)
       );
     };
     vp.addEventListener("wheel", onWheel, { passive: false });
     return () => vp.removeEventListener("wheel", onWheel);
-  }, [readBounds]);
+  }, [readBounds, aimView]);
 
   /** Zoom a step about the middle of the viewport, for the buttons and keys. */
   const zoomByStep = useCallback(
     (factor: number) => {
       const bounds = readBounds();
       if (!bounds) return;
-      setView(current =>
+      aimView(current =>
         zoomAbout(current, bounds, factor, {
           x: bounds.viewportWidth / 2,
           y: bounds.viewportHeight / 2,
         })
       );
     },
-    [readBounds]
+    [readBounds, aimView]
   );
 
   /**
@@ -762,7 +906,7 @@ function PlanPane({
       const from = panFrom.current;
       const bounds = readBounds();
       if (!from || !bounds) return;
-      setView(
+      aimView(
         clampView(
           {
             zoom: from.view.zoom,
@@ -785,7 +929,7 @@ function PlanPane({
       window.removeEventListener("pointerup", end);
       window.removeEventListener("pointercancel", end);
     };
-  }, [panning, readBounds]);
+  }, [panning, readBounds, aimView]);
   const [pageCount, setPageCount] = useState(doc.pageCount ?? 0);
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
@@ -977,13 +1121,9 @@ function PlanPane({
       const bounds = readBounds();
       if (!bounds) return;
       // devicePixelRatio is not decoration: on a Retina or 4K laptop it is 2,
-      // which doubles the resolution the same zoom needs.
-      const want = wantedRegion(
-        view,
-        bounds,
-        drawnScale,
-        window.devicePixelRatio || 1
-      );
+      // which doubles the resolution the same zoom needs. Read from the hook
+      // rather than from window, so plugging in a monitor re-runs this.
+      const want = wantedRegion(view, bounds, drawnScale, dpr);
       setAsk(current => {
         // Zoomed back out far enough that the backdrop is already sharper than
         // the screen shows it — there is nothing to add.
@@ -1001,6 +1141,7 @@ function PlanPane({
     canvasSize.width,
     canvasSize.height,
     drawnScale,
+    dpr,
     readBounds,
     loading,
     error,
@@ -1028,7 +1169,13 @@ function PlanPane({
         if (cancelled) return bitmap.close();
         pendingSharp.current?.close();
         pendingSharp.current = bitmap;
-        setSharp({ key: ask.key, rect, scale });
+        setSharp({
+          key: ask.key,
+          rect,
+          scale,
+          bitmapWidth: bitmap.width,
+          bitmapHeight: bitmap.height,
+        });
       })
       .catch(() => {
         // A region that will not draw is not worth an error screen. The
@@ -1061,6 +1208,86 @@ function PlanPane({
       pendingSharp.current = null;
     };
   }, []);
+
+  /**
+   * ── Thumbnails ────────────────────────────────────────────────────────────
+   *
+   * One small render per sheet, in page order, and ONLY while somebody has the
+   * grid open. The worker is a single queue, so a background pass over a
+   * 40-sheet set would sit in front of the sharp patch for the sheet being
+   * read — the user would see the drawing go soft every time they opened the
+   * sheet picker, which is a strange thing for a picker to do.
+   *
+   * Sequential rather than parallel for the same reason, and because the
+   * pictures are worth more early than all at once: the grid fills in from the
+   * top while it is being looked at.
+   *
+   * `done` is a ref, not state — it is a record of what has been paid for, and
+   * putting it in state would restart this effect on every arrival.
+   */
+  const thumbnailsDone = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    thumbnailsDone.current = new Set();
+  }, [hash]);
+
+  useEffect(() => {
+    if (!drawThumbnails || !onThumbnail) return;
+    if (loading || error || pageCount === 0) return;
+    let cancelled = false;
+
+    (async () => {
+      for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
+        if (cancelled) return;
+        if (thumbnailsDone.current.has(pageNumber)) continue;
+        try {
+          /*
+            Sized from the sheet rather than from a fixed scale. Drawings come
+            in wildly different sizes — a 36x24 E-sheet beside an 8.5x11 detail
+            — and one scale for both gives a grid of one enormous picture and
+            one stamp. Falls back to the whole-sheet render scale divided down
+            when the page size is not known yet.
+          */
+          const pageWidthPoints =
+            canvasSize.width > 0 && drawnScale > 0
+              ? canvasSize.width / drawnScale
+              : 0;
+          const scale =
+            pageWidthPoints > 0 ? THUMBNAIL_PIXELS / pageWidthPoints : 0.12;
+          const { bitmap } = await render(pageNumber, scale, hash);
+          if (cancelled) {
+            bitmap.close();
+            return;
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+          bitmap.close();
+          thumbnailsDone.current.add(pageNumber);
+          onThumbnail(pageNumber, canvas.toDataURL("image/jpeg", 0.75));
+        } catch {
+          // A sheet that will not draw small is not worth an error anywhere.
+          // Its cell keeps its placeholder and its name, which is still enough
+          // to click. Marked done so the grid does not retry it for ever.
+          thumbnailsDone.current.add(pageNumber);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    drawThumbnails,
+    onThumbnail,
+    loading,
+    error,
+    pageCount,
+    hash,
+    render,
+    canvasSize.width,
+    drawnScale,
+  ]);
 
   // Pull the page's text once, for scale detection.
   useEffect(() => {
@@ -1137,84 +1364,74 @@ function PlanPane({
     );
   }
 
+  /**
+   * The zoom cluster, sent up to the one top bar.
+   *
+   * These controls belong to this component — only it knows the zoom — but
+   * they belong ON the bar with everything else, because a second row of
+   * chrome above the drawing is a row of drawing gone. Same portal trick the
+   * trace layer already uses for its own chrome, for the same reason: the
+   * thing that owns the state is not always the thing that owns the space.
+   */
+  const zoomControls = (
+    <div className="flex items-center gap-1">
+      {rendering && !loading && (
+        <span className="flex items-center gap-1.5 text-xs text-muted-foreground mr-1">
+          <Loader2 className="w-3 h-3 animate-spin" /> Drawing…
+        </span>
+      )}
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 w-7 p-0"
+        onClick={() => zoomByStep(1 / BUTTON_ZOOM_STEP)}
+        disabled={loading}
+        aria-label="Zoom out"
+        title="Zoom out (−)"
+      >
+        <Minus className="w-4 h-4" />
+      </Button>
+      <span
+        className="font-mono text-xs tabular-nums min-w-[3.5rem] text-center text-muted-foreground"
+        aria-live="polite"
+        aria-label={`Zoom ${formatZoom(view.zoom)}`}
+      >
+        {loading ? "—" : formatZoom(view.zoom)}
+      </span>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 w-7 p-0"
+        onClick={() => zoomByStep(BUTTON_ZOOM_STEP)}
+        disabled={loading}
+        aria-label="Zoom in"
+        title="Zoom in (+)"
+      >
+        <Plus className="w-4 h-4" />
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 gap-1.5 px-2 text-xs"
+        onClick={fitToView}
+        disabled={loading}
+        title="Fit the whole sheet (0)"
+      >
+        <Maximize2 className="w-3.5 h-3.5" /> Fit
+      </Button>
+    </div>
+  );
+
   return (
     <div className="flex-1 flex flex-col min-h-0 min-w-0">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-card shrink-0">
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 w-7 p-0"
-          onClick={() => go(page - 1)}
-          disabled={loading || page <= 1}
-          aria-label="Previous page"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </Button>
-        <span className="font-mono text-xs tabular-nums min-w-[4.5rem] text-center">
-          {loading ? "—" : `${page} / ${pageCount}`}
-        </span>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 w-7 p-0"
-          onClick={() => go(page + 1)}
-          disabled={loading || page >= pageCount}
-          aria-label="Next page"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-
-        {rendering && !loading && (
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Loader2 className="w-3 h-3 animate-spin" /> Drawing…
-          </span>
-        )}
-
-        {/* Zoom. Sits beside the page controls because both are "where am I
-            looking", and both get reached constantly while counting. */}
-        <div className="ml-auto flex items-center gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 p-0"
-            onClick={() => zoomByStep(1 / BUTTON_ZOOM_STEP)}
-            disabled={loading}
-            aria-label="Zoom out"
-            title="Zoom out (−)"
-          >
-            <Minus className="w-4 h-4" />
-          </Button>
-          <span
-            className="font-mono text-xs tabular-nums min-w-[3.5rem] text-center text-muted-foreground"
-            aria-live="polite"
-            aria-label={`Zoom ${formatZoom(view.zoom)}`}
-          >
-            {loading ? "—" : formatZoom(view.zoom)}
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 p-0"
-            onClick={() => zoomByStep(BUTTON_ZOOM_STEP)}
-            disabled={loading}
-            aria-label="Zoom in"
-            title="Zoom in (+)"
-          >
-            <Plus className="w-4 h-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 gap-1.5 px-2 text-xs"
-            onClick={fitToView}
-            disabled={loading}
-            title="Fit the whole sheet (0)"
-          >
-            <Maximize2 className="w-3.5 h-3.5" /> Fit
-          </Button>
+      {controlsTarget ? (
+        createPortal(zoomControls, controlsTarget)
+      ) : (
+        /* No bar to portal into — keep the controls usable in place. */
+        <div className="flex items-center justify-end px-3 py-2 border-b border-border bg-card shrink-0">
+          {zoomControls}
         </div>
-      </div>
-
+      )}
       <div
         ref={viewportRef}
         className={cn(
@@ -1248,7 +1465,23 @@ function PlanPane({
           <div
             className="absolute top-0 left-0 origin-top-left will-change-transform"
             style={{
-              transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`,
+              /*
+                Snapped to whole DEVICE pixels, not left as the raw offset.
+
+                A composited layer translated by half a pixel is resampled, and
+                a drawing resampled by half a pixel is a drawing of grey lines.
+                The shift this applies is at most half a screen pixel, so the
+                view does not move as far as anyone can see — and it is what
+                lets the sharp patch inside be pixel-for-pixel exact, because
+                the patch's own offset is measured from here.
+
+                view.x and view.y themselves are NOT rounded: every measurement
+                and every hit test reads them, and a rounded pan would drift.
+              */
+              transform: `translate(${snapToDevicePixel(view.x, dpr)}px, ${snapToDevicePixel(
+                view.y,
+                dpr
+              )}px) scale(${view.zoom})`,
             }}
           >
             <div className="relative w-fit">
@@ -1277,10 +1510,32 @@ function PlanPane({
                   aria-hidden
                   className="absolute block pointer-events-none"
                   style={{
-                    left: sharp.rect.x * drawnScale,
-                    top: sharp.rect.y * drawnScale,
-                    width: sharp.rect.width * drawnScale,
-                    height: sharp.rect.height * drawnScale,
+                    /*
+                      Position SNAPPED to the device grid, size taken from the
+                      BITMAP. Both halves are needed for one bitmap pixel to
+                      land on one device pixel, and both were missing.
+
+                      Size: the box is the bitmap's own pixels converted back
+                      through the scale it was actually drawn at, so the ratio
+                      is exactly one rather than nearly one. Reading the scale
+                      that came BACK is what keeps a region the worker had to
+                      draw coarser than asked on the right rectangle.
+
+                      Position: rect.x times drawnScale is the true offset;
+                      rounding it to a whole device pixel moves the patch by
+                      under half a screen pixel, and is the difference between
+                      a crisp hairline and a grey one.
+                    */
+                    left: snapToDevicePixel(
+                      sharp.rect.x * drawnScale,
+                      view.zoom * dpr
+                    ),
+                    top: snapToDevicePixel(
+                      sharp.rect.y * drawnScale,
+                      view.zoom * dpr
+                    ),
+                    width: (sharp.bitmapWidth / sharp.scale) * drawnScale,
+                    height: (sharp.bitmapHeight / sharp.scale) * drawnScale,
                   }}
                 />
               )}
@@ -1364,6 +1619,95 @@ export default function TakeoffPage({
     Record<number, boolean>
   >({});
 
+  // ── Layout: how much of the screen the drawing gets ───────────────────────
+  /**
+   * Which side panels are open, how wide, and whether focus mode is on.
+   *
+   * The whole point of this arrangement is that the drawing gets much bigger.
+   * Measured on a 1536x791 screen: the drawing was 44% of it with both panels
+   * docked and a tool bar underneath, and is about 83% with both folded — so
+   * folding a panel is not a tidiness feature, it is most of the screen.
+   *
+   * Read from storage on the first render rather than in an effect, so the
+   * screen never flashes the wrong arrangement and then corrects itself.
+   */
+  const [panels, setPanels] = useState<PanelState>(() => {
+    if (typeof window === "undefined") return PANELS_DEFAULT;
+    try {
+      return parsePanelState(window.localStorage.getItem(PANELS_STORAGE_KEY));
+    } catch {
+      return PANELS_DEFAULT;
+    }
+  });
+  const updatePanels = useCallback(
+    (next: PanelState | ((current: PanelState) => PanelState)) => {
+      setPanels(current => {
+        const resolved = typeof next === "function" ? next(current) : next;
+        try {
+          window.localStorage.setItem(
+            PANELS_STORAGE_KEY,
+            serialisePanelState(resolved)
+          );
+        } catch {
+          // Private browsing. The arrangement simply does not stick.
+        }
+        return resolved;
+      });
+    },
+    []
+  );
+  const focusMode = isFocusMode(panels);
+
+  /**
+   * Focus mode: one key on, the same key off.
+   *
+   * Its own control rather than "collapse two things", because mid-takeoff the
+   * point is to get the most drawing without hunting for two separate
+   * chevrons — and to get it all back the same way.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        updatePanels(toggleFocus);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [updatePanels]);
+
+  /** Where PlanPane puts its zoom controls — see its `controlsTarget`. */
+  const [zoomSlot, setZoomSlot] = useState<HTMLElement | null>(null);
+
+  /**
+   * Sheet thumbnails, and the switch that pays for them.
+   *
+   * Drawn only while the picker is open (see SheetChip), because every one is
+   * a real page render and the worker draws one thing at a time.
+   */
+  const [browsingSheets, setBrowsingSheets] = useState(false);
+  const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
+  const rememberThumbnail = useCallback(
+    (pageNumber: number, dataUrl: string) => {
+      setThumbnails(current =>
+        current[pageNumber] === dataUrl
+          ? current
+          : { ...current, [pageNumber]: dataUrl }
+      );
+    },
+    []
+  );
+
   // ── Tracing (phase 2b) ────────────────────────────────────────────────────
   /**
    * Calibration is its own mode, not a kind of tracing.
@@ -1410,6 +1754,11 @@ export default function TakeoffPage({
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   const doc = docs.find(d => d.id === selectedDocId) ?? docs[0] ?? null;
+
+  /** A different plan is a different set of pictures. */
+  useEffect(() => {
+    setThumbnails({});
+  }, [doc?.id]);
 
   const { data: sheets = [], isLoading: sheetsLoading } =
     trpc.bidPdfs.sheets.useQuery(
@@ -2592,59 +2941,254 @@ export default function TakeoffPage({
         onOpenChange={setMaterialsListOpen}
       />
 
-      <div className="border-b border-border px-6 py-3 shrink-0">
-        <div className="flex items-center gap-3">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 gap-1.5 text-xs"
-            onClick={onBack}
-          >
-            <ArrowLeft className="w-3.5 h-3.5" /> Bid
-          </Button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-semibold truncate">
-              Plans{bid?.bid?.name ? ` — ${bid.bid.name}` : ""}
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              Set each sheet's scale, then stamp and trace what is on it.
-              Everything you place lands on the bid.
-            </p>
-          </div>
-          {/* Left of "Add PDF" and available from the first mark, not at the
+      {/*
+        Hidden in focus mode, which is what makes focus mode worth a key.
+        Everything here is about the BID — its name, its materials list, adding
+        another plan — and none of it is reached mid-count. The tool bar below
+        stays, because that is the bar you work from.
+      */}
+      {!focusMode && (
+        <div className="border-b border-border px-6 py-2 shrink-0">
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 gap-1.5 text-xs"
+              onClick={onBack}
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Bid
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-semibold truncate">
+                Plans{bid?.bid?.name ? ` — ${bid.bid.name}` : ""}
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                Set each sheet's scale, then stamp and trace what is on it.
+                Everything you place lands on the bid.
+              </p>
+            </div>
+            {/* Left of "Add PDF" and available from the first mark, not at the
               end: a supplier quote is how a contractor finds out what things
               cost, so it must not sit behind a finished, priced bid. It stays
               outlined rather than filled because adding a plan is still the
               louder action on this screen. */}
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 gap-1.5 text-xs shrink-0"
-            onClick={() => setMaterialsListOpen(true)}
-            title="Materials list — quantities only, for a supplier quote"
-          >
-            <ClipboardList className="w-3.5 h-3.5" /> Materials list
-          </Button>
-          {docs.length > 0 && (
             <Button
               size="sm"
-              className="h-8 gap-1.5 text-xs"
-              onClick={() => fileInput.current?.click()}
-              disabled={uploading}
+              variant="outline"
+              className="h-8 gap-1.5 text-xs shrink-0"
+              onClick={() => setMaterialsListOpen(true)}
+              title="Materials list — quantities only, for a supplier quote"
             >
-              {uploading ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading…
-                </>
-              ) : (
-                <>
-                  <Plus className="w-3.5 h-3.5" /> Add PDF
-                </>
+              <ClipboardList className="w-3.5 h-3.5" /> Materials list
+            </Button>
+            {docs.length > 0 && (
+              <Button
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => fileInput.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading…
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-3.5 h-3.5" /> Add PDF
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/*
+        ── THE ONE TOP BAR ──────────────────────────────────────────────────
+
+        It replaces the pager row above the drawing AND the tool bar below it.
+        Removing the bottom bar alone gives back 41px across the full width,
+        and it was the bar that clipped: its rightmost control was the SCALE,
+        so on a narrow drawing pane the one control you need when a sheet has
+        no scale was the first thing to slide off the edge.
+
+        Order is by how often a hand reaches for it: where you are, what you
+        are doing with it, then what it is drawn at and how big.
+
+        It wraps rather than clipping, and wrapping is now safe — the drawing
+        re-fits when its pane changes height, so a second row of tools no
+        longer leaves the sheet cropped at the bottom with nothing to say so.
+      */}
+      {docs.length > 0 && (
+        <div className="border-b border-border bg-card px-3 py-1.5 shrink-0 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <SheetChip
+            sheets={sheets}
+            page={page}
+            pageCount={doc?.pageCount ?? sheets.length}
+            thumbnails={thumbnails}
+            onOpenPage={next => {
+              const last = doc?.pageCount ?? sheets.length;
+              if (next < 1 || (last > 0 && next > last)) return;
+              setPage(next);
+            }}
+            onBrowsing={setBrowsingSheets}
+            disabled={!doc}
+          />
+
+          <div className="w-px h-4 bg-border" />
+
+          {/*
+            Always rendered, disabled with a reason when the sheet cannot be
+            measured. Hiding them was worse than it sounds: on an unscaled
+            sheet the screen offered NO tool at all, and a tool that is not on
+            screen does not read as unavailable, it reads as non-existent.
+          */}
+          {activeSheet && !tracing && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => startTracing("conduit")}
+                disabled={!measurability?.ok}
+                title={traceBlockedReason ?? "Trace a conduit run"}
+              >
+                <Route className="w-3.5 h-3.5 text-[#F5C518]" /> Conduit
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => startTracing("cable")}
+                disabled={!measurability?.ok}
+                title={
+                  traceBlockedReason ??
+                  "Trace a run of self-contained cable — MC or Romex"
+                }
+              >
+                <Spline className="w-3.5 h-3.5 text-emerald-400" /> Cable
+              </Button>
+
+              {/* Counting needs no scale, so this is never gated on one. */}
+              {!stampAssembly && (
+                <StampPicker
+                  assemblies={allAssemblies.map(a => ({
+                    id: a.id,
+                    name: a.name,
+                    category: a.category ?? null,
+                  }))}
+                  disabled={allAssemblies.length === 0}
+                  onPick={assembly => {
+                    setStampAssembly({ id: assembly.id, name: assembly.name });
+                    toast.success(
+                      `Stamping ${assembly.name} — click to place.`
+                    );
+                  }}
+                />
               )}
+            </>
+          )}
+
+          {/*
+            Outside the measurability gate on purpose. Counting devices needs
+            no scale, so the control that says what is being stamped — and the
+            only way to stop — must not disappear on an unscaled sheet.
+          */}
+          {stampAssembly ? (
+            <Button
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => setStampAssembly(null)}
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              Stamping {stampAssembly.name}
+              <X className="w-3 h-3" />
+            </Button>
+          ) : null}
+
+          {activeSheet && !tracing && !calibrating && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => {
+                setCalibratePoints([]);
+                setCalibrating(true);
+                setStampAssembly(null);
+              }}
+              title="Click two points you know the distance between"
+            >
+              <Ruler className="w-3.5 h-3.5 text-[#38BDF8]" /> Measure
             </Button>
           )}
+
+          <div className="ml-auto flex items-center gap-2">
+            {/*
+              ── The scale, as a STATUS CHIP with its remedy beside it ───────
+
+              Out of the drawing entirely. It used to be a panel floating over
+              the bottom-left of the sheet — over the work — and a warning that
+              covers the work is a warning people learn to resent.
+
+              When a scale is set, the ScaleControl chip IS the status: it
+              reads the scale, and clicking it is how you change it. When there
+              is none, an amber chip says so and the button beside it is what
+              to do about it, permanently, in the same place.
+            */}
+            {activeSheet && !measurability?.ok && (
+              <span
+                className="flex items-center gap-1.5 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2 py-1 text-[0.7rem] text-[#F5C518]"
+                title={
+                  traceBlockedReason ??
+                  "Counting still works without a scale — only measuring needs one."
+                }
+              >
+                <TriangleAlert className="w-3 h-3" />
+                {notToScaleBySheet[activeSheet.id]
+                  ? "Marked not to scale"
+                  : "No scale"}
+              </span>
+            )}
+            {activeSheet && (
+              <ScaleControl
+                sheet={activeSheet}
+                notToScale={notToScaleBySheet[activeSheet.id] ?? false}
+                onSet={scaleText =>
+                  setSheetScale.mutate({ id: activeSheet.id, scaleText })
+                }
+                onClear={() => clearSheetScale.mutate({ id: activeSheet.id })}
+              />
+            )}
+
+            <div className="w-px h-4 bg-border" />
+
+            {/* PlanPane portals its zoom cluster in here. */}
+            <div ref={setZoomSlot} className="flex items-center" />
+
+            <div className="w-px h-4 bg-border" />
+
+            <Button
+              size="sm"
+              variant={focusMode ? "default" : "ghost"}
+              className="h-7 gap-1.5 px-2 text-xs"
+              onClick={() => updatePanels(toggleFocus)}
+              title={
+                focusMode
+                  ? "Show the panels again (F)"
+                  : "Focus mode — both panels away, drawing only (F)"
+              }
+              aria-pressed={focusMode}
+            >
+              {focusMode ? (
+                <Minimize2 className="w-3.5 h-3.5" />
+              ) : (
+                <Maximize2 className="w-3.5 h-3.5" />
+              )}
+              Focus
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Above the workspace rather than inside the empty state, so it is in
           the same place whether this is the first plan or the tenth. */}
@@ -2699,10 +3243,34 @@ export default function TakeoffPage({
         </div>
       ) : (
         <div className="flex-1 flex min-h-0">
-          {/* Documents, then the sheets within the chosen one. Docked rather
-              than a drawer: choosing a sheet is the most frequent action here
-              and a drawer would put a click in front of every one. */}
-          <aside className="w-60 shrink-0 border-r border-border bg-card flex flex-col min-h-0">
+          {/*
+            Documents, then the sheets within the chosen one.
+
+            Still on the LEFT and still vertical. Moving it to the top was
+            considered and rejected: sheet names are long — E1.01 POWER PLAN —
+            LEVEL 2 — so horizontal chips either truncate to uselessness or eat
+            the width the tools need, and a vertical list shows fifteen names
+            at once where a strip shows four.
+
+            What changed is that it no longer has to stay open. The top bar
+            always names the sheet you are on and moves one either way, and the
+            same chip drops a grid of thumbnails, so folding this costs
+            nothing.
+          */}
+          <SidePanel
+            side="left"
+            label="the sheet list"
+            open={panels.sheets}
+            width={panels.sheetsWidth}
+            minWidth={PANEL_LIMITS.sheets.min}
+            maxWidth={PANEL_LIMITS.sheets.max}
+            onToggle={() =>
+              updatePanels(current => togglePanel(current, "sheets"))
+            }
+            onWidth={width =>
+              updatePanels(current => setPanelWidth(current, "sheets", width))
+            }
+          >
             <div className="border-b border-border shrink-0 max-h-44 overflow-y-auto">
               <div className="px-3 py-2 text-[0.7rem] uppercase tracking-wide text-muted-foreground">
                 {docs.length} {docs.length === 1 ? "document" : "documents"}
@@ -2781,436 +3349,293 @@ export default function TakeoffPage({
                 }
               />
             </div>
-          </aside>
+          </SidePanel>
 
-          {/* The split: drawing on the left, work pane on the right. Built now
-              so the counted-items list and legend land in a structure that
-              exists, rather than as a drawer bolted on later. */}
-          <ResizablePanelGroup
-            direction="horizontal"
-            className="flex-1 min-w-0"
-          >
-            <ResizablePanel
-              defaultSize={68}
-              minSize={35}
-              className="flex flex-col min-w-0"
-            >
-              {doc && (
-                <>
-                  <PlanPane
-                    key={doc.id}
-                    doc={doc}
-                    page={page}
-                    onPage={setPage}
-                    onPageCount={pageCount =>
-                      setPageCount.mutate({ id: doc.id, pageCount })
-                    }
-                    onDocumentReady={handleDocumentReady}
-                    onSheetVisible={handleSheetVisible}
-                    onPageRendered={handlePageRendered}
-                    /**
-                     * Re-read the sheet list and hand back this document's
-                     * current URL. Invalidating awaits the refetch, so what
-                     * `getData` returns afterwards is the freshly minted URL —
-                     * or the same one, if the window has not rolled over and
-                     * the refusal was never an expiry.
-                     */
-                    onUrlExpired={async () => {
-                      await utils.bidPdfs.list.invalidate({ bidId });
-                      const fresh = utils.bidPdfs.list.getData({ bidId });
-                      return fresh?.find(d => d.id === doc.id)?.url ?? null;
-                    }}
-                    overlay={size =>
-                      measurability ? (
-                        <>
-                          {/* Calibration takes the drawing while it is on: two
+          {doc && (
+            <PlanPane
+              key={doc.id}
+              doc={doc}
+              page={page}
+              onPage={setPage}
+              controlsTarget={zoomSlot}
+              drawThumbnails={browsingSheets}
+              onThumbnail={rememberThumbnail}
+              onPageCount={pageCount =>
+                setPageCount.mutate({ id: doc.id, pageCount })
+              }
+              onDocumentReady={handleDocumentReady}
+              onSheetVisible={handleSheetVisible}
+              onPageRendered={handlePageRendered}
+              /**
+               * Re-read the sheet list and hand back this document's
+               * current URL. Invalidating awaits the refetch, so what
+               * `getData` returns afterwards is the freshly minted URL —
+               * or the same one, if the window has not rolled over and
+               * the refusal was never an expiry.
+               */
+              onUrlExpired={async () => {
+                await utils.bidPdfs.list.invalidate({ bidId });
+                const fresh = utils.bidPdfs.list.getData({ bidId });
+                return fresh?.find(d => d.id === doc.id)?.url ?? null;
+              }}
+              overlay={size =>
+                measurability ? (
+                  <>
+                    {/* Calibration takes the drawing while it is on: two
                               clicks that mean something different from every
                               other click on this screen. */}
-                          {calibrating && activeSheet && (
-                            <CalibrateLayer
-                              width={size.width}
-                              height={size.height}
-                              renderScale={size.renderScale}
-                              chromeTarget={size.chromeTarget}
-                              points={calibratePoints}
-                              onPointsChange={setCalibratePoints}
-                              busy={setSheetScale.isPending}
-                              onApply={scaleText => {
-                                setSheetScale.mutate(
-                                  { id: activeSheet.id, scaleText },
-                                  {
-                                    onSuccess: () => {
-                                      setCalibrating(false);
-                                      setCalibratePoints([]);
-                                    },
-                                  }
-                                );
-                              }}
-                              onCancel={() => {
+                    {calibrating && activeSheet && (
+                      <CalibrateLayer
+                        width={size.width}
+                        height={size.height}
+                        renderScale={size.renderScale}
+                        chromeTarget={size.chromeTarget}
+                        points={calibratePoints}
+                        onPointsChange={setCalibratePoints}
+                        busy={setSheetScale.isPending}
+                        onApply={scaleText => {
+                          setSheetScale.mutate(
+                            { id: activeSheet.id, scaleText },
+                            {
+                              onSuccess: () => {
                                 setCalibrating(false);
                                 setCalibratePoints([]);
-                              }}
-                            />
-                          )}
-                          {capturingSymbol && (
-                            <SymbolCaptureLayer
-                              width={size.width}
-                              height={size.height}
-                              renderScale={size.renderScale}
-                              onCancel={() => setCapturingSymbol(false)}
-                              onRegion={(region: CaptureRegion) => {
-                                const thumbnail = size.canvas
-                                  ? cropToThumbnail(
-                                      size.canvas,
-                                      region,
-                                      size.renderScale
-                                    )
-                                  : null;
-                                setCapturingSymbol(false);
-                                setPendingCapture({ thumbnail });
-                              }}
-                            />
-                          )}
-                          {pendingCapture && (
-                            <SymbolCaptureForm
-                              thumbnail={pendingCapture.thumbnail}
-                              onCancel={() => setPendingCapture(null)}
-                              onSave={label => {
-                                captureSymbol.mutate(
-                                  {
-                                    label,
-                                    thumbnail: pendingCapture.thumbnail,
-                                    capturedFromSheetId: activeSheet?.id,
-                                  },
-                                  {
-                                    onSuccess: r =>
-                                      toast.success(
-                                        r.alreadyKnown
-                                          ? "Already in your legend."
-                                          : "Captured — click it to choose an assembly."
-                                      ),
-                                  }
-                                );
-                                setPendingCapture(null);
-                              }}
-                            />
-                          )}
-                          <TraceLayer
-                            width={size.width}
-                            height={size.height}
-                            renderScale={size.renderScale}
-                            measurability={measurability}
-                            tracing={tracing}
-                            pathType={tracePathType}
-                            points={tracePoints}
-                            onPointsChange={setTracePoints}
-                            existingRuns={visibleRuns}
-                            onFinish={finishTrace}
-                            onCancel={cancelTrace}
-                            selectedRunId={selectedRunId}
-                            onSelectRun={setSelectedRunId}
-                            stamping={Boolean(stampAssembly) && !tracing}
-                            stampAssemblyName={stampAssembly?.name ?? null}
-                            stamps={visibleStamps.map(st => ({
-                              id: st.id,
-                              assemblyName: st.assemblyName,
-                              x: st.x,
-                              y: st.y,
-                            }))}
-                            proposals={proposals}
-                            onDropStamp={queueStamp}
-                            selectedStampId={selectedStampId}
-                            onSelectStamp={setSelectedStampId}
-                            focusPoint={focusPoint}
-                            chromeTarget={size.chromeTarget}
-                          />
-                        </>
-                      ) : null
-                    }
-                  />
-                  {/*
-                    Rendered under the pager rather than inside PlanPane so the
-                    sheet row (and its mutations) stay owned here.
-
-                    It WRAPS rather than clipping. It did not, and the rightmost
-                    control was the SCALE — so on a narrow drawing pane the one
-                    control you need when a sheet has no scale was the first
-                    thing to slide off the edge, with nothing to say it existed.
-                  */}
-                  {activeSheet && (
-                    <div className="border-t border-border bg-card px-3 py-1.5 shrink-0 flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                      <span className="text-xs text-muted-foreground truncate max-w-[14rem] shrink">
-                        {activeSheet.name}
-                      </span>
-                      <div className="w-px h-4 bg-border" />
-                      {/* Tracing is offered only when the sheet can actually
-                          be measured — an enabled tool that produces no number
-                          teaches people the app is broken. */}
-                      {/*
-                        Always rendered, disabled with a reason when the sheet
-                        cannot be measured.
-
-                        Hiding them was worse than it sounds: on an unscaled
-                        sheet the screen offered NO tool at all, and a tool that
-                        is not on screen does not read as unavailable, it reads
-                        as non-existent. A disabled control with a reason at
-                        least tells the user what to go and fix.
-
-                        The wording says "no scale set" today. Once two-point
-                        calibration exists it should mention calibrating too,
-                        since there will be a second way out.
-                      */}
-                      {!tracing && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 gap-1.5 text-xs"
-                            onClick={() => startTracing("conduit")}
-                            disabled={!measurability?.ok}
-                            title={traceBlockedReason ?? "Trace a conduit run"}
-                          >
-                            <Route className="w-3.5 h-3.5 text-[#F5C518]" />{" "}
-                            Trace conduit
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 gap-1.5 text-xs"
-                            onClick={() => startTracing("cable")}
-                            disabled={!measurability?.ok}
-                            title={
-                              traceBlockedReason ??
-                              "Trace a run of self-contained cable — MC or Romex"
+                              },
                             }
-                          >
-                            <Spline className="w-3.5 h-3.5 text-emerald-400" />{" "}
-                            Trace cable (MC/Romex)
-                          </Button>
-
-                          {/* Counting needs no scale, so this is never gated on
-                              one — see StampPicker. */}
-                          {!stampAssembly && (
-                            <StampPicker
-                              assemblies={allAssemblies.map(a => ({
-                                id: a.id,
-                                name: a.name,
-                                category: a.category ?? null,
-                              }))}
-                              disabled={allAssemblies.length === 0}
-                              onPick={assembly => {
-                                setStampAssembly({
-                                  id: assembly.id,
-                                  name: assembly.name,
-                                });
-                                toast.success(
-                                  `Stamping ${assembly.name} — click to place.`
-                                );
-                              }}
-                            />
-                          )}
-                          <div className="w-px h-4 bg-border" />
-                        </>
-                      )}
-
-                      {/* Outside the measurability gate on purpose. Counting
-                          devices needs no scale, so the control that says what
-                          is being stamped — and the only way to stop — must not
-                          disappear on an unscaled sheet. */}
-                      {stampAssembly ? (
-                        <>
-                          <Button
-                            size="sm"
-                            className="h-7 gap-1.5 text-xs"
-                            onClick={() => setStampAssembly(null)}
-                          >
-                            <MapPin className="w-3.5 h-3.5" />
-                            Stamping {stampAssembly.name}
-                            <X className="w-3 h-3" />
-                          </Button>
-                          <div className="w-px h-4 bg-border" />
-                        </>
-                      ) : null}
-
-                      {/*
-                        The second way to set a scale, and on a real set often
-                        the ONLY one that works: most sheets state no ratio, and
-                        a set that does may have been scaled in printing, which
-                        makes the stated ratio confidently wrong.
-
-                        Beside the ratio control rather than hidden behind it —
-                        neither is a fallback for the other.
-                      */}
-                      {!tracing && !calibrating && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 gap-1.5 text-xs"
-                          onClick={() => {
-                            setCalibratePoints([]);
-                            setCalibrating(true);
-                            setStampAssembly(null);
-                          }}
-                          title="Click two points you know the distance between"
-                        >
-                          <Ruler className="w-3.5 h-3.5 text-[#38BDF8]" />
-                          Measure a known distance
-                        </Button>
-                      )}
-
-                      <ScaleControl
-                        sheet={activeSheet}
-                        notToScale={notToScaleBySheet[activeSheet.id] ?? false}
-                        onSet={scaleText =>
-                          setSheetScale.mutate({
-                            id: activeSheet.id,
-                            scaleText,
-                          })
-                        }
-                        onClear={() =>
-                          clearSheetScale.mutate({ id: activeSheet.id })
-                        }
+                          );
+                        }}
+                        onCancel={() => {
+                          setCalibrating(false);
+                          setCalibratePoints([]);
+                        }}
                       />
-                    </div>
-                  )}
-                </>
-              )}
-            </ResizablePanel>
+                    )}
+                    {capturingSymbol && (
+                      <SymbolCaptureLayer
+                        width={size.width}
+                        height={size.height}
+                        renderScale={size.renderScale}
+                        onCancel={() => setCapturingSymbol(false)}
+                        onRegion={(region: CaptureRegion) => {
+                          const thumbnail = size.canvas
+                            ? cropToThumbnail(
+                                size.canvas,
+                                region,
+                                size.renderScale
+                              )
+                            : null;
+                          setCapturingSymbol(false);
+                          setPendingCapture({ thumbnail });
+                        }}
+                      />
+                    )}
+                    {pendingCapture && (
+                      <SymbolCaptureForm
+                        thumbnail={pendingCapture.thumbnail}
+                        onCancel={() => setPendingCapture(null)}
+                        onSave={label => {
+                          captureSymbol.mutate(
+                            {
+                              label,
+                              thumbnail: pendingCapture.thumbnail,
+                              capturedFromSheetId: activeSheet?.id,
+                            },
+                            {
+                              onSuccess: r =>
+                                toast.success(
+                                  r.alreadyKnown
+                                    ? "Already in your legend."
+                                    : "Captured — click it to choose an assembly."
+                                ),
+                            }
+                          );
+                          setPendingCapture(null);
+                        }}
+                      />
+                    )}
+                    <TraceLayer
+                      width={size.width}
+                      height={size.height}
+                      renderScale={size.renderScale}
+                      measurability={measurability}
+                      tracing={tracing}
+                      pathType={tracePathType}
+                      points={tracePoints}
+                      onPointsChange={setTracePoints}
+                      existingRuns={visibleRuns}
+                      onFinish={finishTrace}
+                      onCancel={cancelTrace}
+                      selectedRunId={selectedRunId}
+                      onSelectRun={setSelectedRunId}
+                      stamping={Boolean(stampAssembly) && !tracing}
+                      stampAssemblyName={stampAssembly?.name ?? null}
+                      stamps={visibleStamps.map(st => ({
+                        id: st.id,
+                        assemblyName: st.assemblyName,
+                        x: st.x,
+                        y: st.y,
+                      }))}
+                      proposals={proposals}
+                      onDropStamp={queueStamp}
+                      selectedStampId={selectedStampId}
+                      onSelectStamp={setSelectedStampId}
+                      focusPoint={focusPoint}
+                      chromeTarget={size.chromeTarget}
+                    />
+                  </>
+                ) : null
+              }
+            />
+          )}
 
-            <ResizableHandle withHandle />
-
-            <ResizablePanel defaultSize={32} minSize={18} className="min-w-0">
-              <RunsPanel
-                runs={visibleRuns.map(r => ({
-                  ...r,
-                  firstPoint: r.points[0] ?? null,
-                }))}
-                stampGroups={stampGroups}
-                onJumpTo={at => {
-                  setFocusPoint(at);
-                  // Clear the highlight after a moment — a marker that stays
-                  // ringed forever stops meaning "this is the one".
-                  window.setTimeout(() => setFocusPoint(null), 2200);
-                }}
-                onRemoveStamp={id => removeStamp.mutate({ id })}
-                legend={
-                  <>
-                    {/* Above the layers and the legend: what the reader found
+          {/*
+            The work pane. Folds to its rail like the sheet list, and for the
+            same reason: on a laptop this is 400px of drawing.
+          */}
+          <SidePanel
+            side="right"
+            label="counted items"
+            open={panels.work}
+            width={panels.workWidth}
+            minWidth={PANEL_LIMITS.work.min}
+            maxWidth={PANEL_LIMITS.work.max}
+            onToggle={() =>
+              updatePanels(current => togglePanel(current, "work"))
+            }
+            onWidth={width =>
+              updatePanels(current => setPanelWidth(current, "work", width))
+            }
+          >
+            <RunsPanel
+              runs={visibleRuns.map(r => ({
+                ...r,
+                firstPoint: r.points[0] ?? null,
+              }))}
+              stampGroups={stampGroups}
+              onJumpTo={at => {
+                setFocusPoint(at);
+                // Clear the highlight after a moment — a marker that stays
+                // ringed forever stops meaning "this is the one".
+                window.setTimeout(() => setFocusPoint(null), 2200);
+              }}
+              onRemoveStamp={id => removeStamp.mutate({ id })}
+              legend={
+                <>
+                  {/* Above the layers and the legend: what the reader found
                         is the thing a user comes to this pane to act on, and
                         the legend it depends on sits below it where it is
                         still one glance away. */}
-                    {readerAvailable && (
-                      <CoPilotPanel
-                        state={copilot}
-                        reading={readSheet.isPending}
-                        autoRead={autoRead}
-                        onAutoReadChange={setAutoReadPersisted}
-                        canRead={canRead}
-                        onRead={runReader}
-                        onConfirm={findingIds => {
-                          if (!copilot?.runId) return;
-                          confirmFindings.mutate({
-                            runId: copilot.runId,
-                            findingIds,
-                            confirmed: true,
-                          });
-                        }}
-                        onDismiss={findingIds =>
-                          dismissFindings.mutate({ findingIds })
-                        }
-                        onCorrect={(findingId, symbolLinkId) =>
-                          correctFinding.mutate({
-                            findingId,
-                            symbolLinkId,
-                            confirmed: true,
-                          })
-                        }
-                        onJumpTo={at => {
-                          setFocusPoint(at);
-                          window.setTimeout(() => setFocusPoint(null), 2200);
-                        }}
-                        symbols={symbols}
-                        onAsk={question => {
-                          if (!activeSheet) return;
-                          const snapshot = snapshotPage(
-                            pageCanvas.current,
-                            pageCanvasScale.current
-                          );
-                          if (!snapshot) return;
-                          askCopilot.mutate({
-                            sheetId: activeSheet.id,
-                            question,
-                            pageImage: snapshot.image,
-                            pageText: pageTextByPage.current.get(page) ?? "",
-                          });
-                        }}
-                        asking={askCopilot.isPending}
-                        answer={copilotAnswer}
-                        onClearAnswer={() => setCopilotAnswer(null)}
-                      />
-                    )}
-                    <LayersPanel
-                      present={present}
-                      state={effectiveLayers}
-                      onChange={update =>
-                        setLayerState(previous =>
-                          update(
-                            previous ??
-                              allLayersOn([...layeredStamps, ...layeredRuns])
-                          )
-                        )
-                      }
-                      filtered={hiddenCount > 0}
-                      hiddenCount={hiddenCount}
-                    />
-                    <LegendPanel
-                      symbols={symbols}
-                      assemblies={allAssemblies.map(a => ({
-                        id: a.id,
-                        name: a.name,
-                        category: a.category,
-                      }))}
-                      activeAssemblyId={stampAssembly?.id ?? null}
-                      capturing={capturingSymbol}
-                      onStartCapture={() => setCapturingSymbol(true)}
-                      onCancelCapture={() => setCapturingSymbol(false)}
-                      onLink={(symbolId, assemblyId) =>
-                        linkSymbol.mutate({ id: symbolId, assemblyId })
-                      }
-                      onUnlink={id => unlinkSymbol.mutate({ id })}
-                      onRemove={id => removeSymbol.mutate({ id })}
-                      onUseSymbol={symbol => {
-                        const assembly = allAssemblies.find(
-                          a => a.id === symbol.assemblyId
-                        );
-                        if (!assembly) return;
-                        setStampAssembly({
-                          id: assembly.id,
-                          name: assembly.name,
+                  {readerAvailable && (
+                    <CoPilotPanel
+                      state={copilot}
+                      reading={readSheet.isPending}
+                      autoRead={autoRead}
+                      onAutoReadChange={setAutoReadPersisted}
+                      canRead={canRead}
+                      onRead={runReader}
+                      onConfirm={findingIds => {
+                        if (!copilot?.runId) return;
+                        confirmFindings.mutate({
+                          runId: copilot.runId,
+                          findingIds,
+                          confirmed: true,
                         });
-                        toast.success(
-                          `Stamping ${assembly.name} — click to place.`
-                        );
                       }}
+                      onDismiss={findingIds =>
+                        dismissFindings.mutate({ findingIds })
+                      }
+                      onCorrect={(findingId, symbolLinkId) =>
+                        correctFinding.mutate({
+                          findingId,
+                          symbolLinkId,
+                          confirmed: true,
+                        })
+                      }
+                      onJumpTo={at => {
+                        setFocusPoint(at);
+                        window.setTimeout(() => setFocusPoint(null), 2200);
+                      }}
+                      symbols={symbols}
+                      onAsk={question => {
+                        if (!activeSheet) return;
+                        const snapshot = snapshotPage(
+                          pageCanvas.current,
+                          pageCanvasScale.current
+                        );
+                        if (!snapshot) return;
+                        askCopilot.mutate({
+                          sheetId: activeSheet.id,
+                          question,
+                          pageImage: snapshot.image,
+                          pageText: pageTextByPage.current.get(page) ?? "",
+                        });
+                      }}
+                      asking={askCopilot.isPending}
+                      answer={copilotAnswer}
+                      onClearAnswer={() => setCopilotAnswer(null)}
                     />
-                  </>
-                }
-                totals={totals}
-                selectedRunId={selectedRunId}
-                onSelectRun={setSelectedRunId}
-                onRemoveRun={id => removeRun.mutate({ id })}
-                onCommitRun={id => commitRun.mutate({ id })}
-                onAcceptSuggestion={id => acceptSuggestion.mutate({ id })}
-                onAddCircuit={(runId, name, conductorCount) =>
-                  addCircuit.mutate({ runId, name, conductorCount })
-                }
-                onUpdateCircuit={(id, conductorCount) =>
-                  updateCircuit.mutate({ id, conductorCount })
-                }
-                onRemoveCircuit={id => removeCircuit.mutate({ id })}
-              />
-            </ResizablePanel>
-          </ResizablePanelGroup>
+                  )}
+                  <LayersPanel
+                    present={present}
+                    state={effectiveLayers}
+                    onChange={update =>
+                      setLayerState(previous =>
+                        update(
+                          previous ??
+                            allLayersOn([...layeredStamps, ...layeredRuns])
+                        )
+                      )
+                    }
+                    filtered={hiddenCount > 0}
+                    hiddenCount={hiddenCount}
+                  />
+                  <LegendPanel
+                    symbols={symbols}
+                    assemblies={allAssemblies.map(a => ({
+                      id: a.id,
+                      name: a.name,
+                      category: a.category,
+                    }))}
+                    activeAssemblyId={stampAssembly?.id ?? null}
+                    capturing={capturingSymbol}
+                    onStartCapture={() => setCapturingSymbol(true)}
+                    onCancelCapture={() => setCapturingSymbol(false)}
+                    onLink={(symbolId, assemblyId) =>
+                      linkSymbol.mutate({ id: symbolId, assemblyId })
+                    }
+                    onUnlink={id => unlinkSymbol.mutate({ id })}
+                    onRemove={id => removeSymbol.mutate({ id })}
+                    onUseSymbol={symbol => {
+                      const assembly = allAssemblies.find(
+                        a => a.id === symbol.assemblyId
+                      );
+                      if (!assembly) return;
+                      setStampAssembly({
+                        id: assembly.id,
+                        name: assembly.name,
+                      });
+                      toast.success(
+                        `Stamping ${assembly.name} — click to place.`
+                      );
+                    }}
+                  />
+                </>
+              }
+              totals={totals}
+              selectedRunId={selectedRunId}
+              onSelectRun={setSelectedRunId}
+              onRemoveRun={id => removeRun.mutate({ id })}
+              onCommitRun={id => commitRun.mutate({ id })}
+              onAcceptSuggestion={id => acceptSuggestion.mutate({ id })}
+              onAddCircuit={(runId, name, conductorCount) =>
+                addCircuit.mutate({ runId, name, conductorCount })
+              }
+              onUpdateCircuit={(id, conductorCount) =>
+                updateCircuit.mutate({ id, conductorCount })
+              }
+              onRemoveCircuit={id => removeCircuit.mutate({ id })}
+            />
+          </SidePanel>
         </div>
       )}
 

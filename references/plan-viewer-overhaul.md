@@ -1,6 +1,6 @@
 # Plan viewer overhaul — the plan
 
-Written 2026-09-17. **Phases 1, 1a, 2 and 3 are shipped; everything else is
+Written 2026-09-17. **Phases 1, 1a, 2, 3 and 4 are shipped; everything else is
 still plan.** This is the agreed shape of the work, the order it happens in, and
 the decisions already made, so that none of it has to be re-derived in six weeks.
 
@@ -298,21 +298,22 @@ Each phase ships and gets used before the next starts.
 > **Re-ordered 2026-09-17 after testing Phase 1 on the live site.** The order
 > below is the current one; § 4.1 records what the testing changed and why.
 
-| Phase  | What                                                     | DB change                |
-| ------ | -------------------------------------------------------- | ------------------------ |
-| **1**  | ~~Zoom, pan, and the three viewer bugs~~ **shipped**     | No                       |
-| **1a** | ~~Page-flip fit bug + tool discoverability~~ **shipped** | **No**                   |
-| **2**  | ~~Two-point scale calibration~~ **shipped**              | No (reuses `scaleRatio`) |
-| **3**  | ~~Sharp re-render of the visible area~~ **shipped**      | **No**                   |
-| **4**  | The layout: full screen, top toolbar, collapsing panels  | **No**                   |
-| **4b** | Measure-only tool                                        | **No**                   |
-| **5**  | **Verticals on runs — the money phase**                  | **Yes**                  |
-| **6**  | Three levels of effort                                   | **Yes** — groups         |
-| **7**  | Run settings: allowances, materials, sizes, ground       | **Yes**                  |
-| **8**  | **Verticals on stamps**                                  | **Yes** (small)          |
-| **9**  | Editing runs: drag a vertex, insert/remove points        | No                       |
-| **10** | AI reader tiling, and the daily-limit question with it   | No                       |
-| **11** | Tablet and touch                                         | No                       |
+| Phase  | What                                                                       | DB change                |
+| ------ | -------------------------------------------------------------------------- | ------------------------ |
+| **1**  | ~~Zoom, pan, and the three viewer bugs~~ **shipped**                       | No                       |
+| **1a** | ~~Page-flip fit bug + tool discoverability~~ **shipped**                   | **No**                   |
+| **2**  | ~~Two-point scale calibration~~ **shipped**                                | No (reuses `scaleRatio`) |
+| **3**  | ~~Sharp re-render of the visible area~~ **shipped**                        | **No**                   |
+| **4**  | ~~The layout: top bar, collapsing panels, focus mode~~ **shipped**         | **No**                   |
+| **4b** | Measure-only tool                                                          | **No**                   |
+| **5**  | **Verticals on runs — the money phase**                                    | **Yes**                  |
+| **6**  | Three levels of effort                                                     | **Yes** — groups         |
+| **7**  | Run settings: allowances, materials, sizes, ground                         | **Yes**                  |
+| **8**  | **Verticals on stamps**                                                    | **Yes** (small)          |
+| **9**  | Editing runs: drag a vertex, insert/remove points                          | No                       |
+| **9a** | **AI-assisted legend capture** — see § 9, and § 9.6 for why it precedes 10 | **Yes** (small)          |
+| **10** | AI reader tiling, and the daily-limit question with it                     | No                       |
+| **11** | Tablet and touch                                                           | No                       |
 
 ### 4.1 What live testing of Phase 1 changed
 
@@ -807,7 +808,80 @@ rendered at travels WITH the bitmap, so the two cannot disagree. A constant kept
 in step by hand is the bug waiting to happen, and this one had already been
 noted twice before it was fixed.
 
-## 4a. Phase 4 — the layout. PROPOSAL, not yet approved
+### Step 4 — the patch was still soft, and the reason was the rounding. FIXED 2026-09-17
+
+Step 3 shipped and the sheet was tested at 150% on a real machine. The verdict
+was **"better, but still pretty fuzzy"** — which was right, and the cause was in
+this file's own arithmetic rather than anywhere exotic.
+
+**Measured in the running app at 97% zoom on the DPR-2 screen: the sharp patch
+was being displayed at 1.0335 bitmap pixels per device pixel.** Not one. The
+browser was resampling every line on it down by 3.4%, and a one-pixel hairline
+resampled by any amount is a grey smear.
+
+Two causes, both of them halves of the same mistake — _close to 1:1 is not 1:1_.
+
+**1. `SHARP_SCALE_STEP` rounded the render scale UP to a 0.25 step.** It was
+written to stop a one-notch wheel zoom throwing away a good bitmap, and the
+rounding direction was chosen so the picture could never be coarser than asked
+for. The unexamined half is that **denser is not better**: 97% zoom wants 2.91x,
+the step gave 3.0x, and the surplus resolution has to be squeezed away at
+composite time. Worst case at the bottom of a step is 8% of squeeze.
+
+So the scale is exact now (`sharpRenderScale` returns `base x zoom x dpr` and
+nothing else), and `regionStillGood` compares scales **two-sided** against
+`SHARP_SCALE_TOLERANCE` — an over-dense bitmap is refused exactly as an
+under-dense one is. The cost is one extra region render per settle, which is
+25–96ms measured; the thing it buys is the whole point of the layer.
+
+**2. The patch's edges landed between device pixels.** Even at a perfect scale,
+a composited layer whose origin is at device x = 228.88 is resampled. Fixed by
+snapping both the viewport transform and the patch's own offset to whole device
+pixels (`snapToDevicePixel`), and by sizing the patch from the BITMAP rather
+than from `rect x drawnScale` — the worker rounds a region's pixel size up to
+whole pixels, so the two differ by up to one pixel, which is enough to make the
+ratio 0.9995 instead of 1.
+
+**Re-measured after the fix, same sheet, same machine: 1.0000 bitmap pixels per
+device pixel, with the patch's edges within 0.02 of a device pixel of the grid.**
+Specification text at 176% is clean-edged.
+
+#### What this cost, and what to not conclude
+
+`view.x` and `view.y` are **not** rounded — only the transform that draws them
+is. Every measurement, every hit test and every stored point still reads the
+exact value, so snapping cannot accumulate into drift. The visible shift is at
+most half a screen pixel.
+
+**Do not reintroduce a scale step as an optimisation.** It looks free and it is
+not: it trades a render that costs 25–96ms, once, after the user has stopped
+moving, for a drawing that is softly wrong the whole time they are reading it.
+The settle delay and `regionStillGood`'s rectangle test are what keep the render
+count down, and they still do.
+
+#### How to check it yourself, in the console
+
+Every render logs one line, prefixed `[plan]`. On a sheet at rest there are two
+kinds:
+
+```
+[plan] page 1 whole page at 1.50x — 1252ms, 3888x2592 (10.1 Mpx, 38 MB)
+[plan] page 1 region 750x570pt at 921,579 at 2.91x — 71ms, 2249x1709 (3.8 Mpx, 15 MB)
+```
+
+- **`whole page`** is the backdrop — one per sheet, at `RENDER_SCALE`. It is
+  always there and says nothing about sharpness.
+- **`region`** is the sharp patch. **If there is no `region` line after you zoom
+  and stop, the patch never fired**, and the drawing you are looking at is the
+  stretched backdrop.
+- **`ASKED ... CUT TO ...`** on a region line means the answer came back too
+  small — the budget refused the scale, and the line says how many times softer
+  than the screen the patch therefore is.
+
+"It never asked" and "it asked and the answer was too small" are different
+lines, deliberately, because they have different causes and different fixes.
+
+## 4a. Phase 4 — the layout. BUILT 2026-09-17
 
 **The whole point of this phase is that the drawing gets much bigger.**
 Everything below serves that and nothing else.
@@ -901,6 +975,76 @@ same way. One key on, same key off.
 
 Sharp re-render is Phase 3 and lands first. Tablet and touch stay at Phase 11 —
 this is laptop and desktop only.
+
+### BUILT 2026-09-17 — and measured
+
+Everything above was proposed and is now shipped. What it actually did, on the
+same 1536x791 screen the "what it is today" table was measured on:
+
+| Arrangement          | Drawing viewport | Share of screen |
+| -------------------- | ---------------- | --------------- |
+| Before this phase    | 827 x 646        | 44%             |
+| Both panels open     | 796 x 689        | 45%             |
+| Work pane folded     | 1196 x 689       | 68%             |
+| Both folded          | 1436 x 689       | 81%             |
+| **Focus mode (`F`)** | **1436 x 750**   | **89%**         |
+
+**Panels open is 45%, barely up from 44%, and that is expected** — the width
+lost to the two chevron rails very nearly cancels the height won by deleting the
+bottom bar. The phase was never about the open arrangement. It is about the
+other four rows, which did not exist before, and about it costing one keystroke
+to reach them.
+
+**Focus mode also hides the bid header**, which is where the last 8% comes from.
+Everything on that row is about the BID — its name, its materials list, adding
+another plan — and none of it is reached mid-count.
+
+#### What was built
+
+- **One top bar**, replacing the pager row AND the bottom tool bar. Sheet chip
+  with prev/next and a thumbnail grid, then the tools (Conduit, Cable, Stamp,
+  Measure), then the scale chip and its remedy, the zoom cluster and the focus
+  toggle. It wraps rather than clipping.
+- **The zoom controls are PORTALED up from `PlanPane`**, the same trick the
+  trace layer already uses for its own chrome. Only the pane knows the zoom;
+  only the bar has the room. `controlsTarget` is null-safe, so the component
+  still works on its own.
+- **`SidePanel`** — the fold, the chevron on the inner edge, and the drag. The
+  rail IS the resize handle, because it is already exactly where one belongs
+  and a second 4px target beside it would be a target nobody can hit. The
+  chevron sits at the top of the rail and stops the drag.
+- **`SheetChip`** — the sheet you are on, one click either way, and a 3-column
+  thumbnail grid behind the name. Thumbnails are drawn at 360px, which is 160
+  CSS px at DPR 2, because the point is recognising a sheet by its SHAPE and a
+  blurred shape is no shape. Verified on the 5-sheet Old Blueridge set: the
+  three specification sheets and the two floor plans are told apart instantly.
+- **`lib/takeoffPanels.ts`** — the arrangement as a pure module with 10 tests.
+  Focus mode has to put the panels BACK the way they were, which means the
+  remembered arrangement and the one on screen are different things; written
+  inline that is four booleans that can disagree, and the way it fails is that a
+  panel never comes back.
+- **`react-resizable-panels` is no longer used on this screen.** Its percentage
+  units and imperative collapse were more machinery than three flex children
+  needed once collapsing was the point rather than dragging.
+
+#### Thumbnails are rendered ONLY while the grid is open
+
+The worker draws one thing at a time. A background pass over a 40-sheet set
+would queue itself in front of the sharp patch for the sheet being read — the
+drawing would go soft every time the sheet picker was opened, which is a strange
+thing for a picker to do. `SheetChip` reports `onBrowsing`, the pane renders one
+sheet at a time while that is true, and each picture appears as it arrives.
+
+#### What was NOT built
+
+**Tablet and touch stay at Phase 11.** The rails are 18px, which is a mouse
+target, not a thumb target.
+
+**The bid header is hidden in focus mode rather than folded into the top bar.**
+Folding it in was considered: at 1536px the bar already carries eleven controls
+and adding a bid name, Materials list and Add PDF would make it wrap on any
+laptop. One keystroke removes it entirely, which is better than making it
+smaller.
 
 ## 4c. Typed-length runs — draw the path, type the length
 
@@ -1173,6 +1317,72 @@ sheet lands on something like `1:97.3`, and rounding it to `1/8" = 1'-0"` would
 throw away the accuracy just bought while looking more authoritative than the
 honest number. `formatRatio` already falls back to `1:nnn` for this.
 
+## 5c. THE APP SUGGESTS, THE ESTIMATOR CONFIRMS
+
+**The governing rule for every AI feature this product will ever have.**
+Decided 2026-09-17. It is short, and it is not negotiable.
+
+**The AI does the work. The estimator makes every decision that has money
+attached to it.** The app proposes; a person accepts. Never the other way
+round.
+
+A thing the model produced may sit on screen, be counted in a "found 47"
+summary, be highlighted on the drawing and be one click from being real. What it
+may never do is **arrive on the bid without somebody having said yes to it.**
+
+### This is not new — it is the existing rule, extended
+
+§ 5a governs measurement: nothing in the measuring path may be biased in the
+estimator's favour, and all padding is explicit and adjustable. This is the same
+principle one layer up, and the reader already obeys it in the one place it
+exists so far. `shared/copilotConfidence.ts`:
+
+> _"An illegible mark does not become a low-confidence proposal. It becomes a
+> FLAG: this spot on the drawing needs your eyes, and nothing is proposed for
+> it."_
+
+and
+
+> _"A wrong high-confidence proposal costs more than a missed one. A miss leaves
+> the estimator counting a symbol by hand, which is what they do today; a false
+> accept puts a quantity on a bid nobody checked."_
+
+**That asymmetry is the whole rule.** Everything below is what it means for
+features that do not exist yet.
+
+### What it forbids, concretely
+
+- **No auto-accept, at any confidence, ever.** Not "above 95% we just take it".
+  A threshold that high is exactly where a mistake is least likely to be
+  noticed, because everything around it was right.
+- **No remembered answer applying itself to a new plan set.** See § 9 — this is
+  the sharp edge of the whole legend feature, and it gets its own rule.
+- **No silent re-reads changing a number that was already confirmed.** Once an
+  estimator has said yes, the app has their answer, not its own.
+- **No confidence tuned up to look better.** See § 10.3.
+- **No hiding what the app was unsure about.** A reader that flags ten uncertain
+  marks is more useful than one that confidently reports 47 when the answer is
+  52, because the first one can be finished and the second one cannot be
+  checked.
+
+### What it costs, and why that is the right trade
+
+It costs clicks. Twenty symbols captured from a legend is twenty confirmations,
+and it is tempting to say the app should just get on with it for the ones it is
+sure about.
+
+**The clicks are the product.** What a contractor is buying is a number they can
+stand behind in front of a customer. A count they did not agree to is a count
+they cannot defend, and the first time one of those loses a job the tool is
+finished — not because the AI was usually wrong, but because it was wrong once
+and nothing on screen had ever asked.
+
+So the design job is never "how do we skip the confirmation". It is **"how do we
+make the confirmation take a second instead of a minute"** — a tap instead of a
+drag, a batch instead of a queue, a yes/no instead of a form. § 9 is that idea
+applied to the legend, and it is the shape every future AI feature here should
+take.
+
 ## 6. Decisions already made — do not re-open without saying why
 
 **NO CONDUIT FILL CHECKING. EVER.** Decided 2026-09-17. The app prices what the
@@ -1249,9 +1459,426 @@ two different things that happen to share a unit.
 
 ## 8. Still open
 
-- **How far should sharp zoom go?** Re-rendering at high zoom costs render time
-  on dense sheets (0.5–13s). There is a real trade between "sharp at 800%" and
-  "instant". Suggested: sharp to ~400%, stretch beyond. Needs a look at a real
-  E-sheet. **A Phase 1 decision, and the only question still open.**
-- **How far should sharp zoom go?** — see above. The only question left open,
-  and it is a Phase 1 decision to be made against a real E-sheet.
+- **How far should sharp zoom go? — ANSWERED 2026-09-17, and the question turned
+  out to be the wrong one.** It assumed sharpness gets more expensive with zoom,
+  and asked where to stop paying. Region rendering removed the premise: the
+  region shrinks exactly as fast as the resolution grows, so the cost is flat at
+  11–15 MB and 25–96ms across the entire range (§ 4b). 24x was reached for 14 MB.
+  **Sharp goes all the way to `MAX_ZOOM`, and there is nothing to trade.**
+- **How precise does a legend match have to be before it is worth suggesting?**
+  A design target is set in § 9.5 and the instrumentation to settle it is
+  specified there, but the number itself cannot be decided from a chair — it
+  needs real sets in front of a real estimator.
+
+## 9. AI-assisted legend capture — PROPOSAL, Phase 9a
+
+**Proposed 2026-09-17. Recommended as the NEXT AI work, ahead of tiling — see
+§ 9.6, which argues against the order § 10 ranks them in.**
+
+Open a legend sheet. The app outlines every symbol it can see, with the label it
+read beside each one. You tap the ones you want. Twenty symbols becomes one
+screen instead of twenty drag-a-box-and-type operations.
+
+Governed by § 5c throughout: the app outlines, the estimator confirms.
+
+### 9.1 Why this is the best-value AI work in the product
+
+**A legend sheet is the easiest thing in a plan set for a model to read.**
+Symbols are isolated, spaced out, drawn at a readable size, and each one has a
+text label right beside it. That is the opposite of a dense floor plan, where
+the same symbol is overlapped by homerun arcs, circuit tags, dimension strings
+and wall hatching.
+
+**Capturing a legend by hand is exactly the setup work that makes a new user
+quit.** It is twenty repetitions of the same fiddly operation before the app has
+produced a single number. Nothing else in the product has that shape.
+
+**It is the biggest accuracy jump available downstream.** Once symbols are
+linked, counting on a floor plan is matching a known shape rather than guessing
+at a squiggle — and `shared/copilotConfidence.ts` makes this structural rather
+than merely helpful: **an unlinked symbol can never reach `high` confidence, no
+matter what the model says about it.** A reader run against an empty legend
+produces a list of `low` findings by construction.
+
+**It is paid once per plan set, not per sheet.** On the cost figures in § 11.4
+that is roughly a cent, against roughly eighteen cents for every dense sheet the
+reader looks at. There is no other AI feature here with that ratio.
+
+### 9.2 What it does, in order
+
+1. **Read the sheet's text layer first, with no model call at all.** `pageText`
+   already exists in the worker. Most plan sets are vector PDFs with a real text
+   layer, and on a legend sheet that layer contains the labels — often exactly,
+   with positions. This is the unglamorous half of the feature and probably the
+   highest-value part of it: it turns "read the label" from a task with an error
+   rate into a lookup, and it tells the model where to look, because a legend
+   symbol sits beside its label. Costs nothing and cannot hallucinate.
+
+   Scanned sets have no text layer. So this is an accelerator, never a
+   dependency — everything below still works without it.
+
+2. **Ask the model for boxes.** One call per legend region, on a region render
+   (§ 4b) at a scale where the symbols are legible — the same machinery the
+   viewer's sharp patch uses. It returns, for each symbol it can see: a
+   rectangle in page points, the label it read, and a confidence.
+
+3. **Outline them on the sheet.** Not a list in a panel — boxes drawn on the
+   drawing itself, with the read label beside each. The estimator is looking at
+   the legend; the proposals belong on it.
+
+4. **Tap to confirm, tap to reject, tap to correct.** Confirming captures the
+   crop as a `symbolLinks` row exactly as the manual path does today. Correcting
+   means fixing the label or nudging the box.
+
+5. **Then, and only then, offer a meaning.** A captured symbol with no assembly
+   is already a supported state (`symbolLinks.assemblyId` is nullable on
+   purpose, and the schema says why). Linking it to an assembly is a second,
+   separate confirmation — see § 9.4.
+
+6. **Manual circle mode stays, as the backup.** The drag-a-box capture that
+   exists today (`SymbolCapture.tsx`) is not replaced and not hidden; it is what
+   catches whatever the model missed. The change is that it stops being the
+   first thing a new user is asked to do.
+
+### 9.3 Matching a new symbol against ones already confirmed
+
+**Question 1, answered: all three, as a funnel, in cost order — and the cheapest
+one does most of the work.**
+
+A user with a few jobs behind them has perhaps 30–200 rows in `symbolLinks`.
+Comparing a new symbol against all of them with a model call is the wrong shape
+before it is anything else.
+
+**Stage 1 — the label, free and deterministic.** `symbolLinks.lookupKey` already
+exists: the lower-cased, collapsed label, indexed, and already what uniqueness is
+judged on. A legend's own label text (§ 9.2 step 1) matched against it settles
+the easy majority outright. Real labels vary — `DUPLEX RECEPT.`,
+`RECEPTACLE, DUPLEX 20A`, `DUPLEX RECEPTACLE, 20A, 18" AFF` — so this wants the
+fuzzy ranking the product already has in `client/src/lib/smartSearch.ts` rather
+than string equality. **Reuse that; do not write a second matcher.** Cost: zero
+tokens, sub-millisecond, 200 candidates down to about three.
+
+**Stage 2 — cheap shape descriptors, to rank those three.** Not pixel
+correlation. Raw template matching on the stored thumbnails is brittle in
+exactly the ways that matter: the same symbol is drawn at a different size on a
+1/8" sheet than on a 1/4" one, line weights differ between offices, and the
+thumbnails were captured at whatever resolution the sheet happened to be drawn
+at. What survives all of that is a handful of scalars computed from the
+binarised crop:
+
+- aspect ratio,
+- ink fraction (how much of the box is drawn on) — this is what separates a
+  FILLED triangle from a hollow one, which is the exact distinction the § 9.4
+  warning is about,
+- connected-component count (one blob, or a symbol with a separate tick),
+- whether the outer boundary is closed, and roughly how round it is.
+
+Four or five numbers, compared by distance, computed on a canvas in about a
+millisecond. It will not tell two similar symbols apart reliably, and it is not
+being asked to — it is being asked to ORDER three candidates and to veto an
+obviously wrong one. **Honest limit: this is a ranker, not a decider.**
+
+**Stage 3 — the model, on the final yes/no only.** Vision is genuinely good at
+"are these the same symbol, allowing for line weight and scale", and genuinely
+bad value at being run 200 times. So it sees the new crop and the top one or two
+stored thumbnails, once, as part of the call it is already making about this
+legend sheet. Cost: negligible on top of step 2 of § 9.2.
+
+**Stage 4 — the estimator.** Always. See § 5c.
+
+**What is NOT realistic, so nobody spends a week finding out:** training anything,
+embedding models over symbol crops, or full-page template matching across a set.
+The library is too small to train on, the symbols are too similar for a generic
+image embedding to separate, and a user with 40 symbols will never generate
+enough labelled data to make any of it better than the funnel above.
+
+### 9.4 THE THING THAT NEEDS CARE: a remembered match must never apply itself
+
+**Engineering firms use different symbols.** There are common conventions and
+every office has a house style. The same shape means different things on two
+sets — a filled triangle might be an exit sign on one job and a special-purpose
+outlet on another. The same office can change its own house style between a 2019
+set and a 2026 set.
+
+So the rule, which is § 5c with no discretion left in it:
+
+> **A remembered symbol may be SUGGESTED on a new plan set. It may never be
+> APPLIED to one.**
+
+What that means in practice:
+
+- The suggestion is a question with the evidence attached: the stored thumbnail,
+  the new crop, and the label that was read. _"This looks like your duplex
+  receptacle — yes or no?"_ Five seconds, once per set.
+- **Confirmed once per plan set — per `bid_pdfs` document, not per user and not
+  per customer.** A second PDF attached to the same bid is a second set and asks
+  again. The unit is the drawing package, because that is the thing a legend
+  belongs to.
+- A rejection is remembered for that set too, so the app does not ask twice.
+- Nothing about the suggestion may write to the bid. Confirming links a symbol
+  to an assembly; it does not count anything.
+
+**Why the confirmation cannot be skipped even when the app is certain.** A
+symbol that silently means the wrong thing does not produce one wrong number —
+it produces a whole sheet of wrong numbers that all look consistent with each
+other, and it produces them under a label the estimator recognises and trusts.
+It is the single most expensive failure available to this product, and five
+seconds per set is an absurdly cheap insurance premium against it.
+
+### 9.5 How confident before it is worth suggesting
+
+**Question 2, answered — and the honest part of the answer is that the number
+cannot be decided from a chair.**
+
+The user's framing is the right one: a suggestion rejected nine times out of ten
+is worse than no suggestion, because it costs attention every time and teaches
+people to dismiss the whole mechanism. The quantity that matters is therefore
+not the model's score but **precision** — of the suggestions shown, what
+fraction get accepted.
+
+**The design target: four out of five suggestions accepted.** Below roughly
+three out of four, a suggestion becomes a thing you read and dismiss, which
+costs more than picking the assembly from a list would have.
+
+**This floor is NOT the reader's floor, and conflating them would be a mistake.**
+`HIGH_CONFIDENCE_FLOOR` is 0.75 because there, a wrong accept puts a quantity on
+a bid. Here the two error costs are different again:
+
+- A wrong SUGGESTION costs one glance, and the fallback (pick the assembly from
+  a list) is already fast. So the bar can sit lower than the reader's.
+- A wrong ACCEPT costs § 9.4 — a symbol quietly meaning something else across a
+  whole set. So the bar on what can be accepted without evidence is higher.
+
+The resolution is not one number, it is **showing the evidence**. A suggestion
+that displays the stored thumbnail beside the new crop is one a wrong answer
+fails visibly — the estimator sees two different shapes and says no in half a
+second. A suggestion that shows only a name is one a wrong answer passes. So:
+
+- **Suggest at moderate confidence, always with both pictures and the read
+  label.**
+- **Ship the floor conservative and loosen it on evidence, never the reverse.**
+  A floor that starts too high produces a few good suggestions and a quiet
+  feature; a floor that starts too low produces noise and the feature is dead
+  before it is measured.
+- **Measure it.** Record accept/reject per suggestion with the tier it was shown
+  at — outcome and tier only, no crops, no labels, no drawing content, following
+  the `ai_usage_daily` precedent of storing sizes and never contents. That is
+  what turns "is the floor right" from an argument into a number.
+
+### 9.6 Where this belongs relative to the tiling work
+
+**Question 3, answered: legend capture FIRST. This disagrees with the value
+ranking in § 10, and the disagreement is deliberate.**
+
+§ 10 ranks tile size above legend capture by EFFECT — that is right, and it is a
+ranking of value, not of schedule. Three reasons the schedule inverts it:
+
+1. **The expensive half of tiling is already built.** § 4b step 2 made the
+   worker's contract a REGION, and said at the time that Phase 10 needs exactly
+   this. What remains of "tiling" is choosing a grid, skipping empty tiles,
+   dispatching in parallel and merging — real work, but not the hard part.
+
+2. **A tiled read against an empty legend spends the expensive call to produce
+   `low` findings.** That is not a tuning problem, it is `copilotConfidence`
+   working as designed: an unlinked symbol cannot reach `high`. Building the
+   accurate reader first means paying per sheet for a result the confidence
+   rules will not let anyone act on.
+
+3. **Once per set is cheaper to get wrong.** Legend capture is one or two calls
+   per plan set (§ 11.4); tiling is roughly eighteen cents per dense sheet.
+   Iterating on the cheap once-per-set feature until it is right, and then
+   turning on the per-sheet one, is the order that costs least to learn in.
+
+**So: § 9 is Phase 9a, § 10's tiling is Phase 10.** If only one ever gets built,
+build this one.
+
+---
+
+## 10. The reader's accuracy — ranked by what each is worth
+
+This is a ranking of VALUE. For the order to build them in, see § 9.6.
+
+### 10.1 Zoomed-in tiles instead of one shrunk sheet — the biggest by far
+
+Already the plan, and unchanged. **A receptacle symbol disappears before the
+model ever sees it at full-sheet scale.** A 36x24 sheet handed over as one image
+has its symbols reduced to a few pixels each; no amount of prompting recovers
+information that is not in the picture. Nothing else on this list matters while
+that is true.
+
+The machinery is built (§ 4b). What remains is § 11.
+
+### 10.2 Legend first — the biggest lever after tile size
+
+See § 9. Restated here only so the ranking is complete: linking symbols turns
+counting from recognition into matching, and the confidence rules already refuse
+to call an unlinked symbol `high`.
+
+### 10.3 Letting it say "I am not sure" — this stays, and it is a rule
+
+It already works this way, and **that must not be treated as a first draft to be
+improved on.** Writing it down as a law, since it was asked for as one:
+
+> **Confidence is never tuned up to make the reader look better.** Not the
+> floors, not the prompt, not the scoring. If the reader is unsure, the estimator
+> is told it is unsure.
+
+**A reader that flags ten uncertain marks beats one that confidently reports 47
+when the answer is 52.** The first can be finished — the estimator looks at ten
+spots and the count is right. The second cannot be checked at all, because
+nothing on screen distinguishes the five it got wrong from the forty-two it got
+right, and the only way to find them is to recount the sheet by hand, which is
+the entire job the reader was supposed to do.
+
+`shared/copilotConfidence.ts` already carries the reasoning, including the part
+that is easiest to erode under pressure: an illegible mark becomes a FLAG with
+nothing proposed, not a low-confidence proposal. **There is no allowed action
+that turns an `unreadable` into a stamp**, and `shared/copilotActions.ts`
+enforces it. Keep it that way.
+
+The pressure to break this rule will come dressed as a metric — "we only propose
+60% of what is on the sheet". The answer is that the other 40% is being reported
+honestly, and a number that goes up by relabelling guesses as findings has not
+moved.
+
+### 10.4 Reading dense sheets twice and comparing — RECOMMENDED AGAINST as stated
+
+**Question 4, and this is the item to cut.** The user already hedged it with
+"only if the cost numbers support it". The problem is not the cost.
+
+**Two passes of the same model over the same image are correlated, not
+independent.** A symbol that is genuinely ambiguous is ambiguous both times; a
+symbol that is clear is clear both times. So agreement mostly re-states the
+confidence score the model already returned, and disagreement mostly surfaces
+the borderline cases that `low` already flags. Double the bill for a signal
+largely already in hand — and, worse, "two passes agreed" is a **more
+persuasive-looking** badge than a confidence score, attached to no more
+information. That is a § 5c problem, not just a cost one.
+
+**The version that would genuinely be independent is worth keeping.** Shift the
+tile grid by half a tile on the second pass. That breaks the correlation for a
+real reason: a symbol cut by a seam in pass one is whole in pass two, and seam
+losses are a failure mode tiling actually introduces. So:
+
+- **Drop plain double-reading.**
+- **Keep offset-grid re-reading as an option, and run it only over tiles that
+  produced a flag or that sit on a seam.** The cost is then proportional to
+  uncertainty rather than to sheet area, which is the right shape.
+
+---
+
+## 11. The reader's speed
+
+All four of these are agreed and none of them is controversial. The notes are
+about how, and about the traps.
+
+### 11.1 Run tiles in parallel, not one after another
+
+**The parallelism is in the API calls, not the rasterising.** The worker
+processes one message at a time (`pdfRenderer.worker.ts`), so tiles are
+RENDERED serially whatever happens — and that is fine, because a region render
+is 25–96ms measured (§ 4b) against seconds for a model call.
+
+**Bounded concurrency, not unbounded.** Four in flight is the same number the
+multipart uploader settled on for the same reasons: it saturates a normal
+connection without turning one user into a thundering herd. Unbounded fan-out
+over a 40-tile sheet would also collide with the provider's rate limits and with
+the per-person daily allowance (`shared/aiLimits.ts`), and the failure mode
+there is a half-read sheet.
+
+### 11.2 Skip empty tiles — check for ink before spending a call
+
+A lot of a floor plan is white paper. The check is cheap and it runs on a bitmap
+already in hand: draw the tile down to something small, count pixels that are
+not background, skip the tile if the count is zero.
+
+**Skip only tiles that are genuinely blank.** A threshold set to "nearly blank"
+will eventually skip a tile containing one faint symbol, and that is a silent
+miscount — the exact failure § 10.3 exists to prevent. Zero ink is a fact;
+"not much ink" is a guess.
+
+**Say how many were skipped**, in the run summary. A sheet where 30 of 40 tiles
+were skipped is either mostly white paper or a rendering fault, and the number
+is the only thing that tells them apart.
+
+### 11.3 Show results as they arrive
+
+Findings stream into the panel as each tile answers, rather than after the last
+one. This is `CoPilotPanel` work rather than reader work, and it follows the
+existing rule for a first load: progressive arrival, never a spinner replacing
+content that is already on screen.
+
+### 11.4 Cache by sheet — read once, never re-read unless asked
+
+**Already true today** — the server returns a stored reading and re-reads only
+when the user asks. Worth writing down is what must invalidate it: nothing
+automatic. Not a new legend link, not a page re-render, not a new app version. A
+re-read is an action the estimator takes, because a reading that changes under
+somebody who has already confirmed half of it is a § 5c violation.
+
+### 11.5 The cost numbers, so the trade-offs above are arguable
+
+From `shared/aiPricing.ts`, Sonnet 5 at $2 per million input tokens and $10 per
+million output. An image costs roughly (width x height) / 750 tokens.
+
+| Work                             | Rough cost |
+| -------------------------------- | ---------- |
+| One 1100x1100 tile, in           | ~$0.003    |
+| A dense 36x24 sheet, 16 tiles    | ~$0.05 in  |
+| The same sheet's findings, out   | ~$0.13 out |
+| **One dense sheet, all in**      | **~$0.18** |
+| A 40-sheet set, every sheet read | ~$7        |
+| **A legend sheet, once per set** | **~$0.01** |
+
+Indicative, and they go stale silently — the console has the bill. Two things
+follow from the shape rather than the precision: **empty-tile skipping is worth
+real money** on a floor plan that is half white paper, and **§ 9.6's ordering
+argument holds by an order of magnitude**, not by a hair.
+
+---
+
+## 12. Question 4 — what I would cut, and what I would add
+
+Asked directly: is anything in §§ 9–11 a bad idea or more trouble than it is
+worth? Four answers, two of them "no".
+
+### CUT: reading a sheet twice with the same grid
+
+Covered in § 10.4. Correlated passes, a persuasive-looking badge over no extra
+information, and double the bill. Keep the offset-grid variant, restricted to
+tiles that flagged.
+
+### ADD: read the legend's TEXT LAYER before spending a token
+
+Folded into § 9.2 step 1, and called out again here because it is the item most
+likely to be skipped as unglamorous. `pageText` already exists in the worker and
+already runs on every sheet for scale detection. On a vector plan set — which is
+most of them — the legend's labels are in that layer exactly, with positions.
+
+That converts the highest-error part of the feature (reading a label) into a
+lookup, and it hands the model a strong prior for WHERE symbols are, since a
+legend symbol sits beside its label. It costs nothing, cannot hallucinate, and
+degrades to nothing on a scanned set.
+
+### NO OBJECTION: manual capture as the backup rather than the front door
+
+Agreed without reservation, and it is barely a build: `SymbolCapture.tsx`
+already implements drag-a-box capture. The change is which one a new user meets
+first, not new machinery.
+
+### NO OBJECTION, WITH ONE SHARPENING: remembering symbols between jobs
+
+The risk was identified correctly and completely in the original ask — different
+offices, different house styles, a filled triangle meaning two different things.
+One thing to sharpen: **the same office can change its own house style between
+sets**, so "remembered" must be re-confirmed per drawing package rather than per
+customer or per user. § 9.4 says `bid_pdfs` document, and that is the reason.
+
+### One thing NOT to build yet, though nobody asked for it
+
+**Do not let the reader propose symbols the legend does not contain**, however
+obvious they look. The model knows what a duplex receptacle usually looks like;
+this product deliberately does not use that knowledge, because symbol meaning
+comes from the user's legend links and nowhere else
+(`shared/copilotConfidence.ts` says so explicitly). It will be tempting when a
+sheet has no legend. The answer to a sheet with no legend is to ask for one.

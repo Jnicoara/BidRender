@@ -440,36 +440,20 @@ export function TraceLayer({
       {withChrome(
         <>
           {/*
-          Out of the drawing, into a corner.
-  
-          It used to sit pinned across the top-centre of the sheet, over the
-          drawing the user is trying to read, and swallowed clicks in that whole
-          region. A warning that covers the work is a warning people learn to
-          resent. Bottom-left, narrow, and click-through except for its own text.
-        */}
-          {blocked && !stamping && (
-            <div className="absolute bottom-3 left-3 max-w-xs pointer-events-none">
-              <div className="rounded-lg border border-[#F5C518]/40 bg-card/95 px-3 py-2 shadow-lg pointer-events-auto">
-                <div className="flex items-start gap-2">
-                  <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#F5C518]" />
-                  <div>
-                    <p className="text-xs font-medium">
-                      {blocked.reason === "not-to-scale"
-                        ? "This sheet is marked not to scale"
-                        : "No scale set — tracing is off"}
-                    </p>
-                    <p className="text-[0.7rem] text-muted-foreground mt-0.5">
-                      Counting still works. {blocked.message}
-                    </p>
-                    <p className="text-[0.7rem] text-muted-foreground mt-1 flex items-center gap-1">
-                      <Ruler className="w-3 h-3" />
-                      Set it on the scale control below the drawing.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+            The no-scale notice is NOT here any more — it is a status chip in
+            the viewer's top bar, beside the button that fixes it.
+
+            It began pinned across the top-centre of the sheet, over the
+            drawing, swallowing clicks in that whole region. It was moved to
+            the bottom-left corner, which was better and still wrong: a panel
+            that sits on the work is a panel people learn to resent, and a
+            warning with no remedy next to it is only an interruption. Status
+            and its remedy now live permanently in the same place, out of the
+            drawing entirely.
+
+            `blocked` still drives the CURSOR and the refusal to start a
+            trace — that part was never about the notice.
+          */}
 
           {stamping && stampAssemblyName && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-[#F5C518]/50 bg-card/95 px-3 py-1.5 shadow-lg pointer-events-auto">

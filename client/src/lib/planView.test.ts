@@ -12,7 +12,8 @@ import {
   MAX_ZOOM,
   MIN_ZOOM,
   REGION_MARGIN,
-  SHARP_SCALE_STEP,
+  SHARP_SCALE_TOLERANCE,
+  snapToDevicePixel,
   clampView,
   clampZoom,
   fitView,
@@ -292,31 +293,62 @@ describe("sharpRenderScale", () => {
   it("reproduces the measured numbers from the real sheet", () => {
     // 100% zoom on a DPR-2 screen needs 3x; 260% needs 7.8x, which is where
     // whole-page rendering stops being possible at all.
-    expect(sharpRenderScale(1.5, 1, 2, 0.0001)).toBeCloseTo(3, 3);
-    expect(sharpRenderScale(1.5, 2.6, 2, 0.0001)).toBeCloseTo(7.8, 3);
+    expect(sharpRenderScale(1.5, 1, 2)).toBeCloseTo(3, 6);
+    expect(sharpRenderScale(1.5, 2.6, 2)).toBeCloseTo(7.8, 6);
   });
 
   it("doubles with devicePixelRatio — the half that is easy to forget", () => {
-    expect(sharpRenderScale(1.5, 2, 2, 0.0001)).toBeCloseTo(
-      sharpRenderScale(1.5, 2, 1, 0.0001) * 2,
+    expect(sharpRenderScale(1.5, 2, 2)).toBeCloseTo(
+      sharpRenderScale(1.5, 2, 1) * 2,
       6
     );
   });
 
-  it("rounds UP to a step, so quantising never costs sharpness", () => {
-    // 1.5 * 1.01 * 2 = 3.03, which must not come back as 3.
-    expect(sharpRenderScale(1.5, 1.01, 2)).toBe(3.25);
-    expect(sharpRenderScale(1.5, 1, 2)).toBe(3);
-    expect(SHARP_SCALE_STEP).toBeGreaterThan(0);
+  it("is EXACT — asking for surplus resolution is not free insurance", () => {
+    /*
+      This used to round up to a 0.25 step, and the step was the bug. A bitmap
+      denser than the screen displays it gets resampled DOWN, which turns a
+      hairline grey exactly as being too coarse does. Measured live at 97% on
+      a DPR-2 screen: wanted 2.91, the step gave 3.0, and the sharp patch was
+      shown at 1.0335 bitmap pixels per device pixel.
+    */
+    expect(sharpRenderScale(1.5, 0.97, 2)).toBeCloseTo(2.91, 6);
+    expect(sharpRenderScale(1.5, 1.01, 2)).toBeCloseTo(3.03, 6);
   });
 
-  it("gives neighbouring zooms one scale, so a nudge reuses the bitmap", () => {
-    expect(sharpRenderScale(1.5, 1.02, 2)).toBe(sharpRenderScale(1.5, 1.08, 2));
+  it("gives a different scale for every zoom, because every zoom needs one", () => {
+    expect(sharpRenderScale(1.5, 1.02, 2)).not.toBe(
+      sharpRenderScale(1.5, 1.08, 2)
+    );
   });
 
   it("returns 0 for nonsense rather than asking for an impossible render", () => {
     expect(sharpRenderScale(1.5, Number.NaN, 2)).toBe(0);
     expect(sharpRenderScale(1.5, 1, 0)).toBe(0);
+  });
+});
+
+describe("snapToDevicePixel", () => {
+  it("puts an offset on a whole device pixel", () => {
+    // 2 device pixels per drawing pixel: 10.3 lands on 20.6 device px, and
+    // the nearest whole one is 21 — which is 10.5 back in drawing pixels.
+    expect(snapToDevicePixel(10.3, 2)).toBeCloseTo(10.5, 6);
+    expect(snapToDevicePixel(10.3, 2) * 2).toBe(21);
+  });
+
+  it("never moves anything by as much as one screen pixel", () => {
+    for (const perPixel of [1, 2, 2.91, 7.8]) {
+      for (const value of [0, 3.14159, -122.7, 1000.001]) {
+        const moved = Math.abs(snapToDevicePixel(value, perPixel) - value);
+        expect(moved * perPixel).toBeLessThanOrEqual(0.5 + 1e-9);
+      }
+    }
+  });
+
+  it("leaves a value alone rather than zeroing it on a nonsense ratio", () => {
+    expect(snapToDevicePixel(12.5, 0)).toBe(12.5);
+    expect(snapToDevicePixel(12.5, Number.NaN)).toBe(12.5);
+    expect(snapToDevicePixel(Number.NaN, 2)).toBe(0);
   });
 });
 
@@ -332,7 +364,7 @@ describe("wantedRegion", () => {
   it("wants a region as soon as the screen can show more than was drawn", () => {
     // The same 100% zoom on a Retina screen: 3x is needed, 1.5x is half of it.
     const want = wantedRegion({ zoom: 1, x: 0, y: 0 }, sheet, 1.5, 2)!;
-    expect(want.scale).toBe(3);
+    expect(want.scale).toBeCloseTo(3, 6);
     expect(want.rect.width).toBeGreaterThan(0);
   });
 });
@@ -372,13 +404,30 @@ describe("regionStillGood", () => {
     ).toBe(false);
   });
 
-  it("accepts one drawn sharper than it needs to be", () => {
+  it("REFUSES one drawn sharper than it needs to be, which is also soft", () => {
+    /*
+      The half that was missing. An over-dense bitmap is not a free bonus: the
+      browser squeezes it down to fit the box, and a resampled hairline is grey
+      whichever direction it was resampled in.
+    */
     expect(
       regionStillGood(
         { rect: have.rect, scale: 8 },
         { rect: have.rect, scale: 3 }
       )
+    ).toBe(false);
+  });
+
+  it("keeps a bitmap whose scale is off by less than the tolerance", () => {
+    const want = { rect: have.rect, scale: 3 };
+    const withinTolerance = 3 * (1 + SHARP_SCALE_TOLERANCE / 2);
+    expect(
+      regionStillGood({ rect: have.rect, scale: withinTolerance }, want)
     ).toBe(true);
+    const outsideTolerance = 3 * (1 + SHARP_SCALE_TOLERANCE * 2);
+    expect(
+      regionStillGood({ rect: have.rect, scale: outsideTolerance }, want)
+    ).toBe(false);
   });
 
   it("says a region covers itself, floating-point noise and all", () => {
