@@ -34,6 +34,8 @@ import {
   markRadiusInOverlay,
   markStrokeInOverlay,
   runAppearance,
+  runStrokeInOverlay,
+  runWidthInOverlay,
 } from "@shared/takeoffMarks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -48,6 +50,15 @@ import {
   type PagePoint,
 } from "@shared/takeoffGeometry";
 import type { Measurability, RunPathType } from "@shared/takeoffQuantities";
+
+/**
+ * How wide a run's invisible click target is, in SCREEN pixels.
+ *
+ * 18 matches what it has always been at 100% zoom; the difference is that it
+ * no longer shrinks with the drawing. Comfortably bigger than a cursor's hot
+ * spot and than the line itself, so aiming at a run means aiming near it.
+ */
+const HIT_TARGET_PX = 18;
 
 export type ExistingRun = {
   id: number;
@@ -172,6 +183,17 @@ export function TraceLayer({
   const ratio = measurability.ok ? measurability.ratio : null;
 
   /** Page points → the overlay's pixel space. */
+  /*
+    Every width this layer draws with, in overlay units, from one clamp.
+
+    Worked out here rather than at each call site so there is one place that
+    knows a run must stay readable on SCREEN while living in a coordinate
+    system that is about to be multiplied by the zoom. See runScreenWidth for
+    the measurement behind the numbers.
+  */
+  const runStroke = runStrokeInOverlay(zoom);
+  const hitWidth = runWidthInOverlay(zoom, HIT_TARGET_PX);
+
   const toScreen = useCallback(
     (p: PagePoint) => ({ x: p.x * renderScale, y: p.y * renderScale }),
     [renderScale]
@@ -324,7 +346,12 @@ export function TraceLayer({
                 points={screen.map(p => `${p.x},${p.y}`).join(" ")}
                 fill="none"
                 stroke={runAppearance(run).color}
-                strokeWidth={isSelected ? 5 : 3}
+                /*
+                  Clamped to a readable band on screen — see runScreenWidth.
+                  Selection keeps the old 5:3 ratio rather than a fixed number,
+                  so a selected run stays proportionally heavier at every zoom.
+                */
+                strokeWidth={runStroke * (isSelected ? 5 / 3 : 1)}
                 strokeOpacity={run.isSuggestion ? 0.55 : 1}
                 /*
                   One dash pattern, two meanings kept apart by which wins.
@@ -345,12 +372,18 @@ export function TraceLayer({
                 }
               />
               {/* A fat invisible line makes the run clickable without needing
-                  pixel-accurate aim on a 3px stroke. */}
+                  pixel-accurate aim on a thin stroke.
+
+                  This needed the same clamp and for a sharper reason: 18 units
+                  is 3.5 SCREEN pixels at Fit, so the run you could not see was
+                  also one you could not click. A target is a thing for a finger
+                  or a cursor, which are sized in screen pixels and not in the
+                  drawing's units. */}
               <polyline
                 points={screen.map(p => `${p.x},${p.y}`).join(" ")}
                 fill="none"
                 stroke="transparent"
-                strokeWidth={18}
+                strokeWidth={hitWidth}
                 onClick={() =>
                   !tracing && onSelectRun(isSelected ? null : run.id)
                 }
@@ -431,10 +464,10 @@ export function TraceLayer({
           <circle
             cx={toScreen(focusPoint).x}
             cy={toScreen(focusPoint).y}
-            r={26}
+            r={runWidthInOverlay(zoom, 26)}
             fill="none"
             stroke="#F5C518"
-            strokeWidth={3}
+            strokeWidth={runStroke}
             strokeDasharray="7 5"
             className="animate-pulse"
           />
@@ -450,7 +483,7 @@ export function TraceLayer({
                 .join(" ")}
               fill="none"
               stroke={RUN_COLOR[pathType]}
-              strokeWidth={3}
+              strokeWidth={runStroke}
               strokeLinejoin="round"
               strokeLinecap="round"
             />
@@ -463,7 +496,7 @@ export function TraceLayer({
                 x2={toScreen(hover).x}
                 y2={toScreen(hover).y}
                 stroke={RUN_COLOR[pathType]}
-                strokeWidth={2}
+                strokeWidth={runStroke * (2 / 3)}
                 strokeDasharray="6 5"
                 strokeOpacity={0.75}
               />
@@ -475,10 +508,10 @@ export function TraceLayer({
                   key={index}
                   cx={screen.x}
                   cy={screen.y}
-                  r={index === 0 ? 6 : 4}
+                  r={runWidthInOverlay(zoom, index === 0 ? 6 : 4)}
                   fill={index === 0 ? RUN_COLOR[pathType] : "#0b0b0b"}
                   stroke={RUN_COLOR[pathType]}
-                  strokeWidth={2}
+                  strokeWidth={runStroke * (2 / 3)}
                 />
               );
             })}

@@ -18,12 +18,18 @@ import {
   MARK_MIN_PX,
   MARK_SHAPES,
   RESERVED_COLORS,
+  RUN_BASE_PX,
+  RUN_MAX_PX,
+  RUN_MIN_PX,
   colorFor,
   markAppearance,
   markPath,
   markRadiusInOverlay,
   markScreenDiameter,
   markStrokeInOverlay,
+  runScreenWidth,
+  runStrokeInOverlay,
+  runWidthInOverlay,
   shapeFor,
 } from "@shared/takeoffMarks";
 
@@ -168,6 +174,76 @@ describe("size — measured against the running app", () => {
       expect(onScreen).toBeCloseTo(markScreenDiameter(zoom), 5);
       expect(onScreen).toBeGreaterThanOrEqual(MARK_MIN_PX - 1e-9);
       expect(onScreen).toBeLessThanOrEqual(MARK_MAX_PX + 1e-9);
+    }
+  });
+});
+
+describe("run width — measured against the running app", () => {
+  it("holds a run visible when the whole sheet is on screen", () => {
+    // 19% measured 0.58px before the clamp — a SUB-pixel line, which the
+    // browser draws by spreading the colour across a whole pixel at partial
+    // alpha. The run did not look thin, it looked absent.
+    expect(RUN_BASE_PX * 0.19).toBeLessThan(1);
+    expect(runScreenWidth(0.19)).toBe(RUN_MIN_PX);
+  });
+
+  it("stops a run covering the route being traced when zoomed in", () => {
+    // MAX_ZOOM is 8, which is 24px unclamped.
+    expect(RUN_BASE_PX * 8).toBe(24);
+    expect(runScreenWidth(8)).toBe(RUN_MAX_PX);
+  });
+
+  it("leaves the familiar middle of the range alone", () => {
+    // The whole point of a clamp rather than a new number: at working zooms a
+    // run is exactly what it has always been, and only the ends move.
+    expect(runScreenWidth(1)).toBe(RUN_BASE_PX);
+    expect(runScreenWidth(1.15)).toBeCloseTo(3.45, 5);
+    expect(runScreenWidth(0.73)).toBeCloseTo(2.19, 5);
+  });
+
+  it("stays a LINE beside the counted shapes", () => {
+    // Both clamps live in this overlay and a later change could raise one
+    // without looking at the other. A run as wide as a third of the widest a
+    // mark ever gets has stopped reading as a line and started competing with
+    // the things it runs between.
+    expect(RUN_MAX_PX).toBeLessThan(MARK_MAX_PX / 3);
+  });
+
+  it("survives a zoom that is not a number", () => {
+    // Same reasoning as the marks: a NaN width renders nothing, and a drawing
+    // that silently loses its runs is worse than an ugly one.
+    expect(runScreenWidth(Number.NaN)).toBe(RUN_MIN_PX);
+    expect(runScreenWidth(0)).toBe(RUN_MIN_PX);
+    expect(runScreenWidth(-3)).toBe(RUN_MIN_PX);
+    expect(Number.isFinite(runStrokeInOverlay(Number.NaN))).toBe(true);
+    expect(Number.isFinite(runWidthInOverlay(0, 18))).toBe(true);
+  });
+
+  it("divides the zoom back out, so the clamp survives the transform", () => {
+    for (const zoom of [0.05, 0.19, 0.5, 1, 2, 4, 8]) {
+      const onScreen = runStrokeInOverlay(zoom) * zoom;
+      expect(onScreen).toBeCloseTo(runScreenWidth(zoom), 5);
+      expect(onScreen).toBeGreaterThanOrEqual(RUN_MIN_PX - 1e-9);
+      expect(onScreen).toBeLessThanOrEqual(RUN_MAX_PX + 1e-9);
+    }
+  });
+
+  it("keeps the click target a fixed size on SCREEN", () => {
+    // The sharper half of the same fault: 18 overlay units is 3.5 screen px at
+    // Fit, so the run nobody could see was also one nobody could click. A
+    // target is sized for a cursor, which does not zoom.
+    for (const zoom of [0.05, 0.19, 1, 8]) {
+      expect(runWidthInOverlay(zoom, 18) * zoom).toBeCloseTo(18, 5);
+    }
+  });
+
+  it("keeps the target wider than the line it is for, at every zoom", () => {
+    // If the visible stroke ever caught up with the target, aiming NEAR a run
+    // would stop working and you would be back to pixel-accurate aim.
+    for (const zoom of [0.05, 0.19, 0.5, 1, 2, 4, 8]) {
+      expect(runWidthInOverlay(zoom, 18)).toBeGreaterThan(
+        runStrokeInOverlay(zoom) * (5 / 3)
+      );
     }
   });
 });

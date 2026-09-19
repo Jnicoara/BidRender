@@ -302,6 +302,78 @@ export function markStrokeInOverlay(zoom: number): number {
 }
 
 /**
+ * How wide a traced run is on screen, in CSS pixels, before and after clamps.
+ *
+ * ── The measurement, 2026-09-19 ─────────────────────────────────────────────
+ * Taken the same way as the mark sizes above, and it found the same fault at
+ * the thin end. A run is drawn at 3 units in an overlay that sits INSIDE the
+ * zoom transform, so its width on screen is 3 x zoom, exactly — confirmed
+ * across ten steps of the viewer's own zoom ladder rather than assumed:
+ *
+ *     19%  0.58px      59%  1.76px      143%  4.30px
+ *     24%  0.72px      73%  2.20px      800%  24.0px  (MAX_ZOOM)
+ *     30%  0.90px      92%  2.75px
+ *     38%  1.13px     115%  3.44px
+ *     47%  1.41px
+ *
+ * **At Fit on a D-size sheet — 19% — a run is 0.58 CSS pixels.** That is not a
+ * thin line, it is a sub-pixel one: the browser cannot draw half a pixel, so it
+ * spreads the colour across a whole one at partial alpha and the run fades into
+ * the drawing. Sampling the sheet's own bitmap at the same moment put its
+ * printed linework at 1 page unit, which is 0.19px there — so both the drawing
+ * and the run are sub-pixel, and the drawing gets away with it only because
+ * hundreds of its lines merge into a readable grey. One isolated run does not.
+ *
+ * ── Two stops, and only one of them is a bug fix ────────────────────────────
+ * MIN 2: the first width that is a solid line at Fit rather than a suggestion
+ * of one, and roughly ten times the drawing's own linework there, which is what
+ * makes it read as something laid OVER the sheet instead of part of it.
+ *
+ * MAX 8: this end was not broken — the ratio to the drawing's linework is 3:1
+ * at every zoom, so a run never gets proportionally fatter. It is capped
+ * because past about 267% the zoom is being used to place a trace accurately,
+ * and a line that keeps growing covers the route being traced. 8 is also under
+ * a third of `MARK_MAX_PX`, which keeps a run reading as a LINE beside the
+ * counted shapes rather than competing with them — `takeoffMarks.test.ts`
+ * asserts that relationship, since it is the part a later change could break
+ * without noticing.
+ *
+ * BASE 3 at 100%: what shipped before this clamp existed, looked at again at
+ * 115% and still right — so the middle of the range is unchanged and only the
+ * ends move.
+ */
+export const RUN_MIN_PX = 2;
+export const RUN_MAX_PX = 8;
+/** Width at 100% zoom, matching what shipped before this clamp existed. */
+export const RUN_BASE_PX = 3;
+
+export function runScreenWidth(zoom: number): number {
+  if (!Number.isFinite(zoom) || zoom <= 0) return RUN_MIN_PX;
+  return Math.min(RUN_MAX_PX, Math.max(RUN_MIN_PX, RUN_BASE_PX * zoom));
+}
+
+/**
+ * Any run-overlay width, in the overlay's own units.
+ *
+ * Same route as `markRadiusInOverlay` and for the same reason: the overlay is
+ * inside the zoom transform, so a number specified in screen pixels has to be
+ * divided by the zoom it is about to be multiplied by. Everything the trace
+ * layer draws goes through here — the committed run, the line being drawn, the
+ * rubber band, the vertex dots, the click target and the focus ring — because
+ * they are all the same fault, and a clamp on some of them would mean tracing
+ * an invisible line that appears once it is finished.
+ */
+export function runWidthInOverlay(zoom: number, screenPx: number): number {
+  const safe = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+  return screenPx / safe;
+}
+
+/** The stroke a committed or in-progress run is drawn with, in overlay units. */
+export function runStrokeInOverlay(zoom: number): number {
+  return runWidthInOverlay(zoom, runScreenWidth(zoom));
+}
+
+/**
  * The points of a shape, as an SVG path, centred on (cx, cy).
  *
  * One function rather than five components: every shape has to answer the same

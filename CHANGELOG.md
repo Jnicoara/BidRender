@@ -4,6 +4,10 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-19]
+
+- **Traced runs are visible when the whole sheet is on screen.** At Fit on a big sheet a run was drawn six tenths of one pixel wide — not thin, but too thin for a screen to show, so it faded into the drawing. Run lines now stop shrinking below a readable width, and stop growing when you zoom right in so they cannot cover the route you are tracing. The invisible click target had the same fault and was three pixels wide at Fit, so the run you could not see was also one you could not click.
+
 ## [2026-09-18]
 
 - **A run row is two lines now: what it is, then where it goes.** As one line the sentence overran the panel and dropped the type off the end, so a 12-2 and a 12-3 cable read the same — a different wire and a different number, with nothing on screen to say which. The type is on top because it is what prices the run.
