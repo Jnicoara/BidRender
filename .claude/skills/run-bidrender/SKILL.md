@@ -140,6 +140,72 @@ location.reload();
 not remount the app, and `auth.me` is a `retry: false` query — once it has
 failed, the cached failure keeps the login form up forever.
 
+### Three ways a screenshot lies about the app, and none of them look like a bug
+
+All three were hit in one sitting on 2026-09-18, and each one wasted time
+because the screen looked plausible — just wrong — rather than broken.
+
+**1. The service worker serves a module you deleted.** The app registers a
+service worker with `helixbid-` caches (kept under that name on purpose — see
+CLAUDE.md), and it will keep handing the page an OLD copy of a source module
+across restarts, hard reloads and a cleared `node_modules/.vite`. The symptom
+is a crash screen naming an export that is demonstrably present:
+
+> SyntaxError: The requested module '/@fs/.../shared/takeoffMarks.ts' does not
+> provide an export named 'runAppearance'
+
+**Ask the dev server what it is serving before believing the browser** — this
+answers in one line, and if the export is there the browser is lying:
+
+```bash
+curl -s "http://localhost:3000/@fs/$(pwd)/shared/takeoffMarks.ts" | grep "^export"
+```
+
+Then clear it, in the page console, and reload:
+
+```js
+for (const r of await navigator.serviceWorker.getRegistrations())
+  await r.unregister();
+for (const n of await caches.keys()) await caches.delete(n);
+```
+
+**2. The screenshot is a device-pixel CROP, not the page.** The display runs at
+`devicePixelRatio` 2, and a capture comes back as the top-left ~1520x780
+DEVICE pixels — which is the top-left QUARTER of the page, at double size.
+Nothing says so; it just looks like the app is zoomed to 200% and the right-
+hand panel is missing. Confirm rather than guess:
+
+```js
+JSON.stringify({
+  iw: innerWidth,
+  dpr: devicePixelRatio,
+  h1: getComputedStyle(document.querySelector("h1")).fontSize,
+});
+```
+
+An `h1` reporting 18px while the screenshot shows 36px is the tell. Setting
+`document.documentElement.style.zoom = "0.5"` fits the whole layout into the
+crop and is enough to judge layout — but it confuses the extension's idea of
+the viewport, so take it off before using `zoom` on a region.
+
+**3. The tab's WINDOW can be 200x273, and resizing it does not work.** A tab
+can end up in a window a few hundred pixels across, at which point the app
+renders its phone layout and every screenshot is of that. `resize_window` says
+"Successfully resized" and changes nothing; so does `window.resizeTo`.
+**Open a NEW tab instead** — a fresh one lands in a normal window — and check
+before trusting anything you see:
+
+```js
+JSON.stringify({ iw: innerWidth, ih: innerHeight }); // want ~1536 x ~735
+```
+
+`sessionStorage` is per tab, so the new tab needs the token snippet again.
+
+**The general lesson is the one in CLAUDE.md § A number that can be measured:**
+when a screen looks wrong, measure the thing you are doubting — `innerWidth`,
+a computed font size, what the server serves — before rebuilding anything. Two
+of these three were briefly mistaken for faults in the app.
+
 ### Drive the page through the DOM, not through coordinates
 
 **Prefer finding an element and clicking it to clicking an (x, y).** Coordinate

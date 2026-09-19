@@ -99,12 +99,7 @@ import {
 } from "@/lib/planView";
 import { SheetIndex } from "@/components/takeoff/SheetIndex";
 // The tool button and the row it produces draw the same icon, from one place.
-import {
-  CABLE_COLOR,
-  CONDUIT_COLOR,
-  CableIcon,
-  ConduitIcon,
-} from "@/components/takeoff/runIcons";
+import { CableIcon, ConduitIcon } from "@/components/takeoff/runIcons";
 import { SheetChip } from "@/components/takeoff/SheetChip";
 import { SidePanel } from "@/components/takeoff/SidePanel";
 import {
@@ -3464,7 +3459,10 @@ export default function TakeoffPage({
                 onBlur={() => setReachingForMeasure(false)}
                 title={traceBlockedReason ?? "Trace a conduit run"}
               >
-                <ConduitIcon className={cn("w-3.5 h-3.5", CONDUIT_COLOR)} />{" "}
+                {/* Plain, deliberately — see runIcons. The shape says which
+                    tool this is; colour on the drawing says which TYPE, and a
+                    tinted toolbar would be teaching the older code. */}
+                <ConduitIcon className="w-3.5 h-3.5" />{" "}
                 {armedRunType.conduit?.label ?? "Conduit"}
               </Button>
               {/*
@@ -3524,7 +3522,7 @@ export default function TakeoffPage({
                   "Trace a run of self-contained cable — MC or Romex"
                 }
               >
-                <CableIcon className={cn("w-3.5 h-3.5", CABLE_COLOR)} />{" "}
+                <CableIcon className="w-3.5 h-3.5" />{" "}
                 {armedRunType.cable?.label ?? "Cable"}
               </Button>
               <RunTypePicker

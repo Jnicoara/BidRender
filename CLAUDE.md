@@ -271,6 +271,50 @@ comment cannot fail. When a comment claims a property — these are kept apart,
 this cannot be negative, this is always sorted — **write the test that would go
 red if it stopped being true**, and keep them in sight of each other.
 
+## A fix can manufacture the fault another fix was for — look at them together
+
+**Two changes that are each correct can be wrong as a pair**, and the pair is
+not visible from either diff. Nothing catches this: not `pnpm check`, not a
+test that only knows about one of them, not a review of the change in front of
+you. Only looking at the finished screen does.
+
+**The worked example, 2026-09-18.** Two items shipped together on purpose:
+
+- **Item 2** made a run's colour mean WHICH TYPE it is, instead of
+  conduit-versus-cable. Correct, and the whole point of the change.
+- **Item 4** turned the toolbar's conduit and cable icons white, because a
+  yellow icon in the toolbar would be teaching a colour code the drawing had
+  just stopped using. Correct, and specified for exactly that reason.
+
+Both landed. **And the run rows in the side panel were still tinted conduit
+yellow and cable emerald** — a yellow icon sitting beside a pink line, in a
+list whose entire job is telling you which line is which. Item 2 had
+manufactured, in a second place, the precise fault item 4 existed to remove.
+
+The row's tint had been RIGHT the day before, and the comment above the
+constants said why: they were "the same pair the trace layer draws the runs
+in", so a row could not disagree with its line. That sentence was true when
+written and false by the time the pair shipped. Nothing edited it, which is
+what made it invisible — see the section above on a comment that asserts what
+the code removed.
+
+**So, when a change alters what something MEANS rather than what it does:**
+
+1. **Grep for every place that encodes the old meaning**, not just the places
+   the change touches. Colour, icon, wording, sort order, a legend, a tooltip.
+   The dangerous ones are the places that were already correct, because nothing
+   in the change points at them.
+2. **A comment that explains WHY two things match is a dependency**, and it is
+   the cheapest thing to grep for. If it says "the same pair as X", changing X
+   is what invalidates it.
+3. **Look at the two changes on one screen, at the end.** Not each one as it
+   lands. The contradiction here was one screenshot away and no amount of
+   reading either diff would have produced it.
+
+**The user's summary is the one to remember:** a fix can manufacture the fault
+another fix was for, and the only thing that catches it is looking at the two
+together.
+
 ## A test fixture shaped like its container tests half the rule
 
 **A fixture that shares the viewport's proportions cannot produce the

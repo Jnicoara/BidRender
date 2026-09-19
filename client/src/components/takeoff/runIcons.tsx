@@ -126,11 +126,27 @@ export function CableIcon(props: SVGProps<SVGSVGElement>) {
 }
 
 /**
- * The colours they are drawn in, so those cannot drift either.
+ * ── There are no tint constants here any more, and that is the point ────────
  *
- * Conduit yellow and cable emerald are the same pair the trace layer draws the
- * runs themselves in — see TraceLayer. A row whose icon is a different colour
- * from the line it points at is a row that has to be read twice.
+ * There used to be two — conduit yellow, cable emerald — and the comment above
+ * them said they were "the same pair the trace layer draws the runs in", so a
+ * row could not disagree with the line it pointed at.
+ *
+ * That stopped being true the day colour started meaning WHICH TYPE rather
+ * than conduit-versus-cable. A yellow icon beside a pink line is a row that has
+ * to be read twice, which is the exact fault those constants existed to
+ * prevent — the claim outlived the arrangement it described.
+ *
+ * So the two places that draw these icons now answer the question separately,
+ * because they are different questions:
+ *
+ *   - **The toolbar** has no particular run in hand, so its icons are plain
+ *     foreground. Conduit-versus-cable is carried by the SHAPE — a length of
+ *     pipe against a sheath with conductors — which is what they were drawn
+ *     for. A tint there would be teaching a code the drawing no longer uses.
+ *   - **A row in the panel** does have a run in hand, so it wears that run's
+ *     own colour (`runAppearance`) and the row names its line on sight.
+ *
+ * Do not reintroduce a shared constant to "tidy this up". One colour cannot
+ * answer both, and the last one that tried is what this comment is about.
  */
-export const CONDUIT_COLOR = "text-[#F5C518]";
-export const CABLE_COLOR = "text-emerald-400";

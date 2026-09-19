@@ -22,21 +22,25 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  CABLE_COLOR,
-  CONDUIT_COLOR,
-  CableIcon,
-  ConduitIcon,
-} from "@/components/takeoff/runIcons";
+import { CableIcon, ConduitIcon } from "@/components/takeoff/runIcons";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { InlineNumberField } from "@/components/InlineNumberField";
 import { selectOnFocus } from "@/lib/selectOnFocus";
+import { runAppearance } from "@shared/takeoffMarks";
 import type { RunQuantities } from "@shared/takeoffQuantities";
 
 export type PanelRun = {
   id: number;
   name: string;
+  /** What it IS — type and ends as one sentence. See runDisplayName. */
+  displayName?: string;
+  /** What it IS, alone. The top line of the row. */
+  typeName?: string;
+  /** Where it GOES, or null if both ends are not answered. The second line. */
+  endsName?: string | null;
+  /** Which kind of run — what its colour groups on. Null before types. */
+  runTypeId: number | null;
   pathType: "conduit" | "cable";
   status: "draft" | "committed";
   isSuggestion: boolean;
@@ -359,20 +363,45 @@ export function RunsPanel({
                     information inside an electrical estimating app, and not
                     what the button that produced the row looked like.
                   */}
+                  {/*
+                    In the run's OWN colour, which is the row's answer to "which
+                    of these lines is this?". The icon used to be conduit yellow
+                    or cable emerald, matching how the lines were drawn then;
+                    now colour means which TYPE, so the row reads its colour
+                    from the same function the line does. See runIcons.
+                  */}
                   {run.pathType === "conduit" ? (
                     <ConduitIcon
-                      className={cn(
-                        "w-3.5 h-3.5 mt-0.5 shrink-0",
-                        CONDUIT_COLOR
-                      )}
+                      className="w-3.5 h-3.5 mt-0.5 shrink-0"
+                      style={{ color: runAppearance(run).color }}
                     />
                   ) : (
                     <CableIcon
-                      className={cn("w-3.5 h-3.5 mt-0.5 shrink-0", CABLE_COLOR)}
+                      className="w-3.5 h-3.5 mt-0.5 shrink-0"
+                      style={{ color: runAppearance(run).color }}
                     />
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm truncate">{run.name}</p>
+                    {/*
+                      Two lines, and which fact goes on top is the decision.
+
+                      What it IS, not what the app called it when it was drawn:
+                      three rows reading "Run on Sheet 3" was the complaint, and
+                      the type and the two ends answer it without anybody typing
+                      a name. But as ONE line the sentence overran this column
+                      and dropped the type off the end — so a 12-2 and a 12-3
+                      cable read the same, which is a different wire and a
+                      different number. The type is what prices the run, so it
+                      goes on top and truncates last. See runNameParts.
+                    */}
+                    <p className="text-sm truncate">
+                      {run.typeName ?? run.displayName ?? run.name}
+                    </p>
+                    {run.endsName && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        {run.endsName}
+                      </p>
+                    )}
                     <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                       {run.isSuggestion && (
                         <Badge

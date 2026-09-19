@@ -17,6 +17,7 @@
  * Both carry a location, which is what lets clicking a list row jump the viewer
  * to the mark on the drawing.
  */
+import { heightTypeLabel } from "./takeoffHeights";
 import type { PagePoint } from "./takeoffGeometry";
 
 /**
@@ -93,6 +94,89 @@ export function runName(run: {
   const own = run.name?.trim();
   if (own) return own;
   return "Untyped run";
+}
+
+/**
+ * What a run is CALLED on screen — derived, never stored.
+ *
+ * ── Why nothing writes this down ────────────────────────────────────────────
+ * Every part of it already exists: the type says what the run is, and the two
+ * end pickers say what it goes between. Storing the sentence they make would
+ * be a fourth copy of three facts, stale the moment any of them is edited —
+ * the same reason a count is derived from its marks rather than kept as a
+ * number beside them.
+ *
+ * ── Why the run's own name is last ──────────────────────────────────────────
+ * `takeoff_runs.name` has only ever held a placeholder the app generated:
+ * "Run on Sheet 3", three times per sheet, which is the complaint this
+ * function answers. There is no rename anywhere in the app, so nothing here is
+ * overriding a person's choice — and when a rename does arrive it goes in
+ * FRONT of this, as the one thing a person said out loud.
+ *
+ * Ends are used only when BOTH are known, and a surface with room for two
+ * lines takes the halves from `runNameParts` instead of cutting this string.
+ */
+export function runDisplayName(
+  run: {
+    runTypeLiveLabel?: string | null;
+    runTypeLabel?: string | null;
+    name?: string | null;
+    startKind?: string | null;
+    endKind?: string | null;
+  },
+  /**
+   * The company's merged height types, so an end reads as its LABEL.
+   *
+   * What a run stores at each end is a slug, and showing one is how this read
+   * "junction-box-wall → ceiling-box" the first time it was looked at. The list
+   * comes from the caller because a company's own type is only nameable from a
+   * row — see `heightTypeLabel`, which also covers what happens without it.
+   */
+  endTypes?: readonly { typeKey: string; label: string }[]
+): string {
+  const { type, ends } = runNameParts(run, endTypes);
+  return ends ? `${ends}, ${type}` : type;
+}
+
+/**
+ * The same name, in its two halves, for a surface that can show them apart.
+ *
+ * ── Why this exists rather than the row splitting the string ────────────────
+ * A run row is two lines: what it IS on top, where it GOES underneath. Getting
+ * those by cutting `runDisplayName` at a comma would work until a type is
+ * called `1/2" EMT, 2 #12 + ground` — which is what they are all called. So the
+ * halves come from here, and the joined sentence is built FROM them, which is
+ * the only arrangement where the two cannot disagree.
+ *
+ * ── Why the row stopped being one line ──────────────────────────────────────
+ * The joined name needs 374px in a 306px slot on a real run, and what falls off
+ * the end is the TYPE — so `Junction box, wall → Ceiling box / fixture, 12…`
+ * cannot tell you whether it is 12-2 or 12-3. That is a different wire and a
+ * different number, and colour cannot say which. Measured in the running app on
+ * 2026-09-18; three of the five rows on that sheet fit with ONE pixel to spare,
+ * so it is not a long-name problem, it is every name.
+ *
+ * Type on top because it is what prices the run. Ends underneath because they
+ * are what tells two runs of one type apart, and because losing THEM to
+ * truncation costs a good deal less.
+ */
+export function runNameParts(
+  run: {
+    runTypeLiveLabel?: string | null;
+    runTypeLabel?: string | null;
+    name?: string | null;
+    startKind?: string | null;
+    endKind?: string | null;
+  },
+  endTypes?: readonly { typeKey: string; label: string }[]
+): { type: string; ends: string | null } {
+  const from = heightTypeLabel(run.startKind, endTypes);
+  const to = heightTypeLabel(run.endKind, endTypes);
+  return {
+    type: runName(run),
+    // Both, or neither. "Panel → …" is a half-sentence that reads like a bug.
+    ends: from && to ? `${from} → ${to}` : null,
+  };
 }
 
 /** A traced run as the counter needs it. */

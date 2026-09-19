@@ -164,6 +164,76 @@ export function markAppearance(mark: {
   };
 }
 
+// ─── Traced runs ──────────────────────────────────────────────────────────────
+
+/**
+ * The two raceway kinds, drawn as line STYLE rather than as colour.
+ *
+ * ── Why the swap ────────────────────────────────────────────────────────────
+ * Colour used to mean type: yellow conduit, green cable. That spends the
+ * strongest grouping channel there is on a two-state fact, and leaves nothing
+ * to say which of fifteen lines belong together — so three runs on a sheet
+ * were the same colour, the same name, and indistinguishable on the drawing.
+ *
+ * Type is a permanent property of the thing and belongs in a channel that
+ * cannot be reassigned. Grouping is a relationship between things and needs
+ * many distinct values. Solid against dashed is a perfectly good two-state
+ * channel, and it is how these are drawn on paper anyway.
+ */
+export const RUN_DASH: Record<"conduit" | "cable", string | undefined> = {
+  /** Continuous, like the pipe. */
+  conduit: undefined,
+  /** Broken, like the sheath markings on a reel. */
+  cable: "10 6",
+};
+
+/**
+ * Colour a run by its TYPE, so runs of one kind read as one kind.
+ *
+ * Six homeruns sharing a colour is one useful fact. Fifteen colours for
+ * fifteen runs is none — which is why this keys on the type rather than on the
+ * run, and why the palette is the same one the counted marks use: a drawing
+ * should not have two colour vocabularies on it.
+ *
+ * ── An untyped run keeps the old colours ────────────────────────────────────
+ * A run traced before the palette existed has no type, so there is nothing to
+ * group it by and it falls back to the yellow or green it has always been.
+ * That is honest rather than tidy: inventing a group colour for a run with no
+ * group would assert a relationship that does not exist.
+ */
+export const LEGACY_RUN_COLOR: Record<"conduit" | "cable", string> = {
+  conduit: "#F5C518",
+  cable: "#4ADE80",
+};
+
+export function runAppearance(run: {
+  runTypeId: number | null;
+  pathType: "conduit" | "cable";
+}): { color: string; dash: string | undefined } {
+  return {
+    /*
+      Keyed on the type, and NOT kept apart from the counted groups.
+
+      Negating the key was tried, to stop group 12 and run type 12 sharing a
+      colour. It does not hold: with six colours, a key and its negative land
+      in the same place whenever the id is a multiple of six, so the guarantee
+      would be true five times out of six and a test tuned to pass would hide
+      that. Six colours cannot keep every pair of things on a sheet apart, and
+      pretending otherwise is worse than not claiming it.
+
+      It does not need to hold. A run is a LINE and a mark is a shape with a
+      dot in it; they are told apart by what they are before colour is
+      consulted at all. Colour groups within a kind, which is the job it was
+      freed up to do.
+    */
+    color:
+      run.runTypeId === null
+        ? LEGACY_RUN_COLOR[run.pathType]
+        : colorFor({ id: run.runTypeId }),
+    dash: RUN_DASH[run.pathType],
+  };
+}
+
 // ─── Size ─────────────────────────────────────────────────────────────────────
 
 /**

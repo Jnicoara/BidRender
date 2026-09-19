@@ -37,7 +37,11 @@ import {
   totalQuantities,
   type RunPathType,
 } from "../../shared/takeoffQuantities";
-import { runName } from "../../shared/takeoffCounts";
+import {
+  runDisplayName,
+  runName,
+  runNameParts,
+} from "../../shared/takeoffCounts";
 import * as db from "../db";
 import {
   EMPTY_HEIGHT_CONTEXT,
@@ -214,6 +218,13 @@ export const takeoffRunsRouter = router({
            */
           runTypeId: run.runTypeId,
           typeName: runName(run),
+          /** What it is called as one sentence. Derived, never stored. */
+          displayName: runDisplayName(run, heights.types),
+          /**
+           * The same name in halves, for the two-line row in the panel.
+           * Null when the ends are not both answered — see runNameParts.
+           */
+          endsName: runNameParts(run, heights.types).ends,
           pathType: run.pathType,
           points: run.points ?? [],
           status: run.status,

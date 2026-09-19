@@ -21,8 +21,10 @@
 import { describe, it, expect } from "vitest";
 import {
   DISTRIBUTION_KIND,
+  DISTRIBUTION_LABEL,
   SHIPPED_HEIGHT_TYPES,
   heightList,
+  heightTypeLabel,
   slugForHeightType,
   shouldSuggestStampLink,
   SUGGEST_WITHIN_INCHES,
@@ -43,6 +45,7 @@ import {
   type RunCircuit,
 } from "../shared/takeoffQuantities";
 import type { PagePoint } from "../shared/takeoffGeometry";
+import { runDisplayName, runNameParts } from "../shared/takeoffCounts";
 import {
   EMPTY_HEIGHT_CONTEXT,
   verticalsForRunRow,
@@ -787,6 +790,165 @@ describe("the merged heights list", () => {
     expect(rows.find(r => r.typeKey === "exit-sign")!.isActive).toBe(false);
     // Retired, not gone: a run pointing at it still resolves its height.
     expect(rows.find(r => r.typeKey === "exit-sign")!.heightInches).toBe(90);
+  });
+});
+
+describe("what one end of a run is CALLED", () => {
+  it("reads a shipped key as its label, never as the key", () => {
+    // The fault this exists for: a run row that read
+    // "junction-box-wall → ceiling-box, 12-2 MC cable".
+    expect(heightTypeLabel("junction-box-wall")).toBe("Junction box, wall");
+    expect(heightTypeLabel("ceiling-box")).toBe("Ceiling box / fixture");
+    expect(heightTypeLabel("panel")).toBe("Panel");
+  });
+
+  it("names a company's OWN type from the row, like a shipped one", () => {
+    // The rule this is defending is CLAUDE.md § Customization: their entry
+    // behaves exactly like ours. Read from the shipped list alone, this key is
+    // unknown and would come back slugged while every shipped type read fine —
+    // a parallel path that is worse for the estimator's own work.
+    const types = heightList({
+      company: [
+        {
+          typeKey: "strut-mounted-jbox",
+          label: 'J-box on strut, 10" off deck',
+          heightInches: 112,
+          isActive: true,
+        },
+      ],
+    });
+    expect(heightTypeLabel("strut-mounted-jbox", types)).toBe(
+      'J-box on strut, 10" off deck'
+    );
+    // And humanising cannot stand in for it: the label has punctuation and a
+    // measurement in it, so the slug does not round-trip.
+    expect(heightTypeLabel("strut-mounted-jbox")).toBe("Strut mounted jbox");
+  });
+
+  it("calls a pass-through exactly what the PICKER calls it", () => {
+    // Two names for one choice is how a screen stops agreeing with itself, so
+    // the closed picker and a run's name read the same constant. This is the
+    // test that goes red if somebody types the words out in one of them again.
+    expect(heightTypeLabel(DISTRIBUTION_KIND)).toBe(DISTRIBUTION_LABEL);
+    expect(DISTRIBUTION_LABEL).not.toBe(DISTRIBUTION_KIND);
+  });
+
+  it("is null when nobody has said, rather than a stand-in", () => {
+    // A name built from this must be able to leave the ends out entirely.
+    expect(heightTypeLabel(null)).toBe(null);
+    expect(heightTypeLabel("   ")).toBe(null);
+  });
+
+  it("humanises an unknown key rather than hiding it", () => {
+    // A retired type, or one from a row that has gone. Half a sentence beats a
+    // run that looks unnamed.
+    expect(heightTypeLabel("attic-junction")).toBe("Attic junction");
+  });
+});
+
+describe("what a run is called, ends and all", () => {
+  const conduit = { runTypeLiveLabel: '1/2" EMT, 2 #12 + ground' };
+
+  it("reads as a sentence about the work, from stored keys", () => {
+    expect(
+      runDisplayName({ ...conduit, startKind: "panel", endKind: "receptacle" })
+    ).toBe('Panel → Receptacle, 1/2" EMT, 2 #12 + ground');
+  });
+
+  it("names a company's own end type when the list is passed", () => {
+    const types = heightList({
+      company: [
+        {
+          typeKey: "pull-can",
+          label: "Pull can, high bay",
+          heightInches: 240,
+          isActive: true,
+        },
+      ],
+    });
+    expect(
+      runDisplayName(
+        { ...conduit, startKind: "panel", endKind: "pull-can" },
+        types
+      )
+    ).toBe('Panel → Pull can, high bay, 1/2" EMT, 2 #12 + ground');
+  });
+
+  it("says the pipe carries on, rather than showing the slug", () => {
+    expect(
+      runDisplayName({
+        ...conduit,
+        startKind: DISTRIBUTION_KIND,
+        endKind: "switch",
+      })
+    ).toBe('Run height → Switch, 1/2" EMT, 2 #12 + ground');
+  });
+
+  it("drops BOTH ends when only one is answered", () => {
+    // "Panel → …" reads like a bug. The type alone is a complete answer.
+    expect(
+      runDisplayName({ ...conduit, startKind: "panel", endKind: null })
+    ).toBe('1/2" EMT, 2 #12 + ground');
+  });
+
+  it("tells two runs of the same type apart by their ends", () => {
+    // The whole complaint: several runs on one sheet reading identically. Two
+    // runs of ONE type going to different places must not produce one string.
+    const a = runDisplayName({
+      ...conduit,
+      startKind: "panel",
+      endKind: "receptacle",
+    });
+    const b = runDisplayName({
+      ...conduit,
+      startKind: "panel",
+      endKind: "switch",
+    });
+    expect(a).not.toBe(b);
+  });
+});
+
+describe("the two halves the run row shows on separate lines", () => {
+  const conduit = { runTypeLiveLabel: '1/2" EMT, 2 #12 + ground' };
+
+  it("keeps the type whole, commas and all", () => {
+    // The reason the row cannot just split runDisplayName at a comma: every
+    // type name has commas in it, so the first one is inside the TYPE on a run
+    // with no ends and after the ENDS on a run with them.
+    expect(runNameParts(conduit).type).toBe('1/2" EMT, 2 #12 + ground');
+    expect(
+      runNameParts({ ...conduit, startKind: "panel", endKind: "switch" }).type
+    ).toBe('1/2" EMT, 2 #12 + ground');
+  });
+
+  it("gives the ends on their own, with no type in them", () => {
+    expect(
+      runNameParts({ ...conduit, startKind: "panel", endKind: "switch" }).ends
+    ).toBe("Panel → Switch");
+  });
+
+  it("has no ends line at all when only one end is answered", () => {
+    // Null rather than "Panel → ", so the row renders one line instead of a
+    // second one that trails off.
+    expect(
+      runNameParts({ ...conduit, startKind: "panel", endKind: null }).ends
+    ).toBe(null);
+    expect(runNameParts(conduit).ends).toBe(null);
+  });
+
+  it("is what the one-line name is BUILT from, so they cannot disagree", () => {
+    // The joined sentence reads the halves rather than the halves re-deriving
+    // the sentence. This is the assertion that goes red if someone reorders one
+    // of them and not the other.
+    for (const run of [
+      conduit,
+      { ...conduit, startKind: "panel", endKind: "receptacle" },
+      { ...conduit, startKind: DISTRIBUTION_KIND, endKind: "ceiling-box" },
+      { runTypeLiveLabel: null, runTypeLabel: null, name: "Run on Sheet 3" },
+    ]) {
+      const { type, ends } = runNameParts(run);
+      expect(runDisplayName(run)).toBe(ends ? `${ends}, ${type}` : type);
+    }
   });
 });
 

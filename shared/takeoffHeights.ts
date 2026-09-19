@@ -65,6 +65,15 @@ export function formatElevation(inches: number): string {
  */
 export const DISTRIBUTION_KIND = "distribution";
 
+/**
+ * What that kind is CALLED where there is no room to explain it.
+ *
+ * The picker says "Continues at run height" in the open list, where there is
+ * room for the sentence; this is what the closed trigger shows and what a run's
+ * derived name uses. Both read it from here so the two cannot drift apart.
+ */
+export const DISTRIBUTION_LABEL = "Run height";
+
 /** One entry in the shipped height list. */
 export type ShippedHeightType = {
   /** Stable forever. A run points at this, so it must survive a rename. */
@@ -421,6 +430,49 @@ export type HeightRow = {
    */
   shippedInches: number | null;
 };
+
+/**
+ * What to CALL one end of a run, from the key stored on it.
+ *
+ * ── Why a key cannot be shown as it stands ──────────────────────────────────
+ * The keys are slugs, because a run points at one and it has to survive a
+ * rename (see `ShippedHeightType.key`). Printing one at a person is how a run
+ * comes to read "junction-box-wall → ceiling-box, 12-2 MC cable", which is what
+ * the derived names actually did the first time somebody looked at them.
+ *
+ * ── The list is passed IN, so a company's own type is not second-class ──────
+ * A type the estimator added lives in a table, so its label is only knowable
+ * from a row. This takes the merged list — `heightList` output, or anything
+ * carrying the same two fields — and looks the key up in it. Reading the
+ * shipped list alone would have named every shipped type correctly and left a
+ * company's own reading as a slug: exactly the parallel path CLAUDE.md
+ * § Customization forbids, where their entries quietly behave worse than ours.
+ *
+ * Precedence is not restated here. The passed list has already resolved
+ * shipped-versus-forked in `heightList`, so it is consulted FIRST and the
+ * shipped list is only the answer when no list came — on a client that has not
+ * loaded the heights yet, which must still read names rather than slugs.
+ *
+ * ── A key nothing knows is humanised, not hidden ────────────────────────────
+ * Dashes to spaces and a capital at the front, so an unknown key reads "Attic
+ * junction" rather than disappearing. Hiding it would drop half the sentence
+ * and make a named run look unnamed, which is the worse of the two.
+ */
+export function heightTypeLabel(
+  key: string | null | undefined,
+  types?: readonly { typeKey: string; label: string }[]
+): string | null {
+  const wanted = key?.trim();
+  if (!wanted) return null;
+  // Not a device, so it is in neither list.
+  if (wanted === DISTRIBUTION_KIND) return DISTRIBUTION_LABEL;
+  const known = types?.find(row => row.typeKey === wanted);
+  if (known?.label) return known.label;
+  const shipped = SHIPPED_HEIGHT_TYPES.find(t => t.key === wanted);
+  if (shipped) return shipped.label;
+  const humanised = wanted.replace(/[-_]+/g, " ").trim();
+  return humanised.charAt(0).toUpperCase() + humanised.slice(1);
+}
 
 /**
  * Every height type this company can use, with the number in effect.

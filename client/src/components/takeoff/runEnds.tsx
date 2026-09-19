@@ -40,7 +40,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { HeightFields } from "@/components/HeightFields";
-import { DISTRIBUTION_KIND, formatElevation } from "@shared/takeoffHeights";
+import {
+  DISTRIBUTION_KIND,
+  DISTRIBUTION_LABEL,
+  formatElevation,
+  heightTypeLabel,
+} from "@shared/takeoffHeights";
 import type { EndVertical, RunVerticals } from "@shared/takeoffHeights";
 
 /** The sentinel the Select uses for "nobody has said" — "" is not allowed. */
@@ -90,8 +95,8 @@ export function EndKindSelect({
    */
   const closedLabel = () => {
     if (value === null) return "Not set";
-    if (value === DISTRIBUTION_KIND) return "Run height";
-    return types.find(row => row.typeKey === value)?.label ?? value;
+    if (value === DISTRIBUTION_KIND) return DISTRIBUTION_LABEL;
+    return heightTypeLabel(value, types) ?? value;
   };
 
   return (

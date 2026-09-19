@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-18]
 
+- **A run row is two lines now: what it is, then where it goes.** As one line the sentence overran the panel and dropped the type off the end, so a 12-2 and a 12-3 cable read the same — a different wire and a different number, with nothing on screen to say which. The type is on top because it is what prices the run.
+
+- **A traced run says what it is, instead of "Run on Sheet 1".** A run now reads as the work it represents — "Panel → Receptacle, 1/2" EMT, 2 #12 + ground" — built from the type you traced it with and what you picked at each end. Nothing to type: three rows that used to be identical are now three different sentences.
+
+- **Runs are coloured by TYPE, not by conduit-versus-cable.** Every run of one type gets the same colour, so six homeruns read as six of one thing, and a different type on the same sheet is a different colour. Conduit and cable are told apart by the line itself — solid for pipe, dashed for cable — which is how they are drawn on paper anyway. A run traced before run types existed keeps the yellow or green it has always had, because there is no type to group it by.
+
+- **The row in the list wears the colour of the line it points at**, so finding a run on the drawing no longer means clicking through them. The Conduit and Cable buttons in the toolbar went plain white at the same time: they used to be tinted yellow and green, which claimed a colour code the drawing no longer uses.
+
 - **Counted marks can be told apart now.** Every count gets its own shape and colour — five shapes, six colours, assigned automatically and the same every time you open the job. The five library categories keep a fixed shape, so "triangles are lighting" is worth learning once. Nothing to set up and nothing to pick: a feature you have to configure is one that never gets configured.
 
 - **Marks are no longer the same yellow as a conduit run.** They were, exactly — the same yellow as a traced run and as every warning in the app, so a field of counted devices and a traced conduit looked like the same thing. The colours a drawing has already spoken for are now off the palette, and a test keeps them off it.

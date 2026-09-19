@@ -19,10 +19,12 @@
  * the double-count rule all live there, tested.
  */
 import {
+  heightList,
   resolveDistributionHeight,
   resolveMountingHeight,
   verticalsForRun,
   type HeightLayers,
+  type HeightRow,
   type RunVerticals,
 } from "../shared/takeoffHeights";
 import * as db from "./db";
@@ -34,6 +36,15 @@ export type HeightContext = {
   /** This bid's own, or null to inherit the company's. */
   jobInches: number | null;
   layers: HeightLayers;
+  /**
+   * Every height type this company can use, merged — what each end is CALLED.
+   *
+   * Loaded here rather than by whoever needs a name because the rows are
+   * already in hand: resolving a run's verticals reads the same query. A second
+   * caller fetching them again would be a second merge, which is the one thing
+   * `heightList` exists to prevent.
+   */
+  types: HeightRow[];
 };
 
 /**
@@ -65,6 +76,7 @@ export async function heightContextForBid(
       ),
       job: new Map(job.map(row => [row.typeKey, row.heightInches])),
     },
+    types: heightList({ company, job }),
   };
 }
 
@@ -77,6 +89,10 @@ export const EMPTY_HEIGHT_CONTEXT: HeightContext = {
   companyInches: null,
   jobInches: null,
   layers: { company: new Map(), job: new Map() },
+  // The shipped types, with nothing set on any of them. A name is a different
+  // question from a height: there is nothing to resolve here, but anything that
+  // does get named must still be named rather than slugged.
+  types: heightList({ company: [] }),
 };
 
 /** A run row, as far as its verticals are concerned. */

@@ -33,6 +33,7 @@ import {
   markPath,
   markRadiusInOverlay,
   markStrokeInOverlay,
+  runAppearance,
 } from "@shared/takeoffMarks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -51,6 +52,8 @@ import type { Measurability, RunPathType } from "@shared/takeoffQuantities";
 export type ExistingRun = {
   id: number;
   name: string;
+  /** Which kind of run — decides its colour. Null on a run traced before types. */
+  runTypeId: number | null;
   pathType: RunPathType;
   points: PagePoint[];
   status: "draft" | "committed";
@@ -320,12 +323,21 @@ export function TraceLayer({
               <polyline
                 points={screen.map(p => `${p.x},${p.y}`).join(" ")}
                 fill="none"
-                stroke={RUN_COLOR[run.pathType]}
+                stroke={runAppearance(run).color}
                 strokeWidth={isSelected ? 5 : 3}
                 strokeOpacity={run.isSuggestion ? 0.55 : 1}
-                // A suggestion is dashed — visibly provisional, never mistakable
-                // for something the user drew and checked.
-                strokeDasharray={run.isSuggestion ? "10 6" : undefined}
+                /*
+                  One dash pattern, two meanings kept apart by which wins.
+
+                  A SUGGESTION is dashed to say it is provisional — that is the
+                  older meaning and it stays on top, because "the app guessed
+                  this" matters more than what kind of run it would be. Once a
+                  suggestion is accepted it becomes an ordinary run and takes
+                  its type's style, which is cable dashed and conduit solid.
+                */
+                strokeDasharray={
+                  run.isSuggestion ? "10 6" : runAppearance(run).dash
+                }
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 onClick={() =>
