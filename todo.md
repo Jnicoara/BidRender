@@ -897,30 +897,37 @@ left as written rather than rewritten to match the rename.
 
 ## Test suite health
 
-**HOW TO RUN THE SUITE HONESTLY, until the entry below is done.** `pnpm test` on
-a clean checkout fails 26 tests before anyone has changed a line, because `.env`
-carries `DISABLE_AI_FEATURES=true`. That has been the "known baseline" for long
-enough to have become a trap: it is indistinguishable from a regression you just
-caused, and the natural reaction is to spend an hour chasing your own change.
-So, before trusting a run that touches anything AI-related:
+**The three-command ritual that used to be here is gone — 2026-09-18.** It said
+to flip `DISABLE_AI_FEATURES` in `.env`, run the suite, and flip it back. A check
+that has to be remembered, performed and then undone is a check nobody performs,
+and the undo was the dangerous step: forgetting it leaves a dev server able to
+spend money.
 
-```bash
-sed -i 's/^DISABLE_AI_FEATURES=true/DISABLE_AI_FEATURES=false/' .env
-pnpm test
-sed -i 's/^DISABLE_AI_FEATURES=false/DISABLE_AI_FEATURES=true/' .env   # PUT IT BACK
-```
+**`vitest.setup.ts` now decides the AI environment itself**, unconditionally, and
+blanks `ANTHROPIC_API_KEY` while it is at it. A suite's environment must not be
+inherited from whoever's `.env` it happens to run under, and with the flag on,
+a suite that ever forgot a mock would spend real money on every run. Both lines
+are commented where they sit.
 
-With the flag off the real baseline is **2,399 passing, 102 of 103 files** — the
-only failures are the 3 `backup` tests, which need R2 credentials and a database
-grant rather than a flag. Verified 2026-09-18. Put the flag back afterwards:
-leaving it off is how a local run starts making real AI calls nobody asked for,
-which is the rule at the top of CLAUDE.md's AI section.
+**The baseline is now 3 failures**, all in `backup`, which needs a database grant
+rather than a flag — see below.
 
-- [ ] Fix the 26 known failing tests so the test suite is fully green. They are three files and every one is an environment problem rather than a code fault: `planCopilot` (21) and `navigation` (2) need `DISABLE_AI_FEATURES` unset — it is set to `true` in `.env`, and nothing sets it on DigitalOcean — and `backup` (3) needs the `bidrender` MySQL login granted rights to create `bidrender_backup_restore_test`. (Was 35 across five files; `v545` (8) and `assemblies` (1) started passing once the `bidrender_test` schema was brought up to date.) Worth doing because a suite that always shows red teaches people to stop reading it — which is how a real regression gets through.
+- [ ] Grant the `bidrender` MySQL login rights to create `bidrender_backup_restore_test`, which is the last of the known failures — 3 tests in `backup`. Not a code fault and not fixable in the repo. (Was 26 across three files until 2026-09-18, when `vitest.setup.ts` took over the AI environment and `planCopilot` (21) and `navigation` (2) went green; 35 across five files before that, when the `bidrender_test` schema was behind.) Worth finishing because a suite that always shows red teaches people to stop reading it — which is how a real regression gets through.
 
 ## Working on this repo — traps
 
-**`git stash` is not safe in this checkout. Do not use it.** Hit 2026-09-18:
+**`git stash` is not safe in this checkout. Do not use it.**
+
+> **A hook now refuses it** — `.claude/hooks/block-git-stash.mjs`, wired up in
+> `.claude/settings.json`, denies any Bash command containing `git stash` and
+> prints the worktree alternative. Added 2026-09-18 because this entry was
+> written, read, and then ignored twice on the same day: a warning in a file you
+> have to go looking in is not available at the moment the command is typed. The
+> rule is also in CLAUDE.md now, which is read every session. **The recovery
+> commands below stay here** — they are what you need when it has already
+> happened, and that is a moment for a reference, not a guard rail.
+
+Hit 2026-09-18:
 `git stash push --include-untracked` reported failure, and left a state where
 the stash entry EXISTED, the tracked modifications were still in the working
 tree, and the untracked files had been **deleted from disk**. Half-applied in

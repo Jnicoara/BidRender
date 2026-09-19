@@ -59,6 +59,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { APP_VERSION_LABEL } from "@shared/version";
+import { buildAgeLabel, buildStampLabel } from "@shared/buildStamp";
+import { BUILD_STAMP } from "@/lib/buildStamp";
 import {
   pathToRoute,
   retiredAddress,
@@ -155,7 +157,7 @@ export default function BidRenderShell() {
   /**
    * Rewrite a pathname-spelled address into the hash spelling.
    *
-   * `bidrender.com/settings` — typed by hand, or a link written before the app
+   * `bidridge.com/settings` — typed by hand, or a link written before the app
    * became hash-routed — resolves correctly already, because
    * getCurrentRouteState falls back to the pathname. But the pathname then
    * stays on the URL while every later navigation writes only the hash, giving
@@ -566,11 +568,35 @@ export default function BidRenderShell() {
           </NavSection>
         </div>
 
-        {/* Version tag */}
+        {/*
+          Version tag, and under it the build this page actually is.
+
+          The second line is the one a deploy is checked against, and it is
+          there because the first line could not do that job: APP_VERSION is
+          typed by hand, and on 2026-09-18 it had read v6.1 for thirty-three
+          commits while two documents told the reader to confirm it had moved.
+          The build stamp is written by the build itself, so it cannot be
+          forgotten and cannot agree with a deploy that did not happen.
+
+          Both lines stay hidden until the sidebar is hovered, as before — this
+          is reference information, not something to read every day.
+        */}
         <div className="px-3 py-2 border-t border-sidebar-border shrink-0">
-          <span className="text-[10px] text-muted-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 font-mono">
-            {APP_VERSION_LABEL}
-          </span>
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+            <span className="block text-[10px] text-muted-foreground whitespace-nowrap font-mono">
+              {APP_VERSION_LABEL}
+            </span>
+            <span
+              className="block text-[10px] text-muted-foreground/70 whitespace-nowrap font-mono"
+              title={
+                BUILD_STAMP.builtAt
+                  ? `This page was built ${buildAgeLabel(BUILD_STAMP, new Date()) ?? "at an unknown time"}`
+                  : "Running from source — no build stamp"
+              }
+            >
+              {buildStampLabel(BUILD_STAMP)}
+            </span>
+          </div>
         </div>
       </aside>
 

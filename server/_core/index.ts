@@ -3,6 +3,8 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { BUILD_STAMP } from "../buildStamp";
+import { APP_VERSION } from "../../shared/version";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
@@ -125,6 +127,37 @@ async function startServer() {
       createContext,
     })
   );
+  /**
+   * What build is running — the deploy check, and the only one that cannot
+   * quietly pass.
+   *
+   * Unauthenticated and mounted before the SPA fallthrough, so it can be
+   * curled from anywhere the site is reachable:
+   *
+   *     curl -s https://bidridge.com/api/version
+   *
+   * It exists because the check it replaces could not fail. The sidebar tag
+   * read APP_VERSION, a hand-typed string, and CLAUDE.md and
+   * references/deploying.md both ended the deploy by confirming that it had
+   * moved. On 2026-09-18 it had read v6.1 for thirty-three commits, so every
+   * one of those confirmations was a pass with nothing behind it.
+   *
+   * `builtAt` moves on every build with nothing for anyone to remember, which
+   * is the entire point. It carries no secret: a build time and a short commit
+   * hash of a private repository tell an outsider nothing they could use, and
+   * a check that needs a session is a check nobody runs from a phone at 6am.
+   */
+  app.get("/api/version", (_req, res) => {
+    res.set("Cache-Control", "no-store").json({
+      version: APP_VERSION,
+      builtAt: BUILD_STAMP.builtAt,
+      commit: BUILD_STAMP.commit,
+      mode:
+        process.env.NODE_ENV === "development" ? "development" : "production",
+      now: new Date().toISOString(),
+    });
+  });
+
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);

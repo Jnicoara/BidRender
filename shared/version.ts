@@ -7,8 +7,25 @@
  * looked. Import APP_VERSION_LABEL rather than writing a version literal into
  * a component.
  *
- * The number tracks the `vX.YY` checkpoint convention used in commit messages
- * (see CLAUDE.md § Conventions) — bump it here when a checkpoint ships.
+ * ── This is a RELEASE NAME. It is not a deploy check. ───────────────────────
+ * **Corrected 2026-09-18, after it was used as one for a day.** The comment
+ * here used to say the number tracks the `vX.YY` checkpoint convention in
+ * commit messages and should be bumped when a checkpoint ships. Nobody bumped
+ * it: it read `v6.1` while `main` was at `v6.34`. On its own that is untidy.
+ * What made it expensive is that CLAUDE.md and references/deploying.md both
+ * ended a deploy with "confirm the version tag moved" — **a check on a string
+ * a human has to remember to edit, which therefore passed every time it was
+ * run, including five or six times in one day.**
+ *
+ * **Nothing may use this value to verify a deploy.** The build stamp does that
+ * job now: `scripts/build.mts` writes it, `/api/version` serves it, and the
+ * sidebar prints it under this name. It moves on every build with nothing for
+ * anyone to remember, which is the only property that matters.
+ *
+ * This string stays because a release still deserves a name a person can say
+ * out loud. Bump it when the product reaches something worth naming, and let it
+ * lag the commit count without concern — that is now a cosmetic difference
+ * rather than a broken check.
  */
 /**
  * ── Why this went to 6.0 rather than 5.98 ────────────────────────────────────

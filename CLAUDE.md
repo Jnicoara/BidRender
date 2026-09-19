@@ -14,7 +14,9 @@ The product is **BidRidge**. It was called **BidPhase** until v5.75, **HelixBid*
 
 **The v6.1 rename was deliberately user-visible ONLY, and the split is the point.** What a person reads now says BidRidge: the wordmark, the tab title, on-screen copy, the landing page, exported filenames. What only a machine reads still says `bidrender`, on purpose — the repo and local folder, the database `bidrender` and login `bidrender_app`, the buckets `bidrender-plans` and `bidsoftware`, the `R2_PLANS_*` names, the DigitalOcean app, the Cloudflare worker `bidrender-cron`, the `BidRenderShell` component, and `package.json`'s `name`. Several of those are baked into stored rows or live infrastructure, and renaming them is churn with real risk and no user benefit. **Do not "finish the job" by renaming them.**
 
-**Domains and URLs are untouched and are their own task** — `bidrender.com` still serves the app, so the sign-in page reads BidRidge while the address bar reads bidrender.com. That gap is expected, not a bug to fix in passing.
+**`bidridge.com` is the PRIMARY domain and the one to use in any command, link or check.** It was added to App Platform on 2026-09-17; `bidrender.com` was removed from App Platform and is now only parked.
+
+**This paragraph used to say the opposite** — that `bidrender.com` still served the app and the name gap was expected — and it was left stale after the move. On 2026-09-18 that sent a newly written deploy check at the parked domain, where it would have returned nothing useful about the running build. **A wrong domain in a document is not cosmetic: it is a check that cannot work.** Same family as the rule in `workers/cron/wrangler.toml`, which spells out that `APP_BASE_URL` must be the primary domain and never a redirecting one, because a redirect turns the cron Worker's POST into a GET and the handler never answers.
 
 The `/manus-storage` route, the `helixbid:` localStorage keys and the `helixbid-` cache prefix survive from earlier names for the reasons given above and below; they are not oversights. `todo.md` and `CHANGELOG.md` entries recording past renames are historical record and stay as written.
 
@@ -182,6 +184,32 @@ rather than fixed three times. `HeightFields` takes `unsetLabel` and `setLabel`
 for exactly this; anything else that renders an inheritable value needs the
 same seam.
 
+## Never `git stash` in this checkout — use `git worktree` instead
+
+**This repo lives inside `OneDrive\Documents`, and the sync client holds file
+handles while git is trying to move files.** `git stash` half-completes here.
+The documented case (2026-09-18) left the stash entry created, the tracked
+modifications still in the working tree, and **the untracked files deleted from
+disk** — half-applied in the one direction that loses work.
+
+```bash
+git worktree add ../bidrender-check HEAD   # a clean tree in its own directory
+```
+
+A worktree is a separate directory, so nothing touches the files being worked
+in, and it answers the question stash is usually reached for: _does this happen
+without my changes?_
+
+**This note is here rather than only in todo.md because todo.md is a file you
+go looking in, and this is needed at the moment you are about to type the
+command.** It was written down, in detail, and then reached for anyway on the
+same day it was written — which says the location was wrong, not the warning.
+
+**If it has already happened, the work is recoverable**: an untracked file lives
+in the stash's third parent, which `git stash show` does not list.
+`todo.md` § "Working on this repo — traps" has the four commands, and the
+`git diff stash@{0} --stat` check to run before dropping anything.
+
 ## Changelog — do this on every meaningful commit
 
 Whenever you commit a meaningful change, **also add a one-or-two-line plain-English entry to `CHANGELOG.md`** describing what changed, in addition to the normal commit message. Do this automatically, as part of the same commit — do not wait to be asked.
@@ -231,9 +259,12 @@ The deploy:
    serves wrong data, and because nearly every read is a bare `select()` it can
    also take a whole screen down with `Unknown column`. Ask the database
    directly with `scripts/schemaDrift.mts`.
-5. **Verify the new build is the one running** — the version tag in the sidebar
-   footer (hover) reads `APP_VERSION`; an older number means the deploy did not
-   take.
+5. **Verify the new build is the one running** — `curl -s
+https://bidridge.com/api/version` and read `builtAt` against the clock and
+   `commit` against what you pushed. **Not the version tag**: `APP_VERSION` is
+   typed by hand, read `v6.1` for thirty-three commits, and made this the one
+   step of a deploy that passed without checking anything (2026-09-18). The
+   build stamp is written by the build, so there is nothing to remember.
 6. **A new scheduled job is a separate deploy** — the Cloudflare Worker in
    `workers/cron/` ships with `wrangler` from a local checkout, not by pushing.
 

@@ -326,6 +326,27 @@ any new code ships.
 
 Only then is the deploy a separate decision — § 4 of this document.
 
+#### 8. After that deploy, confirm the new code is actually the code running
+
+**This step is here because of the failure that produced § 6.** Steps 1–7 are
+sound and none of them depends on a version number — step 7 in particular is a
+real check, run against the OLD code on purpose. The hole was one step later, in
+verifying the deploy that follows: the instruction was to confirm a hand-typed
+version tag had moved, and it could not move.
+
+```bash
+curl -s https://bidridge.com/api/version
+```
+
+**`builtAt` must be newer than the moment you pushed, and `commit` must be the
+commit you pushed.** Then open the screen the migration was for and confirm it
+reads the new columns.
+
+**Both halves matter and they fail differently.** A migration that ran with code
+that never shipped looks exactly like a working site, because the old code does
+not touch the new columns — which is what step 7 proves is safe, and also what
+makes it invisible.
+
 #### If a step fails
 
 Every migration in this set is **one statement in one file**, deliberately (see
@@ -367,9 +388,42 @@ something that could only be true of the new build:
   graceful fallback — which means the key is missing or the daily allowance is
   spent. A returned screen **and** a button is the pass.
 
-- **The version tag** in the sidebar footer (hover to reveal) reads
-  `APP_VERSION` from `shared/version.ts`. If it shows an older number than the
-  one on `main`, the deploy did not take.
+- **`/api/version` — the check to run first, and the only one that cannot
+  quietly pass.** No session needed, from anywhere the site answers:
+
+  ```bash
+  curl -s https://bidridge.com/api/version
+  ```
+
+  ```json
+  {
+    "version": "v6.1",
+    "builtAt": "2026-09-19T01:22:57.679Z",
+    "commit": "900380d",
+    "mode": "production",
+    "now": "..."
+  }
+  ```
+
+  **Read `builtAt` against the clock, and `commit` against what you pushed.**
+  `now` is in the reply so the two can be compared without trusting your own
+  machine's clock. A `builtAt` older than your push means the build did not
+  take and the previous version is still serving.
+
+  > **This replaced "check the version tag moved" on 2026-09-18, and the old
+  > check was worse than nothing.** `APP_VERSION` is typed by hand in
+  > `shared/version.ts`; it read `v6.1` while `main` was thirty-three commits
+  > further on. **So the final step of every deploy that day confirmed a number
+  > that could not move, and passed every time.** `builtAt` is written by the
+  > build itself (`scripts/build.mts`) and needs nobody to remember anything.
+
+- **The version tag** in the sidebar footer (hover to reveal) now has two lines:
+  the release name, and under it the build stamp this page was built with —
+  `900380d · 19 Sep 01:22 UTC`. **The second line is the one that means
+  something.** It is baked into the client bundle rather than fetched, so it
+  reports the page you are looking at: if it is older than `/api/version` says
+  the server is, you are holding a cached bundle, which is a different problem
+  from a failed deploy and wants a hard reload rather than a rollback.
 - **A schema-dependent screen** — Materials grouped into categories, with "1900"
   and "gem box" returning hits. Proves step 4 ran.
 
@@ -471,9 +525,11 @@ tracked in `todo.md`.
 > **Configured — this is no longer an outstanding issue.** The rule is on the
 > `bidrender-plans` R2 bucket and covers six origins: `https://bidridge.com`
 > and `https://www.bidridge.com` (added 2026-09-17 with the domain move),
-> `https://bidrender.com` and `https://www.bidrender.com` (kept — they redirect,
-> but a rule costs nothing and removing it is a way to break an old link nobody
-> has retired yet), the `ondigitalocean.app` host, and
+> `https://bidrender.com` and `https://www.bidrender.com` (kept — a rule costs
+> nothing and removing it is a way to break an old link nobody has retired yet.
+> **Note these no longer serve the app**: `bidrender.com` left App Platform with
+> the 2026-09-17 move and is parked, so it is not a URL to check anything
+> against), the `ondigitalocean.app` host, and
 > `http://localhost:3000`.
 >
 > Kept in these docs because it explains a failure that looks like an app bug
@@ -558,7 +614,7 @@ silently falls back to the same-origin route, which works for anything under
 
 ```bash
 curl -i -X OPTIONS "https://<account>.r2.cloudflarestorage.com/bidrender-plans/probe" \
-  -H "Origin: https://bidrender.com" \
+  -H "Origin: https://bidridge.com" \
   -H "Access-Control-Request-Method: PUT" \
   -H "Access-Control-Request-Headers: content-type"
 ```

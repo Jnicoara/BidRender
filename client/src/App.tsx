@@ -46,7 +46,7 @@ function AppChunkFallback() {
  * Routing inside the app is hash-based, so every real address shares the single
  * pathname `/` and wouter has nothing to discriminate on. What the catch-all
  * actually caught was a pathname-spelled address — someone typing
- * `bidrender.com/settings`, or a link written before the hash — and it answered
+ * `bidridge.com/settings`, or a link written before the hash — and it answered
  * with the template's 404 card: a light slate gradient and a blue button inside
  * a dark app, telling a contractor the page "may have been moved or deleted"
  * when it had not.
