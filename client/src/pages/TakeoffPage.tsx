@@ -61,6 +61,7 @@ import {
   ClipboardList,
   Loader2,
   Plus,
+  ChevronDown,
   MapPin,
   Ruler,
   Maximize2,
@@ -119,6 +120,7 @@ import {
   type PanelState,
 } from "@/lib/takeoffPanels";
 import { StampPicker } from "@/components/takeoff/StampPicker";
+import { RunTypePicker } from "@/components/takeoff/RunTypePicker";
 import { CalibrateLayer } from "@/components/takeoff/CalibrateLayer";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
 import { JobHeightsChip } from "@/components/takeoff/JobHeightsChip";
@@ -1833,6 +1835,19 @@ export default function TakeoffPage({
    * (takeoffGroups.forAssembly); a plain count is armed by making one. After
    * that the two are the same path — see server/routers/takeoffGroupsRouter.ts.
    */
+  /**
+   * The kind of run each tool is holding, one per path type.
+   *
+   * Kept per path type rather than as a single armed value so switching
+   * between conduit and cable does not lose either — the decision is made once
+   * and spent many times, which is the whole point of a palette (D3(a)).
+   * Null means nothing armed yet, and the first trace opens the picker.
+   */
+  const [armedRunType, setArmedRunType] = useState<{
+    conduit: { id: number; label: string } | null;
+    cable: { id: number; label: string } | null;
+  }>({ conduit: null, cable: null });
+
   const [armedGroup, setArmedGroup] = useState<{
     groupId: number;
     label: string;
@@ -2062,6 +2077,16 @@ export default function TakeoffPage({
     can tell which door was used — which is the point, and is why the level-1
     path is not a second stamping mode with its own queue and its own bugs.
   */
+  /** The palette: shipped types and this contractor's own, in one list. */
+  const runTypes = trpc.takeoffRunTypes.list.useQuery(
+    { includeArchived: false },
+    { staleTime: 60_000 }
+  );
+  const createRunType = trpc.takeoffRunTypes.create.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: () => runTypes.refetch(),
+  });
+
   const groupForAssembly = trpc.takeoffGroups.forAssembly.useMutation({
     onError: e => toast.error(e.message),
   });
@@ -2741,6 +2766,26 @@ export default function TakeoffPage({
     setSelectedRunId(null);
   }, []);
 
+  /**
+   * Arm a kind of run, and start tracing it.
+   *
+   * One function for both doors — picking from the palette and defining a new
+   * one — so the state after either is identical. Same shape as `armGroup`
+   * for marks, and for the same reason: two ways to reach one state is two
+   * states that drift.
+   */
+  const armRunType = useCallback(
+    (
+      pathType: RunPathType,
+      type: { id: number; label: string },
+      andTrace = true
+    ) => {
+      setArmedRunType(previous => ({ ...previous, [pathType]: type }));
+      if (andTrace) startTracing(pathType);
+    },
+    [startTracing]
+  );
+
   const finishTrace = useCallback(() => {
     if (!activeSheet || tracePoints.length < 2) return;
     saveRun.mutate(
@@ -2756,6 +2801,12 @@ export default function TakeoffPage({
         // KIND is copied down; the HEIGHT stays a live setting.
         startKind: traceEnds.startKind,
         endKind: traceEnds.endKind,
+        /*
+          What this run IS. The server reads the label off the type rather than
+          taking one from here, so a run cannot be saved claiming to be
+          something its type does not say.
+        */
+        runTypeId: armedRunType[tracePathType]?.id ?? null,
       },
       {
         onSuccess: result => {
@@ -2777,6 +2828,7 @@ export default function TakeoffPage({
     saveRun,
     commitRun,
     traceEnds,
+    armedRunType,
   ]);
 
   const cancelTrace = useCallback(() => {
@@ -3413,8 +3465,41 @@ export default function TakeoffPage({
                 title={traceBlockedReason ?? "Trace a conduit run"}
               >
                 <ConduitIcon className={cn("w-3.5 h-3.5", CONDUIT_COLOR)} />{" "}
-                Conduit
+                {armedRunType.conduit?.label ?? "Conduit"}
               </Button>
+              {/*
+                Change what the tool is holding, without starting a trace.
+
+                Separate from the button because the button is the frequent
+                action — arm once, trace six times — and burying "trace" behind
+                a menu would tax the thing people do most to make room for the
+                thing they do once. Same division as the mark tool: the armed
+                thing is shown, and changing it is one deliberate click.
+              */}
+              <RunTypePicker
+                pathType="conduit"
+                types={runTypes.data ?? []}
+                armedId={armedRunType.conduit?.id ?? null}
+                onPick={type => armRunType("conduit", type, false)}
+                onCreate={label =>
+                  createRunType
+                    .mutateAsync({ label, pathType: "conduit" })
+                    .then(type => armRunType("conduit", type, false))
+                    .catch(() => {
+                      /* the mutation's onError has already said so */
+                    })
+                }
+              >
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 w-6 px-0 text-xs"
+                  title="Change what kind of conduit run this traces"
+                  aria-label="Change conduit run type"
+                >
+                  <ChevronDown className="w-3 h-3" />
+                </Button>
+              </RunTypePicker>
               <Button
                 size="sm"
                 variant="outline"
@@ -3439,8 +3524,33 @@ export default function TakeoffPage({
                   "Trace a run of self-contained cable — MC or Romex"
                 }
               >
-                <CableIcon className={cn("w-3.5 h-3.5", CABLE_COLOR)} /> Cable
+                <CableIcon className={cn("w-3.5 h-3.5", CABLE_COLOR)} />{" "}
+                {armedRunType.cable?.label ?? "Cable"}
               </Button>
+              <RunTypePicker
+                pathType="cable"
+                types={runTypes.data ?? []}
+                armedId={armedRunType.cable?.id ?? null}
+                onPick={type => armRunType("cable", type, false)}
+                onCreate={label =>
+                  createRunType
+                    .mutateAsync({ label, pathType: "cable" })
+                    .then(type => armRunType("cable", type, false))
+                    .catch(() => {
+                      /* the mutation's onError has already said so */
+                    })
+                }
+              >
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 w-6 px-0 text-xs"
+                  title="Change what kind of cable run this traces"
+                  aria-label="Change cable run type"
+                >
+                  <ChevronDown className="w-3 h-3" />
+                </Button>
+              </RunTypePicker>
             </>
           )}
 

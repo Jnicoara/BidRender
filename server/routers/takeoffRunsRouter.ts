@@ -37,6 +37,7 @@ import {
   totalQuantities,
   type RunPathType,
 } from "../../shared/takeoffQuantities";
+import { runName } from "../../shared/takeoffCounts";
 import * as db from "../db";
 import {
   EMPTY_HEIGHT_CONTEXT,
@@ -204,6 +205,15 @@ export const takeoffRunsRouter = router({
         return {
           id: run.id,
           name: run.name,
+          /**
+           * What this run IS, and what to call it.
+           *
+           * `typeName` resolves the type's live label, the snapshot, and the
+           * run's own name in that order — see runName. The id comes too,
+           * because it is what a colour and a filter group on.
+           */
+          runTypeId: run.runTypeId,
+          typeName: runName(run),
           pathType: run.pathType,
           points: run.points ?? [],
           status: run.status,
@@ -263,6 +273,18 @@ export const takeoffRunsRouter = router({
         /** Where the raceway sits — the Location layer. Taggable later too. */
         location: z.enum(TAKEOFF_LOCATIONS).nullable().default(null),
         /**
+         * The palette entry this was traced under.
+         *
+         * OPTIONAL, and omitting it leaves what is there — same rule as the
+         * end kinds below, and for the same reason: an autosave part-way
+         * through a trace must not be able to strip a run of what it is.
+         *
+         * The LABEL is not accepted from the client. It is read off the type
+         * here, so a run cannot be saved claiming to be something its type
+         * does not say. See drizzle/0058 on why the snapshot exists at all.
+         */
+        runTypeId: z.number().int().positive().nullable().optional(),
+        /**
          * What is at each end, from the sticky pickers on the trace toolbar.
          *
          * OPTIONAL, and omitting one means "leave what is there" rather than
@@ -279,6 +301,42 @@ export const takeoffRunsRouter = router({
       const bid = await db.getBidById(input.bidId, ctx.scope.dataUserId);
       if (!bid)
         throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
+
+      /*
+        What this run IS, resolved from the palette rather than trusted.
+
+        The label is read off the type here instead of being accepted from the
+        client, so a run cannot be saved claiming to be something its type does
+        not say. Both fields move together: the link is what a later rename
+        follows, and the label is what survives the link being gone.
+
+        Omitted means "leave what is there", which is what makes an autosave
+        part-way through a trace safe. Explicit null clears both, which is what
+        detaching a run from its type means.
+      */
+      let runTypeFields: {
+        runTypeId?: number | null;
+        runTypeLabel?: string | null;
+      } = {};
+      if (input.runTypeId === null) {
+        runTypeFields = { runTypeId: null, runTypeLabel: null };
+      } else if (input.runTypeId !== undefined) {
+        const type = await db.getRunTypeById(
+          input.runTypeId,
+          ctx.scope.dataUserId
+        );
+        if (!type)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "That run type is not in your palette.",
+          });
+        if (type.pathType !== input.pathType)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `"${type.label}" is a ${type.pathType} type, and this is a ${input.pathType} run.`,
+          });
+        runTypeFields = { runTypeId: type.id, runTypeLabel: type.label };
+      }
 
       // Measure if we legitimately can; otherwise store the points with NO
       // length rather than refusing the save. The user's clicking is real work.
@@ -303,6 +361,7 @@ export const takeoffRunsRouter = router({
           ? { startKind: input.startKind }
           : {}),
         ...(input.endKind !== undefined ? { endKind: input.endKind } : {}),
+        ...runTypeFields,
       };
 
       if (input.startKind !== undefined)

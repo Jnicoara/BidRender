@@ -140,6 +140,49 @@ location.reload();
 not remount the app, and `auth.me` is a `retry: false` query — once it has
 failed, the cached failure keeps the login form up forever.
 
+### Drive the page through the DOM, not through coordinates
+
+**Prefer finding an element and clicking it to clicking an (x, y).** Coordinate
+clicks are the brittle half of browser work here: the toolbar wraps at narrow
+widths, a popover shifts the layout under the cursor, and a stray click lands
+on whatever moved into that spot.
+
+```js
+// Instead of clicking (464, 80) and hoping:
+const trigger = [...document.querySelectorAll("button")].find(
+  b => b.getAttribute("aria-label") === "Change conduit run type"
+);
+trigger.click();
+await new Promise(r => setTimeout(r, 400));
+
+// Read back what appeared, rather than screenshotting to find out:
+[
+  ...document.querySelectorAll("[data-radix-popper-content-wrapper] button"),
+].map(b => b.textContent?.trim());
+```
+
+This also gives a better answer than a screenshot for anything textual — the
+strings come back exactly, with no reading them off an image. **Screenshots are
+still the only way to check LAYOUT** (see CLAUDE.md § "A layout or copy change
+is NOT verified"), so the useful split is: drive with the DOM, judge with the
+eye.
+
+Aria labels are worth adding to icon-only controls for this reason alone. The
+run-type chevrons carry them and that is how the palette was verified.
+
+**When Chrome's page zoom gets stuck.** It happened on 2026-09-18: the zoom
+went to 200% mid-session, every screenshot came back magnified, and the browser
+tool refuses page-zoom shortcuts —
+`"ctrl+0" was not pressed: page zoom keyboard shortcuts are not supported`.
+`resize_window` does not reset it either. `window.devicePixelRatio` is how to
+tell (2 where it was 1).
+
+The workaround is the advice above: DOM-driven interaction does not care about
+zoom at all, and `computer`'s `zoom` action still crops a region for reading.
+Closing the tab does not help — Chrome remembers zoom per origin — so if it is
+still wrong at the start of a session, reset it by hand in the browser before
+relying on any coordinate click.
+
 ## Tests and typecheck
 
 ```bash

@@ -69,6 +69,32 @@ export function stampName(stamp: {
   return "Unnamed count";
 }
 
+/**
+ * What to call a traced run, in the order the answer should be trusted.
+ *
+ * The type's LIVE label first, because that is the fact a rename updates and
+ * the reason a run follows its type at all. The snapshot taken when it was
+ * traced second, for a run whose type has been deleted. The run's own name
+ * last, for everything traced before the palette existed.
+ *
+ * Exactly the shape of `stampName` above, deliberately: a mark and a run are
+ * the same problem — a thing on a drawing whose name lives somewhere else —
+ * and two different resolution orders would be two ways to disagree.
+ */
+export function runName(run: {
+  runTypeLiveLabel?: string | null;
+  runTypeLabel?: string | null;
+  name?: string | null;
+}): string {
+  const live = run.runTypeLiveLabel?.trim();
+  if (live) return live;
+  const snapshot = run.runTypeLabel?.trim();
+  if (snapshot) return snapshot;
+  const own = run.name?.trim();
+  if (own) return own;
+  return "Untyped run";
+}
+
 /** A traced run as the counter needs it. */
 export type RunRecord = {
   id: number;

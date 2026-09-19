@@ -5065,15 +5065,30 @@ export async function seedBaselineKits(): Promise<void> {
 // ─── Traced runs (takeoff phase 2b) ───────────────────────────────────────────
 
 /** Every run on one sheet, oldest first — the order they were traced. */
+/**
+ * A run with the live label of its type already attached.
+ *
+ * Joined here rather than looked up by every caller, the same shape as
+ * `StampWithGroup`: one place knows that a run's name has two possible homes —
+ * the type's live label, and the snapshot taken when it was traced. LEFT join,
+ * because a run traced before the palette existed has neither and must still
+ * read.
+ */
+export type RunWithType = TakeoffRun & { runTypeLiveLabel: string | null };
+
 export async function getRunsForSheet(
   sheetId: number,
   userId: number
-): Promise<TakeoffRun[]> {
+): Promise<RunWithType[]> {
   const db = await getDb();
   if (!db) return [];
   return db
-    .select()
+    .select({
+      ...getTableColumns(takeoffRuns),
+      runTypeLiveLabel: takeoffRunTypes.label,
+    })
     .from(takeoffRuns)
+    .leftJoin(takeoffRunTypes, eq(takeoffRuns.runTypeId, takeoffRunTypes.id))
     .where(
       and(eq(takeoffRuns.sheetId, sheetId), eq(takeoffRuns.userId, userId))
     )
@@ -5342,10 +5357,7 @@ export async function createRunType(
  * remembers where it came from (`baselineId`) so it can be reverted and so the
  * palette can hide the original behind it.
  */
-export async function forkRunType(
-  id: number,
-  userId: number
-): Promise<number> {
+export async function forkRunType(id: number, userId: number): Promise<number> {
   const source = await getRunTypeById(id, userId);
   if (!source) throw new Error("Run type not found");
   if (source.userId !== null) return source.id;
@@ -5377,9 +5389,7 @@ export async function updateRunType(
   await db
     .update(takeoffRunTypes)
     .set({ ...safe, updatedAt: new Date() })
-    .where(
-      and(eq(takeoffRunTypes.id, id), eq(takeoffRunTypes.userId, userId))
-    );
+    .where(and(eq(takeoffRunTypes.id, id), eq(takeoffRunTypes.userId, userId)));
 }
 
 /** How many runs each type has, so a list can say so and an archive can warn. */
