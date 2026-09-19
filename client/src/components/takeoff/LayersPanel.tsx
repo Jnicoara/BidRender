@@ -23,10 +23,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  layerColor,
   layerLabel,
   setAxis,
   toggleLayer,
+  type LayerEntry,
   type LayerKey,
   type LayerState,
 } from "@shared/takeoffLayers";
@@ -40,7 +40,7 @@ function Axis({
   onNone,
 }: {
   title: string;
-  entries: { key: LayerKey; count: number }[];
+  entries: LayerEntry[];
   active: Set<LayerKey>;
   onToggle: (key: LayerKey) => void;
   onAll: () => void;
@@ -77,6 +77,8 @@ function Axis({
       <div className="space-y-0.5">
         {entries.map(entry => {
           const on = active.has(entry.key);
+          // Null means this band is not a colour on the drawing.
+          const swatch = entry.color;
           return (
             <button
               key={entry.key}
@@ -87,12 +89,33 @@ function Axis({
               )}
               aria-pressed={on}
             >
+              {/*
+                A swatch here is a LEGEND, so it only shows a colour when the
+                band is actually drawn in one — a run type hands over the colour
+                of its lines. A band with no colour on the sheet gets a neutral
+                chip rather than an invented hue, because two swatches that look
+                alike and mean different things is worse than one that says
+                nothing. See takeoffLayers.
+              */}
               <span
-                className="w-2.5 h-2.5 rounded-sm shrink-0"
-                style={{
-                  backgroundColor: on ? layerColor(entry.key) : "transparent",
-                  border: `1.5px solid ${layerColor(entry.key)}`,
-                }}
+                className={cn(
+                  "w-2.5 h-2.5 rounded-sm shrink-0 border-[1.5px]",
+                  // A neutral chip is styled in CLASSES, not in an inline
+                  // hsl(): this theme's colours are oklab custom properties, so
+                  // `hsl(var(--muted-foreground))` parses to nothing and the
+                  // fill silently vanishes — which made an ON band look exactly
+                  // like an OFF one.
+                  !swatch && "border-muted-foreground/60",
+                  !swatch && on && "bg-muted-foreground/50"
+                )}
+                style={
+                  swatch
+                    ? {
+                        backgroundColor: on ? swatch : "transparent",
+                        borderColor: swatch,
+                      }
+                    : undefined
+                }
               />
               <span className="flex-1 min-w-0 truncate text-left">
                 {layerLabel(entry.key)}
@@ -121,8 +144,8 @@ export function LayersPanel({
   hiddenCount,
 }: {
   present: {
-    systems: { key: LayerKey; count: number }[];
-    locations: { key: LayerKey; count: number }[];
+    systems: LayerEntry[];
+    locations: LayerEntry[];
   };
   state: LayerState;
   /**

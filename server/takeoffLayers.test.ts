@@ -7,22 +7,21 @@
  * filter is at fault rather than the takeoff. So every combination of on and
  * off across both axes is checked, not just the happy path.
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  RUN_SYSTEM_KEYS,
-  UNASSIGNED_LOCATION,
   allLayersOn,
   filterByLayers,
   isFiltered,
   isVisible,
-  layerColor,
   layerLabel,
   layersPresent,
   locationKeyOf,
+  RUN_SYSTEM_KEYS,
   setAxis,
   systemKeyForRun,
   systemKeyForStamp,
   toggleLayer,
+  UNASSIGNED_LOCATION,
   type LayerState,
 } from "../shared/takeoffLayers";
 
@@ -110,6 +109,52 @@ describe("filtering by System alone", () => {
     const shown = filterByLayers(SHEET, state);
     expect(shown).toHaveLength(3);
     expect(shown.every(i => i.systemKey !== "Devices")).toBe(true);
+  });
+
+  it("files a run under its TYPE, so a sheet filters by what it is", () => {
+    // The point of the change: "show me the half-inch homeruns" is a question
+    // an estimator asks, and "show me the conduit" is not.
+    expect(systemKeyForRun("conduit", '1/2" EMT, 2 #12 + ground')).toBe(
+      '1/2" EMT, 2 #12 + ground'
+    );
+    expect(systemKeyForRun("cable", "12-2 MC cable")).toBe("12-2 MC cable");
+  });
+
+  it("keeps a run traced before types in the checklist, not out of it", () => {
+    // It has no type, and a band it cannot reach is work that disappears.
+    expect(systemKeyForRun("conduit")).toBe(RUN_SYSTEM_KEYS.conduit);
+    expect(systemKeyForRun("cable", null)).toBe(RUN_SYSTEM_KEYS.cable);
+    expect(systemKeyForRun("conduit", "   ")).toBe(RUN_SYSTEM_KEYS.conduit);
+  });
+
+  it("gathers two runs of ONE type into one band", () => {
+    const present = layersPresent([
+      { systemKey: systemKeyForRun("conduit", "EMT"), location: null },
+      { systemKey: systemKeyForRun("conduit", "EMT"), location: null },
+      { systemKey: systemKeyForRun("cable", "MC"), location: null },
+    ]);
+    expect(present.systems).toHaveLength(2);
+    expect(present.systems.find(s => s.key === "EMT")?.count).toBe(2);
+  });
+
+  it("carries the colour a run is DRAWN in onto its band", () => {
+    // A swatch is a legend. One that disagreed with the line would teach a
+    // colour code the drawing does not use — which is the fault CLAUDE.md
+    // § "a fix can manufacture the fault another fix was for" is about.
+    const present = layersPresent([
+      { systemKey: "EMT", location: null, systemColor: "#F472B6" },
+      { systemKey: "EMT", location: null, systemColor: "#F472B6" },
+    ]);
+    expect(present.systems[0].color).toBe("#F472B6");
+  });
+
+  it("gives a band with no colour on the drawing no colour here either", () => {
+    // A mark Category is not drawn in one colour, so the panel shows a neutral
+    // chip. The hash that used to invent one is gone: it handed
+    // "Uncategorised" the same pink as a real run type, which is a legend
+    // saying two different things at once.
+    const present = layersPresent([{ systemKey: "Devices", location: null }]);
+    expect(present.systems[0].color).toBe(null);
   });
 
   it("hides traced runs independently of stamps", () => {
@@ -253,16 +298,46 @@ describe("toggling", () => {
   });
 });
 
-describe("layer colours", () => {
-  it("are stable for a key regardless of what else is present", () => {
-    // Colours assigned by position reshuffle when a new system appears, which
-    // teaches the user not to rely on them.
-    expect(layerColor("Devices")).toBe(layerColor("Devices"));
-    expect(layerColor("Lighting")).not.toBe(layerColor("Devices"));
+describe("layer colours — a swatch is a legend or it is nothing", () => {
+  /*
+    These replace two tests about a per-key colour HASH, which is gone.
+
+    The hash gave every band a stable colour, and the tests checked exactly
+    that. What neither could see is that stability is not the property that
+    matters: a swatch next to "1/2\" EMT" says "this is what those lines look
+    like on the sheet", and the same swatch next to "Uncategorised" says
+    nothing of the kind. Measured in the running app, the hash handed those two
+    bands the SAME pink — stable, and wrong.
+  */
+
+  it("shows a run type in the colour its lines are drawn in", () => {
+    const present = layersPresent([
+      { systemKey: "EMT", location: null, systemColor: "#F472B6" },
+    ]);
+    expect(present.systems[0].color).toBe("#F472B6");
   });
 
-  it("always return a colour, even for an unusual key", () => {
-    expect(layerColor("")).toMatch(/^#[0-9A-F]{6}$/i);
-    expect(layerColor(UNASSIGNED_LOCATION)).toMatch(/^#[0-9A-F]{6}$/i);
+  it("keeps a band's colour stable as other bands come and go", () => {
+    // The one property worth keeping from the hash, now got honestly: it comes
+    // from the run itself, so it cannot depend on what else is on the sheet.
+    const alone = layersPresent([
+      { systemKey: "EMT", location: null, systemColor: "#F472B6" },
+    ]);
+    const crowded = layersPresent([
+      { systemKey: "Devices", location: null },
+      { systemKey: "EMT", location: null, systemColor: "#F472B6" },
+      { systemKey: "MC", location: null, systemColor: "#22D3EE" },
+    ]);
+    expect(crowded.systems.find(s => s.key === "EMT")?.color).toBe(
+      alone.systems[0].color
+    );
+  });
+
+  it("invents nothing for a band that is not a colour on the sheet", () => {
+    for (const key of ["Devices", "", UNASSIGNED_LOCATION]) {
+      expect(
+        layersPresent([{ systemKey: key, location: null }])["systems"][0].color
+      ).toBe(null);
+    }
   });
 });

@@ -198,6 +198,7 @@ import {
   systemKeyForStamp,
   type LayerState,
 } from "@shared/takeoffLayers";
+import { runAppearance } from "@shared/takeoffMarks";
 import type { PageRect } from "@shared/planRegion";
 import type { PagePoint } from "@shared/takeoffGeometry";
 import type { RunPathType } from "@shared/takeoffQuantities";
@@ -2494,7 +2495,18 @@ export default function TakeoffPage({
     () =>
       runs.map(run => ({
         ...run,
-        systemKey: systemKeyForRun(run.pathType as "conduit" | "cable"),
+        // The type's name, so the checklist filters by what a run IS rather
+        // than by which of two raceway kinds it belongs to.
+        systemKey: systemKeyForRun(
+          run.pathType as "conduit" | "cable",
+          run.typeName
+        ),
+        // The colour it is already drawn in. A swatch that disagreed with the
+        // line would be a legend teaching a code the drawing does not use.
+        systemColor: runAppearance({
+          runTypeId: run.runTypeId,
+          pathType: run.pathType as "conduit" | "cable",
+        }).color,
         location: run.location ?? null,
       })),
     [runs]

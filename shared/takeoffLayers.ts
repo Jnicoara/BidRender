@@ -18,11 +18,23 @@
  * to be visible in the filter, or a user turns off two boxes and cannot work
  * out why their count dropped by more than those two.
  *
- * ── Runs are on the System axis too ──────────────────────────────────────────
+ * ── Runs are on the System axis too, and a TYPE is the finer answer ─────────
  * A traced run has no assembly and so no Category. It still has to be
  * filterable alongside everything else on the sheet, so conduit and cable get
  * their own System keys. One checklist covers the sheet; nothing on it is
  * unreachable.
+ *
+ * Once a run has a TYPE, that is what it is — `1/2" EMT, 2 #12 + ground`, not
+ * "a conduit run" — so the type's name is its System key and the sheet filters
+ * by the thing an estimator actually asks for: show me the half-inch homeruns.
+ * This is the same axis answering more precisely, not a third axis: System has
+ * always meant "what is this", and a type is a better answer to that question
+ * than a raceway kind is.
+ *
+ * A run traced before types existed has no type, so it keeps the coarse key
+ * and stays visible in the checklist. Dropping it into a types-only list would
+ * hide work nobody could then find, which is what the "absent is a layer"
+ * rule above exists to prevent.
  */
 
 /** Everything with no Location tagged. A real band, not a fallback. */
@@ -37,6 +49,14 @@ export const RUN_SYSTEM_KEYS = {
 /** A layer the checklist can toggle. */
 export type LayerKey = string;
 
+/** One row of the checklist: what, how many, and what colour it is drawn in. */
+export type LayerEntry = {
+  key: LayerKey;
+  count: number;
+  /** Null when nothing on the sheet claims a colour for this band. */
+  color: string | null;
+};
+
 /** What is currently switched on. Absent from the set means hidden. */
 export type LayerState = {
   systems: Set<LayerKey>;
@@ -48,6 +68,19 @@ export type LayeredItem = {
   systemKey: LayerKey;
   /** Null when the user has not tagged it — filtered as UNASSIGNED_LOCATION. */
   location: string | null;
+  /**
+   * The colour this thing is ALREADY drawn in, when it has one.
+   *
+   * A layer swatch is a legend, and a legend that disagrees with the drawing
+   * is worse than none — it teaches a code the sheet does not use. So a run
+   * type hands over the colour `runAppearance` gives its lines rather than
+   * letting `layerColor` hash a different one out of the label.
+   *
+   * Optional because most layers have no colour of their own: a mark Category
+   * is not drawn in one, so it falls back to the hash, which at least keeps
+   * one Category the same colour everywhere.
+   */
+  systemColor?: string | null;
 };
 
 /** The System key for a stamp: its assembly's Category at drop time. */
@@ -58,9 +91,19 @@ export function systemKeyForStamp(assemblyCategory: string | null): LayerKey {
   return assemblyCategory?.trim() ? assemblyCategory : "Uncategorised";
 }
 
-/** The System key for a traced run. */
-export function systemKeyForRun(pathType: "conduit" | "cable"): LayerKey {
-  return RUN_SYSTEM_KEYS[pathType];
+/**
+ * The System key for a traced run: its type's name, or the raceway kind.
+ *
+ * The name rather than the id, because a key is what the checklist SHOWS and
+ * two runs of one type must land in one band. Two types with identical names
+ * would merge — which is right, since a person cannot tell them apart either.
+ */
+export function systemKeyForRun(
+  pathType: "conduit" | "cable",
+  typeName?: string | null
+): LayerKey {
+  const named = typeName?.trim();
+  return named ? named : RUN_SYSTEM_KEYS[pathType];
 }
 
 /** The Location key for anything placed. */
@@ -76,22 +119,37 @@ export function locationKeyOf(location: string | null): LayerKey {
  * the two that matter are harder to find among them.
  */
 export function layersPresent(items: LayeredItem[]): {
-  systems: { key: LayerKey; count: number }[];
-  locations: { key: LayerKey; count: number }[];
+  systems: LayerEntry[];
+  locations: LayerEntry[];
 } {
   const systems = new Map<LayerKey, number>();
+  const systemColors = new Map<LayerKey, string>();
   const locations = new Map<LayerKey, number>();
 
   for (const item of items) {
     systems.set(item.systemKey, (systems.get(item.systemKey) ?? 0) + 1);
+    // First one wins. Every item in a band should agree — they are the same
+    // type — and if two ever disagreed, picking one quietly beats a swatch
+    // that changes colour depending on which run was traced last.
+    const own = item.systemColor?.trim();
+    if (own && !systemColors.has(item.systemKey)) {
+      systemColors.set(item.systemKey, own);
+    }
     const locationKey = locationKeyOf(item.location);
     locations.set(locationKey, (locations.get(locationKey) ?? 0) + 1);
   }
 
-  const toList = (map: Map<LayerKey, number>) =>
-    Array.from(map.entries()).map(([key, count]) => ({ key, count }));
+  const toList = (map: Map<LayerKey, number>, colors?: Map<LayerKey, string>) =>
+    Array.from(map.entries()).map(([key, count]) => ({
+      key,
+      count,
+      color: colors?.get(key) ?? null,
+    }));
 
-  return { systems: toList(systems), locations: toList(locations) };
+  return {
+    systems: toList(systems, systemColors),
+    locations: toList(locations),
+  };
 }
 
 /** Every layer on, which is the state a sheet opens in. */
@@ -162,30 +220,29 @@ export function isFiltered(items: LayeredItem[], state: LayerState): boolean {
 }
 
 /**
- * A stable colour per layer key.
+ * ── There is no `layerColor` any more, and the hash it used is gone ─────────
  *
- * Hashed from the key rather than assigned by position, so a layer keeps its
- * colour as others appear and disappear. A checklist whose colours reshuffle
- * when a new system shows up teaches the user not to rely on them.
+ * A stable colour was hashed out of each layer's key, so a band kept its
+ * colour as others came and went. That was fine while no band's colour MEANT
+ * anything. It stopped being fine the moment a run type's band started wearing
+ * the colour its lines are drawn in, because the panel then held two kinds of
+ * swatch that look identical and say opposite things — one is a legend for the
+ * sheet, the other is decoration.
+ *
+ * It was not theoretical. Measured in the running app on 2026-09-19, the
+ * hashed "Uncategorised" band came out #F472B6 — the exact pink of the
+ * `1/2" EMT, 2 #12 + ground` band two rows below it. One colour, two meanings,
+ * in a list whose whole job is saying which is which. Four of the eight hashed
+ * colours were in `MARK_COLORS` too, so this was going to keep happening.
+ *
+ * Reshuffling the palette would only have made collisions rarer, and a rare
+ * wrong legend is worse than a frequent one because nobody is looking for it.
+ * So: **a band shows a colour only when it HAS one on the drawing.** Everything
+ * else gets a neutral chip, which is honest — that band is not a colour on the
+ * sheet, and pretending otherwise was the whole fault.
+ *
+ * See `CLAUDE.md` § "A fix can manufacture the fault another fix was for".
  */
-const LAYER_COLORS = [
-  "#F5C518",
-  "#4ADE80",
-  "#60A5FA",
-  "#F472B6",
-  "#FB923C",
-  "#A78BFA",
-  "#2DD4BF",
-  "#FACC15",
-];
-
-export function layerColor(key: LayerKey): string {
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
-  }
-  return LAYER_COLORS[hash % LAYER_COLORS.length];
-}
 
 /** How a layer key reads in the checklist. */
 export function layerLabel(key: LayerKey): string {

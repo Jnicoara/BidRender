@@ -10,6 +10,8 @@ This is the human-readable companion to the git history — read this to see wha
 
 - **The Stamp tool is called Mark.** The button, the toasts, the first-run copy and the plan reader's messages. Nothing about your saved work changes — this is the word on screen only. The app had been using both words for one thing: the reader already said "marks" while the tool that places them said "stamp".
 
+- **You can filter the drawing by run type.** The Layers list used to offer "Conduit runs" and "Cable runs"; it now lists each type you have traced with — 1/2" EMT, 12-2 MC cable — so "show me just the half-inch homeruns" is one click. Each row carries the colour those runs are drawn in, so the list reads as a legend for the sheet. Rows that are not a colour on the drawing no longer pretend to be one: the old invented colours could hand two different rows the same swatch.
+
 ## [2026-09-18]
 
 - **A run row is two lines now: what it is, then where it goes.** As one line the sentence overran the panel and dropped the type off the end, so a 12-2 and a 12-3 cable read the same — a different wire and a different number, with nothing on screen to say which. The type is on top because it is what prices the run.
