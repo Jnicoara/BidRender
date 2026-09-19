@@ -321,7 +321,16 @@ pnpm tsx scripts/migrate.mts
 pnpm tsx scripts/schemaDrift.mts
 ```
 
-Expect seven applied and no drift.
+Expect **eleven** applied and no drift.
+
+> **This said seven until 2026-09-18**, when Phase 6 added 0053–0056 on top of
+> Phase 5's 0046–0052 without this checklist being reread. Nothing was wrong
+> with either change; the number here is just a fact that goes stale whenever a
+> migration is written, and it is read at the exact moment somebody is about to
+> touch production. **If the number below does not match what the command
+> prints, stop and find out why before running anything against production** —
+> a mismatch means either this line is stale again or the database is not where
+> you think it is, and those want opposite responses.
 
 > **Worth building before the next migration:** a `KEEP_SCRATCH=1` flag on
 > `verifyBackup.mts` would make steps 2 and 3 one command instead of a manual
@@ -333,8 +342,18 @@ Expect seven applied and no drift.
 DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/schemaDrift.mts
 ```
 
-Expect it to name exactly what you are about to add. For Phase 5 that is three
-tables and the columns on `bids` and `takeoff_runs`.
+Expect it to name exactly what you are about to add. That is now **two
+phases** in one sitting:
+
+- **Phase 5** (0046–0052) — three tables, plus columns on `bids` and
+  `takeoff_runs`.
+- **Phase 6** (0053–0056) — `takeoff_groups`, `takeoff_stamps.groupId`, the
+  backfill that fills it from marks already placed, and `assemblyName`
+  becoming nullable.
+
+**The two are independent and the order is already right**: nothing in Phase 6
+reads anything Phase 5 added. Running them together is one outage window
+instead of two, and the checklist below is unchanged by it.
 
 #### 5. Run it
 
@@ -346,7 +365,17 @@ DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/migrate.mts
 write a new migration file you did not ask for. **Prefer `migrate.mts` on
 production**: it applies what is already in `drizzle/` and nothing else.
 
-Expect `Applied 7 migrations: 0046_magical_electro to 0052_windy_sunspot.`
+Expect
+`Applied 11 migrations: 0046_magical_electro to 0056_stamps_assembly_name_nullable.`
+
+**0055 is the one to watch, and it is the reason step 2 exists.** It is the
+only file here that touches DATA rather than shape: it reads every existing
+mark and writes a group for it. It was rehearsed against a real database on
+2026-09-18 and **failed on its fourth statement** with three already applied —
+a collation mismatch, now fixed (§ 5 "A new table lands on the WRONG
+collation"). It has since run clean and the counts were compared before and
+after, mark by mark. If it stops here anyway, the file says what a re-run does
+and the repair is one `DELETE`; see the header comment in the file itself.
 
 #### 6. Ask again
 

@@ -78,9 +78,70 @@ architecture.
 
 ## 2. Run tracing — the full specification
 
-Agreed 2026-09-17. This is the whole of it in one place.
+Agreed 2026-09-17, and **reconciled 2026-09-18 against a decision this section
+contradicted without knowing it.** Read § 2.0 before anything else here.
 
-### 2.1 Per-run controls
+### 2.0 These are TYPE controls, not per-run fields — D3(a) stands
+
+**The conflict, plainly.** `references/takeoff-spec.md` decision **D3**, made
+2026-09-14, asked how a traced run says what it is and chose between three
+shapes:
+
+> (a) Choose before tracing: "Trace…" asks which conduit or cable assembly,
+> and remembers it for the next run — like the stamp tool.
+> (b) Choose after: each finished run asks "What is this?" in the list.
+> (c) The old per-run calculator form: type, size, conductors, material,
+> fittings, waste, makeup allowance, service loop, terminations, pull points.
+>
+> **Pick: (a)**, with (b) as the way to change it later.
+> **Bloat warning:** (c) puts a form on every run.
+
+**This section was then written three days later, in a different file,
+describing (c).** Not deliberately — nobody reread the older record — but the
+table below is a form of per-run fields, which is the option that had already
+been rejected by name.
+
+**D3(a) stands.** It is the older decision, it is the one made against the old
+screen's actual behaviour, and using the app on 2026-09-18 produced the same
+conclusion independently: three runs on a sheet all called "Run on Sheet 3",
+indistinguishable on the drawing, each needing its settings entered again.
+
+**So the shape is a PALETTE, not a form.** A run type is defined once — "3/4in
+EMT, 3 #12 THHN" — and armed in the toolbar exactly as a counted group is
+armed for marks. Every run traced while it is held inherits it. Tracing six
+identical homeruns becomes arming once and tracing six times.
+
+**The division of ownership, decided 2026-09-18:**
+
+- **The TYPE owns what it IS.** Raceway and size, conductors, material,
+  allowances, and the name and colour that follow from them.
+- **The RUN owns where it is and how long.** Its points, its location, its two
+  ends, its heights — and any deliberate difference from its type, which it
+  says out loud.
+- **Circuits: the type supplies what a new run STARTS with; the run may
+  differ.** A homerun type carrying 3 #12 is the starting point, not a
+  constraint — a particular run may take two circuits in one pipe, and § 2.1 is
+  emphatic that the app must never decide that. The run says when it differs.
+
+**What this fixes beyond settings**, and the reason it is the keystone rather
+than a convenience: runs of one type share a definition, so they share a name
+and a colour without anybody typing either, and "which of these lines is which"
+stops being a question. Naming (T11), colouring, per-run settings and duplicate
+runs are one problem with one answer.
+
+**Everything in § 2.1 to § 2.4 below is still correct about WHAT is
+controlled.** What moves is WHERE the control lives: on the type, inherited by
+the run, overridable on the run. § 2.5's inheritance gains one level — company
+default → run type → this run — and keeps its rule that NULL means "follow the
+level above" rather than a value copied down at creation.
+
+> **The failure is worth more than the fix.** A decision was recorded in one
+> document and a plan was written in another, and the newer one never
+> reconciled. Nothing was wrong with either file on its own; the gap was
+> between them, where no reader stands. It was found by using the app, which is
+> the most expensive place to find it. See CLAUDE.md § Where decisions live.
+
+### 2.1 What is controlled — now per TYPE, inherited by the run
 
 | Control                             | Today                           | Notes                                                       |
 | ----------------------------------- | ------------------------------- | ----------------------------------------------------------- |
@@ -2482,6 +2543,92 @@ accidental.
 **What conversion cannot do is tell you the $38 was wrong.** Show both numbers
 side by side and let the estimator look.
 
+### Offering to put a typed price in the library — after, never before
+
+**Asked for 2026-09-18. Plan only.** Once something has been counted with a
+typed name and price, offer to add it to the library so the next job has it.
+
+**The rule that shapes everything else: ask AFTER, never before.** An offer
+that appears while somebody is counting rebuilds the interruption level 2
+exists to remove. This is the catalog half of CLAUDE.md § "As manual or as
+automated as the user wants".
+
+**So it is not a prompt at all — it is an action on a row that already exists.**
+The needs-attention strip already lists typed-price counts ("3 counted items
+are priced by hand"). That entry gains "add to my library" as a one-tap action
+on the count it names.
+
+That placement answers the nagging question by removing it rather than
+managing it:
+
+- It cannot interrupt, because it lives in a list somebody opens rather than a
+  thing that finds them.
+- It cannot be shown twice, because it disappears when the count is saved.
+- It needs no "don't ask again", no dismissal state, and no column to store one.
+- And it is in the one place somebody is already reviewing what is unpriced —
+  which is exactly when "should this be in my library?" is a live question.
+
+**If an active offer is ever wanted on top of that**, the rules are: once per
+count, ever; declining removes it permanently for that count; never more than
+one on screen. But the list action should ship first and probably makes the
+prompt unnecessary.
+
+**Material or assembly, decided by what was typed, not by asking:**
+
+| Typed             | Saved as                                                            |
+| ----------------- | ------------------------------------------------------------------- |
+| A price           | A material at that price                                            |
+| A price and hours | A material, plus an assembly that contains it and carries the hours |
+
+The second row is the one to be careful about, and it is why this is not a
+one-line feature: "price plus hours" is two library rows, not one. An assembly
+with hours and no materials is a legitimate but different thing (the labour-only
+case § 5f's materials-list note already handles), and silently creating one
+would lose the price. So the honest save creates both and links them, and says
+so in one line before it does — naming the two things it is about to make.
+
+**The labour rate comes along**, because level 2 already collects a role when
+hours are typed (§ 5f). Nothing new to ask.
+
+### Typing a name the library already has — three doors, and the middle one is the default
+
+**Asked for 2026-09-18. Plan only.** The instinct to reject, recorded because
+it was nearly asked for: **typing a price must never quietly overwrite the
+library's.** That would make a keystroke on one job change what every other job
+is priced from.
+
+**But the danger is narrower than it looks, and the design should say so
+honestly rather than inherit a fear.** Checked in `drizzle/schema.ts`: a bid
+line freezes its four pricing inputs when it is added, so **a bid that has
+already been priced does not move when a library price changes — including one
+already sent.** What a library change actually moves is every FUTURE add, and
+any count that has not yet become a bid line. That is a real exposure and worth
+a warning; it is not the catastrophe of retroactively repricing sent work.
+
+**Three choices, presented unequally on purpose:**
+
+1. **Use the library's price.** The count becomes a normal material count
+   (level 3) and re-prices when the library does.
+2. **Use my price, on this job only.** The library is untouched; this bid
+   carries its own number and says it does. **This is the default and the
+   recommended one** — the person typed a price, so they mean a price, and
+   "this job differs" is the common case.
+3. **Update the library.** Deliberate, behind a warning naming what actually
+   moves — every future bid and any count not yet priced, and **not** bids
+   already priced. Same shape as the company-heights warning, with an accurate
+   sentence rather than a frightening one.
+
+**What it costs.** Option 2 is the level-2 path already specified, so it is
+free. Option 1 is level 3, also already specified. Option 3 is a library write
+plus the count-of-affected-bids query behind the warning — the one genuinely
+new piece, and the smallest of the three. The work is almost entirely in the
+moment of collision: noticing the name matches, and presenting three doors in
+the right order without turning a typed word into a modal interrogation.
+
+**What it must not become:** a dialog every time a typed name resembles
+something. It fires on an exact match of a name the user already has, and on
+nothing else.
+
 ### Where the line is drawn differently from how it was first asked for
 
 - **Levels 2 and 3 are ONE feature with two price sources.** Once a group holds
@@ -2695,6 +2842,61 @@ gets louder exactly as the feature that invites counting-without-pricing ships.
 must not reach win-rate analytics as either.
 
 ---
+
+## 5i. Filtering a messy sheet — what Layers reaches, and what it does not
+
+**Surveyed 2026-09-18 from a question about hiding everything except what is
+being worked on.** Nothing here is broken; this is what exists and where it
+stops.
+
+### What it does today
+
+Two axes, independent and combining, so "only devices, and only the ones
+underground" is one state rather than a choice (`shared/takeoffLayers.ts`):
+
+- **System** — the assembly's Category for a mark, and `Conduit runs` /
+  `Cable runs` for a trace.
+- **Location** — the six placed locations, plus an explicit **Unassigned** band
+  rather than a hiding place.
+
+Each row carries a count, and the panel says plainly when a subset is showing —
+because a filtered takeoff that looks like a complete one is how somebody
+quotes a job missing half its receptacles.
+
+So: "only lighting" works for assembly-backed counts, "only conduit" works,
+"only one location" works.
+
+### Three gaps, in the order they will matter
+
+**1. Every plain count lands in one `Uncategorised` band, so three counts are
+one checkbox.** `systemKeyForStamp` returns `Uncategorised` when there is no
+category, which is right for what it was written for — a mark whose assembly
+predates category snapshotting still needs somewhere VISIBLE to live. Level 1
+then arrived and every plain count has no category by definition, so exit
+signs, floor boxes and fire alarm pulls share one row and cannot be isolated.
+
+**The fix is cheap and the group row is why: the GROUP is the natural layer
+key.** A counted group already carries the label a person would look for, it is
+already one row per counted thing, and the panel already groups marks by it.
+The category stays the key for assembly-backed counts — "show me all the
+lighting" is a question about a category, not about one count — so the System
+axis gains a band per plain count rather than replacing what is there. Sizing
+is the only real question: forty plain counts would be forty rows, and § 6's
+"customization available, but never in the way" rule applies — the common few
+visible, the rest behind one control.
+
+**2. Run types cannot be filtered because they do not exist.** Once § 2.0's
+palette ships, a run type is the obvious System-axis key for traces, replacing
+the two-row `Conduit runs` / `Cable runs` split with something that names what
+the run actually is. That is not extra work on top of the palette; it is the
+palette becoming visible in the one place that already filters.
+
+**3. Circuits are rows, not a grouping.** `takeoff_run_circuits` belongs to one
+run, so six lighting homeruns are six unrelated circuit rows that happen to
+share a name. There is nothing to filter or colour by yet. Whether circuits
+should become a shared entity is a real question and it is NOT answered here —
+note it, and answer it when something needs it rather than inventing a table on
+a hunch.
 
 ## 6. Decisions already made — do not re-open without saying why
 

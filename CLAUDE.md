@@ -114,6 +114,98 @@ Reaching a screen needs a session, which is the genuinely hard part and is
 already solved — see the block above, and
 `.claude/skills/run-bidrender/SKILL.md`.
 
+## A checklist that states a count must say what to do when it does not match
+
+**Any instruction of the form "expect N of something" goes stale**, because N
+is a fact about the code at the moment it was written and the checklist is read
+at the moment somebody is about to do something irreversible.
+
+It has now happened twice in two days. The production migration checklist said
+"Expect seven applied" — true when written, and wrong by four the moment Phase
+6 added migrations in a different file. It would have been read mid-procedure,
+against production.
+
+**The number is not the fix. This is:**
+
+> If what the command prints does not match, **stop and find out why before
+> going on.** A mismatch means either this line is stale or the system is not
+> in the state you think it is, and those want opposite responses.
+
+That sentence stays true forever; the count does not. **Write both** — the
+count, because it is genuinely useful when it is right, and the instruction,
+because it is what makes a stale count harmless. Anywhere a doc says a test
+suite prints N passing, a migration applies N files, or a screen shows N rows,
+it needs the second half.
+
+## As manual or as automated as the user wants — every level is a real way to work
+
+**Somebody should be able to work entirely by hand and never build a library at
+all. Somebody else should be able to build everything up front and have every
+job be one click. Every point in between is a legitimate way to work, not a
+lesser one**, and the app must not push from one toward another.
+
+This is the same idea as the AI rule above — manual mode is the product, AI is
+an accelerator on top of it — applied to the catalog instead. There it stops a
+feature existing only in the AI path; here it stops the library becoming a toll
+gate on the work.
+
+What it rules out, concretely:
+
+- **Setup before value.** Demanding a library entry before the first count is
+  what made the old stamp tool unusable on a fresh set, and it is why level 1
+  exists (references/plan-viewer-overhaul.md § 3).
+- **A lesser-looking path.** A typed price is not a degraded assembly. It says
+  what it is — a price that lives on this job — and is otherwise a first-class
+  count, on the bid, in the totals, in the same lists.
+- **Nagging toward the library.** An offer to save something for next time is
+  useful once and noise every time after. See § 5f on where that offer lives.
+- **A one-way door.** Anything counted by hand can become a library item later
+  with every click intact; anything from the library can be overridden on one
+  job without touching the library. Both directions, always.
+
+**The test for a new feature:** could somebody who has never opened the library
+screen use this, and could somebody whose library is complete skip every step
+of it? If either answer is no, the feature has picked a side.
+
+## Where decisions live — read the older record before specifying something new
+
+**Before writing a plan for anything, search the reference files for a decision
+that already covers it.** Decisions in this project are recorded where they were
+made, which is not always where the next plan gets written:
+
+- `references/takeoff-spec.md` — the numbered decisions (D1–D15) about how the
+  takeoff behaves, and the feature inventory (C, S, T, R) with what exists.
+- `references/plan-viewer-overhaul.md` — the phase plan, § 6 "Decisions already
+  made — do not re-open without saying why", and the per-phase specs.
+- `CLAUDE.md` — standing rules that apply to every screen.
+- `todo.md` § "Working on this repo — traps" — the things that bite.
+
+**The worked example, 2026-09-18.** Decision **D3** (2026-09-14) chose how a
+traced run says what it is, picking "choose before tracing, and remember it for
+the next run" and rejecting "a form on every run" **by name, as bloat**. Three
+days later § 2 of the overhaul document was written in a different file
+specifying a table of per-run fields — the rejected option — without citing D3.
+Neither file was wrong on its own. The gap was between them, where no reader
+stands, and it survived until somebody used the app and reached D3's conclusion
+a second time by hand.
+
+**A plan built on that gap gets built.** Nothing downstream re-examines a
+premise: not `pnpm check`, not a test, not a review of the diff. It is the same
+failure as an unmeasured number in the section below — a claim that reads like
+a fact because it is written down.
+
+**So, two habits:**
+
+1. **Before specifying, grep for the feature's name in the reference files**
+   and read what is already decided about it. If something covers it, cite it —
+   agreeing with it in writing is cheap and makes the next reader's search
+   succeed.
+2. **When a new decision overrides an old one, say so in BOTH files.** The
+   older entry gets a line saying what replaced it and when; the newer one gets
+   a line saying what it overrides and why. A decision that is only recorded in
+   the newer file is invisible to anyone who opens the older one first — which
+   is what happened here, in reverse.
+
 ## A number that can be measured should not be asserted
 
 **If a claim is about a quantity the running app would tell you, go and ask

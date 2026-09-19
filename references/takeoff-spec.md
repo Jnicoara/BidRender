@@ -294,9 +294,14 @@ from now on.
   copy kept in the browser is loaded when the sheet opens
   (`TakeoffPage.tsx:1310`) but never shown or offered. The Aug 12 changelog says
   "an interrupted trace is offered back when you return to that sheet."
-- **T11** — Every run is named "Run on (sheet name)" (`TakeoffPage.tsx:1346`),
-  so the list fills with identical names. Naming runs by what they are (T4) would
-  remove most of the need to rename.
+- **T11** — Every run is named "Run on (sheet name)" (`TakeoffPage.tsx`, three
+  call sites), so the list fills with identical names. Naming runs by what they
+  are (T4) would remove most of the need to rename. **Confirmed by use,
+  2026-09-18**, along with the other half nobody had written down: they are
+  also indistinguishable ON THE DRAWING, because colour carries only conduit or
+  cable. Both are downstream of D3(a) — a run that inherits a named type gets
+  its name and its colour from that type, so neither is a feature of its own.
+  Do not build a naming scheme before the type exists; it would be rewritten.
 - **Old screen extras for runs:** Pause, Resume and Finish; lift the pen by
   double-click, right-click or both buttons; saved favourite colours; per-segment
   labels that appeared once zoomed in enough; "Push" to send a run's total to
@@ -510,7 +515,19 @@ Everything else below is still open until you say so.
   - The same assembly added by hand stays a separate line marked "added by hand",
     so a double count is visible rather than hidden (R3).
 
-**D3 — How a traced run says what it is (T4, R2).**
+**D3 — How a traced run says what it is (T4, R2). STILL STANDS — confirmed
+2026-09-18.**
+
+> `references/plan-viewer-overhaul.md` § 2 was written on 2026-09-17
+> describing option (c), the per-run form this decision rejected by name. It
+> did not cite this entry and nobody reread it. Reconciled on 2026-09-18: that
+> document's § 2.0 now records that (a) stands and restates its own § 2.1–2.5
+> as controls on the TYPE, inherited by the run.
+>
+> **The decision was re-reached independently by using the app** — three runs
+> on one sheet, all named "Run on Sheet 3", each needing its settings entered
+> again. When the same answer arrives twice by different routes, it is the
+> answer.
 
 - (a) Choose before tracing: "Trace…" asks which conduit or cable assembly, and
   remembers it for the next run — like the stamp tool.

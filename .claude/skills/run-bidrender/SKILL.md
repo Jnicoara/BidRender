@@ -97,7 +97,13 @@ JWT_SECRET=local-dev-secret node .claude/skills/run-bidrender/smoke.mjs
 
 Finds the server (probing ports 3000–3005), authenticates, and exercises the
 Materials library end to end: listing, create, fork-on-edit, revert, and the
-refusals. Prints `31 passed, 0 failed` / `Smoke OK` and exits 0.
+refusals. Prints something like `31 passed, 0 failed` / `Smoke OK` and exits 0.
+
+**The count grows as the script does, so treat it as a shape rather than a
+number** — what matters is `0 failed` and exit 0. If the passing count is far
+below what you last saw, the script is not running everything it should, which
+is a different problem from a failure and is easy to read past. See CLAUDE.md
+§ "A checklist that states a count".
 
 It is **idempotent** — safe to re-run; it normalises any fork left by a
 previous run and uses timestamped names for created rows.
