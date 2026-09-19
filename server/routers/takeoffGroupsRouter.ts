@@ -27,6 +27,28 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import * as db from "../db";
+import {
+  countsWaitingToSend,
+  countsWithNoPrice,
+  sendWarning,
+  sendability,
+  type BridgeLine,
+} from "../../shared/takeoffBridge";
+
+/** A stored line in the shape the bridge rules read. */
+function toBridgeLine(line: {
+  id: number;
+  name: string;
+  takeoffGroupId: number | null;
+  assemblyId: number | null;
+}): BridgeLine {
+  return {
+    id: line.id,
+    name: line.name,
+    takeoffGroupId: line.takeoffGroupId,
+    assemblyId: line.assemblyId,
+  };
+}
 
 /** This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`. */
 const procedure = scoped("bids.view", "bids.edit");
@@ -43,6 +65,29 @@ const labelSchema = z
   .trim()
   .min(1, "Give it a name — that is what the count is called.")
   .max(255);
+
+/**
+ * Why a count cannot go to the bid, in words the estimator can act on.
+ *
+ * Each one names the next move, because the four reasons want opposite things:
+ * a price, some marks, nothing at all, or a feature that is not built yet.
+ * CLAUDE.md's writing rule — what happened, then what to do about it.
+ */
+function refusalMessage(
+  reason: "already-on-bid" | "nothing-counted" | "no-price" | "unsupported-level",
+  label: string
+): string {
+  switch (reason) {
+    case "already-on-bid":
+      return `"${label}" is already on the bid, and its line follows these marks.`;
+    case "nothing-counted":
+      return `Nothing is marked for "${label}" yet. Mark it on a sheet and it can go over.`;
+    case "no-price":
+      return `"${label}" has no price behind it, so there is nothing to put on the bid. Count it against an assembly from your library.`;
+    case "unsupported-level":
+      return `"${label}" carries its own price, and typed prices cannot reach the bid yet. Counts made against an assembly can.`;
+  }
+}
 
 async function requireBid(bidId: number, userId: number) {
   const bid = await db.getBidById(bidId, userId);
@@ -101,7 +146,10 @@ export const takeoffGroupsRouter = router({
         db.getGroupsForBid(input.bidId, ctx.scope.dataUserId),
         db.countStampsByGroup(input.bidId, ctx.scope.dataUserId),
       ]);
-      return groups.map(group => ({
+      const lines = await db.getBidLineItems(input.bidId);
+      const bridgeLines = lines.map(toBridgeLine);
+
+      const rows = groups.map(group => ({
         id: group.id,
         label: group.label,
         kind: group.kind,
@@ -111,6 +159,30 @@ export const takeoffGroupsRouter = router({
         unitHours: group.unitHours === null ? null : Number(group.unitHours),
         count: counts.get(group.id) ?? 0,
       }));
+
+      return {
+        groups: rows.map(row => ({
+          ...row,
+          /**
+           * Whether this count can go to the bid, and if not, which of the
+           * four reasons — so the panel can say the right next thing rather
+           * than greying a control out and explaining none of them.
+           */
+          sendability: sendability(row, bridgeLines),
+        })),
+        /** The one number the panel prints under the list. */
+        waitingToSend: countsWaitingToSend(rows, bridgeLines),
+        /**
+         * Counts that are marked but have no price, so they can never cross.
+         *
+         * The panel needs this to tell two very different zero-states apart.
+         * With `waitingToSend` alone, a bid whose only count is unpriced reads
+         * as "every priced count is on the bid" — vacuously true, and it sounds
+         * like the takeoff is finished when there is money missing from it
+         * entirely. Caught by looking at the screen, not by a test.
+         */
+        countedWithNoPrice: countsWithNoPrice(rows, bridgeLines),
+      };
     }),
 
   /**
@@ -255,17 +327,95 @@ export const takeoffGroupsRouter = router({
     }),
 
   /**
+   * Send a counted thing to the bid as a line — the bridge.
+   *
+   * ── Why this is a mutation somebody calls, and not a side effect ───────────
+   * D2(a) chose "live" in 2026-09-14 and rejected a button. That is AMENDED,
+   * not abandoned: asking is what creates the line, and from then on the
+   * quantity follows the marks with nothing to press. See
+   * references/plan-viewer-overhaul.md § 5f.0 OVERRIDE 2 and the note now on
+   * D2 itself.
+   *
+   * The deciding reason is R4 rather than the interruption. Costs freeze when
+   * the line is created, and no edit can reach a snapshot afterwards
+   * (`bidsRouter.updateLine` accepts no snapshot field). Automatic creation
+   * would therefore mean the app choosing the instant somebody's money is
+   * frozen — $3 on the way to $38.
+   *
+   * Returns the warning rather than refusing on it: a second line for the same
+   * assembly may be exactly right, and R3's job is to make the double count
+   * visible rather than impossible.
+   */
+  sendToBid: procedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const group = await requireGroup(input.id, ctx.scope.dataUserId);
+      const [counts, lines] = await Promise.all([
+        db.countStampsByGroup(group.bidId, ctx.scope.dataUserId),
+        db.getBidLineItems(group.bidId),
+      ]);
+      const count = counts.get(group.id) ?? 0;
+      const bridgeLines = lines.map(toBridgeLine);
+      const row = {
+        id: group.id,
+        label: group.label,
+        kind: group.kind,
+        assemblyId: group.assemblyId,
+        materialId: group.materialId,
+        unitCost: group.unitCost === null ? null : Number(group.unitCost),
+        count,
+      };
+
+      const allowed = sendability(row, bridgeLines);
+      if (!allowed.sendable) {
+        throw new TRPCError({
+          code: allowed.reason === "already-on-bid" ? "CONFLICT" : "BAD_REQUEST",
+          message: refusalMessage(allowed.reason, group.label),
+        });
+      }
+
+      const warning = sendWarning(row, bridgeLines);
+      const { id } = await db.addCountToBid(
+        group.bidId,
+        ctx.scope.dataUserId,
+        group,
+        count
+      );
+      return { lineId: id, count, warning };
+    }),
+
+  /**
    * Stop counting something, and take its marks off the drawing with it.
    *
    * Returns the number removed rather than a bare success, so the screen can
    * say what happened to a person who has just lost fourteen clicks on purpose.
    * The marks go by the foreign key's cascade — one rule, in the database,
    * rather than a second delete here that could be half done.
+   *
+   * ── A count that is ON THE BID is refused, and neither alternative works ───
+   * `set null` on the line's link would leave a from-plans line with frozen
+   * costs and a quantity that follows nothing, looking exactly like a line that
+   * is fine. `cascade` would take money off a bid because somebody tidied a
+   * drawing. So this refuses and names the line; the RESTRICT constraint in
+   * drizzle/0060 is the backstop under the sentence, not the thing the user is
+   * meant to meet. Removing the line first is the way through, and it is the
+   * same clean undo as changing your mind about sending.
    */
   remove: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const group = await requireGroup(input.id, ctx.scope.dataUserId);
+
+      const onBid = await db.getBidLineForGroup(group.id);
+      if (onBid) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            `"${group.label}" is on the bid as a line. Remove that line from ` +
+            `the bid first, then this count can go.`,
+        });
+      }
+
       const counts = await db.countStampsByGroup(
         group.bidId,
         ctx.scope.dataUserId

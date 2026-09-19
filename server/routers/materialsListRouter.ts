@@ -16,13 +16,25 @@
  * `getAssemblyMaterialQuantities`, which does not select `costPerUnit` at all.
  * There is no point in this path where a cost is in scope and chosen against.
  *
- * ── Two sources, one list ────────────────────────────────────────────────────
- * Stamps on a drawing and line items on the bid are independent — stamping does
- * not create a line item — so a bid can have either, both or neither, and a
- * list built from one of them alone would be short in a way nobody could see.
- * Quick Bids have line items and no plan; a takeoff in progress has stamps and
- * no line items yet. Both are read, and both are why this works before any
- * pricing exists.
+ * ── Two sources, one list, and they OVERLAP since 2026-09-19 ────────────────
+ * Stamps on a drawing and line items on the bid are both read, because a bid
+ * can have either, both or neither, and a list built from one of them alone
+ * would be short in a way nobody could see. Quick Bids have line items and no
+ * plan; a takeoff in progress has stamps and no line items yet. Both are why
+ * this works before any pricing exists.
+ *
+ * **This header used to say the two were independent — "stamping does not
+ * create a line item".** That was true until the bridge shipped and it is not
+ * true now: sending a count creates a line that points back at the group, so
+ * the same fourteen exit signs are reachable down both paths at once. Reading
+ * both without noticing would put twenty-eight on a supplier's desk.
+ *
+ * So the stamp loop below SKIPS any group that already reaches this list as a
+ * bid line. The rule is one line of code, and it is load-bearing: this comment
+ * is here because a stale assertion about what the code does is worse than no
+ * comment at all — the next reader takes it as current and builds on it, which
+ * is exactly how this document's § 2 came to specify an option that had already
+ * been rejected by name.
  *
  * ── It never requires a price to exist ───────────────────────────────────────
  * Nothing here touches labor rates, company defaults, tax or the bid rollup, so
@@ -138,6 +150,25 @@ export const materialsListRouter = router({
         });
       }
 
+      /*
+        Groups that already reach this list through a BID LINE.
+
+        THE DOUBLE COUNT THIS ROUTER WOULD OTHERWISE HAVE. Until 2026-09-19 the
+        two sources above were genuinely independent — stamping did not create a
+        line item — so reading both could not overlap. The bridge makes them
+        overlap exactly: a sent count is fourteen marks AND a line of fourteen,
+        and adding both would send a supplier a request for twenty-eight.
+
+        The line wins rather than the marks, because it is the same quantity
+        resolved from the same marks (`withPlanCounts` in server/db.ts) and it
+        is the row that carries the name the estimator gave it.
+      */
+      const countedOnBid = new Set(
+        liveLines
+          .map(line => line.takeoffGroupId)
+          .filter((id): id is number => id !== null)
+      );
+
       for (const group of groupStamps(
         stamps.map(stamp => ({
           id: stamp.id,
@@ -149,6 +180,7 @@ export const materialsListRouter = router({
           y: Number(stamp.y),
         }))
       )) {
+        if (group.groupId !== null && countedOnBid.has(group.groupId)) continue;
         const materials =
           group.assemblyId === null
             ? []

@@ -2399,18 +2399,103 @@ it goes in the same phase rather than the next one.
 
 ## 5f. Phase 6b — the bridge: counts onto the bid
 
-**Designed 2026-09-18, not built.** Levels 3 and 2 live here, behind the thing
-they both need.
+**Designed 2026-09-18. Reviewed against the built code and SPLIT INTO TWO STEPS
+on 2026-09-19; step one approved and building.** Read § 5f.0 before the rest of
+this section: two things approved earlier are overridden here.
+
+### 5f.0 Two overrides, recorded before anything that depends on them
+
+#### OVERRIDE 1 — this phase is two steps. Level 4 crosses first
+
+**Decided 2026-09-19, on reading the built code rather than the plan.** The
+version of § 5f approved on 2026-09-18 reads as one job: "levels 3 and 2 live
+here, behind the thing they both need". It is two.
+
+**Level 2 does not exist.** `takeoff_groups.unitCost`, `unitHours` and
+`laborRateId` were shipped as columns on 2026-09-18 and **nothing writes any of
+them** — there is no price field on a count anywhere in the app. So the approved
+§ 5f is a typed-price feature and a bridge, stacked, with the bridge underneath.
+
+**Level 4 is complete and is what gets typed in by hand today.** A count made
+with a library assembly already holds a name, materials at today's prices,
+hours, a role and that role's rate, and `addAssemblyToBid` (`server/db.ts`)
+already knows how to freeze all six onto a line. Nothing has to be invented for
+it to cross.
+
+So:
+
+> **Step one is the bridge itself, proved on assembly counts only.**
+> **Step two is the typed price, the material price, and traced runs** — all
+> three of which fill the same group row from a different source and reuse every
+> piece of step one.
+
+**This is not a reduced version of the feature.** Step one builds the whole
+mechanism — the link, the live count, the frozen price, the double-count guard,
+and the fix to the supplier list — against the one level where every input
+already exists. Levels 2 and 3 then become what this section already said they
+were: "fill that cost from a material instead of typing it, same screen, same
+fields, a toggle on where the number comes from".
+
+**And it pays on the day it ships.** Count fourteen receptacles with a library
+assembly, ask once, and they are on the bid at the prices that count was made
+against. That is the hand-typing gone, which is the whole point of the phase.
+
+#### OVERRIDE 2 — the FIRST crossing is an explicit act. D2(a) is amended, not abandoned
+
+**Decided 2026-09-19. This overrides `references/takeoff-spec.md` D2 (decided
+2026-09-14), which chose "live" and rejected a button by name.** That entry now
+carries a line pointing here.
+
+D2(a) rejected a button because it produces "a bid that goes stale when somebody
+forgets to press it". That objection is real and it survives — it is just
+narrower than it looks:
+
+> **Asking is what creates the line. After that the count is live for ever.**
+
+Once a group is on the bid, its quantity follows the marks with nothing to press
+— which is exactly what D2(a) wanted and is most of what it was protecting. The
+only thing that can go stale is a count that has **never** crossed, and § 5f's
+needs-attention work makes that a listed, visible state rather than a silent
+one. D2(a)'s objection is answered by making "not on the bid yet" impossible to
+miss, rather than by removing the moment of choice.
+
+**The reason that actually decides it is R4, not the interruption.** Costs
+freeze when the line is created. If creation is automatic, **the app picks the
+instant the estimator's money is frozen.** Type `3` on the way to typing `38`
+and $3 is already on the bid, snapshotted, unreachable by any edit —
+`bidsRouter.updateLine` deliberately does not accept snapshot fields. An
+interruption costs a moment. A freeze at a moment nobody chose costs a job.
+
+Two smaller facts point the same way. A level 1 count creates no line at all, so
+"automatic" already needs an exception carved into it. And for an assembly count
+there is no defensible automatic moment either — the first mark, or the
+fourteenth, and both are arbitrary.
+
+**Making the waiting work obvious — two places, both quiet, neither on the
+drawing.**
+
+1. **The counted-items panel**, one line of words in a fixed position under the
+   list: `3 counts are not on the bid yet`. Words with a number in them, in the
+   same place whether the number is 0 or 9. Not a control that restyles, tints
+   or appears as state changes — movement where the screen wants steadiness.
+2. **The bid's warning strip**, which already sits directly under the number it
+   contradicts. A count that has not crossed is money missing from the material
+   total above it, which is the same relationship the labour entry already has.
+
+**Never a badge on the drawing.** Unchanged from the approved version, and it
+matters more once a send exists: level 1's whole promise is a quiet count, and a
+marker nagging toward the bid breaks that promise on the screen where it was
+made.
 
 ### The finding that made this its own phase
 
 **Nothing about money reads a stamp. Not level 2 — level 4 either.**
 
 A stamped assembly does not become money on a bid and never has.
-`server/routers/materialsListRouter.ts` says it in its header: "stamping does
-not create a line item". Marks and runs reach the counted-items panel and the
-supplier materials list, and stop. **A finished takeoff is typed into the bid by
-hand.**
+`server/routers/materialsListRouter.ts` said it in its header until step one:
+"stamping does not create a line item". Marks and runs reach the counted-items
+panel and the supplier materials list, and stop. **A finished takeoff is typed
+into the bid by hand.**
 
 This was checked rather than assumed, after the design for level 2 was written
 around the premise that a typed price was the thing with no path to the bid. The
@@ -2458,15 +2543,248 @@ places to teach, and the failure mode is a total that is right on seven screens
 and wrong on the eighth.
 
 **One line per GROUP, marked "from plans", its count following the marks.** This
-is D2(a) in `references/takeoff-spec.md`, decided 2026-09-14, and it stands:
-live rather than a "send to bid" button, because a button is a bid that goes
-stale when somebody forgets to press it. Costs freeze when the line is first
-created (R4). A group with no price — level 1 — creates no line at all.
+is D2(a) in `references/takeoff-spec.md` and it stands, amended by OVERRIDE 2
+above: live after the first crossing rather than from it. Costs freeze when the
+line is first created (R4). A group with no price — level 1 — creates no line at
+all.
+
+**The group row is what makes this small.** When this section was first written,
+"one line per group" was a plan; the group is now a real row, one per counted
+thing per bid, holding the label and the price. A bid line is a name, a count
+and a price. They are the same shape, so the bridge is one column and a rule
+rather than a new concept.
+
+**"From plans" needs no column of its own.** A line is from the plans if it
+points at a group. Read from the absence, exactly as `takeoffRunTypesRouter`'s
+`needsSpecification` is read from a null material link, and for the same reason:
+a second flag is a second thing that can drift out of step with what it
+describes.
 
 **A typed price enters as material money**, so markup, overhead and sales tax
 treat it exactly as they treat a material. That is what is wanted for 14 exit
 signs, and it is worth saying out loud because it means a typed price is inside
-the tax base when `taxMaterials` is on.
+the tax base when `taxMaterials` is on. Step two.
+
+### The rule the whole step follows
+
+> **The plans own what it is and how many. The bid owns what it costs.**
+
+Every answer below falls out of that one sentence, and anything that cannot be
+derived from it is a decision that has not been made yet.
+
+### What happens when the count changes — the walk-through
+
+Fourteen exit signs, sent, priced at $38 each. The line says 14 and $532.
+
+**Two more are found and marked.** The line says **16 and $608**, next time it is
+looked at. Nothing to press, no notification, nothing to re-send — the number was
+never stored as 14, it is the number of marks and always was.
+
+**The price does not move.** Not when material prices change, not when the
+library assembly changes. R4, and the same rule every other bid line already
+follows.
+
+**Where the number comes from — one place, not six.** `getBidLineItems`
+(`server/db.ts`) resolves a from-plans line's quantity from its marks before
+handing the line to anyone. Five routers and the bid screen read through it, and
+`countBidsWithLineItems` joins the table directly and must be looked at
+alongside. This keeps the count DERIVED — the rule `shared/takeoffCounts.ts` and
+`takeoffGroupsRouter.list` already live by — without teaching six screens to
+count marks. Storing the quantity and writing it on every mark change is the
+shape that drifts: one missed write and the bid and the drawing disagree with
+nothing on screen to say which is right.
+
+**Renaming the count renames the line.** A deliberate departure from how an
+assembly line behaves, and the reason is the distinction the snapshot rule
+actually rests on: a line's name is frozen so **the library** cannot rename
+something behind the estimator's back. **A group is not the library.** It is
+their own row, on this bid, that they made and they renamed. Freezing it would
+leave the panel and the bid calling one thing two names.
+
+**Deleting every mark leaves the line at 0, saying so.** It does not vanish.
+Money leaving a bid because somebody undid a click, with nothing on screen
+recording that it happened, is the worse failure — and a line at 0 is findable,
+removable, and obviously wrong, which a missing line is not.
+
+**If the line has already been edited by hand.** Only three fields are editable
+on any line today (`bidsRouter.updateLine`: `qty`, `name`, `unitLabel`); cost is
+already frozen everywhere.
+
+- **Quantity — REFUSED, with the fix in the sentence.** "This line counts 16
+  marks on the plans. Change it by marking or unmarking on the Plans screen."
+  Not a new restriction: D2(a) already decided it — _"that line's quantity is
+  changed by stamping, not by typing — one source of truth"_. Allowing both is
+  how a line reading 20 sits beside a drawing holding 16.
+- **Name — REFUSED too, and the first draft of this was wrong.** The version
+  approved on 2026-09-19 said a hand edit was allowed and "detached" the name
+  from the count. **That state has nowhere to live.** Recording "this line's
+  name no longer follows" needs a column, and the approved database change is
+  three additive things with no fourth. Without one, a typed name is accepted,
+  written, and then overwritten by the group's label on the very next read — a
+  field that takes an edit and silently drops it, which is worse than one that
+  says no. So the name follows the count, and the refusal says where to rename:
+  "This line is named by the count it came from. Rename that count on the Plans
+  screen and the line follows." Corrected while building, before it shipped.
+- **Unit label — allowed**, unchanged. It says which repeating unit the line
+  belongs to, which is a fact about the bid rather than about the drawing.
+- **Deleting the line — allowed, and it is the clean undo.** The group returns
+  to "not on the bid", reappears in the waiting list, and can be sent again.
+
+### The double-count rule, in code — R3
+
+**Three different double counts, and they need three different answers.** R3 has
+been listed **Missing** in the takeoff spec since 2026-09-14; this is where it
+gets built, and § 7 already ruled that it goes in the CODE rather than only in
+this document.
+
+**(a) The same count sent twice — PREVENTED.** One live bid line per group, held
+by a unique index so the database is what is true, plus a check in the router
+above it so what reaches the screen is a sentence rather than a constraint
+violation. Same two-layer shape as `takeoffGroupsRouter.refuseDuplicate`.
+
+**(b) The same thing counted on the plans AND added by hand — MADE VISIBLE, not
+prevented.** Both lines are legitimate rows: six receptacles that are genuinely
+not on the drawing is ordinary work. D2(a) already chose visibility here, and it
+is right. Two places, because one is not enough:
+
+- **At the moment of sending**, while somebody is looking: "This bid already has
+  a line for Duplex receptacle added by hand (6). Sending the count adds a
+  second line."
+- **A standing check on the bid screen.** The hand-added line can arrive AFTER
+  the send, so a warning that fires once catches only half the cases. One
+  function in `shared/` — does any assembly appear on both a from-plans line and
+  a hand-added one — read by the bid screen and covered by a test. **This is the
+  half that makes R3 code rather than a note**, and it is the half a one-time
+  warning would quietly leave out.
+
+**(c) Wire counted twice** — a starter device assembly carries 25 ft of NM-B
+built in (`server/seed/baselineAssemblies.ts`), and the run feeding that device
+is also traced. Flagged in the takeoff spec since 2026-09-14. It cannot bite
+until **runs** reach the bid, so it belongs to step two — named here so it is not
+discovered there.
+
+### The supplier materials list breaks, and it is fixed in the SAME step
+
+**This is the one real breakage, and it is live rather than theoretical.**
+
+`materialsListRouter` builds the list from two sources — marks on the drawing
+and lines on the bid — and treats them as independent **because they were**. Its
+header said so in as many words: "stamping does not create a line item — so a
+bid can have either, both or neither".
+
+The moment stamping does create one, a sent count reaches the supplier list
+**twice**: once from its fourteen marks, once from its bid line. A supplier
+quotes twice the parts, and nothing on the document says so.
+
+So the fix ships in step one, not after it: a group with a live bid line is
+counted from the line, not from its marks. **And the header comment changes with
+it.** A comment asserting what the code no longer does is exactly the fault
+`CLAUDE.md` § "And the same distrust applies to a comment" describes — it is
+worse than no comment, because the next reader takes it as current and builds on
+it. That is how § 2 of this document came to specify the option D3 had already
+rejected.
+
+### What step one does NOT change
+
+**No existing bid reads differently.** Nothing creates from-plans lines
+retroactively. Every line on every bid today has an empty link, prices
+identically, appears identically, and exports identically. The only bid that
+changes is one where somebody afterwards chooses to send a count.
+
+**No pricing code changes.** `shared/pricing.ts` is untouched. A from-plans line
+is an ordinary line with an ordinary snapshot, which is the entire reason this
+was built as a real bid line rather than a thing alongside.
+
+**The proposal, accounting export, close-out, dashboard and analytics need no
+code change.** They read bid lines, and a from-plans line is a bid line. Their
+totals move because the bid has more on it, which is correct.
+
+**One behaviour worth naming rather than discovering:** `countBidsWithLineItems`
+drives the onboarding checklist's "first bid" step. A from-plans line will tick
+it. That is right — the work was done — but it is a path that check has never had
+before.
+
+### Database changes — three, all additive, riding with the production migration
+
+1. **`bid_line_items.takeoffGroupId`** — nullable, null on every existing row.
+2. **A unique index** on (bid, group), so one count cannot hold two live lines.
+3. **A guard on deleting a count that is on the bid.** Neither obvious option is
+   acceptable on its own: `set null` leaves a from-plans line pointing at
+   nothing, frozen, with a quantity that no longer follows anything and no way
+   to tell; `cascade` pulls money off a bid because somebody tidied a drawing.
+   So the router refuses with a sentence naming the line, and the foreign key's
+   RESTRICT is the backstop underneath it. `takeoffGroupsRouter.remove` already
+   reports what it removed, and the screen already asks first.
+
+**They ride with the production migration — one sitting, not two.** The
+DigitalOcean database is built by running every migration against an empty
+database (`references/deploying.md` § "A new database has to build from the
+files alone"), so there is no cost to these landing in the same run. Two
+constraints hold: a new migration must be dated after every existing one or
+every existing database skips it silently, and one statement per file as 0046
+onward established.
+
+---
+
+## 5f.2 Step two — the typed price, the material price, and traced runs
+
+Everything below is designed and NOT approved for building. Step one ships
+first.
+
+### THE GATE ON STEP TWO: traced footage reaches the bid with NO LABOUR BEHIND IT
+
+**Found 2026-09-19, while checking whether runs belong in step one. They do not,
+and this is why.** Recorded as a gate rather than a note, at the estimator's
+instruction, because it is the exact failure this project has a standing rule
+about and it arrives wearing a correct-looking number.
+
+**A run type names a raceway material and a conductor material. Materials in
+this app carry no labour hours — nowhere in the schema.** So a traced run sent
+to the bid through the obvious path arrives as **340 feet of pipe, at material
+cost, with zero hours to install it.**
+
+That line is materially right and wrong on the number that decides whether a job
+is won at a loss. It does not look wrong. It totals, it taxes, it takes markup,
+it prints on a proposal, and the only symptom is money — which is precisely the
+failure `CLAUDE.md` § "AI features" records about `invokeAnthropic`: a hole the
+types allowed, that nothing complained about, found a year late by accident. It
+is also the failure `shared/takeoffQuantities.ts` already refuses to permit for
+verticals, and for the same stated reason: **a total that is too high gets
+queried, and a total that is too low looks like a competitive bid.**
+
+**So: no traced footage reaches a bid line until labour on a run has an answer.**
+Not a smaller version, not behind a flag, not "material only for now with hours
+to follow". A priced run with no hours is the plausible-but-wrong number this
+whole document exists to keep off a bid.
+
+Two more things must exist before runs cross, and both are smaller than the
+labour question:
+
+- **The three allowances are not built** — no waste, makeup or routing columns
+  exist on `takeoff_run_types` or anywhere else (§ 2.2, § 2.3). Measured length
+  is not purchased length. Sending traced footage now is short by exactly the
+  waste, and § 5a forbids the app quietly padding to cover it.
+- **A run has no per-bid identity to hang a line off.** Six homeruns of ½" EMT
+  across four sheets are one purchase. Exit signs on five sheets are one count
+  only because the GROUP row holds them together; runs of one type have no
+  equivalent row.
+
+### How a traced run should eventually cross — the group row, again
+
+**Recommended 2026-09-19, not approved.** Give a run type a **group row on the
+bid**, the same row a counted thing gets. Then "½" EMT on this job" is a name, a
+quantity and a price, and the bridge built in step one carries it with no second
+mechanism to keep in step.
+
+The alternative — a second link column and a second kind on the bid line — is
+how one path starts lagging the other in small ways nobody lists, which is the
+argument `takeoffGroupsRouter`'s header already makes for why stamping an
+assembly does not bypass the group.
+
+**What it is NOT:** one line per run. A conduit run is pipe, and wire, and the
+drops at both ends folded into each — three quantities along one traced line
+that `shared/takeoffQuantities.ts` goes to deliberate lengths to keep apart. Any
+design that produces one line per traced path has collapsed them.
 
 ### Hours on a typed count — yes, and the rate is the real question
 
@@ -2482,10 +2800,16 @@ looks finished — a failure the bid screen already warns about
 
 - **Type hours, pick a role.** One dropdown, **shown only when hours are filled
   in** — the common case is material-only and must stay one field.
-- **Default it to the company default role.** Which means finishing a wire-up:
-  `pricing_defaults.defaultLaborRateId` is written today and read by nothing
-  that prices. **A setting that is stored and read by nothing is its own small
-  lie**, and it is in scope here.
+- **Default it to the company default role — and that wire-up is bigger than
+  this section claimed.** CORRECTED 2026-09-19: the approved text said
+  `pricing_defaults.defaultLaborRateId` "is written today and read by nothing
+  that prices". Checked in the code: **it is neither written nor read.** No
+  screen sets it — `bidsRouter.setPricingDefaults` does not accept it, and the
+  only writer of a column by that name is `upsertBidSummary`, which writes the
+  unrelated legacy `bid_summary` table. So this is a setting with no way in and
+  no way out, and step two has to build both halves. **A setting that is stored
+  and read by nothing is its own small lie**, and it is still in scope here — it
+  is simply one screen larger than recorded.
 - **No modifier list and no productivity override on a typed count.** The bid's
   productivity factor applies as it does everywhere. One escape hatch, not a
   second pricing system growing beside the first.
@@ -2493,8 +2817,9 @@ looks finished — a failure the bid screen already warns about
 **Note the asymmetry this creates, deliberately:** materials carry no labour
 hours anywhere in the schema, so level 3 (a count linked to a material) is
 material-only by nature. A level 2 that can carry hours is therefore MORE
-capable than level 3. That is not a mistake to tidy up — see § 5f's last
-paragraph on building them as one screen.
+capable than level 3. That is not a mistake to tidy up — see the last paragraph
+of this section on building them as one screen. It is the same absence the run
+gate above turns on, seen from the other side.
 
 ### How it shows as what it is, without nagging
 
@@ -2524,6 +2849,10 @@ entirely, which is worse than a price nobody can re-check. List only — **never
 badge on the drawing**, or level 1's promise of a quiet count is broken on the
 screen where it was made.
 
+**Step one adds a third entry to the same strip** — counts that are priced and
+have not been sent (OVERRIDE 2). Three entries, one strip, one rule: it sits
+under the number it contradicts.
+
 ### Converting a typed price into a real material later
 
 **Realistic and cheap, because the group is a row.** Add a real exit sign
@@ -2539,6 +2868,9 @@ changing where the price comes from, and freezing it here would leave a bid
 stuck on a number they had just replaced. **It must not add a second line** —
 that is a double count, and R3 exists to make those visible rather than
 accidental.
+
+This is the same distinction step one's renaming rule turns on: the group is the
+user's own row on this bid, so the user moving it is not the library moving.
 
 **What conversion cannot do is tell you the $38 was wrong.** Show both numbers
 side by side and let the estimator look.
@@ -2583,12 +2915,12 @@ prompt unnecessary.
 The second row is the one to be careful about, and it is why this is not a
 one-line feature: "price plus hours" is two library rows, not one. An assembly
 with hours and no materials is a legitimate but different thing (the labour-only
-case § 5f's materials-list note already handles), and silently creating one
+case the materials-list note already handles), and silently creating one
 would lose the price. So the honest save creates both and links them, and says
 so in one line before it does — naming the two things it is about to make.
 
 **The labour rate comes along**, because level 2 already collects a role when
-hours are typed (§ 5f). Nothing new to ask.
+hours are typed. Nothing new to ask.
 
 ### Typing a name the library already has — three doors, and the middle one is the default
 

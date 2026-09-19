@@ -259,16 +259,28 @@ describe("rolling assemblies into one list", () => {
 });
 
 describe("measured footage is reported as its own kind of thing", () => {
-  it("names what still has to be specified rather than inventing a size", () => {
+  it("says the footage is a combined total rather than inventing a size", () => {
     const measured = measuredEntries({
       conduitFeet: 340,
       cableFeet: 0,
       wireFeet: 900,
     });
     expect(measured.map(m => m.label)).toEqual(["Conduit", "Wire"]);
-    // The note is the whole reason this is not an orderable line.
-    expect(measured[0].note).toMatch(/still to be specified/i);
-    expect(measured[1].note).toMatch(/still to be specified/i);
+    /*
+      The note is the whole reason this is not an orderable line, and what it
+      has to say changed on 2026-09-19. It used to claim the type was "still to
+      be specified", which stopped being true once run types shipped — the
+      estimator may well have specified it, on the type. What is actually true
+      is that these are totals across every type on the job, so the assertion
+      is on that rather than on the old claim.
+    */
+    expect(measured[0].note).toMatch(/combined/i);
+    expect(measured[0].note).toMatch(/not broken out/i);
+    expect(measured[1].note).toMatch(/combined/i);
+    // And it must not go back to asserting the app does not know the spec.
+    for (const entry of measured) {
+      expect(entry.note).not.toMatch(/still to be specified/i);
+    }
   });
 
   it("omits a category with no footage rather than listing it as zero", () => {

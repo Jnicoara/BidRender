@@ -916,6 +916,95 @@ rather than a flag — see below.
 
 ## Working on this repo — traps
 
+**`users.lastSignedIn` reads back SEVEN HOURS in the future. Do not compare it
+to the clock by eye.**
+
+Found 2026-09-19 while working out whether a sign-in had succeeded. Read
+straight out of the table it looked like the account had signed in seven hours
+from now, which is the sort of thing that sends the next reader hunting for a
+clock bug, a bad write, or a corrupted row. None of those is happening.
+
+**What is actually going on.** The column is a `TIMESTAMP`, so the MySQL driver
+timezone-converts it on the way out; `now()` is not a column and comes back
+unconverted. `server/databaseConnection.ts` sets no `timezone`, so the gap is
+exactly the machine's UTC offset — seven hours on PDT. The two values are
+simply not in the same frame, and neither one is wrong on its own.
+
+**Compare inside SQL, where both sides are in the database's frame:**
+
+```sql
+select email,
+       timestampdiff(SECOND, lastSignedIn, now()) as secondsAgo
+  from users
+ where email = 'you@example.com';
+```
+
+A negative `secondsAgo` that is close to your UTC offset in seconds (25200 on
+PDT, 28800 on PST) is this, not a real future timestamp.
+
+**Why it is not being fixed today:** `lastSignedIn` is written in four places
+(`authRouter.ts` signup and login, `_core/oauth.ts`, `_core/sdk.ts`) and **read
+by nothing** — not retention, not analytics, not the UI. So it misleads a person
+reading the table and costs the app nothing. If anything ever starts reading it,
+fix the frame first, because every stored value is ambiguous until then.
+
+**A failed sign-in leaves no trace anywhere. There is nothing to look at.**
+
+Also found 2026-09-19. `authRouter.login` throws `UNAUTHORIZED` on both a
+missing account and a bad password, and logs neither. There is no tRPC
+`onError` handler, so nothing reaches the console either. The only auth line the
+dev server ever prints is `[Auth] Missing session cookie`, which is an
+unauthenticated page load — **not** a rejected login, and easy to mistake for
+one.
+
+The practical consequence: the only way to tell a successful sign-in from a
+failed one, after the fact, is that a success writes `users.lastSignedIn` and a
+failure writes nothing. That works for one known account and does not scale to
+"a user says it will not let them in", where there would be no record that they
+ever tried. Worth a counter or a log line before anyone but the author is
+signing in; deliberately not built today.
+
+**A single stray NUL byte makes `grep` skip a whole source file, silently.**
+
+Found 2026-09-19 in `shared/materialsList.ts`, which had one NUL where a space
+belonged, in the middle of an ordinary template string on line 142:
+
+```ts
+const key = `${material.name.trim().toLowerCase()}${material.unit}`;
+//                                                 ^ this was a NUL, not a space
+```
+
+**Why it matters more than a typo.** ripgrep and grep treat any file containing
+a NUL as binary. They do not search it and they do not error — `grep -rn` prints
+`Binary file shared/materialsList.ts matches`, or with common flag combinations
+prints **nothing at all**. So every repo-wide search that should have found
+something in that file came back empty, and came back empty *confidently*. This
+project's whole working method is "grep the reference files and the code before
+specifying anything" (CLAUDE.md § Where decisions live). A file that cannot be
+grepped is a file whose decisions are invisible to that method.
+
+It had been there long enough that earlier searches touching this file were
+lying. Nothing in the app misbehaved: the NUL worked fine as a map-key
+separator, so there were no symptoms at all.
+
+**How to spot it.** A file that `grep` calls "binary" when it is plainly source,
+or a search that finds nothing where you are sure something is. To confirm and
+locate:
+
+```bash
+file shared/materialsList.ts        # says "data" instead of "JavaScript source"
+perl -ne 'print "$.\n" if /\x00/' shared/materialsList.ts   # the line number
+```
+
+To sweep the whole tree for others (there were none):
+
+```bash
+for f in $(find client/src server shared drizzle workers scripts -type f \
+    \( -name '*.ts' -o -name '*.tsx' -o -name '*.sql' -o -name '*.mts' \)); do
+  perl -ne 'exit 1 if /\x00/' "$f" || echo "NUL: $f"
+done
+```
+
 **`git stash` is not safe in this checkout. Do not use it.**
 
 > **A hook now refuses it** — `.claude/hooks/block-git-stash.mjs`, wired up in

@@ -43,7 +43,68 @@ import {
   rangeIsBackwards,
   toPage,
 } from "../../shared/bidSearch";
+import {
+  countsWaitingToSend,
+  countsWithNoPrice,
+  doubleCountedAssemblies,
+  type BridgeGroup,
+  type BridgeLine,
+} from "../../shared/takeoffBridge";
 import * as db from "../db";
+
+/**
+ * The three things a takeoff can be telling a bid that its money does not say.
+ *
+ * ── Why all three live under the totals and none on the drawing ─────────────
+ * The warning strip's rule is that it sits directly under the number it
+ * contradicts, which is exactly the relationship each of these has with the
+ * material total. A marker on the drawing would break level 1's promise of a
+ * quiet count on the screen where that promise was made — see
+ * references/plan-viewer-overhaul.md § 5f.
+ *
+ * ── `doubleCounted` is the half a warning at send time cannot cover ─────────
+ * The hand-added line can arrive AFTER the count was sent, so this is read
+ * every time the bid is shown rather than fired once at the crossing. That is
+ * what makes R3 a rule in the code instead of a note in a document.
+ */
+async function planAttentionFor(
+  bidId: number,
+  userId: number,
+  lines: readonly { id: number; name: string; takeoffGroupId: number | null; assemblyId: number | null }[]
+): Promise<{
+  waitingToSend: number;
+  countedWithNoPrice: number;
+  doubleCounted: string[];
+}> {
+  const bridgeLines: BridgeLine[] = lines.map(line => ({
+    id: line.id,
+    name: line.name,
+    takeoffGroupId: line.takeoffGroupId,
+    assemblyId: line.assemblyId,
+  }));
+
+  const doubleCounted = doubleCountedAssemblies(bridgeLines);
+
+  const [groups, counts] = await Promise.all([
+    db.getGroupsForBid(bidId, userId),
+    db.countStampsByGroup(bidId, userId),
+  ]);
+  const bridgeGroups: BridgeGroup[] = groups.map(group => ({
+    id: group.id,
+    label: group.label,
+    kind: group.kind,
+    assemblyId: group.assemblyId,
+    materialId: group.materialId,
+    unitCost: group.unitCost === null ? null : Number(group.unitCost),
+    count: counts.get(group.id) ?? 0,
+  }));
+
+  return {
+    waitingToSend: countsWaitingToSend(bridgeGroups, bridgeLines),
+    countedWithNoPrice: countsWithNoPrice(bridgeGroups, bridgeLines),
+    doubleCounted,
+  };
+}
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -542,6 +603,14 @@ export const bidsRouter = router({
          * the screen and the document cannot show different names.
          */
         resolvedClient: resolveBidClient(bid, client),
+        /**
+         * What the takeoff says that this bid's money does not yet agree with.
+         *
+         * All three sit in the warning strip under the totals, which is the
+         * rule that surface already follows: it goes directly under the number
+         * it contradicts. None of them is a badge on the drawing.
+         */
+        fromPlans: await planAttentionFor(bid.id, ctx.scope.dataUserId, lines),
       };
     }),
 
@@ -624,6 +693,38 @@ export const bidsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       await requireBid(input.bidId, ctx.scope.dataUserId);
+
+      /*
+        What a from-plans line IS and HOW MANY of it there are both belong to
+        the plans, so neither is typeable here.
+
+        The quantity half is D2(a), settled 2026-09-14: "that line's quantity is
+        changed by stamping, not by typing — one source of truth". Enforced here
+        rather than only hidden in the UI, because a line reading 20 beside a
+        drawing holding 16 is a disagreement with nothing on screen to say which
+        is right.
+
+        The name half follows from the same rule and is enforced for a plainer
+        reason: `withPlanCounts` resolves a from-plans line's name from its
+        group on every read, so a typed name would be accepted, written, and
+        then silently never shown again. A field that takes an edit and drops it
+        is worse than one that says no.
+
+        Both refusals name where the change is actually made. Everything else on
+        the line — the unit label, and removing it entirely — stays ordinary.
+      */
+      if (input.qty !== undefined || input.name !== undefined) {
+        const line = await db.getBidLineItem(input.id, input.bidId);
+        if (line && line.takeoffGroupId !== null) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              input.qty !== undefined
+                ? `This line counts ${Number(line.qty)} marks on the plans. Change it by marking or unmarking on the Plans screen.`
+                : `This line is named by the count it came from. Rename that count on the Plans screen and the line follows.`,
+          });
+        }
+      }
 
       const patch: Record<string, unknown> = {};
       if (input.qty !== undefined) patch.qty = toDecimal4(input.qty);

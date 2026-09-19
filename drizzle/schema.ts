@@ -3124,6 +3124,45 @@ export const bidLineItems = mysqlTable(
      */
     sourceKitName: varchar("sourceKitName", { length: 255 }),
 
+    /**
+     * The counted group on the plans that this line came from — the bridge.
+     *
+     * ── This link is LIVE, and it is the only live thing on the line ────────
+     * Set means the line is "from plans", and two facts follow it for as long
+     * as it is set: the line's QUANTITY is the number of marks on the drawing,
+     * and its NAME is whatever the count is called. Everything to do with money
+     * stays frozen in the snapshot below, exactly as on every other line.
+     *
+     * The rule in one sentence, and every behaviour here falls out of it:
+     * **the plans own what it is and how many, the bid owns what it costs.**
+     *
+     * ── Why the name follows and an assembly's does not ─────────────────────
+     * `name` above is snapshotted so that renaming something in the LIBRARY
+     * cannot change a bid behind the estimator's back. A group is not the
+     * library — it is their own row, on this bid, that they made and they
+     * renamed. Freezing it would leave the counted-items panel and the bid
+     * calling one thing two different names, with neither wrong.
+     *
+     * ── Why there is no `fromPlans` boolean beside it ───────────────────────
+     * A line is from the plans precisely when this is set. Read from the
+     * absence, the same convention `takeoffRunTypesRouter.needsSpecification`
+     * uses for a type with no material. A second flag is a second thing that
+     * can disagree with the first.
+     *
+     * ── RESTRICT, and the two obvious answers that are both wrong ───────────
+     * `set null` would leave a line with frozen costs and a quantity that
+     * follows nothing, looking exactly like a line that is fine. `cascade`
+     * would take money off a bid because somebody tidied a drawing. So deleting
+     * a counted group that is on the bid is REFUSED, by the router in words and
+     * by the constraint underneath it. See drizzle/0060.
+     *
+     * The unique index in that migration is the other half: one group holds at
+     * most one live line, so a count cannot be sent to the bid twice (R3).
+     */
+    takeoffGroupId: int("takeoffGroupId").references(() => takeoffGroups.id, {
+      onDelete: "restrict",
+    }),
+
     // ── The snapshot: four inputs, frozen ──
     /** Material cost for ONE of this assembly. */
     snapshotMaterialCost: decimal("snapshotMaterialCost", {
@@ -3178,6 +3217,10 @@ export const bidLineItems = mysqlTable(
     index("bid_line_items_bidId_idx").on(t.bidId),
     index("bid_line_items_unitLabel_idx").on(t.unitLabel),
     index("bid_line_items_archivedAt_idx").on(t.archivedAt),
+    // R3's first half, in the database: one counted group, at most one line.
+    // MySQL allows many NULLs here, which is what lets every hand-added line on
+    // every bid share the index without colliding. See drizzle/0060.
+    unique("bid_line_items_bid_group_uq").on(t.bidId, t.takeoffGroupId),
   ]
 );
 

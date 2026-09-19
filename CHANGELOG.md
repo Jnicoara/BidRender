@@ -6,6 +6,26 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-19]
 
+- **A count on your plans can go onto the bid.** Count fourteen receptacles against something from your library, press "Send 14 to bid", and they are a real line at your prices — the same kind of line as one you typed, so it taxes, takes markup and prints on a proposal exactly as everything else does. This is the thing a finished takeoff used to be typed in by hand for, and it is the first time anything you mark has ever reached the bid's price. Counts made with a typed price or a material still cannot cross; that is the next step.
+
+- **After it has gone over once, the number looks after itself.** Find two more and mark them and the line says 16 without you pressing anything, because it was never storing 14 — it counts the marks, every time it is read. Rename the count and the line follows. **What does not move is the money:** the price is frozen the moment the line is made, so changing your material costs afterwards leaves the bid exactly where it was, like every other line in the app.
+
+- **Sending is something you do, not something that happens while you count.** A line appearing on its own would mean the app choosing the instant your prices are frozen — type 3 on the way to typing 38 and you would have a $3 line you cannot edit. Instead the panel beside the drawing says plainly where the takeoff stands: how many counts are waiting to go over, or — when none are — whether that is because they are all on the bid or because some have no price and never can. Same spot, same size, different words. The bid says the same under its totals.
+
+- **Two ways to count one thing twice, and the app now says so both times.** If you send a count for something you had already typed onto the bid by hand, it tells you as it goes over. And if you type it in *afterwards*, the bid keeps saying so under the totals — a warning that only fired at the moment of sending would have caught half the cases and looked like it caught all of them.
+
+- **The supplier list was about to ask for double the parts.** It reads both your marks and your bid lines, which was safe for as long as marking could not create a line. The moment it could, a sent count arrived down both paths and fourteen exit signs asked for twenty-eight. Fixed in the same change, along with the comment in the code that still promised the old behaviour.
+
+- **A count that is on the bid cannot be deleted out from under it.** Removing it would either strand a line holding money for marks that no longer exist, or quietly take money off a bid because you tidied a drawing. It refuses and names the line to remove first.
+
+- **Your existing bids read exactly as they did.** Nothing was converted, nothing was recalculated, and every line already on every bid prices, totals and prints identically. The only bid that changes is one where you choose to send a count.
+
+- **Traced footage still cannot reach the bid, and that is now written down as a rule rather than a gap.** A run knows what pipe and wire it is, so pricing it looks like the obvious next step — but materials in this app carry no labor hours, so a traced run would arrive as 340 feet of pipe at material cost with **no hours to install it**. That is a total that looks finished and is wrong in the direction nobody queries. It is blocked until labor on a run has an answer.
+
+- **A source file had a hidden character that made searching skip it.** One stray invisible byte in the middle of an ordinary line meant search tools quietly treated the whole file as unreadable — not an error, just no results. Every earlier search that came up empty in that file was wrong to. Removed, the file swept for others, and written into the notes with how to spot it, because the symptom is a search that confidently finds nothing.
+
+- **The supplier list stopped telling your supplier something out of date.** It said traced footage was "still to be specified", which stopped being true when run types shipped — you may well have specified it. It now says what is actually so: the footage is every type on the job added together, and it is not broken out.
+
 - **Traced runs are visible when the whole sheet is on screen.** At Fit on a big sheet a run was drawn six tenths of one pixel wide — not thin, but too thin for a screen to show, so it faded into the drawing. Run lines now stop shrinking below a readable width, and stop growing when you zoom right in so they cannot cover the route you are tracing. The invisible click target had the same fault and was three pixels wide at Fit, so the run you could not see was also one you could not click.
 
 - **The Stamp tool is called Mark.** The button, the toasts, the first-run copy and the plan reader's messages. Nothing about your saved work changes — this is the word on screen only. The app had been using both words for one thing: the reader already said "marks" while the tool that places them said "stamp".

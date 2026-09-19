@@ -402,6 +402,7 @@ export default function BidsPage({
     salesTax,
     taxRate,
     taxNote,
+    fromPlans,
   } = detailQuery.data;
 
   /**
@@ -727,6 +728,19 @@ export default function BidsPage({
                       >
                         <div className="flex-1 min-w-0">
                           <span className="text-sm truncate">{line.name}</span>
+                          {/*
+                            Where this line came from.
+
+                            GREY, not yellow. Yellow is spent twice already —
+                            conduit runs on the drawing, and every warning in
+                            the app — and this is not a warning. It is a line
+                            behaving exactly as intended, saying so.
+                          */}
+                          {line.takeoffGroupId !== null ? (
+                            <div className="text-xs text-muted-foreground truncate">
+                              From plans — counts your marks
+                            </div>
+                          ) : null}
                           {line.snapshotModifierNames?.length ? (
                             <div className="text-xs text-muted-foreground truncate">
                               {line.snapshotModifierNames.join(", ")} · frozen{" "}
@@ -740,15 +754,34 @@ export default function BidsPage({
                             </div>
                           ) : null}
                         </div>
-                        <InlineNumberField
-                          value={Number(line.qty)}
-                          onSave={qty =>
-                            updateLine.mutate({ bidId, id: line.id, qty })
-                          }
-                          rules={{ min: 0, max: 999999 }}
-                          className="h-7 w-16 text-sm"
-                          ariaLabel={`Quantity of ${line.name}`}
-                        />
+                        {/*
+                          A from-plans line's quantity is not typeable, because
+                          it is not a number anybody typed — it is how many
+                          marks are on the drawing. D2(a): changed by marking,
+                          not by typing, one source of truth.
+
+                          It reads as a plain number rather than a disabled
+                          field: a control that looks editable and refuses is
+                          worse than one that never invited the click.
+                        */}
+                        {line.takeoffGroupId !== null ? (
+                          <span
+                            className="font-mono text-sm w-16 text-center shrink-0 tabular-nums"
+                            title="Counted from the marks on your plans. Change it on the Plans screen."
+                          >
+                            {Number(line.qty)}
+                          </span>
+                        ) : (
+                          <InlineNumberField
+                            value={Number(line.qty)}
+                            onSave={qty =>
+                              updateLine.mutate({ bidId, id: line.id, qty })
+                            }
+                            rules={{ min: 0, max: 999999 }}
+                            className="h-7 w-16 text-sm"
+                            ariaLabel={`Quantity of ${line.name}`}
+                          />
+                        )}
                         <span className="font-mono text-xs w-24 text-right shrink-0 text-muted-foreground">
                           {round(line.breakdown.totalLaborHours, 2)} h
                         </span>
@@ -834,6 +867,63 @@ export default function BidsPage({
                     — their hours are in the total above and their labor is
                     priced at $0. Open the assembly in the Library and give it a
                     role, then re-add the line to pick the rate up.
+                  </p>
+                </div>
+              )}
+
+              {/*
+                What the takeoff says that this total does not.
+
+                Same strip, same rule as the labor entry above it: each one sits
+                directly under the number it contradicts. All three are counts
+                of things on the Plans screen that have not become money here,
+                which is exactly the relationship the material total has with
+                them — and none of them appears on the drawing itself.
+              */}
+              {fromPlans.waitingToSend > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {fromPlans.waitingToSend} count
+                      {fromPlans.waitingToSend === 1 ? " is" : "s are"} not on
+                      this bid yet
+                    </span>{" "}
+                    — they are marked and priced on your plans, and none of that
+                    money is in the total above. Send them from the Plans
+                    screen.
+                  </p>
+                </div>
+              )}
+
+              {fromPlans.countedWithNoPrice > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {fromPlans.countedWithNoPrice} count
+                      {fromPlans.countedWithNoPrice === 1 ? " has" : "s have"}{" "}
+                      no price
+                    </span>{" "}
+                    — they are marked on your plans and can never reach this
+                    bid. Count them against something from your library to give
+                    them a price.
+                  </p>
+                </div>
+              )}
+
+              {fromPlans.doubleCounted.length > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {fromPlans.doubleCounted.join(", ")}{" "}
+                      {fromPlans.doubleCounted.length === 1 ? "is" : "are"} on
+                      this bid twice
+                    </span>{" "}
+                    — once counted from the plans and once added by hand. Both
+                    lines are in the total above. Check the two and remove
+                    whichever is the duplicate.
                   </p>
                 </div>
               )}

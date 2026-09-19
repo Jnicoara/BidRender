@@ -313,10 +313,10 @@ from now on.
 
 | ID  | What it does                                                                                                                            | Status      | Source                          | Need         |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------- | ------------ |
-| R1  | **Stamped counts become quantities on the bid.**                                                                                        | **Missing** | Your request                    | Essential    |
-| R2  | **Traced footage becomes quantities on the bid.** Blocked until T4 exists.                                                              | **Missing** | Your request, Old screen        | Essential    |
-| R3  | A clear rule for when the same assembly is on the bid twice — once from the plans and once added by hand — so nothing is counted twice. | **Missing** | Found in this review            | Essential    |
-| R4  | Quantities from the plans follow the app's cost-snapshot rule: costs are frozen when the line is created, like every other bid line.    | **Missing** | CLAUDE.md, Found in this review | Essential    |
+| R1  | **Stamped counts become quantities on the bid.** Building 2026-09-19 for assembly counts (level 4); typed and material counts follow.   | **Building** | Your request                    | Essential    |
+| R2  | **Traced footage becomes quantities on the bid.** T4 now exists, but R2 is GATED on labor for a run — see the note below.               | **Missing** | Your request, Old screen        | Essential    |
+| R3  | A clear rule for when the same assembly is on the bid twice — once from the plans and once added by hand — so nothing is counted twice. | **Building** | Found in this review            | Essential    |
+| R4  | Quantities from the plans follow the app's cost-snapshot rule: costs are frozen when the line is created, like every other bid line.    | **Building** | CLAUDE.md, Found in this review | Essential    |
 | R5  | Materials list for a supplier: quantities only, no prices, built from stamps, runs and bid lines, as CSV or PDF.                        | **Works**   | Changelog Aug 14                | Nice-to-have |
 | R6  | Other per-run estimating details from the old screen: service loop, pull points, fittings. Makeup is now R7; routing waste is T16.      | **Missing** | Old screen                      | Nice-to-have |
 | R7  | **Makeup allowances:** extra conductor at each termination and at the panel, from defaults set once, shown as its own amount.           | **Missing** | Decided 2026-09-14 (section 13) | Essential    |
@@ -324,13 +324,22 @@ from now on.
 
 **Notes**
 
-- **R1, R2** — The screen says "Everything you place lands on the bid"
-  (`TakeoffPage.tsx:1651`). The code says the opposite: "stamping does not
-  create a line item" (`server/routers/materialsListRouter.ts:20`). Nothing that
-  prices a bid reads stamps or runs. Today a takeoff has to be typed into the bid
-  by hand. See D2.
-- **R2 depends on T4.** A run that cannot say whether it is 3/4" EMT or 12/2 MC
-  has nothing to price against, so R2 cannot be built until T4 exists.
+- **R1, R2** — The screen said "Everything you place lands on the bid"
+  (`TakeoffPage.tsx`) while the code said the opposite: "stamping does not
+  create a line item" (`server/routers/materialsListRouter.ts`). The copy was
+  corrected on 2026-09-18 and **R1 is being built on 2026-09-19** for counts made
+  with a library assembly. See D2, and the override on it below.
+- **R2 depends on T4 — and, since 2026-09-19, on one thing more.** A run that
+  cannot say whether it is 3/4" EMT or 12/2 MC has nothing to price against, so
+  R2 could not be built until T4 existed. T4 now does exist — a run type ships a
+  raceway material, a conductor material and a conductor count — and checking
+  what that unblocked found a second, larger blocker: **materials carry no labor
+  hours anywhere in the schema**, so a traced run priced from its type reaches
+  the bid as footage at material cost with **zero hours to install it**. That is
+  a plausible-looking total, wrong in the direction nobody queries. R2 is gated
+  on an answer for labor on a run, and on the allowances that turn a measured
+  length into a purchased one. Written up as a gate rather than a note in
+  `references/plan-viewer-overhaul.md` § 5f.2.
 - **R6** — On the old screen these lived on each run's calculator card, all
   defaulting to 0 and typed by hand per run. Makeup has moved to R7 and routing
   waste to T16; what remains here is service loop, pull points and fittings.
@@ -499,7 +508,24 @@ Everything else below is still open until you say so.
 - Also pick: a small zoom control (−, %, +, fit) floating in a corner of the
   drawing, big enough for a finger.
 
-**D2 — How counts reach the bid (R1). Decided 2026-09-14: (a).**
+**D2 — How counts reach the bid (R1). Decided 2026-09-14: (a). AMENDED
+2026-09-19 — read the override below before building against this.**
+
+> **The FIRST crossing is now an explicit act.** `references/plan-viewer-overhaul.md`
+> § 5f.0 OVERRIDE 2 amends (a): asking is what CREATES the line, and from then
+> on its quantity follows the marks with nothing to press. Everything (a) says
+> after the moment of creation stands unchanged.
+>
+> **Why, in one line:** costs freeze when the line is created (R4), so fully
+> automatic creation means the app choosing the instant somebody's money is
+> frozen — typing `3` on the way to `38` freezes $3, and no edit can reach a
+> snapshot afterwards. This entry's objection to a button, that a bid "goes
+> stale when someone forgets to press it", survives and is answered instead by
+> making "not on the bid yet" a listed, visible state rather than a silent one.
+>
+> Recorded in both files per `CLAUDE.md` § "Where decisions live". The gap that
+> rule exists to close is exactly this one: a decision recorded only in the
+> newer file is invisible to whoever opens the older one first.
 
 - (a) **Live:** each stamped assembly is one bid line, marked "from plans", and
   its quantity follows the stamps.

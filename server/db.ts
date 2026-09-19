@@ -183,6 +183,7 @@ import {
   usableTerm,
 } from "../shared/bidSearch";
 import { addAssemblyOverheadHours } from "../shared/pricing";
+import { resolveLineQty } from "../shared/takeoffBridge";
 import type { PlanRemovalImpact } from "../shared/planRemoval";
 
 let _db: MySql2Database | null = null;
@@ -4018,14 +4019,123 @@ export async function updateBidPdfSheet(
  * archiving exists. The alternative — filtering at each call site — is one
  * forgotten `.filter()` away from a bid that quotes rooms the estimator removed.
  */
+/**
+ * How many marks each counted group has on this bid.
+ *
+ * Scoped by BID alone, unlike `countStampsByGroup`, and that is not a missing
+ * check: every mark on a bid belongs to that bid, and a bid belongs to exactly
+ * one `dataUserId`, so adding the user to this query could only ever exclude
+ * rows that are already in scope. The callers below have verified the bid
+ * before they get here.
+ */
+async function stampCountsForBid(
+  bidId: number
+): Promise<Map<number, number>> {
+  const db = await getDb();
+  if (!db) return new Map();
+  const rows = await db
+    .select({ groupId: takeoffStamps.groupId, total: sql<number>`count(*)` })
+    .from(takeoffStamps)
+    .where(eq(takeoffStamps.bidId, bidId))
+    .groupBy(takeoffStamps.groupId);
+
+  const counts = new Map<number, number>();
+  for (const row of rows) {
+    if (row.groupId === null) continue;
+    counts.set(row.groupId, Number(row.total));
+  }
+  return counts;
+}
+
+/**
+ * Give every from-plans line the quantity and the name its count actually has.
+ *
+ * ── THIS IS THE CHOKEPOINT, and it is why the count is not stored ───────────
+ * `getBidLineItems` is what the bid screen, the proposal, the accounting
+ * export, the close-out and the supplier list all read through, so resolving
+ * here means every one of them sees the same number without any of them
+ * learning to count marks. The alternative — writing the count onto the line
+ * whenever a mark is placed or removed — is one missed write away from a bid
+ * and a drawing that disagree, with nothing on screen to say which is right.
+ *
+ * ── The rule ───────────────────────────────────────────────────────────────
+ * The plans own what it is and how many. The bid owns what it costs. So the
+ * quantity and the name are resolved here on every read, and the four snapshot
+ * columns are never touched — R4 holds exactly as it does for any other line.
+ *
+ * A group with no marks left resolves to 0 and the LINE STAYS, deliberately.
+ * See `resolveLineQty` in shared/takeoffBridge.ts.
+ */
+async function withPlanCounts(
+  bidId: number,
+  rows: BidLineItem[]
+): Promise<BidLineItem[]> {
+  if (!rows.some(row => row.takeoffGroupId !== null)) return rows;
+
+  const [counted, groups] = await Promise.all([
+    stampCountsForBid(bidId),
+    getGroupsForBidUnscoped(bidId),
+  ]);
+  const labels = new Map(groups.map(group => [group.id, group.label]));
+
+  /*
+    A group that EXISTS with no marks is 0. A group that is GONE is a fallback.
+
+    Those are different situations and the count query cannot tell them apart on
+    its own — `count(*) ... group by` returns no row either way. So every group
+    on the bid is seeded at 0 first and the real counts are laid over the top.
+
+    Without this, removing the last mark from a count leaves its line reading
+    whatever it read before, because `resolveLineQty` cannot find an entry and
+    falls back to the stored number. That is a bid quietly holding money for
+    work the drawing no longer shows — the exact failure the derived count
+    exists to prevent, arriving through the one door nobody was watching.
+
+    Caught by `server/takeoffBridgeFlow.test.ts`, not by review.
+  */
+  const counts = new Map<number, number>();
+  for (const group of groups) counts.set(group.id, 0);
+  counted.forEach((total, groupId) => counts.set(groupId, total));
+
+  return rows.map(row => {
+    if (row.takeoffGroupId === null) return row;
+    const qty = resolveLineQty(
+      { takeoffGroupId: row.takeoffGroupId, qty: Number(row.qty) },
+      counts
+    );
+    const label = labels.get(row.takeoffGroupId);
+    return {
+      ...row,
+      qty: qty.toFixed(4),
+      // The live label wins while there is one; the snapshot on the line is
+      // the fallback, which is the same two-step `stampName` and `runName`
+      // already use for a name that lives somewhere else.
+      name: label ?? row.name,
+    };
+  });
+}
+
 export async function getBidLineItems(bidId: number): Promise<BidLineItem[]> {
   const db = await getDb();
   if (!db) return [];
-  return db
+  const rows = await db
     .select()
     .from(bidLineItems)
     .where(and(eq(bidLineItems.bidId, bidId), isNull(bidLineItems.archivedAt)))
     .orderBy(asc(bidLineItems.sortOrder), asc(bidLineItems.id));
+  return withPlanCounts(bidId, rows);
+}
+
+/** Groups on a bid, without the user filter — see `stampCountsForBid`. */
+async function getGroupsForBidUnscoped(
+  bidId: number
+): Promise<TakeoffGroup[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(takeoffGroups)
+    .where(eq(takeoffGroups.bidId, bidId));
 }
 
 /** Archived lines only — for showing what a bulk archive removed, and undoing it. */
@@ -4054,7 +4164,13 @@ export async function getBidLineItem(
     .from(bidLineItems)
     .where(and(eq(bidLineItems.id, id), eq(bidLineItems.bidId, bidId)))
     .limit(1);
-  return row;
+  if (!row) return undefined;
+  // Resolved here too, not only in the list: `updateLine` returns this row and
+  // the bid screen writes it straight into its cache, so a stored quantity
+  // escaping through here would show the line disagreeing with itself until
+  // the next refetch.
+  const [resolved] = await withPlanCounts(bidId, [row]);
+  return resolved;
 }
 
 /** Next free sort position, so appended lines land at the bottom. */
@@ -4124,6 +4240,41 @@ export async function addAssemblyToBid(
     }
   }
 
+  const snapshot = await snapshotForAssembly(userId, detail);
+
+  const [result] = await db.insert(bidLineItems).values({
+    bidId,
+    assemblyId: detail.id,
+    name: detail.name,
+    qty: qty.toFixed(4),
+    unitLabel,
+    ...snapshot,
+    sortOrder: await nextBidSortOrder(bidId),
+  });
+  return { id: result.insertId, merged: false };
+}
+
+/**
+ * The four frozen pricing inputs, resolved from a live assembly.
+ *
+ * ── Extracted so the bridge cannot drift from the hand-added path ───────────
+ * `addAssemblyToBid` and `addCountToBid` produce lines that must price
+ * identically — the same assembly, counted on the plans or typed on the bid, is
+ * the same money. Two copies of this arithmetic is two places for a rounding
+ * step or a lookup to be fixed in one and not the other, and the symptom would
+ * be one assembly costing two different amounts on one bid depending on which
+ * screen it came from.
+ */
+async function snapshotForAssembly(
+  userId: number,
+  detail: Awaited<ReturnType<typeof getAssemblyDetail>> & object
+): Promise<{
+  snapshotMaterialCost: string;
+  snapshotLaborHours: string;
+  snapshotModifierPct: string;
+  snapshotLaborRate: string;
+  snapshotModifierNames: string[];
+}> {
   const [activeModifiers, rates] = await Promise.all([
     getLibraryModifiers(userId, "active"),
     getLibraryLaborRates(userId),
@@ -4146,12 +4297,7 @@ export async function addAssemblyToBid(
     0
   );
 
-  const [result] = await db.insert(bidLineItems).values({
-    bidId,
-    assemblyId: detail.id,
-    name: detail.name,
-    qty: qty.toFixed(4),
-    unitLabel,
+  return {
     snapshotMaterialCost: materialCost.toFixed(4),
     /**
      * Material-driven hours AND the assembly's overhead hours, as one figure.
@@ -4177,9 +4323,73 @@ export async function addAssemblyToBid(
     snapshotModifierPct: modifierPct.toFixed(4),
     snapshotLaborRate: laborRate.toFixed(4),
     snapshotModifierNames: applied.map(m => m.name),
+  };
+}
+
+/**
+ * Send a counted group to the bid — the bridge.
+ *
+ * ── What freezes and what does not ──────────────────────────────────────────
+ * The four pricing inputs freeze here, exactly as they do for a hand-added
+ * line (R4), and this is the one moment they are decided. Which is precisely
+ * why sending is something the estimator DOES rather than something that
+ * happens while they count: automatic creation would mean the app picking the
+ * instant somebody's money is frozen, and no edit can reach a snapshot
+ * afterwards. See references/plan-viewer-overhaul.md § 5f.0 OVERRIDE 2.
+ *
+ * The quantity written here is the count at this moment, and it is a starting
+ * value rather than the answer — every read resolves it from the marks again
+ * (`withPlanCounts`). It is stored at all so that a line has an honest number
+ * in the column if it is ever read outside that path.
+ *
+ * ── Refusing a second line is the DATABASE's job, not a check here ──────────
+ * The unique index on (bidId, takeoffGroupId) is what makes "one count, one
+ * line" true. The router asks first so the estimator gets a sentence; if two
+ * requests race past that check, the insert is what fails, and it fails
+ * correctly rather than producing the double count R3 exists to stop.
+ */
+export async function addCountToBid(
+  bidId: number,
+  userId: number,
+  group: TakeoffGroup,
+  count: number
+): Promise<{ id: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  if (group.assemblyId === null)
+    throw new Error("This count has no assembly to price from");
+
+  const detail = await getAssemblyDetail(group.assemblyId, userId);
+  if (!detail) throw new Error("Assembly not found");
+
+  const snapshot = await snapshotForAssembly(userId, detail);
+
+  const [result] = await db.insert(bidLineItems).values({
+    bidId,
+    assemblyId: detail.id,
+    takeoffGroupId: group.id,
+    // The COUNT's label, not the assembly's. They are usually the same string,
+    // and where they differ the count is what the estimator named on this job.
+    name: group.label,
+    qty: count.toFixed(4),
+    ...snapshot,
     sortOrder: await nextBidSortOrder(bidId),
   });
-  return { id: result.insertId, merged: false };
+  return { id: result.insertId };
+}
+
+/** The live bid line for a counted group, if it has one. */
+export async function getBidLineForGroup(
+  groupId: number
+): Promise<BidLineItem | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db
+    .select()
+    .from(bidLineItems)
+    .where(eq(bidLineItems.takeoffGroupId, groupId))
+    .limit(1);
+  return row;
 }
 
 /**

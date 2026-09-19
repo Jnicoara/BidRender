@@ -106,9 +106,38 @@ other check passed:
   in the feature whose entire purpose is that an unset height must never look
   like a zero. Nothing failed. It just said something false.
 
+- **Staleness, 2026-09-19, and this is a whole CLASS rather than one fault.**
+  The counted-items panel offered "Send 5 to bid" and said "1 count is not on
+  the bid yet" using the numbers it had fetched when the page loaded. Marking
+  two more moved nothing, because the mutation invalidated the queries it knew
+  about and not the one added that morning. Both the control and the sentence
+  were confidently wrong rather than blank.
+
 The third is the one to remember: **the failures worth catching here do not
 look like breakage.** A broken screen gets reported by whoever hits it. A
 screen that quietly states a wrong number gets believed.
+
+### A test that calls the server cannot see a screen showing yesterday's answer
+
+**The fourth one above is structurally invisible to the server suite, and that
+is not a gap anybody can close by writing more server tests.** Those tests call
+a router and read what it returns, so they always see the database as it is
+this instant. A browser holds a cache, and the whole question is whether that
+cache was told to let go. The router was right every single time.
+
+So, whenever a change **adds a query** to a screen that already has mutations:
+
+- find the helper the existing mutations already invalidate through — there is
+  usually exactly one per screen (`refreshStamps`, `refreshRuns`) — and add the
+  new query to it rather than to the one mutation you were thinking about;
+- key it by what it actually depends on. The bridge query is per BID while the
+  panel is per SHEET, so marks placed on another sheet move it too;
+- then **look at the screen, act, and look again**. Not "does it render" —
+  does the number MOVE when the thing it counts moves.
+
+The same reasoning applies to anything derived and cached rather than stored:
+the cost of being wrong is a screen that states a stale number in the confident
+voice of a fresh one.
 
 Reaching a screen needs a session, which is the genuinely hard part and is
 already solved — see the block above, and

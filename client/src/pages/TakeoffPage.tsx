@@ -165,7 +165,10 @@ import {
 } from "@/lib/uploadQueue";
 import { takePendingPlan } from "@/lib/pendingPlanUpload";
 import { TraceLayer } from "@/components/takeoff/TraceLayer";
-import { RunsPanel } from "@/components/takeoff/RunsPanel";
+import {
+  RunsPanel,
+  type GroupBridgeState,
+} from "@/components/takeoff/RunsPanel";
 import {
   clearDraft,
   clearStampQueue,
@@ -2058,7 +2061,25 @@ export default function TakeoffPage({
         sheetId: activeSheet.id,
       });
     }
-  }, [utils, activeSheet?.id]);
+    /*
+      The bridge reads a count's whole-bid tally, so it goes stale on a mark.
+
+      Not optional, and the symptom is quiet: without this, the send control
+      keeps offering the number it saw when the page loaded, and the line under
+      the list goes on saying "every priced count is on the bid" while a count
+      sits there waiting. Both are confidently wrong rather than blank, which is
+      the worse kind.
+
+      It is invalidated on EVERY mark change rather than only on the first,
+      because the number in "Send 14 to bid" has to be the number that will
+      actually go over. Bid-wide, so it is keyed by bid rather than by sheet —
+      marks on another sheet move it too.
+
+      Found by looking at the running app: the tests call the router directly
+      and so never see a stale cache.
+    */
+    void utils.takeoffGroups.list.invalidate({ bidId });
+  }, [utils, activeSheet?.id, bidId]);
 
   const dropStamps = trpc.takeoffStamps.drop.useMutation({
     onError: e => toast.error(e.message),
@@ -2088,6 +2109,51 @@ export default function TakeoffPage({
   });
   const createGroup = trpc.takeoffGroups.create.useMutation({
     onError: e => toast.error(e.message),
+  });
+
+  /**
+   * Every count on this BID, and where each one stands with the bid.
+   *
+   * Bid-wide on purpose, unlike `stampGroups` below, which is this sheet after
+   * the Layers filter. A count marked across five sheets is one thing on the
+   * bid and one line, so what the send control offers has to be the whole
+   * number rather than the part of it currently on screen.
+   */
+  const bidCounts = trpc.takeoffGroups.list.useQuery({ bidId });
+
+  const bridgeByGroup = useMemo(() => {
+    const map = new Map<number, GroupBridgeState>();
+    for (const row of bidCounts.data?.groups ?? []) {
+      map.set(row.id, {
+        bidCount: row.count,
+        onBid:
+          !row.sendability.sendable &&
+          row.sendability.reason === "already-on-bid",
+        sendable: row.sendability.sendable,
+      });
+    }
+    return map;
+  }, [bidCounts.data]);
+
+  const sendToBid = trpc.takeoffGroups.sendToBid.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: result => {
+      void bidCounts.refetch();
+      /*
+        The warning is shown as its own message rather than folded into the
+        success line, and it does not block.
+
+        R3's rule is that a double count is VISIBLE, not impossible — a second
+        line for the same assembly may be exactly what the job has. So the send
+        succeeds, and the fact arrives beside it in time to be acted on. The
+        standing check on the bid screen is what covers the other order, where
+        the hand-added line turns up afterwards.
+      */
+      toast.success(
+        `${result.count} on the bid. The line follows your marks from here.`
+      );
+      if (result.warning) toast.warning(result.warning);
+    },
   });
 
   /** Pick the tool up. One function, so both doors leave the same state. */
@@ -4028,6 +4094,13 @@ export default function TakeoffPage({
                 firstPoint: r.points[0] ?? null,
               }))}
               stampGroups={stampGroups}
+              bridge={bridgeByGroup}
+              waitingToSend={bidCounts.data?.waitingToSend}
+              countedWithNoPrice={bidCounts.data?.countedWithNoPrice}
+              onSendToBid={id => sendToBid.mutate({ id })}
+              sendingGroupId={
+                sendToBid.isPending ? (sendToBid.variables?.id ?? null) : null
+              }
               onJumpTo={at => {
                 setFocusPoint(at);
                 // Clear the highlight after a moment — a marker that stays

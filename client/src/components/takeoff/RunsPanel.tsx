@@ -159,6 +159,25 @@ function verticalsMissingReason(run: PanelRun): string {
 }
 
 /** Stamped assemblies, grouped, as the list shows them. */
+/**
+ * What a count's relationship to the bid is — the bridge, as this panel needs
+ * it.
+ *
+ * ── Why the count here is the BID's and not the panel's ─────────────────────
+ * This panel shows one SHEET. A count can be marked across five of them, and
+ * the bid line takes all of them. So the send control has to say the whole
+ * number — "Send 14 to bid" while the sheet in front of you shows 5 — or the
+ * estimator reasonably believes they are sending what they can see.
+ */
+export type GroupBridgeState = {
+  /** Every mark on the BID, across every sheet. Not this sheet's tally. */
+  bidCount: number;
+  /** Already a line. The quantity follows the marks from here on. */
+  onBid: boolean;
+  /** Can go over now. False covers "no price" and "not built yet" alike. */
+  sendable: boolean;
+};
+
 export type PanelStampGroup = {
   /** Which count this is. Decides the swatch, and the key. */
   groupId: number | null;
@@ -186,6 +205,11 @@ export function RunsPanel({
   onUpdateCircuit,
   onRemoveCircuit,
   stampGroups,
+  bridge,
+  waitingToSend,
+  countedWithNoPrice,
+  onSendToBid,
+  sendingGroupId,
   onJumpTo,
   onRemoveStamp,
   legend,
@@ -194,6 +218,20 @@ export function RunsPanel({
   runs: PanelRun[];
   /** Counted stamps, grouped by assembly. Quantities are derived, not typed. */
   stampGroups: PanelStampGroup[];
+  /** Each count's relationship to the bid, by group id. */
+  bridge?: ReadonlyMap<number, GroupBridgeState>;
+  /**
+   * How many counts are priced, marked, and not yet on the bid.
+   *
+   * Undefined while the bid's counts are still loading, which is different
+   * from 0 and reads differently — see the footer.
+   */
+  /** Counts that are marked but unpriced, so they can never cross. */
+  countedWithNoPrice?: number;
+  waitingToSend?: number;
+  onSendToBid?: (groupId: number) => void;
+  /** The count currently crossing, so its own control can say so. */
+  sendingGroupId?: number | null;
   /** Move the viewer to a mark on the drawing and highlight it. */
   onJumpTo: (at: { x: number; y: number }) => void;
   onRemoveStamp: (id: number) => void;
@@ -312,6 +350,47 @@ export function RunsPanel({
                 {group.count}
               </span>
             </div>
+            {/*
+              Where this count stands with the bid.
+
+              Three states and three different things worth saying, all of them
+              words rather than colour: it is over, it can go over, or there is
+              nothing to say here and the row stays quiet. A level 1 count falls
+              in the third — its whole promise is a quiet count, and a nudge
+              toward the bid on the drawing screen breaks that promise on the
+              screen where it was made. The footer and the bid's own strip
+              carry the summary instead.
+            */}
+            {(() => {
+              const state =
+                group.groupId === null ? undefined : bridge?.get(group.groupId);
+              if (!state) return null;
+              if (state.onBid) {
+                return (
+                  <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                    On the bid — the line follows these marks
+                  </p>
+                );
+              }
+              if (!state.sendable || !onSendToBid) return null;
+              const busy = sendingGroupId === group.groupId;
+              return (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onSendToBid(group.groupId as number)}
+                  className="mt-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
+                >
+                  {/*
+                    The BID's count, not this sheet's. A count marked across
+                    five sheets sends all of them, and a control reading "Send 5
+                    to bid" beside a panel showing five of fourteen would be
+                    telling the truth about the wrong number.
+                  */}
+                  {busy ? "Sending…" : `Send ${state.bidCount} to bid`}
+                </button>
+              );
+            })()}
             {/* Walk the instances: each chip jumps the viewer to that mark. */}
             <div className="flex flex-wrap gap-1 mt-1.5">
               {group.stamps.map((placed, index) => (
@@ -327,6 +406,47 @@ export function RunsPanel({
             </div>
           </div>
         ))}
+
+        {/*
+          Where the takeoff stands with the bid — one line, in one place.
+
+          ── Why it is here and not a badge on the drawing ──────────────────
+          Level 1's promise is a quiet count. A marker nagging toward the bid on
+          the sheet itself would break that promise on the screen where it was
+          made, so the summary lives in a list somebody reads rather than on the
+          work they are doing.
+
+          ── Why it says something at zero instead of disappearing ──────────
+          A line that appears and vanishes as counts cross is movement in the
+          corner of the eye during the most repetitive action on the screen.
+          Same position, same weight, same colour, different words — so it can
+          be read when wanted and ignored when not. It is drawn whenever there
+          is any count at all, because before that there is genuinely nothing to
+          report.
+
+          ── Why there are THREE states and not two ─────────────────────────
+          Found by looking at a real bid, after the tests passed. With only
+          "waiting" and "all sent", a job whose only count is unpriced read as
+          **"Every priced count is on the bid."** — vacuously true, because
+          there were no priced counts, and it sounds exactly like a finished
+          takeoff while money is missing from the bid entirely. That is the
+          reading § 5f calls the worse of the two failures, produced by copy
+          that was literally correct.
+
+          So an unpriced count gets said out loud here. It is a line in a list
+          somebody opens, which is what § 5f permits; what stays forbidden is a
+          badge on the drawing, where level 1's promise of a quiet count was
+          made.
+        */}
+        {stampGroups.length > 0 && waitingToSend !== undefined ? (
+          <p className="px-3 py-2 text-[0.7rem] text-muted-foreground border-b border-border">
+            {waitingToSend > 0
+              ? `${waitingToSend} count${waitingToSend === 1 ? " is" : "s are"} not on the bid yet.`
+              : countedWithNoPrice
+                ? `${countedWithNoPrice} count${countedWithNoPrice === 1 ? " has" : "s have"} no price, so ${countedWithNoPrice === 1 ? "it cannot" : "they cannot"} go on the bid.`
+                : "Every priced count is on the bid."}
+          </p>
+        ) : null}
 
         {runs.length === 0 && stampGroups.length === 0 ? (
           <div className="p-6 text-center">
