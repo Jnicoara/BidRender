@@ -298,23 +298,49 @@ Each phase ships and gets used before the next starts.
 > **Re-ordered 2026-09-17 after testing Phase 1 on the live site.** The order
 > below is the current one; § 4.1 records what the testing changed and why.
 
-| Phase   | What                                                                       | DB change                |
-| ------- | -------------------------------------------------------------------------- | ------------------------ |
-| **1**   | ~~Zoom, pan, and the three viewer bugs~~ **shipped**                       | No                       |
-| **1a**  | ~~Page-flip fit bug + tool discoverability~~ **shipped**                   | **No**                   |
-| **2**   | ~~Two-point scale calibration~~ **shipped**                                | No (reuses `scaleRatio`) |
-| **3**   | ~~Sharp re-render of the visible area~~ **shipped**                        | **No**                   |
-| **4**   | ~~The layout: top bar, collapsing panels, focus mode~~ **shipped**         | **No**                   |
-| **4b**  | Measure-only tool                                                          | **No**                   |
-| **5**   | **Verticals on runs — the money phase**                                    | **Yes**                  |
-| **6**   | Three levels of effort, and marks you can tell apart — § 5e                | **Yes** — stamp kinds    |
-| **7**   | Run settings: allowances, materials, sizes, ground                         | **Yes**                  |
-| **8**   | **Verticals on stamps**                                                    | **Yes** (small)          |
-| **9**   | Editing runs: drag a vertex, insert/remove points                          | No                       |
-| **9a**  | **AI-assisted legend capture** — see § 9, and § 9.6 for why it precedes 10 | **Yes** (small)          |
-| **10**  | AI reader tiling, and the daily-limit question with it — **gated on § 15** | No                       |
-| **10b** | **AI-suggested known distances for calibration** — see § 13                | No                       |
-| **11**  | Tablet and touch                                                           | No                       |
+| Phase   | What                                                                           | DB change                |
+| ------- | ------------------------------------------------------------------------------ | ------------------------ |
+| **1**   | ~~Zoom, pan, and the three viewer bugs~~ **shipped**                           | No                       |
+| **1a**  | ~~Page-flip fit bug + tool discoverability~~ **shipped**                       | **No**                   |
+| **2**   | ~~Two-point scale calibration~~ **shipped**                                    | No (reuses `scaleRatio`) |
+| **3**   | ~~Sharp re-render of the visible area~~ **shipped**                            | **No**                   |
+| **4**   | ~~The layout: top bar, collapsing panels, focus mode~~ **shipped**             | **No**                   |
+| **4b**  | Measure-only tool                                                              | **No**                   |
+| **5**   | **Verticals on runs — the money phase**                                        | **Yes**                  |
+| **6**   | Group row, plain counting, and marks you can tell apart — § 5e                 | **Yes** — count groups   |
+| **6b**  | **The bridge: counts onto the bid, then levels 3 and 2** — § 5f                | **Yes** (small)          |
+| **6c**  | Takeoff-only jobs: stop nagging a finished count — § 5h                        | **Yes** (one column)     |
+| **7**   | Run settings: allowances, materials, sizes, ground                             | **Yes**                  |
+| **8**   | **Verticals on stamps**                                                        | **Yes** (small)          |
+| **9**   | Editing runs: drag a vertex, insert/remove points                              | No                       |
+| **9a**  | **AI-assisted legend capture** — see § 9, and § 9.6 for why it precedes 10     | **Yes** (small)          |
+| **10**  | AI reader tiling, and the daily-limit question with it — **gated on § 15**     | No                       |
+| **10b** | **AI-suggested known distances for calibration** — see § 13                    | No                       |
+| **11**  | Tablet and touch                                                               | No                       |
+| **12**  | **Alternates and allowances** — add/deduct priced apart from the base — § 5g   | **Yes**                  |
+| **13**  | Per-bid proposal breakdown: where the choice is STORED, then the shapes — § 5g | **Yes** (small)          |
+
+> **Phase 6 was split on 2026-09-18 and 6c inserted.** The bridge (6b) is the
+> largest piece in this document and is not a step inside an appearance phase —
+> § 5e records the cut and § 5f the finding behind it. **6c sits immediately
+> after 6b rather than later**, and the reason is a consequence of Phase 6 rather
+> than a preference: level 1 counting produces bids with no line items by design,
+> which every pricing prompt in the app reads as unfinished. Phase 6 is what
+> makes the nagging worse, so the fix belongs next to it, and it is one column.
+>
+> **Phase 12 ranks above 13, and that order was corrected on 2026-09-18.**
+> Alternates started as a footnote under the breakdown work and outrank it:
+> **a breakdown shape is a preference, while a missing alternate can make a bid
+> non-responsive on the federal and public work this contractor bids** — one
+> annoys a reader, the other gets the bid rejected unread. It is also not a
+> presentation feature at all (§ 5g), so it must not be folded into 13.
+>
+> **Phase 13 leads with WHERE the choice is stored, not what the choices are.**
+> The layouts, the sections and the pro-rata allocation rule all exist; what
+> does not is any way to make the choice per bid rather than once for the whole
+> company. The one shape with a further dependency is "by system", which wants a
+> category snapshot a bid line does not carry yet — and reads better after 6b,
+> when a plan-driven bid has real lines to group.
 
 > **Phase 10 is gated.** Nobody has measured whether the reader counts
 > accurately at the detail level it is priced at. § 15 specifies the bake-off
@@ -2021,6 +2047,18 @@ three are Phase 6.
 
 ### The panning bug — NOT Phase 6, no database change
 
+**Fixed 2026-09-18, with the false screen copy below.** `clampView` now decides
+centring for the VIEW rather than per axis, and
+`client/src/lib/planView.test.ts` covers the in-between state under "wider than
+the pane but shorter than it". Two of those tests fail against the old rule and
+three assert that everything else is unchanged.
+
+**One thing worth recording, because it is why this shipped at all:** the
+existing fixture is a 2000x1500 sheet in an 800x600 viewport — the SAME aspect
+ratio, so on it the two axes overflow together at every zoom and the broken
+state cannot be reproduced. The suite was thorough and still could not see this.
+A fixture shaped like the viewport tests half the rule.
+
 **The fault:** `clampView` (`client/src/lib/planView.ts`) applies one `axis()`
 function to x and y independently, and its first branch forces an axis to centre
 whenever the drawing is smaller than the viewport on THAT axis. So at a zoom
@@ -2081,24 +2119,95 @@ unrelated assembly as a placeholder. That is backwards. The blocker is one
 column: `takeoff_stamps.assemblyName` is NOT NULL and the whole stamp path
 assumes an assembly behind it.
 
-| Level                   | What it is                                    | What it needs                                                                 |
-| ----------------------- | --------------------------------------------- | ----------------------------------------------------------------------------- |
-| **1. Plain count**      | A typed name, nothing else. "Exit signs: 14." | A `kind` column and a label. **Never reaches the bid** — a number on screen   |
-| **2. Count + price**    | A name and a dollar amount per item           | `unitCost` / `unitHours`, **plus a way to become a bid line** — the real work |
-| **3. Count = material** | The part, no labour                           | A `materialId` link                                                           |
-| **4. Count = assembly** | What exists today                             | Nothing. Stays as the fullest option                                          |
+| Level                   | What it is                                    | What it needs                                                     |
+| ----------------------- | --------------------------------------------- | ----------------------------------------------------------------- |
+| **1. Plain count**      | A typed name, nothing else. "Exit signs: 14." | The group row and a label. **Never reaches the bid** — a count    |
+| **2. Count + price**    | A name and a dollar amount per item           | `unitCost` / `unitHours` on the group, **plus the bridge** — § 5f |
+| **3. Count = material** | The part, no labour                           | A `materialId` on the group, **plus the bridge** — § 5f           |
+| **4. Count = assembly** | What exists today                             | Nothing. Stays as the fullest option                              |
+
+#### The group is a ROW — this overrides what was approved on 2026-09-18
+
+**Changed the same day it was approved, before anything was built.** The version
+of this section approved that morning put `kind`, a label, `materialId`,
+`unitCost` and `unitHours` **on `takeoff_stamps`**, one set of columns per
+mark. **That is wrong, and a real group row replaces it.** Recorded as an
+override rather than quietly edited, because the approved version is the one a
+reader would otherwise take as current.
+
+**Why it is wrong, in this document's own words.** § 7 already settled that "a
+vertical belongs to the GROUP, not each stamp. Thirty receptacles in a room
+share one height, and storing it thirty times is thirty places for it to
+disagree with itself." **A price is the same kind of fact as a height.** Fourteen
+exit signs at $38 stored on the marks is one number in fourteen homes, and the
+first time thirteen of them are edited the count and the price disagree with
+nothing on screen to say which is right.
+
+**Two more things the row buys, neither of which per-stamp columns can do at any
+price:**
+
+- **Attaching a price later with every click intact** — which § 3.1 calls "the
+  entire point of the three levels". On a group row that is an edit to ONE row.
+  On per-stamp columns it is a rewrite of fourteen, and the tempting shortcut
+  becomes asking the user to re-count.
+- **Phase 8's stamp verticals**, which § 7 already decided belong to the group.
+  The table pays for itself twice, and Phase 8 stops needing its own migration.
+
+```
+takeoff_groups          one row per counted thing per BID
+  label                 "Exit signs"
+  kind                  plain | typed | material | assembly
+  assemblyId            level 4
+  materialId            level 3
+  unitCost / unitHours  level 2, typed
+  laborRateId           only when unitHours is set — see § 5f
+
+takeoff_stamps
+  groupId               new. the mark keeps its position and points at the group
+```
+
+**Per BID, not per sheet.** Exit signs are one priced thing on the job even when
+they are marked on five sheets, and a price per sheet is the same
+disagree-with-itself problem one level up. The per-sheet panel still GROUPS by
+sheet for display — a display choice over one set of rows, which is what
+`groupStamps` already does.
+
+**`assemblyName` becomes nullable here, and only here.** § 3.1 warns that level
+1 "must not be smuggled in early by making a column nullable and hoping" — that
+warning is about nullable WITHOUT a group, where nothing holds the label. With
+the group row present the label has a home, which is the condition the warning
+was waiting for. Existing rows keep their snapshots untouched; readers prefer
+the group.
+
+**Database change: yes.** A new table plus `groupId` on `takeoff_stamps`, both
+additive, and a backfill making one group per existing (bid, assembly) pair so
+today's takeoffs read identically. Same migrate-first-deploy-second shape as
+Phase 5.
 
 **Level 2 ships with a warning on the screen**, and the reasoning is the
 unpriced-material rule (`CLAUDE.md` § Starter content) applied one level along:
-a stamp carrying its own dollar amount is **a price that lives outside the
+a group carrying its own dollar amount is **a price that lives outside the
 materials library**, so it is never re-priced when supplier costs move and never
-appears in "what needs pricing". So it says so where it is set, and those stamps
+appears in "what needs pricing". So it says so where it is set, and those groups
 go in the needs-attention list — findable rather than forgotten. A price nobody
-can find again is the quiet kind of wrong.
+can find again is the quiet kind of wrong. The list itself, and the entry for
+level 1, are in § 5f.
 
-**Database change: yes.** `kind`, a label, `materialId`, `unitCost`,
-`unitHours` on `takeoff_stamps` — all additive and nullable, so the same
-migrate-first-deploy-second shape as Phase 5.
+### Where Phase 6 now ends — the bridge is its own phase
+
+**Decided 2026-09-18, on the finding that opens § 5f.** Levels 2 and 3 both need
+a path from a count to a priced bid line, and that path **does not exist for any
+level, including level 4**. It is the largest piece of work in sight and it is
+not a step inside an appearance phase.
+
+So **Phase 6 is the panning fix, the group row, level 1, and marks you can tell
+apart — and it stops there.** Levels 3 and 2 leave with the bridge into Phase 6b
+(§ 5f).
+
+**Planned as the cut from the start**, rather than discovered halfway. The
+alternative is finding out mid-phase that a "step" is phase-sized, with a
+half-built bridge and a level 2 hanging off it. If 6b turns out to be
+step-sized, nothing has been lost by drawing the line here.
 
 ### Why the appearance work belongs WITH the levels, not after
 
@@ -2107,6 +2216,366 @@ argument is causal: **the moment you can count "exit signs" without building an
 assembly, the number of different kinds of mark on one sheet jumps.** Telling
 them apart stops being polish at exactly the point level 1 ships, which is why
 it goes in the same phase rather than the next one.
+
+## 5f. Phase 6b — the bridge: counts onto the bid
+
+**Designed 2026-09-18, not built.** Levels 3 and 2 live here, behind the thing
+they both need.
+
+### The finding that made this its own phase
+
+**Nothing about money reads a stamp. Not level 2 — level 4 either.**
+
+A stamped assembly does not become money on a bid and never has.
+`server/routers/materialsListRouter.ts` says it in its header: "stamping does
+not create a line item". Marks and runs reach the counted-items panel and the
+supplier materials list, and stop. **A finished takeoff is typed into the bid by
+hand.**
+
+This was checked rather than assumed, after the design for level 2 was written
+around the premise that a typed price was the thing with no path to the bid. The
+takeoff spec had it right a fortnight earlier — R1, R2 and R4 are all listed
+**Missing** — and the screen said the opposite anyway: "Everything you place
+lands on the bid" was live copy until 2026-09-18 (fixed, § 5e).
+
+So the bridge is not level 2's plumbing. **It is the most valuable single piece
+of work in this whole document**, because it is the one that stops a takeoff
+being typed in twice.
+
+### What a bid line actually is
+
+Six things, frozen at add time by `addAssemblyToBid` (`server/db.ts`), and
+nothing else:
+
+| On the line           | Example         |
+| --------------------- | --------------- |
+| a name                | "Exit sign LED" |
+| a count               | 14              |
+| material cost for ONE | $38.00          |
+| labour hours for ONE  | 0.50            |
+| an hourly rate        | $68.00          |
+| a modifier percentage | 0%              |
+
+Two things follow, and they are the whole design:
+
+1. **A bid line does not know what an assembly is.** Where those six numbers
+   came from is not recorded and never consulted again.
+2. **A line with nothing behind it already works.** `assemblyId` is nullable,
+   and the shipped sample bid writes lines with it empty and hand-set numbers
+   (`server/db.ts`, `createSampleBid`). Those lines price, tax, roll up and
+   print today.
+
+### So a counted group becomes a REAL bid line
+
+Not a thing alongside. The bid line is already "a name, a count, a price each,
+optional hours each", which is a literal description of what a counted group
+holds.
+
+**What "alongside" would cost:** the proposal, the sales-tax base, overhead,
+profit, the accounting export, the close-out comparison, the dashboard totals
+and the analytics rollup all read bid lines. A second kind of money is eight
+places to teach, and the failure mode is a total that is right on seven screens
+and wrong on the eighth.
+
+**One line per GROUP, marked "from plans", its count following the marks.** This
+is D2(a) in `references/takeoff-spec.md`, decided 2026-09-14, and it stands:
+live rather than a "send to bid" button, because a button is a bid that goes
+stale when somebody forgets to press it. Costs freeze when the line is first
+created (R4). A group with no price — level 1 — creates no line at all.
+
+**A typed price enters as material money**, so markup, overhead and sales tax
+treat it exactly as they treat a material. That is what is wanted for 14 exit
+signs, and it is worth saying out loud because it means a typed price is inside
+the tax base when `taxMaterials` is on.
+
+### Hours on a typed count — yes, and the rate is the real question
+
+**Decided: level 2 carries optional hours.** It is nearly free. A bid line
+already holds hours separately from money, so typed hours ride the field an
+assembly's hours ride. Nothing in `shared/pricing.ts` changes.
+
+**Hours are not money until something multiplies them, and that is the part that
+needed deciding.** An assembly names a role and brings its own rate. A typed
+count does not. Leave the rate at zero and 14 x 0.5 h costs $0 while the bid
+looks finished — a failure the bid screen already warns about
+(`client/src/pages/BidsPage.tsx`, "lines have hours but no labor rate").
+
+- **Type hours, pick a role.** One dropdown, **shown only when hours are filled
+  in** — the common case is material-only and must stay one field.
+- **Default it to the company default role.** Which means finishing a wire-up:
+  `pricing_defaults.defaultLaborRateId` is written today and read by nothing
+  that prices. **A setting that is stored and read by nothing is its own small
+  lie**, and it is in scope here.
+- **No modifier list and no productivity override on a typed count.** The bid's
+  productivity factor applies as it does everywhere. One escape hatch, not a
+  second pricing system growing beside the first.
+
+**Note the asymmetry this creates, deliberately:** materials carry no labour
+hours anywhere in the schema, so level 3 (a count linked to a material) is
+material-only by nature. A level 2 that can carry hours is therefore MORE
+capable than level 3. That is not a mistake to tidy up — see § 5f's last
+paragraph on building them as one screen.
+
+### How it shows as what it is, without nagging
+
+Three places, none of them shouting.
+
+1. **Where it is set.** One line under the price field: this price lives on this
+   job, it will not follow your material prices, and it will not appear in what
+   needs pricing.
+2. **On the item and on the line.** A small grey tag — "typed price" on the
+   counted item, "from plans" on the bid line. **Grey, not yellow.** Yellow is
+   already spent twice on that screen: conduit runs, and every warning in the
+   app.
+3. **The needs-attention list.** **It does not exist.** The closest things today
+   are the yellow strip under the bid's labour total and the Materials screen's
+   "No price" filter.
+
+**Decided: extend the strip, do not invent a list.** The strip's rule is already
+the right one — it sits directly under the number it contradicts — and a typed
+price contradicts the material total:
+
+> **3 counted items are priced by hand** — $1,240 of the material above is not
+> from your materials library, so it will not move when your prices do.
+
+**And a second entry, which matters more:** **level 1 counts that were never
+priced.** "14 exit signs counted, no price" is money missing from the bid
+entirely, which is worse than a price nobody can re-check. List only — **never a
+badge on the drawing**, or level 1's promise of a quiet count is broken on the
+screen where it was made.
+
+### Converting a typed price into a real material later
+
+**Realistic and cheap, because the group is a row.** Add a real exit sign
+material with a real price, open the group, switch it from typed to that
+material. One row changes. Fourteen marks stay where they are, the count stays
+14, nothing on the drawing moves. `setLocationForAssembly` (`server/db.ts`)
+is the precedent for retagging a whole group in one action.
+
+**The bid line that already exists gets RE-SNAPSHOTTED, and says so** — "re-priced
+from Exit sign LED, 18 Sep". The snapshot rule exists to stop the LIBRARY moving
+a bid behind the user's back. This is not that: it is the user deliberately
+changing where the price comes from, and freezing it here would leave a bid
+stuck on a number they had just replaced. **It must not add a second line** —
+that is a double count, and R3 exists to make those visible rather than
+accidental.
+
+**What conversion cannot do is tell you the $38 was wrong.** Show both numbers
+side by side and let the estimator look.
+
+### Where the line is drawn differently from how it was first asked for
+
+- **Levels 2 and 3 are ONE feature with two price sources.** Once a group holds
+  a typed cost and optional hours, level 3 is "fill that cost from a material
+  instead of typing it, and keep the link so it re-prices". Same screen, same
+  fields, a toggle on where the number comes from. Two screens that do almost
+  the same thing will drift apart.
+- **No "save this price to my library" button.** It will look obviously
+  helpful. It is how a materials library fills with rows named "exit sign" at
+  prices nobody sourced, and those rows then look exactly like real ones.
+  Conversion goes one way only: go and add the material properly.
+- **Level 1 and its needs-attention entry ship together.** "Never reaches the
+  bid" is only safe when the count is findable somewhere.
+
+---
+
+## 5g. The proposal choice is made once for the COMPANY, and it has to be made per BID
+
+**Asked and answered 2026-09-18. Not built.** The want: the same bid shown
+several ways, chosen per bid, because a Dollar Tree remodel wants a lump sum and
+a school district wants a breakdown.
+
+### The headline, because everything else here is smaller than it looks
+
+**`proposal_settings` is keyed by user and trade — company-wide.** Which
+sections a proposal shows is one decision for every document the contractor ever
+sends. **Switching sections off for the Dollar Tree job changes the school
+district's proposal too.**
+
+That is the whole gap. It is not layouts, not sections, not arithmetic: those
+exist, and more of them than expected. **The document cannot be told apart from
+the job it belongs to**, and no amount of new breakdown options fixes that,
+because every one of them would land in the same company-wide row and be wrong
+for the next bid out the door.
+
+So the first piece of work here is **where the choice is stored**, not what the
+choices are. Everything below is content for a control that does not yet have a
+home.
+
+### What a customer can be shown TODAY
+
+More than expected, which is the other half of why the gap is where it is.
+
+- **Three layouts** — classic, modern, minimal — plus an accent colour and a
+  logo. Deliberately no template upload and no free-form editor: the user picks
+  between finished documents (`shared/proposal.ts`).
+- **Ten sections, eight of them switchable.** Only two cannot be turned off: the
+  letterhead, because a document with no sender is not a proposal, and the total,
+  because one that does not state a price is not either.
+- **Two modes** — `full` and `scope-only`. Scope-only removes every money
+  figure so a GC can agree WHAT is being done before bid day.
+- **Scope of work** lists what is included **by name and quantity, never with
+  unit costs**, and it already GROUPS by `unitLabel` — so "Room 101" or
+  "Building A" is a heading today, for free, because that field is free text.
+- **Price per unit** gives a per-room or per-apartment price.
+- **Labor summary** gives total estimated hours.
+
+**So a lump sum already exists**: switch off everything switchable and the
+document is a letterhead and a number.
+
+### What is missing, and it is one thing more than it looks
+
+| Wanted                                  | Status                                                                                            |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Lump sum — one number                   | **Exists.** Hide the optional sections                                                            |
+| By area or by room                      | **Mostly exists.** `unitLabel` groups the scope section already                                   |
+| Labour and materials split              | **Missing.** Deliberately: the total folds materials, labour, overhead and profit into one figure |
+| Full cost breakdown, every line priced  | **Missing, and deliberately refused** — see below                                                 |
+| By system (lighting, power, fire alarm) | **Missing**, and the only one needing a database change                                           |
+| **Chosen per BID**                      | **Missing, and this is the real gap**                                                             |
+
+**The per-bid row is the headline above**, and it is the only one of these that
+blocks the others. A lump sum "exists" today in the sense that the switches
+exist — but switching them for one client re-dresses every proposal the company
+sends, so in the sense that matters it does not exist either.
+
+### What it needs, and how little of it is new arithmetic
+
+**The allocation rule already exists and is already reasoned.** Per-unit pricing
+scales a unit's direct cost by the bid's own cost-to-price ratio so the parts sum
+to the quoted total, and `shared/proposal.ts` says why: "Anything else prints
+per-room figures that visibly do not sum to the number underneath them, which is
+the fastest way to lose an argument about a price."
+
+**Every breakdown option is that same rule pointed at a different grouping.**
+Which makes most of this presentation, not pricing:
+
+- **Labour and materials split — no database change.** The rollup already
+  carries `materialCost` and `laborCost` separately; the Bids screen shows
+  both. The split must be of the PRICE, pro rata, not of the bare cost — two
+  numbers that do not add up to the total are worse than one number.
+- **Full breakdown, every line — no database change.** The lines and their
+  snapshots are already there. What it needs is a decision, because
+  `shared/proposal.ts` currently refuses it on purpose: "nothing on the page
+  that invites a line-by-line negotiation of the contractor's margin." **That
+  refusal is right for a Dollar Tree remodel and wrong for a school district,
+  which is exactly why this becomes a per-bid choice rather than a setting.**
+- **By system — the one database change, and it is small.** The grouping key is
+  `assemblies.category`, which a bid line does not store; reaching it means a
+  live join that returns nothing once the assembly is deleted. So: snapshot the
+  category onto the line, exactly as `takeoff_stamps.assemblyCategory` already
+  does and for the same stated reason.
+  **Two warnings.** The five categories are library filing — Devices, Lighting,
+  Panels, Equipment Connections, Low Voltage/EMS — **not the systems a customer
+  would recognise**, and there is no fire alarm among them. A customer-facing
+  "by system" summary either prints "Devices" as a heading or needs its own
+  user-editable grouping. Decide that before building it.
+- **By area — nothing to build, and a conflict to know about.** `unitLabel` is
+  free text and already groups the scope section, so typing "First floor" works
+  now. But a label also makes a unit a candidate for the template and
+  mass-duplicate machinery (`bid_unit_links`), so areas and repeating units
+  would share one field. Cheap today, worth a real `area` column later if it
+  gets used.
+
+### Storing the choice per bid — and the existing decision it has to answer
+
+`proposalsRouter` deliberately does NOT store the mode: "A stored preference is
+one that can be left on scope-only by accident and then printed as if it were
+the priced proposal."
+
+**That reasoning holds for scope-only and does not extend to a breakdown
+shape**, and the difference is exactly what makes storing this safe: every
+breakdown option states **the same final price**. Scope-only is dangerous
+forgotten because it removes the price; a breakdown left on "by system" prints
+the same total as a lump sum, in more detail. **So the breakdown may be stored
+per bid. Scope-only stays transient.** Do not merge the two controls.
+
+### Alternates and allowances — raised as a footnote, promoted on 2026-09-18
+
+**These outrank every breakdown option in this section, including the
+labour/materials split that prompted it.** Neither was asked for; both are
+staying, and this one moves to the front.
+
+An alternate is an add or deduct priced separately from the base bid — "deduct
+$4,200 if the owner supplies the fixtures", "add $11,800 for the gym lighting
+package". An allowance is a stated sum carried for work that cannot be priced
+yet.
+
+**Why this is not a nice-to-have.** This contractor bids federal and public
+work, where alternates and allowances are requested constantly and the bid form
+names them. **A breakdown shape is a preference — a missing alternate can make a
+bid non-responsive and get it rejected unread.** That is a different category of
+consequence from a proposal that groups its lines the wrong way, and it is the
+reason this is written down here rather than left in a list of ideas.
+
+It is also **not** a presentation choice, which is why it cannot ride along with
+the rest of this section: an alternate is money that is deliberately NOT in the
+base total, with its own scope and its own accept/reject state. That is data the
+bid does not carry today, and it wants designing on its own terms — probably
+closer to `bid_expenses` (a named amount with its own tax and markup flags)
+than to anything in the proposal builder. **Not specified here, and not to be
+bolted onto the breakdown control when that gets built.**
+
+### Also noted, not scheduled
+
+- **A schedule of values** — the breakdown a GC needs for progress billing, by
+  phase rather than by system. A different audience from a proposal, and
+  probably its own document rather than another option here.
+
+---
+
+## 5h. Takeoff-only jobs — is it a real state?
+
+**Asked and answered 2026-09-18. Not built.** The want: sometimes a job is a
+materials count for a supplier quote and nothing else — no labour, no overhead,
+no proposal.
+
+### The materials list already does the job
+
+It works on a completely unpriced bid, by design and with tests that assert it:
+no labour rate, $0 materials, no pricing defaults, and the quantities come out
+identical to a priced bid. It is reachable from the takeoff screen's toolbar from
+the first mark, ahead of "Add PDF", on the reasoning that a contractor asks for a
+quote precisely because they do not yet know what things cost. It exports CSV and
+PDF and carries no money anywhere.
+
+**So nothing is blocked today.** The suspicion in the question — "am I just
+describing not using features I do not need" — is half right.
+
+### What is NOT right today: the app nags a finished job
+
+A count-only bid is complete work, and the app treats it as an unfinished bid.
+The pricing prompts are all correct for a real bid and all wrong for this one:
+the $0-labour-lines strip, the getting-started push toward a labour rate, a
+dashboard showing the job at $0, and `jobsWithoutLaborBasis` counting it in
+analytics as a job that "carried no estimated hours". **A job that is finished
+and permanently complained about is the actual complaint.**
+
+**And level 1 makes it worse.** A bid full of level-1 counts has no line items by
+design (§ 5e), so it looks unpriced to every one of those checks. The nagging
+gets louder exactly as the feature that invites counting-without-pricing ships.
+
+### Recommendation: one bit, and NOT a mode picked at the start
+
+- **Not a mode chosen when the bid is created.** That is a decision made when
+  the user knows least, and jobs change their mind — "I will price it after all"
+  must not mean switching a mode off to be allowed to.
+- **Not derived either**, though this codebase rightly prefers derived state
+  (counts from rows, "a template is a template because other units point at
+  it"). What the nags are about is **intent**, and no amount of data says whether
+  a user MEANT to leave a job unpriced.
+- **So: one nullable column on the bid**, doing one job — silencing the pricing
+  prompts and keeping the job out of the analytics that assume a priced bid. It
+  hides no features and changes no number.
+- **Offered at the moment the app would otherwise nag**, not at the start: "This
+  job has 240 counted items and no pricing. Is that deliberate?" → yes, it is a
+  takeoff. **That turns a recurring nag into a question asked once**, which is
+  the whole value, and it is why the column earns its place.
+
+**Win and loss stay out of it.** A takeoff-only job is not won or lost, and it
+must not reach win-rate analytics as either.
+
+---
 
 ## 6. Decisions already made — do not re-open without saying why
 

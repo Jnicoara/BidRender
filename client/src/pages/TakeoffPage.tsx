@@ -9,8 +9,15 @@
  * All of it, now. Documents and the sheet index, per-sheet scale, stamping
  * assemblies onto the drawing, tracing conduit and cable runs against that
  * scale, the legend that maps a symbol to an assembly, layer visibility, and
- * the plan reader that proposes stamps for you to accept. Everything placed
- * lands on the bid — see RunsPanel and the counted-items list for the totals.
+ * the plan reader that proposes stamps for you to accept.
+ *
+ * **What is placed here is COUNTED, not priced.** Marks and runs become
+ * quantities on this screen and on the supplier materials list — see RunsPanel
+ * and the counted-items list for the totals — and they stop there. Nothing that
+ * prices a bid reads a stamp or a run (server/routers/materialsListRouter.ts
+ * says so in its header), so a finished takeoff is still typed into the bid by
+ * hand. The screen claimed the opposite until 2026-09-18. The bridge that would
+ * make the claim true is its own phase: references/plan-viewer-overhaul.md § 5e.
  *
  * ── Layout, and why this shape ───────────────────────────────────────────────
  *   documents + sheet index │ the drawing │ work pane
@@ -3134,7 +3141,7 @@ export default function TakeoffPage({
               </h1>
               <p className="text-xs text-muted-foreground">
                 Set each sheet's scale, then stamp and trace what is on it.
-                Everything you place lands on the bid.
+                Counts feed the materials list, not the bid price.
               </p>
             </div>
             {/* Left of "Add PDF" and available from the first mark, not at the

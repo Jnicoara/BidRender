@@ -101,19 +101,34 @@ export const materialsListRouter = router({
 
       // ── Both sources, as one flat list of "this assembly, this many" ───────
       const sources: CountedAssemblySource[] = [];
-      const orphaned = new Set<string>();
+      /*
+        Two different reasons a counted thing cannot be itemised, kept apart.
+
+        `gone` is an assembly deleted from the library since it was used: the
+        bid keeps its snapshot name and nothing knows what it CONTAINED any more.
+        `noParts` is an assembly still sitting in the library that contains no
+        materials at all — a labour-only one, which the builder allows
+        (assembliesRouter's materials default of []).
+
+        They were one set until 2026-09-18, under a note that told the supplier
+        the assembly was "no longer in the library". For a labour-only assembly
+        that is simply false, and it is false on a document that leaves the app
+        and gets read by somebody who cannot ask the screen a question. A
+        supplier chasing a part that was never a part is the app lying about
+        itself.
+      */
+      const gone = new Set<string>();
+      const noParts = new Set<string>();
 
       for (const line of liveLines) {
         const materials =
           line.assemblyId === null
             ? []
             : (byAssembly.get(line.assemblyId) ?? []);
-        // An assembly deleted from the library since it was added keeps its
-        // snapshot name on the bid, but nothing knows what it CONTAINS any
-        // more. It is named in the notes rather than dropped, because a
-        // supplier reading a short list cannot tell that something is missing.
+        // Named in the notes rather than dropped, either way: a supplier
+        // reading a short list cannot tell that something is missing from it.
         if (materials.length === 0) {
-          orphaned.add(line.name);
+          (line.assemblyId === null ? gone : noParts).add(line.name);
           continue;
         }
         sources.push({
@@ -138,7 +153,7 @@ export const materialsListRouter = router({
             ? []
             : (byAssembly.get(group.assemblyId) ?? []);
         if (materials.length === 0) {
-          orphaned.add(group.name);
+          (group.assemblyId === null ? gone : noParts).add(group.name);
           continue;
         }
         sources.push({
@@ -208,11 +223,20 @@ export const materialsListRouter = router({
           } length is not included above.`
         );
       }
-      if (orphaned.size > 0) {
+      if (gone.size > 0) {
         notes.push(
           `Not itemised, because the assembly is no longer in the library: ${Array.from(
-            orphaned
+            gone
           ).join(", ")}.`
+        );
+      }
+      if (noParts.size > 0) {
+        notes.push(
+          `Counted on this job but not itemised, because ${
+            noParts.size === 1 ? "it contains" : "they contain"
+          } no materials — ${
+            noParts.size === 1 ? "it is" : "they are"
+          } labor only: ${Array.from(noParts).join(", ")}.`
         );
       }
       /*

@@ -110,15 +110,37 @@ export function clampZoom(zoom: number): number {
  *
  * Two cases, and they want opposite behaviour:
  *
- *   Drawing SMALLER than the viewport — centre it, and ignore any pan. Letting
- *   someone shove a small sheet into a corner looks like a bug, not a feature,
- *   and a sheet small enough to see whole is not one anybody is repositioning.
+ *   The WHOLE SHEET fits — centre it, and ignore any pan. Letting someone shove
+ *   a sheet they can already see all of into a corner looks like a bug, not a
+ *   feature, and a sheet small enough to see whole is not one anybody is
+ *   repositioning.
  *
- *   Drawing LARGER — pan anywhere within it AND past its edges, with empty
- *   ground showing, until only `MIN_VISIBLE_FRACTION` of the viewport still has
- *   drawing on it. That last clause is the entire safety net: the drawing can
- *   be pushed aside but never away, so there is always a large piece of it on
- *   screen to drag back.
+ *   ANY part of it is off screen — pan anywhere within it AND past its edges,
+ *   with empty ground showing, until only `MIN_VISIBLE_FRACTION` of the
+ *   viewport still has drawing on it. That last clause is the entire safety
+ *   net: the drawing can be pushed aside but never away, so there is always a
+ *   large piece of it on screen to drag back.
+ *
+ * ── Decided for the VIEW, never per axis ─────────────────────────────────────
+ * Both cases are chosen once, from whether the whole sheet fits, and then
+ * applied to x and y together. Deciding per axis is the bug this replaces
+ * (fixed 2026-09-18): at a zoom where a sheet is wider than the pane but
+ * shorter than it, x panned and y was forced back to centre, so one drag
+ * gesture had two behaviours and vertical movement was silently ignored.
+ *
+ * The centring rule's own justification is what gives the boundary away. "A
+ * sheet small enough to see whole is not one anybody is repositioning" is true
+ * when the whole sheet fits and false in the in-between state, where the sheet
+ * is NOT small enough to see whole and the user is demonstrably repositioning
+ * it — that is what the sideways drag IS. So the rule keeps its reason and gets
+ * the condition its reason actually describes.
+ *
+ * Allowing it costs nothing that can be lost. `MIN_VISIBLE_FRACTION` still
+ * bounds every drag, on the short axis exactly as on the long one: the stop
+ * below is written in terms of OVERLAP, so an axis with room to spare stops
+ * once a quarter of the viewport still has drawing on it, the same as any
+ * other. `fitView` is untouched, because at fit zoom the whole sheet fits by
+ * definition and still centres — so there is always a way home.
  *
  * Strict rather than elastic, still. The limit is a stop, not a rubber band —
  * an overshoot that springs back reads as slack on a screen whose whole job is
@@ -130,13 +152,32 @@ export function clampView(view: PlanView, bounds: ViewBounds): PlanView {
   const scaledWidth = bounds.contentWidth * zoom;
   const scaledHeight = bounds.contentHeight * zoom;
 
+  const centred = (scaled: number, viewport: number) => (viewport - scaled) / 2;
+
+  /*
+    One question, asked of the whole view: is any of this sheet off screen?
+
+    Asked per axis instead, the two answers disagree in the in-between state and
+    the disagreement reaches the user as a drag that works sideways and not
+    vertically. See the header.
+  */
+  if (
+    scaledWidth <= bounds.viewportWidth &&
+    scaledHeight <= bounds.viewportHeight
+  ) {
+    return {
+      zoom,
+      x: centred(scaledWidth, bounds.viewportWidth),
+      y: centred(scaledHeight, bounds.viewportHeight),
+    };
+  }
+
   const axis = (offset: number, scaled: number, viewport: number): number => {
-    if (!Number.isFinite(offset)) return 0;
-    // Smaller than the viewport: centred, and the offset is not negotiable.
-    if (scaled <= viewport) return (viewport - scaled) / 2;
+    // No direction to clamp toward, so there is nothing to preserve: go home.
+    if (!Number.isFinite(offset)) return centred(scaled, viewport);
 
     /*
-      Larger. The drawing occupies [offset, offset + scaled] and the viewport is
+      The drawing occupies [offset, offset + scaled] and the viewport is
       [0, viewport], so what has to stay above `keep` is the overlap between
       them. Reading that requirement backwards on each side gives both stops:
 
@@ -148,6 +189,11 @@ export function clampView(view: PlanView, bounds: ViewBounds): PlanView {
       Setting keep = viewport reduces this to exactly the old clamp,
       [viewport - scaled, 0]. Edge-pinning was never a different rule — it was
       this one with the fraction set to all of it.
+
+      Written in terms of overlap, this needs no separate case for the axis with
+      room to spare: a 300px-tall drawing in a 600px viewport stops at -150 and
+      at 450, both of which leave exactly the same quarter covered. The range
+      can never invert either, since 2 x keep <= viewport + scaled always holds.
     */
     const keep = viewport * MIN_VISIBLE_FRACTION;
     return Math.min(viewport - keep, Math.max(keep - scaled, offset));

@@ -365,6 +365,60 @@ describeDb("building the list from a real bid", () => {
     expect(doc.entries.find(e => e.name.startsWith("Wire"))!.qty).toBe(200);
   });
 
+  /*
+    The two reasons something cannot be itemised, and why they are worded apart.
+
+    This note is the only part of the document that explains an absence, and it
+    goes to a supplier who cannot ask the screen what happened. Telling them a
+    labour-only assembly is "no longer in the library" sends them looking for a
+    part that was never a part. Both branches were untested until 2026-09-18,
+    which is how the wrong one survived.
+  */
+  it("says labor-only when the assembly is present and contains no parts", async () => {
+    const bidId = await newBid();
+    const sheetId = await newSheet(bidId);
+    const labourOnly = await assembly(`Testing ${uniq()}`, []);
+
+    await caller().takeoffStamps.drop({
+      bidId,
+      sheetId,
+      assemblyId: labourOnly,
+      assemblyName: "Testing and commissioning",
+      at: [{ x: 5, y: 5 }],
+    });
+
+    const doc = await caller().materialsList.get({ bidId });
+    const note = doc.notes.find(n => n.includes("Testing and commissioning"))!;
+    expect(note).toContain("labor only");
+    expect(note).not.toContain("no longer in the library");
+  });
+
+  it("still says so plainly when the assembly really has gone", async () => {
+    const bidId = await newBid();
+    const sheetId = await newSheet(bidId);
+    const boxId = await material(`Doomed box ${uniq()}`);
+    const asmId = await assembly(`Doomed ${uniq()}`, [
+      { materialId: boxId, qty: 1 },
+    ]);
+
+    await caller().takeoffStamps.drop({
+      bidId,
+      sheetId,
+      assemblyId: asmId,
+      assemblyName: "Doomed assembly",
+      at: [{ x: 7, y: 7 }],
+    });
+    // Deleting the library row nulls the stamp's assemblyId; the name survives.
+    // Permanent deletion is gated on archiving first, deliberately.
+    await caller().assemblies.archive({ id: asmId });
+    await caller().assemblies.deleteForever({ id: asmId });
+
+    const doc = await caller().materialsList.get({ bidId });
+    const note = doc.notes.find(n => n.includes("Doomed assembly"))!;
+    expect(note).toContain("no longer in the library");
+    expect(note).not.toContain("labor only");
+  });
+
   it("adds a stamped and a bid-added assembly together into one line", async () => {
     const bidId = await newBid();
     const sheetId = await newSheet(bidId);

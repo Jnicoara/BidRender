@@ -112,6 +112,35 @@ Reaching a screen needs a session, which is the genuinely hard part and is
 already solved — see the block above, and
 `.claude/skills/run-bidrender/SKILL.md`.
 
+## A test fixture shaped like its container tests half the rule
+
+**A fixture that shares the viewport's proportions cannot produce the
+in-between state**, so any rule that behaves differently when one axis
+overflows and the other does not is untestable against it — and will look fully
+covered while being untested.
+
+**The worked example, 2026-09-18.** `clampView` centred the drawing per AXIS,
+so at a zoom where a sheet was wider than the pane but shorter than it, sideways
+drags panned and vertical drags were silently ignored: one gesture, two
+behaviours. `planView.test.ts` had eight assertions on that function,
+including a loop over five zooms and six pan distances, and **not one of them
+could see the fault.** Every case used the fixture — a 2000x1500 drawing in an
+800x600 viewport. **Those are the same 4:3 shape**, so the two axes overflow
+together at every possible zoom and the broken state does not exist on that
+fixture. The bug shipped past a thorough suite because the suite could only ever
+exercise half the rule.
+
+**So: make test shapes differ from the container deliberately.** A 2000x600
+sheet in the same 800x600 viewport produces the in-between state at any zoom
+between 0.205 and 0.266, and the two failing assertions appear immediately.
+
+**It generalises past viewports.** The same trap is any fixture whose
+proportions make two conditions fire together when the code treats them
+separately — a container and its content, a page and its margins, a grid and
+its cells. **If a rule asks two questions, the fixture has to be able to answer
+them differently.** Where a fixture cannot, say so in the test file rather than
+leaving the next reader to assume the coverage is real.
+
 ## Copying a layout does not copy the behaviour with it
 
 Two similar-looking pieces of UI in two files WILL drift, and the drift shows

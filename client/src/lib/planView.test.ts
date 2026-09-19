@@ -142,9 +142,75 @@ describe("clampView — the drawing can be pushed aside but never away", () => {
   });
 
   it("treats zoomed-out-below-viewport as small, not as pannable", () => {
-    // 2000 × 0.2 = 400, narrower than the viewport, so it centres.
+    // 2000 × 0.2 = 400 wide and 300 tall: the WHOLE sheet fits, so it centres.
     const view = clampView({ zoom: 0.2, x: -300, y: 0 }, bounds);
     expect(view.x).toBe((800 - 400) / 2);
+    expect(view.y).toBe((600 - 300) / 2);
+  });
+
+  /*
+    The in-between state: wider than the pane, shorter than it.
+
+    This is the shape the per-axis rule got wrong, and nothing above could see
+    it — the 2000×1500 fixture has the SAME aspect ratio as the 800×600
+    viewport, so on it the two axes overflow together at every zoom and the
+    in-between state does not exist. It takes a sheet shaped differently from
+    the pane, which is every real landscape drawing.
+
+    A 2000×600 sheet at 0.5 is 1000×300: 200px wider than the 800 viewport,
+    300px shorter than the 600 one. Before the fix, y was forced to 150 here
+    whatever the user did, so one drag gesture had two behaviours.
+  */
+  describe("wider than the pane but shorter than it", () => {
+    const wide: ViewBounds = {
+      ...bounds,
+      contentWidth: 2000,
+      contentHeight: 600,
+    };
+    const zoom = 0.5;
+    const scaledWidth = 1000; // overflows the 800 viewport
+    const scaledHeight = 300; // fits inside the 600 one
+    /** Where the old per-axis rule pinned y, regardless of the pan. */
+    const wasPinnedTo = (600 - scaledHeight) / 2;
+
+    it("pans vertically, instead of snapping back to centre", () => {
+      const view = clampView({ zoom, x: -100, y: -80 }, wide);
+      expect(view.x).toBe(-100);
+      expect(view.y).toBe(-80);
+      expect(view.y).not.toBe(wasPinnedTo);
+    });
+
+    it("keeps the quarter-of-the-viewport guarantee on the short axis too", () => {
+      const up = clampView({ zoom, x: 0, y: -99999 }, wide);
+      const down = clampView({ zoom, x: 0, y: 99999 }, wide);
+      expect(overlap(up.y, scaledHeight, 600)).toBeCloseTo(150, 6);
+      expect(overlap(down.y, scaledHeight, 600)).toBeCloseTo(150, 6);
+      // Stopped, not free: the short axis has stops like any other.
+      expect(up.y).toBe(600 * MIN_VISIBLE_FRACTION - scaledHeight);
+      expect(down.y).toBe(600 - 600 * MIN_VISIBLE_FRACTION);
+    });
+
+    it("leaves the long axis exactly as it was", () => {
+      const shoved = clampView({ zoom, x: 99999, y: 0 }, wide);
+      expect(overlap(shoved.x, scaledWidth, 800)).toBeCloseTo(200, 6);
+      expect(shoved.x).toBe(800 - 800 * MIN_VISIBLE_FRACTION);
+    });
+
+    it("still opens centred — nothing moves until the user drags", () => {
+      const fresh = clampView(
+        { zoom, x: (800 - scaledWidth) / 2, y: wasPinnedTo },
+        wide
+      );
+      expect(fresh.y).toBe(wasPinnedTo);
+    });
+
+    it("centres both axes again the moment the whole sheet fits", () => {
+      // Zooming back out past the fit point restores the old behaviour exactly.
+      // This is the half of the rule that is deliberately unchanged.
+      const out = clampView({ zoom: 0.3, x: -400, y: -400 }, wide);
+      expect(out.x).toBe((800 - 600) / 2);
+      expect(out.y).toBe((600 - 180) / 2);
+    });
   });
 });
 

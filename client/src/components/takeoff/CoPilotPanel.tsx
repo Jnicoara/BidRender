@@ -265,7 +265,7 @@ export function CoPilotPanel({
             <p className="px-3 pb-3 text-xs text-muted-foreground">
               The plan reader looks at the sheet on screen, finds the symbols
               you have linked in your legend, and offers to stamp them. Nothing
-              lands on the bid until you say so.
+              is counted until you say so.
             </p>
           )}
 
