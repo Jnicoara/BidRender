@@ -2072,6 +2072,122 @@ export type InsertBidPdfSheet = typeof bidPdfSheets.$inferInsert;
  * checked. It is evidence, not the source of truth.
  */
 export const RUN_PATH_TYPES = ["conduit", "cable"] as const;
+
+// ─── Run types (takeoff phase 7) ──────────────────────────────────────────────
+/**
+ * A kind of run, defined once and reused on every job — "3/4in EMT, 3 #12 THHN".
+ *
+ * ── Why a library row and not a per-bid one ──────────────────────────────────
+ * A counted group (`takeoff_groups`) is per BID because "14 exit signs on this
+ * school" is a fact about one job. This is the opposite kind of thing: the same
+ * definition applies to every job the contractor will ever bid, which is the
+ * definition of a library item. The migration cost decided it — per-bid to
+ * per-user later would mean finding and merging duplicates spread across every
+ * bid ever made, and per-user from the start costs nothing extra today.
+ *
+ * ── It is what makes a traced run priceable (T4) ─────────────────────────────
+ * A run is only "conduit" or "cable" today, so the materials list prints its
+ * footage as "awaiting a specification" and traced footage cannot reach a bid
+ * (takeoff-spec.md T4, R2). The material links below are why this table carries
+ * a specification rather than a nickname: without them the palette would be
+ * cosmetic and T4 would still be open.
+ *
+ * ── Shipped rows and the contractor's own, one table ─────────────────────────
+ * Same shape as materials, and the flag is the same: **NULL `userId` is an
+ * app-owned row**, shared by everyone and re-stamped from the seed on startup;
+ * a set `userId` is that contractor's own. Editing a shipped row forks it
+ * rather than changing everyone's (CLAUDE.md § Customization available).
+ *
+ * **What ships carries IDENTITY and no money.** A handful of recognisable types
+ * — 1/2in EMT with 2 #12 and a ground, 12/2 MC — so the first trace does not
+ * require defining something first, which is the setup-before-value failure
+ * level 1 exists to remove. Every allowance ships NULL and inherits from the
+ * company defaults, because an allowance is the contractor's judgement and a
+ * plausible number nobody chose is indistinguishable on screen from one they
+ * set. Identical reasoning to every shipped material costing $0.
+ *
+ * ── Retire, never delete ─────────────────────────────────────────────────────
+ * `status` withdraws a type from every picker while anything pointing at it
+ * still resolves. A run also keeps `runTypeLabel` as a snapshot, so even a row
+ * that somehow goes to NULL leaves the run able to say what it was — see
+ * `takeoff_runs`.
+ *
+ * ── The run reads this LIVE, and that is deliberate ──────────────────────────
+ * Editing a type updates every run still following it. The freeze belongs at
+ * the bid line, not before it: a traced run is measured work, not money, and
+ * the snapshot boundary in this app is the moment something becomes a bid line
+ * (see `bid_line_items`). Same relationship an assembly has to a bid.
+ */
+export const takeoffRunTypes = mysqlTable(
+  "takeoff_run_types",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    /** NULL = shipped row, shared by everyone. Set = this contractor's own. */
+    userId: int("userId").references(() => users.id, { onDelete: "cascade" }),
+    /** The shipped row this was forked from. NULL = shipped, or fully custom. */
+    baselineId: int("baselineId"),
+    /** Baseline `version` at fork time — drives the "update available" nudge. */
+    baselineVersion: int("baselineVersion"),
+    /** Bumped when a shipped row is republished. Meaningless on user rows. */
+    version: int("version").default(1).notNull(),
+
+    /** What the estimator calls it. Also the name every run of it inherits. */
+    label: varchar("label", { length: 255 }).notNull(),
+    /** Which tool arms it, and which line style the drawing gives it. */
+    pathType: mysqlEnum("pathType", RUN_PATH_TYPES).notNull(),
+
+    /**
+     * Which trade's palette this belongs to.
+     *
+     * Present for the same reason every other library table has it: unlocking
+     * is gated at the app layer so a new trade is content rather than a
+     * migration (CLAUDE.md § Project). A plumber runs pipe too, and nothing
+     * here is electrical except the rows that ship.
+     */
+    trade: varchar("trade", { length: 64 })
+      .default(TRADE_DEFAULT_TRADE_GATED)
+      .notNull(),
+
+    /**
+     * The raceway itself — the EMT, the PVC, the flex.
+     *
+     * NULL for a cable type, where the cable IS the material and the conductor
+     * link below holds it. `set null` on delete, like every other provenance
+     * link: retiring a material must not change what a traced run says it is,
+     * and `label` keeps it readable either way.
+     */
+    racewayMaterialId: int("racewayMaterialId").references(() => materials.id, {
+      onDelete: "set null",
+    }),
+    /** The conductor — the #12 THHN, or the MC cable itself. */
+    conductorMaterialId: int("conductorMaterialId").references(
+      () => materials.id,
+      { onDelete: "set null" }
+    ),
+    /**
+     * How many conductors one circuit of this type carries.
+     *
+     * Entered, never derived (§ 2.1). NULL means the type does not say, which
+     * is honest for a half-defined row and must not be read as zero.
+     */
+    conductorCount: int("conductorCount"),
+
+    /** active / archived / deleted. See materials.status — same lifecycle. */
+    status: mysqlEnum("status", LIBRARY_STATUSES).default("active").notNull(),
+    archivedAt: timestamp("archivedAt"),
+
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    index("takeoff_run_types_userId_idx").on(t.userId),
+    index("takeoff_run_types_status_idx").on(t.status),
+    index("takeoff_run_types_trade_idx").on(t.trade),
+  ]
+);
+
+export type TakeoffRunType = typeof takeoffRunTypes.$inferSelect;
+export type InsertTakeoffRunType = typeof takeoffRunTypes.$inferInsert;
 export type RunPathType = (typeof RUN_PATH_TYPES)[number];
 
 /** Draft = still being traced or autosaved; committed = the user finished. */
@@ -2149,6 +2265,42 @@ export const takeoffRuns = mysqlTable(
      * height — an answer rather than an absence. Collapsing the two would hide
      * every unanswered run among the deliberate ones.
      */
+    /**
+     * What KIND of run this is — the palette entry it was traced under.
+     *
+     * ── Read live, not frozen ───────────────────────────────────────────────
+     * Editing a type updates every run still pointing at it. A traced run is
+     * measured work rather than money, and the freeze in this app belongs at
+     * the moment something becomes a bid line (see `bid_line_items`), exactly
+     * as an assembly stays live in the library and is frozen onto a bid. So
+     * fixing a typo in "3/4in EMT" fixes it everywhere it has not been priced,
+     * and moves nothing that has.
+     *
+     * `set null` on delete rather than cascade, and the difference matters
+     * here more than anywhere: a run's POINTS are measured work that somebody
+     * traced by hand. Losing the specification is recoverable; losing the
+     * footage is not. Retiring is the intended path anyway — see
+     * `takeoff_run_types.status`.
+     */
+    runTypeId: int("runTypeId").references(() => takeoffRunTypes.id, {
+      onDelete: "set null",
+    }),
+    /**
+     * What the type was called when this was traced. The FALLBACK, not the
+     * answer.
+     *
+     * Read only when `runTypeId` is null — the live label wins while there is
+     * one, which is what makes a rename propagate. Same two-step the counted
+     * marks use (`stampName` in shared/takeoffCounts.ts), and it exists for
+     * the same reason: a row whose library entry is gone must still be able to
+     * say what it was, or a finished takeoff becomes unreadable.
+     *
+     * Deliberately NOT updated on rename. It is a record of what was traced,
+     * and the moment it chases the live value it stops being a fallback and
+     * becomes a second copy that can disagree.
+     */
+    runTypeLabel: varchar("runTypeLabel", { length: 255 }),
+
     startKind: varchar("startKind", { length: 64 }),
     endKind: varchar("endKind", { length: 64 }),
 
@@ -2183,6 +2335,7 @@ export const takeoffRuns = mysqlTable(
   },
   t => [
     index("takeoff_runs_bidId_idx").on(t.bidId),
+    index("takeoff_runs_runTypeId_idx").on(t.runTypeId),
     index("takeoff_runs_sheetId_idx").on(t.sheetId),
     index("takeoff_runs_userId_idx").on(t.userId),
   ]

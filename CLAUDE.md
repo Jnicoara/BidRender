@@ -227,6 +227,30 @@ building the wrong feature and shipping it, because nothing downstream — not
 is the one kind of error that gets more expensive the better the work built on
 it is.
 
+**The third example is the useful one, because the rule was already written
+down when it was broken — by the person who wrote it.** Migration
+`0055_backfill_takeoff_groups.sql` left a re-run gap open and explained why:
+closing it "means reading `takeoff_groups` inside a statement that writes to
+it, which MySQL handles badly". Nobody had asked MySQL. Asked on 2026-09-18,
+one day after the rule above was added to this file: it accepts the guarded
+statement, and a second run inserts nothing. The guard went in before
+production ever ran the file.
+
+**Two things that came out of that are worth more than the fix.**
+
+**Knowing the rule does not make you follow it.** The assumption was written
+confidently, in a file about being careful, by someone who had just finished
+writing a section about not doing that. The only thing that caught it was going
+and asking the system — not a test, not a review, not the rule itself.
+
+**Measuring the wrong thing looks exactly like measuring.** The first attempt to
+check the re-run behaviour ran the file once against a database that had two
+un-backfilled rows in it, saw three rows change, and concluded "it duplicates".
+It did not — it was correctly backfilling two marks. The real test was running
+it TWICE and looking at the second run, which touched nothing. **A measurement
+needs the same suspicion as an assumption: ask what else would produce this
+number.**
+
 **So a plan that states a number should say where the number came from**, and a
 number with no source is a question rather than a fact. The measurements that
 survive belong next to the code that depends on them: see the table in
