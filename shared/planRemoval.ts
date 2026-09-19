@@ -64,7 +64,7 @@ export function describePlanRemoval(
       title: "Delete this plan and its takeoff?",
       lead: `Removing ${filename} permanently deletes everything on it:`,
       losses: [
-        "every stamp",
+        "every mark",
         "every traced run, and its circuits",
         "every plan-reader result",
         "the names and scales of its sheets",
@@ -80,7 +80,7 @@ export function describePlanRemoval(
 
   if (hasTakeoffWork(impact)) {
     const losses: string[] = [];
-    if (impact.stamps > 0) losses.push(count(impact.stamps, "stamp"));
+    if (impact.stamps > 0) losses.push(count(impact.stamps, "mark"));
     if (impact.runs > 0) {
       losses.push(
         impact.circuits > 0
@@ -107,7 +107,7 @@ export function describePlanRemoval(
 
   return {
     title: "Remove this plan?",
-    lead: `Nothing has been stamped or traced on ${filename}.`,
+    lead: `Nothing has been marked or traced on ${filename}.`,
     losses: [],
     after: [
       impact.sheets > 0

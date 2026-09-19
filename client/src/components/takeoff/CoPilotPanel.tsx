@@ -264,7 +264,7 @@ export function CoPilotPanel({
           {!state?.runId && !reading && (
             <p className="px-3 pb-3 text-xs text-muted-foreground">
               The plan reader looks at the sheet on screen, finds the symbols
-              you have linked in your legend, and offers to stamp them. Nothing
+              you have linked in your legend, and offers to mark them. Nothing
               is counted until you say so.
             </p>
           )}
@@ -418,7 +418,7 @@ export function CoPilotPanel({
               >
                 <Check className="w-3.5 h-3.5" />
                 Place {pickedList.length}{" "}
-                {pickedList.length === 1 ? "stamp" : "stamps"}
+                {pickedList.length === 1 ? "mark" : "marks"}
               </Button>
               <Button
                 size="sm"

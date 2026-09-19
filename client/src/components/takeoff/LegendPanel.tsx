@@ -126,8 +126,8 @@ export function LegendPanel({
         {symbols.length === 0 ? (
           <p className="px-3 pb-3 text-xs text-muted-foreground">
             Capture a symbol from the plan's legend and link it to an assembly.
-            Once linked, one click loads it into the stamp tool — on this job
-            and every job after it.
+            Once linked, one click loads it into the mark tool — on this job and
+            every job after it.
           </p>
         ) : (
           symbols.map(symbol => (
@@ -219,7 +219,7 @@ export function LegendPanel({
           </p>
           <p className="text-[0.7rem] text-muted-foreground">
             Asked once. From then on, clicking this symbol loads that assembly
-            straight into the stamp tool — on this job and every job after it.
+            straight into the mark tool — on this job and every job after it.
           </p>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />

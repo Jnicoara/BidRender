@@ -38,7 +38,7 @@ describe("the remove-plan warning", () => {
     expect(warning.title).toBe("Delete this plan and its takeoff?");
     expect(warning.lead).toBe("Removing E-Series.pdf permanently deletes:");
     expect(warning.losses).toEqual([
-      "14 stamps",
+      "14 marks",
       "3 traced runs, with 5 circuits",
       "1 plan-reader result",
       "the names and scales of its 4 sheets",
@@ -57,7 +57,7 @@ describe("the remove-plan warning", () => {
       readerResults: 0,
     });
     expect(warning.losses).toEqual([
-      "1 stamp",
+      "1 mark",
       "1 traced run",
       "the names and scales of its 1 sheet",
     ]);
@@ -82,7 +82,7 @@ describe("the remove-plan warning", () => {
     expect(hasTakeoffWork(untouched)).toBe(false);
     expect(warning.title).toBe("Remove this plan?");
     expect(warning.lead).toBe(
-      "Nothing has been stamped or traced on E-Series.pdf."
+      "Nothing has been marked or traced on E-Series.pdf."
     );
     expect(warning.losses).toEqual([]);
     expect(warning.after.join(" ")).toMatch(/names and scales of its 4 sheets/);
@@ -92,7 +92,7 @@ describe("the remove-plan warning", () => {
   it("still warns in full when the count could not be loaded", () => {
     const warning = describePlanRemoval("E-Series.pdf", null);
     expect(warning.title).toBe("Delete this plan and its takeoff?");
-    expect(warning.losses).toContain("every stamp");
+    expect(warning.losses).toContain("every mark");
     expect(warning.losses).toContain("every traced run, and its circuits");
     expect(warning.after.join(" ")).toMatch(/could not be checked/);
     expect(warning.confirmLabel).toBe("Delete plan and takeoff");
@@ -100,6 +100,6 @@ describe("the remove-plan warning", () => {
 
   it("writes large counts the way people read them", () => {
     const warning = describePlanRemoval("Set.pdf", { ...worked, stamps: 1204 });
-    expect(warning.losses[0]).toBe("1,204 stamps");
+    expect(warning.losses[0]).toBe("1,204 marks");
   });
 });

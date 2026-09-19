@@ -595,7 +595,7 @@ export const planCopilotRouter = router({
         return record(
           "failed",
           null,
-          "The plan reader could not be reached. Nothing was changed — carry on stamping by hand and try again later.",
+          "The plan reader could not be reached. Nothing was changed — carry on marking by hand and try again later.",
           []
         );
       }
@@ -740,7 +740,7 @@ export const planCopilotRouter = router({
           summary,
           summary
             ? "No device symbols could be picked out of this sheet — it may be a detail, a schedule, or too low-quality to read. Nothing was proposed."
-            : "This sheet could not be read. Nothing was proposed; stamp it by hand as usual.",
+            : "This sheet could not be read. Nothing was proposed; mark it by hand as usual.",
           []
         );
       }

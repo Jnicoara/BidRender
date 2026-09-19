@@ -103,7 +103,7 @@ export function StampPicker({
           disabled={disabled}
           title="Count things by clicking them on the drawing"
         >
-          <MapPin className="w-3.5 h-3.5" /> Stamp
+          <MapPin className="w-3.5 h-3.5" /> Mark
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-2">

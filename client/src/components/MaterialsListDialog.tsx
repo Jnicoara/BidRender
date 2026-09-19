@@ -133,8 +133,8 @@ export function MaterialsListDialog({
               <Package className="w-9 h-9 text-muted-foreground/30 mb-3" />
               <p className="font-medium">Nothing taken off yet</p>
               <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                Stamp assemblies on a plan, or add them to the bid, and they
-                will appear here as quantities to quote.
+                Mark assemblies on a plan, or add them to the bid, and they will
+                appear here as quantities to quote.
               </p>
             </div>
           ) : (

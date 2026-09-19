@@ -96,7 +96,7 @@ export type CopilotAction = {
 export const COPILOT_ACTIONS: readonly CopilotAction[] = [
   {
     id: "propose_stamp",
-    label: "Propose a stamp",
+    label: "Propose a mark",
     purpose:
       "Offer a detected symbol at a location on the sheet, for the user to accept or dismiss. Places nothing.",
     writes: false,
@@ -139,9 +139,9 @@ export const COPILOT_ACTIONS: readonly CopilotAction[] = [
   },
   {
     id: "confirm_stamps",
-    label: "Place confirmed stamps",
+    label: "Place confirmed marks",
     purpose:
-      "Drop the stamps the user ticked onto the sheet, through the same stamp tool a hand-placed mark uses.",
+      "Drop the marks the user ticked onto the sheet, through the same mark tool a hand-placed mark uses.",
     writes: true,
     placesWork: true,
     requiresConfirmation: true,

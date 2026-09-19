@@ -1,6 +1,25 @@
 /**
  * The stamp tool and the legend's symbol links. Takeoff redesign, phase 2c.
  *
+ * ── A person reads "mark"; this code says "stamp", on purpose ───────────────
+ * The tool was called Stamp until 2026-09-19 and is called **Mark** on screen
+ * now — the button, the toasts, the first-run copy, the plan reader's labels
+ * and its refusals. Nothing underneath moved: this router, `takeoff_stamps`,
+ * every column and id on it, the `helixbid:stamp-queue:` key a browser may
+ * already hold unsent work under, and the test names.
+ *
+ * That split is the same one `CLAUDE.md` describes for BidPhase → BidRender →
+ * BidRidge, and it is deliberate for the same reason: a stored row, a live
+ * queue and a migration history are expensive to rename and buy a user
+ * nothing. **Do not "finish the job".**
+ *
+ * The word changed because the app already said BOTH. The plan reader has
+ * always spoken of "marks" — "Unreadable mark", "That mark is not on this
+ * sheet" — while the tool that places them said "stamp", so one feature had
+ * two names for one object. "Mark" won because it is what the thing IS on a
+ * drawing, and because a stamp is a tool you press rather than the thing left
+ * behind. `shared/takeoffMarks.ts` was already named for the winner.
+ *
  * ── Manual only, by design ───────────────────────────────────────────────────
  * Nothing here interprets a drawing. A symbol's identity comes from the user
  * boxing it and naming it; a link is created because they chose an assembly.

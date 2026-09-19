@@ -116,7 +116,7 @@ export function checkDailyLimit(
     allowed: false,
     message:
       group === "plan-reader"
-        ? `You have used today's plan-reading allowance (${limit} sheets). It resets at midnight UTC. Everything else works as normal — you can still count and stamp by hand.`
+        ? `You have used today's plan-reading allowance (${limit} sheets). It resets at midnight UTC. Everything else works as normal — you can still count and mark by hand.`
         : `You have used today's allowance for the help assistant (${limit} questions). It resets at midnight UTC. Nothing else is affected.`,
   };
 }

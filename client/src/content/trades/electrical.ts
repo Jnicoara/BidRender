@@ -54,7 +54,7 @@ export const electrical: TradeContent = {
     steps: [
       {
         title: "Trace the plans",
-        body: "Load the PDF the architect sent, set the sheet's scale, and stamp each device where it sits. The count builds as you go.",
+        body: "Load the PDF the architect sent, set the sheet's scale, and mark each device where it sits. The count builds as you go.",
         icon: "ruler",
       },
       {

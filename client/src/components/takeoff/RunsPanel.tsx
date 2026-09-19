@@ -335,7 +335,7 @@ export function RunsPanel({
               Nothing counted yet
             </p>
             <p className="text-xs text-muted-foreground/70 mt-1.5">
-              Stamp an assembly onto the plan, or trace a conduit or cable run.
+              Mark an assembly onto the plan, or trace a conduit or cable run.
               Everything you place appears here as you go.
             </p>
           </div>

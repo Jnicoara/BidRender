@@ -2225,7 +2225,7 @@ export default function TakeoffPage({
     onSuccess: result => {
       if (result.placed > 0) {
         toast.success(
-          `Placed ${result.placed} ${result.placed === 1 ? "stamp" : "stamps"}.`
+          `Placed ${result.placed} ${result.placed === 1 ? "mark" : "marks"}.`
         );
       }
       // Every refusal is shown rather than counted. A user who ticked twelve
@@ -3281,7 +3281,7 @@ export default function TakeoffPage({
                 Plans{bid?.bid?.name ? ` — ${bid.bid.name}` : ""}
               </h1>
               <p className="text-xs text-muted-foreground">
-                Set each sheet's scale, then stamp and trace what is on it.
+                Set each sheet's scale, then mark and trace what is on it.
                 Counts feed the materials list, not the bid price.
               </p>
             </div>

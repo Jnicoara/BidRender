@@ -293,8 +293,8 @@ export function RunEndsEditor({
       {suggestion && (
         <div className="flex items-start gap-2 rounded border border-[#38BDF8]/40 bg-[#38BDF8]/5 px-2 py-1.5">
           <span className="text-[0.7rem] flex-1 min-w-0">
-            <span className="font-medium">{suggestion.label}</span> is stamped
-            at this end. Link it and this run keeps the drop, so it cannot be
+            <span className="font-medium">{suggestion.label}</span> is marked at
+            this end. Link it and this run keeps the drop, so it cannot be
             counted twice.
           </span>
           <Button
