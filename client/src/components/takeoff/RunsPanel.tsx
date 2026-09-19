@@ -10,6 +10,7 @@
  * Circuit rows follow CLAUDE.md § Editing fields via InlineNumberField —
  * conductor counts are exactly the sort of number someone types down a column.
  */
+import { markAppearance, markPath } from "@shared/takeoffMarks";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
@@ -155,10 +156,18 @@ function verticalsMissingReason(run: PanelRun): string {
 
 /** Stamped assemblies, grouped, as the list shows them. */
 export type PanelStampGroup = {
+  /** Which count this is. Decides the swatch, and the key. */
+  groupId: number | null;
   assemblyId: number | null;
   name: string;
   count: number;
-  stamps: { id: number; x: number; y: number }[];
+  stamps: {
+    id: number;
+    x: number;
+    y: number;
+    /** Keeps an assembly-backed swatch on its category shape. */
+    assemblyCategory?: string | null;
+  }[];
 };
 
 export function RunsPanel({
@@ -250,11 +259,45 @@ export function RunsPanel({
             stays where they can watch it climb. */}
         {stampGroups.map(group => (
           <div
-            key={group.assemblyId ?? group.name}
+            key={group.groupId ?? group.assemblyId ?? group.name}
             className="border-b border-border px-3 py-2 hover:bg-muted/40 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full border-2 border-[#F5C518] bg-[#F5C518]/20 shrink-0" />
+              {/*
+                The swatch IS the legend. It draws the same shape in the same
+                colour as the marks on the drawing, from the same function —
+                a panel that showed a yellow circle for every count would be
+                worse than no swatch at all, because it would assert a sameness
+                that the drawing contradicts.
+
+                Fixed at 20px here rather than clamped: this one is on the
+                screen, not on the paper, so it has no zoom to fight.
+              */}
+              {(() => {
+                const { shape, color } = markAppearance({
+                  groupId: group.groupId,
+                  assemblyId: group.assemblyId,
+                  assemblyCategory: group.stamps[0]?.assemblyCategory ?? null,
+                });
+                return (
+                  <svg
+                    width={20}
+                    height={20}
+                    viewBox="0 0 20 20"
+                    className="shrink-0"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d={markPath(shape, 10, 10, 8)}
+                      fill={color}
+                      fillOpacity={0.22}
+                      stroke={color}
+                      strokeWidth={2}
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                );
+              })()}
               <div className="flex-1 min-w-0">
                 <p className="text-sm truncate">{group.name}</p>
                 <p className="text-[0.7rem] text-muted-foreground">

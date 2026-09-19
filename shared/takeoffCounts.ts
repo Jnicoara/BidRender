@@ -37,6 +37,15 @@ export type StampRecord = {
   name: string;
   /** Provenance, still used to key pre-phase-6 marks. Null for a plain count. */
   assemblyId: number | null;
+  /**
+   * The assembly's category at drop time, or null.
+   *
+   * Carried here only so the PANEL can draw the same shape as the drawing:
+   * an assembly-backed count takes its shape from its category, and a swatch
+   * computed without one would quietly show a different shape from the marks
+   * it is the legend for. See shared/takeoffMarks.ts.
+   */
+  assemblyCategory?: string | null;
   x: number;
   y: number;
 };

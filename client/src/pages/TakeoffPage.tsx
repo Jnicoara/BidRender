@@ -581,6 +581,14 @@ function PlanPane({
     width: number;
     height: number;
     renderScale: number;
+    /**
+     * The display zoom the overlay is being scaled by.
+     *
+     * Passed because the overlay cannot see it: it renders inside the
+     * transform, so anything that must hold a size ON SCREEN — a counted
+     * mark — has to divide it back out. See shared/takeoffMarks.ts.
+     */
+    zoom: number;
     canvas: HTMLCanvasElement | null;
     /**
      * Where to put anything that must stay screen-sized.
@@ -1577,6 +1585,7 @@ function PlanPane({
               {canvasSize.width > 0 &&
                 overlay?.({
                   ...canvasSize,
+                  zoom: view.zoom,
                   /*
                     The scale the page was ACTUALLY drawn at, reported by the
                     worker with the bitmap — no longer the constant. Both
@@ -2547,6 +2556,7 @@ export default function TakeoffPage({
           groupId: st.groupId,
           name: st.name,
           assemblyId: st.assemblyId,
+          assemblyCategory: st.assemblyCategory ?? null,
           x: st.x,
           y: st.y,
         }))
@@ -3851,9 +3861,13 @@ export default function TakeoffPage({
                       onSelectRun={setSelectedRunId}
                       stamping={Boolean(armedGroup) && !tracing}
                       armedGroupName={armedGroup?.label ?? null}
+                      zoom={size.zoom}
                       stamps={visibleStamps.map(st => ({
                         id: st.id,
                         name: st.name,
+                        groupId: st.groupId,
+                        assemblyId: st.assemblyId,
+                        assemblyCategory: st.assemblyCategory ?? null,
                         x: st.x,
                         y: st.y,
                       }))}

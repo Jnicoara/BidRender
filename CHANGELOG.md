@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-18]
 
+- **Counted marks can be told apart now.** Every count gets its own shape and colour — five shapes, six colours, assigned automatically and the same every time you open the job. The five library categories keep a fixed shape, so "triangles are lighting" is worth learning once. Nothing to set up and nothing to pick: a feature you have to configure is one that never gets configured.
+
+- **Marks are no longer the same yellow as a conduit run.** They were, exactly — the same yellow as a traced run and as every warning in the app, so a field of counted devices and a traced conduit looked like the same thing. The colours a drawing has already spoken for are now off the palette, and a test keeps them off it.
+
+- **The list beside the drawing is a legend.** Each row draws the same shape in the same colour as its marks, from the same code, so the panel and the page cannot tell you different things.
+
+- **Marks stay a sensible size at any zoom, and the old note about this was wrong in both directions.** It said they were a fixed size and overlapped when zoomed out. Measured in the running app, the opposite: they tracked the drawing exactly, so at 19% a mark was under four pixels — smaller than a full stop, which is why nobody could see what had been counted — and zoomed right in it passed 150 pixels and covered the symbol it was marking. They now hold between 10 and 26 pixels on screen, growing with the paper in between so they still feel stuck to the drawing.
+
 - **You can count something your library has never heard of.** Type "exit signs" into the Stamp box and it offers to count them: a name, a tally, and marks on the drawing. No assembly to build first, no price to decide, nothing to set up. It says plainly what it is — "just a tally, no price, not on the bid" — because a count that does not reach the bid must never look like one that does. The offer appears as soon as you type, not only when nothing matches, since the moment you most need it is when the list is showing you something close but wrong.
 
 - **What a mark IS now lives in one place instead of on every mark.** Counting used to work by writing the assembly's name onto each click and grouping the clicks by that name — which is why counting anything outside your library was impossible. A count is now a row of its own that the marks point at. Rename a count and all fourteen marks follow, because none of them was holding the name. More to the point: when a price can be attached later, it attaches to that one row, so the fourteen clicks you already made stay exactly where you put them. Your existing takeoffs were moved onto the new shape by the database migration and read identically — same counts, same quantities, checked mark by mark against the old rule before and after.

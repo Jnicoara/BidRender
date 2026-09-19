@@ -982,7 +982,7 @@ applied. That is exactly how it was found: the backfill joined a new table's
 
 - [ ] Decide whether to convert these four to `utf8mb4_unicode_ci`. **Not
       urgent, and not obviously worth it**: `ALTER TABLE … CONVERT TO CHARACTER
-    SET` rewrites a live table, which is real risk for a problem nothing is
+SET` rewrites a live table, which is real risk for a problem nothing is
       currently hitting. The cheap half is already done — every new table names
       its collation explicitly (references/deploying.md § 5, and
       `drizzle/0053_worried_puppet_master.sql` as the worked example) — so the

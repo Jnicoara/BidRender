@@ -114,6 +114,47 @@ Reaching a screen needs a session, which is the genuinely hard part and is
 already solved — see the block above, and
 `.claude/skills/run-bidrender/SKILL.md`.
 
+## A number that can be measured should not be asserted
+
+**If a claim is about a quantity the running app would tell you, go and ask
+it.** Pixels, milliseconds, megabytes, row counts, how many of something a
+screen shows. Two minutes with `getBoundingClientRect` or a query beats an
+afternoon of building on a number somebody remembered.
+
+**The worked example, 2026-09-18.** The plan for the takeoff marks said they
+were "drawn at a fixed pixel size today, so at 19% on a dense sheet they
+already overlap each other". It had been written down for a day and read like a
+fact. Measured in the browser, it was wrong in both directions: the overlay
+sits INSIDE the zoom transform, so a mark tracks the drawing exactly — 3.8px at
+19% (invisible, not overlapping) and past 150px at `MAX_ZOOM` (swallowing the
+symbol it marks). The fix was the opposite of the one specified.
+
+The cost of checking was two minutes. The cost of not checking would have been
+building the wrong feature and shipping it, because nothing downstream — not
+`pnpm check`, not a test, not a review — re-examines a premise. A wrong premise
+is the one kind of error that gets more expensive the better the work built on
+it is.
+
+**So a plan that states a number should say where the number came from**, and a
+number with no source is a question rather than a fact. The measurements that
+survive belong next to the code that depends on them: see the table in
+`shared/takeoffMarks.ts`, which is there so the next person does not have to
+re-measure to know whether the clamp is still right.
+
+### And the same distrust applies to a comment that asserts what the code removes
+
+Found in the same afternoon, in a file written that hour.
+`markAppearance` negates the fallback key so that group 8 and assembly 8 cannot
+be drawn as the same thing, and the comment said so — while the function it
+called used `Math.abs`, which folds them straight back together. The comment
+asserted the separation; the arithmetic had removed it.
+
+**That is worse than no comment**, because the next person reads it and stops
+looking. A test caught it, which is the only thing that reliably does: a
+comment cannot fail. When a comment claims a property — these are kept apart,
+this cannot be negative, this is always sorted — **write the test that would go
+red if it stopped being true**, and keep them in sight of each other.
+
 ## A test fixture shaped like its container tests half the rule
 
 **A fixture that shares the viewport's proportions cannot produce the

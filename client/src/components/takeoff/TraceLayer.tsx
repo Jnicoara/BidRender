@@ -28,6 +28,12 @@
  * OUT to an untransformed layer (`chromeTarget`), because chrome that scales
  * with the drawing is three pixels tall at 20% and off-screen at 400%.
  */
+import {
+  markAppearance,
+  markPath,
+  markRadiusInOverlay,
+  markStrokeInOverlay,
+} from "@shared/takeoffMarks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
@@ -60,6 +66,12 @@ export type PlacedStamp = {
   id: number;
   /** What it is counting — the group's label. See shared/takeoffCounts.ts. */
   name: string;
+  /** Which count this belongs to — decides its shape and colour. */
+  groupId: number | null;
+  /** Fallback key for a mark placed before groups existed. */
+  assemblyId: number | null;
+  /** Keeps an assembly-backed count's shape meaningful across jobs. */
+  assemblyCategory: string | null;
   x: number;
   y: number;
 };
@@ -90,6 +102,7 @@ export function TraceLayer({
   width,
   height,
   renderScale,
+  zoom,
   measurability,
   tracing,
   pathType,
@@ -115,6 +128,16 @@ export function TraceLayer({
   height: number;
   /** What the page was rasterised at. Divided out to get page points. */
   renderScale: number;
+  /**
+   * The viewer's display zoom.
+   *
+   * Needed because this overlay lives INSIDE the zoom transform, so a mark's
+   * size on screen is whatever it is drawn at multiplied by this. Marks are
+   * specified in screen pixels and divided back out — see
+   * shared/takeoffMarks.ts, which has the measurements that made the clamp
+   * necessary.
+   */
+  zoom: number;
   measurability: Measurability;
   tracing: boolean;
   pathType: RunPathType;
@@ -331,6 +354,15 @@ export function TraceLayer({
         {stamps.map(placed => {
           const at = toScreen({ x: placed.x, y: placed.y });
           const isSelected = placed.id === selectedStampId;
+          const { shape, color } = markAppearance(placed);
+          /*
+            Sized in screen pixels and expressed in overlay units, because this
+            overlay is inside the zoom transform. Selection adds a fifth on top
+            of whatever the clamp allowed, so it reads as "this one" at every
+            zoom rather than only where there is room for it.
+          */
+          const r = markRadiusInOverlay(zoom) * (isSelected ? 1.2 : 1);
+          const stroke = markStrokeInOverlay(zoom);
           return (
             <g
               key={placed.id}
@@ -339,16 +371,20 @@ export function TraceLayer({
                 !tracing && onSelectStamp(isSelected ? null : placed.id)
               }
             >
-              <circle
-                cx={at.x}
-                cy={at.y}
-                r={isSelected ? 13 : 10}
-                fill="#F5C518"
+              <path
+                d={markPath(shape, at.x, at.y, r)}
+                fill={color}
                 fillOpacity={0.22}
-                stroke="#F5C518"
-                strokeWidth={isSelected ? 3.5 : 2.5}
+                stroke={color}
+                strokeWidth={isSelected ? stroke * 1.4 : stroke}
+                strokeLinejoin="round"
               />
-              <circle cx={at.x} cy={at.y} r={3} fill="#F5C518" />
+              {/*
+                The centre dot is what makes a mark point at something. Kept at
+                a fixed fraction of the shape so it stays a dot rather than
+                becoming a filled shape at one zoom and vanishing at another.
+              */}
+              <circle cx={at.x} cy={at.y} r={r * 0.28} fill={color} />
               <title>{placed.name}</title>
             </g>
           );

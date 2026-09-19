@@ -2105,12 +2105,70 @@ traced runs must never share a colour.**
   and three colours are already spoken for: conduit yellow, cable green, and
   the blue used for selection. Thirty combinations is more distinct marks than
   a sheet can usefully carry.
-- **Marks must scale with zoom, in the same pass.** They are drawn at a fixed
-  pixel size today, so at 19% on a dense sheet they already overlap each other.
-  Shapes do not help if they are all on top of one another.
+- **Marks must hold a SIZE ON SCREEN, between two stops — and the sentence this
+  replaces was wrong in both directions.** It said marks "are drawn at a fixed
+  pixel size today, so at 19% on a dense sheet they already overlap each
+  other". Measured in the running app on 2026-09-18, they are nothing of the
+  kind: the overlay sits INSIDE the viewer's zoom transform, so a mark tracks
+  the drawing exactly.
+
+  | zoom | mark  | zoom | mark   |
+  | ---- | ----- | ---- | ------ |
+  | 19%  | 3.8px | 92%  | 18.3px |
+  | 24%  | 4.8px | 115% | 22.9px |
+  | 47%  | 9.4px | 143% | 28.7px |
+
+  So the fault is the opposite of the one described, and it is at both ends.
+  Zoomed out to see a whole sheet a mark is under four pixels — smaller than a
+  full stop, which is why nobody could see what had been counted. Zoomed in to
+  place one accurately it passes 150 pixels at `MAX_ZOOM` and swallows the
+  symbol it is marking.
+
+  **Shipped: clamped to 10–26px on screen, growing with the paper in between.**
+  Between the stops a mark feels stuck to the symbol; outside them it has
+  stopped doing its job either way. The overlay divides the zoom back out, or
+  the clamp would be applied to a number that is then scaled again — which is
+  no clamp at all. `shared/takeoffMarks.ts` carries the measurements and the
+  arithmetic; `client/src/lib/takeoffMarks.test.ts` asserts the round trip
+  lands back inside the band at every zoom from 0.05 to 8.
+
+  **Worth keeping from this:** the claim had been in the plan for a day and read
+  as a fact. Two minutes in the browser with `getBoundingClientRect` replaced it
+  with a table. A number that can be measured should not be asserted.
 
 **No database change.** The category is already on the stamp; the colour is
 derived. Only an override would need storage, and it is not in the first pass.
+
+#### SHIPPED 2026-09-18 — shapes, colours, the clamp, and the yellow
+
+Five shapes from `MARK_SHAPES`, six colours from `MARK_COLORS`, both decided by
+the GROUP and both computed rather than stored — no column, no migration, and
+nothing to configure. The five library categories keep a fixed shape so
+"triangles are lighting" survives across jobs; everything else takes a stable
+assignment from its own id.
+
+**The collision is gone.** Marks were `#F5C518` — conduit yellow, cable green's
+neighbour, and the colour of every warning in the app. The palette now excludes
+all three reserved colours and a test asserts it, so the next person to add a
+colour cannot quietly reintroduce one.
+
+**The panel's swatch draws from the same function as the mark.** It is the
+legend, and a legend that showed a yellow circle for every count would assert a
+sameness the drawing contradicts. One function, so the two cannot disagree.
+
+**A bug the tests caught in this module, worth recording** because it was in a
+comment before it was in the code: the fallback key for a pre-phase-6 mark is
+the assembly id NEGATED, to keep group 8 and assembly 8 apart — and the spread
+function used `Math.abs`, which folds them back together. The comment claimed
+the separation while the arithmetic removed it. Fixed with a sign-preserving
+modulo.
+
+**One instance of the yellow remains, deliberately not touched:** the plan
+reader's LOW-confidence proposal is still `#F5C518`. A proposal is drawn dashed
+and hollow, so it does not read as a placed mark — but it is the same collision
+one step removed, on a sheet that also has conduit on it. Left alone because
+changing it means a decision about the reader's own visual language, which is
+§ 9's business, not this phase's. Noted so the next person meets it on purpose.
 
 ### Counting without an assembly — this is § 3, in four levels
 
