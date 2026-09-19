@@ -21,6 +21,7 @@ import {
   seedBaselineLaborRates,
   seedBaselineMaterials,
   seedBaselineModifiers,
+  seedBaselineRunTypes,
 } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -186,6 +187,10 @@ async function startServer() {
       .then(() => seedBaselineAssemblies())
       // Kits reference assemblies by name, so they come last of all.
       .then(() => seedBaselineKits())
+      // Run types resolve their raceway and conductor by catalog name, so they
+      // wait for materials too. Independent of assemblies and kits; chained
+      // rather than parallel only to keep one failure from hiding another.
+      .then(() => seedBaselineRunTypes())
       .catch(err =>
         console.warn("[BaselineAssemblies/Kits] Seed failed:", err)
       );

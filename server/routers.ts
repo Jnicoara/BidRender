@@ -27,6 +27,7 @@ import { bidPdfsRouter } from "./routers/bidPdfsRouter";
 import { takeoffHeightsRouter } from "./routers/takeoffHeightsRouter";
 import { takeoffRunsRouter } from "./routers/takeoffRunsRouter";
 import { takeoffGroupsRouter } from "./routers/takeoffGroupsRouter";
+import { takeoffRunTypesRouter } from "./routers/takeoffRunTypesRouter";
 import { takeoffStampsRouter } from "./routers/takeoffStampsRouter";
 import { kitsRouter } from "./routers/kitsRouter";
 import { onboardingRouter } from "./routers/onboardingRouter";
@@ -81,6 +82,7 @@ export const appRouter = router({
   takeoffRuns: takeoffRunsRouter,
   takeoffHeights: takeoffHeightsRouter,
   takeoffGroups: takeoffGroupsRouter,
+  takeoffRunTypes: takeoffRunTypesRouter,
   takeoffStamps: takeoffStampsRouter,
   kits: kitsRouter,
   onboarding: onboardingRouter,

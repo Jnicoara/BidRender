@@ -94,6 +94,9 @@ import {
   InsertTakeoffGroup,
   TakeoffGroup,
   takeoffGroups,
+  takeoffRunTypes,
+  InsertTakeoffRunType,
+  TakeoffRunType,
   TakeoffLocation,
   InsertSymbolLink,
   SymbolLink,
@@ -164,6 +167,7 @@ import {
   RETIRED_BASELINE_MATERIALS,
 } from "./seed/baselineMaterials";
 import { BASELINE_LABOR_RATES } from "./seed/baselineLaborRates";
+import { BASELINE_RUN_TYPES } from "./seed/baselineRunTypes";
 import { BASELINE_MODIFIERS } from "./seed/baselineModifiers";
 import {
   BASELINE_ASSEMBLIES,
@@ -2023,6 +2027,106 @@ export async function seedBaselineLaborRates(): Promise<void> {
     if (missing.length > 0) await db.insert(laborRates).values(missing);
 
     await backfillLaborRateAmounts();
+  });
+}
+
+/**
+ * The starter run palette — four recognisable kinds of run, shipped so the
+ * first trace on a new account does not require defining something first.
+ *
+ * ── Runs AFTER the material seeder, and that ordering is load-bearing ───────
+ * Each row names the catalog material it is made of and is resolved by name
+ * here, the same way `seedBaselineAssemblies` resolves its recipe. A name that
+ * finds nothing leaves the link NULL rather than failing: the type still arms,
+ * still names and colours its runs, and simply has nothing to price against —
+ * which is the honest state for a type whose material is missing, and is
+ * repaired on the next start by the pass below.
+ *
+ * ── No dedupe pass, unlike materials and labor rates ────────────────────────
+ * Those carry one because earlier versions of their seeders created duplicates
+ * that are still in real databases. This table was born after that lesson and
+ * has no such history, so there is nothing to clean up — and a dedupe keyed on
+ * `name` would not fit a table whose column is `label` anyway.
+ */
+export async function seedBaselineRunTypes(): Promise<void> {
+  await withSeedLock("helixbid:seed:run_types", async () => {
+    const db = await getDb();
+    if (!db) return;
+
+    const wanted = new Set(
+      BASELINE_RUN_TYPES.flatMap(t => [
+        t.racewayMaterialName,
+        t.conductorMaterialName,
+      ]).filter((n): n is string => Boolean(n))
+    );
+    const catalog =
+      wanted.size === 0
+        ? []
+        : await db
+            .select({ id: materials.id, name: materials.name })
+            .from(materials)
+            .where(
+              and(
+                isNull(materials.userId),
+                inArray(materials.name, Array.from(wanted))
+              )
+            );
+    const materialId = (name: string | null) =>
+      name === null ? null : (catalog.find(m => m.name === name)?.id ?? null);
+
+    const existing = await db
+      .select({
+        id: takeoffRunTypes.id,
+        label: takeoffRunTypes.label,
+        pathType: takeoffRunTypes.pathType,
+        racewayMaterialId: takeoffRunTypes.racewayMaterialId,
+        conductorMaterialId: takeoffRunTypes.conductorMaterialId,
+      })
+      .from(takeoffRunTypes)
+      .where(isNull(takeoffRunTypes.userId));
+
+    const key = (pathType: string, label: string) => `${pathType}:${label}`;
+    const alreadySeeded = new Map(
+      existing.map(row => [key(row.pathType, row.label), row])
+    );
+
+    const missing = BASELINE_RUN_TYPES.filter(
+      t => !alreadySeeded.has(key(t.pathType, t.label))
+    ).map(t => ({
+      userId: null,
+      label: t.label,
+      pathType: t.pathType,
+      racewayMaterialId: materialId(t.racewayMaterialName),
+      conductorMaterialId: materialId(t.conductorMaterialName),
+      conductorCount: t.conductorCount,
+    }));
+
+    if (missing.length > 0) await db.insert(takeoffRunTypes).values(missing);
+
+    /*
+      Repair a shipped row whose material link is empty because the catalog had
+      not seeded yet when it was written.
+
+      Only BASELINE rows, and only links that are NULL — a user's own fork is
+      invisible to this, and a link somebody deliberately changed is never
+      overwritten. Same boundary as the material price pass below.
+    */
+    for (const t of BASELINE_RUN_TYPES) {
+      const row = alreadySeeded.get(key(t.pathType, t.label));
+      if (!row) continue;
+      const patch: Record<string, number> = {};
+      const raceway = materialId(t.racewayMaterialName);
+      const conductor = materialId(t.conductorMaterialName);
+      if (row.racewayMaterialId === null && raceway !== null)
+        patch.racewayMaterialId = raceway;
+      if (row.conductorMaterialId === null && conductor !== null)
+        patch.conductorMaterialId = conductor;
+      if (Object.keys(patch).length === 0) continue;
+      await db
+        .update(takeoffRunTypes)
+        .set(patch)
+        .where(eq(takeoffRunTypes.id, row.id));
+    }
   });
 }
 
@@ -5165,6 +5269,137 @@ export async function getStampsForBid(
       and(eq(takeoffStamps.bidId, bidId), eq(takeoffStamps.userId, userId))
     )
     .orderBy(asc(takeoffStamps.id));
+}
+
+// ─── Run types (takeoff phase 7) ──────────────────────────────────────────────
+
+/**
+ * The palette one contractor sees: the app's shipped types and their own.
+ *
+ * Both in one list because they behave identically once they are there —
+ * CLAUDE.md § "Customization available, but never in the way". A shipped row a
+ * user has forked is hidden behind their fork, so the palette never shows two
+ * rows for the same thing with only one of them theirs.
+ */
+export async function getRunTypesFor(
+  userId: number,
+  includeArchived = false
+): Promise<TakeoffRunType[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select()
+    .from(takeoffRunTypes)
+    .where(
+      and(
+        or(isNull(takeoffRunTypes.userId), eq(takeoffRunTypes.userId, userId)),
+        includeArchived ? undefined : eq(takeoffRunTypes.status, "active")
+      )
+    )
+    .orderBy(asc(takeoffRunTypes.pathType), asc(takeoffRunTypes.label));
+
+  const forkedFrom = new Set(
+    rows
+      .filter(r => r.userId === userId && r.baselineId !== null)
+      .map(r => r.baselineId as number)
+  );
+  return rows.filter(r => !(r.userId === null && forkedFrom.has(r.id)));
+}
+
+export async function getRunTypeById(
+  id: number,
+  userId: number
+): Promise<TakeoffRunType | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db
+    .select()
+    .from(takeoffRunTypes)
+    .where(
+      and(
+        eq(takeoffRunTypes.id, id),
+        or(isNull(takeoffRunTypes.userId), eq(takeoffRunTypes.userId, userId))
+      )
+    )
+    .limit(1);
+  return row;
+}
+
+export async function createRunType(
+  row: InsertTakeoffRunType
+): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db.insert(takeoffRunTypes).values(row);
+  return result.insertId;
+}
+
+/**
+ * Edit a shipped type by taking a copy of it first.
+ *
+ * The fork-not-multiply rule the material library uses: a shipped row is
+ * shared by everyone, so changing it would change it for everyone. The copy
+ * remembers where it came from (`baselineId`) so it can be reverted and so the
+ * palette can hide the original behind it.
+ */
+export async function forkRunType(
+  id: number,
+  userId: number
+): Promise<number> {
+  const source = await getRunTypeById(id, userId);
+  if (!source) throw new Error("Run type not found");
+  if (source.userId !== null) return source.id;
+
+  return createRunType({
+    userId,
+    baselineId: source.id,
+    baselineVersion: source.version,
+    label: source.label,
+    pathType: source.pathType,
+    trade: source.trade,
+    racewayMaterialId: source.racewayMaterialId,
+    conductorMaterialId: source.conductorMaterialId,
+    conductorCount: source.conductorCount,
+  });
+}
+
+export async function updateRunType(
+  id: number,
+  userId: number,
+  data: Partial<InsertTakeoffRunType>
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const safe: Record<string, unknown> = { ...data };
+  delete safe.id;
+  delete safe.userId;
+  delete safe.baselineId;
+  await db
+    .update(takeoffRunTypes)
+    .set({ ...safe, updatedAt: new Date() })
+    .where(
+      and(eq(takeoffRunTypes.id, id), eq(takeoffRunTypes.userId, userId))
+    );
+}
+
+/** How many runs each type has, so a list can say so and an archive can warn. */
+export async function countRunsByType(
+  userId: number
+): Promise<Map<number, number>> {
+  const db = await getDb();
+  if (!db) return new Map();
+  const rows = await db
+    .select({ runTypeId: takeoffRuns.runTypeId, total: sql<number>`count(*)` })
+    .from(takeoffRuns)
+    .where(eq(takeoffRuns.userId, userId))
+    .groupBy(takeoffRuns.runTypeId);
+
+  const counts = new Map<number, number>();
+  for (const row of rows) {
+    if (row.runTypeId === null) continue;
+    counts.set(row.runTypeId, Number(row.total));
+  }
+  return counts;
 }
 
 // ─── Counted groups (takeoff phase 6) ─────────────────────────────────────────
