@@ -142,6 +142,47 @@ The same check runs as `server/schemaDrift.test.ts`, so a column added to the
 schema without its migration fails on the author's machine rather than in
 somebody else's console a week later.
 
+### A new table lands on the WRONG collation unless you say otherwise
+
+**Found the hard way on 2026-09-18**, by a migration that failed halfway
+through its own rehearsal.
+
+Every table in this schema is `utf8mb4_unicode_ci`. The DATABASE default is
+`utf8mb4_0900_ai_ci`. drizzle-kit's `CREATE TABLE` names no collation, so a new
+table takes the database's — the other one.
+
+Nothing breaks until a string column of a new table is compared with a string
+column of an old one, and then MySQL refuses outright:
+
+```
+ER_CANT_AGGREGATE_2COLLATIONS: Illegal mix of collations
+  (utf8mb4_0900_ai_ci,IMPLICIT) and (utf8mb4_unicode_ci,IMPLICIT) for operation '='
+```
+
+**So: name the collation in every `CREATE TABLE`**, as `0053` does:
+
+```sql
+) COLLATE=utf8mb4_unicode_ci;
+```
+
+That makes the table match its neighbours on any server, whatever that
+server's default happens to be — which also means local and production cannot
+diverge on it.
+
+**Four tables are already on the wrong side of the line** — `ai_usage_daily`,
+`bid_mounting_heights`, `takeoff_height_defaults` and
+`takeoff_mounting_heights`. Nothing joins their strings to anything, so nothing
+has broken. **Leave them**: converting a live table's collation is real risk for
+no current benefit. Check this list before writing a query that joins one of
+their text columns to an older table's.
+
+**The general lesson is about rehearsal, not collations.** The failure was
+invisible to `pnpm check`, to the test suite and to reading the file, and it
+would have stopped the migration on production with three statements already
+applied. Running it against a real database first is what found it — see § 5a
+step 5, and note that `scripts/migrate.mts` names the file, the statement and
+MySQL's own reason, which is what made it a two-minute diagnosis.
+
 ### A new database has to build from the files alone
 
 Moving to new hosting means applying every migration to an empty database —

@@ -34,7 +34,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
-import { groupStamps } from "../../shared/takeoffCounts";
+import { groupStamps, stampName } from "../../shared/takeoffCounts";
 import { totalQuantities } from "../../shared/takeoffQuantities";
 import { heightContextForBid, verticalsForRunRow } from "../runVerticals";
 import {
@@ -142,8 +142,9 @@ export const materialsListRouter = router({
         stamps.map(stamp => ({
           id: stamp.id,
           sheetId: stamp.sheetId,
+          groupId: stamp.groupId,
+          name: stampName(stamp),
           assemblyId: stamp.assemblyId,
-          assemblyName: stamp.assemblyName,
           x: Number(stamp.x),
           y: Number(stamp.y),
         }))

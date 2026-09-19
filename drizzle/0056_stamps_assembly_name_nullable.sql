@@ -1,0 +1,17 @@
+-- A counted thing no longer has to be an assembly.
+--
+-- One statement — see 0053. Relaxing NOT NULL is not a destructive change and
+-- touches no existing row: every mark placed so far keeps the snapshot it has.
+--
+-- ── Why this is not "making a column nullable and hoping" ───────────────────
+-- § 3.1 of references/plan-viewer-overhaul.md warns against exactly that, and
+-- the warning is about nullable WITHOUT a group — where nothing holds the name
+-- and a plain count has nowhere to live. 0053 gave the label a home and 0055
+-- moved every existing name into it. This is the last step of that sequence
+-- rather than a shortcut past it, which is why it runs LAST: run out of order,
+-- the backfill would have NULL labels to copy.
+--
+-- After this, the label a screen shows comes from the group, and this column is
+-- the fallback for rows written before groups existed. stampName() in
+-- shared/takeoffCounts.ts is the one place that knows the order.
+ALTER TABLE `takeoff_stamps` MODIFY COLUMN `assemblyName` varchar(255);

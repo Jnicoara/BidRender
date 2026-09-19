@@ -2126,6 +2126,67 @@ assumes an assembly behind it.
 | **3. Count = material** | The part, no labour                           | A `materialId` on the group, **plus the bridge** — § 5f           |
 | **4. Count = assembly** | What exists today                             | Nothing. Stays as the fullest option                              |
 
+#### SHIPPED 2026-09-18 — the group row and level 1
+
+Four migrations, split one statement per file as 0046–0052 established:
+`0053` creates `takeoff_groups`, `0054` adds `takeoff_stamps.groupId`, `0055`
+backfills a group for every mark already placed, and `0056` finally lets
+`assemblyName` be null. That order is load-bearing: the backfill copies names
+while the column still holds them.
+
+**The backfill was rehearsed against a real database and the rehearsal earned
+its keep twice.** It caught a collation mismatch that would have stopped the
+migration on production mid-file (references/deploying.md § 5), and it proved
+the counts are unchanged — same groups, same quantities, every mark attached,
+compared against the old grouping rule row by row.
+
+**What a person can do now that they could not:** type a name the library has
+never heard of into the Stamp picker and count it. The offer appears whenever
+the box has text in it, not only when nothing matches — a query that finds
+something similar is exactly when somebody needs to say "no, not that one".
+
+**One verb across the screen.** The toolbar, the overlay and the toast all say
+"Counting" now. "Stamping" was the assembly-only word and it is not true of a
+plain count; the panel it feeds has always been called Counted items.
+
+### The GROUP carries its own shape and colour — decided 2026-09-18
+
+**The question, found while building level 1:** § 5e said shape comes from the
+CATEGORY, "which every stamp already stores" — five categories, five shapes, no
+setup. That was true while every mark carried an assembly. A plain count has no
+category and nothing to get one from, so step 3 had to answer what shape a
+thing the library has never heard of gets.
+
+**Decided: the shape and colour live on the group**, defaulting from the
+category where there is one. Two rejected answers, and why:
+
+- **A sixth shape reserved for plain counts** only postpones the problem until
+  somebody has TWO plain counts on one sheet — which is the ordinary case the
+  moment level 1 is used for what it is for, not an edge case.
+- **Asking for a category when the count is made** puts a question at exactly
+  the moment the feature exists to remove one. Level 1's whole claim is that
+  you can count first and decide later.
+
+**The deciding argument is coverage.** A category-derived shape works for three
+of the four levels: assembly has one, material could borrow one, typed and
+plain have nothing. A group-carried shape works for all four, because every
+level IS a group. A rule that covers the whole feature beats a rule that covers
+most of it and needs a special case for the rest — and the special case would
+land on level 1, the level with the weakest claim to being second class.
+
+**And it is cheap now in a way it would not have been before.** § 5e ruled an
+override out of the first pass because it meant storage; the group row IS that
+storage, already built, one row per counted thing rather than one per mark.
+This is the second thing the row has paid for (the first was attaching a price
+to a count made last week), which is worth noticing about the decision to make
+it a row at all.
+
+**What this does NOT become:** a colour picker in front of every new count.
+Defaults are derived and silent — the category's shape where there is one, a
+stable assignment from the palette otherwise — and changing one is a deliberate
+act on a count that already exists. The § 5e rule stands: a feature nobody
+configures must work without being configured.
+
 #### The group is a ROW — this overrides what was approved on 2026-09-18
 
 **Changed the same day it was approved, before anything was built.** The version

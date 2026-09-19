@@ -2400,6 +2400,134 @@ export const bidMountingHeights = mysqlTable(
 export type BidMountingHeight = typeof bidMountingHeights.$inferSelect;
 export type InsertBidMountingHeight = typeof bidMountingHeights.$inferInsert;
 
+// ─── Counted groups (takeoff phase 6) ─────────────────────────────────────────
+/**
+ * The four levels of counting, from a plain tally to a full assembly.
+ *
+ *   plain     A typed name and nothing else. "Exit signs: 14." Never reaches
+ *             the bid — it is a count, and the count is the whole feature.
+ *   typed     A name with a dollar amount, and optionally hours, typed onto
+ *             this job. A price that lives OUTSIDE the materials library.
+ *   material  The count is that part, priced from the library and re-priced
+ *             when the library moves. Materials carry no hours, so nor does
+ *             this.
+ *   assembly  What the stamp tool has always done: a priced recipe with hours,
+ *             a role and modifiers behind it.
+ *
+ * Deliberately an ENUM and not the varchar treatment `trade` gets. A trade is
+ * content, unlocked at the app layer so a new one needs no migration; these
+ * four are the product's own design, and a fifth would be a decision rather
+ * than a row. See references/plan-viewer-overhaul.md § 5e.
+ */
+export const TAKEOFF_GROUP_KINDS = [
+  "plain",
+  "typed",
+  "material",
+  "assembly",
+] as const;
+export type TakeoffGroupKind = (typeof TAKEOFF_GROUP_KINDS)[number];
+
+/**
+ * One counted THING on one bid — "exit signs", "the 2x4 troffers", "receptacles".
+ *
+ * ── Why this is a row and not columns on the stamps ──────────────────────────
+ * Because a price is the same kind of fact as a mounting height, and § 7 of the
+ * plan-viewer document already settled that one: "a vertical belongs to the
+ * GROUP, not each stamp. Thirty receptacles in a room share one height, and
+ * storing it thirty times is thirty places for it to disagree with itself."
+ * Fourteen exit signs at $38 stored on fourteen marks is one number in fourteen
+ * homes, and the first time thirteen of them are edited the count and the price
+ * disagree with nothing on screen to say which is right.
+ *
+ * It also buys the thing the four levels exist FOR: attaching a price to a
+ * count made last week, with every click intact. On this table that is an edit
+ * to one row. On per-stamp columns it is a rewrite of fourteen, and the
+ * tempting shortcut becomes asking the estimator to count them again.
+ *
+ * ── Per BID, not per sheet ───────────────────────────────────────────────────
+ * Exit signs are one priced thing on the job even when they are marked on five
+ * sheets. A group per sheet would be the same disagree-with-itself problem one
+ * level up — five prices for one product — and the per-sheet panel still groups
+ * by sheet for DISPLAY, which is a choice about presentation over one set of
+ * rows rather than a second set of rows.
+ *
+ * ── What is null, and what that means ────────────────────────────────────────
+ * Every source column is nullable and `kind` is what says which one is in play.
+ * A plain group has all four empty; that is not an unfinished row, it is the
+ * whole of level 1. The columns for levels 2 and 3 ship with this table rather
+ * than in a later migration because they are the same feature at different
+ * settings, and a nullable column nothing writes costs nothing.
+ *
+ * ── No unique constraint on the label, deliberately ──────────────────────────
+ * Two groups on one bid should not share a name, and the router refuses it. It
+ * is NOT a database constraint because of the backfill: existing takeoffs are
+ * grouped by the assembly behind them, and two different assemblies with the
+ * same snapshot name on one bid would make the migration fail on production —
+ * a deploy stopped by a data shape nobody can see beforehand. A duplicate label
+ * is a confusing panel; a failed migration is a bad morning.
+ */
+export const takeoffGroups = mysqlTable(
+  "takeoff_groups",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    bidId: int("bidId")
+      .notNull()
+      .references(() => bids.id, { onDelete: "cascade" }),
+    /** Denormalised for one-query ownership checks, as on takeoff_stamps. */
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    /** What the estimator calls it. The identity of a plain or typed group. */
+    label: varchar("label", { length: 255 }).notNull(),
+    kind: mysqlEnum("kind", TAKEOFF_GROUP_KINDS).default("plain").notNull(),
+
+    /**
+     * Level 4. Provenance only, and `set null` on delete for the same reason
+     * bid lines do it: removing a library assembly must not alter a takeoff
+     * that counted it. `label` holds the name, so the group stays readable.
+     */
+    assemblyId: int("assemblyId").references(() => assemblies.id, {
+      onDelete: "set null",
+    }),
+    /** Level 3. Same treatment, same reason. */
+    materialId: int("materialId").references(() => materials.id, {
+      onDelete: "set null",
+    }),
+
+    /**
+     * Level 2 — a price typed onto this job, for one of these.
+     *
+     * NULL means no price, which is level 1 and is a supported resting state.
+     * Zero does NOT mean that: it means somebody typed zero, and the
+     * unpriced-material rule in CLAUDE.md applies here as everywhere — a
+     * plausible number nobody chose is the dangerous kind.
+     */
+    unitCost: decimal("unitCost", { precision: 12, scale: 4 }),
+    /** Level 2, optional. Hours for one of these, before any modifier. */
+    unitHours: decimal("unitHours", { precision: 10, scale: 4 }),
+    /**
+     * Which role does those hours. Only meaningful when `unitHours` is set,
+     * and required by the router when it is: hours with no rate behind them
+     * price at nothing while the bid still looks finished, which is the failure
+     * the Bids screen already warns about for assemblies.
+     */
+    laborRateId: int("laborRateId").references(() => laborRates.id, {
+      onDelete: "set null",
+    }),
+
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    index("takeoff_groups_bidId_idx").on(t.bidId),
+    index("takeoff_groups_userId_idx").on(t.userId),
+  ]
+);
+
+export type TakeoffGroup = typeof takeoffGroups.$inferSelect;
+export type InsertTakeoffGroup = typeof takeoffGroups.$inferInsert;
+
 // ─── Stamps (takeoff phase 2c) ────────────────────────────────────────────────
 /**
  * One placed instance of an assembly on a sheet — a single click of the stamp
@@ -2412,8 +2540,21 @@ export type InsertBidMountingHeight = typeof bidMountingHeights.$inferInsert;
  * The quantity an estimator wants is then just how many rows there are, derived
  * rather than stored — so a count can never drift from the marks on the plan.
  *
- * `assemblyName` is a snapshot taken at drop time, for the same reason bid
- * lines snapshot theirs: archiving or renaming the assembly later must not
+ * ── The mark carries POSITION. The group carries meaning ────────────────────
+ * Added in phase 6. What is being counted — its name, and its price if it has
+ * one — belongs to `takeoff_groups`, and a mark points at one. Before that, a
+ * mark carried a snapshot of the assembly's name and the count was derived by
+ * grouping on it, which works only while every count has an assembly behind it.
+ *
+ * `assemblyName` and `assemblyId` stay for rows written before phase 6 and for
+ * the provenance they record. **`assemblyName` is nullable from phase 6 on**:
+ * a plain count has no assembly and inventing a name for one would put the
+ * group's label in two places, which is the disagreement the group row exists
+ * to prevent. Readers take the label from the group and fall back to this
+ * snapshot, in that order.
+ *
+ * The snapshot is still the right shape for what it holds, for the same reason
+ * bid lines snapshot theirs: archiving or renaming an assembly later must not
  * make an existing takeoff unreadable.
  */
 export const takeoffStamps = mysqlTable(
@@ -2430,12 +2571,30 @@ export const takeoffStamps = mysqlTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
 
+    /**
+     * What is being counted. Null only on rows written before phase 6 and
+     * backfilled since — see drizzle/0055_backfill_takeoff_groups.sql.
+     *
+     * `cascade` on delete, unlike the provenance columns below: deleting the
+     * group IS deleting the count, and leaving fourteen orphan marks on a
+     * drawing with nothing to say what they are would be worse than removing
+     * them. The screen asks before it happens.
+     */
+    groupId: int("groupId").references(() => takeoffGroups.id, {
+      onDelete: "cascade",
+    }),
+
     /** Provenance. Null once the library assembly is gone; the name remains. */
     assemblyId: int("assemblyId").references(() => assemblies.id, {
       onDelete: "set null",
     }),
-    /** What it was called when it was dropped. Never re-read from the library. */
-    assemblyName: varchar("assemblyName", { length: 255 }).notNull(),
+    /**
+     * What it was called when it was dropped. Never re-read from the library.
+     *
+     * Nullable from phase 6: a plain count has no assembly, and the label lives
+     * on the group. See the header.
+     */
+    assemblyName: varchar("assemblyName", { length: 255 }),
     /**
      * The assembly's Category at drop time — the System layer this mark belongs
      * to. Snapshotted for the same reason the name is: an archived or deleted
@@ -2459,6 +2618,7 @@ export const takeoffStamps = mysqlTable(
     index("takeoff_stamps_bidId_idx").on(t.bidId),
     index("takeoff_stamps_sheetId_idx").on(t.sheetId),
     index("takeoff_stamps_userId_idx").on(t.userId),
+    index("takeoff_stamps_groupId_idx").on(t.groupId),
   ]
 );
 

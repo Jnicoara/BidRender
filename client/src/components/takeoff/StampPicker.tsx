@@ -12,19 +12,27 @@
  * is one click this job, on this job and every job after it. It just stops
  * being the only door.
  *
- * ── What this is NOT ─────────────────────────────────────────────────────────
- * This is still a priced assembly on every stamp. It is not level-1 counting —
- * dropping plain points that carry no assembly and no price — which needs
- * `takeoff_stamps.assemblyName` to stop being required AND the group concept,
- * so a count made today can have an assembly attached next week with every
- * click intact. That is Phase 6 in references/plan-viewer-overhaul.md, and it
- * must not be faked early by making a column nullable.
+ * ── Level 1 lives here too, from phase 6 ─────────────────────────────────────
+ * Type something your library does not have and the list offers to count it
+ * anyway: a tally with a name and no price. That is deliberately the SAME
+ * control rather than a second button beside it, because the question a person
+ * arrives with is "what am I counting?", not "is this thing in my library?" —
+ * and the answer to the second one is the app's problem, not theirs.
+ *
+ * It is offered whenever the box has text in it, not only when nothing matches.
+ * A query that matches something similar is exactly when a person needs to say
+ * "no, not that, the other one" — hiding the escape at that moment would make
+ * the feature findable only by typing a word with no neighbours in the library.
+ *
+ * What lands is a `takeoff_groups` row of kind `plain`. It never reaches the
+ * bid's price, and a price can be attached to it later with every click intact
+ * — which is the whole reason the group is a row (drizzle/schema.ts).
  *
  * Ranking is `smartSearch`, the same as the Assembly Builder and the legend, so
  * the same query finds the same assembly wherever it is typed.
  */
 import { useMemo, useState } from "react";
-import { MapPin, Search } from "lucide-react";
+import { Hash, MapPin, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -46,10 +54,13 @@ const MAX_RESULTS = 8;
 export function StampPicker({
   assemblies,
   onPick,
+  onCountPlain,
   disabled,
 }: {
   assemblies: PickableAssembly[];
   onPick: (assembly: PickableAssembly) => void;
+  /** Count something the library does not have — level 1. See the header. */
+  onCountPlain: (label: string) => void;
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -90,11 +101,7 @@ export function StampPicker({
           variant="outline"
           className="h-7 gap-1.5 text-xs"
           disabled={disabled}
-          title={
-            disabled
-              ? "No assemblies in your library yet — build one first"
-              : "Count devices by clicking them on the drawing"
-          }
+          title="Count things by clicking them on the drawing"
         >
           <MapPin className="w-3.5 h-3.5" /> Stamp
         </Button>
@@ -111,13 +118,23 @@ export function StampPicker({
             onChange={e => setQuery(e.target.value)}
             onKeyDown={e => {
               if (e.key === "Escape") setOpen(false);
-              // Enter takes the top hit — the whole point of ranking them.
-              if (e.key === "Enter" && results[0]) {
-                onPick(results[0]);
-                setOpen(false);
+              /*
+                Enter takes the top hit, which is the whole point of ranking
+                them — and when there is no hit it counts what was typed, so a
+                name the library has never heard of is still one keystroke from
+                being counted.
+              */
+              if (e.key === "Enter") {
+                if (results[0]) {
+                  onPick(results[0]);
+                  setOpen(false);
+                } else if (query.trim()) {
+                  onCountPlain(query.trim());
+                  setOpen(false);
+                }
               }
             }}
-            placeholder="Search assemblies…"
+            placeholder="Search, or type anything to count it…"
             className="h-7 pl-7 text-xs"
             autoFocus
           />
@@ -140,14 +157,42 @@ export function StampPicker({
               )}
             </button>
           ))}
-          {results.length === 0 && (
+          {results.length === 0 && !query.trim() && (
             <p className="text-[0.7rem] text-muted-foreground px-2 py-2">
-              {assemblies.length === 0
-                ? "Your library has no assemblies yet."
-                : `Nothing matches “${query}”.`}
+              Your library has no assemblies yet — type a name to count
+              something anyway.
             </p>
           )}
         </div>
+
+        {/*
+          The escape hatch, below a divider and worded as what it does rather
+          than as what it lacks. "No price" is the honest half of that and is
+          said plainly: a count that never reaches the bid must not look like
+          one that does, and the moment to say so is while it is being made.
+        */}
+        {query.trim() && (
+          <>
+            <div className="h-px bg-border my-1.5" />
+            <button
+              className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted"
+              onClick={() => {
+                onCountPlain(query.trim());
+                setOpen(false);
+              }}
+            >
+              <span className="flex items-center gap-1.5">
+                <Hash className="w-3 h-3 text-muted-foreground shrink-0" />
+                <span className="truncate">
+                  Count “<span className="font-medium">{query.trim()}</span>”
+                </span>
+              </span>
+              <span className="block text-[0.7rem] text-muted-foreground mt-0.5 pl-[1.125rem]">
+                Just a tally — no price, not on the bid
+              </span>
+            </button>
+          </>
+        )}
       </PopoverContent>
     </Popover>
   );

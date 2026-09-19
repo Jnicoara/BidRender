@@ -19,15 +19,46 @@
  */
 import type { PagePoint } from "./takeoffGeometry";
 
-/** A stamp as the counter needs it. */
+/**
+ * A stamp as the counter needs it.
+ *
+ * ── `name` is resolved before it gets here ───────────────────────────────────
+ * From phase 6 a mark carries position and a pointer to its group; what it is
+ * CALLED belongs to the group. The database layer resolves the two into one
+ * string (`stampName` below) so this module stays a pure function over records
+ * and never has to know that a label has two possible homes.
+ */
 export type StampRecord = {
   id: number;
   sheetId: number;
+  /** The group this mark belongs to. Null only on pre-phase-6 rows. */
+  groupId: number | null;
+  /** The group's label, or the pre-phase-6 assembly snapshot. Never empty. */
+  name: string;
+  /** Provenance, still used to key pre-phase-6 marks. Null for a plain count. */
   assemblyId: number | null;
-  assemblyName: string;
   x: number;
   y: number;
 };
+
+/**
+ * What to call a mark, in the order the answer should be trusted.
+ *
+ * The group first, because it is the live fact and the only one a rename
+ * updates. The stamp's snapshot second, for rows written before groups existed.
+ * A placeholder last, so a row that somehow has neither shows as something a
+ * person can click rather than as an empty line in the count.
+ */
+export function stampName(stamp: {
+  groupLabel?: string | null;
+  assemblyName?: string | null;
+}): string {
+  const label = stamp.groupLabel?.trim();
+  if (label) return label;
+  const snapshot = stamp.assemblyName?.trim();
+  if (snapshot) return snapshot;
+  return "Unnamed count";
+}
 
 /** A traced run as the counter needs it. */
 export type RunRecord = {
@@ -40,10 +71,12 @@ export type RunRecord = {
   runFeet: number | null;
 };
 
-/** Many stamps of one assembly, gathered. */
+/** Many marks of one counted thing, gathered. */
 export type CountedAssembly = {
   kind: "assembly";
-  /** Null for an assembly deleted from the library since it was stamped. */
+  /** The group these belong to. Null only for pre-phase-6 marks. */
+  groupId: number | null;
+  /** Null for a plain count, or an assembly deleted since it was stamped. */
   assemblyId: number | null;
   name: string;
   /** How many were dropped. Derived from the stamps themselves. */
@@ -68,13 +101,20 @@ export type CountedRun = {
 export type CountedItem = CountedAssembly | CountedRun;
 
 /**
- * Group stamps by the assembly they placed.
+ * Gather marks into the things they are counting.
  *
- * Keyed by assemblyId where there is one, and by NAME where there is not: a
- * stamp whose library assembly has since been deleted keeps its snapshot name,
- * and two such orphans of the same name are the same thing to a person reading
- * the list. Keying orphans by their null id would collapse every deleted
- * assembly into one meaningless row.
+ * ── Three keys, in order, and the order is the history ───────────────────────
+ * The GROUP where there is one, which from phase 6 is every mark placed. Two
+ * groups may legitimately share a label — the router discourages it rather than
+ * forbidding it, see drizzle/schema.ts — so the id is the identity and the
+ * label is only what it is called.
+ *
+ * Then the two pre-phase-6 keys, unchanged, for marks placed before groups
+ * existed and for any the backfill could not reach: the ASSEMBLY id where there
+ * is one, and the NAME where there is not. A mark whose library assembly has
+ * since been deleted keeps its snapshot name, and two such orphans of the same
+ * name are the same thing to a person reading the list; keying them by their
+ * null id would collapse every deleted assembly into one meaningless row.
  *
  * Order is by first appearance, so the list does not reshuffle as more stamps
  * land — a list that reorders itself while you are clicking is a list you
@@ -85,9 +125,11 @@ export function groupStamps(stamps: StampRecord[]): CountedAssembly[] {
 
   for (const stamp of stamps) {
     const key =
-      stamp.assemblyId !== null
-        ? `id:${stamp.assemblyId}`
-        : `name:${stamp.assemblyName.trim().toLowerCase()}`;
+      stamp.groupId !== null
+        ? `group:${stamp.groupId}`
+        : stamp.assemblyId !== null
+          ? `id:${stamp.assemblyId}`
+          : `name:${stamp.name.trim().toLowerCase()}`;
 
     const existing = groups.get(key);
     if (existing) {
@@ -97,8 +139,9 @@ export function groupStamps(stamps: StampRecord[]): CountedAssembly[] {
     }
     groups.set(key, {
       kind: "assembly",
+      groupId: stamp.groupId,
       assemblyId: stamp.assemblyId,
-      name: stamp.assemblyName,
+      name: stamp.name,
       count: 1,
       stamps: [stamp],
     });

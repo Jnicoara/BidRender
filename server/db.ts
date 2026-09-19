@@ -12,6 +12,7 @@ import {
   or,
   like,
   sql,
+  getTableColumns,
 } from "drizzle-orm";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2/promise";
@@ -90,6 +91,9 @@ import {
   InsertTakeoffStamp,
   TakeoffStamp,
   takeoffStamps,
+  InsertTakeoffGroup,
+  TakeoffGroup,
+  takeoffGroups,
   TakeoffLocation,
   InsertSymbolLink,
   SymbolLink,
@@ -5111,15 +5115,36 @@ export async function deleteRunCircuit(id: number, userId: number) {
 
 // ─── Stamps and symbol links (takeoff phase 2c) ───────────────────────────────
 
+/**
+ * A mark with its group's name already attached.
+ *
+ * Joined here rather than looked up by every caller, so there is one place that
+ * knows a label has two possible homes — the group, and the pre-phase-6
+ * snapshot on the mark itself. `shared/takeoffCounts.ts` resolves the pair with
+ * `stampName`; everything downstream sees one string.
+ */
+export type StampWithGroup = TakeoffStamp & {
+  groupLabel: string | null;
+  groupKind: TakeoffGroup["kind"] | null;
+};
+
+/** LEFT join, because a pre-phase-6 mark has no group and must still count. */
+const stampWithGroupColumns = {
+  ...getTableColumns(takeoffStamps),
+  groupLabel: takeoffGroups.label,
+  groupKind: takeoffGroups.kind,
+};
+
 export async function getStampsForSheet(
   sheetId: number,
   userId: number
-): Promise<TakeoffStamp[]> {
+): Promise<StampWithGroup[]> {
   const db = await getDb();
   if (!db) return [];
   return db
-    .select()
+    .select(stampWithGroupColumns)
     .from(takeoffStamps)
+    .leftJoin(takeoffGroups, eq(takeoffStamps.groupId, takeoffGroups.id))
     .where(
       and(eq(takeoffStamps.sheetId, sheetId), eq(takeoffStamps.userId, userId))
     )
@@ -5129,16 +5154,137 @@ export async function getStampsForSheet(
 export async function getStampsForBid(
   bidId: number,
   userId: number
-): Promise<TakeoffStamp[]> {
+): Promise<StampWithGroup[]> {
   const db = await getDb();
   if (!db) return [];
   return db
-    .select()
+    .select(stampWithGroupColumns)
     .from(takeoffStamps)
+    .leftJoin(takeoffGroups, eq(takeoffStamps.groupId, takeoffGroups.id))
     .where(
       and(eq(takeoffStamps.bidId, bidId), eq(takeoffStamps.userId, userId))
     )
     .orderBy(asc(takeoffStamps.id));
+}
+
+// ─── Counted groups (takeoff phase 6) ─────────────────────────────────────────
+
+/** Every counted thing on one bid, oldest first — the order they were made. */
+export async function getGroupsForBid(
+  bidId: number,
+  userId: number
+): Promise<TakeoffGroup[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(takeoffGroups)
+    .where(
+      and(eq(takeoffGroups.bidId, bidId), eq(takeoffGroups.userId, userId))
+    )
+    .orderBy(asc(takeoffGroups.id));
+}
+
+export async function getGroupById(
+  id: number,
+  userId: number
+): Promise<TakeoffGroup | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db
+    .select()
+    .from(takeoffGroups)
+    .where(and(eq(takeoffGroups.id, id), eq(takeoffGroups.userId, userId)))
+    .limit(1);
+  return row;
+}
+
+/**
+ * Is this name already taken on this bid?
+ *
+ * The duplicate check the schema deliberately does not make a constraint — see
+ * the header on `takeoff_groups` for why the backfill rules one out. Compared
+ * case-insensitively and trimmed, because "Exit signs" and "exit signs " are
+ * the same thing to the person typing them.
+ */
+export async function findGroupByLabel(
+  bidId: number,
+  userId: number,
+  label: string
+): Promise<TakeoffGroup | undefined> {
+  const rows = await getGroupsForBid(bidId, userId);
+  const wanted = label.trim().toLowerCase();
+  return rows.find(row => row.label.trim().toLowerCase() === wanted);
+}
+
+export async function createTakeoffGroup(
+  row: InsertTakeoffGroup
+): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db.insert(takeoffGroups).values(row);
+  return result.insertId;
+}
+
+export async function updateTakeoffGroup(
+  id: number,
+  userId: number,
+  data: Partial<InsertTakeoffGroup>
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const safe: Record<string, unknown> = { ...data };
+  delete safe.id;
+  delete safe.bidId;
+  delete safe.userId;
+  await db
+    .update(takeoffGroups)
+    .set({ ...safe, updatedAt: new Date() })
+    .where(and(eq(takeoffGroups.id, id), eq(takeoffGroups.userId, userId)));
+}
+
+/**
+ * Remove a counted thing, and with it every mark on the drawing.
+ *
+ * The marks go by the foreign key's `cascade`, not by a second statement here —
+ * one rule, enforced by the database, rather than a delete that can be half
+ * done. The screen asks first and says how many marks it is about to take.
+ */
+export async function deleteTakeoffGroup(
+  id: number,
+  userId: number
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .delete(takeoffGroups)
+    .where(and(eq(takeoffGroups.id, id), eq(takeoffGroups.userId, userId)));
+}
+
+/** How many marks each group has, for a list that says so without a second query. */
+export async function countStampsByGroup(
+  bidId: number,
+  userId: number
+): Promise<Map<number, number>> {
+  const db = await getDb();
+  if (!db) return new Map();
+  const rows = await db
+    .select({
+      groupId: takeoffStamps.groupId,
+      total: sql<number>`count(*)`,
+    })
+    .from(takeoffStamps)
+    .where(
+      and(eq(takeoffStamps.bidId, bidId), eq(takeoffStamps.userId, userId))
+    )
+    .groupBy(takeoffStamps.groupId);
+
+  const counts = new Map<number, number>();
+  for (const row of rows) {
+    if (row.groupId === null) continue;
+    counts.set(row.groupId, Number(row.total));
+  }
+  return counts;
 }
 
 /** Insert many at once — the stamp tool flushes a batch of clicks. */
@@ -5163,11 +5309,18 @@ export async function setStampLocation(
     .where(and(eq(takeoffStamps.id, id), eq(takeoffStamps.userId, userId)));
 }
 
-/** Tag a whole assembly's stamps at once — the common case after stamping. */
-export async function setStampLocationForAssembly(
+/**
+ * Tag a whole count's marks at once — the common case after stamping.
+ *
+ * Keyed on the GROUP since phase 6, not on the assembly name it used to match.
+ * A plain count has no assembly name at all, so matching on one would silently
+ * tag nothing for exactly the counts this phase added — an action that reports
+ * success and does nothing, which is the worst shape a bug can take here.
+ */
+export async function setStampLocationForGroup(
   sheetId: number,
   userId: number,
-  assemblyName: string,
+  groupId: number,
   location: TakeoffLocation | null
 ) {
   const database = await getDb();
@@ -5179,7 +5332,7 @@ export async function setStampLocationForAssembly(
       and(
         eq(takeoffStamps.sheetId, sheetId),
         eq(takeoffStamps.userId, userId),
-        eq(takeoffStamps.assemblyName, assemblyName)
+        eq(takeoffStamps.groupId, groupId)
       )
     );
 }

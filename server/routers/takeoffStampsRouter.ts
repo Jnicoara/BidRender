@@ -16,7 +16,11 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
-import { buildCountedItems, symbolLookupKey } from "../../shared/takeoffCounts";
+import {
+  buildCountedItems,
+  stampName,
+  symbolLookupKey,
+} from "../../shared/takeoffCounts";
 import { measurabilityOf } from "../../shared/takeoffQuantities";
 import { TAKEOFF_LOCATIONS } from "../../drizzle/schema";
 import { pathRealInches, toBillableFeet } from "../../shared/takeoffGeometry";
@@ -82,8 +86,16 @@ export const takeoffStampsRouter = router({
       z.object({
         bidId: z.number().int().positive(),
         sheetId: z.number().int().positive(),
-        assemblyId: z.number().int().positive().nullable(),
-        assemblyName: nameSchema,
+        /**
+         * What these marks are counting.
+         *
+         * Required, and the only thing that says what a mark IS. The assembly
+         * columns on the row below are filled FROM the group rather than passed
+         * in, so a caller cannot place a mark that says one thing and belongs
+         * to another. An assembly is armed through takeoffGroups.forAssembly,
+         * which is one call and makes this path the only path.
+         */
+        groupId: z.number().int().positive(),
         /** Where these ones sit. Optional — tagging can happen after placing. */
         location: z.enum(TAKEOFF_LOCATIONS).nullable().default(null),
         /** One entry per click. Bounded so a runaway loop cannot flood a sheet. */
@@ -97,12 +109,28 @@ export const takeoffStampsRouter = router({
       await requireBid(input.bidId, ctx.scope.dataUserId);
       await requireSheet(input.sheetId, ctx.scope.dataUserId);
 
-      // The assembly's Category is snapshotted at drop time so the System
-      // layer keeps working after the library assembly is archived or renamed.
+      const group = await db.getGroupById(input.groupId, ctx.scope.dataUserId);
+      if (!group || group.bidId !== input.bidId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "That count is not on this bid.",
+        });
+      }
+
+      /*
+        The assembly columns are PROVENANCE, written from the group.
+
+        They stay because they are a snapshot with a job: the Category drives
+        the System layer and must keep working after the library assembly is
+        archived or renamed, and the name is what a pre-phase-6 mark is read by.
+        A plain count has neither, and inventing a name for one would put the
+        group's label in two places — the disagreement the group row exists to
+        prevent (drizzle/schema.ts on takeoff_groups).
+      */
       let assemblyCategory: string | null = null;
-      if (input.assemblyId !== null) {
+      if (group.assemblyId !== null) {
         const assembly = await db.getAssemblyById(
-          input.assemblyId,
+          group.assemblyId,
           ctx.scope.dataUserId
         );
         assemblyCategory = assembly?.category ?? null;
@@ -113,8 +141,9 @@ export const takeoffStampsRouter = router({
           bidId: input.bidId,
           sheetId: input.sheetId,
           userId: ctx.scope.dataUserId,
-          assemblyId: input.assemblyId,
-          assemblyName: input.assemblyName,
+          groupId: group.id,
+          assemblyId: group.assemblyId,
+          assemblyName: group.kind === "assembly" ? group.label : null,
           assemblyCategory,
           location: input.location,
           x: point.x.toFixed(4),
@@ -145,6 +174,9 @@ export const takeoffStampsRouter = router({
       return rows.map(row => ({
         id: row.id,
         sheetId: row.sheetId,
+        groupId: row.groupId,
+        /** Resolved once, here, so no screen has to know where a name lives. */
+        name: stampName(row),
         assemblyId: row.assemblyId,
         assemblyName: row.assemblyName,
         assemblyCategory: row.assemblyCategory,
@@ -173,20 +205,33 @@ export const takeoffStampsRouter = router({
    * The realistic path: you stamp twenty ceiling lights and then say they are
    * all in the ceiling, rather than tagging each of twenty marks.
    */
-  setLocationForAssembly: procedure
+  /**
+   * Tag every mark of one count on one sheet.
+   *
+   * Named by the GROUP since phase 6. It used to take an assembly name and
+   * match marks on their snapshot of it, which cannot work for a count that
+   * has no assembly — it would have tagged nothing and said it succeeded.
+   */
+  setLocationForGroup: procedure
     .input(
       z.object({
         sheetId: z.number().int().positive(),
-        assemblyName: nameSchema,
+        groupId: z.number().int().positive(),
         location: z.enum(TAKEOFF_LOCATIONS).nullable(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       await requireSheet(input.sheetId, ctx.scope.dataUserId);
-      await db.setStampLocationForAssembly(
+      const group = await db.getGroupById(input.groupId, ctx.scope.dataUserId);
+      if (!group)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "That count is not on this bid.",
+        });
+      await db.setStampLocationForGroup(
         input.sheetId,
         ctx.scope.dataUserId,
-        input.assemblyName,
+        input.groupId,
         input.location
       );
       return { success: true };
@@ -219,8 +264,9 @@ export const takeoffStampsRouter = router({
         stamps.map(s => ({
           id: s.id,
           sheetId: s.sheetId,
+          groupId: s.groupId,
+          name: stampName(s),
           assemblyId: s.assemblyId,
-          assemblyName: s.assemblyName,
           x: Number(s.x),
           y: Number(s.y),
         })),

@@ -159,9 +159,30 @@ export function hasUnsavedWork(
 // The old product name again, for the same reason as KEY_PREFIX.
 const STAMP_KEY_PREFIX = "helixbid:stamp-queue:";
 
+/**
+ * One click, waiting to be sent.
+ *
+ * ── Two shapes live here, and that is deliberate ────────────────────────────
+ * Since phase 6 a mark belongs to a `takeoff_groups` row and `groupId` is all
+ * it needs. A queue written by an OLDER build carries `assemblyId` and
+ * `assemblyName` instead and no group — and a browser can be holding one of
+ * those right now: the key survives deploys on purpose (CLAUDE.md), the TTL is
+ * seven days, and the whole point of this mirror is work that exists nowhere
+ * else.
+ *
+ * So both are accepted and the recovery path resolves the old one into a group
+ * before sending it. Refusing it instead would silently discard clicks somebody
+ * made — which is the exact failure this file exists to prevent, and worse than
+ * the half-restored batch it already refuses, because there would be nothing
+ * left to notice.
+ */
 export type QueuedStamp = {
-  assemblyId: number | null;
-  assemblyName: string;
+  /** Phase 6 and later. Null on a queue written by an older build. */
+  groupId?: number | null;
+  /** Pre-phase-6 only. Resolved into a group on recovery. */
+  assemblyId?: number | null;
+  /** Pre-phase-6 only. */
+  assemblyName?: string | null;
   x: number;
   y: number;
 };
@@ -224,12 +245,22 @@ export function loadStampQueue(
         typeof stamp?.x !== "number" ||
         typeof stamp?.y !== "number" ||
         !Number.isFinite(stamp.x) ||
-        !Number.isFinite(stamp.y) ||
-        typeof stamp.assemblyName !== "string" ||
-        !stamp.assemblyName
+        !Number.isFinite(stamp.y)
       ) {
         return null;
       }
+      /*
+        One of the two shapes, and nothing in between. A group id is the
+        current one; a non-empty assembly name is the older one, which the
+        caller turns into a group before sending. An entry with neither cannot
+        say what it was counting, and a mark that cannot say that is worse
+        restored than dropped — it would land on the drawing as an unnamed
+        tally nobody can price or explain.
+      */
+      const hasGroup = typeof stamp.groupId === "number" && stamp.groupId > 0;
+      const hasLegacyName =
+        typeof stamp.assemblyName === "string" && stamp.assemblyName.length > 0;
+      if (!hasGroup && !hasLegacyName) return null;
     }
 
     return {

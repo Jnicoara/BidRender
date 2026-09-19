@@ -150,6 +150,36 @@ beforeEach(async () => {
 
 // ── The pure aggregation ─────────────────────────────────────────────────────
 
+/**
+ * The group a drop names — found or made, by assembly where there is one and
+ * by label where there is not.
+ *
+ * Phase 6 moved the identity of a count off the mark and onto a
+ * `takeoff_groups` row, so every drop names one. Reusing an existing group for
+ * a repeated label is what keeps these tests saying what they said before: a
+ * test that drops "Recep" three times is testing that one count reaches three,
+ * not that three counts reach one each.
+ */
+async function groupFor(
+  bidId: number,
+  label: string,
+  assemblyId: number | null
+): Promise<number> {
+  if (assemblyId !== null) {
+    const group = await caller().takeoffGroups.forAssembly({
+      bidId,
+      assemblyId,
+    });
+    return group.id;
+  }
+  const group = await caller().takeoffGroups.create({
+    bidId,
+    label,
+    reuseExisting: true,
+  });
+  return group.id;
+}
+
 describe("rolling assemblies into one list", () => {
   it("multiplies each material by how many of the assembly there are", () => {
     const entries = aggregateMaterials([
@@ -337,8 +367,7 @@ describeDb("building the list from a real bid", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: asmId,
-      assemblyName: "Recep",
+      groupId: await groupFor(bidId, "Recep", asmId),
       at: [
         { x: 10, y: 10 },
         { x: 20, y: 20 },
@@ -377,18 +406,19 @@ describeDb("building the list from a real bid", () => {
   it("says labor-only when the assembly is present and contains no parts", async () => {
     const bidId = await newBid();
     const sheetId = await newSheet(bidId);
-    const labourOnly = await assembly(`Testing ${uniq()}`, []);
+    const name = `Testing and commissioning ${uniq()}`;
+    const labourOnly = await assembly(name, []);
 
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: labourOnly,
-      assemblyName: "Testing and commissioning",
+      // The group takes the assembly's own name, which is what the note prints.
+      groupId: await groupFor(bidId, name, labourOnly),
       at: [{ x: 5, y: 5 }],
     });
 
     const doc = await caller().materialsList.get({ bidId });
-    const note = doc.notes.find(n => n.includes("Testing and commissioning"))!;
+    const note = doc.notes.find(n => n.includes(name))!;
     expect(note).toContain("labor only");
     expect(note).not.toContain("no longer in the library");
   });
@@ -397,24 +427,27 @@ describeDb("building the list from a real bid", () => {
     const bidId = await newBid();
     const sheetId = await newSheet(bidId);
     const boxId = await material(`Doomed box ${uniq()}`);
-    const asmId = await assembly(`Doomed ${uniq()}`, [
-      { materialId: boxId, qty: 1 },
-    ]);
+    const name = `Doomed assembly ${uniq()}`;
+    const asmId = await assembly(name, [{ materialId: boxId, qty: 1 }]);
 
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: asmId,
-      assemblyName: "Doomed assembly",
+      groupId: await groupFor(bidId, name, asmId),
       at: [{ x: 7, y: 7 }],
     });
-    // Deleting the library row nulls the stamp's assemblyId; the name survives.
-    // Permanent deletion is gated on archiving first, deliberately.
+    /*
+      Deleting the library row nulls BOTH the stamp's assemblyId and the
+      group's, by the same `set null` rule — and the group keeps its label, so
+      the note can still name what was counted. That is the whole reason the
+      label lives on the group rather than being looked up from the library.
+      Permanent deletion is gated on archiving first, deliberately.
+    */
     await caller().assemblies.archive({ id: asmId });
     await caller().assemblies.deleteForever({ id: asmId });
 
     const doc = await caller().materialsList.get({ bidId });
-    const note = doc.notes.find(n => n.includes("Doomed assembly"))!;
+    const note = doc.notes.find(n => n.includes(name))!;
     expect(note).toContain("no longer in the library");
     expect(note).not.toContain("labor only");
   });
@@ -429,8 +462,7 @@ describeDb("building the list from a real bid", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: asmA,
-      assemblyName: "A",
+      groupId: await groupFor(bidId, "A", asmA),
       at: [
         { x: 1, y: 1 },
         { x: 2, y: 2 },
@@ -588,8 +620,7 @@ describeDb("works on a completely unpriced bid", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: asmId,
-      assemblyName: "No settings asm",
+      groupId: await groupFor(bidId, "No settings asm", asmId),
       at: [{ x: 5, y: 5 }],
     });
 
@@ -672,8 +703,7 @@ describeDb("carries no pricing", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: asmId,
-      assemblyName: "Priced asm",
+      groupId: await groupFor(bidId, "Priced asm", asmId),
       at: [
         { x: 1, y: 1 },
         { x: 2, y: 2 },

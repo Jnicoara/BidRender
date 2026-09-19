@@ -102,13 +102,114 @@ beforeEach(async () => {
 
 // ── Pure grouping ────────────────────────────────────────────────────────────
 
+/**
+ * A mark as it looked BEFORE phase 6 — no group, identified by its assembly or
+ * by the name it snapshotted.
+ *
+ * Deliberately still here, and still without a `groupId`. These marks exist in
+ * every database that was in use before the group row shipped, and the counter
+ * has to keep reading them the same way it always did; the tests below are what
+ * says so. New marks are covered by `grouped` underneath.
+ */
 const stamp = (
   id: number,
   assemblyId: number | null,
   name: string,
   x = 0,
   y = 0
-) => ({ id, sheetId: 1, assemblyId, assemblyName: name, x, y });
+) => ({ id, sheetId: 1, groupId: null, assemblyId, name, x, y });
+
+/** A mark placed since phase 6: it belongs to a group, and that is its identity. */
+const inGroup = (id: number, groupId: number, name: string, x = 0, y = 0) => ({
+  id,
+  sheetId: 1,
+  groupId,
+  assemblyId: null,
+  name,
+  x,
+  y,
+});
+
+/**
+ * The group a drop names — found or made, by assembly where there is one and
+ * by label where there is not.
+ *
+ * Phase 6 moved the identity of a count off the mark and onto a
+ * `takeoff_groups` row, so every drop names one. Reusing an existing group for
+ * a repeated label is what keeps these tests saying what they said before: a
+ * test that drops "Recep" three times is testing that one count reaches three,
+ * not that three counts reach one each.
+ */
+async function groupFor(
+  bidId: number,
+  label: string,
+  assemblyId: number | null
+): Promise<number> {
+  if (assemblyId !== null) {
+    const group = await caller().takeoffGroups.forAssembly({
+      bidId,
+      assemblyId,
+    });
+    return group.id;
+  }
+  const group = await caller().takeoffGroups.create({
+    bidId,
+    label,
+    reuseExisting: true,
+  });
+  return group.id;
+}
+
+describe("counting stamps — the group is the identity", () => {
+  it("gathers marks by their GROUP, whatever each one is called", () => {
+    // Renaming a count does not rewrite its marks, so two marks of one group
+    // can legitimately carry different resolved names in flight. The group is
+    // what says they are the same thing.
+    const counted = groupStamps([
+      inGroup(1, 700, "Exit signs"),
+      inGroup(2, 700, "Exit sign"),
+    ]);
+    expect(counted).toHaveLength(1);
+    expect(counted[0].count).toBe(2);
+    expect(counted[0].groupId).toBe(700);
+  });
+
+  it("keeps two groups apart even when they share a label", () => {
+    // The router discourages duplicate labels rather than forbidding them, and
+    // the backfill can produce a pair. Collapsing them on the name would merge
+    // two counts into one quantity — the bug that would reach a bid.
+    const counted = groupStamps([
+      inGroup(1, 701, "Exit signs"),
+      inGroup(2, 702, "Exit signs"),
+    ]);
+    expect(counted).toHaveLength(2);
+    expect(counted.map(c => c.count)).toEqual([1, 1]);
+  });
+
+  it("still counts marks placed before groups existed", () => {
+    // The fallback keys, unchanged. Every database in use before phase 6 is
+    // full of these, and the backfill is not the only thing standing between
+    // them and a correct count.
+    const counted = groupStamps([
+      stamp(1, 10, "Duplex receptacle"),
+      stamp(2, 10, "Duplex receptacle"),
+      stamp(3, null, "Orphan"),
+    ]);
+    expect(counted).toHaveLength(2);
+    expect(counted[0].count).toBe(2);
+    expect(counted[1].count).toBe(1);
+  });
+
+  it("does not mix a grouped mark with an ungrouped one of the same name", () => {
+    // They are different rows with different histories; only the backfill may
+    // join them, and it does that in SQL where it can be checked.
+    const counted = groupStamps([
+      inGroup(1, 703, "Recep"),
+      stamp(2, null, "Recep"),
+    ]);
+    expect(counted).toHaveLength(2);
+  });
+});
 
 describe("counting stamps", () => {
   it("gathers repeated drops of one assembly into a quantity", () => {
@@ -280,14 +381,185 @@ describe("symbol keys", () => {
 
 // ── Through the API ──────────────────────────────────────────────────────────
 
+describe.skipIf(!hasDb)(
+  "counting something the library has never heard of",
+  () => {
+    it("counts a typed name, with no assembly anywhere in it", async () => {
+      // Level 1, which is the whole point of phase 6: a number on a drawing
+      // before anybody knows what the thing costs.
+      const { bidId, sheetId } = await scenario();
+      const group = await caller().takeoffGroups.create({
+        bidId,
+        label: "Exit signs",
+      });
+
+      await caller().takeoffStamps.drop({
+        bidId,
+        sheetId,
+        groupId: group.id,
+        at: [
+          { x: 10, y: 10 },
+          { x: 20, y: 20 },
+          { x: 30, y: 30 },
+        ],
+      });
+
+      const items = await caller().takeoffStamps.countedItems({ sheetId });
+      expect(items).toHaveLength(1);
+      expect((items[0] as { name: string }).name).toBe("Exit signs");
+      expect((items[0] as { count: number }).count).toBe(3);
+
+      // Nothing about an assembly was written, because there is no assembly.
+      const stamps = await caller().takeoffStamps.listForSheet({ sheetId });
+      expect(stamps.every(s => s.assemblyId === null)).toBe(true);
+      expect(stamps.every(s => s.assemblyName === null)).toBe(true);
+      expect(stamps.every(s => s.name === "Exit signs")).toBe(true);
+    });
+
+    it("renames a count without touching a single mark", async () => {
+      // The reason the group is a row: the label has one home, so a rename is
+      // one write and cannot leave fourteen marks disagreeing with the panel.
+      const { bidId, sheetId } = await scenario();
+      const group = await caller().takeoffGroups.create({
+        bidId,
+        label: "Exit signs",
+      });
+      await caller().takeoffStamps.drop({
+        bidId,
+        sheetId,
+        groupId: group.id,
+        at: [{ x: 1, y: 1 }],
+      });
+
+      await caller().takeoffGroups.rename({
+        id: group.id,
+        label: "Exit sign LED",
+      });
+
+      const items = await caller().takeoffStamps.countedItems({ sheetId });
+      expect((items[0] as { name: string }).name).toBe("Exit sign LED");
+      expect((items[0] as { count: number }).count).toBe(1);
+    });
+
+    it("refuses a name this bid is already counting", async () => {
+      const { bidId } = await scenario();
+      await caller().takeoffGroups.create({ bidId, label: "Exit signs" });
+      await expect(
+        caller().takeoffGroups.create({ bidId, label: "  exit signs  " })
+      ).rejects.toThrow(/already counts/i);
+    });
+
+    it("reuses the existing count when a recovery asks it to", async () => {
+      // The one caller allowed to: clicks queued by an older build, which have
+      // no person to tell and must not be dropped on the floor.
+      const { bidId } = await scenario();
+      const first = await caller().takeoffGroups.create({
+        bidId,
+        label: "Exit signs",
+      });
+      const again = await caller().takeoffGroups.create({
+        bidId,
+        label: "Exit signs",
+        reuseExisting: true,
+      });
+      expect(again.id).toBe(first.id);
+    });
+
+    it("gives one assembly one group however often the tool is armed", async () => {
+      // Arming twice in a session must not split one count into two rows.
+      const { bidId } = await scenario();
+      const asm = (await caller().assemblies.create({
+        name: `Armed ${Math.random()}`,
+        category: "Devices",
+        trade: "electrical",
+        projectType: "both",
+        baseLaborHours: 0.5,
+        laborRateId: null,
+        materials: [],
+        modifierIds: [],
+      }))!;
+
+      const one = await caller().takeoffGroups.forAssembly({
+        bidId,
+        assemblyId: asm.id,
+      });
+      const two = await caller().takeoffGroups.forAssembly({
+        bidId,
+        assemblyId: asm.id,
+      });
+      expect(one.created).toBe(true);
+      expect(two.created).toBe(false);
+      expect(two.id).toBe(one.id);
+    });
+
+    it("takes the marks with it when a count is removed", async () => {
+      // Deleting a count IS deleting its marks — by the foreign key, so it
+      // cannot be half done — and it says how many it took.
+      const { bidId, sheetId } = await scenario();
+      const group = await caller().takeoffGroups.create({
+        bidId,
+        label: "Floor boxes",
+      });
+      await caller().takeoffStamps.drop({
+        bidId,
+        sheetId,
+        groupId: group.id,
+        at: [
+          { x: 1, y: 1 },
+          { x: 2, y: 2 },
+        ],
+      });
+
+      const result = await caller().takeoffGroups.remove({ id: group.id });
+      expect(result.removed).toBe(2);
+      expect(
+        await caller().takeoffStamps.listForSheet({ sheetId })
+      ).toHaveLength(0);
+    });
+
+    it("refuses to drop against another bid's count", async () => {
+      const { bidId, sheetId } = await scenario();
+      const other = (await caller().bids.create({
+        name: `Other bid ${Math.random()}`,
+        trades: ["electrical"],
+      }))!;
+      const elsewhere = await caller().takeoffGroups.create({
+        bidId: other.id,
+        label: "Somewhere else",
+      });
+      await expect(
+        caller().takeoffStamps.drop({
+          bidId,
+          sheetId,
+          groupId: elsewhere.id,
+          at: [{ x: 1, y: 1 }],
+        })
+      ).rejects.toThrow(/not on this bid/i);
+    });
+
+    it("refuses another user's count", async () => {
+      const { bidId } = await scenario();
+      const mine = await caller().takeoffGroups.create({
+        bidId,
+        label: "Mine alone",
+      });
+      await expect(
+        callerFor(OTHER_USER).takeoffGroups.rename({
+          id: mine.id,
+          label: "Theirs now",
+        })
+      ).rejects.toThrow(/not on this bid/i);
+    });
+  }
+);
+
 describe.skipIf(!hasDb)("dropping stamps", () => {
   it("records one row per click", async () => {
     const { bidId, sheetId } = await scenario();
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: null,
-      assemblyName: "Duplex receptacle",
+      groupId: await groupFor(bidId, "Duplex receptacle", null),
       at: [
         { x: 100, y: 100 },
         { x: 200, y: 100 },
@@ -301,12 +573,12 @@ describe.skipIf(!hasDb)("dropping stamps", () => {
 
   it("increments the quantity without any quantity being typed", async () => {
     const { bidId, sheetId } = await scenario();
+    const groupId = await groupFor(bidId, "Recep", null);
     const drop = (x: number) =>
       caller().takeoffStamps.drop({
         bidId,
         sheetId,
-        assemblyId: null,
-        assemblyName: "Recep",
+        groupId,
         at: [{ x, y: 50 }],
       });
 
@@ -327,8 +599,7 @@ describe.skipIf(!hasDb)("dropping stamps", () => {
     const result = await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: null,
-      assemblyName: "Recep",
+      groupId: await groupFor(bidId, "Recep", null),
       at: Array.from({ length: 12 }, (_, i) => ({ x: i * 20, y: 40 })),
     });
     expect(result.dropped).toBe(12);
@@ -345,8 +616,7 @@ describe.skipIf(!hasDb)("dropping stamps", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: null,
-      assemblyName: "Recep",
+      groupId: await groupFor(bidId, "Recep", null),
       at: [
         { x: 10, y: 10 },
         { x: 20, y: 20 },
@@ -369,8 +639,7 @@ describe.skipIf(!hasDb)("dropping stamps", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: null,
-      assemblyName: "Recep",
+      groupId: await groupFor(bidId, "Recep", null),
       at: [{ x: 123.5, y: 456.25 }],
     });
     const [placed] = await caller().takeoffStamps.listForSheet({ sheetId });
@@ -404,8 +673,7 @@ describe.skipIf(!hasDb)("dropping stamps", () => {
     const result = await caller().takeoffStamps.drop({
       bidId: bid.id,
       sheetId: sheets[0].id,
-      assemblyId: null,
-      assemblyName: "Recep",
+      groupId: await groupFor(bid.id, "Recep", null),
       at: [{ x: 10, y: 10 }],
     });
     expect(result.dropped).toBe(1);
@@ -417,8 +685,7 @@ describe.skipIf(!hasDb)("dropping stamps", () => {
       callerFor(OTHER_USER).takeoffStamps.drop({
         bidId,
         sheetId,
-        assemblyId: null,
-        assemblyName: "Recep",
+        groupId: await groupFor(bidId, "Recep", null),
         at: [{ x: 1, y: 1 }],
       })
     ).rejects.toThrow(/not found/i);
@@ -431,8 +698,7 @@ describe.skipIf(!hasDb)("the live counted-items list", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: null,
-      assemblyName: "Recep",
+      groupId: await groupFor(bidId, "Recep", null),
       at: [
         { x: 10, y: 10 },
         { x: 20, y: 20 },
@@ -460,8 +726,7 @@ describe.skipIf(!hasDb)("the live counted-items list", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: null,
-      assemblyName: "Recep",
+      groupId: await groupFor(bidId, "Recep", null),
       at: [{ x: 77, y: 88 }],
     });
     const run = await caller().takeoffRuns.save({
@@ -695,8 +960,7 @@ describe.skipIf(!hasDb)("tagging where a placed item sits", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: assembly.id,
-      assemblyName: assembly.name,
+      groupId: await groupFor(bidId, assembly.name, assembly.id),
       at: [{ x: 10, y: 10 }],
     });
 
@@ -709,8 +973,7 @@ describe.skipIf(!hasDb)("tagging where a placed item sits", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: null,
-      assemblyName: "Recep",
+      groupId: await groupFor(bidId, "Recep", null),
       at: [{ x: 1, y: 1 }],
     });
     const [placed] = await caller().takeoffStamps.listForSheet({ sheetId });
@@ -722,8 +985,7 @@ describe.skipIf(!hasDb)("tagging where a placed item sits", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: null,
-      assemblyName: "Recep",
+      groupId: await groupFor(bidId, "Recep", null),
       location: "Wall",
       at: [{ x: 1, y: 1 }],
     });
@@ -736,8 +998,7 @@ describe.skipIf(!hasDb)("tagging where a placed item sits", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: null,
-      assemblyName: "Recep",
+      groupId: await groupFor(bidId, "Recep", null),
       at: [{ x: 1, y: 1 }],
     });
     const [placed] = await caller().takeoffStamps.listForSheet({ sheetId });
@@ -757,8 +1018,7 @@ describe.skipIf(!hasDb)("tagging where a placed item sits", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: null,
-      assemblyName: "Ceiling light",
+      groupId: await groupFor(bidId, "Ceiling light", null),
       at: [
         { x: 1, y: 1 },
         { x: 2, y: 2 },
@@ -768,21 +1028,22 @@ describe.skipIf(!hasDb)("tagging where a placed item sits", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: null,
-      assemblyName: "Wall recep",
+      groupId: await groupFor(bidId, "Wall recep", null),
       at: [{ x: 9, y: 9 }],
     });
 
-    await caller().takeoffStamps.setLocationForAssembly({
+    await caller().takeoffStamps.setLocationForGroup({
       sheetId,
-      assemblyName: "Ceiling light",
+      groupId: await groupFor(bidId, "Ceiling light", null),
       location: "Ceiling/Overhead",
     });
 
     const all = await caller().takeoffStamps.listForSheet({ sheetId });
     expect(all.filter(s => s.location === "Ceiling/Overhead")).toHaveLength(3);
-    // The other assembly is untouched — bulk tagging is scoped, not global.
-    expect(all.find(s => s.assemblyName === "Wall recep")!.location).toBeNull();
+    // The other count is untouched — bulk tagging is scoped, not global.
+    // Found by the resolved name, which is what every screen reads: a plain
+    // count has no assembly snapshot to look it up by.
+    expect(all.find(s => s.name === "Wall recep")!.location).toBeNull();
   });
 
   it("can clear a Location back to untagged", async () => {
@@ -790,8 +1051,7 @@ describe.skipIf(!hasDb)("tagging where a placed item sits", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: null,
-      assemblyName: "Recep",
+      groupId: await groupFor(bidId, "Recep", null),
       location: "Wall",
       at: [{ x: 1, y: 1 }],
     });
@@ -808,8 +1068,7 @@ describe.skipIf(!hasDb)("tagging where a placed item sits", () => {
       caller().takeoffStamps.drop({
         bidId,
         sheetId,
-        assemblyId: null,
-        assemblyName: "Recep",
+        groupId: await groupFor(bidId, "Recep", null),
         location: "Attic" as never,
         at: [{ x: 1, y: 1 }],
       })
@@ -845,8 +1104,7 @@ describe.skipIf(!hasDb)("tagging where a placed item sits", () => {
     await caller().takeoffStamps.drop({
       bidId,
       sheetId,
-      assemblyId: null,
-      assemblyName: "Recep",
+      groupId: await groupFor(bidId, "Recep", null),
       at: [{ x: 1, y: 1 }],
     });
     const [placed] = await caller().takeoffStamps.listForSheet({ sheetId });

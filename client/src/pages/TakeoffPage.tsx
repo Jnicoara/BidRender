@@ -1814,11 +1814,21 @@ export default function TakeoffPage({
   const [recoverable, setRecoverable] =
     useState<ReturnType<typeof loadDraft>>(null);
 
-  // ── Stamping (phase 2c) ───────────────────────────────────────────────────
-  /** The assembly the stamp tool holds. Chosen once, then click, click, click. */
-  const [stampAssembly, setStampAssembly] = useState<{
-    id: number | null;
-    name: string;
+  // ── Stamping (phase 2c, on groups since phase 6) ──────────────────────────
+  /**
+   * What the stamp tool is holding. Chosen once, then click, click, click.
+   *
+   * A GROUP rather than an assembly since phase 6, and that is the whole shape
+   * of the change: the tool no longer needs the library to have heard of the
+   * thing being counted. An assembly is armed by finding or making its group
+   * (takeoffGroups.forAssembly); a plain count is armed by making one. After
+   * that the two are the same path — see server/routers/takeoffGroupsRouter.ts.
+   */
+  const [armedGroup, setArmedGroup] = useState<{
+    groupId: number;
+    label: string;
+    /** Null for a plain count. Kept for the legend panel's active-row mark. */
+    assemblyId: number | null;
   } | null>(null);
   const [selectedStampId, setSelectedStampId] = useState<number | null>(null);
   /** Where a click in the counted-items list sent the viewer. */
@@ -2034,6 +2044,34 @@ export default function TakeoffPage({
     onError: e => toast.error(e.message),
     onSettled: refreshStamps,
   });
+
+  /*
+    Arming the tool, in two flavours that end in the same state.
+
+    A library assembly finds or makes its group; a typed name makes a plain
+    one. Both hand back a group, and from the click onward nothing downstream
+    can tell which door was used — which is the point, and is why the level-1
+    path is not a second stamping mode with its own queue and its own bugs.
+  */
+  const groupForAssembly = trpc.takeoffGroups.forAssembly.useMutation({
+    onError: e => toast.error(e.message),
+  });
+  const createGroup = trpc.takeoffGroups.create.useMutation({
+    onError: e => toast.error(e.message),
+  });
+
+  /** Pick the tool up. One function, so both doors leave the same state. */
+  const armGroup = useCallback(
+    (group: { id: number; label: string }, assemblyId: number | null) => {
+      setArmedGroup({
+        groupId: group.id,
+        label: group.label,
+        assemblyId,
+      });
+      toast.success(`Counting ${group.label} — click to place.`);
+    },
+    []
+  );
   const removeStamp = trpc.takeoffStamps.remove.useMutation({
     onError: e => toast.error(e.message),
     onSettled: refreshStamps,
@@ -2285,12 +2323,11 @@ export default function TakeoffPage({
   const flushTimer = useRef<number | null>(null);
   const queueStamp = useCallback(
     (at: { x: number; y: number }) => {
-      if (!activeSheet || !stampAssembly) return;
+      if (!activeSheet || !armedGroup) return;
       pendingStamps.current = [
         ...pendingStamps.current,
         {
-          assemblyId: stampAssembly.id,
-          assemblyName: stampAssembly.name,
+          groupId: armedGroup.groupId,
           x: at.x,
           y: at.y,
         },
@@ -2306,8 +2343,13 @@ export default function TakeoffPage({
           {
             bidId,
             sheetId: activeSheet.id,
-            assemblyId: batch[0].assemblyId,
-            assemblyName: batch[0].assemblyName,
+            /*
+              Every click in a batch belongs to the armed group, because the
+              batch is flushed whenever the tool changes hands — putting the
+              tool down clears the queue first. Reading it off the first entry
+              would be the same value by a longer route.
+            */
+            groupId: batch[0].groupId ?? 0,
             at: batch.map(b => ({ x: b.x, y: b.y })),
           },
           {
@@ -2322,45 +2364,86 @@ export default function TakeoffPage({
         );
       }, 700);
     },
-    [activeSheet?.id, stampAssembly, bidId, dropStamps]
+    [activeSheet?.id, armedGroup, bidId, dropStamps]
   );
 
-  /** Recover stamps clicked but never sent, after a crash or reload. */
+  /**
+   * Recover stamps clicked but never sent, after a crash or reload.
+   *
+   * ── The queue may predate groups ────────────────────────────────────────
+   * A browser can be holding clicks written by the build before phase 6: the
+   * storage key survives deploys on purpose and the mirror lives for a week.
+   * Those entries name an assembly and know nothing about a group, so one is
+   * found or made for them before they are sent. Discarding them instead would
+   * throw away work that exists nowhere else, which is the failure this whole
+   * mirror exists to prevent.
+   */
   useEffect(() => {
     if (!activeSheet) return;
     const queued = loadStampQueue(activeSheet.id);
     if (!queued || queued.stamps.length === 0) return;
-    dropStamps.mutate(
-      {
-        bidId: queued.bidId,
-        sheetId: activeSheet.id,
-        assemblyId: queued.stamps[0].assemblyId,
-        assemblyName: queued.stamps[0].assemblyName,
-        at: queued.stamps.map(st => ({ x: st.x, y: st.y })),
-      },
-      {
-        onSuccess: () => {
-          clearStampQueue(activeSheet.id);
-          toast.success(
-            `Recovered ${queued.stamps.length} stamp${queued.stamps.length === 1 ? "" : "s"} from your last session.`
-          );
-        },
-      }
-    );
+
+    const sheetId = activeSheet.id;
+    const at = queued.stamps.map(st => ({ x: st.x, y: st.y }));
+    const announce = () => {
+      clearStampQueue(sheetId);
+      toast.success(
+        `Recovered ${queued.stamps.length} mark${queued.stamps.length === 1 ? "" : "s"} from your last session.`
+      );
+    };
+
+    const first = queued.stamps[0];
+    if (typeof first.groupId === "number" && first.groupId > 0) {
+      dropStamps.mutate(
+        { bidId: queued.bidId, sheetId, groupId: first.groupId, at },
+        { onSuccess: announce }
+      );
+      return;
+    }
+
+    // Older shape. The assembly is the honest reading of what was counted; a
+    // queue with only a name becomes a plain count under that name, reusing
+    // one if the bid already has it rather than making a second.
+    const resolve =
+      typeof first.assemblyId === "number" && first.assemblyId > 0
+        ? groupForAssembly.mutateAsync({
+            bidId: queued.bidId,
+            assemblyId: first.assemblyId,
+          })
+        : createGroup.mutateAsync({
+            bidId: queued.bidId,
+            label: first.assemblyName?.trim() || "Recovered count",
+            reuseExisting: true,
+          });
+
+    resolve
+      .then(group =>
+        dropStamps.mutateAsync({
+          bidId: queued.bidId,
+          sheetId,
+          groupId: group.id,
+          at,
+        })
+      )
+      .then(announce)
+      .catch(() => {
+        // Left in storage on purpose: a failed recovery must not be a silent
+        // deletion. The next visit to this sheet tries again.
+      });
   }, [activeSheet?.id]);
 
   /** Escape puts the stamp tool down. */
   useEffect(() => {
-    if (!stampAssembly) return;
+    if (!armedGroup) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        setStampAssembly(null);
+        setArmedGroup(null);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [stampAssembly]);
+  }, [armedGroup]);
 
   /**
    * Everything on the sheet, expressed on the two layer axes.
@@ -2461,8 +2544,9 @@ export default function TakeoffPage({
         visibleStamps.map(st => ({
           id: st.id,
           sheetId: st.sheetId,
+          groupId: st.groupId,
+          name: st.name,
           assemblyId: st.assemblyId,
-          assemblyName: st.assemblyName,
           x: st.x,
           y: st.y,
         }))
@@ -2508,7 +2592,7 @@ export default function TakeoffPage({
         );
         if (inches === null || inches > SUGGEST_WITHIN_INCHES) continue;
         if (!best || inches < best.inches)
-          best = { id: stamp.id, name: stamp.assemblyName, inches };
+          best = { id: stamp.id, name: stamp.name, inches };
       }
       if (
         !best ||
@@ -3231,7 +3315,7 @@ export default function TakeoffPage({
             "these two are a kind, and they need something" without spending a
             pixel of width on saying so.
           */}
-          {stampAssembly ? (
+          {armedGroup ? (
             /*
               Outside the measurability gate on purpose. The control that says
               what is being stamped — and the only way to stop — must not
@@ -3240,10 +3324,10 @@ export default function TakeoffPage({
             <Button
               size="sm"
               className="h-7 gap-1.5 text-xs"
-              onClick={() => setStampAssembly(null)}
+              onClick={() => setArmedGroup(null)}
             >
               <MapPin className="w-3.5 h-3.5" />
-              Stamping {stampAssembly.name}
+              Counting {armedGroup.label}
               <X className="w-3 h-3" />
             </Button>
           ) : (
@@ -3257,8 +3341,20 @@ export default function TakeoffPage({
                 }))}
                 disabled={allAssemblies.length === 0}
                 onPick={assembly => {
-                  setStampAssembly({ id: assembly.id, name: assembly.name });
-                  toast.success(`Stamping ${assembly.name} — click to place.`);
+                  groupForAssembly
+                    .mutateAsync({ bidId, assemblyId: assembly.id })
+                    .then(group => armGroup(group, assembly.id))
+                    .catch(() => {
+                      /* the mutation's onError has already said so */
+                    });
+                }}
+                onCountPlain={label => {
+                  createGroup
+                    .mutateAsync({ bidId, label })
+                    .then(group => armGroup(group, null))
+                    .catch(() => {
+                      /* a duplicate name is refused by name, and said so */
+                    });
                 }}
               />
             )
@@ -3397,7 +3493,7 @@ export default function TakeoffPage({
                 onClick={() => {
                   setCalibratePoints([]);
                   setCalibrating(true);
-                  setStampAssembly(null);
+                  setArmedGroup(null);
                 }}
                 title="Set this sheet's scale by clicking two points you know the distance between"
               >
@@ -3753,11 +3849,11 @@ export default function TakeoffPage({
                       onCancel={cancelTrace}
                       selectedRunId={selectedRunId}
                       onSelectRun={setSelectedRunId}
-                      stamping={Boolean(stampAssembly) && !tracing}
-                      stampAssemblyName={stampAssembly?.name ?? null}
+                      stamping={Boolean(armedGroup) && !tracing}
+                      armedGroupName={armedGroup?.label ?? null}
                       stamps={visibleStamps.map(st => ({
                         id: st.id,
-                        assemblyName: st.assemblyName,
+                        name: st.name,
                         x: st.x,
                         y: st.y,
                       }))}
@@ -3902,7 +3998,7 @@ export default function TakeoffPage({
                       name: a.name,
                       category: a.category,
                     }))}
-                    activeAssemblyId={stampAssembly?.id ?? null}
+                    activeAssemblyId={armedGroup?.assemblyId ?? null}
                     capturing={capturingSymbol}
                     onStartCapture={() => setCapturingSymbol(true)}
                     onCancelCapture={() => setCapturingSymbol(false)}
@@ -3916,13 +4012,12 @@ export default function TakeoffPage({
                         a => a.id === symbol.assemblyId
                       );
                       if (!assembly) return;
-                      setStampAssembly({
-                        id: assembly.id,
-                        name: assembly.name,
-                      });
-                      toast.success(
-                        `Stamping ${assembly.name} — click to place.`
-                      );
+                      groupForAssembly
+                        .mutateAsync({ bidId, assemblyId: assembly.id })
+                        .then(group => armGroup(group, assembly.id))
+                        .catch(() => {
+                          /* the mutation's onError has already said so */
+                        });
                     }}
                   />
                 </>

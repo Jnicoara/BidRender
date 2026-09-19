@@ -954,6 +954,41 @@ directory, so nothing touches the files you are working in.
       deleted. Tracked under "Test suite health" above; noted here too because
       this is the section someone reads when something inexplicable happens.
 
+**Four tables are on a different collation from the other 49, and the next
+join against one of them will fail with no clue why.** Found 2026-09-18 while
+writing the phase 6 backfill.
+
+Every table in this schema is `utf8mb4_unicode_ci`. The DATABASE default is
+`utf8mb4_0900_ai_ci`, and drizzle-kit's `CREATE TABLE` names no collation — so
+a new table silently takes the database's instead. These four did:
+
+- `ai_usage_daily`
+- `bid_mounting_heights`
+- `takeoff_height_defaults`
+- `takeoff_mounting_heights`
+
+**Nothing is broken today.** It only bites when a string column of one of them
+is compared with a string column of an older table, and nothing does that yet.
+When something does, MySQL refuses the whole statement:
+
+```
+ER_CANT_AGGREGATE_2COLLATIONS: Illegal mix of collations for operation '='
+```
+
+which says nothing about tables, columns or why, and lands wherever the query
+runs — including inside a migration, mid-file, with earlier statements already
+applied. That is exactly how it was found: the backfill joined a new table's
+`label` to an old table's `assemblyName` and stopped on statement 4 of 4.
+
+- [ ] Decide whether to convert these four to `utf8mb4_unicode_ci`. **Not
+      urgent, and not obviously worth it**: `ALTER TABLE … CONVERT TO CHARACTER
+    SET` rewrites a live table, which is real risk for a problem nothing is
+      currently hitting. The cheap half is already done — every new table names
+      its collation explicitly (references/deploying.md § 5, and
+      `drizzle/0053_worried_puppet_master.sql` as the worked example) — so the
+      list above can only shrink, never grow. Read this entry before writing a
+      query that joins one of their text columns to anything older.
+
 **`pnpm test` WRITES TO WHATEVER `DATABASE_URL` POINTS AT, and in this
 checkout that is the local dev database.** Hit 2026-09-18 — the suite was run
 twice against `bidrender_local` before anyone read the warning `.env` carries

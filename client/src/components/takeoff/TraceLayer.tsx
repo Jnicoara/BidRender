@@ -58,7 +58,8 @@ const RUN_COLOR: Record<RunPathType, string> = {
 
 export type PlacedStamp = {
   id: number;
-  assemblyName: string;
+  /** What it is counting — the group's label. See shared/takeoffCounts.ts. */
+  name: string;
   x: number;
   y: number;
 };
@@ -100,7 +101,7 @@ export function TraceLayer({
   selectedRunId,
   onSelectRun,
   stamping,
-  stampAssemblyName,
+  armedGroupName,
   stamps,
   proposals,
   onDropStamp,
@@ -126,7 +127,7 @@ export function TraceLayer({
   onSelectRun: (id: number | null) => void;
   /** The stamp tool is armed: clicks drop instances of the chosen assembly. */
   stamping: boolean;
-  stampAssemblyName: string | null;
+  armedGroupName: string | null;
   stamps: PlacedStamp[];
   /** Awaiting the user's decision. Never counted, never priced. */
   proposals?: ProposedStamp[];
@@ -348,7 +349,7 @@ export function TraceLayer({
                 strokeWidth={isSelected ? 3.5 : 2.5}
               />
               <circle cx={at.x} cy={at.y} r={3} fill="#F5C518" />
-              <title>{placed.assemblyName}</title>
+              <title>{placed.name}</title>
             </g>
           );
         })}
@@ -455,10 +456,16 @@ export function TraceLayer({
             trace — that part was never about the notice.
           */}
 
-          {stamping && stampAssemblyName && (
+          {stamping && armedGroupName && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-[#F5C518]/50 bg-card/95 px-3 py-1.5 shadow-lg pointer-events-auto">
-              <span className="text-xs text-muted-foreground">Stamping</span>
-              <span className="text-sm font-medium">{stampAssemblyName}</span>
+              {/*
+                "Counting", not "Stamping", since phase 6: a plain count has no
+                stamp behind it, and the panel this feeds is called Counted
+                items. One verb across the screen, and it is the true one for
+                all four levels.
+              */}
+              <span className="text-xs text-muted-foreground">Counting</span>
+              <span className="text-sm font-medium">{armedGroupName}</span>
               <span className="text-[0.7rem] text-muted-foreground">
                 click to place · Esc to stop
               </span>
