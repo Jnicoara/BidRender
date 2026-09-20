@@ -576,8 +576,31 @@ export const takeoffRunsRouter = router({
       z.object({
         runId: z.number().int().positive(),
         name: nameSchema,
-        /** Bounded at 60: a raceway with more conductors is a data-entry slip. */
+        /**
+         * INSULATED conductors. The ground is counted separately, below.
+         *
+         * Bounded at 60: a raceway with more conductors is a data-entry slip.
+         */
         conductorCount: z.number().int().min(1).max(60),
+        /**
+         * Grounds. One on almost every circuit, two on an isolated ground.
+         *
+         * ── DEFAULTS TO ZERO, and the tempting answer is 1 ─────────────────
+         * A new circuit almost always has a ground, so defaulting to 1 reads as
+         * the helpful choice. It is not, because of what the EXISTING caller
+         * sends: the panel passes `conductorCount: 3` and nothing else, meaning
+         * "2 and a ground" under the old convention — three wires. Defaulting
+         * the ground to 1 would turn that same call into four wires, silently,
+         * on every circuit anyone adds. A 33% wire increase with nothing on
+         * screen to say so.
+         *
+         * So absent stays ZERO here, exactly as it is in the column (0061), in
+         * `RunCircuit`, and in `circuitWire`. One meaning for "nobody said",
+         * everywhere. The panel starts sending 2 and 1 explicitly when it
+         * learns about grounds, and then the number is a person's, not a
+         * default's.
+         */
+        groundCount: z.number().int().min(0).max(10).default(0),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -594,6 +617,7 @@ export const takeoffRunsRouter = router({
         userId: ctx.scope.dataUserId,
         name: input.name,
         conductorCount: input.conductorCount,
+        groundCount: input.groundCount,
       });
       return { id };
     }),
@@ -604,6 +628,15 @@ export const takeoffRunsRouter = router({
         id: z.number().int().positive(),
         name: nameSchema.optional(),
         conductorCount: z.number().int().min(1).max(60).optional(),
+        /**
+         * Omitted leaves it alone, as with every other field here.
+         *
+         * Deliberately NOT defaulted on this path: an edit that names only the
+         * conductor count must not silently give a circuit a ground it did not
+         * have, which is the difference between changing what somebody typed
+         * and changing what they did not.
+         */
+        groundCount: z.number().int().min(0).max(10).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {

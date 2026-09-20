@@ -4054,9 +4054,7 @@ export async function updateBidPdfSheet(
  * rows that are already in scope. The callers below have verified the bid
  * before they get here.
  */
-async function stampCountsForBid(
-  bidId: number
-): Promise<Map<number, number>> {
+async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
   const db = await getDb();
   if (!db) return new Map();
   const rows = await db
@@ -4153,15 +4151,10 @@ export async function getBidLineItems(bidId: number): Promise<BidLineItem[]> {
 }
 
 /** Groups on a bid, without the user filter — see `stampCountsForBid`. */
-async function getGroupsForBidUnscoped(
-  bidId: number
-): Promise<TakeoffGroup[]> {
+async function getGroupsForBidUnscoped(bidId: number): Promise<TakeoffGroup[]> {
   const db = await getDb();
   if (!db) return [];
-  return db
-    .select()
-    .from(takeoffGroups)
-    .where(eq(takeoffGroups.bidId, bidId));
+  return db.select().from(takeoffGroups).where(eq(takeoffGroups.bidId, bidId));
 }
 
 /** Archived lines only — for showing what a bulk archive removed, and undoing it. */
@@ -5598,16 +5591,40 @@ export async function forkRunType(id: number, userId: number): Promise<number> {
   if (!source) throw new Error("Run type not found");
   if (source.userId !== null) return source.id;
 
+  /*
+    Everything EXCEPT identity and lifecycle, rather than a list of the
+    specification columns.
+
+    The list used to be the other way round — label, pathType, trade, raceway,
+    conductor, conductorCount — and it was one column out of date within minutes
+    of `groundMaterialId` and `groundCount` existing: a fork of a shipped type
+    would have silently dropped the ground it was forked from. Same failure as
+    the three routers that hand-built a circuit and lost `groundCount` the day
+    it split (shared/takeoffQuantities.ts, `circuitWire`).
+
+    Excluding is the stable half. What must NOT be copied is a short list that
+    changes when the TABLE'S IDENTITY changes, which is almost never; what must
+    be copied is every specification column, which changes whenever the feature
+    grows. Naming the short list means a new column is forked by default.
+  */
+  const {
+    id: _id,
+    userId: _userId,
+    baselineId: _baselineId,
+    baselineVersion: _baselineVersion,
+    version: _version,
+    status: _status,
+    archivedAt: _archivedAt,
+    createdAt: _createdAt,
+    updatedAt: _updatedAt,
+    ...specification
+  } = source;
+
   return createRunType({
+    ...specification,
     userId,
     baselineId: source.id,
     baselineVersion: source.version,
-    label: source.label,
-    pathType: source.pathType,
-    trade: source.trade,
-    racewayMaterialId: source.racewayMaterialId,
-    conductorMaterialId: source.conductorMaterialId,
-    conductorCount: source.conductorCount,
   });
 }
 

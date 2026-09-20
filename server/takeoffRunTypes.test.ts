@@ -18,7 +18,7 @@
  * parallel and shared ids delete each other's rows mid-run.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, isNull } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
 import {
@@ -490,5 +490,81 @@ describeDb("saying what an already-traced run is", () => {
         runTypeId: null,
       })
     ).rejects.toThrow();
+  });
+});
+
+describeDb("the ground travels with the type", () => {
+  it("carries the ground through a fork, like every other specification column", async () => {
+    // The regression this exists for: `forkRunType` used to hand-list the
+    // columns it copied, so the day `groundMaterialId` and `groundCount` were
+    // added, forking a shipped type would have dropped the ground it was
+    // forked from — silently, and only visible to whoever forked it.
+    const wire = await caller().materials.create({
+      name: `Fork fixture ground ${uniq()}`,
+      unitOfSale: "foot",
+      costPerUnit: 0.11,
+      category: "Grounding & Bonding",
+    });
+    const mine = await caller().takeoffRunTypes.create({
+      label: `Forkable ${uniq()}`,
+      pathType: "conduit",
+      conductorCount: 2,
+      groundMaterialId: wire!.id,
+      groundCount: 1,
+    });
+
+    // Fork it by editing, which is the only way a fork happens.
+    const shipped = (await caller().takeoffRunTypes.list()).find(
+      t => t.isShipped && t.pathType === "conduit"
+    )!;
+    const forked = await caller().takeoffRunTypes.update({
+      id: shipped.id,
+      label: `${shipped.label} — forked ${uniq()}`,
+    });
+    expect(forked.forked).toBe(true);
+
+    const after = (await caller().takeoffRunTypes.list()).find(
+      t => t.id === forked.id
+    )!;
+    // The shipped rows carry a ground after 0064, so the fork must too.
+    expect(after.groundCount).toBe(shipped.groundCount);
+    expect(after.groundMaterialId).toBe(shipped.groundMaterialId);
+    expect(after.conductorCount).toBe(shipped.conductorCount);
+
+    // And a type created with a ground keeps it.
+    const kept = (await caller().takeoffRunTypes.list()).find(
+      t => t.id === mine.id
+    )!;
+    expect(kept.groundCount).toBe(1);
+    expect(kept.groundMaterialName).toBe(wire!.name);
+  });
+
+  it("splits the shipped types, so the label and the numbers agree", async () => {
+    /*
+      Read from the TABLE, not from a palette.
+
+      The first version of this asked `takeoffRunTypes.list()` for shipped rows
+      and found none — because tests earlier in this file fork them, and a
+      forked baseline is hidden from that user's palette by design. The test was
+      order-dependent and would have passed or failed depending on what ran
+      before it.
+
+      The claim is about the shipped rows themselves — what 0064 left in the
+      database — so it is asked of the database. "2 #12 + ground" stores a 2 and
+      a 1 rather than a 3 that has to be explained.
+    */
+    const db = await getDb();
+    const shipped = await db!
+      .select()
+      .from(takeoffRunTypes)
+      .where(isNull(takeoffRunTypes.userId));
+    const conduit = shipped.filter(t => t.pathType === "conduit");
+    expect(conduit.length).toBeGreaterThan(0);
+    for (const type of conduit) {
+      expect(type.groundCount).toBe(1);
+      expect(type.conductorCount).toBeGreaterThanOrEqual(1);
+      // The label says "+ ground" and the columns now agree with it.
+      expect(type.label).toMatch(/ground/i);
+    }
   });
 });

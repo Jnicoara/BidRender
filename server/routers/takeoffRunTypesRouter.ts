@@ -44,14 +44,31 @@ const labelSchema = z
   .max(255);
 
 /**
- * Conductors in one circuit, INCLUDING the ground.
+ * INSULATED conductors in one circuit. The ground is counted separately.
  *
- * Matches takeoff_run_circuits.conductorCount, which counts the same way. § 2.1
- * records that separating the ground is the right call and mechanical to
- * migrate; until then this must not invent a second convention, because two
- * meanings for one number is worse than one imperfect meaning.
+ * ── This used to say "INCLUDING the ground", and the note predicted its own
+ *    replacement ──────────────────────────────────────────────────────────
+ * It said § 2.1 recorded separating the ground as the right call and
+ * mechanical to migrate, and that until then this file must not invent a second
+ * convention "because two meanings for one number is worse than one imperfect
+ * meaning". That happened on 2026-09-20: migrations 0061-0064 split the ground
+ * into its own column and its own count, and the shipped type labelled
+ * "2 #12 + ground" now stores a 2 and a 1 rather than a 3 that had to be
+ * explained.
+ *
+ * The old note was right to refuse a second convention while only one column
+ * existed. There are two columns now, so there is one meaning each.
  */
 const conductorCountSchema = z.number().int().min(1).max(100).nullable();
+
+/**
+ * Grounds in one circuit of this type. NULL means the type does not say.
+ *
+ * Null rather than 0 for the same reason `conductorCount` is nullable: a
+ * half-defined type is honest about what it has not been told, and a zero here
+ * would be a claim that this run carries no ground.
+ */
+const groundCountSchema = z.number().int().min(0).max(10).nullable();
 
 async function requireOwnType(id: number, userId: number) {
   const type = await db.getRunTypeById(id, userId);
@@ -121,9 +138,11 @@ export const takeoffRunTypesRouter = router({
         (
           await db.getMaterialsByIds(
             types.flatMap(t =>
-              [t.racewayMaterialId, t.conductorMaterialId].filter(
-                (id): id is number => id !== null
-              )
+              [
+                t.racewayMaterialId,
+                t.conductorMaterialId,
+                t.groundMaterialId,
+              ].filter((id): id is number => id !== null)
             ),
             ctx.scope.dataUserId
           )
@@ -138,10 +157,13 @@ export const takeoffRunTypesRouter = router({
         pathType: type.pathType,
         racewayMaterialId: type.racewayMaterialId,
         conductorMaterialId: type.conductorMaterialId,
+        groundMaterialId: type.groundMaterialId,
         /** Resolved above. Null for no link AND for a link that no longer resolves. */
         racewayMaterialName: nameOf(type.racewayMaterialId),
         conductorMaterialName: nameOf(type.conductorMaterialId),
+        groundMaterialName: nameOf(type.groundMaterialId),
         conductorCount: type.conductorCount,
+        groundCount: type.groundCount,
         status: type.status,
         /** True for a row the app ships. Read-only until it is forked. */
         isShipped: type.userId === null,
@@ -152,6 +174,15 @@ export const takeoffRunTypesRouter = router({
          * material being the one whose cost is 0, rather than a second flag
          * that can drift out of step with the thing it describes.
          */
+        /*
+          The ground is deliberately NOT part of this test.
+
+          A type with a raceway and a conductor is specified; one that also
+          names a ground is specified in more detail. Counting the ground here
+          would push every type that predates the split back into "needs a
+          specification" on the day it shipped, which is a screen full of
+          warnings about work nobody did wrong.
+        */
         needsSpecification:
           type.racewayMaterialId === null && type.conductorMaterialId === null,
         runCount: counts.get(type.id) ?? 0,
@@ -172,6 +203,9 @@ export const takeoffRunTypesRouter = router({
           .nullable()
           .default(null),
         conductorCount: conductorCountSchema.default(null),
+        /** The ground wire itself — bare copper, or the green insulated one. */
+        groundMaterialId: z.number().int().positive().nullable().default(null),
+        groundCount: groundCountSchema.default(null),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -183,6 +217,8 @@ export const takeoffRunTypesRouter = router({
         racewayMaterialId: input.racewayMaterialId,
         conductorMaterialId: input.conductorMaterialId,
         conductorCount: input.conductorCount,
+        groundMaterialId: input.groundMaterialId,
+        groundCount: input.groundCount,
       });
       return { id, label: input.label, pathType: input.pathType };
     }),
@@ -203,6 +239,8 @@ export const takeoffRunTypesRouter = router({
         racewayMaterialId: z.number().int().positive().nullable().optional(),
         conductorMaterialId: z.number().int().positive().nullable().optional(),
         conductorCount: conductorCountSchema.optional(),
+        groundMaterialId: z.number().int().positive().nullable().optional(),
+        groundCount: groundCountSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
