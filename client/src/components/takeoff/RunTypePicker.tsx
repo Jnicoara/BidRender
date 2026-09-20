@@ -104,6 +104,56 @@ const draftOf = (type: PickableRunType): Draft => ({
 });
 
 /**
+ * A whole-number count in a DRAFT form, blank when nobody has said.
+ *
+ * ── Not InlineNumberField, and not by omission ──────────────────────────────
+ * That component saves as you type, and its own header says a field inside an
+ * explicit Save/Cancel form wants `selectOnFocus` alone. Here the draft IS the
+ * state and Save is the commit, so there is nothing to persist per keystroke.
+ *
+ * ── Blank is unset, and that is the whole point of it being a component ─────
+ * A count of zero conductors is a claim, and a false one. This shipped once as
+ * a plain `0` in the field that decides how much wire gets bought — the second
+ * time in this app after `0 ft 0 in` under a caption reading "not set". It is a
+ * component rather than a copied input so the next count beside it cannot make
+ * the same choice independently.
+ */
+function CountField({
+  value,
+  onChange,
+  min = 1,
+  max = 100,
+  ariaLabel,
+}: {
+  value: number | null;
+  onChange: (next: number | null) => void;
+  min?: number;
+  max?: number;
+  ariaLabel: string;
+}) {
+  return (
+    <Input
+      value={value === null ? "" : String(value)}
+      onChange={e => {
+        const raw = e.target.value.trim();
+        if (raw === "") {
+          onChange(null);
+          return;
+        }
+        const next = Number(raw);
+        if (!Number.isFinite(next)) return;
+        onChange(Math.min(max, Math.max(min, Math.floor(next))));
+      }}
+      onFocus={selectOnFocus}
+      inputMode="numeric"
+      placeholder="not set"
+      className="h-7 w-16 text-xs"
+      aria-label={ariaLabel}
+    />
+  );
+}
+
+/**
  * One material slot: what is in it, and how to change it.
  *
  * Collapsed to a line until somebody asks, because two open search boxes in a
@@ -380,50 +430,13 @@ export function RunTypePicker({
                   because two meanings for one number is worse than one
                   imperfect meaning — § 2.1 of the overhaul document.
                 */}
-                {/*
-                  A plain field, not InlineNumberField, and both halves of that
-                  matter.
-
-                  This is an explicit Save/Cancel form, and that component's own
-                  header says a field inside one wants `selectOnFocus` alone —
-                  it saves as you type, which would write half a specification
-                  every time somebody paused.
-
-                  And UNSET IS BLANK, never 0. A count of zero conductors is a
-                  claim, and a false one; "nobody has said yet" is the state
-                  this actually starts in. CLAUDE.md records the same failure
-                  shipping once already, as `0 ft 0 in` under a caption reading
-                  "not set", in the feature whose whole point was that an unset
-                  height must not look like a zero.
-                */}
                 <div className="flex items-center gap-2 mt-1">
-                  <Input
-                    value={
-                      draft.conductorCount === null
-                        ? ""
-                        : String(draft.conductorCount)
+                  <CountField
+                    value={draft.conductorCount}
+                    onChange={conductorCount =>
+                      setDraft({ ...draft, conductorCount })
                     }
-                    onChange={e => {
-                      const raw = e.target.value.trim();
-                      if (raw === "") {
-                        setDraft({ ...draft, conductorCount: null });
-                        return;
-                      }
-                      const next = Number(raw);
-                      if (!Number.isFinite(next)) return;
-                      setDraft({
-                        ...draft,
-                        conductorCount: Math.min(
-                          100,
-                          Math.max(1, Math.floor(next))
-                        ),
-                      });
-                    }}
-                    onFocus={selectOnFocus}
-                    inputMode="numeric"
-                    placeholder="not set"
-                    className="h-7 w-16 text-xs"
-                    aria-label="Conductors per circuit"
+                    ariaLabel="Conductors per circuit"
                   />
                   <span className="text-[0.7rem] text-muted-foreground">
                     ground included

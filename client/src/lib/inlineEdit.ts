@@ -84,6 +84,69 @@ export function commitNumericEdit(
 }
 
 /**
+ * What an unset value looks like. The call site names the convention.
+ *
+ * Two of them, and both are deliberate:
+ *
+ *   "zero"       MONEY. Unset renders as 0 and shouts — an unpriced material
+ *                is the one showing $0, and a blank would read as "not
+ *                applicable".
+ *   placeholder  MEASUREMENT. Unset must never render as 0, because zero is a
+ *                legitimate answer and would read as a considered one.
+ */
+export type UnsetMode = "zero" | { placeholder: string };
+
+/** `commitNumericEdit`, plus the one outcome a nullable field adds. */
+export type NullableCommitOutcome =
+  | CommitOutcome
+  | { action: "clear"; reason: string };
+
+/**
+ * Decide what Enter or blur means for a field whose value may be UNSET.
+ *
+ * ── The one rule this exists to enforce ──────────────────────────────────────
+ * **An emptied box in placeholder mode is never a zero.** `allowEmpty` makes a
+ * blank commit as 0, which is correct for money and a lie for a measurement —
+ * and the lie has shipped twice: `0 ft 0 in` under a caption reading "not set",
+ * and an unset conductor count rendering as 0 in the field that decides how
+ * much wire gets bought.
+ *
+ * It lives here rather than in the component because a component cannot be
+ * tested in this repo — `vitest.config.ts` covers server, `client/src/lib` and
+ * scripts. Putting the DECISION in a pure function is what gives the rule a red
+ * to go to, which is the whole difference between a rule and a guard.
+ */
+export function commitNullableEdit(
+  draft: string,
+  savedValue: number | null,
+  mode: UnsetMode,
+  rules: NumericFieldRules = {}
+): NullableCommitOutcome {
+  const trimmed = draft.trim();
+
+  // Money: a blank IS a zero here, and the call site said so.
+  if (mode === "zero") return commitNumericEdit(draft, savedValue ?? 0, rules);
+
+  if (trimmed === "") {
+    // Already unset — emptying an empty box writes nothing and flashes nothing.
+    if (savedValue === null) return { action: "none" };
+    return { action: "clear", reason: "emptied" };
+  }
+
+  /*
+    Compared against NaN when nothing is stored, and that is not a trick.
+
+    A field showing its placeholder and then typed with "0" HAS moved: it went
+    from "nobody said" to "somebody said zero", and those are different facts.
+    Comparing against a stand-in 0 would call that no change and write nothing
+    — the same conflation this function exists to stop, one level up. NaN
+    equals nothing, so every valid entry counts as a change, and an invalid one
+    still reverts.
+  */
+  return commitNumericEdit(draft, savedValue ?? Number.NaN, rules);
+}
+
+/**
  * What Escape does: the text the field should show, discarding the draft.
  *
  * Deliberately derives from the saved VALUE rather than remembering the text

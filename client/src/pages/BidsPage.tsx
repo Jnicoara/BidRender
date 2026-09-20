@@ -902,7 +902,9 @@ export default function BidsPage({
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     <span className="text-foreground font-medium">
                       {fromPlans.countedWithNoPrice} count
-                      {fromPlans.countedWithNoPrice === 1 ? " has" : "s have"}{" "}
+                      {fromPlans.countedWithNoPrice === 1
+                        ? " has"
+                        : "s have"}{" "}
                       no price
                     </span>{" "}
                     — they are marked on your plans and can never reach this
@@ -1202,12 +1204,25 @@ export default function BidsPage({
                         <SelectItem value="flat">Flat $</SelectItem>
                       </SelectContent>
                     </Select>
+                    {/*
+                      The fifth of this family, and the one that hid: the
+                      fallback sat inside a ternary, so an audit that looked
+                      for `?? 0` beside a `value` prop walked straight past it.
+
+                      Overhead is switched on for this bid here, and the value
+                      is seeded from the company at that moment — but if it
+                      ever were not, "0%" would read as a decision rather than
+                      as a blank.
+                    */}
                     <InlineNumberField
                       value={
-                        bid.overheadMode === "flat"
-                          ? Number(bid.overheadValue ?? 0)
-                          : asPercent(Number(bid.overheadValue ?? 0))
+                        bid.overheadValue === null
+                          ? null
+                          : bid.overheadMode === "flat"
+                            ? Number(bid.overheadValue)
+                            : asPercent(Number(bid.overheadValue))
                       }
+                      whenUnset={{ placeholder: "company default" }}
                       onSave={raw =>
                         updateBid.mutate({
                           id: bid.id,
@@ -1268,8 +1283,22 @@ export default function BidsPage({
                   </SelectContent>
                 </Select>
                 {bid.profitMethod && (
+                  /*
+                    NULL here means "follow the company default", never zero.
+
+                    It was `?? 0`, which was safe only because this field is
+                    gated on `profitMethod` — a claim about a sibling
+                    expression, and one refactor away from printing "0% profit"
+                    on a bid that is inheriting 15%. Now the fallback says what
+                    it means and cannot lie about money.
+                  */
                   <InlineNumberField
-                    value={asPercent(Number(bid.profitValue ?? 0))}
+                    value={
+                      bid.profitValue === null
+                        ? null
+                        : asPercent(Number(bid.profitValue))
+                    }
+                    whenUnset={{ placeholder: "company default" }}
                     onSave={raw =>
                       updateBid.mutate({
                         id: bid.id,
@@ -1332,7 +1361,12 @@ export default function BidsPage({
                 </Select>
                 {bid.productivityPct !== null && (
                   <InlineNumberField
-                    value={asPercent(Number(bid.productivityPct ?? 0))}
+                    value={
+                      bid.productivityPct === null
+                        ? null
+                        : asPercent(Number(bid.productivityPct))
+                    }
+                    whenUnset={{ placeholder: "company default" }}
                     onSave={raw =>
                       updateBid.mutate({
                         id: bid.id,

@@ -8,6 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
+  commitNullableEdit,
   asPercent,
   commitNumericEdit,
   formatForEdit,
@@ -237,5 +238,76 @@ describe("keys the field does not claim", () => {
     // "enter" is not a key name; treating it as one would mean a stray handler
     // silently never firing.
     expect(planFieldKey("enter", "panel")).toEqual({ action: "pass" });
+  });
+});
+
+describe("a field whose value may be unset", () => {
+  /**
+   * ── What these are defending ───────────────────────────────────────────────
+   * One rule: an emptied box in placeholder mode is never a zero. It has
+   * shipped twice — "0 ft 0 in" under a caption reading "not set", and an
+   * unset conductor count rendering as 0 in the field that decides how much
+   * wire gets bought. The component cannot be tested in this repo, so the
+   * decision lives here, where it can go red.
+   */
+  const measured = { placeholder: "not set" } as const;
+
+  it("clears rather than saving zero when the box is emptied", () => {
+    expect(commitNullableEdit("", 3, measured, { allowEmpty: true })).toEqual({
+      action: "clear",
+      reason: "emptied",
+    });
+  });
+
+  it("ignores allowEmpty, which is exactly the trapdoor", () => {
+    // allowEmpty makes commitNumericEdit save 0 for a blank. That is right for
+    // money and a lie for a measurement, and this is the line between them.
+    expect(commitNumericEdit("", 3, { allowEmpty: true })).toEqual({
+      action: "save",
+      value: 0,
+    });
+    expect(
+      commitNullableEdit("", 3, measured, { allowEmpty: true }).action
+    ).toBe("clear");
+  });
+
+  it("writes nothing when an already-unset field is left empty", () => {
+    expect(commitNullableEdit("", null, measured)).toEqual({ action: "none" });
+  });
+
+  it("treats a typed zero as a real answer, not as no change", () => {
+    // "nobody said" and "somebody said zero" are different facts, and a field
+    // showing its placeholder that is then typed with 0 has moved.
+    expect(commitNullableEdit("0", null, measured)).toEqual({
+      action: "save",
+      value: 0,
+    });
+  });
+
+  it("still reverts what is not a number", () => {
+    expect(commitNullableEdit("abc", null, measured).action).toBe("revert");
+    expect(commitNullableEdit("abc", 3, measured).action).toBe("revert");
+  });
+
+  it("still enforces the range against an unset value", () => {
+    expect(commitNullableEdit("200", null, measured, { max: 100 }).action).toBe(
+      "revert"
+    );
+  });
+
+  it("writes nothing when the number has not moved", () => {
+    expect(commitNullableEdit("3", 3, measured)).toEqual({ action: "none" });
+  });
+
+  it("keeps the money convention intact: a blank IS a zero there", () => {
+    // The opposite answer, on purpose. An unpriced material is the one showing
+    // $0, and the Materials screen filters to exactly those.
+    expect(commitNullableEdit("", 12, "zero", { allowEmpty: true })).toEqual({
+      action: "save",
+      value: 0,
+    });
+    expect(commitNullableEdit("", null, "zero", { allowEmpty: true })).toEqual({
+      action: "none",
+    });
   });
 });

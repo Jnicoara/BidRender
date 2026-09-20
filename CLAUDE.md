@@ -280,6 +280,21 @@ it TWICE and looking at the second run, which touched nothing. **A measurement
 needs the same suspicion as an assumption: ask what else would produce this
 number.**
 
+**A GREP IS A MEASUREMENT, AND IT MEASURES THE PATTERN YOU TYPED.** Added
+2026-09-20, from an audit that missed one of the things it was auditing for.
+Five numeric fields fell back to `?? 0`; the audit searched for `?? 0` beside a
+`value` prop and found four, because the fifth was written
+`mode === "flat" ? Number(x ?? 0) : asPercent(Number(x ?? 0))` and the pattern
+never appeared where the search expected it. The count was then reported as a
+fact — four sites, all accounted for — and a decision was made on it.
+
+**An audit that searches for a shape finds that shape, not the problem.** So:
+search for the thing that CANNOT be written differently — here the nullable
+column, or the component's own name — rather than the idiom somebody happened
+to use. Read every hit rather than counting them. And when an audit reports a
+total, say what it searched for, so the next reader can see the gap between the
+question and the answer.
+
 **So a plan that states a number should say where the number came from**, and a
 number with no source is a question rather than a fact. The measurements that
 survive belong next to the code that depends on them: see the table in
@@ -930,6 +945,56 @@ Invalid input reverts rather than erroring — an inline field has nowhere to pu
 a message, and leaving a bad draft on screen is how someone comes to believe
 they saved something they did not. Blank never silently becomes zero unless the
 field opts in with `allowEmpty`: a zero quantity prices work at nothing.
+
+### 6. UNSET is not zero, and which one to show is a decision you must name
+
+**Added 2026-09-20, after the same mistake shipped twice.** The job heights
+popover rendered `0 ft 0 in` under a caption reading "not set". Two days later
+an unset conductor count rendered as `0` — in the field that decides how much
+wire gets bought.
+
+**Neither was a careless line. Both were the shortest thing to write**, because
+`InlineNumberField` took a `value: number`, so every caller with a nullable
+column had to supply something, and `?? 0` is four characters. **Five call sites
+did it**, and the fifth hid inside a ternary where an audit for `?? 0` beside a
+`value` prop walked past it.
+
+**There is no single right answer, because this app has two opposite
+conventions and both are load-bearing:**
+
+- **MONEY — unset renders as 0, and shouts.** An unpriced material IS the one
+  showing `$0`, and the Materials screen filters to exactly those. A blank
+  there would read as "not applicable" (`references/writing-style.md` § 8).
+- **MEASUREMENT — unset must NEVER render as 0.** Zero is a legitimate answer —
+  a floor box really is at 0'-0" — so a zero reads as a considered one. A
+  length, a height, a count of conductors, a percentage that inherits.
+
+So do not write a rule that picks one. **Name the convention at the call site:**
+
+```tsx
+<InlineNumberField value={salary}       whenUnset="zero" … />
+<InlineNumberField value={overridePct}  whenUnset={{ placeholder: "company default" }} … />
+```
+
+Passing a nullable `value` makes `whenUnset` **required** — the props are a
+union, and `number | null` cannot match the member where it is optional. A
+caller passing a plain number is unaffected, so nothing had to be swept; what
+changed is that nothing new can quietly choose zero.
+
+**`?? 0` in front of a `value` prop is now a smell**, and usually a claim that a
+sibling field makes null unreachable — see § "a comment claiming that SOMETHING
+ELSE handles it", which is the same failure with a different shape.
+
+**In a draft form with its own Save button, none of this applies** and
+`InlineNumberField` is the wrong component: it saves as you type. Hold the null
+in the draft and render a blank with a placeholder — `CountField` in
+`RunTypePicker.tsx` is the pattern.
+
+**The decision is in `@/lib/inlineEdit`, not in the component, and that is the
+point.** `commitNullableEdit` guarantees an emptied box in placeholder mode
+never commits a zero, and `vitest` can reach `client/src/lib` while it cannot
+reach a React component. A rule with no red to go to is an instruction; a rule
+with a failing test is a guard.
 
 **Do not hand-roll this.** `InlineNumberField` (`@/components/InlineNumberField`)
 implements all five for self-saving numbers; the decisions live in

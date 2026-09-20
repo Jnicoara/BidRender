@@ -119,8 +119,17 @@ export function LaborRateQuickEdit({
               </span>
               {/* No onDismiss: closing here would strand the user outside a
                   panel they had not finished — hours is still below. */}
+              {/*
+                  `whenUnset="zero"` rather than `?? 0`, and the difference is
+                  that this one is a statement. Money follows the unpriced-
+                  material convention: a salary nobody has entered shows $0 and
+                  shouts, where a blank would read as "not applicable".
+                */}
               <InlineNumberField
-                value={Number(rate.annualSalary ?? 0)}
+                value={
+                  rate.annualSalary === null ? null : Number(rate.annualSalary)
+                }
+                whenUnset="zero"
                 onSave={annualSalary =>
                   update.mutate({ id: rate.id, annualSalary })
                 }
