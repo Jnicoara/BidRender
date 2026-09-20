@@ -69,9 +69,12 @@ export type PickableRunType = {
   /** Null on a cable type by design — the cable IS the raceway. */
   racewayMaterialId: number | null;
   conductorMaterialId: number | null;
+  groundMaterialId: number | null;
   racewayMaterialName: string | null;
   conductorMaterialName: string | null;
+  groundMaterialName: string | null;
   conductorCount: number | null;
+  groundCount: number | null;
   needsSpecification: boolean;
   isShipped: boolean;
   runCount: number;
@@ -85,6 +88,9 @@ type Draft = {
   conductorMaterialId: number | null;
   conductorMaterialName: string | null;
   conductorCount: number | null;
+  groundMaterialId: number | null;
+  groundMaterialName: string | null;
+  groundCount: number | null;
 };
 
 export type RunTypePatch = {
@@ -92,6 +98,8 @@ export type RunTypePatch = {
   racewayMaterialId: number | null;
   conductorMaterialId: number | null;
   conductorCount: number | null;
+  groundMaterialId: number | null;
+  groundCount: number | null;
 };
 
 const draftOf = (type: PickableRunType): Draft => ({
@@ -101,6 +109,9 @@ const draftOf = (type: PickableRunType): Draft => ({
   conductorMaterialId: type.conductorMaterialId,
   conductorMaterialName: type.conductorMaterialName,
   conductorCount: type.conductorCount,
+  groundMaterialId: type.groundMaterialId,
+  groundMaterialName: type.groundMaterialName,
+  groundCount: type.groundCount,
 });
 
 /**
@@ -419,6 +430,36 @@ export function RunTypePicker({
               }
             />
 
+            {/*
+              The ground gets its own slot, and only on a conduit type.
+
+              A cable carries its ground inside the jacket — a 12-2 MC IS two
+              conductors and a ground — so there is nothing separate to name or
+              to buy, and offering a picker would be offering a field that must
+              stay null. Same reasoning as the raceway slot above.
+            */}
+            {pathType === "conduit" && (
+              <MaterialSlot
+                title="Ground"
+                hint="Search ground wire — “#12 bare”, “#10 green”…"
+                name={draft.groundMaterialName}
+                onPick={m =>
+                  setDraft({
+                    ...draft,
+                    groundMaterialId: m.id,
+                    groundMaterialName: m.name,
+                  })
+                }
+                onClear={() =>
+                  setDraft({
+                    ...draft,
+                    groundMaterialId: null,
+                    groundMaterialName: null,
+                  })
+                }
+              />
+            )}
+
             {pathType === "conduit" && (
               <div className="mt-2.5">
                 <p className="text-[0.7rem] font-medium">
@@ -430,6 +471,14 @@ export function RunTypePicker({
                   because two meanings for one number is worse than one
                   imperfect meaning — § 2.1 of the overhaul document.
                 */}
+                {/*
+                  "ground included" is gone, and its going is the whole point.
+
+                  It was true while one column counted both, and it stopped
+                  being true when 0063 split them. A caption that quietly
+                  describes the old meaning next to a number that now has a new
+                  one is worse than no caption: it reads as confirmation.
+                */}
                 <div className="flex items-center gap-2 mt-1">
                   <CountField
                     value={draft.conductorCount}
@@ -439,7 +488,23 @@ export function RunTypePicker({
                     ariaLabel="Conductors per circuit"
                   />
                   <span className="text-[0.7rem] text-muted-foreground">
-                    ground included
+                    insulated, not counting the ground
+                  </span>
+                </div>
+
+                <p className="text-[0.7rem] font-medium mt-2.5">Grounds</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <CountField
+                    value={draft.groundCount}
+                    min={0}
+                    max={10}
+                    onChange={groundCount =>
+                      setDraft({ ...draft, groundCount })
+                    }
+                    ariaLabel="Grounds per circuit"
+                  />
+                  <span className="text-[0.7rem] text-muted-foreground">
+                    usually one; two on an isolated ground
                   </span>
                 </div>
               </div>
@@ -460,6 +525,24 @@ export function RunTypePicker({
                         pathType === "cable" ? null : draft.racewayMaterialId,
                       conductorMaterialId: draft.conductorMaterialId,
                       conductorCount: draft.conductorCount,
+                      /*
+                        Passed through on a cable rather than nulled, and the
+                        difference from the raceway above is the point.
+
+                        Forcing the raceway to null on a cable is a GUARD: a
+                        cable has no pipe, and a stray raceway link would be
+                        wrong data. Doing the same to the ground would DESTROY
+                        right data — 0064 split the shipped cables too, so
+                        "12-2 MC cable" correctly stores 2 conductors and 1
+                        ground, describing what is inside the jacket.
+
+                        The cable form does not show these fields, so the draft
+                        still holds whatever the type had and writes it back
+                        unchanged. A form that cannot edit a field must not
+                        clear it.
+                      */
+                      groundMaterialId: draft.groundMaterialId,
+                      groundCount: draft.groundCount,
                     });
                     stopEditing();
                   } finally {
