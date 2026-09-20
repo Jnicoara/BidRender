@@ -272,6 +272,36 @@ confidently, in a file about being careful, by someone who had just finished
 writing a section about not doing that. The only thing that caught it was going
 and asking the system — not a test, not a review, not the rule itself.
 
+**It happened three more times on 2026-09-20, all in one working day, and the
+pattern is the point rather than the embarrassment:**
+
+| The rule                                                 | Broken by                                                                         | Caught by                                                |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| A comment must not claim something elsewhere handles it  | A migration comment claiming a property that depended on code elsewhere           | Running the migration against a live database            |
+| An audit reports what it searched for, not what is there | An audit for `?? 0` that missed a fifth site written as a ternary                 | The typecheck, after the union made `whenUnset` required |
+| Migrate first — except when the meaning changes          | The exception being written INTO the migration, while three mappings stayed wrong | A number: 125.01 ft becoming 83.34 ft                    |
+
+Each was written down, in the right file, by whoever then broke it, within
+hours. **So a rule is not a mechanism.** What actually caught all three was
+something that could FAIL: a database, a type, a measurement.
+
+**Prefer a forcing function to a reminder, every time.** The three from that day
+are worth copying:
+
+- `circuitWire(row)` takes the ROW, so a mapping has nothing to destructure and
+  therefore nothing to forget. It replaced three hand-built objects that had
+  each silently dropped a field.
+- `InlineNumberField`'s props are a UNION, so a nullable value cannot compile
+  without saying what unset looks like. It replaced a paragraph asking people
+  to remember.
+- `commitNullableEdit` lives in `client/src/lib` rather than in the component,
+  because the suite can reach one and not the other. A rule with no red to go
+  to is an instruction.
+
+**Where a forcing function is genuinely impossible, say so in the rule** rather
+than implying the rule is enough. `circuitWire` does not stop a fourth reader
+hand-mapping a row; it only makes the right way shorter than the wrong one.
+
 **Measuring the wrong thing looks exactly like measuring.** The first attempt to
 check the re-run behaviour ran the file once against a database that had two
 un-backfilled rows in it, saw three rows change, and concluded "it duplicates".
@@ -294,6 +324,28 @@ column, or the component's own name — rather than the idiom somebody happened
 to use. Read every hit rather than counting them. And when an audit reports a
 total, say what it searched for, so the next reader can see the gap between the
 question and the answer.
+
+**The second way an audit misses: searching the WRONG LAYER for the right
+thing.** Later the same day, "is there a way to check what a database has
+applied" was answered by reading `server/schemaCheck.ts` and
+`server/schemaDrift.test.ts`, concluding there was no runnable check, and
+writing one. `scripts/schemaDrift.mts` had existed for days and
+`references/deploying.md` § 5 documented it by name.
+
+**Search by the JOB, not by where you expect the code to live.** A thing that
+answers your question may be a script, a pnpm task, a test, a router procedure
+or a line in a reference file, and looking in the layer you would have written
+it in finds only the version you would have written.
+
+**And the sharper half, because it is the one that will happen again:
+`scripts/schemaDrift.mts` was in output already on screen.** An `ls scripts/` run
+minutes earlier had listed it, and it was read past — because by then the search
+was for a function name, and the eye was not looking for a file. A search that
+returns the answer and does not deliver it is indistinguishable from a search
+that found nothing. **When the conclusion is "this does not exist", re-read what
+you already have in front of you before building a second one**; that costs
+seconds, and a duplicate costs everybody who later has to work out which of the
+two to trust.
 
 **So a plan that states a number should say where the number came from**, and a
 number with no source is a question rather than a fact. The measurements that
@@ -584,6 +636,41 @@ https://bidridge.com/api/version` and read `builtAt` against the clock and
 `references/deploying.md` is the full version: exact commands, rollback, the
 migration traps, verifying secrets reached the deployed environment, and the
 outside services the app cannot run without.
+
+## Migrate first — EXCEPT when the migration changes what a column MEANS
+
+**The standing order is MIGRATE FIRST, DEPLOY SECOND**, because old code
+ignores a new column while new code against an old database dies outright —
+nearly every read here is a bare `select()`, so a missing column takes the whole
+statement and the screen behind it. The database may be ahead of the code and
+must never be behind it.
+
+**There is one exception and it is silent.** A migration that rewrites what an
+EXISTING column means is not additive, and run in the default order it does not
+fail — it reports wrong numbers. 0063 took the ground out of
+`takeoff_run_circuits.conductorCount`, and for the minutes before the code that
+reads `groundCount` shipped, **every circuit in the app was one conductor short**:
+a bid's wire read 125.01 ft, then 83.34 ft, with nothing on screen to say so.
+
+**So, for that kind: the code ships FIRST and the migration runs after it.**
+
+**How to tell which kind you are holding**, in a minute, from the .sql file:
+
+1. **Does any `UPDATE` write to a column that existed before this batch?**
+   No `UPDATE`, or one that only fills a column the same batch added (0055 filling
+   0054's `groupId`) — additive, migrate first. An `UPDATE` to a column older than
+   the batch (`SET conductorCount = conductorCount - 1`) — **the exception.**
+2. **No `UPDATE`? Does the new code need the new column to compute a number it
+   was already computing correctly?** If yes, the meaning changed anyway.
+
+**What makes code-first safe is not luck: the code has to read BOTH meanings.**
+Add the column NULLABLE with no default so "not yet migrated" is a value nothing
+else can produce, and have the code read NULL as the OLD meaning. Then there is
+no window in either direction. A `DEFAULT 0` throws that away — "not yet split"
+and "deliberately none" become the same value.
+
+Full version, with the worked example and the deploy sequence:
+`references/deploying.md` § 5, "Which goes first, the migration or the code?".
 
 ## Materials — always ship trade slang with a new material
 

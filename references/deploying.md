@@ -142,6 +142,100 @@ The same check runs as `server/schemaDrift.test.ts`, so a column added to the
 schema without its migration fails on the author's machine rather than in
 somebody else's console a week later.
 
+### WHICH GOES FIRST, THE MIGRATION OR THE CODE?
+
+**Added 2026-09-20, because the standing answer has an exception and nobody
+knew.** Everything above assumes MIGRATE FIRST, DEPLOY SECOND, and that is
+right for almost every migration this repo has ever had. It is wrong for one
+kind, and the wrong one is silent.
+
+#### The default: migrate first, and why it is the default
+
+**Old code ignores a new column.** Adding `takeoff_groups`, or
+`bid_line_items.takeoffGroupId`, or an index, changes nothing about what the
+running build reads — every value it already had still means what it meant.
+
+**The reverse is not true.** Nearly every read here is a bare `select()`, which
+drizzle expands to every column in `drizzle/schema.ts`, so NEW code against an
+OLD database does not lose a field — the whole statement dies with
+`Unknown column` and the screen behind it goes with it (§ 5 above, the bid
+archive). Migrating first is therefore the safe order by default: the database
+is allowed to be ahead of the code, and never behind it.
+
+#### The exception: a migration that changes what an existing column MEANS
+
+**0063 is the first one.** It took the ground out of
+`takeoff_run_circuits.conductorCount`, so a stored 3 stopped meaning "three
+conductors including the ground" and started meaning "three insulated
+conductors, and look at `groundCount` for the rest".
+
+Run in the default order, that is not a missing field and not an error. It is
+**every circuit in the app reporting one conductor short**, on every run, on
+every bid, with nothing on screen to say so. Measured on a local database:
+**a bid's wire went from 125.01 ft to 83.34 ft the instant the migration
+landed**, and it stayed wrong until the code that reads `groundCount` shipped.
+
+**So: the code that understands the new meaning ships FIRST, and the migration
+runs after it.**
+
+#### How to tell which kind you are holding
+
+Two questions, in order. Both are answerable in a minute from the .sql file.
+
+**1. Does any `UPDATE` write to a column that existed before this batch?**
+
+```bash
+grep -n "UPDATE\|SET " drizzle/00NN_*.sql
+```
+
+Read each `SET` target and ask "did this column exist yesterday?"
+
+- **No `UPDATE` at all** — additive. Migrate first.
+- **`UPDATE` that only fills a column this batch added** — still additive. 0055
+  sets `takeoff_stamps.groupId`, which 0054 had just created; no value that
+  existed before means anything different afterwards. Migrate first.
+- **`UPDATE` that writes a column older than this batch** — **this is the
+  exception.** 0063 does `SET conductorCount = conductorCount - 1` on a column
+  as old as its table. Code first.
+
+**2. If there is no `UPDATE`: does the new code need the new column to compute
+a number it was ALREADY computing correctly?**
+
+If yes, the old column's meaning has changed even though no row was rewritten,
+and the same answer applies. If no, it is additive.
+
+#### What makes "code first" safe, and it is not luck
+
+Shipping the code first only works if that code can read **both** meanings —
+the migrated rows and the ones still waiting. The way to guarantee that is to
+make "not yet migrated" a value **nothing else can produce**:
+
+- **A new column is NULLABLE with no default.** NULL is "not yet split"; it
+  cannot be confused with a real answer.
+- **The code treats NULL as the OLD meaning.** `shared/takeoffQuantities.ts`
+  reads an absent ground as ZERO, which is exactly right while the ground is
+  still inside the conductor count.
+
+Do that and there is no window at all: the code ships, every row still reads
+correctly, the migration runs whenever you like, and every row reads correctly
+after it too. A `DEFAULT 0` instead of NULL would have thrown that away —
+"not yet split" and "deliberately no ground" become the same value, and nothing
+can tell them apart.
+
+#### And the other half: one mapper between the table and the arithmetic
+
+The three places that broke were not the arithmetic. They were three routers
+each hand-building `{ name, conductorCount }` from a row. **A rule in a
+document would not have caught that**, and did not: the exception above was
+written down in the migration itself and the mappings were still wrong.
+
+`circuitWire(row)` in `shared/takeoffQuantities.ts` is the answer — one
+function, taking the ROW, so `circuits.map(circuitWire)` has nothing to
+destructure and therefore nothing to forget. **When a column's meaning changes,
+find every place its value crosses from the database into a calculation and put
+them behind one function, in the same change.** That is the work; the deploy
+order is just the part you can get wrong at 11pm.
+
 ### A new table lands on the WRONG collation unless you say otherwise
 
 **Found the hard way on 2026-09-18**, by a migration that failed halfway

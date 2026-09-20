@@ -11,6 +11,11 @@
  * code expect that this database does not have.
  *
  * Exits 1 on drift so it can gate a deploy step; 0 when they agree.
+ *
+ * It names the HOST and database it asked, never the URL, so the output can go
+ * straight into a transcript — the question is almost always "did 0060 reach
+ * PRODUCTION", and an answer that does not say which database it came from is
+ * not an answer to it.
  */
 import "dotenv/config";
 import {
@@ -18,6 +23,17 @@ import {
   describeDrift,
   findSchemaDrift,
 } from "../server/schemaCheck";
+
+function where(): string {
+  try {
+    const parsed = new URL(process.env.DATABASE_URL ?? "");
+    return parsed.hostname + ":" + (parsed.port || "3306") + parsed.pathname;
+  } catch {
+    return "(DATABASE_URL unset or unparseable)";
+  }
+}
+
+console.log("database: " + where());
 
 const applied = await appliedMigrationCount();
 console.log(
