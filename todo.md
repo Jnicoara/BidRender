@@ -909,10 +909,34 @@ inherited from whoever's `.env` it happens to run under, and with the flag on,
 a suite that ever forgot a mock would spend real money on every run. Both lines
 are commented where they sit.
 
-**The baseline is now 3 failures**, all in `backup`, which needs a database grant
-rather than a flag — see below.
+**The baseline is now 0 failures.** The last 3 were all in `backup` and needed a
+database grant rather than a flag; granted 2026-09-19, and `server/backup.test.ts`
+now runs 32 passed / 0 failed. See below for what the grant was.
 
-- [ ] Grant the `bidrender` MySQL login rights to create `bidrender_backup_restore_test`, which is the last of the known failures — 3 tests in `backup`. Not a code fault and not fixable in the repo. (Was 26 across three files until 2026-09-18, when `vitest.setup.ts` took over the AI environment and `planCopilot` (21) and `navigation` (2) went green; 35 across five files before that, when the `bidrender_test` schema was behind.) Worth finishing because a suite that always shows red teaches people to stop reading it — which is how a real regression gets through.
+- [x] Grant the `bidrender` MySQL login rights to create the scratch schemas the backup tests and the verify tool need. Not a code fault and not fixable in the repo. (Was 26 across three files until 2026-09-18, when `vitest.setup.ts` took over the AI environment and `planCopilot` (21) and `navigation` (2) went green; 35 across five files before that, when the `bidrender_test` schema was behind.) Worth finishing because a suite that always shows red teaches people to stop reading it — which is how a real regression gets through.
+
+  **This entry named one schema and there are five, which is why granting it and rerunning kept leaving failures on the board.** Confirmed 2026-09-19 by running the suite: the first failure reports `Access denied for user 'bidrender'@'127.0.0.1' to database 'bidrender_verify_selftest'` — not `bidrender_backup_restore_test`, the only name this entry used to give. The full set is `bidrender_backup_restore_test` (`server/backup.test.ts:246`), `bidrender_verify_selftest` (`:595`), `bidrender_verify_corrupt` (`:634`), `bidrender_verify_mismatch` (`:666`), and `bidrender_backup_verify` (the default in `server/backup/verifyBackup.ts:67`, used by `scripts/verifyBackup.mts`). The login holds `ALL PRIVILEGES` on `bidrender_local` and `bidrender_test` only, and bare `USAGE` globally, so it can create none of them.
+
+  One grant covers all five, now and later — note the escaped underscore, because `_` is a wildcard in a MySQL grant pattern and an unescaped one would match far more than intended:
+
+  ```sql
+  GRANT ALL PRIVILEGES ON `bidrender_%`.* TO 'bidrender'@'127.0.0.1';
+  FLUSH PRIVILEGES;
+  ```
+
+  Done 2026-09-19. **Run it against port 3307, not 3306.** Two MySQL servers run on
+  this machine from the same `mysqld.exe`: the `MySQL80` Windows service on 3306,
+  and the app's own instance on 3307 started by `BidRenderLocalstart-mysql.cmd`
+  with `--defaults-file=BidRenderLocalmy.ini`. They have separate data folders,
+  so separate `mysql.user` tables and separate root passwords — 3307's is in
+  `BidRenderLocalpasswords.txt`. Granting on the wrong one fails with
+  `ERROR 1410 ... not allowed to create a user with GRANT`, because `bidrender`
+  does not exist on 3306 at all. Check with `SELECT @@port, @@datadir;` before
+  granting; an access-denied from the wrong server looks just like a bad password.
+
+- [ ] `server/backup/verifyBackup.ts` built its scratch connection with `mysqlConnection(scratchDatabaseUrl)` and no environment argument, so it inherited `DATABASE_CA_CERT` — **production's** certificate — and applied it to whatever local server the restore was pointed at. Fixed 2026-09-19; `VERIFY_DATABASE_CA_CERT` now covers a scratch server that needs its own TLS.
+
+  Worth keeping as a written-down shape rather than a closed ticket. It was dormant for as long as `DATABASE_CA_CERT` was unset and broke the moment production moved to a managed database — the failure was `self-signed certificate in certificate chain` from the LOCAL server, naming a certificate that belongs to the database not being restored into. Nothing about the message points at the cause. The nightly verification would have failed the same way and just as quietly, leaving backups that nobody was confirming. Proved by changing that one variable and watching the error become a different one.
 
 ## Working on this repo — traps
 

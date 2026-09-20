@@ -153,7 +153,16 @@ async function restoreInto(
   say: (message: string) => void
 ): Promise<Map<string, number>> {
   const connection = await mysql.createConnection({
-    ...mysqlConnection(scratchDatabaseUrl),
+    // The scratch server is a DIFFERENT server, and production's CA says
+    // nothing about it. Inheriting DATABASE_CA_CERT from the environment made
+    // every restore fail with "self-signed certificate in certificate chain"
+    // the moment production moved to a managed database — a quiet break, since
+    // the variable that caused it belongs to the database NOT being restored
+    // into. VERIFY_DATABASE_CA_CERT covers a scratch server that needs its own.
+    ...mysqlConnection(scratchDatabaseUrl, {
+      ...process.env,
+      DATABASE_CA_CERT: process.env.VERIFY_DATABASE_CA_CERT ?? "",
+    }),
     multipleStatements: true,
   });
 

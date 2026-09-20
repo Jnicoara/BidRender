@@ -48,8 +48,10 @@ COLLATE utf8mb4_unicode_ci`.
    "Illegal mix of collations" the moment a query compares text across two
    tables.
 3. **Built the tables:** `pnpm tsx scripts/migrate.mts`, with `DATABASE_URL`
-   pointing at the cluster and `DATABASE_CA_CERT` set. All 44 migrations
-   applied, producing 49 tables.
+   pointing at the cluster and `DATABASE_CA_CERT` set. All 44 migrations as of
+   that date applied, producing 49 tables. Both numbers are a snapshot of the
+   load, not the current state — compare `__drizzle_migrations` on the cluster
+   against `drizzle/meta/_journal.json` for where it actually stands.
 4. **Loaded data only** from the backup — the INSERT statements, and nothing
    else. Skipped: 49 `DROP TABLE`, 49 `CREATE TABLE`, the session settings, and
    the one INSERT into `__drizzle_migrations` (the migration runner writes its
