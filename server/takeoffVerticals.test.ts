@@ -367,7 +367,9 @@ describe("both ends of a run", () => {
 // ── Through the per-conductor maths ──────────────────────────────────────────
 
 describe("vertical footage reaches the wire, once per conductor", () => {
-  const circuits: RunCircuit[] = [{ name: "Ckt 1", conductorCount: 3 }];
+  const circuits: RunCircuit[] = [
+    { name: "Ckt 1", conductorCount: 3, groundCount: 0 },
+  ];
 
   it("adds the drop to conduit ONCE and to wire per conductor", () => {
     const verticals = verticalsForRun(
@@ -451,9 +453,9 @@ describe("vertical footage reaches the wire, once per conductor", () => {
 
   it("ignores a nonsense conductor count instead of producing NaN", () => {
     const result = verticalWireFeetByCircuit(8.5, [
-      { name: "Good", conductorCount: 3 },
-      { name: "Bad", conductorCount: Number.NaN },
-      { name: "Negative", conductorCount: -2 },
+      { name: "Good", conductorCount: 3, groundCount: 0 },
+      { name: "Bad", conductorCount: Number.NaN, groundCount: 0 },
+      { name: "Negative", conductorCount: -2, groundCount: 0 },
     ]);
     expect(result.totalFeet).toBe(25.5);
     expect(Number.isNaN(result.totalFeet)).toBe(false);
@@ -589,8 +591,8 @@ describe("a vertical belongs to the run or the stamp, never both", () => {
 
 describe("a bid with no heights set reads exactly as it did before", () => {
   const circuits: RunCircuit[] = [
-    { name: "Ckt 1", conductorCount: 3 },
-    { name: "Ckt 2", conductorCount: 2 },
+    { name: "Ckt 1", conductorCount: 3, groundCount: 0 },
+    { name: "Ckt 2", conductorCount: 2, groundCount: 0 },
   ];
 
   it("produces the same quantities with verticals omitted", () => {

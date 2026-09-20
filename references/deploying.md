@@ -59,7 +59,8 @@ pnpm check                           # TypeScript, the correctness gate
 - **Read the first list.** It is the entire change set the deploy carries. If
   anything in it surprises you, stop.
 - **Does it add a migration?** (`drizzle/` changed.) Then § 5 applies and the
-  migration has to be run by hand — it does not ride along.
+  migration has to be run by hand — it does not ride along. **Sort the files
+  first**: the additive ones run BEFORE this push, the backfills after it.
 - **Write down what is live now**, so "roll back to what?" has an answer:
 
 ```bash
@@ -69,13 +70,20 @@ git log --oneline -1 origin/main
 ## 4. Deploy sequence
 
 1. **Pre-flight** — § 3 above.
-2. **Merge and push `main`** — § 2. The build starts by itself.
-3. **Watch the Activity tab** — § 4a. Do not walk away; a failed build is
+2. **Sort the migrations, if there are any** — § 5, "Which goes first". Each
+   **file** is either additive or a meaning change; a release normally has
+   both.
+3. **Run the ADDITIVE migrations now, BEFORE the push.** Old code ignores a new
+   column, and new code against a database without it dies outright. Skipping
+   this step is what took the site down on 2026-09-20.
+4. **Merge and push `main`** — § 2. The build starts by itself.
+5. **Watch the Activity tab** — § 4a. Do not walk away; a failed build is
    quiet unless you are looking at it.
-4. **Run migrations if there are any** — § 5. They do **not** deploy with the
-   code, and a missed one does not crash the app, it serves wrong data.
-5. **Verify** — § 6.
-6. **Deploy any new scheduled job separately** — § 7. The cron Worker is not
+6. **Run the MEANING migrations now, AFTER the build is live** — the backfills
+   that rewrite existing values. The code that understands the new meaning is
+   running by this point, which is the whole reason they waited.
+7. **Verify** — § 6, plus `scripts/schemaDrift.mts` against that database.
+8. **Deploy any new scheduled job separately** — § 7. The cron Worker is not
    part of this deploy and never has been.
 
 ### 4a. Watching it, and rolling back
@@ -142,12 +150,34 @@ The same check runs as `server/schemaDrift.test.ts`, so a column added to the
 schema without its migration fails on the author's machine rather than in
 somebody else's console a week later.
 
-### WHICH GOES FIRST, THE MIGRATION OR THE CODE?
+### WHICH GOES FIRST, THE MIGRATION OR THE CODE? THREE STEPS, NOT TWO
 
-**Added 2026-09-20, because the standing answer has an exception and nobody
-knew.** Everything above assumes MIGRATE FIRST, DEPLOY SECOND, and that is
-right for almost every migration this repo has ever had. It is wrong for one
-kind, and the wrong one is silent.
+**Added 2026-09-20, and corrected the same evening after the two-step version
+of it took the live site down.**
+
+#### The shape: ALTERs, then code, then backfills
+
+    1. ADDITIVE MIGRATIONS   the new columns, nullable, no defaults
+    2. DEPLOY THE CODE       it now reads both the old meaning and the new
+    3. MEANING MIGRATIONS    the backfills that rewrite existing values
+
+**State it as three steps every time, even when a release has nothing in step 3.** The two-step version — "migrate first, except when the meaning changes,
+then code first" — is true of each FILE and false of a release, and collapsing
+it is not a hypothetical risk:
+
+> The rule was written on 2026-09-20 and applied too broadly within the hour,
+> by the person who wrote it. Migrations 0061–0064 were treated as one batch
+> and held back behind the deploy because two of them changed a meaning. But
+> 0061 and 0062 are plain `ALTER`s, and with them unrun the newly deployed code
+> asked for `groundCount` on a table that did not have it. Every screen touching
+> traced runs failed on the live site until the two `ALTER`s were applied.
+
+#### CLASSIFY EACH FILE, NOT THE BATCH
+
+**A release normally contains both kinds, and that is not a problem — it is the
+normal case.** 0061–0064 is exactly it: two additive `ALTER`s that must go
+BEFORE the deploy and two backfills that must go AFTER. Asking "is this batch
+additive?" has no correct answer. Asking it of each file does.
 
 #### The default: migrate first, and why it is the default
 
@@ -178,9 +208,11 @@ landed**, and it stayed wrong until the code that reads `groundCount` shipped.
 **So: the code that understands the new meaning ships FIRST, and the migration
 runs after it.**
 
-#### How to tell which kind you are holding
+#### How to tell which kind you are holding — ASK IT OF EVERY FILE
 
-Two questions, in order. Both are answerable in a minute from the .sql file.
+Two questions, in order, **per .sql file**, not per release. Both are
+answerable in a minute. Write the answer at the top of the file while you have
+it, so the person deploying does not have to derive it again at 11pm.
 
 **1. Does any `UPDATE` write to a column that existed before this batch?**
 
@@ -204,7 +236,12 @@ a number it was ALREADY computing correctly?**
 If yes, the old column's meaning has changed even though no row was rewritten,
 and the same answer applies. If no, it is additive.
 
-#### What makes "code first" safe, and it is not luck
+**Then sort the files into step 1 and step 3, and deploy in the three-step
+order.** Running a subset is supported and is the documented path for exactly
+this: `scripts/migrate.mts` takes a folder, so a copy of `drizzle/` whose
+journal stops after the additive files applies those and no others.
+
+#### What makes step 3 safe, and it is not luck
 
 Shipping the code first only works if that code can read **both** meanings —
 the migrated rows and the ones still waiting. The way to guarantee that is to

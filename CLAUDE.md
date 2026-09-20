@@ -275,15 +275,21 @@ and asking the system — not a test, not a review, not the rule itself.
 **It happened three more times on 2026-09-20, all in one working day, and the
 pattern is the point rather than the embarrassment:**
 
-| The rule                                                 | Broken by                                                                         | Caught by                                                |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| A comment must not claim something elsewhere handles it  | A migration comment claiming a property that depended on code elsewhere           | Running the migration against a live database            |
-| An audit reports what it searched for, not what is there | An audit for `?? 0` that missed a fifth site written as a ternary                 | The typecheck, after the union made `whenUnset` required |
-| Migrate first — except when the meaning changes          | The exception being written INTO the migration, while three mappings stayed wrong | A number: 125.01 ft becoming 83.34 ft                    |
+| The rule                                                 | Broken by                                                                                                                                                      | Caught by                                                                     |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| A comment must not claim something elsewhere handles it  | A migration comment claiming a property that depended on code elsewhere                                                                                        | Running the migration against a live database                                 |
+| An audit reports what it searched for, not what is there | An audit for `?? 0` that missed a fifth site written as a ternary                                                                                              | The typecheck, after the union made `whenUnset` required                      |
+| Migrate first — except when the meaning changes          | The exception being written INTO the migration, while three mappings stayed wrong                                                                              | A number: 125.01 ft becoming 83.34 ft                                         |
+| The same rule again, one hour later                      | Applying it to the BATCH instead of each FILE, so two additive `ALTER`s were held back with two backfills and the deploy asked for a column that did not exist | The live site: every screen touching traced runs, down until the `ALTER`s ran |
 
 Each was written down, in the right file, by whoever then broke it, within
-hours. **So a rule is not a mechanism.** What actually caught all three was
-something that could FAIL: a database, a type, a measurement.
+hours — **and the fourth is the sharpest, because the rule was applied too
+broadly within an HOUR of being written, by its author, and the cost was an
+outage rather than a wrong number.** Writing a rule down appears to create a
+false sense that it is now handled.
+
+**So a rule is not a mechanism.** What actually caught all four was something
+that could FAIL: a database, a type, a measurement, a live site.
 
 **Prefer a forcing function to a reminder, every time.** The three from that day
 are worth copying:
@@ -299,8 +305,33 @@ are worth copying:
   to is an instruction.
 
 **Where a forcing function is genuinely impossible, say so in the rule** rather
-than implying the rule is enough. `circuitWire` does not stop a fourth reader
-hand-mapping a row; it only makes the right way shorter than the wrong one.
+than implying the rule is enough.
+
+### The forcing functions stop at the test boundary, and that is a real hole
+
+**Found 2026-09-20 while closing a different one.** `tsconfig.json` excludes
+`**/*.test.ts`, so `pnpm check` — the thing this file calls the correctness gate
+— **does not typecheck a single test file.**
+
+The measurement, because it is the point: making `RunCircuit.groundCount`
+required produced **zero** errors from `pnpm check` and **28** from the same
+compiler with tests included. Fixing those 28 left **33 pre-existing errors**
+in ten other test files, which have been accumulating unseen for as long as the
+exclusion has been there.
+
+**What that means for everything decided today:** a type-level guarantee that
+stops at the test boundary is not a guarantee. A fixture can construct a shape
+the production code cannot, and a test that compiles only because nothing
+compiled it will happily assert against a value the types forbid. The forcing
+functions are real in `server/`, `shared/` and `client/src/`, which is where the
+three broken mappings lived — and they are absent in exactly the place that is
+supposed to be catching things.
+
+**Not fixed, deliberately, and not urgent enough to do badly.** Including tests
+means clearing 33 errors across files nobody is otherwise touching, and doing
+that in a hurry is how a test gets "fixed" by weakening its assertion. See
+`todo.md`. Until then: **when you make something uncompilable, say whether the
+tests were part of "everything".**
 
 **Measuring the wrong thing looks exactly like measuring.** The first attempt to
 check the re-run behaviour ran the file once against a database that had two
@@ -624,6 +655,12 @@ The deploy:
    serves wrong data, and because nearly every read is a bare `select()` it can
    also take a whole screen down with `Unknown column`. Ask the database
    directly with `scripts/schemaDrift.mts`.
+
+   **This step is numbered 4, and the additive half of it belongs at 0.** The
+   ADDITIVE files must be applied BEFORE the push and the meaning-changing
+   backfills after it — three steps, per file, see the section below. Putting
+   all of `drizzle/` here is what took the live site down on 2026-09-20.
+
 5. **Verify the new build is the one running** — `curl -s
 https://bidridge.com/api/version` and read `builtAt` against the clock and
    `commit` against what you pushed. **Not the version tag**: `APP_VERSION` is
@@ -637,13 +674,29 @@ https://bidridge.com/api/version` and read `builtAt` against the clock and
 migration traps, verifying secrets reached the deployed environment, and the
 outside services the app cannot run without.
 
-## Migrate first — EXCEPT when the migration changes what a column MEANS
+## Deploying a migration: THREE STEPS, NOT TWO
 
-**The standing order is MIGRATE FIRST, DEPLOY SECOND**, because old code
-ignores a new column while new code against an old database dies outright —
-nearly every read here is a bare `select()`, so a missing column takes the whole
-statement and the screen behind it. The database may be ahead of the code and
-must never be behind it.
+```
+1. ADDITIVE MIGRATIONS   the new columns, nullable, no defaults
+2. DEPLOY THE CODE       it now reads both the old meaning and the new
+3. MEANING MIGRATIONS    the backfills that rewrite existing values
+```
+
+**Say it as three steps even when step 3 is empty**, and **classify each FILE
+rather than the release** — a release normally holds both kinds, and asking
+"is this batch additive?" has no correct answer.
+
+**The two-step version of this rule took the live site down on 2026-09-20,
+within an hour of being written, applied by the person who wrote it.**
+0061–0064 were held back as one batch because two of them changed a meaning;
+the two that were plain `ALTER`s went with them, and the deployed code asked
+for `groundCount` on a table that did not have it. Every screen touching traced
+runs failed until those two were applied.
+
+**Why step 1 exists:** old code ignores a new column, while new code against an
+old database dies outright — nearly every read here is a bare `select()`, so a
+missing column takes the whole statement and the screen behind it. The database
+may be ahead of the code and must never be behind it.
 
 **There is one exception and it is silent.** A migration that rewrites what an
 EXISTING column means is not additive, and run in the default order it does not
@@ -652,9 +705,11 @@ fail — it reports wrong numbers. 0063 took the ground out of
 reads `groundCount` shipped, **every circuit in the app was one conductor short**:
 a bid's wire read 125.01 ft, then 83.34 ft, with nothing on screen to say so.
 
-**So, for that kind: the code ships FIRST and the migration runs after it.**
+**So, for that kind: the code ships FIRST and the backfill runs after it —
+which is step 3, not a different rule.**
 
-**How to tell which kind you are holding**, in a minute, from the .sql file:
+**How to tell which kind each FILE is**, in a minute, from the .sql. Ask it of
+every file in the release, never of the release:
 
 1. **Does any `UPDATE` write to a column that existed before this batch?**
    No `UPDATE`, or one that only fills a column the same batch added (0055 filling

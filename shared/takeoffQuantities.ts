@@ -65,14 +65,21 @@ export type RunCircuit = {
   /**
    * Grounds this circuit pulls. Usually one; two on an isolated-ground circuit.
    *
-   * ── UNDEFINED MEANS ZERO, AND MUST ─────────────────────────────────────────
-   * Not one. A caller that has not been told about grounds yet — an old test
-   * fixture, a screen not yet updated — must produce exactly the numbers it
-   * produced before, or the split silently adds a conductor's worth of wire to
-   * every run on every bid. The data migration is what moves 3 into 2 + 1; this
-   * type must never do it by guessing.
+   * ── REQUIRED, AND THAT IS THE POINT ────────────────────────────────────────
+   * It was optional for one afternoon, so that a caller which had not been told
+   * about grounds would keep producing the numbers it produced before. That is
+   * a real property and it still holds — but as an OPTIONAL FIELD it was a
+   * reminder rather than a mechanism, and three routers had already proved that
+   * a field which can be left out will be left out. They dropped it, every
+   * circuit in the app reported one conductor short, and a bid's wire went
+   * 125.01 ft to 83.34 ft with nothing on screen to say so.
+   *
+   * So the property moved to where it can be enforced instead of hoped for:
+   * `circuitWire` turns a stored NULL into 0, and nothing else constructs one of
+   * these. Leaving this out is now a compile error, which is the difference
+   * between a rule and a mechanism.
    */
-  groundCount?: number;
+  groundCount: number;
 };
 
 /**
@@ -226,8 +233,17 @@ export type StoredCircuit = {
  * database went from 125.01 ft to 83.34 ft the instant the migration landed.
  *
  * So the mapping is a function, and it takes the ROW. `circuits.map(circuitWire)`
- * has nothing to destructure and therefore nothing to forget. A fourth reader
- * that hand-maps is still possible; one that uses this cannot go stale.
+ * has nothing to destructure and therefore nothing to forget.
+ *
+ * ── And it is the ONLY place that knows what a missing ground means ─────────
+ * `RunCircuit.groundCount` is REQUIRED, so a hand-mapped object no longer
+ * compiles — which is what closes the hole this function was first written to
+ * paper over. The "a row the backfill has not reached still reads as it always
+ * did" property has not gone anywhere; it moved HERE, to the one line that
+ * turns a stored NULL into a zero, where it is enforced rather than hoped for.
+ *
+ * That is the whole lesson of 2026-09-20 in one function: a partial forcing
+ * function still has a hole, and a rule without a failure is not a mechanism.
  */
 export function circuitWire(row: StoredCircuit): RunCircuit {
   return {
@@ -255,7 +271,7 @@ function insulatedOf(circuit: RunCircuit): number {
   return countOf(circuit.conductorCount);
 }
 
-/** Grounds only. Absent is none — see the type. */
+/** Grounds only. Guarded like the conductor count: one bad row poisons nothing. */
 function groundsOf(circuit: RunCircuit): number {
   return countOf(circuit.groundCount);
 }
