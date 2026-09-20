@@ -49,7 +49,19 @@ export type PanelRun = {
   pathType: "conduit" | "cable";
   status: "draft" | "committed";
   isSuggestion: boolean;
-  circuits: { id: number; name: string; conductorCount: number }[];
+  circuits: {
+    id: number;
+    name: string;
+    /** INSULATED conductors. The ground is its own number since 0063. */
+    conductorCount: number;
+    /**
+     * Grounds, RAW: null means nobody has said, and the row shows that rather
+     * than a zero. 0063 left none of these null, but a circuit added before
+     * the panel learned to ask still can be — and "no ground" is a decision
+     * while "not said" is not.
+     */
+    groundCount: number | null;
+  }[];
   quantities: RunQuantities | null;
   /** What is at each end. Undefined only for a suggestion the AI proposed. */
   ends?: {
@@ -71,6 +83,23 @@ const feet = (value: number) =>
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   })} ft`;
+
+/**
+ * What a new circuit starts as: two conductors and a ground.
+ *
+ * ── It used to be a bare 3, and that stopped being right ───────────────────
+ * Three was "2 and a ground" while one column counted both. After 0063 split
+ * them, a bare 3 means THREE UNGROUNDED CONDUCTORS — the same wire footage, and
+ * a description of something nobody wires. Typing a lighting circuit would have
+ * produced a row reading "3 cond. 0 gnd.".
+ *
+ * So the default moved rather than the number: the footage is unchanged at
+ * three wires, and what the row SAYS is now what an electrician would say.
+ * Named here rather than written twice, because the Enter key and the Add
+ * button are two call sites and a default that disagrees with itself is worse
+ * than either value.
+ */
+const NEW_CIRCUIT = { conductors: 2, grounds: 1 } as const;
 
 /** Guards the subtraction below from floating-point dust like 1239.9999998. */
 const round2 = (value: number) => Math.round(value * 100) / 100;
@@ -137,6 +166,25 @@ function wireFlat(run: PanelRun): number {
 function wireVertical(run: PanelRun): number {
   const total = (run.quantities?.wireByCircuit ?? []).reduce(
     (sum, circuit) => sum + circuit.verticalFeet,
+    0
+  );
+  return Math.round(total * 100) / 100;
+}
+
+/**
+ * The bare copper, across every circuit on this run.
+ *
+ * ── Why the split shows HERE and not on each circuit row ───────────────────
+ * A circuit row is already a name, two counts and a footage in 384 pixels, and
+ * the question "how much of WHICH wire" is a purchasing question — it is asked
+ * when ordering, against the run, not while typing conductor counts.
+ *
+ * Shown only when there IS bare copper: `200.00 + 0.00 = 200.00` is noise
+ * standing where a number goes, the same reasoning the vertical line follows.
+ */
+function wireGround(run: PanelRun): number {
+  const total = (run.quantities?.wireByCircuit ?? []).reduce(
+    (sum, circuit) => sum + circuit.groundFeet,
     0
   );
   return Math.round(total * 100) / 100;
@@ -274,8 +322,16 @@ export function RunsPanel({
   onRemoveRun: (id: number) => void;
   onCommitRun: (id: number) => void;
   onAcceptSuggestion: (id: number) => void;
-  onAddCircuit: (runId: number, name: string, conductorCount: number) => void;
-  onUpdateCircuit: (id: number, conductorCount: number) => void;
+  onAddCircuit: (
+    runId: number,
+    name: string,
+    conductorCount: number,
+    groundCount: number
+  ) => void;
+  onUpdateCircuit: (
+    id: number,
+    patch: { conductorCount?: number; groundCount?: number }
+  ) => void;
   onRemoveCircuit: (id: number) => void;
 }) {
   const [addingTo, setAddingTo] = useState<number | null>(null);
@@ -655,6 +711,30 @@ export function RunsPanel({
                         total={run.quantities.totalWireFeet}
                       />
                     )}
+                    {/*
+                      The bare copper, on its own line, and only when there is
+                      some.
+
+                      Wire and ground are SEPARATE PURCHASES — bare copper
+                      cannot be ordered as THHN — which is the entire reason the
+                      ground got its own column. A single wire figure answers
+                      "how much" and cannot answer "how much of which", and the
+                      supplier list is about to ask exactly that.
+
+                      Shown only when it is non-zero, like the vertical line
+                      above: a bare figure of 0.00 ft is noise standing where a
+                      number goes.
+                    */}
+                    {run.pathType === "conduit" && wireGround(run) > 0 && (
+                      <div className="flex items-baseline justify-between text-xs gap-2 pl-3">
+                        <span className="text-muted-foreground/70 shrink-0">
+                          of which bare ground
+                        </span>
+                        <span className="font-mono text-right text-muted-foreground/70">
+                          {feet(wireGround(run))}
+                        </span>
+                      </div>
+                    )}
 
                     {/*
                       The zero has to shout. An unset height makes a total
@@ -717,13 +797,42 @@ export function RunsPanel({
                         </span>
                         <InlineNumberField
                           value={circuit.conductorCount}
-                          onSave={next => onUpdateCircuit(circuit.id, next)}
+                          onSave={next =>
+                            onUpdateCircuit(circuit.id, {
+                              conductorCount: next,
+                            })
+                          }
                           rules={{ min: 1, max: 60 }}
-                          className="h-6 w-14 text-xs"
+                          className="h-6 w-12 text-xs"
                           ariaLabel={`Conductors for ${circuit.name}`}
                         />
-                        <span className="text-[0.7rem] text-muted-foreground w-16">
+                        <span className="text-[0.7rem] text-muted-foreground">
                           cond.
+                        </span>
+                        {/*
+                          The ground, and the reason it is nullable here.
+
+                          This is the first place a person types a ground on a
+                          REAL run rather than on a type, and "no ground on this
+                          circuit" is a decision while "nobody has said" is not.
+                          0063 left none of these null, but a circuit written
+                          before the panel could ask still can be — and a zero
+                          standing in for silence is the failure rule 6 exists
+                          for, in the field that decides how much bare copper
+                          gets bought.
+                        */}
+                        <InlineNumberField
+                          value={circuit.groundCount}
+                          whenUnset={{ placeholder: "?" }}
+                          onSave={next =>
+                            onUpdateCircuit(circuit.id, { groundCount: next })
+                          }
+                          rules={{ min: 0, max: 10 }}
+                          className="h-6 w-10 text-xs"
+                          ariaLabel={`Grounds for ${circuit.name}`}
+                        />
+                        <span className="text-[0.7rem] text-muted-foreground">
+                          gnd.
                         </span>
                         <span className="text-[0.7rem] font-mono text-muted-foreground w-16 text-right">
                           {run.quantities
@@ -754,7 +863,12 @@ export function RunsPanel({
                           onFocus={selectOnFocus}
                           onKeyDown={e => {
                             if (e.key === "Enter" && circuitName.trim()) {
-                              onAddCircuit(run.id, circuitName.trim(), 3);
+                              onAddCircuit(
+                                run.id,
+                                circuitName.trim(),
+                                NEW_CIRCUIT.conductors,
+                                NEW_CIRCUIT.grounds
+                              );
                               setCircuitName("");
                             }
                             if (e.key === "Escape") {
@@ -771,7 +885,12 @@ export function RunsPanel({
                           className="h-6 px-2 text-xs"
                           onClick={() => {
                             if (!circuitName.trim()) return;
-                            onAddCircuit(run.id, circuitName.trim(), 3);
+                            onAddCircuit(
+                              run.id,
+                              circuitName.trim(),
+                              NEW_CIRCUIT.conductors,
+                              NEW_CIRCUIT.grounds
+                            );
                             setCircuitName("");
                           }}
                         >

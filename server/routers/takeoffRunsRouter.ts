@@ -206,9 +206,34 @@ export const takeoffRunsRouter = router({
           wire go 125.01 ft to 83.34 ft. The arithmetic was right the whole
           time; three mappings between the table and the arithmetic were not.
         */
-        const runCircuits = circuits
-          .filter(c => c.runId === run.id)
-          .map(c => ({ id: c.id, ...circuitWire(c) }));
+        const rows = circuits.filter(c => c.runId === run.id);
+
+        /*
+          Two mappings from one row, and the split is deliberate.
+
+          The ARITHMETIC goes through `circuitWire`, which turns a stored NULL
+          into a zero — correct, because an un-split circuit still has its
+          ground inside `conductorCount`.
+
+          The SCREEN gets the raw nullable value, because it has to tell "no
+          ground on this circuit" from "nobody has said yet", and `circuitWire`
+          has deliberately thrown that distinction away by the time it returns.
+          A panel showing 0 for both would report a decision nobody made — the
+          failure CLAUDE.md § Editing fields rule 6 is about.
+
+          Hand-mapped here, where a structural spread would be wrong: an added
+          column reaching the arithmetic silently is a wrong number, and an
+          added column reaching the SCREEN silently is clutter nobody chose.
+          Display shapes are listed on purpose.
+        */
+        const forMaths = rows.map(circuitWire);
+        const runCircuits = rows.map(c => ({
+          id: c.id,
+          name: c.name,
+          conductorCount: c.conductorCount,
+          /** Raw: null is "not yet said", and the panel shows it as such. */
+          groundCount: c.groundCount,
+        }));
 
         const traced = {
           pathType: run.pathType as RunPathType,
@@ -242,7 +267,7 @@ export const takeoffRunsRouter = router({
           /** Null whenever the sheet cannot be measured — never a fallback 0. */
           quantities: quantitiesForRun(
             traced,
-            runCircuits,
+            forMaths,
             ratio,
             verticalsForRunRow(run, heights)
           ),

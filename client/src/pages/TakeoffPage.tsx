@@ -4544,11 +4544,11 @@ export default function TakeoffPage({
               onRemoveRun={id => removeRun.mutate({ id })}
               onCommitRun={id => commitRun.mutate({ id })}
               onAcceptSuggestion={id => acceptSuggestion.mutate({ id })}
-              onAddCircuit={(runId, name, conductorCount) =>
-                addCircuit.mutate({ runId, name, conductorCount })
+              onAddCircuit={(runId, name, conductorCount, groundCount) =>
+                addCircuit.mutate({ runId, name, conductorCount, groundCount })
               }
-              onUpdateCircuit={(id, conductorCount) =>
-                updateCircuit.mutate({ id, conductorCount })
+              onUpdateCircuit={(id, patch) =>
+                updateCircuit.mutate({ id, ...patch })
               }
               onRemoveCircuit={id => removeCircuit.mutate({ id })}
             />

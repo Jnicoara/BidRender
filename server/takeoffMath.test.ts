@@ -935,3 +935,54 @@ describe("counting the ground separately", () => {
     expect(quantities.totalWireFeet).toBe(400);
   });
 });
+
+describe("the two purchases a conduit run makes", () => {
+  /**
+   * ── What this defends ──────────────────────────────────────────────────────
+   * Bare copper cannot be ordered as THHN. A single wire figure answers "how
+   * much" and cannot answer "how much of WHICH", which is the entire reason the
+   * ground got its own column — and the reason the run panel shows the bare
+   * share on its own line.
+   */
+  it("reports the bare share separately from the total", () => {
+    const quantities = quantitiesForRun(
+      RUN_100FT,
+      [
+        { name: "Ckt 1", conductorCount: 2, groundCount: 1 },
+        { name: "Ckt 2", conductorCount: 3, groundCount: 1 },
+      ],
+      QUARTER_INCH,
+      NO_VERTICALS
+    )!;
+
+    const insulated = quantities.wireByCircuit.reduce(
+      (sum, c) => sum + c.insulatedFeet,
+      0
+    );
+    const bare = quantities.wireByCircuit.reduce(
+      (sum, c) => sum + c.groundFeet,
+      0
+    );
+
+    expect(insulated).toBe(500); // (2 + 3) conductors x 100 ft
+    expect(bare).toBe(200); //     (1 + 1) grounds    x 100 ft
+    // And the two still come to what the run has always reported.
+    expect(insulated + bare).toBe(quantities.totalWireFeet);
+    expect(quantities.totalWireFeet).toBe(700);
+  });
+
+  it("reports no bare share when no circuit carries a ground", () => {
+    // The panel hides the line entirely in this case: "0.00 ft" of bare copper
+    // is noise standing where a number goes.
+    const quantities = quantitiesForRun(
+      RUN_100FT,
+      [{ name: "Ckt 1", conductorCount: 3, groundCount: 0 }],
+      QUARTER_INCH,
+      NO_VERTICALS
+    )!;
+    expect(
+      quantities.wireByCircuit.reduce((sum, c) => sum + c.groundFeet, 0)
+    ).toBe(0);
+    expect(quantities.totalWireFeet).toBe(300);
+  });
+});
