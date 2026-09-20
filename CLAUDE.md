@@ -300,6 +300,74 @@ comment cannot fail. When a comment claims a property — these are kept apart,
 this cannot be negative, this is always sorted — **write the test that would go
 red if it stopped being true**, and keep them in sight of each other.
 
+### The stronger version: a comment claiming that SOMETHING ELSE handles it
+
+**Added 2026-09-19, after two of them shipped in the same file.** The `Math.abs`
+case above is the mild form: the comment and the code that contradicted it were
+two functions apart, in one file, and a unit test could reach both.
+
+**The dangerous form is a comment that explains why a guard is ABSENT by
+naming code somewhere else.** It is a claim about a part of the system you
+cannot see from where you are reading, and it is load-bearing in the worst
+direction: it is the reason a check was not written.
+
+Both of these were live in `client/src/pages/TakeoffPage.tsx`, and neither was
+found by anything except using the app.
+
+**1. "Nothing else wanted it."** `beginPlainPan` pans the sheet on a plain
+left-drag and had no check for whether a tool was armed. The comment said one
+was not needed:
+
+> No check for "is a tool armed" is needed, and that is not laziness: while
+> tracing or stamping, TraceLayer's overlay takes the event and this never
+> fires.
+
+**A React event bubbles.** The overlay handled it AND it arrived here, every
+time, from the day it was written. Marking and tracing survived only because a
+click that does not move pans by nothing — but boxing a symbol on the legend is
+a DRAG, so Capture drew its box while the sheet moved under it, and read as a
+tool that had simply stopped working.
+
+**2. "The batch is flushed whenever the tool changes hands."** Marks are sent
+in batches and a batch goes over under ONE count id. The comment explained why
+reading the id off the first entry was safe:
+
+> Every click in a batch belongs to the armed group, because the batch is
+> flushed whenever the tool changes hands — putting the tool down clears the
+> queue first.
+
+**Nothing did that.** No flush on disarm, none on a sheet change, nowhere. A
+click made in the second after switching counts was counted as the previous
+thing — **two wrong quantities, on the screen whose entire job is quantities,
+with nothing to show for it.** That is the failure this app is built against,
+arriving as a sentence in a comment.
+
+**What makes this class worse than the `Math.abs` one, and it is not the
+severity.** There is nowhere to put the test. `vitest.config.ts` covers
+`server/**`, `client/src/lib/**` and `scripts/**` — not React components — so a
+claim about which layer receives an event, or about what happens when a piece
+of state changes, has no assertion that can be written against it here at all.
+The rule above says "write the test that would go red". For this class there is
+no red to go.
+
+**So the rule is different, and it is stricter:**
+
+- **Do not write a comment that makes a guard unnecessary. Write the guard.**
+  `e.stopPropagation()` in the overlay is one line and it is true by
+  construction; a paragraph explaining why it is not needed is a bug nobody can
+  see. The same goes for "the queue is already empty here" — flush it.
+- **If a guard genuinely cannot be written, the comment names the file and the
+  line, and you go and read it before you believe it.** A named claim can be
+  checked in a minute. "Something upstream handles this" cannot be checked at
+  all.
+- **Treat the words as a smell:** "never fires", "cannot happen here", "is
+  already cleared", "X takes it first", "by the time we get here". Each one is
+  an assertion about code that is not on the screen in front of you.
+- **And when you find one that was wrong, say so where it was.** Both comments
+  above were rewritten to describe what the code now actually does, with the
+  wrongness kept in the text — a corrected comment that hides its own history
+  teaches nobody.
+
 ## A fix can manufacture the fault another fix was for — look at them together
 
 **Two changes that are each correct can be wrong as a pair**, and the pair is

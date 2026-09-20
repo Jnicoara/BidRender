@@ -3607,6 +3607,75 @@ and "94% complete" printed beside a count would do precisely the damage the
 third tier exists to prevent — an unreliable number, styled like a fact, one
 glance from a quantity.
 
+## 5n. A run type you can edit, and a run you can retype — ONE piece
+
+**Grouped 2026-09-19.** Three gaps found while answering "where do I set size
+and conductors on a run I have already traced". They read as three small things
+and they are one: **a run type can be named but never specified, so nothing
+downstream can say what a run is made of.** Fixing any one of them alone leaves
+the question unanswered.
+
+### The three parts, and what is already there
+
+**1. A type editor.** `takeoffRunTypes.update` is **built** — label, raceway
+material, conductor material, conductor count, and fork-on-edit so that
+changing a shipped row makes the contractor their own copy instead of everyone
+else's. **Nothing in the client calls it**, and `RunTypePicker`'s create path
+sends only a label, which is why a type invented mid-trace comes back labelled
+"needs specification".
+
+**Where it lives: in the picker, not a new screen.** The sidebar is eight
+destinations, down from fourteen, and a ninth for a list most people will touch
+twice is the fold-a-screen-back-in mistake in reverse. A row in the palette
+gets an edit affordance and the form opens there — CLAUDE.md § "Customization
+available, but never in the way". A library screen only if somebody asks for
+one.
+
+**The real work here is a material picker, and there is no reusable one.**
+`materials.list` is fetched whole in four screens and each rolls its own search
+over `smartSearch`. This piece either extracts one or writes a small combobox,
+and that is the largest unknown in the whole job.
+
+**Say the fork out loud.** `update` returns `{ forked: true }` when it copies a
+shipped row. If the screen stays silent, somebody edits "1/2in EMT" and has two
+rows with one name and no idea why.
+
+**2. Change a traced run's type.** There is no procedure at all. It mirrors
+`setLocation` almost exactly — a dozen lines — plus the same picker mounted on
+the run row.
+
+**One decision to make first: does retyping RENAME the run?** `takeoff_runs.name`
+is a stored column and `runDisplayName` derives what is shown from the type and
+the ends. If a name was never edited by hand it should follow the type; if it
+was, it must not be overwritten. That is the whole question, and the answer
+decides whether a `nameIsCustom` bit is needed or whether comparing against the
+derived name is enough.
+
+**3. The spec on the run row.** `takeoffRunTypes.list` already returns the two
+material ids and the conductor count; only the NAMES are missing, and the
+takeoff screen does not fetch `materials.list` today. One line under the type
+name — `3/4" EMT · 3 x #12 THHN` — and the run panel finally says what the run
+is carrying rather than only what it is called.
+
+### Why it is one piece and not three
+
+An editor with no way to retype an existing run leaves every run traced before
+today stuck on an unspecified type. A retype action with no editor can only
+move a run between types that are equally empty. And the spec on the row is the
+only thing that makes either of them verifiable by looking — without it, you
+edit a type and nothing on the screen you are working on changes.
+
+### Where it sits relative to everything else
+
+**Before the takeoff CSV export** (todo.md), and that ordering is the point: an
+export of run footage BY TYPE, from a palette where no type names a material,
+writes rows that say "Conduit type 4 — 340 ft" and nothing else. The door out is
+worth less than it looks until this exists.
+
+**It does not open the § 5f.2 gate either.** A fully specified type still
+reaches a bid as footage at material cost with no hours behind it. This makes
+the runs describable; labour is what makes them priceable.
+
 ## 6. Decisions already made — do not re-open without saying why
 
 **NO CONDUIT FILL CHECKING. EVER.** Decided 2026-09-17. The app prices what the
