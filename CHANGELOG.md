@@ -4,6 +4,18 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-20]
+
+- **You can finally say what a run is made of.** The Conduit and Cable dropdowns have always let you pick a kind of run and name it; now each one has a pencil beside it that opens a short form — the pipe, the wire, and how many conductors go in a circuit. Every run traced under that kind takes it. Editing one of the kinds BidRidge ships makes your own copy instead of changing everyone's, and the form says so before you save rather than after.
+
+- **And you can change your mind after tracing.** Open a run in the right-hand panel and there is a line reading "This run is" with the kind it was traced under. Change it and the run renames itself, because the name was never stored: a run is called what its kind is called.
+
+- **Every run now shows what it is carrying.** Under the name and the two ends, a run row reads its pipe and its wire. A kind with nothing behind it says "No materials on this type — cannot be priced" in the same spot, because a blank line reads as "nothing to say" and this is the opposite. The same line shows in the dropdown, so two similar kinds can be told apart before one is picked.
+
+- **Searching for a material works the same way everywhere it is offered.** The Assembly Builder's material search — your recent parts when the box is empty, ranking and trade slang once you type, arrow keys and Enter — is now one piece of the app rather than one screen's, and the new form uses it. One search, one set of rules, one place to improve it.
+
+- **Still true and unchanged by any of this:** traced footage does not reach a bid price. A fully specified kind of run still carries no labor hours, and that gate is deliberate.
+
 ## [2026-09-19]
 
 - **A mark now appears the instant you click, instead of a second later.** It used to wait for the server to answer before anything was drawn — and worse, the send was put off again by every new click, so counting forty lights in a row put nothing at all on the drawing until your hand stopped moving. Losing your place in a count is the expensive part of that: a count you cannot read off the screen is one you do again by hand. Measured on the same click: the mark is drawn in **12 ms** where the saved version came back at **866 ms**. It is still saved in batches rather than one request per click, but the batch now has a ceiling on how long it may wait rather than being restarted by the next click. If a save fails, the marks stay on the drawing and go with the next one.

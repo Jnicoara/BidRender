@@ -84,7 +84,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { smartSearch } from "@/lib/smartSearch";
 import {
   addAssemblyOverheadHours,
   calculateBidPrice,
@@ -96,6 +95,10 @@ import {
 } from "@shared/laborHourDefaults";
 import { HourSuggestions } from "@/components/HourSuggestions";
 import { money } from "@/lib/money";
+import {
+  MaterialPicker,
+  type PickableMaterial,
+} from "@/components/MaterialPicker";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -464,21 +467,21 @@ function AssemblyBuilder({
   onRevert: () => void;
 }) {
   const [draft, setDraft] = useState<Draft>(initial);
-  const [materialQuery, setMaterialQuery] = useState("");
   /** Tracks whether the user has typed in the hours box themselves. */
   const [hoursTouched, setHoursTouched] = useState(false);
 
-  const { data: materials = [] } = trpc.materials.list.useQuery();
-  const { data: recentMaterials = [] } = trpc.materials.recent.useQuery({
-    limit: 8,
-  });
   const { data: laborRates = [] } = trpc.laborRates.list.useQuery();
   const { data: modifiers = [] } = trpc.modifiers.list.useQuery({
     status: "active",
   });
 
-  /** Keyboard state for the material picker: which result Enter would take. */
-  const [materialHighlight, setMaterialHighlight] = useState(0);
+  /**
+   * The picker's own search box, so focus can be handed back to it.
+   *
+   * The search, the ranking and the keyboard now live in `MaterialPicker`;
+   * what stays here is what happens to a material once it is chosen, which is
+   * the half that is genuinely this screen's.
+   */
   const materialSearchRef = useRef<HTMLInputElement>(null);
   /**
    * Set to the materialId just added so its quantity input can grab focus once
@@ -508,53 +511,6 @@ function AssemblyBuilder({
     !hoursTouched &&
     isPlaceholderHours(draft.name, Number(draft.baseLaborHours));
 
-  const searchable = useMemo(
-    () =>
-      (
-        materials as Array<{
-          id: number;
-          name: string;
-          searchAliases: string | null;
-        }>
-      ).map(m => ({
-        id: String(m.id),
-        description: m.name,
-        searchAliases: m.searchAliases,
-      })),
-    [materials]
-  );
-
-  type CatalogMaterial = {
-    id: number;
-    name: string;
-    unitOfSale: string;
-    costPerUnit: string;
-    category: string | null;
-    defaultQty: string | null;
-  };
-
-  /**
-   * With nothing typed, offer what this user reached for most recently — the
-   * same dozen parts go into most recipes, and one click beats a search. Once
-   * they start typing, ranking takes over completely.
-   */
-  const materialResults = useMemo<CatalogMaterial[]>(() => {
-    const all = materials as unknown as CatalogMaterial[];
-    if (!materialQuery.trim()) {
-      const chosen = new Set(draft.materials.map(l => l.materialId));
-      return (recentMaterials as unknown as CatalogMaterial[])
-        .filter(m => !chosen.has(m.id))
-        .slice(0, 6);
-    }
-    const hits = smartSearch(searchable, materialQuery, 8);
-    const byId = new Map(all.map(m => [m.id, m]));
-    return hits
-      .map(hit => byId.get(Number(hit.id)))
-      .filter((m): m is CatalogMaterial => Boolean(m));
-  }, [materialQuery, searchable, materials, recentMaterials, draft.materials]);
-
-  const showingRecent = !materialQuery.trim() && materialResults.length > 0;
-
   // resolveLaborRate, not a bare find: an assembly that referenced a starter
   // role keeps that id after the role is forked, and the fork is what it means.
   const selectedRate = resolveLaborRate(laborRates, draft.laborRateId);
@@ -580,13 +536,7 @@ function AssemblyBuilder({
     [modifiers, draft.modifierIds]
   );
 
-  const addMaterial = (material: {
-    id: number;
-    name: string;
-    unitOfSale: string;
-    costPerUnit: string;
-    defaultQty?: string | null;
-  }) => {
+  const addMaterial = (material: PickableMaterial) => {
     let already = false;
     setDraft(d => {
       if (d.materials.some(line => line.materialId === material.id)) {
@@ -618,8 +568,6 @@ function AssemblyBuilder({
       return;
     }
 
-    setMaterialQuery("");
-    setMaterialHighlight(0);
     // Hand the keyboard to the new row's quantity, which selects its own text.
     setFocusQtyFor(material.id);
   };
@@ -628,31 +576,6 @@ function AssemblyBuilder({
   // row's quantity input — see the material list below. An effect that hunted
   // for the node raced React's commit and lost; autoFocus fires on mount, which
   // is exactly the moment the row appears.
-
-  const onMaterialSearchKeyDown = (
-    event: React.KeyboardEvent<HTMLInputElement>
-  ) => {
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setMaterialHighlight(h => Math.min(h + 1, materialResults.length - 1));
-      return;
-    }
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setMaterialHighlight(h => Math.max(h - 1, 0));
-      return;
-    }
-    if (event.key === "Enter") {
-      event.preventDefault();
-      const chosen = materialResults[materialHighlight];
-      if (chosen) addMaterial(chosen);
-      return;
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      setMaterialQuery("");
-    }
-  };
 
   const save = () => {
     if (!draft.name.trim()) {
@@ -802,69 +725,14 @@ function AssemblyBuilder({
             {/* Materials */}
             <div className="rounded-xl border border-border bg-card overflow-hidden">
               <div className="px-4 py-3 border-b border-border">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                  <Input
-                    ref={materialSearchRef}
-                    value={materialQuery}
-                    onChange={e => {
-                      setMaterialQuery(e.target.value);
-                      setMaterialHighlight(0);
-                    }}
-                    onKeyDown={onMaterialSearchKeyDown}
-                    placeholder="Search materials to add — try “1900”, “romex”, “gem box”…"
-                    className="h-8 pl-9 text-sm"
-                    aria-label="Search materials to add"
-                  />
-                </div>
-                {materialResults.length > 0 && (
-                  <>
-                    {showingRecent && (
-                      <div className="mt-2 text-xs text-muted-foreground">
-                        Recently used —{" "}
-                        <span className="text-foreground">↑↓</span> then{" "}
-                        <span className="text-foreground">Enter</span>, or start
-                        typing to search.
-                      </div>
-                    )}
-                    <div className="mt-2 rounded-lg border border-border overflow-hidden">
-                      {materialResults.map((m, index) => (
-                        <button
-                          key={m.id}
-                          onMouseEnter={() => setMaterialHighlight(index)}
-                          onClick={() => addMaterial(m)}
-                          className={cn(
-                            "w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors border-b border-border last:border-0",
-                            index === materialHighlight
-                              ? "bg-[#F5C518]/10 text-foreground"
-                              : "hover:bg-muted/40"
-                          )}
-                        >
-                          <Plus
-                            className={cn(
-                              "w-3.5 h-3.5 shrink-0",
-                              index === materialHighlight
-                                ? "text-[#F5C518]"
-                                : "text-muted-foreground"
-                            )}
-                          />
-                          <span className="flex-1 truncate">{m.name}</span>
-                          {m.defaultQty != null && (
-                            <span className="text-xs text-muted-foreground">
-                              ×{Number(m.defaultQty)}
-                            </span>
-                          )}
-                          <span className="text-xs text-muted-foreground">
-                            {m.category ?? "—"}
-                          </span>
-                          <span className="font-mono text-xs">
-                            {money(Number(m.costPerUnit))}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
+                <MaterialPicker
+                  inputRef={materialSearchRef}
+                  onChoose={addMaterial}
+                  exclude={draft.materials.map(l => l.materialId)}
+                  placeholder="Search materials to add — try “1900”, “romex”, “gem box”…"
+                  ariaLabel="Search materials to add"
+                  showQty
+                />
               </div>
 
               {draft.materials.length === 0 ? (

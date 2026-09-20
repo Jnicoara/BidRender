@@ -8,7 +8,7 @@
  * or that let colour go back to meaning something it no longer means.
  */
 import { describe, it, expect } from "vitest";
-import { runDisplayName } from "@shared/takeoffCounts";
+import { runDisplayName, runTypeSpec } from "@shared/takeoffCounts";
 import {
   LEGACY_RUN_COLOR,
   MARK_COLORS,
@@ -136,5 +136,67 @@ describe("what a run looks like", () => {
       expect(color).not.toBe(LEGACY_RUN_COLOR.cable);
       expect(MARK_COLORS).toContain(color);
     }
+  });
+});
+
+describe("what a run type is made of", () => {
+  it("reads as the pipe and the wire in it", () => {
+    expect(
+      runTypeSpec({
+        pathType: "conduit",
+        racewayMaterialName: '3/4" EMT',
+        conductorMaterialName: "#12 THHN",
+        conductorCount: 3,
+      })
+    ).toBe('3/4" EMT · 3 x #12 THHN');
+  });
+
+  it("gives a cable its own name and no pipe", () => {
+    // The cable IS the raceway; a cable type has no raceway link by design,
+    // and offering one would be offering a field that must stay null.
+    expect(
+      runTypeSpec({
+        pathType: "cable",
+        racewayMaterialName: null,
+        conductorMaterialName: "12-2 MC",
+        conductorCount: 3,
+      })
+    ).toBe("12-2 MC");
+  });
+
+  it("returns null when nothing has been said, rather than something hopeful", () => {
+    // This is the state the palette calls "cannot be priced". An empty string
+    // or a guessed "EMT" would put a specification on screen that nobody chose.
+    expect(
+      runTypeSpec({
+        pathType: "conduit",
+        racewayMaterialName: null,
+        conductorMaterialName: null,
+        conductorCount: 3,
+      })
+    ).toBeNull();
+  });
+
+  it("never prints a count with no conductor after it", () => {
+    // "3 x" with nothing following is not a fact about anything.
+    expect(
+      runTypeSpec({
+        pathType: "conduit",
+        racewayMaterialName: '1/2" EMT',
+        conductorMaterialName: null,
+        conductorCount: 4,
+      })
+    ).toBe('1/2" EMT');
+  });
+
+  it("drops a count that means nothing", () => {
+    expect(
+      runTypeSpec({
+        pathType: "conduit",
+        racewayMaterialName: null,
+        conductorMaterialName: "#10 stranded",
+        conductorCount: 0,
+      })
+    ).toBe("#10 stranded");
   });
 });

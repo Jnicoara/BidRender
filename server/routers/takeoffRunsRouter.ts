@@ -485,6 +485,74 @@ export const takeoffRunsRouter = router({
       return { success: true };
     }),
 
+  /**
+   * Say what an already-traced run is — D3(b), the way to change it later.
+   *
+   * ── The name follows, and nothing has to be written to make it ────────────
+   * `runName` reads the type's LIVE label first and the run's own `name` column
+   * last (shared/takeoffCounts.ts), so retyping renames what is shown without
+   * touching a row. That is also why this is safe today: nothing in the app can
+   * rename a run by hand yet, so there is no chosen name to overwrite. When a
+   * rename arrives it goes in FRONT of the type in that resolution order, which
+   * is where `takeoffCounts.ts` already says it belongs — and this procedure
+   * needs no change for it.
+   *
+   * ── The label snapshot moves with the link, always ────────────────────────
+   * Both fields together, exactly as `save` does it, and the label is read off
+   * the type here rather than accepted from the caller — so a run cannot be
+   * retyped into claiming something its type does not say. The snapshot is what
+   * survives the type being archived (drizzle/0058).
+   */
+  setRunType: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        /** Null detaches the run from the palette, leaving it untyped. */
+        runTypeId: z.number().int().positive().nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const run = await requireRun(input.id, ctx.scope.dataUserId);
+
+      if (input.runTypeId === null) {
+        await db.updateRun(input.id, ctx.scope.dataUserId, {
+          runTypeId: null,
+          runTypeLabel: null,
+        });
+        return { success: true, label: null };
+      }
+
+      const type = await db.getRunTypeById(
+        input.runTypeId,
+        ctx.scope.dataUserId
+      );
+      if (!type)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "That run type is not in your palette.",
+        });
+
+      /*
+        A cable type on a conduit run is refused rather than quietly converted.
+
+        Changing `pathType` to match would change what the run MEASURES — a
+        conduit run counts pipe once and wire per conductor, a cable run counts
+        neither — so accepting it would rewrite a quantity as a side effect of
+        picking from a list. Same refusal, same wording, as `save`.
+      */
+      if (type.pathType !== run.pathType)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `"${type.label}" is a ${type.pathType} type, and this is a ${run.pathType} run.`,
+        });
+
+      await db.updateRun(input.id, ctx.scope.dataUserId, {
+        runTypeId: type.id,
+        runTypeLabel: type.label,
+      });
+      return { success: true, label: type.label };
+    }),
+
   remove: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {

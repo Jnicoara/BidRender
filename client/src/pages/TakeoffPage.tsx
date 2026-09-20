@@ -115,7 +115,11 @@ import {
   type PanelState,
 } from "@/lib/takeoffPanels";
 import { StampPicker } from "@/components/takeoff/StampPicker";
-import { RunTypePicker } from "@/components/takeoff/RunTypePicker";
+import {
+  RunTypePicker,
+  type RunTypePatch,
+} from "@/components/takeoff/RunTypePicker";
+import { runTypeSpec } from "@shared/takeoffCounts";
 import { CalibrateLayer } from "@/components/takeoff/CalibrateLayer";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
 import { JobHeightsChip } from "@/components/takeoff/JobHeightsChip";
@@ -2153,6 +2157,76 @@ export default function TakeoffPage({
     onError: e => toast.error(e.message),
     onSuccess: () => runTypes.refetch(),
   });
+  const updateRunType = trpc.takeoffRunTypes.update.useMutation({
+    onError: e => toast.error(e.message),
+  });
+
+  /**
+   * Save what a run type is made of, and follow the fork when there is one.
+   *
+   * ── Two things have to move, not one ──────────────────────────────────────
+   * Editing a SHIPPED type forks it server-side, so the id that comes back is
+   * a different row from the one that was edited. If the armed type is not
+   * re-pointed at the fork, the next six runs are traced under the shipped row
+   * the user has just decided is not what they wanted — the specification
+   * would be saved and ignored, which looks exactly like it not saving.
+   *
+   * Runs are refreshed too, because a run reads its type's LIVE label: renaming
+   * a type renames every run traced under it, and the panel is where that shows.
+   */
+  const saveRunType = useCallback(
+    async (id: number, patch: RunTypePatch) => {
+      const result = await updateRunType.mutateAsync({ id, ...patch });
+      await runTypes.refetch();
+      refreshRuns();
+
+      setArmedRunType(previous => {
+        const next = { ...previous };
+        for (const key of ["conduit", "cable"] as const) {
+          const armed = previous[key];
+          if (!armed) continue;
+          if (armed.id === id || armed.id === result.id)
+            next[key] = { id: result.id, label: patch.label };
+        }
+        return next;
+      });
+
+      toast.success(
+        result.forked
+          ? `Saved as your own "${patch.label}" — the one BidRidge ships is untouched.`
+          : `Saved. Every run of "${patch.label}" says so.`
+      );
+    },
+    [updateRunType, runTypes, refreshRuns]
+  );
+
+  /**
+   * What each run type is made of, by id.
+   *
+   * Built once here rather than looked up per row: the palette is already on
+   * this screen for the toolbar, so a run row costs a Map hit instead of a
+   * fetch. `runTypeSpec` is the one place that turns two materials and a count
+   * into a sentence — see shared/takeoffCounts.ts on why it is not written out
+   * at each surface.
+   */
+  const specByRunType = useMemo(() => {
+    const map = new Map<number, string | null>();
+    for (const type of runTypes.data ?? []) map.set(type.id, runTypeSpec(type));
+    return map;
+  }, [runTypes.data]);
+
+  /** Say what an already-traced run is. D3(b), the way to change it later. */
+  const setRunTypeFor = trpc.takeoffRuns.setRunType.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: result => {
+      refreshRuns();
+      toast.success(
+        result.label
+          ? `This run is a "${result.label}" now.`
+          : "This run no longer says what it is."
+      );
+    },
+  });
 
   const groupForAssembly = trpc.takeoffGroups.forAssembly.useMutation({
     onError: e => toast.error(e.message),
@@ -3722,6 +3796,7 @@ export default function TakeoffPage({
                       /* the mutation's onError has already said so */
                     })
                 }
+                onSave={saveRunType}
               >
                 <Button
                   size="sm"
@@ -3773,6 +3848,7 @@ export default function TakeoffPage({
                       /* the mutation's onError has already said so */
                     })
                 }
+                onSave={saveRunType}
               >
                 <Button
                   size="sm"
@@ -4272,6 +4348,10 @@ export default function TakeoffPage({
               runs={visibleRuns.map(r => ({
                 ...r,
                 firstPoint: r.points[0] ?? null,
+                spec:
+                  r.runTypeId === null
+                    ? null
+                    : (specByRunType.get(r.runTypeId) ?? null),
               }))}
               stampGroups={stampGroups}
               bridge={bridgeByGroup}
@@ -4288,6 +4368,55 @@ export default function TakeoffPage({
                 window.setTimeout(() => setFocusPoint(null), 2200);
               }}
               onRemoveStamp={id => removeStamp.mutate({ id })}
+              renderRunType={run => {
+                const armed = (runTypes.data ?? []).find(
+                  t => t.id === run.runTypeId
+                );
+                return (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[0.7rem] text-muted-foreground shrink-0">
+                      This run is
+                    </span>
+                    <RunTypePicker
+                      pathType={run.pathType}
+                      types={runTypes.data ?? []}
+                      armedId={run.runTypeId}
+                      onPick={type =>
+                        setRunTypeFor.mutate({
+                          id: run.id,
+                          runTypeId: type.id,
+                        })
+                      }
+                      onCreate={label =>
+                        createRunType
+                          .mutateAsync({ label, pathType: run.pathType })
+                          .then(type =>
+                            setRunTypeFor.mutate({
+                              id: run.id,
+                              runTypeId: type.id,
+                            })
+                          )
+                          .catch(() => {
+                            /* the mutation's onError has already said so */
+                          })
+                      }
+                      onSave={saveRunType}
+                    >
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 gap-1 px-2 text-[0.7rem] min-w-0"
+                        aria-label={`Change what this run is`}
+                      >
+                        <span className="truncate">
+                          {armed?.label ?? run.typeName ?? "Not said"}
+                        </span>
+                        <ChevronDown className="w-3 h-3 shrink-0" />
+                      </Button>
+                    </RunTypePicker>
+                  </div>
+                );
+              }}
               renderRunEnds={run => (
                 <RunEndsEditor
                   bidId={bidId}

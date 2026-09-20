@@ -3609,6 +3609,11 @@ glance from a quantity.
 
 ## 5n. A run type you can edit, and a run you can retype — ONE piece
 
+> **BUILT 2026-09-20.** All three parts, plus the material picker extracted.
+> Two things written below were wrong and are corrected in place: the rename
+> question needed no flag and no column, and "four screens each roll their own
+> material picker" was a miscount.
+
 **Grouped 2026-09-19.** Three gaps found while answering "where do I set size
 and conductors on a run I have already traced". They read as three small things
 and they are one: **a run type can be named but never specified, so nothing
@@ -3632,9 +3637,26 @@ available, but never in the way". A library screen only if somebody asks for
 one.
 
 **The real work here is a material picker, and there is no reusable one.**
-`materials.list` is fetched whole in four screens and each rolls its own search
-over `smartSearch`. This piece either extracts one or writes a small combobox,
-and that is the largest unknown in the whole job.
+
+**CORRECTED 2026-09-20 — the count was wrong.** `materials.list` is fetched by
+four screens, but three of them are LIST screens with filters (the materials
+library, the material database) and only ONE is a picker: the Assembly
+Builder's, with recents when the box is empty, `smartSearch` ranking once it is
+not, and an arrow-key loop. The duplication being removed is of one picker, not
+four — worth saying, because "four copies is four chances to drift" was the
+argument for extracting it and only one copy existed.
+
+**The SHAPE, though, is repeated five times**, over different item types:
+`LegendPanel` and `StampPicker` over assemblies, this file over run types,
+`KitsPage` over assemblies, and the Assembly Builder over materials. Extracting
+a generic searchable picker is a real job and was deliberately NOT done here —
+refactoring four working pickers while building a new feature is how one change
+manufactures the fault another change was for. Noted, not scheduled.
+
+**BUILT:** `client/src/components/MaterialPicker.tsx`, used by the Assembly
+Builder and by the run-type editor. The search, the ranking and the keyboard
+live in it; what is done with the chosen material stays with the caller, which
+is the half that genuinely differs between the two.
 
 **Say the fork out loud.** `update` returns `{ forked: true }` when it copies a
 shipped row. If the screen stays silent, somebody edits "1/2in EMT" and has two
@@ -3644,12 +3666,23 @@ rows with one name and no idea why.
 `setLocation` almost exactly — a dozen lines — plus the same picker mounted on
 the run row.
 
-**One decision to make first: does retyping RENAME the run?** `takeoff_runs.name`
-is a stored column and `runDisplayName` derives what is shown from the type and
-the ends. If a name was never edited by hand it should follow the type; if it
-was, it must not be overwritten. That is the whole question, and the answer
-decides whether a `nameIsCustom` bit is needed or whether comparing against the
-derived name is enough.
+**One decision to make first: does retyping RENAME the run?**
+
+**ANSWERED 2026-09-20, and it cost nothing: it already does.** `runName` in
+`shared/takeoffCounts.ts` resolves the type's LIVE label first, the run's
+snapshot second and `takeoff_runs.name` last — so retyping renames what is shown
+without writing to a row. No flag, no column, no migration.
+
+The decision the estimator made — rename unless I renamed it by hand — is
+already where that file says a rename belongs: **in FRONT of the type in the
+resolution order**, as the one thing a person said out loud. Nothing in the app
+can rename a run yet (T11), so there is no chosen name to overwrite today, and
+when T11 arrives it changes `runName` rather than `setRunType`.
+
+**This was nearly built the other way.** The sizing above assumed a
+`nameIsCustom` column and the estimator had approved adding one. Reading
+`runName` before writing the code is the only reason there is no migration in
+this change.
 
 **3. The spec on the run row.** `takeoffRunTypes.list` already returns the two
 material ids and the conductor count; only the NAMES are missing, and the

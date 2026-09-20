@@ -37,6 +37,11 @@ export type PanelRun = {
   displayName?: string;
   /** What it IS, alone. The top line of the row. */
   typeName?: string;
+  /**
+   * What it is MADE OF — `3/4" EMT · 3 x #12 THHN`. Null when the type names
+   * no materials, which is a real state and says so in its own words.
+   */
+  spec?: string | null;
   /** Where it GOES, or null if both ends are not answered. The second line. */
   endsName?: string | null;
   /** Which kind of run — what its colour groups on. Null before types. */
@@ -214,6 +219,7 @@ export function RunsPanel({
   onRemoveStamp,
   legend,
   renderRunEnds,
+  renderRunType,
 }: {
   runs: PanelRun[];
   /** Counted stamps, grouped by assembly. Quantities are derived, not typed. */
@@ -243,6 +249,14 @@ export function RunsPanel({
    * ends editor needs queries and mutations of its own.
    */
   renderRunEnds?: (run: PanelRun) => React.ReactNode;
+  /**
+   * The control that says what this run IS — D3(b), changing it after tracing.
+   *
+   * A render prop for the same reason `renderRunEnds` is one: the picker it
+   * opens belongs to the takeoff screen, and this panel stays a panel that
+   * shows runs rather than one that knows about palettes.
+   */
+  renderRunType?: (run: PanelRun) => React.ReactNode;
   totals:
     | {
         conduitFeet: number;
@@ -522,6 +536,25 @@ export function RunsPanel({
                         {run.endsName}
                       </p>
                     )}
+                    {/*
+                      What it is made of, under what it is called.
+
+                      The row said what a run was NAMED and never what it was,
+                      so "1/2in EMT" and a type somebody typed in a hurry read
+                      identically — and the one that cannot price anything is
+                      the one worth spotting. A type with no materials says so
+                      here rather than leaving the line blank, because blank
+                      reads as "nothing to say" and this is the opposite.
+                    */}
+                    <p
+                      className={cn(
+                        "text-[0.7rem] truncate",
+                        run.spec ? "text-muted-foreground" : "text-[#F5C518]/80"
+                      )}
+                    >
+                      {run.spec ??
+                        "No materials on this type — cannot be priced"}
+                    </p>
                     <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                       {run.isSuggestion && (
                         <Badge
@@ -633,6 +666,15 @@ export function RunsPanel({
                   only on the open run: nine controls on every row is a panel
                   people stop reading.
                 */}
+                {isSelected && renderRunType && !run.isSuggestion && (
+                  <div
+                    className="mt-2 pt-2 border-t border-border/60"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {renderRunType(run)}
+                  </div>
+                )}
+
                 {isSelected && renderRunEnds && !run.isSuggestion && (
                   <div onClick={e => e.stopPropagation()}>
                     {renderRunEnds(run)}

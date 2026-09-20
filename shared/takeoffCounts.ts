@@ -97,6 +97,62 @@ export function runName(run: {
 }
 
 /**
+ * What a run type is MADE OF, in one short line.
+ *
+ * ── Why this is shared rather than written at each surface ───────────────────
+ * The same argument `runNameParts` makes below: the palette, the run row and
+ * anything that exports a takeoff all have to say the same thing about the same
+ * type, and two implementations of "what is this made of" is two chances to
+ * disagree in the one place an estimator is checking what they are buying.
+ *
+ * ── Null means "nothing has been said yet", and it has to stay distinct ──────
+ * Not an empty string, and never a hopeful "EMT". A type with no materials
+ * behind it is a real and supported state — it still names its runs and still
+ * groups them — and the palette already says so in words. Returning something
+ * that looks like a specification would be the whisper `§ 2.3` of the overhaul
+ * document warns about, in the field that decides what gets bought.
+ *
+ * A CABLE type has no raceway by design: the cable IS the raceway, and the
+ * conductor link holds it (drizzle/schema.ts on `takeoff_run_types`). So a
+ * cable reads as its own name alone rather than as a pipe it does not have.
+ */
+export function runTypeSpec(type: {
+  pathType?: "conduit" | "cable" | null;
+  racewayMaterialName?: string | null;
+  conductorMaterialName?: string | null;
+  conductorCount?: number | null;
+}): string | null {
+  const raceway = type.racewayMaterialName?.trim() || null;
+  const conductor = type.conductorMaterialName?.trim() || null;
+  if (!raceway && !conductor) return null;
+
+  const count =
+    typeof type.conductorCount === "number" &&
+    Number.isFinite(type.conductorCount) &&
+    type.conductorCount > 0
+      ? Math.floor(type.conductorCount)
+      : null;
+
+  /*
+    A CABLE never shows the count, and a test is why.
+
+    The column means "conductors in one circuit, including the ground", so a
+    12-2 MC legitimately stores 3 — and printing it gives `3 x 12-2 MC`, which
+    reads as three cables rather than one cable with three conductors in it.
+    The cable's own name already says what is inside it. A pipe's does not,
+    which is the whole reason the count is worth showing there.
+  */
+  if (type.pathType === "cable") return conductor ?? raceway;
+
+  // The count belongs to the conductor and means nothing without one, so it is
+  // never printed on its own — "3 x" with nothing after it is not a fact.
+  const wire =
+    conductor && count !== null ? `${count} x ${conductor}` : conductor;
+
+  return [raceway, wire].filter(Boolean).join(" · ");
+}
+
+/**
  * What a run is CALLED on screen — derived, never stored.
  *
  * ── Why nothing writes this down ────────────────────────────────────────────

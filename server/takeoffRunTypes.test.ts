@@ -306,3 +306,189 @@ describeDb("retiring a type keeps the footage", () => {
     ).rejects.toThrow(/not found/i);
   });
 });
+
+describeDb("saying what a type is made of", () => {
+  it("resolves both materials to names, and stops needing a specification", async () => {
+    // The palette sends NAMES rather than ids, because the screen that needs
+    // them most — the takeoff — does not hold the material catalog. A type that
+    // still shows an id somewhere is a type nobody can read.
+    const pipe = await caller().materials.create({
+      name: `Spec fixture EMT ${uniq()}`,
+      unitOfSale: "foot",
+      costPerUnit: 0.42,
+      category: "Conduit",
+    });
+    const wire = await caller().materials.create({
+      name: `Spec fixture THHN ${uniq()}`,
+      unitOfSale: "foot",
+      costPerUnit: 0.18,
+      category: "Wire & Cable",
+    });
+
+    const type = await caller().takeoffRunTypes.create({
+      label: `Unspecified ${uniq()}`,
+      pathType: "conduit",
+    });
+    const before = (await caller().takeoffRunTypes.list()).find(
+      t => t.id === type.id
+    )!;
+    expect(before.needsSpecification).toBe(true);
+    expect(before.racewayMaterialName).toBeNull();
+
+    await caller().takeoffRunTypes.update({
+      id: type.id,
+      racewayMaterialId: pipe!.id,
+      conductorMaterialId: wire!.id,
+      conductorCount: 3,
+    });
+
+    const after = (await caller().takeoffRunTypes.list()).find(
+      t => t.id === type.id
+    )!;
+    expect(after.needsSpecification).toBe(false);
+    expect(after.racewayMaterialName).toBe(pipe!.name);
+    expect(after.conductorMaterialName).toBe(wire!.name);
+    expect(after.conductorCount).toBe(3);
+  });
+});
+
+describeDb("saying what an already-traced run is", () => {
+  /** A committed conduit run under `type`, returned with its ids. */
+  async function tracedRun(typeId: number, label: string) {
+    const { bidId, sheetId } = await scenario();
+    const db = await getDb();
+    const [run] = await db!.insert(takeoffRuns).values({
+      bidId,
+      sheetId,
+      userId: USER,
+      name: "Run on Sheet 1",
+      pathType: "conduit",
+      points: [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+      ],
+      runTypeId: typeId,
+      runTypeLabel: label,
+    });
+    return { bidId, sheetId, runId: run.insertId as number };
+  }
+
+  it("moves the link and the snapshot label together", async () => {
+    // Both fields or neither: the link is what a later rename follows, and the
+    // label is what survives the link being archived.
+    const first = await caller().takeoffRunTypes.create({
+      label: `Was ${uniq()}`,
+      pathType: "conduit",
+    });
+    const second = await caller().takeoffRunTypes.create({
+      label: `Is now ${uniq()}`,
+      pathType: "conduit",
+    });
+    const { runId } = await tracedRun(first.id, first.label);
+
+    const result = await caller().takeoffRuns.setRunType({
+      id: runId,
+      runTypeId: second.id,
+    });
+    expect(result.label).toBe(second.label);
+
+    const db = await getDb();
+    const [row] = await db!
+      .select()
+      .from(takeoffRuns)
+      .where(eq(takeoffRuns.id, runId));
+    expect(row.runTypeId).toBe(second.id);
+    expect(row.runTypeLabel).toBe(second.label);
+  });
+
+  it("renames what the run is CALLED without writing a name anywhere", async () => {
+    // The claim the procedure's comment makes, with a test that can fail it:
+    // `runName` reads the type's live label first and the run's own `name`
+    // column last, so retyping renames the row on screen while
+    // takeoff_runs.name still holds the placeholder it was created with.
+    const first = await caller().takeoffRunTypes.create({
+      label: `Before ${uniq()}`,
+      pathType: "conduit",
+    });
+    const second = await caller().takeoffRunTypes.create({
+      label: `After ${uniq()}`,
+      pathType: "conduit",
+    });
+    const { sheetId, runId } = await tracedRun(first.id, first.label);
+
+    await caller().takeoffRuns.setRunType({ id: runId, runTypeId: second.id });
+
+    const listed = (await caller().takeoffRuns.listForSheet({ sheetId })).find(
+      r => r.id === runId
+    )!;
+    expect(listed.typeName).toBe(second.label);
+
+    const db = await getDb();
+    const [row] = await db!
+      .select()
+      .from(takeoffRuns)
+      .where(eq(takeoffRuns.id, runId));
+    expect(row.name).toBe("Run on Sheet 1");
+  });
+
+  it("refuses a cable type on a conduit run, and changes nothing", async () => {
+    // Accepting it would rewrite what the run MEASURES as a side effect of
+    // picking from a list — conduit counts pipe once and wire per conductor.
+    const conduit = await caller().takeoffRunTypes.create({
+      label: `Pipe ${uniq()}`,
+      pathType: "conduit",
+    });
+    const cable = await caller().takeoffRunTypes.create({
+      label: `Cable ${uniq()}`,
+      pathType: "cable",
+    });
+    const { runId } = await tracedRun(conduit.id, conduit.label);
+
+    await expect(
+      caller().takeoffRuns.setRunType({ id: runId, runTypeId: cable.id })
+    ).rejects.toThrow(/is a cable type/i);
+
+    const db = await getDb();
+    const [row] = await db!
+      .select()
+      .from(takeoffRuns)
+      .where(eq(takeoffRuns.id, runId));
+    expect(row.runTypeId).toBe(conduit.id);
+  });
+
+  it("detaches a run from the palette when asked", async () => {
+    const type = await caller().takeoffRunTypes.create({
+      label: `Detachable ${uniq()}`,
+      pathType: "conduit",
+    });
+    const { runId } = await tracedRun(type.id, type.label);
+
+    const result = await caller().takeoffRuns.setRunType({
+      id: runId,
+      runTypeId: null,
+    });
+    expect(result.label).toBeNull();
+
+    const db = await getDb();
+    const [row] = await db!
+      .select()
+      .from(takeoffRuns)
+      .where(eq(takeoffRuns.id, runId));
+    expect(row.runTypeId).toBeNull();
+    expect(row.runTypeLabel).toBeNull();
+  });
+
+  it("refuses to retype another contractor's run", async () => {
+    const type = await caller().takeoffRunTypes.create({
+      label: `Mine only ${uniq()}`,
+      pathType: "conduit",
+    });
+    const { runId } = await tracedRun(type.id, type.label);
+    await expect(
+      callerFor(OTHER_USER).takeoffRuns.setRunType({
+        id: runId,
+        runTypeId: null,
+      })
+    ).rejects.toThrow();
+  });
+});

@@ -103,12 +103,44 @@ export const takeoffRunTypesRouter = router({
         db.getRunTypesFor(ctx.scope.dataUserId, input.includeArchived),
         db.countRunsByType(ctx.scope.dataUserId),
       ]);
+
+      /*
+        The two materials, resolved to NAMES, in one query.
+
+        Sent from here rather than looked up on the client, because the client
+        that needs them most — the takeoff screen — does not fetch the material
+        catalog at all and should not have to pull one in to print "3/4in EMT"
+        on a run row. It is two ids per type and one round trip for all of them.
+
+        A link that resolves to nothing comes back null rather than as a
+        dangling id: `set null` on delete means a retired material leaves the
+        type readable, and the palette already says what a type with nothing
+        behind it cannot do.
+      */
+      const byId = new Map(
+        (
+          await db.getMaterialsByIds(
+            types.flatMap(t =>
+              [t.racewayMaterialId, t.conductorMaterialId].filter(
+                (id): id is number => id !== null
+              )
+            ),
+            ctx.scope.dataUserId
+          )
+        ).map(m => [m.id, m])
+      );
+      const nameOf = (id: number | null) =>
+        id === null ? null : (byId.get(id)?.name ?? null);
+
       return types.map(type => ({
         id: type.id,
         label: type.label,
         pathType: type.pathType,
         racewayMaterialId: type.racewayMaterialId,
         conductorMaterialId: type.conductorMaterialId,
+        /** Resolved above. Null for no link AND for a link that no longer resolves. */
+        racewayMaterialName: nameOf(type.racewayMaterialId),
+        conductorMaterialName: nameOf(type.conductorMaterialId),
         conductorCount: type.conductorCount,
         status: type.status,
         /** True for a row the app ships. Read-only until it is forked. */

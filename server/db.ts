@@ -1438,6 +1438,32 @@ export async function getMaterialById(
   return result[0];
 }
 
+/**
+ * Several materials at once, for resolving a column of ids to names.
+ *
+ * One query rather than a loop of `getMaterialById`: the run-type palette
+ * resolves two ids per row, so a dozen types is 24 round trips done the naive
+ * way. Scoped the same as the single getter — shipped rows and this user's.
+ */
+export async function getMaterialsByIds(
+  ids: readonly number[],
+  userId: number
+): Promise<Material[]> {
+  const wanted = Array.from(new Set(ids.filter(id => Number.isFinite(id))));
+  if (wanted.length === 0) return [];
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(materials)
+    .where(
+      and(
+        inArray(materials.id, wanted),
+        or(isNull(materials.userId), eq(materials.userId, userId))
+      )
+    );
+}
+
 /** Create a material owned by the user. Returns the new row id. */
 export async function createMaterial(data: InsertMaterial): Promise<number> {
   const db = await getDb();
