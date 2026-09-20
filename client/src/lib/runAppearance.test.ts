@@ -200,3 +200,76 @@ describe("what a run type is made of", () => {
     ).toBe("#10 stranded");
   });
 });
+
+describe("the ground on a run type's spec line", () => {
+  /**
+   * ── What these are defending ───────────────────────────────────────────────
+   * The complaint that started the whole ground split: a type LABELLED
+   * "1/2\" EMT, 2 #12 + ground" showed a spec line reading "3 x #12 THHN", so
+   * the words and the number disagreed on the same row. Getting the number
+   * right and then dropping the ground from the line would be the same
+   * disagreement reversed.
+   */
+  const conduit = {
+    pathType: "conduit" as const,
+    racewayMaterialName: '3/4" EMT',
+    conductorMaterialName: "#12 THHN",
+    conductorCount: 3,
+  };
+
+  it("names the ground wire when the type says which one", () => {
+    expect(
+      runTypeSpec({
+        ...conduit,
+        groundMaterialName: "#12 bare copper",
+        groundCount: 1,
+      })
+    ).toBe('3/4" EMT · 3 x #12 THHN + #12 bare copper');
+  });
+
+  it("counts two grounds, for an isolated-ground circuit", () => {
+    expect(
+      runTypeSpec({
+        ...conduit,
+        groundMaterialName: "#12 bare copper",
+        groundCount: 2,
+      })
+    ).toBe('3/4" EMT · 3 x #12 THHN + 2 x #12 bare copper');
+  });
+
+  it("says there IS a ground when no wire has been named for it", () => {
+    // Every shipped type is in this state: 0064 split the count and
+    // deliberately invented no ground wire. Printing nothing here would put
+    // "+ ground" in the label above a line that never mentions one.
+    expect(
+      runTypeSpec({ ...conduit, groundMaterialName: null, groundCount: 1 })
+    ).toBe('3/4" EMT · 3 x #12 THHN + ground');
+  });
+
+  it("says nothing when the type carries no ground", () => {
+    expect(
+      runTypeSpec({ ...conduit, groundMaterialName: null, groundCount: 0 })
+    ).toBe('3/4" EMT · 3 x #12 THHN');
+  });
+
+  it("says nothing when nobody has said either way", () => {
+    // Null is "not set", and a spec line must not invent a ground from it —
+    // the same rule the column and circuitWire follow.
+    expect(
+      runTypeSpec({ ...conduit, groundMaterialName: null, groundCount: null })
+    ).toBe('3/4" EMT · 3 x #12 THHN');
+  });
+
+  it("leaves a cable alone — its ground is inside the jacket", () => {
+    expect(
+      runTypeSpec({
+        pathType: "cable",
+        racewayMaterialName: null,
+        conductorMaterialName: "12-2 MC",
+        conductorCount: 2,
+        groundMaterialName: null,
+        groundCount: 1,
+      })
+    ).toBe("12-2 MC");
+  });
+});

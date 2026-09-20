@@ -545,16 +545,36 @@ export function RunsPanel({
                       the one worth spotting. A type with no materials says so
                       here rather than leaving the line blank, because blank
                       reads as "nothing to say" and this is the opposite.
+
+                      ── Unless it would just repeat the line above ───────────
+                      A CABLE's specification is the cable itself, and its type
+                      is usually named after it — so the row rendered
+                      "12-2 MC cable" and then "12-2 MC cable" again, which is
+                      not information, it is furniture. Seen on screen, not in
+                      the diff.
+
+                      Suppressed as a REPEAT rather than by path type: a conduit
+                      type named exactly after its pipe would read the same way,
+                      and the test is what the two lines SAY rather than what
+                      kind of run they belong to.
                     */}
-                    <p
-                      className={cn(
-                        "text-[0.7rem] truncate",
-                        run.spec ? "text-muted-foreground" : "text-[#F5C518]/80"
-                      )}
-                    >
-                      {run.spec ??
-                        "No materials on this type — cannot be priced"}
-                    </p>
+                    {(() => {
+                      const named = run.typeName ?? run.displayName ?? run.name;
+                      if (run.spec === named) return null;
+                      return (
+                        <p
+                          className={cn(
+                            "text-[0.7rem] truncate",
+                            run.spec
+                              ? "text-muted-foreground"
+                              : "text-[#F5C518]/80"
+                          )}
+                        >
+                          {run.spec ??
+                            "No materials on this type — cannot be priced"}
+                        </p>
+                      );
+                    })()}
                     <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                       {run.isSuggestion && (
                         <Badge

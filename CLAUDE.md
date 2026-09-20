@@ -1069,7 +1069,7 @@ zero gets fixed and a plausible wrong number does not.
 
 Accuracy is this app's whole value. A contractor who cannot tell whether a
 number saved will stop trusting the total, and a wrong total loses a job. So
-every field follows the same five rules, without being asked:
+every field follows the same seven rules, without being asked:
 
 **1. A numeric field selects its value on focus.** Click or tab into a rate,
 percentage, quantity or hour count and the existing text is selected, so the
@@ -1160,8 +1160,43 @@ never commits a zero, and `vitest` can reach `client/src/lib` while it cannot
 reach a React component. A rule with no red to go to is an instruction; a rule
 with a failing test is a guard.
 
+### 7. A FORM THAT CANNOT EDIT A FIELD MUST NOT CLEAR IT
+
+**Added 2026-09-20.** A Save button writes what the form is holding. The trap is
+a field the form deliberately does not SHOW — hidden because it does not apply
+to this shape of thing — being written as null on the way past.
+
+The run-type editor hides the raceway on a cable type, because a cable has no
+pipe, and forces it to null on save. That is a GUARD and it is right: a stray
+raceway link on a cable is wrong data.
+
+Writing the ground the same way looked symmetrical and was destructive. A
+shipped cable legitimately stores two conductors and one ground — that is what
+is inside the jacket — and saving through a form that does not show those
+fields would have set them to nothing. **Caught by saving a cable type and
+reading the row back**, not by reading the code, which looked consistent.
+
+**So decide per field, and state which it is:**
+
+- **A guard** — this value must not exist on this shape of thing. Write the
+  null, and say in a comment why the field cannot apply.
+- **Not shown** — this form simply does not edit it. **Pass it through
+  untouched**, from a draft initialised out of the stored row.
+
+This is the same distinction the routers already make between an OMITTED field
+and an explicit `null` — omitted leaves it, null clears it — arriving from the
+user-interface side. A form is a patch; the fields it does not mention are
+fields it is not changing.
+
+**And a label describing the OLD meaning is worse than no label.** The
+conductor count once read "ground included", which was true while one column
+counted both and false the moment 0063 split them. A caption that quietly
+restates the old meaning beside a number carrying the new one does not merely
+fail to help — **it reads as confirmation.** When a meaning changes, the words
+around it are part of the change.
+
 **Do not hand-roll this.** `InlineNumberField` (`@/components/InlineNumberField`)
-implements all five for self-saving numbers; the decisions live in
+implements rules 1–5 for self-saving numbers; the decisions live in
 `@/lib/inlineEdit` and are tested there — `planFieldKey` is the one that knows
 what Enter and Escape mean on each surface. For a numeric input inside an
 explicit Save/Cancel form, rules 2–4 belong to the form's buttons, but rule 1

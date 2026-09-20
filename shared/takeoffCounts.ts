@@ -121,17 +121,20 @@ export function runTypeSpec(type: {
   racewayMaterialName?: string | null;
   conductorMaterialName?: string | null;
   conductorCount?: number | null;
+  groundMaterialName?: string | null;
+  groundCount?: number | null;
 }): string | null {
   const raceway = type.racewayMaterialName?.trim() || null;
   const conductor = type.conductorMaterialName?.trim() || null;
+  const groundWire = type.groundMaterialName?.trim() || null;
   if (!raceway && !conductor) return null;
 
-  const count =
-    typeof type.conductorCount === "number" &&
-    Number.isFinite(type.conductorCount) &&
-    type.conductorCount > 0
-      ? Math.floor(type.conductorCount)
+  const positive = (value: number | null | undefined): number | null =>
+    typeof value === "number" && Number.isFinite(value) && value > 0
+      ? Math.floor(value)
       : null;
+  const count = positive(type.conductorCount);
+  const grounds = positive(type.groundCount);
 
   /*
     A CABLE never shows the count, and a test is why.
@@ -149,7 +152,35 @@ export function runTypeSpec(type: {
   const wire =
     conductor && count !== null ? `${count} x ${conductor}` : conductor;
 
-  return [raceway, wire].filter(Boolean).join(" · ");
+  /*
+    ── The ground, and the case that made this worth writing carefully ────────
+    Four states, and each says a different true thing:
+
+      a named wire, one ground     "+ #12 bare copper"
+      a named wire, two            "+ 2 x #12 bare copper"   isolated ground
+      NO wire named, one ground    "+ ground"
+      no ground, or nothing said   nothing
+
+    The third is the one that matters and the one it would be easy to drop. It
+    is what every shipped type looks like right now: 0064 split the count but
+    deliberately invented no ground WIRE, so these carry a ground they cannot
+    yet name. Printing nothing there would leave the label saying
+    "2 #12 + ground" above a spec line that mentions no ground — which is the
+    exact disagreement this whole line exists to remove, just reversed.
+
+    "+ ground" is honest: there IS one, and nobody has said which.
+  */
+  const ground =
+    grounds === null
+      ? null
+      : groundWire === null
+        ? "ground"
+        : grounds > 1
+          ? `${grounds} x ${groundWire}`
+          : groundWire;
+
+  const core = [raceway, wire].filter(Boolean).join(" · ");
+  return ground ? `${core} + ${ground}` : core;
 }
 
 /**
