@@ -231,8 +231,32 @@ export function SymbolCaptureLayer({
       className={cn("absolute inset-0 w-full h-full z-10 cursor-crosshair")}
       onPointerDown={e => {
         if (e.button !== 0) return;
+        /*
+          This layer CLAIMS the drag, and that one line is the whole fix.
+
+          The viewport underneath listens for a plain left-drag and pans the
+          sheet with it (TakeoffPage, `beginPlainPan`, which arrived with zoom
+          and pan in v6.8). A React event raised here bubbles to it, so boxing
+          a symbol on the legend drew the box AND panned the drawing out from
+          under it at the same time. Nothing about the capture layer changed;
+          an ancestor started wanting the same gesture.
+
+          Right-drag, middle-drag and space-drag still pan, because those are
+          taken in the CAPTURE phase on the viewport and never reach here — the
+          sheet can still be moved mid-capture without putting the tool down.
+        */
+        e.stopPropagation();
         const at = toPage(e);
         if (at) {
+          try {
+            // Keeps the drag alive past the edge of the page, so a box started
+            // on a symbol near the margin still ends where it is dropped.
+            // Guarded: a pointer that is no longer active throws here, and a
+            // capture that cannot be taken is not a reason to lose the drag.
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            /* the drag still works, it just stops at the edge */
+          }
           setStart(at);
           setCurrent(at);
         }

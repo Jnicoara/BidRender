@@ -177,7 +177,6 @@ import {
   loadStampQueue,
   saveDraft,
   saveStampQueue,
-  type QueuedStamp,
 } from "@/lib/traceDraft";
 import { LegendPanel } from "@/components/takeoff/LegendPanel";
 import { CoPilotPanel } from "@/components/takeoff/CoPilotPanel";
@@ -885,9 +884,19 @@ function PlanPane({
   /**
    * A plain left-drag pans — but only when it reaches us.
    *
-   * No check for "is a tool armed" is needed, and that is not laziness: while
-   * tracing or stamping, TraceLayer's overlay takes the event and this never
-   * fires. If the event got here, nothing else wanted it.
+   * ── This comment used to be wrong, and the wrongness shipped ──────────────
+   * It said no check for "is a tool armed" was needed because "TraceLayer's
+   * overlay takes the event and this never fires". A React event bubbles: the
+   * overlay handled it AND it arrived here. Marking and tracing were unharmed
+   * only because a click that does not move pans by nothing — but boxing a
+   * symbol on the legend is a DRAG, so Capture drew its box and panned the
+   * sheet out from under it at the same time, and looked like it was only
+   * panning.
+   *
+   * The overlays now claim the gesture when they are armed, by calling
+   * `stopPropagation` in their own pointerdown, so the sentence is true by
+   * construction rather than by assumption. If the event got here, nothing
+   * above it wanted it.
    */
   const beginPlainPan = useCallback(
     (e: React.PointerEvent) => {
@@ -1623,6 +1632,35 @@ const TRACE_ENDS_KEY = "helixbid:trace-ends";
 
 // ── The page ─────────────────────────────────────────────────────────────────
 
+/**
+ * A click that has been made and not yet confirmed by the server.
+ *
+ * Carries enough to DRAW the mark — the count it belongs to, and the Category
+ * that decides its shape — as well as enough to send it. Before this existed
+ * the queue held only coordinates, because nothing rendered it.
+ */
+type PendingMark = {
+  /** Negative, so a mark awaiting the server cannot collide with a real id. */
+  key: number;
+  sheetId: number;
+  groupId: number;
+  name: string;
+  assemblyId: number | null;
+  assemblyCategory: string | null;
+  x: number;
+  y: number;
+  /** In flight. Still drawn, no longer waiting to be sent. */
+  sent: boolean;
+};
+
+/**
+ * How long a click may sit unsent.
+ *
+ * A CEILING, not a quiet period. It used to be restarted by every click, which
+ * meant a fast run of forty marks sent nothing until the hand stopped.
+ */
+const FLUSH_AFTER_MS = 700;
+
 export default function TakeoffPage({
   bidId,
   onBack,
@@ -1863,8 +1901,20 @@ export default function TakeoffPage({
   const [pendingCapture, setPendingCapture] = useState<{
     thumbnail: string | null;
   } | null>(null);
-  /** Clicks not yet confirmed by the server. Mirrored locally; see traceDraft. */
-  const pendingStamps = useRef<QueuedStamp[]>([]);
+  /**
+   * Clicks not yet confirmed by the server — drawn here, mirrored to storage.
+   *
+   * State as well as a ref, because these are now RENDERED. The ref is what the
+   * flush reads when its timer fires, and both are written by `setPending` so
+   * the ref can never be a render behind the drawing.
+   */
+  const [pendingMarks, setPendingMarks] = useState<PendingMark[]>([]);
+  const pendingStamps = useRef<PendingMark[]>([]);
+  const setPending = useCallback((next: PendingMark[]) => {
+    pendingStamps.current = next;
+    setPendingMarks(next);
+  }, []);
+  const nextPendingKey = useRef(-1);
   /** Which layers are showing. Null until a sheet's contents are known. */
   const [layerState, setLayerState] = useState<LayerState | null>(null);
   const hadSystem = useRef<Set<string>>(new Set());
@@ -2409,59 +2459,166 @@ export default function TakeoffPage({
   );
 
   /**
-   * Queue a click and flush shortly after.
+   * The Category of the armed count, for drawing a mark the server has not
+   * seen yet.
    *
-   * Queued rather than sent per click: an estimator drops markers faster than a
-   * round trip, and a request per click would put the drawing behind the
-   * network. The local mirror covers the window where the clicks exist only
-   * here.
+   * Looked up rather than left null because the Category decides the SHAPE
+   * (shared/takeoffMarks.ts). Leave it out and the mark drawn on the click
+   * changes shape when the real row arrives — reintroducing, in the fix, the
+   * flicker the fix exists to remove.
    */
+  const armedCategory = useMemo(() => {
+    if (!armedGroup || armedGroup.assemblyId === null) return null;
+    return (
+      allAssemblies.find(a => a.id === armedGroup.assemblyId)?.category ?? null
+    );
+  }, [armedGroup, allAssemblies]);
+
+  /**
+   * Write what is still unconfirmed for one sheet to the crash mirror.
+   *
+   * Everything unconfirmed, in flight or not: a tab closed mid-request loses
+   * the request, and those clicks exist nowhere else. `saveStampQueue` removes
+   * the key when the list is empty, so this is also how the mirror is cleared.
+   */
+  const mirrorQueue = useCallback(
+    (sheetId: number) => {
+      saveStampQueue(
+        sheetId,
+        bidId,
+        pendingStamps.current
+          .filter(m => m.sheetId === sheetId)
+          .map(m => ({ groupId: m.groupId, x: m.x, y: m.y }))
+      );
+    },
+    [bidId]
+  );
+
   const flushTimer = useRef<number | null>(null);
+
+  /**
+   * Send every click that has not been sent yet.
+   *
+   * Its own function rather than only a timer body, because two things must
+   * not wait for the timer: the armed count changing and the sheet changing.
+   * A batch goes over under ONE group id and one sheet id, so a click made
+   * after the tool changed hands would otherwise be counted as the previous
+   * thing — correct-looking, and wrong.
+   */
+  const flushStamps = useCallback(() => {
+    if (flushTimer.current !== null) {
+      window.clearTimeout(flushTimer.current);
+      flushTimer.current = null;
+    }
+    const batch = pendingStamps.current.filter(m => !m.sent);
+    if (batch.length === 0) return;
+
+    const sheetId = batch[0].sheetId;
+    const keys = new Set(batch.map(m => m.key));
+    // Still drawn, no longer waiting to be sent.
+    setPending(
+      pendingStamps.current.map(m =>
+        keys.has(m.key) ? { ...m, sent: true } : m
+      )
+    );
+
+    dropStamps.mutate(
+      {
+        bidId,
+        sheetId,
+        groupId: batch[0].groupId,
+        at: batch.map(m => ({ x: m.x, y: m.y })),
+      },
+      {
+        /*
+          The drawn copy goes only once the refetch has LANDED, which is what
+          `invalidate` resolves on. Dropping it when the response arrives
+          instead would blank the marks for the length of one refetch and paint
+          them again — a flicker in exactly the place a count is being read.
+        */
+        onSuccess: async () => {
+          await utils.takeoffStamps.listForSheet.invalidate({ sheetId });
+          setPending(pendingStamps.current.filter(m => !keys.has(m.key)));
+          mirrorQueue(sheetId);
+        },
+        /*
+          Back in the queue, and still on the drawing. A failed request must not
+          take a count off the screen: it rides the next flush, and survives a
+          reload in the mirror either way.
+        */
+        onError: () => {
+          setPending(
+            pendingStamps.current.map(m =>
+              keys.has(m.key) ? { ...m, sent: false } : m
+            )
+          );
+        },
+      }
+    );
+  }, [bidId, dropStamps, mirrorQueue, setPending, utils]);
+  /**
+   * Take a click: draw it now, send it shortly after.
+   *
+   * ── Drawn on the click, not on the answer ─────────────────────────────────
+   * The mark used to appear only when the sheet's list came back from the
+   * server — a round trip after a debounce that was RESTARTED by every click,
+   * so counting forty lights in a row put nothing on the drawing at all until
+   * the hand stopped. Losing your place is the expensive part: a count that
+   * cannot be read off the screen gets done again by hand.
+   *
+   * ── Still batched, because the drawing no longer waits for it ─────────────
+   * One request per click is forty requests. The timer is now a ceiling on how
+   * long a click may sit unsent rather than a quiet period, so a fast run
+   * flushes every FLUSH_AFTER_MS instead of never.
+   */
   const queueStamp = useCallback(
     (at: { x: number; y: number }) => {
       if (!activeSheet || !armedGroup) return;
-      pendingStamps.current = [
+      const sheetId = activeSheet.id;
+
+      setPending([
         ...pendingStamps.current,
         {
+          key: nextPendingKey.current--,
+          sheetId,
           groupId: armedGroup.groupId,
+          name: armedGroup.label,
+          assemblyId: armedGroup.assemblyId,
+          assemblyCategory: armedCategory,
           x: at.x,
           y: at.y,
+          sent: false,
         },
-      ];
-      saveStampQueue(activeSheet.id, bidId, pendingStamps.current);
+      ]);
+      mirrorQueue(sheetId);
 
-      if (flushTimer.current !== null) window.clearTimeout(flushTimer.current);
-      flushTimer.current = window.setTimeout(() => {
-        const batch = pendingStamps.current;
-        if (batch.length === 0 || !activeSheet) return;
-        pendingStamps.current = [];
-        dropStamps.mutate(
-          {
-            bidId,
-            sheetId: activeSheet.id,
-            /*
-              Every click in a batch belongs to the armed group, because the
-              batch is flushed whenever the tool changes hands — putting the
-              tool down clears the queue first. Reading it off the first entry
-              would be the same value by a longer route.
-            */
-            groupId: batch[0].groupId ?? 0,
-            at: batch.map(b => ({ x: b.x, y: b.y })),
-          },
-          {
-            onSuccess: () => clearStampQueue(activeSheet.id),
-            // Put the batch back so it is retried and stays mirrored, rather than
-            // vanishing because one request failed.
-            onError: () => {
-              pendingStamps.current = [...batch, ...pendingStamps.current];
-              saveStampQueue(activeSheet.id, bidId, pendingStamps.current);
-            },
-          }
-        );
-      }, 700);
+      if (flushTimer.current === null) {
+        flushTimer.current = window.setTimeout(flushStamps, FLUSH_AFTER_MS);
+      }
     },
-    [activeSheet?.id, armedGroup, bidId, dropStamps]
+    [
+      activeSheet?.id,
+      armedGroup,
+      armedCategory,
+      flushStamps,
+      mirrorQueue,
+      setPending,
+    ]
   );
+
+  /**
+   * Put the batch in before the thing it belongs to changes.
+   *
+   * The old comment inside the flush claimed "the batch is flushed whenever the
+   * tool changes hands — putting the tool down clears the queue first". Nothing
+   * did that. Clicks made within the window after switching counts went over
+   * under the PREVIOUS count's id, which is a wrong quantity on two counts at
+   * once and nothing on screen to say so.
+   */
+  useEffect(() => {
+    flushStamps();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [armedGroup?.groupId, activeSheet?.id]);
 
   /**
    * Recover stamps clicked but never sent, after a crash or reload.
@@ -4048,15 +4205,38 @@ export default function TakeoffPage({
                       stamping={Boolean(armedGroup) && !tracing}
                       armedGroupName={armedGroup?.label ?? null}
                       zoom={size.zoom}
-                      stamps={visibleStamps.map(st => ({
-                        id: st.id,
-                        name: st.name,
-                        groupId: st.groupId,
-                        assemblyId: st.assemblyId,
-                        assemblyCategory: st.assemblyCategory ?? null,
-                        x: st.x,
-                        y: st.y,
-                      }))}
+                      stamps={[
+                        ...visibleStamps.map(st => ({
+                          id: st.id,
+                          name: st.name,
+                          groupId: st.groupId,
+                          assemblyId: st.assemblyId,
+                          assemblyCategory: st.assemblyCategory ?? null,
+                          x: st.x,
+                          y: st.y,
+                        })),
+                        /*
+                          Clicked and not yet saved, drawn the same way.
+
+                          Deliberately NOT put through the Layers filter above:
+                          these are the marks somebody is placing right now with
+                          that very count armed, and a mark that does not appear
+                          because a layer is hidden is indistinguishable from a
+                          click that missed.
+                        */
+                        ...pendingMarks
+                          .filter(m => m.sheetId === activeSheet?.id)
+                          .map(m => ({
+                            id: m.key,
+                            name: m.name,
+                            groupId: m.groupId,
+                            assemblyId: m.assemblyId,
+                            assemblyCategory: m.assemblyCategory,
+                            x: m.x,
+                            y: m.y,
+                            pending: true,
+                          })),
+                      ]}
                       proposals={proposals}
                       onDropStamp={queueStamp}
                       selectedStampId={selectedStampId}

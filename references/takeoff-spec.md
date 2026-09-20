@@ -311,16 +311,16 @@ from now on.
 
 ## 5. Getting results onto the bid
 
-| ID  | What it does                                                                                                                            | Status      | Source                          | Need         |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------- | ------------ |
+| ID  | What it does                                                                                                                            | Status       | Source                          | Need         |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ------------------------------- | ------------ |
 | R1  | **Stamped counts become quantities on the bid.** Building 2026-09-19 for assembly counts (level 4); typed and material counts follow.   | **Building** | Your request                    | Essential    |
-| R2  | **Traced footage becomes quantities on the bid.** T4 now exists, but R2 is GATED on labor for a run — see the note below.               | **Missing** | Your request, Old screen        | Essential    |
+| R2  | **Traced footage becomes quantities on the bid.** T4 now exists, but R2 is GATED on labor for a run — see the note below.               | **Missing**  | Your request, Old screen        | Essential    |
 | R3  | A clear rule for when the same assembly is on the bid twice — once from the plans and once added by hand — so nothing is counted twice. | **Building** | Found in this review            | Essential    |
 | R4  | Quantities from the plans follow the app's cost-snapshot rule: costs are frozen when the line is created, like every other bid line.    | **Building** | CLAUDE.md, Found in this review | Essential    |
-| R5  | Materials list for a supplier: quantities only, no prices, built from stamps, runs and bid lines, as CSV or PDF.                        | **Works**   | Changelog Aug 14                | Nice-to-have |
-| R6  | Other per-run estimating details from the old screen: service loop, pull points, fittings. Makeup is now R7; routing waste is T16.      | **Missing** | Old screen                      | Nice-to-have |
-| R7  | **Makeup allowances:** extra conductor at each termination and at the panel, from defaults set once, shown as its own amount.           | **Missing** | Decided 2026-09-14 (section 13) | Essential    |
-| R8  | **From a bid line back to the plan:** click a line that came from the plans and open the Takeoff screen on its marks.                   | **Missing** | Proposed (section 14)           | Nice-to-have |
+| R5  | Materials list for a supplier: quantities only, no prices, built from stamps, runs and bid lines, as CSV or PDF.                        | **Works**    | Changelog Aug 14                | Nice-to-have |
+| R6  | Other per-run estimating details from the old screen: service loop, pull points, fittings. Makeup is now R7; routing waste is T16.      | **Missing**  | Old screen                      | Nice-to-have |
+| R7  | **Makeup allowances:** extra conductor at each termination and at the panel, from defaults set once, shown as its own amount.           | **Missing**  | Decided 2026-09-14 (section 13) | Essential    |
+| R8  | **From a bid line back to the plan:** click a line that came from the plans and open the Takeoff screen on its marks.                   | **Missing**  | Proposed (section 14)           | Nice-to-have |
 
 **Notes**
 
@@ -599,6 +599,19 @@ Everything else below is still open until you say so.
 - **Pick:** (a). Add (b) only if it turns out to be needed. Name runs
   automatically from what they are (D3), so renaming is rare.
 
+> **OVERRIDDEN IN PART, 2026-09-19: (b) turned out to be needed.** The estimator
+> asked, while using the app, to branch a run — start a new line and keep it on
+> the same run, either as a tee off the main route or as a second leg of the
+> same circuit. That is the half of (b) about one run holding more than one
+> path. **Splitting one run into two is still not asked for and stays deferred.**
+>
+> The design is in § 5k of `references/plan-viewer-overhaul.md`: a leg is its
+> own ROW linked to a parent, not a longer polyline, because a run carries two
+> ends and the whole vertical calculation hangs off them. It is recommended and
+> not approved, and it belongs **after T9 (extend a finished run)** — extending
+> needs no schema change and removes the "I stopped and want to keep going" half
+> of the request on its own.
+
 **D8 — Location tags (C10, C11). Decided 2026-09-14.**
 
 - **Decision:** keep them. Location changes price and materials: underground
@@ -862,6 +875,14 @@ miscount can be fixed once the check finds it).
 
 ### R7 — Makeup allowances (extends R6)
 
+> **2026-09-19: makeup KEEPS its name while the two percentages become
+> "extra".** It is trade language for a real thing — the tail left at each end —
+> rather than a euphemism for padding, and it is not a percentage. Renaming it
+> to "extra" is the first step toward somebody folding it into the wire
+> percentage, which is the mistake it exists to avoid: it scales with conductors
+> and ends, never with length. Shown as its own term. See § 5j of
+> `references/plan-viewer-overhaul.md`.
+
 **What it does.** Adds conductor length for making up connections:
 
 - **At each termination** (a box, device or piece of equipment): a set number of
@@ -913,6 +934,20 @@ calculation. No touch or offline issue of its own.
 **Depends on.** T4 and R2 to reach the bid; T3 circuits for the panel allowance.
 
 ### T16 — Routing waste factor
+
+> **RENAMED 2026-09-19: it is EXTRA.** "Routing waste factor" is not what an
+> estimator says out loud, and "waste" reads as something that could be argued
+> down to zero rather than as conduit that gets bought and installed. It is now
+> **conduit extra** and **wire extra**, two percentages rather than one, because
+> § 7.1 of `references/plan-viewer-overhaul.md` already applies them to
+> different footage. The word, the display and where it is set are specified
+> there in § 5j. **The unit and the reasoning below are unchanged.**
+>
+> **Also reconciled there: "not per run" stands, but the chain is now three
+> levels** — company default → run type → this run — because the run TYPE did
+> not exist when this row was written (D3(a), and § 2.0 of the overhaul). What
+> this row was refusing is D15's form of nine fields on every traced line, and
+> that refusal is intact.
 
 **What it does.** A percentage added to traced length, because a pipe drawn on a
 flat plan understates the real run: offsets, going around beams and ducts, and

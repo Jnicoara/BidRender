@@ -167,6 +167,13 @@ call, and the migration is mechanical.
 
 ### 2.2 The three allowances — each measuring what it actually is
 
+> **RENAMED 2026-09-19 — they are EXTRA, not allowances.** "Extra wire" and
+> "extra conduit" is what an estimator says out loud, and it does not read as
+> padding the way "allowance" and "waste" do. See § 5j for the word, where the
+> number is set and the arithmetic it has to show. Makeup keeps its own name,
+> and § 5j says why. **Nothing below changes** — three quantities, three units,
+> and the rule that a percentage is the wrong unit for makeup all stand.
+
 This is the part most estimating tools get wrong by making everything a
 percentage.
 
@@ -3230,6 +3237,376 @@ should become a shared entity is a real question and it is NOT answered here —
 note it, and answer it when something needs it rather than inventing a table on
 a hunch.
 
+## 5j. EXTRA — the word, and the arithmetic it has to show
+
+**Named 2026-09-19, at the estimator's instruction.** "Extra wire" and "extra
+conduit" is what gets said out loud on a job, and it does not sound like
+padding. **"Waste", "slack" and "allowance" are retired as user-facing words**
+for these three numbers — here, in § 2.2, § 2.3 and § 7.1, and in
+`references/takeoff-spec.md` T16 and R7, both of which carry a line pointing
+here.
+
+**This is a naming decision and nothing else.** Three quantities, three units,
+three rules about what each one applies to — all unchanged. What changes is the
+word on the screen and the fact that the number has to be visible.
+
+**Why the word earns its own section.** An "allowance" sounds like a cushion
+somebody added and could take off again, which is exactly the reading that gets
+it argued down to zero. Extra conduit is conduit that gets bought, bent and
+installed. A bid without it is not a leaner bid, it is a short one — and § 2.3
+already records why the short one is the expensive mistake.
+
+| What              | Unit                       | Applies to                       | Was called                             |
+| ----------------- | -------------------------- | -------------------------------- | -------------------------------------- |
+| **Conduit extra** | percentage                 | traced length ONLY (§ 7.1)       | conduit allowance; routing waste (T16) |
+| **Wire extra**    | percentage                 | traced AND vertical (§ 7.1)      | wire allowance                         |
+| **Makeup**        | feet per conductor per end | wire only, never conduit (§ 2.2) | makeup allowance (R7)                  |
+
+**Makeup keeps its own name**, and that is deliberate rather than an oversight.
+It is trade language for a real thing — the tail left at each end — not a
+euphemism for padding, and it is not a percentage. Folding it into the word
+"extra" is the first step toward somebody folding it into the wire percentage,
+which is the mistake § 2.2 exists to prevent: it does not scale with length, so
+a percentage is the wrong unit twice over. It shows as its own term.
+
+### Where it shows — the same shape as the verticals arithmetic
+
+Per run, one line per thing that gets bought, every term visible:
+
+```
+Conduit   112.00 traced + 8.50 vertical + 5.60 extra = 126.10 ft
+Wire      336.00 traced + 25.50 vertical + 36.15 extra + 12.00 makeup = 409.65 ft
+```
+
+That is § 5d's rule extended by one term, and for the same stated reason: a
+total with the extra folded in is exactly as invisible as not counting it. The
+estimator has to be able to see where every foot came from.
+
+**A term that is zero is dropped, EXCEPT when the zero means "nobody set
+this".** `+ 0.00 extra` is noise standing where a number goes. But an extra of
+zero because no value has ever been entered is the whisper § 2.3 warns about,
+so it gets the treatment a flat-only run already gets: the run says it out loud,
+and the totals panel counts them — "23 runs carry no extra".
+
+In the bid total, the same shape:
+
+```
+Conduit   1,240.00 traced + 255.00 vertical + 62.00 extra = 1,557.00 ft
+```
+
+### Where it is SET — on the type, not on each run
+
+§ 2.0's division of ownership decides this: the TYPE owns what a run is made
+of, and a percentage covering route uncertainty is a property of the kind of
+run, not of one traced line. The run may still differ and says when it does.
+
+Inheritance follows § 2.5, gaining the level § 2.0 added:
+
+> company default → run type → this run
+
+NULL at any level means "follow the level above", never a value copied down at
+creation.
+
+**This reconciles takeoff-spec T16**, which said the routing factor is "a
+company default, overridable per bid — not per run". That was written on
+2026-09-14, before the run type existed, and its real target was D15's per-run
+form. The chain above keeps that intact: the company default is still where it
+starts, and there is still no form of nine fields on every traced line.
+
+### Starter values — unchanged from § 2.3
+
+10% wire, 5% conduit, 2 ft per conductor per end, more at panels. Shipped with
+real numbers rather than zero, labelled as starters, dated, for the reasons
+§ 2.3 gives. `server/seed/baselineRunTypes.ts` currently says in its header that
+no allowances ship; that comment is where they will ship from, and it gets
+rewritten rather than deleted.
+
+### What this does NOT do
+
+**It does not put traced footage on a bid.** § 5f.2's gate stands and is
+unchanged: a run priced from its type reaches the bid as footage at material
+cost with **zero hours to install it**, because materials carry no labour hours.
+The extras are one of the three things that gate names, and they are the
+smallest of them. Building them does not open the gate.
+
+---
+
+## 5k. Branching a run — asked 2026-09-19, recommended, NOT approved
+
+**The ask:** while tracing conduit, start a new line but keep it on the same run
+— a branch off the main route, or a second leg belonging to the same circuit.
+Today every trace is its own run.
+
+### Two different things are hiding in one sentence
+
+1. **A branch.** A tee. A second path leaving the first somewhere along its
+   length. One raceway system, one circuit, two routes.
+2. **A second leg.** The same run continuing after a stop — the other side of a
+   wall, another part of the sheet, a trace that was interrupted.
+
+They want different mechanisms, and telling them apart is most of the design
+work. The second one is largely **T7 (pick up an interrupted trace) and T9
+(extend a finished run)**, both already on the essential list in
+`references/takeoff-spec.md` and neither built. **Extending a run needs no
+schema change at all** — it appends to a polyline that already exists.
+
+### What D7 said, and why this overrides it
+
+**D7 (2026-09-14)** chose how much run editing to build: "(a) drag a point, add
+to the end, delete a point, rename", and deferred "(b) gaps inside a run and
+splitting one run into two" with **"Add (b) only if it turns out to be
+needed."**
+
+**It has turned out to be needed**, said by the estimator on 2026-09-19 while
+using the app. That is an override, and under CLAUDE.md § "Where decisions live"
+it is recorded in both files: takeoff-spec's D7 gets a line pointing here.
+
+### The recommendation: a leg is a ROW, not a longer polyline
+
+Three shapes are possible. Only one of them leaves the existing arithmetic
+alone.
+
+1. **One run row, `points` becomes a list of paths.** One row, many polylines.
+2. **A run row per leg, linked by a parent.** `takeoff_runs.parentRunId`, null
+   on a plain run.
+3. **A shared circuit entity every leg points at.**
+
+**Pick 2**, for four reasons in descending order of how much they would hurt:
+
+- **A run carries TWO ENDS, and the whole vertical calculation hangs off them**
+  (§ 5d). One row with three paths has six ends and nowhere to put four of
+  them. One row per leg keeps the ends exactly where `quantitiesForRun` already
+  reads them, and Phase 5 needs no revisiting.
+- **The tee end is a new end KIND, and it is the load-bearing part.** A branch
+  that starts on another run has **no vertical at that end** — it is the same
+  pipe at the same elevation. Without an end kind that contributes zero, every
+  branch double-counts a drop. That is § 5d's double-count trap wearing a new
+  hat, and § 5d already put the rule in code rather than only in prose.
+- **Deleting a leg stays a delete.** Under shape 1 it is surgery on a JSON
+  array, with the run's cached length and `scaleRatioUsed` to keep in step.
+- **Totals need no new arithmetic.** `totalQuantities` already sums rows; the
+  panel nests legs under the parent for display and nothing underneath changes.
+
+**Shape 3 is probably right eventually and is the wrong first step.** § 5i
+already notes that circuits are per-run rows today, that whether they should
+become a shared entity is a real question, and that the answer should wait for
+something that needs it rather than a table invented on a hunch.
+
+### What a leg inherits, and what it must not
+
+- **The type, from the parent — but the leg owns its own.** A branch off a 3/4"
+  EMT run starts as 3/4" EMT, and in practice a branch is often smaller. It
+  inherits, it may differ, and it says when it differs. That is § 2.0's rule
+  verbatim.
+- **Circuits: seeded from the parent, owned by the leg.** § 2.1 is emphatic
+  that the app must never decide what a pipe carries.
+- **One name for the whole thing.** Legs are not separately named. The panel
+  shows the parent's name — "Panel A → Switch" — with "2 legs" under it, and
+  the run's totals are the sum.
+
+### The question this does not answer
+
+**Where the branch starts.** Snapping the first click to a point on the
+parent's path is the obvious answer and will be fiddly at 20% zoom. Proposed:
+the first click of a branch snaps to the nearest point ON the parent path
+within the hit target the runs already use (`HIT_TARGET_PX`, 18 screen pixels,
+so aiming near a run is aiming at it), and the panel then states which run it
+left and how far along. **Shown, never assumed** — if the snap picked the wrong
+run, the vertical at that end is wrong, and § 5c's rule is that the app
+suggests and the estimator confirms.
+
+### Where it belongs in the order
+
+**After T9 (extend), before anything reaches a bid.** Extend removes the "I
+stopped and want to keep going" half of the ask with no schema change; what is
+left is the genuine tee, and it is worth building against the smaller remaining
+problem. The § 5f.2 gate covers legs exactly as it covers runs: no traced
+footage reaches a bid line until labour on a run has an answer, however the
+footage was traced.
+
+---
+
+## 5l. § 9 restated as ONE flow — one button, a list to correct, then counting
+
+**Rewritten 2026-09-19 at the estimator's instruction, whose words this follows.**
+§ 9 (legend capture) and §§ 10–11 (the tiled read) were written as two features
+because they are two builds. **They are one thing to use**, and writing them
+apart is how the first half ships as a feature nobody can finish with: a
+captured legend that counts nothing is setup work with no payoff at the end of
+it.
+
+The flow, in order, with what each step already has behind it:
+
+**1. One button: read the legend.** Not "capture a symbol", twenty times. It
+scans the legend sheet and finds **every** symbol at once. § 9.2 steps 1–2 are
+the mechanism: the text layer first where there is one (free, cannot
+hallucinate, and **measured worthless on both real sets** — build it as an
+accelerator, never a dependency), then one model call per legend region on a
+region render at a scale where the symbols are legible.
+
+**2. The right panel lists what it found.** So you can see at a glance whether
+anything is missing. The boxes are still drawn on the drawing (§ 9.2 step 3) —
+the estimator is looking at the legend and the proposals belong on it — but
+**the list is what makes a miss visible.** A symbol the reader never boxed
+leaves no trace on the drawing; it leaves a gap in a list you can read down.
+
+**3. Next to each one, say what it is.** Four choices, and they are already the
+four levels in § 5e, all shipped or specified:
+
+| What you type beside a symbol      | Level |
+| ---------------------------------- | ----- |
+| An assembly from the library       | 4     |
+| A material                         | 3     |
+| A name and a price, hours optional | 2     |
+| Just a name                        | 1     |
+
+**Nothing new is needed in the data model for this** — the group row carries all
+four, and level 1 and level 4 are live today. It is the same picker the Mark
+tool already opens, reached from a legend row instead of a toolbar button.
+
+**4. Then scan the plan set and mark every device it finds.** This is §§ 10–11's
+tiled read, entered from the same place rather than from a separate control.
+Per sheet, results shown as they arrive (§ 11.3), cached so a sheet is read once
+(§ 11.4). **This is the step that is gated on § 15's bake-off**, which has not
+been run.
+
+**5. Each device type gets its own shape and colour.** **Built, shipped
+2026-09-18** — `shared/takeoffMarks.ts`. Lighting is a triangle, Devices a
+circle, Panels a square, Equipment connections a diamond, Low voltage a hexagon,
+and the colour separates counts within a shape. Nothing here needs building; it
+needs connecting to step 3, so the shape a symbol will be marked with is visible
+in the list before a single mark is placed.
+
+### What this rewrite changes, and what it does not
+
+**The build order does not change.** § 9.6 stands: legend capture is Phase 9a
+and the tiled read is Phase 10, in that order, for the three reasons given there
+— the expensive half of tiling is already built, a tiled read against an empty
+legend can only produce `low` findings by construction, and once-per-set is the
+cheaper place to learn.
+
+**The shape of the screen changes.** One entry point, one list, one verb. The
+manual drag-a-box capture is not removed and not hidden (§ 9.2 step 6) — it
+stops being the front door and becomes what fixes what the reader missed.
+
+**One thing this flow adds that § 9 did not have.** Step 4 feeds back into step
+2: a symbol found on a floor plan with no legend entry behind it is exactly the
+finding that can never reach `high` confidence (§ 9.1,
+`shared/copilotConfidence.ts`), and the honest place to show it is the legend
+list, as a row that says "on the plans, not in the legend". The loop closes
+there or it does not close at all.
+
+---
+
+## 5m. Checking what the reader counted — the surface, and the honest part
+
+**Asked 2026-09-19, and it is the right question to ask:** "If I can't check its
+work quickly I won't trust it, and if I don't trust it I'll count by hand anyway
+— which makes the whole AI side worthless."
+
+That is the gate on the whole AI investment, stated better than this document
+had stated it. § 5c already says the app suggests and the estimator confirms;
+this section is about whether confirming is actually possible at the speed of a
+real job.
+
+### What already exists — more than it looks
+
+`CoPilotPanel.tsx` and `planCopilotRouter.ts`, shipped:
+
+- **Three tiers in their own bands.** Confident, uncertain, and unreadable —
+  and the third exists precisely so "I could not read this" never gets styled
+  like an answer.
+- **Confident proposals arrive ticked; uncertain ones arrive unticked.** The
+  asymmetry is the design: accepting a confident batch is one press, accepting
+  an uncertain one is a decision somebody made rather than one they failed to
+  undo.
+- **Bulk place and bulk dismiss**, over whatever is ticked.
+- **Click a row and the viewer jumps to it** and rings the spot (`focusPoint`).
+- **Nothing is placed until Place is pressed**, and the server re-checks every
+  id against the same rules regardless of what the panel offered
+  (`shared/copilotActions.ts`).
+- **`plan_copilot_findings.stampId`** — every placed mark knows which finding it
+  came from, and the link survives the mark being deleted.
+
+So four of the five things asked for exist in some form. The gaps are specific.
+
+### What is missing, in the order it will matter
+
+1. **Provenance disappears the moment a finding is accepted.** A confirmed
+   finding becomes an ordinary stamp, and the counted-items panel cannot say
+   which of the 40 came from the reader or at what confidence — **although the
+   database knows**, through `stampId`. This is the cheapest item on the list
+   and it is most of the ask.
+2. **There is no whole-set view.** The reader is per sheet and so is its panel.
+   "Everything counted, by type, with quantities" across the bid does not exist
+   for reader results, and a five-sheet set means opening five sheets to check
+   one number.
+3. **Jumping across sheets.** `onJumpTo` centres the current sheet's viewer.
+   From a bid-wide list it has to change sheet, wait for a render and then
+   centre — real work, and the thing that decides whether checking is fast
+   enough to happen at all.
+4. **Bulk is per sheet and per tier, never per TYPE.** "Accept every exit sign"
+   is the operation an estimator actually wants. Today it is "tick the fourteen
+   rows that say exit sign".
+5. **Nothing shows what was rejected.** Dismissed findings are kept, and a
+   rejection somebody wants back is a re-read and another call.
+
+### What I would build
+
+**One surface, bid-wide, named for what it does: what the reader counted.**
+
+- **Rows by TYPE with a quantity**, not one row per mark. Forty lights is one
+  row saying forty.
+- **The three states shown separately, always** — confident, uncertain,
+  unreadable — and never summed into a single "found 214". Summing them is the
+  two-tier design the third tier was invented to escape.
+- **Accept or reject a whole type in one press**, on this sheet or across the
+  set.
+- **A row expands to its marks**, and clicking one takes the viewer there,
+  changing sheet if it has to.
+- **A rejected pile that can be reopened**, so a wrong rejection costs a click
+  rather than another read.
+
+**And a placed mark keeps its provenance until somebody says otherwise** — but
+**not as a different colour.** Colour belongs to the count (§ 5e), and a second
+colour vocabulary on one drawing is the exact confusion that section's palette
+exists to prevent. The Layers panel is the right home: an axis of "placed by",
+with "me" and "the reader" as its two keys, filtered like every other layer.
+
+### The honest part: a list of what it found cannot show what it missed
+
+**This is the hard problem, and it is not a user-interface problem.** Everything
+above verifies **precision** — is each thing it found really there. None of it
+touches **recall** — did it find everything that is there. Forty lights listed,
+jumped to and confirmed tells you nothing about the forty-first, and recall is
+the number that decides whether a count can be trusted without a hand count.
+
+Three things attack it. Only one is cheap, and the first one is not optional:
+
+1. **§ 15's bake-off, which has still not been run.** Hand-count five sheets,
+   compare. About $3 of API spend and two hours of counting, and it is the only
+   way to learn the recall number. **Until it is run, nobody knows whether the
+   reader misses 2% or 30%** — and no amount of interface makes up for not
+   knowing. The decision of 2026-09-18 stands: run the small version when Phase
+   10 is actually next, because the answer goes stale if the model or the detail
+   level moves in between.
+2. **Cross-check against a schedule — C14 in takeoff-spec, essential, not
+   built.** A lighting or panel schedule on the drawings states quantities
+   independently of any symbol on a plan. **"The schedule says 43 type-A
+   fixtures; the reader found 40"** is the single most valuable sentence this
+   feature could ever print, because it is the only one that names a MISS rather
+   than confirming a hit. It needs the schedule read, which is another model
+   call on a page that is mostly text — the cheapest kind.
+3. **Coverage — V19, essential, not built.** Not "did it find everything on this
+   sheet" but "which sheets has anyone looked at". Cheap, mechanical, and it
+   catches the largest miss available: a whole sheet nobody read.
+
+**And the thing not to build:** a completeness score for a sheet. A model's own
+certainty about what it did not see is the least reliable number it produces,
+and "94% complete" printed beside a count would do precisely the damage the
+third tier exists to prevent — an unreliable number, styled like a fact, one
+glance from a quantity.
+
 ## 6. Decisions already made — do not re-open without saying why
 
 **NO CONDUIT FILL CHECKING. EVER.** Decided 2026-09-17. The app prices what the
@@ -3367,6 +3744,14 @@ two different things that happen to share a unit.
 
 **Proposed 2026-09-17. Recommended as the NEXT AI work, ahead of tiling — see
 § 9.6, which argues against the order § 10 ranks them in.**
+
+> **READ § 5l FIRST.** On 2026-09-19 this section and §§ 10–11 were restated as
+> ONE flow, because that is how they are used: one button reads the legend, a
+> list in the right panel is corrected, and then the plans are counted. Nothing
+> below is withdrawn — the funnel, the matching, the confidence rules and the
+> build order are all still the mechanism — but the front door is "read the
+> legend", not "capture a symbol", and the drag-a-box tool is what fixes what
+> the reader missed.
 
 Open a legend sheet. The app outlines every symbol it can see, with the label it
 read beside each one. You tap the ones you want. Twenty symbols becomes one

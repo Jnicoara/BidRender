@@ -88,6 +88,16 @@ export type PlacedStamp = {
   assemblyCategory: string | null;
   x: number;
   y: number;
+  /**
+   * Clicked, drawn, and not yet acknowledged by the server.
+   *
+   * Drawn exactly like a saved mark rather than as a ghost, deliberately. An
+   * estimator counting forty lights in a row is trusting the drawing to say
+   * what has landed; a mark that changes appearance when the network answers
+   * is one more thing moving on a screen where the count is the only thing
+   * that should. It is not clickable — there is no row to select yet.
+   */
+  pending?: boolean;
 };
 
 /**
@@ -302,6 +312,19 @@ export function TraceLayer({
         onPointerLeave={() => setHover(null)}
         onPointerDown={e => {
           if (e.button !== 0) return;
+          /*
+            An ARMED overlay claims the gesture, for the same reason the legend
+            capture layer does: the viewport underneath pans on a plain
+            left-drag, and a React event raised here bubbles to it.
+
+            The comment on `beginPlainPan` used to say an armed overlay "takes
+            the event and this never fires". That was never true of a React
+            event. Every mark dropped and every vertex clicked also began a pan,
+            so any wobble between press and release slid the sheet under the
+            click. Unarmed, the overlay is `pointer-events-none` and a drag on
+            the drawing should pan — so the claim is conditional, not blanket.
+          */
+          if (tracing || stamping) e.stopPropagation();
           const page = pointerToPage(e);
           if (!page) return;
           if (tracing) {
@@ -410,10 +433,16 @@ export function TraceLayer({
           const stroke = markStrokeInOverlay(zoom);
           return (
             <g
-              key={placed.id}
-              className={tracing ? "" : "pointer-events-auto cursor-pointer"}
+              key={`${placed.pending ? "pending" : "stamp"}-${placed.id}`}
+              className={
+                tracing || placed.pending
+                  ? ""
+                  : "pointer-events-auto cursor-pointer"
+              }
               onClick={() =>
-                !tracing && onSelectStamp(isSelected ? null : placed.id)
+                !tracing &&
+                !placed.pending &&
+                onSelectStamp(isSelected ? null : placed.id)
               }
             >
               <path
