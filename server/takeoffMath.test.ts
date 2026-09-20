@@ -664,19 +664,26 @@ describe("the full breakdown for one run", () => {
     expect(quantities.conduitFeet).not.toBe(quantities.totalWireFeet);
   });
 
-  it("names each circuit in the breakdown", () => {
+  it("names each circuit in the breakdown, and splits the ground out of it", () => {
+    // 3 #12 and a ground, which is what "conductorCount: 4" used to mean and
+    // what this now says out loud.
     const quantities = quantitiesForRun(
       RUN_100FT,
-      [{ name: "Panel A-12", conductorCount: 4 }],
+      [{ name: "Panel A-12", conductorCount: 3, groundCount: 1 }],
       QUARTER_INCH,
       NO_VERTICALS
     )!;
     expect(quantities.wireByCircuit[0]).toEqual({
       name: "Panel A-12",
-      conductorCount: 4,
+      conductorCount: 3,
+      groundCount: 1,
+      // The two purchases, apart: 300 ft of THHN and 100 ft of bare copper.
+      insulatedFeet: 300,
+      groundFeet: 100,
       // Flat and vertical stay apart all the way to the bid — see § 7.1, which
       // gives the two allowances different reach over them. No verticals were
-      // supplied here, so the traced length is the whole of it.
+      // supplied here, so the traced length is the whole of it. And 400 is the
+      // number this produced before the split, which is the point.
       flatFeet: 400,
       verticalFeet: 0,
       feet: 400,
@@ -763,5 +770,136 @@ describe("a realistic takeoff, checked by hand", () => {
     expect(runFeet(RUN_100FT, QUARTER_INCH)).toBe(
       conduitFeet(RUN_100FT, QUARTER_INCH)
     );
+  });
+});
+
+// ── The ground, split out ────────────────────────────────────────────────────
+
+describe("counting the ground separately", () => {
+  /**
+   * ── What these are defending ───────────────────────────────────────────────
+   * One property, and the whole migration rests on it: **a circuit written as
+   * 2 + 1 comes to exactly what one written as 3 came to.** If that is not
+   * true, the backfill that turns every stored 3 into 2 + 1 changes the wire on
+   * every run of every bid — silently, in the direction nobody queries.
+   *
+   * The estimator asked for these first, before any of the code, for that
+   * reason: they are the check on the migration rather than on the maths.
+   */
+  const PAIRS: {
+    what: string;
+    before: { name: string; conductorCount: number };
+    after: { name: string; conductorCount: number; groundCount: number };
+  }[] = [
+    {
+      what: "2 #12 and a ground",
+      before: { name: "Ckt 1", conductorCount: 3 },
+      after: { name: "Ckt 1", conductorCount: 2, groundCount: 1 },
+    },
+    {
+      what: "3 #12 and a ground",
+      before: { name: "Ckt 1", conductorCount: 4 },
+      after: { name: "Ckt 1", conductorCount: 3, groundCount: 1 },
+    },
+    {
+      what: "an isolated-ground circuit, two grounds",
+      before: { name: "IG", conductorCount: 4 },
+      after: { name: "IG", conductorCount: 2, groundCount: 2 },
+    },
+  ];
+
+  for (const pair of PAIRS) {
+    it(`${pair.what} pulls the same wire either way`, () => {
+      const before = quantitiesForRun(
+        RUN_100FT,
+        [pair.before],
+        QUARTER_INCH,
+        NO_VERTICALS
+      )!;
+      const after = quantitiesForRun(
+        RUN_100FT,
+        [pair.after],
+        QUARTER_INCH,
+        NO_VERTICALS
+      )!;
+      expect(after.totalWireFeet).toBe(before.totalWireFeet);
+      expect(after.wireByCircuit[0].feet).toBe(before.wireByCircuit[0].feet);
+      expect(after.conduitFeet).toBe(before.conduitFeet);
+    });
+  }
+
+  it("splits the footage without changing it", () => {
+    const [circuit] = quantitiesForRun(
+      RUN_100FT,
+      [{ name: "Ckt 1", conductorCount: 2, groundCount: 1 }],
+      QUARTER_INCH,
+      NO_VERTICALS
+    )!.wireByCircuit;
+    expect(circuit.insulatedFeet).toBe(200);
+    expect(circuit.groundFeet).toBe(100);
+    expect(circuit.insulatedFeet + circuit.groundFeet).toBe(circuit.flatFeet);
+    expect(circuit.flatFeet).toBe(300);
+  });
+
+  it("invents NO ground when a caller has not been told about them", () => {
+    // The property that keeps every un-migrated row and every old fixture
+    // producing the number it produced before. Undefined is zero, never one:
+    // a type that guesses a ground adds a conductor's worth of wire to every
+    // run in the app on the day it ships.
+    const quantities = quantitiesForRun(
+      RUN_100FT,
+      [{ name: "Ckt 1", conductorCount: 3 }],
+      QUARTER_INCH,
+      NO_VERTICALS
+    )!;
+    expect(quantities.totalWireFeet).toBe(300);
+    expect(quantities.wireByCircuit[0].groundCount).toBe(0);
+    expect(quantities.wireByCircuit[0].groundFeet).toBe(0);
+  });
+
+  it("counts a ground down a drop, once per ground", () => {
+    // A vertical adds to conduit ONCE and to wire once per conductor — and a
+    // ground is a conductor for that purpose, because it goes down the pipe
+    // with the rest of them.
+    const flat = quantitiesForRun(
+      RUN_100FT,
+      [{ name: "Ckt 1", conductorCount: 2, groundCount: 1 }],
+      QUARTER_INCH,
+      NO_VERTICALS
+    )!;
+    const dropped = quantitiesForRun(
+      RUN_100FT,
+      [{ name: "Ckt 1", conductorCount: 2, groundCount: 1 }],
+      QUARTER_INCH,
+      {
+        start: {
+          counted: true,
+          kind: "receptacle",
+          direction: "drop",
+          distributionInches: 120,
+          endInches: 0,
+          feet: 10,
+        },
+        end: { counted: false, kind: null, reason: "height-not-set" },
+        feet: 10,
+      }
+    )!;
+    // Three conductors down a 10 ft drop is 30 ft of wire, ground included.
+    expect(dropped.totalWireFeet - flat.totalWireFeet).toBe(30);
+  });
+
+  it("refuses to count a ground that is not a number", () => {
+    const quantities = quantitiesForRun(
+      RUN_100FT,
+      [
+        { name: "Bad", conductorCount: 2, groundCount: Number.NaN },
+        { name: "Negative", conductorCount: 2, groundCount: -1 },
+      ],
+      QUARTER_INCH,
+      NO_VERTICALS
+    )!;
+    // One bad row must not poison a total — the same rule the conductor count
+    // already follows.
+    expect(quantities.totalWireFeet).toBe(400);
   });
 });

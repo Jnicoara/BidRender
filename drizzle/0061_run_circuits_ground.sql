@@ -1,0 +1,59 @@
+-- Give a circuit somewhere to count its ground.
+--
+-- One statement — see 0053. Nothing is backfilled here; 0063 does that, after
+-- 0062 has given the run TYPE the same treatment.
+--
+-- ── NULLABLE, WITH NO DEFAULT, AND THAT IS THE WHOLE DESIGN ──────────────────
+-- Not `NOT NULL DEFAULT 0`, and emphatically not `DEFAULT 1`. NULL means
+-- "nobody has split this row yet", exactly as `takeoff_stamps.groupId` did in
+-- 0054, and it buys three things that a default cannot:
+--
+--   1. The backfill in 0063 is re-runnable FOR EVER, because it is gated on
+--      `groundCount IS NULL` and no row the app writes afterwards is ever NULL.
+--      A default of 0 would make "not yet split" and "deliberately no ground"
+--      the same value, and a second run would decrement a circuit somebody
+--      entered as three ungrounded conductors.
+--   2. There is no window. A circuit written between this ALTER and 0063 —
+--      by the old code, which counts the ground inside `conductorCount` — is
+--      still NULL and is still split correctly whenever 0063 runs.
+--   3. **An un-split row keeps its old meaning.** `shared/takeoffQuantities.ts`
+--      treats an absent ground as ZERO, so a row 0063 has not reached still has
+--      the ground inside `conductorCount` and comes to exactly the footage it
+--      came to yesterday.
+--
+-- ── WHAT THIS FILE CLAIMED, AND WHY IT WAS WRONG ────────────────────────────
+-- It said "there is no state of this migration in which a bid moves". That was
+-- true of the arithmetic and FALSE of the running app, and applying 0063 to a
+-- local database proved it inside a minute: a bid's wire went 125.01 ft to
+-- 83.34 ft.
+--
+-- The arithmetic had been neutral the whole time. THREE MAPPINGS BETWEEN THE
+-- TABLE AND THE ARITHMETIC had not. `takeoffRuns.listForSheet`,
+-- `takeoffRuns.totals` and the materials list each hand-built a
+-- `{ name, conductorCount }` object from a row, so the instant the ground came
+-- out of that count, every circuit was reported ONE CONDUCTOR SHORT — no
+-- error, no missing field, just less wire, on every run, with nothing on
+-- screen to say so.
+--
+-- They go through `circuitWire` now, which takes the ROW and so has nothing to
+-- forget.
+--
+-- **The honest statement of the property, and the one to rely on:**
+--
+--   Given code that reads `groundCount`, no state of this migration moves a
+--   bid — not applied, half applied, or applied twice.
+--
+--   Without it, 0063 moves every circuit. **THE CODE SHIPS BEFORE THE DATA
+--   MIGRATION RUNS.** That is already this repo's deploy order for an additive
+--   column; it now has a reason rather than a habit behind it.
+--
+-- ── Why a ground is a column at all ─────────────────────────────────────────
+-- "2 #12 + ground" is what an electrician writes on a drawing and says out
+-- loud, and a ground is a different wire: often a size smaller, sometimes bare,
+-- and never orderable as THHN. Folding it into the conductor count answered
+-- "how much wire" and could not answer "how much of WHICH wire" — which is the
+-- question a supplier quote asks. § 2.1 of references/plan-viewer-overhaul.md
+-- recorded this as the right call on 2026-09-17 and called the migration
+-- mechanical; it is, and this is it.
+ALTER TABLE `takeoff_run_circuits`
+	ADD `groundCount` int;

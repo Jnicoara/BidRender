@@ -49,13 +49,30 @@ export type RunCircuit = {
   /** What the estimator calls it — "Ckt 12", "Panel A-3". Display only. */
   name: string;
   /**
-   * How many conductors this circuit pulls through the run.
+   * INSULATED conductors this circuit pulls. The ground is counted separately.
    *
-   * Counted, not derived. A 3-wire circuit might be 2 + ground, or 2 hots and
-   * a neutral, and deriving it from a voltage or a breaker size would be the
-   * app guessing at something the estimator knows.
+   * Counted, not derived. Deriving it from a voltage or a breaker size would
+   * be the app guessing at something the estimator knows.
+   *
+   * **This meaning changed on 2026-09-20 and the change is not visible in the
+   * type.** It used to include the ground — a 2-wire-and-ground circuit was 3.
+   * Now that circuit is `conductorCount: 2, groundCount: 1`, because a ground
+   * is a different wire: often smaller, sometimes bare, and never orderable as
+   * THHN. "2 #12 + ground" is how it is written on a drawing and said out loud,
+   * and the app now stores it the same way.
    */
   conductorCount: number;
+  /**
+   * Grounds this circuit pulls. Usually one; two on an isolated-ground circuit.
+   *
+   * ── UNDEFINED MEANS ZERO, AND MUST ─────────────────────────────────────────
+   * Not one. A caller that has not been told about grounds yet — an old test
+   * fixture, a screen not yet updated — must produce exactly the numbers it
+   * produced before, or the split silently adds a conductor's worth of wire to
+   * every run on every bid. The data migration is what moves 3 into 2 + 1; this
+   * type must never do it by guessing.
+   */
+  groundCount?: number;
 };
 
 /**
@@ -164,7 +181,14 @@ export function cableFeet(
 /** Wire for one circuit: the full run length once per conductor. */
 export type CircuitWire = {
   name: string;
+  /** Insulated conductors. Since 2026-09-20 this excludes the ground. */
   conductorCount: number;
+  /** Grounds. Zero on a circuit written before the split, and on none. */
+  groundCount: number;
+  /** The insulated conductors' share of `flatFeet`. */
+  insulatedFeet: number;
+  /** The grounds' share. Bare copper is a different purchase from THHN. */
+  groundFeet: number;
   /** The traced length, once per conductor. */
   flatFeet: number;
   /**
@@ -180,15 +204,72 @@ export type CircuitWire = {
 };
 
 /**
+ * A stored circuit row, as it comes out of `takeoff_run_circuits`.
+ *
+ * Named here so the mapper below can take the row itself rather than a
+ * hand-built object — see `circuitWire`.
+ */
+export type StoredCircuit = {
+  name: string;
+  conductorCount: number;
+  groundCount: number | null;
+};
+
+/**
+ * Turn a stored circuit into the shape the arithmetic takes.
+ *
+ * ── Why this exists, and it is not tidiness ─────────────────────────────────
+ * Three routers used to hand-map a circuit row into `{ name, conductorCount }`.
+ * The moment 0063 split the ground out, every one of those became a circuit
+ * reported ONE CONDUCTOR SHORT — not an error, not a missing field, just less
+ * wire on every run, with nothing on screen to say so. A bid on the local
+ * database went from 125.01 ft to 83.34 ft the instant the migration landed.
+ *
+ * So the mapping is a function, and it takes the ROW. `circuits.map(circuitWire)`
+ * has nothing to destructure and therefore nothing to forget. A fourth reader
+ * that hand-maps is still possible; one that uses this cannot go stale.
+ */
+export function circuitWire(row: StoredCircuit): RunCircuit {
+  return {
+    name: row.name,
+    conductorCount: row.conductorCount,
+    // NULL is a row the backfill has not reached. Zero, never one — see the
+    // type, and 0061 on why the column is nullable rather than defaulted.
+    groundCount: row.groundCount ?? 0,
+  };
+}
+/**
  * Conductors this circuit actually pulls.
  *
  * A non-positive or non-finite count contributes nothing rather than NaN — one
  * bad row must not poison a whole total.
  */
-function conductorsOf(circuit: RunCircuit): number {
-  return Number.isFinite(circuit.conductorCount) && circuit.conductorCount > 0
-    ? Math.floor(circuit.conductorCount)
+function countOf(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
     : 0;
+}
+
+/** Insulated conductors only. */
+function insulatedOf(circuit: RunCircuit): number {
+  return countOf(circuit.conductorCount);
+}
+
+/** Grounds only. Absent is none — see the type. */
+function groundsOf(circuit: RunCircuit): number {
+  return countOf(circuit.groundCount);
+}
+
+/**
+ * Everything pulled through the pipe for this circuit.
+ *
+ * The number that multiplies a length, and the one that has to stay the same
+ * across the split: a circuit written as 2 + 1 pulls exactly what one written
+ * as 3 used to. Every footage below goes through here, so there is no path on
+ * which the two can disagree.
+ */
+function conductorsOf(circuit: RunCircuit): number {
+  return insulatedOf(circuit) + groundsOf(circuit);
 }
 
 /**
@@ -212,11 +293,25 @@ export function wireFeetByCircuit(
   if (length === null) return null;
 
   const perCircuit = circuits.map(circuit => {
-    const conductors = conductorsOf(circuit);
-    const flat = round2(length * conductors);
+    const insulated = insulatedOf(circuit);
+    const grounds = groundsOf(circuit);
+    /*
+      Two footages and their sum, kept apart for the reason the vertical is
+      kept apart from the traced length: they are different purchases. Bare
+      copper cannot be ordered as THHN, and a ground is frequently a size down.
+
+      `flatFeet` is still both of them together, so every existing reader —
+      the panel, the totals, the materials list — is unchanged by the split.
+    */
+    const insulatedFeet = round2(length * insulated);
+    const groundFeet = round2(length * grounds);
+    const flat = round2(insulatedFeet + groundFeet);
     return {
       name: circuit.name,
-      conductorCount: conductors,
+      conductorCount: insulated,
+      groundCount: grounds,
+      insulatedFeet,
+      groundFeet,
       flatFeet: flat,
       // Traced wire only. Vertical wire is added by `quantitiesForRun`, which
       // is the one place that knows what is at the ends of this run.

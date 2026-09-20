@@ -32,6 +32,7 @@ import {
   shippedHeightType,
 } from "../../shared/takeoffHeights";
 import {
+  circuitWire,
   measurabilityOf,
   quantitiesForRun,
   totalQuantities,
@@ -194,13 +195,20 @@ export const takeoffRunsRouter = router({
             );
 
       return runs.map(run => {
+        /*
+          Through `circuitWire`, plus the id the panel needs to edit a row.
+
+          Hand-mapping this is what broke: `conductorCount` stopped including
+          the ground when 0063 split it, so a mapping that drops `groundCount`
+          does not report a missing field — it reports a circuit one conductor
+          SHORT, on every run, with nothing on screen to say so. Found by
+          applying the migration to a live local database and watching a bid's
+          wire go 125.01 ft to 83.34 ft. The arithmetic was right the whole
+          time; three mappings between the table and the arithmetic were not.
+        */
         const runCircuits = circuits
           .filter(c => c.runId === run.id)
-          .map(c => ({
-            id: c.id,
-            name: c.name,
-            conductorCount: c.conductorCount,
-          }));
+          .map(c => ({ id: c.id, ...circuitWire(c) }));
 
         const traced = {
           pathType: run.pathType as RunPathType,
@@ -664,9 +672,7 @@ export const takeoffRunsRouter = router({
             pathType: run.pathType as RunPathType,
             points: run.points ?? [],
           },
-          circuits: circuits
-            .filter(c => c.runId === run.id)
-            .map(c => ({ name: c.name, conductorCount: c.conductorCount })),
+          circuits: circuits.filter(c => c.runId === run.id).map(circuitWire),
           ratio: ratioBySheet.get(run.sheetId) ?? null,
           verticals: verticalsForRunRow(run, heights),
         }))

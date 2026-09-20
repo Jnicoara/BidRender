@@ -2172,6 +2172,32 @@ export const takeoffRunTypes = mysqlTable(
      */
     conductorCount: int("conductorCount"),
 
+    /**
+     * The ground wire itself — the bare copper, or the green insulated one.
+     *
+     * Its own link rather than reusing `conductorMaterialId`, because that is
+     * the whole point of separating it: a ground is frequently a size down from
+     * the phases and frequently bare, and bare copper cannot be ordered as
+     * THHN. A supplier list that cannot tell them apart asks for the wrong
+     * thing in the right quantity.
+     *
+     * `set null` on delete like every other provenance link here: retiring a
+     * material must not change what a traced run says it is.
+     */
+    groundMaterialId: int("groundMaterialId").references(() => materials.id, {
+      onDelete: "set null",
+    }),
+    /**
+     * How many grounds one circuit of this type carries. NULL is "not said".
+     *
+     * Same nullability reasoning as `takeoff_run_circuits.groundCount`, and
+     * the same backfill guard (0064). "2 #12 + ground" is what an electrician
+     * writes on a drawing, and as of 2026-09-20 it is what this stores: a
+     * conductor count of 2 and a ground count of 1, rather than a 3 that has to
+     * be explained.
+     */
+    groundCount: int("groundCount"),
+
     /** active / archived / deleted. See materials.status — same lifecycle. */
     status: mysqlEnum("status", LIBRARY_STATUSES).default("active").notNull(),
     archivedAt: timestamp("archivedAt"),
@@ -2372,6 +2398,25 @@ export const takeoffRunCircuits = mysqlTable(
      * does not, and guessing it would put a wrong wire quantity on a bid.
      */
     conductorCount: int("conductorCount").default(3).notNull(),
+
+    /**
+     * Grounds pulled for this circuit. Usually one; two on an isolated ground.
+     *
+     * ── NULL is "not yet split", and it is load-bearing ──────────────────────
+     * Nullable with no default, deliberately. While this is NULL the ground is
+     * still counted inside `conductorCount` — the pre-0063 meaning — and
+     * `shared/takeoffQuantities.ts` treats an absent ground as ZERO, so such a
+     * row comes to exactly the footage it always did. A `DEFAULT 0` would have
+     * made "not yet split" and "deliberately no ground" the same value, and
+     * left the backfill unable to tell them apart on a second run.
+     *
+     * Always written by the app on a new circuit. Read through `circuitWire`,
+     * which is the only place that turns a stored row into the shape the
+     * arithmetic takes: three routers used to hand-map it, and every one of
+     * them reported a circuit a conductor SHORT the moment the ground came out
+     * of the count.
+     */
+    groundCount: int("groundCount"),
 
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
