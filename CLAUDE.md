@@ -341,6 +341,28 @@ it TWICE and looking at the second run, which touched nothing. **A measurement
 needs the same suspicion as an assumption: ask what else would produce this
 number.**
 
+**A COUNT TAKEN BEFORE THE CHANGE IS INTENT, NOT OUTCOME.** A distinct failure
+from the one above, and a quieter one: the number is of the right thing, it is
+simply from the wrong moment. Added 2026-09-20.
+
+The backfill rehearsal reported `5 circuit(s) split` and passed. That 5 was
+`SELECT COUNT(*) … WHERE conductorCount >= 2`, taken **before** the migration —
+a count of rows that COULD be split, printed in the past tense as if they had
+been. **A backfill that silently did nothing would have produced the same line
+and the same pass**, because unchanged totals are exactly what doing nothing
+also produces.
+
+The fix is to measure the same thing on BOTH sides and compare:
+`conductors 17 -> 12, grounds 0 -> 5, unsplit 5 -> 0`. That is an outcome. It
+cannot be produced by a migration that did not run.
+
+**So, whenever a check reports that something happened:** ask whether the
+number was read after the thing it claims to describe. "Rows found", "files
+matched", "items queued" and "records to update" are all intent. Outcome is a
+before-and-after of the same query — and for a change that is supposed to leave
+totals alone, you need both halves, because **"nothing moved" and "nothing
+happened" are indistinguishable from one side.**
+
 **A GREP IS A MEASUREMENT, AND IT MEASURES THE PATTERN YOU TYPED.** Added
 2026-09-20, from an audit that missed one of the things it was auditing for.
 Five numeric fields fell back to `?? 0`; the audit searched for `?? 0` beside a
