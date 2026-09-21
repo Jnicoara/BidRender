@@ -23,6 +23,7 @@
 import "dotenv/config";
 import { eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb } from "../server/db";
+import { assertWritableDatabase } from "./databaseGuard";
 import { assemblyMaterials, materials } from "../drizzle/schema";
 import {
   BASELINE_MATERIALS,
@@ -77,6 +78,14 @@ for (const o of orphans) {
   console.log(
     `  ${referenced.has(o.id) ? "REFERENCED" : "safe      "}  #${o.id}  ${o.name}`
   );
+}
+
+// Guarded HERE rather than at the top: reporting is read-only and should stay
+// runnable against anything. Only the delete needs saying out loud.
+if (process.argv.includes("--delete")) {
+  assertWritableDatabase(process.env.DATABASE_URL, {
+    action: "retire orphaned baseline materials",
+  });
 }
 
 if (!process.argv.includes("--delete")) {

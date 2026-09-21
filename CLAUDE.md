@@ -785,6 +785,20 @@ one.** Read every statement; if it touches anything you did not just change,
 throw it away and hand-write it. `pnpm db:push` generates first and carries the
 same risk — `npx tsx scripts/migrate.mts` applies without generating.
 
+**A script that writes REFUSES a database that is not on this machine**, unless
+you say `ALLOW_REMOTE_DATABASE=yes`. So the production migration is:
+
+```bash
+ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local   pnpm tsx scripts/migrate.mts
+```
+
+The word is the point. A throwaway script once loaded
+`.env.production.local` for its R2 keys, inherited that file's
+`DATABASE_URL`, and asked PRODUCTION to drop a database — it failed only
+because `bidrender_app` lacks the privilege. One helper
+(`scripts/databaseGuard.ts`) now gates every script that can write, and it is
+silent locally.
+
 Full version, with the worked example and the deploy sequence:
 `references/deploying.md` § 5, "Which goes first, the migration or the code?".
 

@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-21]
 
+- **Internal safety: a script cannot write to a database that is not on this
+  machine unless it is told to.** A maintenance script once reached the live
+  database because it was run with the production settings file loaded for
+  unrelated credentials, and asked it to drop something. It failed only because
+  that account is not allowed to. One shared check now guards every script that
+  can write, it says plainly what to do if you really did mean the live one,
+  and it is silent during ordinary local work.
+
 - **Counting with a starter and then pricing it now freezes YOUR numbers.**
   Count exit signs with an assembly BidRidge ships, then put your own labour
   hours on it — pricing a starter makes your own copy — and sending that count

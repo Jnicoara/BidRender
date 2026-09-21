@@ -32,6 +32,7 @@ import "dotenv/config";
 import mysql from "mysql2/promise";
 import { gunzipSync } from "node:zlib";
 import { readR2Config } from "../server/backup/config";
+import { assertWritableDatabase } from "./databaseGuard";
 import { createR2Target } from "../server/backup/target";
 import { newestRunId } from "../server/backup/verifyBackup";
 import { mysqlConnection } from "../server/databaseConnection";
@@ -64,6 +65,11 @@ const SCHEMA = process.env.REHEARSE_SCHEMA ?? "bidrender_rehearsal";
 
 function scratchUrl(): string {
   const local = process.env.LOCAL_DATABASE_URL;
+  // A rehearsal that can reach a real server is not a rehearsal. This is the
+  // exact shape of the 2026-09-21 near-miss — see scripts/databaseGuard.ts.
+  assertWritableDatabase(local, {
+    action: "restore a backup for a backfill rehearsal",
+  });
   if (!local)
     throw new Error(
       "LOCAL_DATABASE_URL is required — the server to restore INTO. It must " +

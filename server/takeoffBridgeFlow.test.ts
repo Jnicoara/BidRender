@@ -17,7 +17,7 @@
  * parallel and shared ids delete each other's rows mid-run.
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, like } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
 import {
@@ -150,6 +150,16 @@ beforeEach(async () => {
   if (!hasDb) return;
   const database = await getDb();
   if (!database) return;
+  /*
+    The shipped-row fixture below is userId NULL, which is GLOBAL — other
+    suites assert that every baseline assembly has materials. A run that fails
+    before its own cleanup would leave one behind and break them, which is
+    exactly what happened on 2026-09-21. Cleaned by name here so a failed run
+    heals itself on the next one, rather than relying on the happy path.
+  */
+  await database
+    .delete(assemblies)
+    .where(like(assemblies.name, "Fork flow starter %"));
   await database.delete(bids).where(inArray(bids.userId, [USER]));
   await database.delete(assemblies).where(eq(assemblies.userId, USER));
   await database.delete(materials).where(eq(materials.userId, USER));

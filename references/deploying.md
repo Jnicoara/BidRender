@@ -163,7 +163,9 @@ So:
    `drizzle/meta/_journal.json` yourself. That is what 0061-0066 are.
 3. **`pnpm db:push` runs generate first**, so it carries the same risk. To
    apply already-written migrations without generating, run the migrator
-   directly: `npx tsx scripts/migrate.mts`.
+   directly: `npx tsx scripts/migrate.mts`. Against production that needs
+   `ALLOW_REMOTE_DATABASE=yes` in front of it — see § "The guard on scripts
+   that write" below.
 4. Delete the stray `<n>_snapshot.json` along with the `.sql`, or the next
    generate diffs from a snapshot describing a migration that never ran.
 
@@ -527,7 +529,7 @@ instead of two, and the checklist below is unchanged by it.
 #### 5. Run it
 
 ```bash
-DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/migrate.mts
+ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local   pnpm tsx scripts/migrate.mts
 ```
 
 `pnpm db:push` also works, but it runs `drizzle-kit generate` first, which can
@@ -865,3 +867,32 @@ large multi-part upload will reassemble.
 
 Failing that, attach a plan **over 25MB**. Under that size the fallback hides
 the answer; over it, only the direct path can succeed.
+
+## The guard on scripts that write
+
+**Every script that can write to or drop a database refuses one that is not on
+this machine**, unless you say so: `ALLOW_REMOTE_DATABASE=yes`. The decision is
+in `scripts/databaseGuard.ts` — one helper, so there is no second copy to
+disagree with the first — and it is tested in `scripts/databaseGuard.test.ts`.
+
+Guarded today: `migrate.mts`, `dropOrphanBaselines.mts --delete` (the report is
+read-only and stays unguarded), `verifyBackup.mts`, `rehearseBackfill.mts`.
+
+**Where it came from, 2026-09-21.** A throwaway rehearsal script needed R2
+credentials, so it ran with `DOTENV_CONFIG_PATH=.env.production.local`. That
+file also carries `DATABASE_URL`. The script read it, connected to the
+production server, and issued `DROP DATABASE IF EXISTS bidrender_rehearsal`. It
+failed — `bidrender_app` cannot drop databases — and that is the only reason
+nothing happened.
+
+The author knew about the risk and did it anyway, because the variable that
+caused it belongs to a file being read for something else entirely. That is why
+this is a function that can fail rather than a warning in a document.
+
+**The override is a WORD, not a truthy flag.** `=1` or `=true` is the kind of
+thing left exported in a shell from an unrelated task, and a forgotten override
+is the same hole with extra steps. It also announces itself when used, because
+an override that works silently is one nobody notices they left on.
+
+**It refuses when it cannot tell**, too — a missing or unparseable URL is not
+the same as a safe one, and only one of those should let a `DROP` proceed.

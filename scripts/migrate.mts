@@ -14,6 +14,7 @@
 import "dotenv/config";
 import mysql from "mysql2/promise";
 import { mysqlConnection } from "../server/databaseConnection";
+import { assertWritableDatabase } from "./databaseGuard";
 import { drizzle } from "drizzle-orm/mysql2";
 import { migrate } from "drizzle-orm/mysql2/migrator";
 import {
@@ -25,6 +26,13 @@ import {
 } from "../server/migrationRun";
 
 const url = process.env.DATABASE_URL;
+/*
+  Applying migrations to production is a real and routine thing to do — and it
+  is exactly the kind of thing that should take a word rather than an
+  environment somebody forgot they had loaded. See scripts/databaseGuard.ts for
+  the near-miss this came from. Locally it is silent.
+*/
+assertWritableDatabase(url, { action: "apply migrations" });
 if (!url) {
   console.error("DATABASE_URL is required — it names the database to migrate.");
   process.exit(1);

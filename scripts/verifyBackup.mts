@@ -15,6 +15,7 @@
  */
 import "dotenv/config";
 import { readR2Config, REQUIRED_VARS } from "../server/backup/config";
+import { assertWritableDatabase } from "./databaseGuard";
 import { createR2Target } from "../server/backup/target";
 import { verifyBackup, summariseVerify } from "../server/backup/verifyBackup";
 
@@ -43,6 +44,16 @@ if (
   );
   process.exit(1);
 }
+
+/*
+  This DROPs and CREATEs a scratch schema, so it is a write even though its
+  purpose is to read. The existing refusal below catches the worst case —
+  restoring onto the database being backed up — and this catches the wider one:
+  any server that is not this machine.
+*/
+assertWritableDatabase(scratchUrl, {
+  action: "restore a backup into a scratch schema",
+});
 
 const configResult = readR2Config();
 if (!configResult.ok) {
