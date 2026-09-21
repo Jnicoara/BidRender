@@ -244,8 +244,7 @@ export function sendWarning(
 ): string | null {
   if (group.assemblyId === null) return null;
   const clash = lines.find(
-    line =>
-      line.takeoffGroupId === null && line.assemblyId === group.assemblyId
+    line => line.takeoffGroupId === null && line.assemblyId === group.assemblyId
   );
   if (!clash) return null;
   return (

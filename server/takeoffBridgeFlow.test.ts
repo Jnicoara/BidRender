@@ -124,7 +124,8 @@ async function countOf(
   return group;
 }
 
-const lineFor = async (bidId: number) => (await caller().bids.get({ id: bidId })).lines;
+const lineFor = async (bidId: number) =>
+  (await caller().bids.get({ id: bidId })).lines;
 
 beforeAll(async () => {
   if (!hasDb) return;
@@ -229,7 +230,10 @@ withDb("the plans own what it is and how many", () => {
       bidId,
       sheetId,
       groupId: group.id,
-      at: [{ x: 90, y: 90 }, { x: 91, y: 91 }],
+      at: [
+        { x: 90, y: 90 },
+        { x: 91, y: 91 },
+      ],
     });
 
     const after = await lineFor(bidId);
@@ -274,7 +278,11 @@ withDb("the plans own what it is and how many", () => {
 withDb("the bid owns what it costs", () => {
   it("does NOT re-price when the material's cost moves afterwards — R4", async () => {
     const { bidId, sheetId } = await scenario();
-    const { assemblyId, materialId } = await ownAssembly("Exit sign LED", 38, 0.5);
+    const { assemblyId, materialId } = await ownAssembly(
+      "Exit sign LED",
+      38,
+      0.5
+    );
     const group = await countOf(bidId, sheetId, assemblyId, 10);
     await caller().takeoffGroups.sendToBid({ id: group.id });
 

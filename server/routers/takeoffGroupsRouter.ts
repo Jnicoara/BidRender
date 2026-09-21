@@ -74,7 +74,11 @@ const labelSchema = z
  * CLAUDE.md's writing rule — what happened, then what to do about it.
  */
 function refusalMessage(
-  reason: "already-on-bid" | "nothing-counted" | "no-price" | "unsupported-level",
+  reason:
+    | "already-on-bid"
+    | "nothing-counted"
+    | "no-price"
+    | "unsupported-level",
   label: string
 ): string {
   switch (reason) {
@@ -369,7 +373,8 @@ export const takeoffGroupsRouter = router({
       const allowed = sendability(row, bridgeLines);
       if (!allowed.sendable) {
         throw new TRPCError({
-          code: allowed.reason === "already-on-bid" ? "CONFLICT" : "BAD_REQUEST",
+          code:
+            allowed.reason === "already-on-bid" ? "CONFLICT" : "BAD_REQUEST",
           message: refusalMessage(allowed.reason, group.label),
         });
       }

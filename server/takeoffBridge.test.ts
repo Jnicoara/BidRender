@@ -172,9 +172,9 @@ describe("a from-plans line's quantity follows the marks", () => {
   it("resolves to 0 when every mark is removed, rather than to the old count", () => {
     // The line stays and reads 0. Money leaving a bid because somebody undid a
     // click, with nothing on screen saying so, is the worse failure.
-    expect(resolveLineQty({ takeoffGroupId: 7, qty: 14 }, new Map([[7, 0]]))).toBe(
-      0
-    );
+    expect(
+      resolveLineQty({ takeoffGroupId: 7, qty: 14 }, new Map([[7, 0]]))
+    ).toBe(0);
   });
 
   it("falls back to the stored number when the group is absent entirely", () => {
@@ -188,7 +188,12 @@ describe("a from-plans line's quantity follows the marks", () => {
 describe("R3 — the same assembly on the bid twice", () => {
   it("finds an assembly counted on the plans AND added by hand", () => {
     const lines = [
-      line({ id: 1, name: "Duplex receptacle", takeoffGroupId: 3, assemblyId: 5 }),
+      line({
+        id: 1,
+        name: "Duplex receptacle",
+        takeoffGroupId: 3,
+        assemblyId: 5,
+      }),
       line({ id: 2, name: "Duplex receptacle", assemblyId: 5 }),
     ];
     expect(doubleCountedAssemblies(lines)).toEqual(["Duplex receptacle"]);

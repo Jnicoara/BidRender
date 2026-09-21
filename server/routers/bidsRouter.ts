@@ -70,7 +70,12 @@ import * as db from "../db";
 async function planAttentionFor(
   bidId: number,
   userId: number,
-  lines: readonly { id: number; name: string; takeoffGroupId: number | null; assemblyId: number | null }[]
+  lines: readonly {
+    id: number;
+    name: string;
+    takeoffGroupId: number | null;
+    assemblyId: number | null;
+  }[]
 ): Promise<{
   waitingToSend: number;
   countedWithNoPrice: number;
