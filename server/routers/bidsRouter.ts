@@ -134,6 +134,12 @@ const profitMethodSchema = z.enum(["markup", "margin"]);
  * anyone means and would be a very quiet way to send a bid out wrong.
  */
 const productivitySchema = z.number().min(-0.9).max(2);
+/**
+ * The per-job whip dial, as a signed fraction. -0.9 to +3 is a deliberately
+ * wide but finite range: past that it is a typo rather than a tight building,
+ * and a floor below -100% would subtract wire somebody else counted.
+ */
+const whipAdjustSchema = z.number().min(-0.9).max(3);
 
 const toDecimal4 = (value: number) => value.toFixed(4);
 
@@ -325,6 +331,14 @@ export const bidsRouter = router({
         profitValue: z.number().min(0).max(0.99).nullable().optional(),
         productivityPct: productivitySchema.nullable().optional(),
         /**
+         * How much tighter or looser this building is than the library assumes.
+         *
+         * NOT nullable, unlike the overrides around it: there is no company
+         * default above it to inherit, so 0 is the answer rather than a stand-in
+         * for one. Signed — a tight fit-out is as real as a sprawling house.
+         */
+        whipAdjustPct: whipAdjustSchema.optional(),
+        /**
          * Who this bid is for. Null unassigns, leaving the bid's own
          * `clientName` text as the only source — which is the state every bid
          * written before clients existed is already in, and it prints exactly
@@ -382,6 +396,11 @@ export const bidsRouter = router({
           rest.productivityPct === null
             ? null
             : toDecimal4(rest.productivityPct);
+      }
+      // No null branch: the column is NOT NULL and 0 means no adjustment, so
+      // there is nothing to clear back to.
+      if (rest.whipAdjustPct !== undefined) {
+        patch.whipAdjustPct = toDecimal4(rest.whipAdjustPct);
       }
       // Checked rather than trusted: a client id is a small integer, so
       // assigning one must prove it belongs to this user or a bid could be

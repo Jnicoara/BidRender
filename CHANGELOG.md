@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-20]
 
+- **One number per job for a building laid out tighter or looser.** Rather than
+  editing the whip on every assembly, a bid carries a single adjustment that
+  scales all of them at once — a sprawling house up, a tight commercial fit-out
+  down. It ships at nought, so nothing moves until you move it, and setting it
+  back to nought puts every number exactly where it was.
+
+  **It never touches traced footage.** What you measured off the drawing is
+  what you measured, and this only ever scales the branch wire your devices
+  carry.
+
 - **Say which part of a recipe is the wire to the next device.** Open an
   assembly and each component now offers a "Branch wire" mark; the starter
   recipes come with it already on the right line — the receptacle's 25 ft of

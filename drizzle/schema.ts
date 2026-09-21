@@ -1820,6 +1820,32 @@ export const bids = mysqlTable(
     productivityPct: decimal("productivityPct", { precision: 6, scale: 4 }),
 
     /**
+     * How much tighter or looser THIS BUILDING is laid out than the library
+     * assumes. A signed fraction: 0.15 is +15%, -0.25 is a tight fit-out.
+     *
+     * ── It scales the branch whips, and NOTHING else ────────────────────────
+     * The component lines marked `isBranchWhip` — the cable each device carries
+     * to the next one. **Traced footage is measured and is never padded**
+     * (§ 5a), and `totalBranchWireFeet` in shared/branchWire.ts is the only
+     * function that applies this, so measured length cannot be reached by it.
+     *
+     * ── NOT NULL, unlike `productivityPct` directly above ───────────────────
+     * That one is nullable because it overrides a COMPANY trait, so "inherit"
+     * is a real third state. How tightly one building is laid out is a fact
+     * about one job with no company-wide answer above it, so there is nothing
+     * to inherit and no row in `pricing_defaults`. Ships at 0, which is no
+     * adjustment, so every existing bid prices exactly as it did.
+     *
+     * ── Applied at calculation time, written nowhere ────────────────────────
+     * Setting it back to 0 returns every number where it was. Nothing is
+     * stamped onto a line when it moves — the property `productivityPct` has,
+     * and what makes it safe to touch mid-bid.
+     */
+    whipAdjustPct: decimal("whipAdjustPct", { precision: 6, scale: 4 })
+      .default("0")
+      .notNull(),
+
+    /**
      * The elevation the raceway runs at ON THIS JOB, in inches. NULL inherits
      * the company's, from `takeoff_height_defaults`.
      *

@@ -1,0 +1,46 @@
+-- One number for a building laid out tighter or looser than the library assumes.
+--
+-- One statement — see 0053, 0061, 0065, 0067. The flag it scales is 0067; two
+-- tables means two files, so a failure can only ever mean "that statement
+-- failed and nothing was applied".
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- A plain ADD with a default that reproduces today's behaviour exactly: 0 is no
+-- adjustment, so every existing bid prices identically until somebody moves it.
+-- Old code ignores the column; new code against an old database dies on a bare
+-- select(). CLAUDE.md § "Deploying a migration: THREE STEPS, NOT TWO".
+-- **Step 3 is empty across 0067 and 0068** — no existing column changes
+-- meaning and there is no SQL backfill. Saying so is the point.
+--
+-- Hand-written, not generated, for the reason 0065 and 0067 give.
+--
+-- ── WHY IT IS PER BID AND HAS NO COMPANY DEFAULT ────────────────────────────
+-- `bids.productivityPct` is nullable because the thing it overrides is a
+-- COMPANY trait — how this contractor's crews compare with book hours — so
+-- "inherit" is a real third state worth storing.
+--
+-- This is not that. How tightly a BUILDING is laid out is a fact about one job,
+-- and there is no company-wide answer for it to inherit. So the column is NOT
+-- NULL with a default of 0 and there is no row in `pricing_defaults`: an
+-- inheritance chain with nothing at the top is a setting nobody can use and one
+-- more thing on a settings screen that must stay readable.
+--
+-- ── WHAT IT REACHES, AND WHAT IT MUST NEVER REACH ───────────────────────────
+-- The branch whips only — the component lines 0067 marks. **Traced footage is
+-- measured and is never padded** (§ 5a of references/plan-viewer-overhaul.md),
+-- and `totalBranchWireFeet` in shared/branchWire.ts is the only function that
+-- applies this at all, so there is no path on which a caller can reach measured
+-- length with it.
+--
+-- ── SIGNED, AND THAT IS DELIBERATE ──────────────────────────────────────────
+-- decimal(6,4) holding a fraction: 0.15 is +15%, -0.25 is a building tighter
+-- than the library assumes. A tight commercial fit-out is as real as a sprawling
+-- house, and a dial that only went up would quietly bias every bid upward.
+-- Same shape and same reasoning as `pricing_defaults.productivityPct`, which
+-- also ships at 0 and is signed so a crew that beats book hours can say so.
+--
+-- ── APPLIED AT CALCULATION TIME, WRITTEN NOWHERE ────────────────────────────
+-- Nothing is stamped onto a line when this moves, so setting it back to 0
+-- returns every number exactly where it was. That is what makes it safe to
+-- touch mid-bid, and it is the property `productivityPct` already has.
+ALTER TABLE `bids` ADD `whipAdjustPct` decimal(6,4) DEFAULT '0' NOT NULL;
