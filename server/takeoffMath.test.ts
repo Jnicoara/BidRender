@@ -608,6 +608,7 @@ describe("a shared run across a whole takeoff", () => {
       conduitFeet: 0,
       cableFeet: 0,
       wireFeet: 0,
+      wireGroundFeet: 0,
       conduitVerticalFeet: 0,
       cableVerticalFeet: 0,
       wireVerticalFeet: 0,
@@ -760,6 +761,10 @@ describe("a realistic takeoff, checked by hand", () => {
       conduitFeet: 80,
       cableFeet: 40,
       wireFeet: 960,
+      // Every circuit in this hand-checked example predates the ground split
+      // and states no ground, so none of the 960 ft is bare — and the 960 is
+      // the number it has always been.
+      wireGroundFeet: 0,
       // No heights set anywhere, so this hand-checked takeoff comes to exactly
       // what it came to before verticals existed. Both runs are flat-only, and
       // the panel says so rather than leaving a low total to be noticed.

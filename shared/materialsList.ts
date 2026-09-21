@@ -182,6 +182,8 @@ export function measuredEntries(totals: {
   conduitFeet: number;
   cableFeet: number;
   wireFeet: number;
+  /** The bare share OF wireFeet. Optional so an older caller still compiles. */
+  wireGroundFeet?: number;
 }): MeasuredEntry[] {
   const out: MeasuredEntry[] = [];
   if (totals.conduitFeet > 0) {
@@ -198,11 +200,32 @@ export function measuredEntries(totals: {
       note: "Traced length, every cable type on this job combined. Not broken out by type or size.",
     });
   }
-  if (totals.wireFeet > 0) {
+  /*
+    ── Insulated and bare are two lines, because they are two purchases ──────
+    Bare copper cannot be ordered as THHN. A single wire figure answers "how
+    much" and cannot answer "how much of WHICH", and a supplier quoting from
+    one number has to guess — which is the whole reason the ground got its own
+    column on 2026-09-20.
+
+    The split is a SUBTRACTION, not an addition: `wireGroundFeet` is a share of
+    `wireFeet`, so the insulated line is the remainder. Pushing both from the
+    same total is what keeps them summing to what the run panel shows.
+  */
+  const bare = roundQty(Math.max(0, totals.wireGroundFeet ?? 0));
+  const insulated = roundQty(Math.max(0, totals.wireFeet - bare));
+
+  if (insulated > 0) {
     out.push({
-      label: "Wire",
-      feet: roundQty(totals.wireFeet),
-      note: "All conductors, all circuits, every type combined. Not broken out by gauge or insulation.",
+      label: "Wire, insulated",
+      feet: insulated,
+      note: "All insulated conductors, all circuits, every type combined. Not broken out by gauge or insulation.",
+    });
+  }
+  if (bare > 0) {
+    out.push({
+      label: "Wire, bare ground",
+      feet: bare,
+      note: "Equipment grounds on traced conduit runs. A cable's ground is inside the cable and is already in the Cable figure. Not broken out by gauge.",
     });
   }
   return out;

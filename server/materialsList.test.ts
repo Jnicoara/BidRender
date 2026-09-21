@@ -265,7 +265,10 @@ describe("measured footage is reported as its own kind of thing", () => {
       cableFeet: 0,
       wireFeet: 900,
     });
-    expect(measured.map(m => m.label)).toEqual(["Conduit", "Wire"]);
+    // No ground stated, so there is nothing bare to split out and the
+    // insulated line carries the whole 900 — the number it always carried.
+    expect(measured.map(m => m.label)).toEqual(["Conduit", "Wire, insulated"]);
+    expect(measured[1].feet).toBe(900);
     /*
       The note is the whole reason this is not an orderable line, and what it
       has to say changed on 2026-09-19. It used to claim the type was "still to
@@ -514,9 +517,43 @@ describeDb("building the list from a real bid", () => {
     const doc = await caller().materialsList.get({ bidId });
     expect(doc.entries).toHaveLength(0);
     const conduit = doc.measured.find(m => m.label === "Conduit")!;
-    const wire = doc.measured.find(m => m.label === "Wire")!;
+    const wire = doc.measured.find(m => m.label === "Wire, insulated")!;
     expect(conduit.feet).toBe(40);
-    expect(wire.feet).toBe(120); // 40 ft × 3 conductors
+    // 40 ft × 3 conductors. The circuit states no ground, so all of it is
+    // insulated and there is no bare line — the same 120 ft this asserted
+    // before the ground was split out of the conductor count.
+    expect(wire.feet).toBe(120);
+    expect(doc.measured.some(m => m.label === "Wire, bare ground")).toBe(false);
+  });
+
+  it("puts the bare copper on its own line when a circuit is grounded", async () => {
+    const bidId = await newBid();
+    const sheetId = await newSheet(bidId, 48);
+    const saved = await caller().takeoffRuns.save({
+      bidId,
+      sheetId,
+      name: "Lighting homerun",
+      pathType: "conduit",
+      points: [
+        { x: 0, y: 0 },
+        { x: 720, y: 0 },
+      ],
+    });
+    await caller().takeoffRuns.addCircuit({
+      runId: saved.id,
+      name: "Ckt 1",
+      conductorCount: 2,
+      groundCount: 1,
+    });
+
+    const doc = await caller().materialsList.get({ bidId });
+    const insulated = doc.measured.find(m => m.label === "Wire, insulated")!;
+    const bare = doc.measured.find(m => m.label === "Wire, bare ground")!;
+    expect(insulated.feet).toBe(80); // 40 ft × 2 insulated conductors
+    expect(bare.feet).toBe(40); //     40 ft × 1 ground
+    // Three wires down the pipe either way: the same 120 ft the un-split
+    // version of this circuit reported, now split into its two purchases.
+    expect(insulated.feet + bare.feet).toBe(120);
   });
 
   it("reports an unmeasurable run rather than dropping it silently", async () => {
@@ -779,5 +816,69 @@ describeDb("carries no pricing", () => {
     // Nothing in the entries varies with a cost — asserted by rebuilding the
     // same shape from the pure function with no cost in scope at all.
     expect(quantities.every(q => /\|\d+(\.\d+)?$/.test(q))).toBe(true);
+  });
+});
+
+describe("insulated and bare are two lines on a supplier's list", () => {
+  /**
+   * ── What this defends ──────────────────────────────────────────────────────
+   * Bare copper cannot be ordered as THHN. One wire figure answers "how much"
+   * and cannot answer "how much of WHICH", so a supplier quoting from it has to
+   * guess — which is the whole reason the ground got its own column.
+   */
+  it("splits the wire, and the two lines still sum to the total", () => {
+    const measured = measuredEntries({
+      conduitFeet: 340,
+      cableFeet: 0,
+      wireFeet: 900,
+      wireGroundFeet: 200,
+    });
+    expect(measured.map(m => m.label)).toEqual([
+      "Conduit",
+      "Wire, insulated",
+      "Wire, bare ground",
+    ]);
+    const insulated = measured.find(m => m.label === "Wire, insulated")!;
+    const bare = measured.find(m => m.label === "Wire, bare ground")!;
+    expect(insulated.feet).toBe(700);
+    expect(bare.feet).toBe(200);
+    // A SHARE, not an addition: a reader who adds bare to the old wire figure
+    // has double-counted, so the two lines must come back to it exactly.
+    expect(insulated.feet + bare.feet).toBe(900);
+  });
+
+  it("says where a cable's ground went, because it is not on this list", () => {
+    // A cable's ground is inside the jacket and already paid for by the Cable
+    // figure. A supplier who sees no bare line on a cable job should be told
+    // why rather than left to wonder.
+    const bare = measuredEntries({
+      conduitFeet: 0,
+      cableFeet: 120,
+      wireFeet: 0,
+      wireGroundFeet: 0,
+    });
+    expect(bare.map(m => m.label)).toEqual(["Cable"]);
+
+    const withGround = measuredEntries({
+      conduitFeet: 100,
+      cableFeet: 0,
+      wireFeet: 300,
+      wireGroundFeet: 100,
+    });
+    expect(withGround.find(m => m.label === "Wire, bare ground")!.note).toMatch(
+      /inside the cable/i
+    );
+  });
+
+  it("shows no bare line when nothing is grounded", () => {
+    // Zero feet of bare copper is not a line a supplier should be asked about.
+    const measured = measuredEntries({
+      conduitFeet: 100,
+      cableFeet: 0,
+      wireFeet: 300,
+      wireGroundFeet: 0,
+    });
+    expect(measured.some(m => m.label === "Wire, bare ground")).toBe(false);
+    expect(measured.find(m => m.label === "Wire, insulated")!.feet).toBe(300);
   });
 });

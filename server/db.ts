@@ -2080,10 +2080,22 @@ export async function seedBaselineRunTypes(): Promise<void> {
     const db = await getDb();
     if (!db) return;
 
+    /*
+      Every material name a shipped type mentions.
+
+      The THIRD hand-written field list in this one function, and the third to
+      need the ground added by hand on 2026-09-20 — after `circuitWire` and
+      `forkRunType` had already been made structural for exactly this. Left as a
+      list here because each entry is a DIFFERENT KIND of link rather than a
+      row being copied wholesale, so there is nothing to spread; the cost is
+      that a fourth kind of material would have to be remembered in three
+      places. Worth revisiting if a fourth ever arrives.
+    */
     const wanted = new Set(
       BASELINE_RUN_TYPES.flatMap(t => [
         t.racewayMaterialName,
         t.conductorMaterialName,
+        t.groundMaterialName,
       ]).filter((n): n is string => Boolean(n))
     );
     const catalog =
@@ -2108,6 +2120,7 @@ export async function seedBaselineRunTypes(): Promise<void> {
         pathType: takeoffRunTypes.pathType,
         racewayMaterialId: takeoffRunTypes.racewayMaterialId,
         conductorMaterialId: takeoffRunTypes.conductorMaterialId,
+        groundMaterialId: takeoffRunTypes.groundMaterialId,
       })
       .from(takeoffRunTypes)
       .where(isNull(takeoffRunTypes.userId));
@@ -2126,6 +2139,8 @@ export async function seedBaselineRunTypes(): Promise<void> {
       racewayMaterialId: materialId(t.racewayMaterialName),
       conductorMaterialId: materialId(t.conductorMaterialName),
       conductorCount: t.conductorCount,
+      groundMaterialId: materialId(t.groundMaterialName),
+      groundCount: t.groundCount,
     }));
 
     if (missing.length > 0) await db.insert(takeoffRunTypes).values(missing);
@@ -2144,10 +2159,24 @@ export async function seedBaselineRunTypes(): Promise<void> {
       const patch: Record<string, number> = {};
       const raceway = materialId(t.racewayMaterialName);
       const conductor = materialId(t.conductorMaterialName);
+      const ground = materialId(t.groundMaterialName);
       if (row.racewayMaterialId === null && raceway !== null)
         patch.racewayMaterialId = raceway;
       if (row.conductorMaterialId === null && conductor !== null)
         patch.conductorMaterialId = conductor;
+      /*
+        The ground link, on the same NULL-only terms as the two above.
+
+        It matters more here than it looks: 0064 gave every shipped type a
+        ground COUNT and deliberately invented no ground WIRE, because a
+        migration cannot know which wire an existing type uses. The seed does
+        know — it is what we ship — so this is the pass that converges a
+        migrated database onto the same specification a fresh one is born with.
+        Without it, "+ ground" would stay unnameable on every existing install
+        for ever.
+      */
+      if (row.groundMaterialId === null && ground !== null)
+        patch.groundMaterialId = ground;
       if (Object.keys(patch).length === 0) continue;
       await db
         .update(takeoffRunTypes)

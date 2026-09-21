@@ -51,16 +51,27 @@ export type BaselineRunType = {
   /** Catalog name of the conductor, or of the cable itself. */
   conductorMaterialName: string | null;
   /**
-   * Conductors in one circuit of this type, INCLUDING the ground.
+   * INSULATED conductors in one circuit of this type. The ground is separate.
    *
-   * Matches how `takeoff_run_circuits.conductorCount` already works — a
-   * 2-wire-and-ground circuit is 3. § 2.1 of the overhaul document records that
-   * separating the ground is the right call and that the migration is
-   * mechanical; until that happens this file must not invent a second
-   * convention, because two meanings for one column is worse than the one
-   * imperfect meaning it has.
+   * ── This said "INCLUDING the ground" until 2026-09-20 ──────────────────────
+   * It did, and it was right to, because only one column existed and two
+   * meanings for one column is worse than one imperfect meaning. Migrations
+   * 0061-0064 gave the ground its own column and its own count, so a row
+   * labelled "2 #12 + ground" now ships as a 2 and a 1 rather than as a 3 that
+   * has to be explained.
    */
   conductorCount: number;
+  /** Grounds in one circuit. Null on a cable — see `groundMaterialName`. */
+  groundCount: number | null;
+  /**
+   * The ground wire itself, on a conduit type.
+   *
+   * NULL on a cable, and not because nobody got round to it: a 12-2 MC carries
+   * its ground inside the jacket, so there is no separate wire to buy and a
+   * name here would put a second line on a supplier's quote for something that
+   * arrives on the same reel.
+   */
+  groundMaterialName: string | null;
 };
 
 export const BASELINE_RUN_TYPES: BaselineRunType[] = [
@@ -69,27 +80,37 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
     pathType: "conduit",
     racewayMaterialName: '1/2" EMT',
     conductorMaterialName: "#12 THHN",
-    conductorCount: 3,
+    conductorCount: 2,
+    groundCount: 1,
+    groundMaterialName: "#12 bare copper, solid",
   },
   {
     label: '3/4" EMT, 3 #12 + ground',
     pathType: "conduit",
     racewayMaterialName: '3/4" EMT',
     conductorMaterialName: "#12 THHN",
-    conductorCount: 4,
+    conductorCount: 3,
+    groundCount: 1,
+    groundMaterialName: "#12 bare copper, solid",
   },
   {
     label: "12-2 MC cable",
     pathType: "cable",
     racewayMaterialName: null,
     conductorMaterialName: "12-2 MC cable",
-    conductorCount: 3,
+    // 12-2 is two insulated and a ground, all inside one jacket.
+    conductorCount: 2,
+    groundCount: 1,
+    groundMaterialName: null,
   },
   {
     label: "12-3 MC cable",
     pathType: "cable",
     racewayMaterialName: null,
     conductorMaterialName: "12-3 MC cable",
-    conductorCount: 4,
+    // 12-3 is three insulated and a ground, all inside one jacket.
+    conductorCount: 3,
+    groundCount: 1,
+    groundMaterialName: null,
   },
 ];

@@ -527,6 +527,15 @@ export function totalQuantities(
   cableFeet: number;
   wireFeet: number;
   /**
+   * The bare-ground share of `wireFeet`, NOT a fourth quantity beside it.
+   *
+   * Bare copper and insulated conductor are separate purchases — one cannot be
+   * ordered as the other — but they are both wire, so this is a share rather
+   * than an addition. A reader who adds it to `wireFeet` has double-counted,
+   * which is why it is named for what it is a part OF.
+   */
+  wireGroundFeet: number;
+  /**
    * The vertical share of each of the three above, so the totals panel can
    * print `1,240 flat + 255 vertical` rather than one figure to be trusted.
    */
@@ -548,6 +557,14 @@ export function totalQuantities(
   let conduit = 0;
   let cable = 0;
   let wire = 0;
+  /*
+    The bare copper, kept apart from the rest of the wire.
+
+    Only conduit runs contribute: `wireFeetByCircuit` refuses a cable run, and
+    that refusal is what stops a cable's ground being counted twice — it is
+    inside the jacket and already paid for by `cableFeet`.
+  */
+  let wireGround = 0;
   let conduitVertical = 0;
   let cableVertical = 0;
   let wireVertical = 0;
@@ -568,6 +585,8 @@ export function totalQuantities(
     conduit += quantities.conduitFeet ?? 0;
     cable += quantities.cableFeet ?? 0;
     wire += quantities.totalWireFeet;
+    for (const circuit of quantities.wireByCircuit)
+      wireGround += circuit.groundFeet;
 
     if (quantities.verticalFeet <= 0) {
       flatOnly++;
@@ -586,6 +605,7 @@ export function totalQuantities(
     conduitFeet: round2(conduit),
     cableFeet: round2(cable),
     wireFeet: round2(wire),
+    wireGroundFeet: round2(wireGround),
     conduitVerticalFeet: round2(conduitVertical),
     cableVerticalFeet: round2(cableVertical),
     wireVerticalFeet: round2(wireVertical),
