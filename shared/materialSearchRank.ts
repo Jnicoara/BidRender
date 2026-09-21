@@ -44,27 +44,14 @@
  * connector, because a pipe outranks a fitting and the role rule could not see
  * that the size had been asked for.
  *
- * ── HOW the row matched outranks role, in three tiers ────────────────────────
- * Demotion has to have a floor. When "Ground rod clamp" is pushed down for
- * being an accessory, the row that rises must not be one that never contained
- * the typed word at all — that is how a GFCI receptacle reached second place
- * for "ground". So role only orders rows that matched the same WAY:
+ * ── HOW the row answers the word outranks role, in five tiers ────────────────
+ * See queryTier for the full reasoning; the short version is that "is the word
+ * this row's head noun" and "does the shelf it sits on agree" together separate
+ * three searches that no simpler rule gets right at once — "fixture", "wire"
+ * and "ground". The tiers are EXACT, IS_A, VARIETY, MODIFIER, ASSOCIATED.
  *
- *   0. the NAME holds every word typed        "Grounding bushing" for "ground"
- *   1. the row's OWN aliases hold them        "Wire nuts" for "marrette"
- *   2. only the global synonym table did      "GFCI receptacle" for "ground"
- *
- * Two tiers were not enough in either direction, and each collapse was found by
- * running the sweep. Folding 1 into 2 made every wire-nut row an alias match no
- * better than a lever connector reached through ALIAS_MAP, so the slang for a
- * wire nut stopped returning wire nuts. Folding 1 into 0 let "ground fault",
- * a perfectly good alias on a GFCI receptacle, outrank grounding material.
- *
- * Per-material vocabulary is a fact about THAT material (CLAUDE.md § Materials);
- * the global table is a fact about the language, shared by everything it
- * touches. Three tiers is what it takes to keep those apart.
- *
- * Substring, not whole word, so "ground" still claims "Grounding bushing".
+ * Role only orders rows that answered the same way. That floor is what stops a
+ * demoted accessory being passed by a row that never held the word at all.
  *
  * ── And the query is classified with the SAME lexicon, to STAND DOWN ─────────
  * The grouping is for a bare product word. Once the query itself names a role
@@ -84,6 +71,8 @@
  * as fixtures — the false positives above were all found by running the whole
  * sweep and reading it, never by reasoning about the rule.
  */
+
+import { materialTypeName } from "./materialSizeOrder";
 
 /** Words meaning "this joins, terminates or closes a product". */
 const FITTING_NOUNS = [
@@ -268,18 +257,160 @@ export function queryRole(query: string): MaterialRole | null {
   return null;
 }
 
-/** How directly this row matched: 0 by name, 1 by its own aliases, 2 neither. */
-export function matchTier(
-  name: string,
-  query: string,
-  aliases?: string | null
-): 0 | 1 | 2 {
+/** A row, as much of it as ranking needs to see. */
+export type RankableRow = {
+  name: string;
+  category?: string | null;
+  /** The material's OWN searchAliases, not the global synonym table. */
+  aliases?: string | null;
+};
+
+export const TIER = {
+  /** The name's head noun IS the word, with nothing qualifying it. */
+  EXACT: 0,
+  /**
+   * This row IS one of these — either its head noun says so ("LED strip
+   * FIXTURE") or its shelf and its own aliases do ("#12 THHN", Wire & Cable).
+   *
+   * ── These were two tiers for an hour, and splitting them was wrong ─────────
+   * Ranking the shelf-and-alias claim ABOVE the head noun put "50A spa
+   * disconnect" above every main panel for "panel", and "Dimmer" above
+   * "Single-pole switch". Ranking it BELOW buried building wire under fixture
+   * wire again. Neither order is right because neither claim is weaker: a spa
+   * panel really is a panel and so is a main panel. What actually separates
+   * them is not HOW the row claims the word but HOW MANY of it the catalog
+   * stocks — see the family tiebreak in compareByRole.
+   */
+  IS_A: 1,
+  /** The word is in the name, modifying something else. */
+  MODIFIER: 2,
+  /** The row's own aliases carry the word; its shelf does not agree. */
+  OWN_ALIAS: 3,
+  /** Reached some other way — the global synonym table, usually. */
+  ASSOCIATED: 4,
+} as const;
+export type MatchTier = (typeof TIER)[keyof typeof TIER];
+
+/**
+ * How a row answers a single typed word.
+ *
+ * ── Why the head noun is asked twice, of the name and of the category ────────
+ * Two searches forced this, and they pull in opposite directions:
+ *
+ *   "fixture" must give LIGHT FIXTURES, not "#16 fixture wire". The wire's head
+ *   noun is "wire"; "fixture" only tells you which kind. So a head match beats
+ *   a modifier match — the plain rule, and it needs nothing but the name.
+ *
+ *   "wire" must give BUILDING WIRE — THHN, Romex — and those names contain no
+ *   "wire" at all. They are reachable only through their own aliases ("building
+ *   wire", "pipe wire"), scoring 10 against fixture wire's 200, so they sat at
+ *   #22 and #41 of 51. Here the alias match has to BEAT the name match.
+ *
+ * A name-beats-alias rule gets the first right and the second wrong; the
+ * reverse gets the second right and puts a GFCI receptacle — aliased "ground
+ * fault" — above every ground rod in the catalog. There is no ordering of those
+ * two tiers alone that satisfies both.
+ *
+ * What separates them is the CATEGORY. "#12 THHN" sits in Wire & Cable and
+ * claims "wire"; the shelf it lives on is named after the thing asked for, so
+ * the claim is an identity rather than an association. "GFCI receptacle" sits
+ * in Receptacles and claims "ground" — the shelf says it is something else, so
+ * the claim stays an association. That is IS_A, and it is the whole trick.
+ *
+ * It is a rule about structure, not a list of words: nothing here knows what
+ * wire or a fixture is, only where the word sits in a name and whether the
+ * shelf agrees.
+ */
+export function queryTier(row: RankableRow, word: string): MatchTier {
+  const term = norm(word);
+  if (!term) return TIER.ASSOCIATED;
+
+  const name = norm(head(row.name));
+  /*
+    The type is the name with its leading size taken off, so "#16 fixture wire"
+    is judged as "fixture wire" and not as a row beginning with a gauge. Shared
+    with the sort (materialSizeOrder) on purpose — a row cannot be one type when
+    it is listed and another when it is searched.
+  */
+  const type = norm(materialTypeName(head(row.name)) ?? head(row.name));
+
+  /*
+    The head noun is matched by PREFIX, not only whole.
+
+    People search by typing the start of a word and stopping. "recep" is the
+    documented example — CLAUDE.md records it ranking "Wall plate" first once
+    already — and a whole-word test sends it to TIER.MODIFIER, where "Duplex
+    receptacle" lost to a combo device that claimed the word through its shelf.
+    A term that starts the head noun IS the head noun.
+  */
+  const headWord = type.split(" ").pop() ?? "";
+  if (headWord.startsWith(term)) {
+    return type === headWord ? TIER.EXACT : TIER.IS_A;
+  }
+  if (endsWithWord(type, term)) return TIER.IS_A;
+
+  if (hasWordPrefix(norm(row.name), term)) return TIER.MODIFIER;
+
+  /*
+    The word is nowhere in the name. The row may still BE one — but only if its
+    own aliases claim the word AND the shelf it sits on is named after it.
+
+    Both halves are required, and dropping either breaks a real search. Without
+    the shelf, "GFCI receptacle" (aliased "ground fault", shelved under
+    Receptacles) outranks every ground rod in the catalog. Without the alias,
+    nothing connects "#12 THHN" to the word "wire" at all.
+
+    A claim the shelf does not back is still worth something — it is how
+    "marrette" reaches Wire nuts — so it lands on OWN_ALIAS rather than being
+    thrown in with the global synonym table.
+  */
+  const claims = aliasTerms(row.aliases).includes(term);
+  if (!claims) return TIER.ASSOCIATED;
+  return hasWordPrefix(norm(row.category ?? ""), term)
+    ? TIER.IS_A
+    : TIER.OWN_ALIAS;
+}
+
+/**
+ * Does some word in `text` START with `term`?
+ *
+ * Prefix, never a bare substring, and the difference is a real result: with
+ * `includes`, searching "ground" matched "UNDERground splice kit" and ranked it
+ * above the grounding bushing, because the kit reads as a product and the
+ * bushing as a fitting. A stem the user typed should reach what grew out of it
+ * — "ground" to "grounding" — and stop there. smartSearch draws the same line
+ * in matchTier, for the same reason.
+ */
+const escapeRe = (s: string): string =>
+  s.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+
+function hasWordPrefix(text: string, term: string): boolean {
+  if (!term) return false;
+  return new RegExp("(^| )" + escapeRe(term)).test(text);
+}
+
+/** The row's own alias words, as whole terms. */
+function aliasTerms(aliases: string | null | undefined): string[] {
+  return norm(aliases ?? "")
+    .split(" ")
+    .filter(Boolean);
+}
+
+/**
+ * The worst tier across every word typed.
+ *
+ * Worst, not best: a row has to answer the whole query. Taking the best would
+ * let one strong word carry a row that ignores the rest of what was typed.
+ */
+export function matchTier(row: RankableRow, query: string): MatchTier {
   const words = norm(query).split(" ").filter(Boolean);
-  if (words.length === 0) return 2;
-  const inName = norm(name);
-  if (words.every(word => inName.includes(word))) return 0;
-  const withAliases = inName + " " + norm(aliases ?? "");
-  return words.every(word => withAliases.includes(word)) ? 1 : 2;
+  if (words.length === 0) return TIER.ASSOCIATED;
+  let worst: MatchTier = TIER.EXACT;
+  for (const word of words) {
+    const tier = queryTier(row, word);
+    if (tier > worst) worst = tier;
+  }
+  return worst;
 }
 
 /**
@@ -311,17 +442,65 @@ export function roleRankFor(name: string, query: string): number {
 }
 
 /**
+ * Does family size get to decide between these two, or does relevance?
+ *
+ * Only one question needs it: a row whose NAME says it is one of these, against
+ * a row whose SHELF says so. "#16 fixture wire" against "#12 THHN" for "wire";
+ * "100A main panel" against "50A spa disconnect" for "panel". Both are honestly
+ * the thing asked for, relevance cannot separate them — the name always wins on
+ * score, 200 to 10 — and the catalog's own stock levels can.
+ *
+ * ── It was applied to EVERY comparison for one run, and that was a disaster ──
+ * Above the relevance score, family size stops being a tiebreak and becomes the
+ * ranking. Measured on the standard sweep: "plug" returned 2-Pole BREAKERS
+ * ahead of every receptacle, "gfi" returned 2-Pole GFCI breakers ahead of the
+ * GFCI receptacle, "box" led with cast boxes and "cover" with mud rings. Twenty
+ * of fifty-eight queries moved, most of them wrongly.
+ *
+ * The lesson is the shape of the fix rather than the number: a signal that is
+ * right for one question is not a better sort key, and the narrower guard is
+ * what makes it safe. So it fires only between the two claim kinds, only inside
+ * TIER.IS_A, and only for a single typed word.
+ */
+function familyDecides(
+  a: RankableMatch,
+  b: RankableMatch,
+  query: string
+): boolean {
+  const words = norm(query).split(" ").filter(Boolean);
+  if (words.length !== 1) return false;
+  const word = words[0];
+  if (queryTier(a, word) !== TIER.IS_A) return false;
+  if (queryTier(b, word) !== TIER.IS_A) return false;
+  // Exactly one of them names the word outright; the other is claiming it
+  // through its shelf. Same kind on both sides means relevance can do the job.
+  return (
+    hasWordPrefix(norm(a.name), word) !== hasWordPrefix(norm(b.name), word)
+  );
+}
+
+/**
  * Compare two already-matched results for one query.
  *
- * Match tier, then role, then the relevance score smartSearch produced,
- * then the caller's own tiebreak — which for a material list is size order, so 1/2,
+ * Match tier, then role, then family size, then the relevance score
+ * smartSearch produced, then the caller's own tiebreak — which for a material list is size order, so 1/2,
  * 3/4, 1 runs in trade order inside each group rather than by score accident.
  */
-export type RankableMatch = {
-  name: string;
+export type RankableMatch = RankableRow & {
   score: number;
-  /** The material's OWN searchAliases, not the global synonym table. */
-  aliases?: string | null;
+  /**
+   * How many rows share this one's type across the whole catalog.
+   *
+   * The catalog stocks eighteen sizes of THHN and two fixture wires, five main
+   * panels and two spa panels — so when two rows answer the typed word equally
+   * well, the bigger family is the one the word usually means. It is a fact
+   * about the catalog rather than about the language, which is what makes it a
+   * rule instead of a list.
+   *
+   * Optional: a caller that does not supply it simply does not get the
+   * tiebreak, and ranking falls through to relevance as before.
+   */
+  family?: number;
 };
 
 export function compareByRole(
@@ -330,14 +509,45 @@ export function compareByRole(
   query: string,
   tiebreak: (x: string, y: string) => number = () => 0
 ): number {
-  const la = matchTier(a.name, query, a.aliases);
-  const lb = matchTier(b.name, query, b.aliases);
+  const la = matchTier(a, query);
+  const lb = matchTier(b, query);
   if (la !== lb) return la - lb;
 
   const ra = roleRankFor(a.name, query);
   const rb = roleRankFor(b.name, query);
   if (ra !== rb) return ra - rb;
 
+  if (familyDecides(a, b, query)) {
+    const fa = a.family ?? 0;
+    const fb = b.family ?? 0;
+    if (fa !== fb) return fb - fa;
+  }
+
   if (a.score !== b.score) return b.score - a.score;
   return tiebreak(a.name, b.name);
+}
+
+/**
+ * How many catalog rows share each type, keyed by the type.
+ *
+ * Built once from the whole catalog and handed to `compareByRole` as
+ * `family`. It uses the SAME type derivation as the sort, so a family here is
+ * the same run of rows the Materials screen groups under one heading — there is
+ * no second opinion about what counts as one product.
+ */
+export function familySizes(
+  rows: ReadonlyArray<{ name: string }>
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const key = familyKey(row.name);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** The type a name belongs to, as `familySizes` keys it. */
+export function familyKey(name: string): string {
+  const bare = head(name);
+  return norm(materialTypeName(bare) ?? bare);
 }

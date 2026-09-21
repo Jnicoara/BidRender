@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-21]
 
+- **Searching a bare product word now gives the product an electrician means.**
+  "fixture" gives light fixtures instead of fixture wire; "wire" gives building
+  wire — THHN and Romex — instead of wire nuts. Building wire had been all but
+  unfindable by the word: its names contain no "wire" at all, so it sat 22nd
+  and 41st in a list of 51. Also improved: "panel", "switch", "conduit",
+  "1900", "12/2" and "ground".
+
 - **Searching the catalog puts the product first, then the parts that attach
   to it.** Typing "pvc" used to return PVC cement above every length of PVC
   conduit; "emt" returned a strap; "panel" returned a filler plate. Results

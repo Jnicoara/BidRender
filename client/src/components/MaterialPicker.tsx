@@ -32,7 +32,11 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/money";
 import { smartSearch } from "@/lib/smartSearch";
-import { compareByRole } from "@shared/materialSearchRank";
+import {
+  compareByRole,
+  familyKey,
+  familySizes,
+} from "@shared/materialSearchRank";
 import { compareBySize } from "@shared/materialSizeOrder";
 import { trpc } from "@/lib/trpc";
 
@@ -102,6 +106,27 @@ export function MaterialPicker({
     [catalog]
   );
 
+  /*
+    How deep to look before grouping, and it is not a tuning knob.
+
+    A row promoted by its tier has to be IN the page to be promoted at all, and
+    the rows this exists for sit a long way down on score: searching "wire",
+    "#14 THHN" was 22nd of 51 and "14-2 NM-B" 41st, because their names contain
+    no "wire" and they matched through an alias worth 10 points against fixture
+    wire's 200. MAX_RESULTS * 6 is 48, which would have cut the Romex off — so
+    the floor is what makes the promotion real rather than occasional.
+  */
+  const SEARCH_DEPTH = Math.max(MAX_RESULTS * 6, 80);
+
+  /*
+    How many rows share each type. Counted once over the catalog rather than
+    per comparison, because the comparator runs O(n log n) times per keystroke.
+  */
+  const families = useMemo(
+    () => familySizes(catalog as PickableMaterial[]),
+    [catalog]
+  );
+
   const results = useMemo<PickableMaterial[]>(() => {
     const all = catalog as PickableMaterial[];
     if (!query.trim()) {
@@ -121,8 +146,8 @@ export function MaterialPicker({
       position stands in for it — which is all the role comparison needs, since
       it only ever uses the score to break a tie inside one role.
     */
-    const hits = smartSearch(searchable, query, MAX_RESULTS * 6);
     const byId = new Map(all.map(m => [m.id, m]));
+    const hits = smartSearch(searchable, query, SEARCH_DEPTH);
     return hits
       .map((hit, index) => ({ hit, index }))
       .sort((a, b) =>
@@ -131,11 +156,15 @@ export function MaterialPicker({
             name: a.hit.description,
             score: -a.index,
             aliases: a.hit.searchAliases,
+            category: byId.get(Number(a.hit.id))?.category,
+            family: families.get(familyKey(a.hit.description)),
           },
           {
             name: b.hit.description,
             score: -b.index,
             aliases: b.hit.searchAliases,
+            category: byId.get(Number(b.hit.id))?.category,
+            family: families.get(familyKey(b.hit.description)),
           },
           query,
           compareBySize
@@ -144,7 +173,7 @@ export function MaterialPicker({
       .map(({ hit }) => byId.get(Number(hit.id)))
       .filter((m): m is PickableMaterial => Boolean(m))
       .slice(0, MAX_RESULTS);
-  }, [query, searchable, catalog, recent, exclude]);
+  }, [query, searchable, catalog, recent, exclude, families]);
 
   const showingRecent = !query.trim() && results.length > 0;
 

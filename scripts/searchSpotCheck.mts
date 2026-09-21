@@ -20,7 +20,11 @@
  */
 import { BASELINE_MATERIALS } from "../server/seed/baselineMaterials";
 import { smartSearch } from "../client/src/lib/smartSearch";
-import { compareByRole } from "../shared/materialSearchRank";
+import {
+  compareByRole,
+  familyKey,
+  familySizes,
+} from "../shared/materialSearchRank";
 import { compareBySize } from "../shared/materialSizeOrder";
 
 const index = BASELINE_MATERIALS.map((m, i) => ({
@@ -103,10 +107,12 @@ const SWEEP = [
 
 /** How many rows to show, and how deep to look before grouping them. */
 const SHOW = 5;
-const OVERSAMPLE = 6;
+/** Deep enough that a row promoted by its tier was in the page to promote. */
+const DEPTH = 80;
 
 const rowOf = (id: string) => BASELINE_MATERIALS[Number(id)];
 const nameOf = (id: string) => rowOf(id).name;
+const FAMILIES = familySizes(BASELINE_MATERIALS);
 
 /** smartSearch alone, in the order it returns. */
 function raw(query: string, limit = SHOW): string[] {
@@ -122,12 +128,14 @@ function raw(query: string, limit = SHOW): string[] {
  * for it, which is all the role comparison needs to break a tie.
  */
 function ranked(query: string, limit = SHOW): string[] {
-  const hits = smartSearch(index, query, limit * OVERSAMPLE);
+  const hits = smartSearch(index, query, DEPTH);
   return hits
     .map((hit, index) => ({
       name: nameOf(hit.id),
       score: -index,
       aliases: rowOf(hit.id).searchAliases,
+      category: rowOf(hit.id).category,
+      family: FAMILIES.get(familyKey(nameOf(hit.id))),
     }))
     .sort((a, b) => compareByRole(a, b, query, compareBySize))
     .slice(0, limit)
