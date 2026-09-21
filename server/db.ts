@@ -1447,23 +1447,51 @@ export async function getMaterialById(
  * resolves two ids per row, so a dozen types is 24 round trips done the naive
  * way. Scoped the same as the single getter — shipped rows and this user's.
  */
+/**
+ * The materials a set of STORED ids refers to — forks followed.
+ *
+ * ── READ THE RESULT WITH `resolveMaterial`, NEVER BY ID ──────────────────────
+ * This returns a MERGED library list, so a fork appears under its OWN id while
+ * the stored id still names the baseline it superseded. Keying a Map on
+ * `row.id` and looking up the stored id therefore MISSES every forked row —
+ * which is precisely the bug this function was changed to fix.
+ *
+ * ── Measured on the dev database, 2026-09-20 ────────────────────────────────
+ * Pricing 1/2" EMT at 0.04 h forked it to a new row, and the run-type palette
+ * went on reading the shipped row and saying "No labor units yet — priced at
+ * material only" for a type whose pipe the user had just costed. Same fault
+ * `getAssemblyMaterialLines` had, found the same afternoon, one layer across:
+ * a fix in one place had not reached the other place with the same seam.
+ * See `shared/materialLookup.ts` for the whole reasoning.
+ */
 export async function getMaterialsByIds(
   ids: readonly number[],
   userId: number
 ): Promise<Material[]> {
-  const wanted = Array.from(new Set(ids.filter(id => Number.isFinite(id))));
+  const wanted = materialIdsToFetch(ids);
   if (wanted.length === 0) return [];
   const db = await getDb();
   if (!db) return [];
-  return db
+  /*
+    One query for both halves — the stored ids, and this user's forks OF those
+    ids — built from the same list, so a fork can never arrive without the
+    baseline it supersedes.
+  */
+  const candidates = await db
     .select()
     .from(materials)
     .where(
-      and(
-        inArray(materials.id, wanted),
-        or(isNull(materials.userId), eq(materials.userId, userId))
+      or(
+        and(
+          inArray(materials.id, wanted),
+          or(isNull(materials.userId), eq(materials.userId, userId))
+        ),
+        and(eq(materials.userId, userId), inArray(materials.baselineId, wanted))
       )
     );
+  // MERGE BEFORE RESOLVING — see getAssemblyMaterialLines for why the order is
+  // not interchangeable: resolveMaterial takes a direct hit first.
+  return mergeLibraryRows(candidates, userId);
 }
 
 /** Create a material owned by the user. Returns the new row id. */

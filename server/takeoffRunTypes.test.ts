@@ -30,6 +30,8 @@ import {
   users,
 } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { laborPerFootForRunType } from "../shared/runTypeLabor";
+import { laborUnitHours } from "../shared/materialLabor";
 
 const USER = 9701;
 const OTHER_USER = 9702;
@@ -565,6 +567,136 @@ describeDb("the ground travels with the type", () => {
       expect(type.conductorCount).toBeGreaterThanOrEqual(1);
       // The label says "+ ground" and the columns now agree with it.
       expect(type.label).toMatch(/ground/i);
+    }
+  });
+});
+
+describeDb("what a foot of this type costs", () => {
+  it("sends each slot's labor unit, so the palette can price a foot", async () => {
+    /*
+      D17 as revised on 2026-09-20: a run's labour comes off the same material
+      rows everything else reads, rather than a second figure typed on the type.
+      The router sends the units for the same reason it sends the names — the
+      takeoff screen does not hold the material catalog.
+    */
+    const pipe = await caller().materials.create({
+      name: `Labor fixture EMT ${uniq()}`,
+      unitOfSale: "foot",
+      costPerUnit: 0.42,
+      category: "Conduit",
+      laborHours: 0.04,
+    });
+    const wire = await caller().materials.create({
+      name: `Labor fixture THHN ${uniq()}`,
+      unitOfSale: "foot",
+      costPerUnit: 0.18,
+      category: "Wire & Cable",
+      laborHours: 0.0055,
+    });
+
+    const type = await caller().takeoffRunTypes.create({
+      label: `Costed ${uniq()}`,
+      pathType: "conduit",
+      racewayMaterialId: pipe!.id,
+      conductorMaterialId: wire!.id,
+      conductorCount: 2,
+      groundCount: 0,
+    });
+
+    const row = (await caller().takeoffRunTypes.list()).find(
+      t => t.id === type.id
+    )!;
+    expect(laborUnitHours(row.racewayLaborHours)).toBe(0.04);
+    expect(laborUnitHours(row.conductorLaborHours)).toBe(0.0055);
+
+    // The figure the palette prints: pipe once, conductors the full way.
+    const labor = laborPerFootForRunType(row);
+    expect(labor.hours).toBe(0.051);
+    expect(labor.complete).toBe(true);
+  });
+
+  it("says a figure is SHORT rather than printing a confident low one", async () => {
+    // A type whose pipe is costed and whose wire is not returns 0.04, which
+    // looks exactly like a finished answer. The caveat has to travel with it.
+    const pipe = await caller().materials.create({
+      name: `Half-costed EMT ${uniq()}`,
+      unitOfSale: "foot",
+      costPerUnit: 0.42,
+      category: "Conduit",
+      laborHours: 0.04,
+    });
+    const wire = await caller().materials.create({
+      name: `Uncosted THHN ${uniq()}`,
+      unitOfSale: "foot",
+      costPerUnit: 0.18,
+      category: "Wire & Cable",
+    });
+    const type = await caller().takeoffRunTypes.create({
+      label: `Half costed ${uniq()}`,
+      pathType: "conduit",
+      racewayMaterialId: pipe!.id,
+      conductorMaterialId: wire!.id,
+      conductorCount: 2,
+      groundCount: 0,
+    });
+
+    const row = (await caller().takeoffRunTypes.list()).find(
+      t => t.id === type.id
+    )!;
+    const labor = laborPerFootForRunType(row);
+    expect(labor.hours).toBe(0.04);
+    expect(labor.unsetCount).toBe(1);
+    expect(labor.complete).toBe(false);
+  });
+
+  it("FOLLOWS A FORK — pricing a shipped material reaches the palette", async () => {
+    /*
+      ── The bug this is the red for, measured on the dev database ────────────
+      Editing a SHIPPED material forks it: a new row, a new id, a baselineId
+      pointing back, and `mergeLibraryRows` then hides the baseline. The run
+      type still stores the BASELINE's id, so a lookup keyed on `row.id` fetched
+      the very row the fork replaced — and the palette went on saying "No labor
+      units yet" about a type whose pipe the user had priced minutes earlier.
+
+      Same seam `getAssemblyMaterialLines` had, found the same afternoon one
+      layer across: a fix in one place had not reached the other place with it.
+      `getMaterialsByIds` now merges and resolves, like every other consumer.
+    */
+    const shipped = (await caller().materials.list()).find(
+      m => m.userId === null && m.laborHours === null
+    );
+    if (!shipped) return; // No unpriced shipped row to fork; nothing to assert.
+
+    const type = await caller().takeoffRunTypes.create({
+      label: `Fork follower ${uniq()}`,
+      pathType: "conduit",
+      conductorMaterialId: shipped.id,
+      conductorCount: 1,
+      groundCount: 0,
+    });
+
+    const before = (await caller().takeoffRunTypes.list()).find(
+      t => t.id === type.id
+    )!;
+    expect(before.conductorLaborHours).toBeNull();
+
+    // Forks, rather than editing the row every other contractor shares.
+    const fork = await caller().materials.update({
+      id: shipped.id,
+      laborHours: 0.0125,
+    });
+    expect(fork!.material.id).not.toBe(shipped.id);
+
+    try {
+      const after = (await caller().takeoffRunTypes.list()).find(
+        t => t.id === type.id
+      )!;
+      // The type still stores the baseline id — resolution happens on read.
+      expect(after.conductorMaterialId).toBe(shipped.id);
+      expect(laborUnitHours(after.conductorLaborHours)).toBe(0.0125);
+      expect(laborPerFootForRunType(after).hours).toBe(0.0125);
+    } finally {
+      await caller().materials.revert({ id: fork!.material.id });
     }
   });
 });

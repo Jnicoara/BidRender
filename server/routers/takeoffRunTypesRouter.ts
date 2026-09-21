@@ -28,6 +28,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import { RUN_PATH_TYPES } from "../../drizzle/schema";
+import { resolveMaterial } from "../../shared/materialLookup";
 import * as db from "../db";
 
 /**
@@ -134,22 +135,40 @@ export const takeoffRunTypesRouter = router({
         type readable, and the palette already says what a type with nothing
         behind it cannot do.
       */
-      const byId = new Map(
-        (
-          await db.getMaterialsByIds(
-            types.flatMap(t =>
-              [
-                t.racewayMaterialId,
-                t.conductorMaterialId,
-                t.groundMaterialId,
-              ].filter((id): id is number => id !== null)
-            ),
-            ctx.scope.dataUserId
-          )
-        ).map(m => [m.id, m])
+      /*
+        RESOLVED, not keyed by id — and the difference is a wrong number.
+
+        `getMaterialsByIds` returns a MERGED list, in which a forked material
+        appears under its own new id while the run type still stores the
+        baseline's. A `Map` on `row.id` therefore misses every fork, which is
+        how the palette came to say "No labor units yet" about a type whose
+        pipe the user had priced minutes earlier. Measured 2026-09-20.
+      */
+      const visible = await db.getMaterialsByIds(
+        types.flatMap(t =>
+          [
+            t.racewayMaterialId,
+            t.conductorMaterialId,
+            t.groundMaterialId,
+          ].filter((id): id is number => id !== null)
+        ),
+        ctx.scope.dataUserId
       );
-      const nameOf = (id: number | null) =>
-        id === null ? null : (byId.get(id)?.name ?? null);
+      const materialFor = (id: number | null) =>
+        id === null ? undefined : resolveMaterial(visible, id);
+      const nameOf = (id: number | null) => materialFor(id)?.name ?? null;
+      /*
+        The labour unit travels with the name, from the row already fetched.
+
+        Sent rather than resolved on the client for the reason the names are:
+        the takeoff screen does not fetch the material catalog and must not have
+        to pull one in to say what a foot of 3/4in EMT takes. Undefined for a
+        link that resolves to nothing, which `laborPerFootForRunType` reads as
+        unset — a retired material leaves the type readable and honestly
+        incomplete, never quietly free.
+      */
+      const laborOf = (id: number | null) =>
+        materialFor(id)?.laborHours ?? null;
 
       return types.map(type => ({
         id: type.id,
@@ -162,6 +181,16 @@ export const takeoffRunTypesRouter = router({
         racewayMaterialName: nameOf(type.racewayMaterialId),
         conductorMaterialName: nameOf(type.conductorMaterialId),
         groundMaterialName: nameOf(type.groundMaterialId),
+        /*
+          Hours per unit of sale for each slot, so the palette can say what a
+          foot of this type costs. Listed one by one rather than spread from
+          the row, because this mapping feeds a SCREEN — CLAUDE.md § "Where to
+          be structural, and where to be explicit". The ARITHMETIC over them is
+          structural, and lives in `runTypeComponentsPerFoot`.
+        */
+        racewayLaborHours: laborOf(type.racewayMaterialId),
+        conductorLaborHours: laborOf(type.conductorMaterialId),
+        groundLaborHours: laborOf(type.groundMaterialId),
         conductorCount: type.conductorCount,
         groundCount: type.groundCount,
         status: type.status,

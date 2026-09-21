@@ -139,11 +139,23 @@ export function runTypeSpec(type: {
   /*
     A CABLE never shows the count, and a test is why.
 
-    The column means "conductors in one circuit, including the ground", so a
-    12-2 MC legitimately stores 3 — and printing it gives `3 x 12-2 MC`, which
-    reads as three cables rather than one cable with three conductors in it.
-    The cable's own name already says what is inside it. A pipe's does not,
-    which is the whole reason the count is worth showing there.
+    The count describes what is INSIDE the jacket, so a 12-2 MC stores two
+    conductors and one ground — and printing either gives `2 x 12-2 MC`, which
+    reads as two cables rather than one cable with two conductors in it. The
+    cable's own name already says what is inside it. A pipe's does not, which
+    is the whole reason the count is worth showing there.
+
+    ── This paragraph used to say the column meant "including the ground" ─────
+    That was true until 0063/0064 split the ground into its own column and its
+    own count, and it was left describing a meaning the schema had stopped
+    having — the exact fault CLAUDE.md names, a caption quietly restating the
+    old meaning beside a number carrying the new one. The CONCLUSION never
+    moved: whichever way the count is stored, a cable must not print one.
+    Corrected 2026-09-20.
+
+    The same "inside the jacket, not a multiplier" rule decides a cable's LABOR
+    — see `runTypeComponentsPerFoot` in shared/runTypeLabor.ts, where reading it
+    the other way would bill one foot of cable as two.
   */
   if (type.pathType === "cable") return conductor ?? raceway;
 
@@ -161,10 +173,9 @@ export function runTypeSpec(type: {
       NO wire named, one ground    "+ ground"
       no ground, or nothing said   nothing
 
-    The third is the one that matters and the one it would be easy to drop. It
-    is what every shipped type looks like right now: 0064 split the count but
-    deliberately invented no ground WIRE, so these carry a ground they cannot
-    yet name. Printing nothing there would leave the label saying
+    The third is the one that matters and the one it would be easy to drop: a
+    type can carry a ground without naming one. Printing nothing there would
+    leave the label saying
     "2 #12 + ground" above a spec line that mentions no ground — which is the
     exact disagreement this whole line exists to remove, just reversed.
 

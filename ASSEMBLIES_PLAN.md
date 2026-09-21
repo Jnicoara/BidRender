@@ -104,6 +104,29 @@ box at a termination — which is an interim standing in for fittings that canno
 carry hours yet, and which retires to zero rather than being deleted when they
 can. See D17(b) and the open fork at D17(c).
 
+**BUILT 2026-09-20 — the per-foot half.** `shared/runTypeLabor.ts` turns a run
+type into what ONE FOOT of it is made of, and `laborForRun` prices that from the
+material rows. The palette and the type editor both show the figure, through one
+sentence builder so they cannot word it differently.
+
+Three things worth knowing before building on it:
+
+- **A cable is one foot of one thing.** Its count describes what is inside the
+  jacket, so multiplying by it would bill a 12-2 MC at three times its labour.
+  Its ground gets no line either, for the same reason the materials list gives:
+  the ground is in the jacket and already paid for.
+- **A partial figure never appears without what it is short by.** A type whose
+  pipe is costed and whose wire is not returns a confident, low number that
+  looks exactly like a finished one.
+- **This is the TYPE's figure, not a run's.** A run may carry circuits that
+  differ from its type's counts (§ 2.1), so anything pricing an actual run reads
+  that run's circuits, the way `quantitiesForRun` already does for footage.
+
+**Still unbuilt: the run → bid bridge (R2).** `bid_line_items` has no run
+equivalent of `takeoffGroupId`, so runs still reach the materials list and
+nothing else. The labour answer is what unblocked writing it; it is not itself
+the bridge, and R2 also wants R7's allowances and R3's double-count handling.
+
 ### Where labor hours come from
 
 The CORE assemblies in [STARTER_LIBRARY.md](STARTER_LIBRARY.md) ship with materials but **no labor hours**. Those get populated by the user, from their own field experience, with the **NECA Manual of Labor Units** as a general reference.

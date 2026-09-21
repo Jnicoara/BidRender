@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { selectOnFocus } from "@/lib/selectOnFocus";
+import { laborForAssembly } from "@shared/materialLabor";
 import { LaborRateQuickEdit } from "@/components/LaborRateQuickEdit";
 import { resolveLaborRate } from "@shared/laborRateLookup";
 import {
@@ -137,6 +138,20 @@ type MaterialLine = {
   name: string;
   unitOfSale: "each" | "foot" | "box";
   costPerUnit: number;
+  /**
+   * The material's own labor unit, and this recipe's disagreement with it.
+   *
+   * Carried as the raw nullable values rather than a resolved number, because
+   * WHICH one wins is decided in one place — `componentLaborUnit` — and a
+   * screen resolving it for itself is how two parts of the app come to disagree
+   * about the same recipe. NULL on both means nobody has said, which is not
+   * zero and must not display as it.
+   *
+   * These feed the CROSS-CHECK only. They never touch what the assembly prices
+   * at; see the note on the cross-check line itself.
+   */
+  laborHours: string | null;
+  overrideLaborHours: string | null;
 };
 
 type Draft = {
@@ -511,6 +526,40 @@ function AssemblyBuilder({
     !hoursTouched &&
     isPlaceholderHours(draft.name, Number(draft.baseLaborHours));
 
+  /**
+   * What the parts come to, against what was typed.
+   *
+   * Goes through `laborForAssembly` rather than summing here, so this screen
+   * and anything else that ever shows the pair read the same decision. The
+   * `pricedHours` it returns is deliberately ignored: this component already
+   * holds the typed number as a draft string, and the point of the shared
+   * function is that the two figures are computed apart.
+   */
+  const crossCheck = useMemo(() => {
+    const labor = laborForAssembly({
+      typedHours: Number(draft.baseLaborHours) || 0,
+      components: draft.materials.map(m => ({
+        qty: m.qty,
+        laborHours: m.laborHours,
+        overrideLaborHours: m.overrideLaborHours,
+      })),
+    });
+    return {
+      hours: labor.crossCheckHours,
+      unsetCount: labor.crossCheckUnsetCount,
+      typed: Number(draft.baseLaborHours) || 0,
+      /*
+        Nothing to compare against is not a comparison. With no components, or
+        with none of them costed, "your parts add to 0 h" reads as a claim that
+        the work is free — the same wrong-number-shaped failure as an unset
+        height rendering 0'-0".
+      */
+      shown:
+        draft.materials.length > 0 &&
+        labor.crossCheckUnsetCount < draft.materials.length,
+    };
+  }, [draft.baseLaborHours, draft.materials]);
+
   // resolveLaborRate, not a bare find: an assembly that referenced a starter
   // role keeps that id after the role is forked, and the fork is what it means.
   const selectedRate = resolveLaborRate(laborRates, draft.laborRateId);
@@ -555,6 +604,10 @@ function AssemblyBuilder({
             name: material.name,
             unitOfSale: material.unitOfSale as MaterialLine["unitOfSale"],
             costPerUnit: Number(material.costPerUnit),
+            // A material just picked from the catalog brings its own unit and
+            // no override — the recipe has not disagreed with anything yet.
+            laborHours: material.laborHours ?? null,
+            overrideLaborHours: null,
           },
         ],
       };
@@ -881,6 +934,42 @@ function AssemblyBuilder({
                 </div>
               </div>
 
+              {/*
+                THE CROSS-CHECK. INFORMATION, NEVER A CORRECTION.
+
+                What the parts come to, beside what was typed. It is muted body
+                text on purpose — not amber, not a warning, no icon — because
+                **the gap is the point, not a mistake.** 0.45 typed against 0.62
+                of parts is a 27% efficiency claim: doing the whole rough-in in
+                one operation instead of five separate jobs. A screen that
+                nagged toward closing that gap would be arguing with the model
+                and would teach the estimator to make their honest number worse.
+                See ASSEMBLIES_PLAN.md § "What must come with it".
+
+                It NEVER changes what the assembly prices at. The typed number
+                is the whole answer; `laborForAssembly` returns the two under
+                names that make adding them read as the mistake it is.
+
+                It is hidden only when there is genuinely nothing to compare —
+                no components at all, or not one of them costed — because "your
+                parts add to 0" is not a cross-check, it is a number pretending
+                to be one.
+              */}
+              {crossCheck.shown && (
+                <p className="text-xs text-muted-foreground">
+                  Your parts add to {round(crossCheck.hours, 3)} h; you typed{" "}
+                  {round(crossCheck.typed, 3)} h.
+                  {crossCheck.unsetCount > 0 && (
+                    <>
+                      {" "}
+                      {crossCheck.unsetCount} of {draft.materials.length} have
+                      no labor unit set, so the parts total is short by whatever
+                      those take.
+                    </>
+                  )}
+                </p>
+              )}
+
               {draft.laborRateId === null && (
                 <p className="text-xs text-destructive">
                   No role picked — labor prices at $0 until you choose one.
@@ -1183,6 +1272,8 @@ export default function AssembliesLibraryPage() {
         name: m.name,
         unitOfSale: m.unitOfSale,
         costPerUnit: Number(m.costPerUnit),
+        laborHours: m.laborHours,
+        overrideLaborHours: m.overrideLaborHours,
       })),
       modifierIds: detail.modifierIds,
     };

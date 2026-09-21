@@ -39,6 +39,14 @@ export type PickableMaterial = {
   name: string;
   unitOfSale: string;
   costPerUnit: string;
+  /**
+   * The material's labor unit, carried so a recipe can start from it.
+   *
+   * Optional because a caller that only needs to NAME a material should not
+   * have to supply it; nullable because a material nobody has costed the hours
+   * for is the normal state of all 629 shipped rows.
+   */
+  laborHours?: string | null;
   category: string | null;
   defaultQty: string | null;
   searchAliases?: string | null;

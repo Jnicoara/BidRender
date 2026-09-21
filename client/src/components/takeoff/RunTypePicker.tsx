@@ -60,6 +60,7 @@ import { MaterialPicker } from "@/components/MaterialPicker";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { smartSearch } from "@/lib/smartSearch";
 import { runTypeSpec } from "@shared/takeoffCounts";
+import { laborPerFootSentence } from "@shared/runTypeLabor";
 import { cn } from "@/lib/utils";
 
 export type PickableRunType = {
@@ -73,6 +74,16 @@ export type PickableRunType = {
   racewayMaterialName: string | null;
   conductorMaterialName: string | null;
   groundMaterialName: string | null;
+  /**
+   * Hours per unit of sale for each slot, as the router resolved them.
+   *
+   * Here rather than looked up, because this screen does not fetch the material
+   * catalog at all. Null for no link AND for a link that no longer resolves,
+   * which laborPerFootForRunType reads as unset rather than as free.
+   */
+  racewayLaborHours: string | null;
+  conductorLaborHours: string | null;
+  groundLaborHours: string | null;
   conductorCount: number | null;
   groundCount: number | null;
   needsSpecification: boolean;
@@ -85,11 +96,24 @@ type Draft = {
   label: string;
   racewayMaterialId: number | null;
   racewayMaterialName: string | null;
+  /*
+    The labour unit rides along with the name it belongs to.
+
+    Held in the draft rather than re-fetched, so the hours line answers while
+    the form is open — pick a costed conductor and the figure moves before Save.
+
+    It is never SENT: RunTypePatch has no labour field, because the hours live
+    on the material and a run type holding its own copy would be the second
+    place D17 was revised to remove.
+  */
+  racewayLaborHours: string | null;
   conductorMaterialId: number | null;
   conductorMaterialName: string | null;
+  conductorLaborHours: string | null;
   conductorCount: number | null;
   groundMaterialId: number | null;
   groundMaterialName: string | null;
+  groundLaborHours: string | null;
   groundCount: number | null;
 };
 
@@ -106,11 +130,14 @@ const draftOf = (type: PickableRunType): Draft => ({
   label: type.label,
   racewayMaterialId: type.racewayMaterialId,
   racewayMaterialName: type.racewayMaterialName,
+  racewayLaborHours: type.racewayLaborHours,
   conductorMaterialId: type.conductorMaterialId,
   conductorMaterialName: type.conductorMaterialName,
+  conductorLaborHours: type.conductorLaborHours,
   conductorCount: type.conductorCount,
   groundMaterialId: type.groundMaterialId,
   groundMaterialName: type.groundMaterialName,
+  groundLaborHours: type.groundLaborHours,
   groundCount: type.groundCount,
 });
 
@@ -182,7 +209,11 @@ function MaterialSlot({
   title: string;
   hint: string;
   name: string | null;
-  onPick: (material: { id: number; name: string }) => void;
+  onPick: (material: {
+    id: number;
+    name: string;
+    laborHours: string | null;
+  }) => void;
   onClear: () => void;
 }) {
   const [picking, setPicking] = useState(false);
@@ -198,7 +229,11 @@ function MaterialSlot({
             ariaLabel={title}
             placeholder={hint}
             onChoose={material => {
-              onPick({ id: material.id, name: material.name });
+              onPick({
+                id: material.id,
+                name: material.name,
+                laborHours: material.laborHours ?? null,
+              });
               setPicking(false);
             }}
           />
@@ -394,6 +429,7 @@ export function RunTypePicker({
                     ...draft,
                     racewayMaterialId: m.id,
                     racewayMaterialName: m.name,
+                    racewayLaborHours: m.laborHours,
                   })
                 }
                 onClear={() =>
@@ -401,6 +437,7 @@ export function RunTypePicker({
                     ...draft,
                     racewayMaterialId: null,
                     racewayMaterialName: null,
+                    racewayLaborHours: null,
                   })
                 }
               />
@@ -419,6 +456,7 @@ export function RunTypePicker({
                   ...draft,
                   conductorMaterialId: m.id,
                   conductorMaterialName: m.name,
+                  conductorLaborHours: m.laborHours,
                 })
               }
               onClear={() =>
@@ -426,6 +464,7 @@ export function RunTypePicker({
                   ...draft,
                   conductorMaterialId: null,
                   conductorMaterialName: null,
+                  conductorLaborHours: null,
                 })
               }
             />
@@ -448,6 +487,7 @@ export function RunTypePicker({
                     ...draft,
                     groundMaterialId: m.id,
                     groundMaterialName: m.name,
+                    groundLaborHours: m.laborHours,
                   })
                 }
                 onClear={() =>
@@ -455,6 +495,7 @@ export function RunTypePicker({
                     ...draft,
                     groundMaterialId: null,
                     groundMaterialName: null,
+                    groundLaborHours: null,
                   })
                 }
               />
@@ -466,13 +507,14 @@ export function RunTypePicker({
                   Conductors per circuit
                 </p>
                 {/*
-                  Including the ground, which is how takeoff_run_circuits counts
-                  and how a run started under this type will count. Said here
-                  because two meanings for one number is worse than one
-                  imperfect meaning — § 2.1 of the overhaul document.
-                */}
-                {/*
                   "ground included" is gone, and its going is the whole point.
+
+                  Until 2026-09-20 the note saying so sat directly BELOW a
+                  second comment still explaining that the count included the
+                  ground — the replacement was written and the thing it replaced
+                  was never deleted, so the file asserted both meanings at once.
+                  That is the same fault one level up: a reader takes the first
+                  one they reach and stops looking.
 
                   It was true while one column counted both, and it stopped
                   being true when 0063 split them. A caption that quietly
@@ -509,6 +551,30 @@ export function RunTypePicker({
                 </div>
               </div>
             )}
+
+            {/*
+              WHAT A FOOT OF THIS TAKES, FROM THE MATERIALS THEMSELVES.
+
+              Nothing here is typed and nothing here is saved. D17 was revised
+              on 2026-09-20 to read a run's labour off the same material rows
+              everything else reads, precisely so this number cannot be
+              maintained in two places and disagree with itself — so this is a
+              readout, not a field.
+
+              It is muted body text rather than a warning even when it says
+              something is missing, matching "No materials yet — cannot be
+              priced" on the rows below. A type with no hours yet is not a
+              mistake; it is a job somebody has not done, and it is stated where
+              they can do it.
+
+              The sentence is built in shared/runTypeLabor.ts so this and the
+              row below cannot word it differently — and so the rule that a
+              partial figure never appears without what it is short by has a
+              test that can go red.
+            */}
+            <p className="text-[0.7rem] text-muted-foreground mt-2.5">
+              Labor {laborPerFootSentence({ ...draft, pathType })}
+            </p>
 
             <div className="flex items-center gap-1.5 mt-3">
               <Button
@@ -631,11 +697,47 @@ export function RunTypePicker({
                           No materials yet — cannot be priced
                         </span>
                       ) : (
-                        runTypeSpec(type) && (
-                          <span className="block text-[0.7rem] text-muted-foreground truncate">
-                            {runTypeSpec(type)}
+                        <>
+                          {runTypeSpec(type) && (
+                            <span className="block text-[0.7rem] text-muted-foreground truncate">
+                              {runTypeSpec(type)}
+                            </span>
+                          )}
+                          {/*
+                            What a foot takes, on the row where the type is
+                            CHOSEN — the same reason the specification is here
+                            rather than behind a hover. Six runs get traced
+                            under a choice made in a second, and "this one has
+                            no hours on its wire" is worth knowing before that
+                            rather than at pricing.
+
+                            Only on a specified type: a row already saying it
+                            has no materials does not need a second line saying
+                            it therefore has no hours.
+                          */}
+                          {/*
+                            NOT truncate, and the line above it still is.
+
+                            An IDENTIFIER may be clipped — the spec line names
+                            materials, and "1/2in EMT · 2 x #12 THHN + #12 ba…"
+                            still tells you which row this is. A CAVEAT may not.
+                            Measured in the popover on 2026-09-20: the line box
+                            is 191px, and the full sentence is 327px, so this
+                            shipped for one screenshot reading "No labor units
+                            yet — priced at mat…" — the figure's warning cut off
+                            exactly where it started to say why it mattered.
+
+                            Shortening was the obvious fix and is the wrong one:
+                            at 191px even "0.0605 h per ft · 2 of 3 unset" is
+                            217px, so any wording is one longer rate or a
+                            two-digit count away from clipping again. Wrapping
+                            cannot fail that way, and it costs a second line
+                            only on the types that have something to warn about.
+                          */}
+                          <span className="block text-[0.7rem] text-muted-foreground">
+                            {laborPerFootSentence(type)}
                           </span>
-                        )
+                        </>
                       )}
                     </span>
                     {type.runCount > 0 && (

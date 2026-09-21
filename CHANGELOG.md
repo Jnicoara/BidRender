@@ -6,6 +6,44 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-20]
 
+- **An assembly shows what its parts add up to, beside what you typed.** Build
+  a duplex rough-in out of a box, a device, a plate and some wire and it says
+  "Your parts add to 0.62 h; you typed 0.45 h". **The gap is the point, not a
+  mistake** — doing the whole rough-in in one operation instead of five
+  separate jobs is exactly the efficiency you are claiming, and the typed
+  number is still the only one that prices. Nothing nags you to close it.
+
+  It stays quiet when there is nothing to compare: no components, or none of
+  them costed. "Your parts add to 0 h" is not a cross-check, it is a number
+  pretending to be one.
+
+- **A run type now tells you what a foot of it takes to install.** Pick "3/4"
+  EMT, 3 #12" out of the trace palette and it says the labour underneath —
+  worked out from the pipe, the wire and the ground themselves, not from a
+  second number you have to keep up to date on the type. Change the conductor
+  count from 2 to 3 and the hours move on their own. It shows in the palette
+  and in the form where you say what a type is made of.
+
+  **It says when the figure is incomplete, which is the point.** A type whose
+  pipe you have costed and whose wire you have not reads "0.04 h per ft so far
+  — 1 of 3 has no labor unit", never a bare "0.04 h per ft". A confident low
+  number is the one nobody queries. A type with nothing costed says so in
+  words rather than showing you a zero.
+
+  Cable is counted as one foot of one thing. A 12-2 MC is two conductors and a
+  ground, but they are inside the jacket and you install one foot of cable per
+  foot of run — so the count does not multiply the labour, and the ground gets
+  no second line.
+
+  This is the figure on the TYPE. Traced runs still do not reach the bid at
+  all; that bridge is a separate job.
+
+- **Pricing a starter material now reaches the run palette.** Putting a labour
+  unit on 1/2" EMT makes your own copy of it, and the run types built on it
+  carried on reading the original — so the palette said "No labor units yet"
+  about a type whose pipe you had priced a minute earlier. Same fault as the
+  one fixed for assemblies earlier the same day, one layer across.
+
 - **Editing a job-condition modifier no longer switches it off.** Open one of
   the modifiers BidRidge ships — "Working at height", "Occupied building" —
   save it, and it silently stopped applying to every assembly that used it.

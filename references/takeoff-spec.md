@@ -736,6 +736,12 @@ answer already removed from the board.
   else reads.** Pipe hours off the raceway material, wire hours off the
   conductor material times the conductor count. Nothing is typed on the run
   type, and the same figure is never maintained in two places.
+- **BUILT the same day**, as the per-foot figure on the type:
+  `shared/runTypeLabor.ts`, shown on the palette and in the type editor. See
+  "Run types read the same number" in `ASSEMBLIES_PLAN.md` for the three
+  properties that matter — a cable must not be multiplied by what is inside its
+  jacket, a partial figure always carries what it is short by, and this is the
+  TYPE's number rather than a particular run's.
 
 **This gets (b)'s benefit for free.** (b) was picked so that changing 2 #12 to
 3 #12 would move the labour by itself rather than leaving a type reading "3 #12"
