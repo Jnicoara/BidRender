@@ -6,6 +6,18 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-20]
 
+- **The per-job branch-wire dial now has a control, and says what it is doing.**
+  It sits with the other per-bid pricing settings and reads back the
+  arithmetic — "every device's branch wire counted as 1.15x, 20 ft becomes 23
+  ft" — rather than leaving you to work out what a percentage did. It also says
+  plainly what it does NOT touch: traced runs are measured footage and are
+  never padded.
+
+  The effect lands where the wire actually appears: your materials list. Forty
+  receptacles at +15% ask the supplier for 1,150 ft of cable instead of 1,000 —
+  and still exactly 40 boxes, 40 plates and 120 wire nuts, because a building
+  laid out loosely needs more cable and the same number of everything else.
+
 - **Trace a run between two devices and the app asks whose wire it is.** Your
   device assemblies already include the cable to the next device, so a run from
   a junction box to a ceiling box may well be wire you have already counted.

@@ -102,6 +102,14 @@ export type AssemblyMaterialQty = {
   category: string | null;
   /** How many of this material one of the assembly needs. */
   qty: number;
+  /**
+   * This line is the branch wire to the next device (D18).
+   *
+   * The ONLY thing the per-job whip dial scales. A building laid out tighter or
+   * looser changes the cable between devices; it does not change how many boxes
+   * or plates you buy, and it never touches measured footage.
+   */
+  isBranchWhip?: boolean;
 };
 
 /** One assembly appearing on the bid, and how many of it. */
@@ -137,9 +145,21 @@ export function roundQty(value: number): number {
  * Order is first appearance, so the list does not reshuffle as more marks land.
  */
 export function aggregateMaterials(
-  sources: CountedAssemblySource[]
+  sources: CountedAssemblySource[],
+  /**
+   * The bid's whip dial, as a signed fraction — how much tighter or looser this
+   * building is laid out than the library assumes.
+   *
+   * Optional and defaulting to no adjustment, so every existing caller is
+   * unchanged. It reaches lines marked `isBranchWhip` and nothing else: the
+   * boxes, plates and devices are counted, not estimated, and measured footage
+   * is handled by `measuredEntries` which this never touches.
+   */
+  whipAdjustPct: number = 0
 ): MaterialsEntry[] {
   const byKey = new Map<string, MaterialsEntry>();
+  const adjust =
+    Number.isFinite(whipAdjustPct) && whipAdjustPct !== 0 ? whipAdjustPct : 0;
 
   for (const source of sources) {
     // A zero or negative count contributes nothing rather than subtracting.
@@ -148,8 +168,19 @@ export function aggregateMaterials(
     if (count === 0) continue;
 
     for (const material of source.materials) {
-      const per =
+      const raw =
         Number.isFinite(material.qty) && material.qty > 0 ? material.qty : 0;
+      /*
+        The dial, applied to the branch wire only, and floored at zero.
+
+        Below -100% is not a tighter building — it is wire subtracted from
+        somebody else's count. Same floor `totalBranchWireFeet` applies, for the
+        same reason, because these two must not disagree about the same cable.
+      */
+      const per =
+        material.isBranchWhip && adjust !== 0
+          ? Math.max(0, raw * (1 + adjust))
+          : raw;
       if (per === 0) continue;
 
       const key = `${material.name.trim().toLowerCase()} ${material.unit}`;

@@ -6535,6 +6535,9 @@ export async function getAssemblyMaterialQuantities(
     name: string;
     unitOfSale: "each" | "foot" | "box";
     category: string | null;
+    /** This line is the branch wire to the next device — the per-job dial
+     *  scales it, and nothing else in the list. See D18. */
+    isBranchWhip: boolean;
   }>
 > {
   if (assemblyIds.length === 0) return [];
@@ -6545,6 +6548,7 @@ export async function getAssemblyMaterialQuantities(
       assemblyId: assemblyMaterials.assemblyId,
       materialId: assemblyMaterials.materialId,
       qty: assemblyMaterials.qty,
+      isBranchWhip: assemblyMaterials.isBranchWhip,
       name: materials.name,
       unitOfSale: materials.unitOfSale,
       category: materials.category,

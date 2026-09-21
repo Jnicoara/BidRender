@@ -1387,6 +1387,63 @@ export default function BidsPage({
                   job-condition modifiers rather than added to them.
                 </p>
               </div>
+
+              {/*
+                THE WHIP DIAL (D18). Next to the other per-bid settings, because
+                it describes THIS BUILDING rather than the company.
+
+                ── No "use company default" row, unlike productivity above ────
+                That one overrides a company trait, so inheriting is a real
+                third choice. How tightly one building is laid out has no
+                company-wide answer above it, so offering an inherit option
+                would point at nothing. It ships at 0 and is simply a number.
+
+                ── What it says it does, in the units it does it in ───────────
+                A dial nobody can see is a dial nobody trusts, so the line below
+                states which quantity moves and which does not. It is the only
+                honest way to describe it: the wire your devices carry between
+                each other is an ESTIMATE that scales with the building, while
+                traced footage is measured and is never padded (§ 5a).
+              */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium">Branch wire</span>
+                  <Badge variant="outline" className="text-[10px]">
+                    This bid
+                  </Badge>
+                </div>
+                <InlineNumberField
+                  value={asPercent(Number(bid.whipAdjustPct))}
+                  whenUnset="zero"
+                  onSave={raw =>
+                    updateBid.mutate({
+                      id: bid.id,
+                      whipAdjustPct: fromPercent(raw),
+                    })
+                  }
+                  // Signed: a tight commercial fit-out is as real as a
+                  // sprawling house. Floored above −100%, where the wire
+                  // between devices would come to nothing.
+                  rules={{ min: -90, max: 300 }}
+                  className="h-7 w-20 text-xs"
+                  ariaLabel="Branch wire adjustment for this bid"
+                  suffix="%"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {Number(bid.whipAdjustPct) === 0
+                    ? "Your devices carry the wire between each other. Raise this for a building laid out loosely, lower it for a tight one."
+                    : `Every device's branch wire counted as ${(
+                        1 + Number(bid.whipAdjustPct)
+                      ).toFixed(2)}x — 20 ft becomes ${round(
+                        20 * (1 + Number(bid.whipAdjustPct)),
+                        1
+                      )} ft.`}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Traced runs are not adjusted — measured footage is what you
+                  measured.
+                </p>
+              </div>
             </CollapsiblePanel>
           </div>
         </div>

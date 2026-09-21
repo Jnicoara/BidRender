@@ -107,6 +107,7 @@ export const materialsListRouter = router({
           unit: row.unitOfSale,
           category: row.category,
           qty: Number(row.qty),
+          isBranchWhip: row.isBranchWhip,
         });
         byAssembly.set(row.assemblyId, list);
       }
@@ -196,7 +197,16 @@ export const materialsListRouter = router({
         });
       }
 
-      const entries = aggregateMaterials(sources);
+      /*
+        The per-job whip dial reaches the branch-wire lines and nothing else.
+
+        A building laid out tighter or looser changes the cable between devices;
+        it does not change how many boxes or plates get bought, and it never
+        touches the measured footage below — that is § 5a, and it is why the
+        dial is an argument here rather than something applied to the finished
+        totals where it could not tell the two apart.
+      */
+      const entries = aggregateMaterials(sources, Number(bid.whipAdjustPct));
 
       // ── Traced runs: footage, kept apart from the counted materials ────────
       const scales = await db.getSheetScalesForBid(

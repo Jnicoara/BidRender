@@ -882,3 +882,69 @@ describe("insulated and bare are two lines on a supplier's list", () => {
     expect(measured.find(m => m.label === "Wire, insulated")!.feet).toBe(300);
   });
 });
+
+describe("the per-job whip dial reaches branch wire and nothing else", () => {
+  const source = {
+    name: "Duplex receptacle standard",
+    count: 40,
+    materials: [
+      {
+        name: "Single-gang box",
+        unit: "each" as const,
+        category: "Boxes",
+        qty: 1,
+      },
+      {
+        name: "12-2 NM-B",
+        unit: "foot" as const,
+        category: "Wire & Cable",
+        qty: 25,
+        isBranchWhip: true,
+      },
+    ],
+  };
+  const feetOf = (
+    entries: ReturnType<typeof aggregateMaterials>,
+    name: string
+  ) => entries.find(e => e.name === name)?.qty;
+
+  it("scales the marked line and leaves the rest alone", () => {
+    /*
+      40 receptacles: 1,000 ft of branch cable, and 40 boxes. A building laid
+      out 15% looser needs more cable and exactly as many boxes — the failure
+      worth guarding is a dial that quietly buys 46 boxes.
+    */
+    const entries = aggregateMaterials([source], 0.15);
+    expect(feetOf(entries, "12-2 NM-B")).toBe(1150);
+    expect(feetOf(entries, "Single-gang box")).toBe(40);
+  });
+
+  it("goes both ways, for a tight fit-out", () => {
+    const entries = aggregateMaterials([source], -0.2);
+    expect(feetOf(entries, "12-2 NM-B")).toBe(800);
+  });
+
+  it("changes nothing at 0, and nothing for an unmarked line", () => {
+    const plain = aggregateMaterials([source]);
+    expect(feetOf(plain, "12-2 NM-B")).toBe(1000);
+    expect(aggregateMaterials([source], 0)).toEqual(plain);
+
+    const unmarked = aggregateMaterials(
+      [
+        {
+          ...source,
+          materials: source.materials.map(m => ({ ...m, isBranchWhip: false })),
+        },
+      ],
+      0.15
+    );
+    expect(feetOf(unmarked, "12-2 NM-B")).toBe(1000);
+  });
+
+  it("never turns a quantity negative", () => {
+    // Below -100% is not a tighter building; it is cable subtracted from
+    // somebody else's count. Same floor totalBranchWireFeet applies.
+    const entries = aggregateMaterials([source], -3);
+    expect(feetOf(entries, "12-2 NM-B")).toBeUndefined();
+  });
+});
