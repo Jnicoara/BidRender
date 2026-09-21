@@ -2793,6 +2793,69 @@ drops at both ends folded into each — three quantities along one traced line
 that `shared/takeoffQuantities.ts` goes to deliberate lengths to keep apart. Any
 design that produces one line per traced path has collapsed them.
 
+### 5f.3 Who owns the wire between devices — APPROVED 2026-09-20
+
+**The gate above names labour as the blocker and the allowances as smaller. It
+did not name the one that actually puts a wrong number on a bid**, which the
+takeoff spec records separately: every starter device assembly already carries
+wire inside it — 25 ft of 12-2 NM-B in the standard receptacle, 20–40 ft in
+eight of eight — so the moment traced cable crosses, a job where you stamp
+receptacles and trace their feeds counts the same cable twice. Two innocent
+line items, neither wrong on its face.
+
+**Settled by splitting the wire the way the trade does, so the overlap cannot
+occur.** Full reasoning and the rejected alternative are in D18 of
+`references/takeoff-spec.md`; this section is the mechanism.
+
+- **Devices carry branch wiring between each other.** A whip per assembly — a
+  troffer and a receptacle are different numbers. **Material only:** the
+  assembly's typed hours already cover pulling it, which is what "0.45 h for a
+  duplex rough-in" means.
+- **Traced runs are homeruns only**, first device back to the panel.
+- **One ownership function decides before anything sums**, the same
+  construction as `totalVerticalFeet`: a foot of wire belongs to either the
+  assembly or the run, never both. Not two checks that agree until somebody
+  edits one.
+
+**The per-job dial is the whip ONLY.** One number per bid for a building laid
+out tighter or looser, ships at 0, applied at calculation time and written
+nowhere — `productivityPct` is the precedent to copy, including its rule about
+never being folded into another sum. **Traced footage is measured and is not
+padded**, per § 5a.
+
+**The guard asks, it does not decide.** `takeoff_runs` already carries
+`startKind` / `endKind` and `"panel"` is a shipped height-type key, so
+panel-to-device and device-to-device are distinguishable today. Copy
+`shouldSuggestStampLink`: only ask where a double count is actually possible,
+and only when both ends are POSITIVELY known non-panel devices — an unanswered
+end is a different sentence, because a warning that fires on correct work is as
+bad as silence. A junction box counts as a device and does ask, deliberately:
+in the field a J-box is often mid-branch, which is the ambiguous case the guard
+exists for. **The answer is recorded on the run**, like `endStampId`, because
+re-asking is how a confirmed answer gets un-confirmed.
+
+**Starter whips ship real, labelled and dated** — § 2.3, the deliberate
+exception to the $0 rule, and for its stated reason: an unset allowance
+whispers, and a zero one wins a bid you then lose money on. Residential
+starters ship generous, commercial short or zero; that difference lives in the
+SHIPPED VALUES and nothing at runtime reads `projectType`.
+
+**THE WHIP IS AN INTERIM AND RETIRES PER DEVICE.** When AI routing between
+fixtures lands, the routed footage replaces the whip for the devices it covers,
+the way D17(b)'s per-end number retires to zero rather than being deleted.
+**Per device instance, never per assembly** — routing one circuit of six
+troffers must not zero the whip for the other forty on the job. So the whip
+resolves per STAMP against a claim recorded on the stamp, the same shape as
+`endStampId` claiming a vertical: claimed, never inferred. Any other
+construction makes routing a second wire-counting path rather than a new way to
+set an existing flag.
+
+**And routing says what it counted**, in the voice the totals already use — "a
+cable's ground is inside the cable and is already in the Cable figure", "no
+vertical footage is in these numbers" — so nobody hand-traces the same wire on
+top of it. The standing AI rules apply unchanged: routing is a button, never a
+page load, and hand-tracing stays complete for somebody who never turns it on.
+
 ### Hours on a typed count — yes, and the rate is the real question
 
 **Decided: level 2 carries optional hours.** It is nearly free. A bid line

@@ -369,11 +369,18 @@ from now on.
   on 2026-09-20, when materials gained labour units.
   See D15 before bringing any of it back: it is the biggest bloat risk in this
   document.
-- **Watch for double counting before R2 ships:** starter device assemblies
-  already carry wire — for example 25 ft of 12-2 NM-B inside every standard
-  receptacle (`server/seed/baselineAssemblies.ts:98-108`). Once traced cable
-  also reaches the bid, the same wire could be counted twice. R3 has to cover
-  this, not only duplicate lines.
+- **Watch for double counting before R2 ships — SETTLED 2026-09-20, see D18.**
+  Starter device assemblies already carry wire — 25 ft of 12-2 NM-B inside the
+  standard receptacle (`server/seed/baselineAssemblies.ts:98-108`), and
+  **eight of eight starter assemblies carry 20–40 ft** of cable or conductor.
+  Once traced cable also reaches the bid, the same wire could be counted twice,
+  and R3 as built cannot see it: `doubleCountedAssemblies` keys on
+  `assemblyId`, and a traced-run line has none.
+
+  **D18 removes the overlap rather than detecting it.** Devices own the branch
+  wiring between each other, traced runs are homeruns only, and one ownership
+  function decides before anything sums. The guard for the ambiguous case — a
+  run with devices at both ends — ASKS.
 
 ---
 
@@ -789,6 +796,78 @@ fittings, this number **goes to zero** rather than being removed. A zero with an
 honest name tells the next reader what it stood in for; a deleted field tells
 them nothing. Anyone reaching this section because the number looks redundant
 should check whether fittings are being counted before touching it.
+
+**D18 — Who owns the wire between devices (R2, R3). Decided 2026-09-20.**
+
+The double-count R3 flagged before R2 ships — starter device assemblies already
+carry 20–40 ft of cable each, eight of eight in the seed — is settled by
+splitting the wire the way the trade already does, rather than by detecting the
+overlap after the fact.
+
+- **DEVICES carry the branch wiring between each other.** A troffer includes an
+  average whip of MC to the next fixture; a receptacle includes the cable to the
+  next receptacle. That is what makes dropping devices fast.
+- **TRACED RUNS are homeruns only** — first device on the circuit back to the
+  panel.
+- **Each foot belongs to exactly one of them, so there is no double count by
+  construction.** Not a reconciliation, not a warning: an ownership rule, in one
+  function, deciding before anything sums. Same shape as `totalVerticalFeet`,
+  which already does this for a drop owned by either a run or a stamp.
+
+**Three parts, and one thing that was rejected.**
+
+1. **A whip length per ASSEMBLY.** A troffer and a receptacle are not the same
+   number. Material only — see below.
+2. **One per-JOB adjustment** for a building laid out tighter or looser, rather
+   than editing every assembly. Per bid only, ships at 0.
+3. **A guard that ASKS.** A run with a panel at one end is a homerun and passes
+   silently. A run with devices at BOTH ends is branch wiring the assemblies
+   have already counted, and the app asks rather than deciding.
+
+**REJECTED: hanging the whip off `projectType`.** Residential wants a generous
+whip and commercial a short one, and the starter assemblies already carry the
+tag — but reading that tag at runtime is wrong three ways. `PROJECT_TYPES` is
+`residential | commercial | both` and the column is NULLABLE, so two of the four
+states have no answer and most starters are `both`. The tag is per-assembly
+while a bid mixes, so a residential assembly used on a commercial job would pull
+a residential whip invisibly. And it would turn a **library filter into a
+pricing input**, so retagging an assembly to fix a filter would silently
+re-price every bid using it — which is exactly what "Project Type is a filter,
+not a structural split" in `ASSEMBLIES_PLAN.md` forbids.
+
+**Instead the tag informs the SEED, not the arithmetic.** Ship a generous whip
+on the residential starters and a short or zero one on the commercial ones.
+Nothing at runtime reads `projectType`. This is also more correct: the whip is a
+fact about how that device is installed, not about the job, so a residential
+assembly used on a commercial job rightly keeps its own — and the job-level dial
+in part 2 is where job character belongs.
+
+**Material only. The assembly's typed hours already cover pulling it**, because
+that is what "0.45 h for a duplex rough-in" means — the whole operation at once.
+Adding whip labour would be the parts-sum error the cross-check exists to refuse.
+
+**The adjustment applies to the WHIP only.** Traced footage is measured, and
+§ 5a forbids the app quietly padding measured length.
+
+**Starter values ship real, labelled and dated**, per § 2.3 of
+`references/plan-viewer-overhaul.md` — the deliberate exception to the $0 rule.
+A zero whip is the failure that section names: an unset allowance whispers, and
+"a zero allowance wins a bid you then lose money on."
+
+**THE WHIP IS AN INTERIM, and it retires PER DEVICE.** When AI routing between
+fixtures on a circuit lands, that routed footage replaces the whip for the
+devices it covers — automatically, the way D17(b)'s per-end number retires to
+zero rather than being deleted. **Per device instance, never per assembly:**
+routing one circuit of six troffers must not zero the whip for the other forty
+on the job. So the whip is resolved per STAMP with a claim recorded on the
+stamp, the same construction as `endStampId` claiming a vertical — a claimed
+answer, never inferred. Building it any other way makes routing a second
+wire-counting path instead of a new way to set an existing flag.
+
+**And when it routes, it says so plainly**, in the voice the totals already use
+for what is and is not included — "a cable's ground is inside the cable and is
+already in the Cable figure", "no vertical footage is in these numbers" — so
+nobody traces the same wire by hand on top of it.
 
 **D17(c) — The fork behind all of it. RESOLVED 2026-09-20.**
 
