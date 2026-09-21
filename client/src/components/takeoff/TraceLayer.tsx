@@ -567,7 +567,13 @@ export function TraceLayer({
           */}
 
           {stamping && armedGroupName && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-[#F5C518]/50 bg-card/95 px-3 py-1.5 shadow-lg pointer-events-auto">
+            /*
+              Nothing in here is clickable — it is a label saying what is armed
+              — so it takes no pointer events at all. Same reason as the tracing
+              readout below: a pointer crossing a number must not change the
+              cursor, and must not stop the drawing underneath from tracking it.
+            */
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-[#F5C518]/50 bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none">
               {/*
                 "Counting", not "Stamping", since phase 6: a plain count has no
                 stamp behind it, and the panel this feeds is called Counted
@@ -586,7 +592,26 @@ export function TraceLayer({
             making the user look elsewhere to see what they are measuring is how
             a wrong run gets committed. */}
           {tracing && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-auto">
+            /*
+              ── The BODY of this pill is click-through, and that is a fix ────
+              It used to be `pointer-events-auto` across the whole rounded box.
+              The pill floats at the top centre of the DRAWING, so tracing along
+              the top of a sheet dragged the pointer across it — and over it the
+              pointer stopped being the crosshair the armed tool sets, flicking
+              to a normal arrow and back, several times in one run. Reported as
+              "the crosshair flickers in and out as I move" on 2026-09-20.
+
+              It cost more than the cursor. While the box swallowed pointer
+              moves, the overlay below stopped receiving them, so the alignment
+              guides froze mid-drawing at wherever the pointer was when it went
+              under.
+
+              So the container is click-through and only the CONTROLS take
+              pointer events. The readout is something to look at, not something
+              to hit, and a pointer passing over a number should not change
+              what the tool is doing.
+            */
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none">
               <span className="text-xs text-muted-foreground">
                 {pathType === "conduit" ? "Conduit run" : "Cable run"}
               </span>
@@ -602,7 +627,7 @@ export function TraceLayer({
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-6 w-6 p-0"
+                className="h-6 w-6 p-0 pointer-events-auto"
                 onClick={() => onPointsChange(points.slice(0, -1))}
                 disabled={points.length === 0}
                 title="Undo last point (Backspace)"
@@ -612,7 +637,7 @@ export function TraceLayer({
               </Button>
               <Button
                 size="sm"
-                className="h-6 gap-1 text-xs"
+                className="h-6 gap-1 text-xs pointer-events-auto"
                 onClick={onFinish}
                 disabled={points.length < 2}
                 title="Finish this run (Enter or double-click)"
@@ -627,7 +652,7 @@ export function TraceLayer({
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-6 w-6 p-0 text-muted-foreground"
+                className="h-6 w-6 p-0 text-muted-foreground pointer-events-auto"
                 onClick={onCancel}
                 title="Discard this run (Escape twice)"
                 aria-label="Discard this run"
