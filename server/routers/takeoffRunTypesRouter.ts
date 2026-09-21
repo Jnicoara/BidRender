@@ -29,6 +29,10 @@ import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import { RUN_PATH_TYPES } from "../../drizzle/schema";
 import { resolveMaterial } from "../../shared/materialLookup";
+import { resolveRunType } from "../../shared/runTypeLookup";
+import { runTypeRows, runRowSendability } from "../../shared/takeoffBridge";
+import { footageByRunType } from "../runTypeFootage";
+import { RUN_MATERIAL_ROLES } from "../../drizzle/schema";
 import * as db from "../db";
 
 /**
@@ -330,5 +334,271 @@ export const takeoffRunTypesRouter = router({
         archivedAt: null,
       });
       return { id: input.id };
+    }),
+
+  /**
+   * What each run type on this bid would put on it — R2, the bridge.
+   *
+   * One entry per type, each holding one ROW PER MATERIAL: pipe, wire, ground.
+   * Three purchases at three prices, which is what § 5f.2 requires and what the
+   * materials list already does. A cable type has one row; an empty conduit run
+   * for future use has one row too, and that is a real thing to bid.
+   *
+   * Footage is derived here and never stored, the same rule a counted group's
+   * quantity follows: a stored total is a second source of truth that drifts
+   * the moment somebody edits a run.
+   */
+  bridgeForBid: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      const bid = await db.getBidById(input.bidId, ctx.scope.dataUserId);
+      if (!bid)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
+
+      const [types, footage, lines] = await Promise.all([
+        db.getRunTypesFor(ctx.scope.dataUserId, true),
+        footageByRunType(
+          input.bidId,
+          ctx.scope.dataUserId,
+          bid.distributionHeightInches
+        ),
+        db.getBidLineItems(input.bidId),
+      ]);
+
+      const onBid = new Set(
+        lines
+          .filter(
+            line => line.archivedAt === null && line.takeoffRunTypeId !== null
+          )
+          .map(line => line.takeoffRunTypeId + ":" + line.runMaterialRole)
+      );
+
+      /*
+        RESOLVED, not filtered by id, and the difference is missing footage.
+
+        A run stores the id it was traced under. Editing a shipped type forks
+        it and `mergeLibraryRows` hides the baseline, so filtering the merged
+        palette by the stored ids finds nothing for exactly those types — on
+        the dev fixture that silently dropped two 1/2" EMT homeruns and a 12-2
+        MC run, leaving a bid with less pipe than the drawing. Measured
+        2026-09-20. See shared/runTypeLookup.ts.
+
+        The STORED id is what a bid line records, so the line and the runs can
+        be matched again; only the label and materials come from the fork.
+      */
+      const visible = Array.from(footage.keys())
+        .map(storedId => ({ storedId, type: resolveRunType(types, storedId) }))
+        .filter(
+          (
+            entry
+          ): entry is { storedId: number; type: (typeof types)[number] } =>
+            entry.type !== undefined
+        );
+      const materials = await db.getMaterialsByIds(
+        visible.flatMap(({ type: t }) =>
+          [
+            t.racewayMaterialId,
+            t.conductorMaterialId,
+            t.groundMaterialId,
+          ].filter((id): id is number => id !== null)
+        ),
+        ctx.scope.dataUserId
+      );
+      const nameOf = (id: number | null) =>
+        id === null ? null : (resolveMaterial(materials, id)?.name ?? null);
+
+      return visible.map(({ storedId, type }) => {
+        // Present by construction: `visible` is built FROM the footage map.
+        const f = footage.get(storedId)!;
+        const rows = runTypeRows({
+          pathType: type.pathType,
+          racewayMaterialId: type.racewayMaterialId,
+          racewayMaterialName: nameOf(type.racewayMaterialId),
+          conductorMaterialId: type.conductorMaterialId,
+          conductorMaterialName: nameOf(type.conductorMaterialId),
+          groundMaterialId: type.groundMaterialId,
+          groundMaterialName: nameOf(type.groundMaterialId),
+          footage: {
+            conduitFeet: f.conduitFeet,
+            cableFeet: f.cableFeet,
+            insulatedFeet: f.insulatedFeet,
+            groundFeet: f.groundFeet,
+          },
+        });
+        return {
+          // The id the RUNS use, which is what a bid line records.
+          runTypeId: storedId,
+          label: type.label,
+          pathType: type.pathType,
+          /** Said out loud, so a smaller number has a reason beside it. */
+          unmeasurableCount: f.unmeasurableCount,
+          unansweredCount: f.unansweredCount,
+          branchCount: f.branchCount,
+          rows: rows.map(row => ({
+            role: row.role,
+            materialId: row.materialId,
+            materialName: row.materialName,
+            feet: row.feet,
+            onBid: onBid.has(storedId + ":" + row.role),
+            sendable: runRowSendability(row),
+          })),
+        };
+      });
+    }),
+
+  /**
+   * Send one run type's footage to the bid — every row that can go.
+   *
+   * Rows that cannot are SKIPPED rather than refusing the whole send, and the
+   * result says which and why. A type whose pipe is named and whose ground is
+   * not should put the pipe on the bid; refusing everything would leave the
+   * estimator with nothing on the bid and no idea what was missing.
+   */
+  sendToBid: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        runTypeId: z.number().int().positive(),
+        /** Omitted sends every sendable row; given, sends just that one. */
+        role: z.enum(RUN_MATERIAL_ROLES).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const bid = await db.getBidById(input.bidId, ctx.scope.dataUserId);
+      if (!bid)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
+      /*
+        RESOLVED, exactly like the read above, and for a sharper reason.
+
+        `input.runTypeId` is the id the RUNS store, which is a baseline when the
+        user has forked that type. Reading the row by that id directly would
+        build the bid lines from the SHIPPED specification while the screen
+        showed the fork's — so a ground the user had removed could still reach
+        the bid, from a row the panel never offered. Caught on 2026-09-20 by
+        sending a type whose fork had dropped its ground.
+
+        The line still records `input.runTypeId`, so a line and its runs can be
+        matched again; only what it is MADE OF comes from the fork.
+      */
+      const palette = await db.getRunTypesFor(ctx.scope.dataUserId, true);
+      const type = resolveRunType(palette, input.runTypeId);
+      if (!type)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Run type not found.",
+        });
+
+      const [footage, existing] = await Promise.all([
+        footageByRunType(
+          input.bidId,
+          ctx.scope.dataUserId,
+          bid.distributionHeightInches
+        ),
+        db.getBidLinesForRunType(input.bidId, input.runTypeId),
+      ]);
+      const f = footage.get(input.runTypeId);
+      if (!f)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Nothing is traced under this type on this bid.",
+        });
+
+      const materials = await db.getMaterialsByIds(
+        [
+          type.racewayMaterialId,
+          type.conductorMaterialId,
+          type.groundMaterialId,
+        ].filter((id): id is number => id !== null),
+        ctx.scope.dataUserId
+      );
+      const nameOf = (id: number | null) =>
+        id === null ? null : (resolveMaterial(materials, id)?.name ?? null);
+
+      const rows = runTypeRows({
+        pathType: type.pathType,
+        racewayMaterialId: type.racewayMaterialId,
+        racewayMaterialName: nameOf(type.racewayMaterialId),
+        conductorMaterialId: type.conductorMaterialId,
+        conductorMaterialName: nameOf(type.conductorMaterialId),
+        groundMaterialId: type.groundMaterialId,
+        groundMaterialName: nameOf(type.groundMaterialId),
+        footage: {
+          conduitFeet: f.conduitFeet,
+          cableFeet: f.cableFeet,
+          insulatedFeet: f.insulatedFeet,
+          groundFeet: f.groundFeet,
+        },
+      });
+
+      const already = new Map(
+        existing
+          .filter(line => line.archivedAt === null)
+          .map(line => [line.runMaterialRole, line])
+      );
+      const wanted = input.role
+        ? rows.filter(row => row.role === input.role)
+        : rows;
+
+      const sent = [];
+      const updated = [];
+      const skipped = [];
+      for (const row of wanted) {
+        /*
+          Already there: REFRESH the footage rather than refusing.
+
+          A counted group's line re-resolves its quantity on every read; a run
+          type's does not yet (see addRunTypeRowToBid on why, and what it would
+          take). Refusing outright would leave an estimator who traced three
+          more homeruns with a stale line and no way to move it, which is worse
+          than either. The PRICING is never re-snapshotted — only the feet.
+        */
+        const live = already.get(row.role);
+        if (live) {
+          const allowedAgain = runRowSendability(row);
+          if (!allowedAgain.ok) {
+            skipped.push({ role: row.role, why: allowedAgain.message });
+            continue;
+          }
+          if (Number(live.qty) !== row.feet) {
+            await db.refreshRunTypeLineQty(live.id, row.feet);
+            updated.push(row.role);
+          } else {
+            skipped.push({
+              role: row.role,
+              why: "Already on the bid, and unchanged.",
+            });
+          }
+          continue;
+        }
+        const allowed = runRowSendability(row);
+        if (!allowed.ok) {
+          skipped.push({ role: row.role, why: allowed.message });
+          continue;
+        }
+        await db.addRunTypeRowToBid(input.bidId, ctx.scope.dataUserId, {
+          // The id the RUNS use — see the note above.
+          runTypeId: input.runTypeId,
+          role: row.role,
+          // Non-null past `runRowSendability`, which refuses a row with no
+          // material before this point — a line nobody can order.
+          materialId: row.materialId as number,
+          /*
+            The type, then what this row is — unless that just says it twice.
+
+            A cable type is usually named after its cable, so the plain join
+            produced "12-2 MC cable — 12-2 MC cable", which is not information,
+            it is furniture. RunsPanel already refuses the same duplication on
+            its spec line, and by the same test: what the two strings SAY,
+            rather than what kind of run they belong to.
+          */
+          name:
+            row.materialName && row.materialName !== type.label
+              ? type.label + " — " + row.materialName
+              : type.label,
+          feet: row.feet,
+        });
+        sent.push(row.role);
+      }
+      return { sent, updated, skipped };
     }),
 });

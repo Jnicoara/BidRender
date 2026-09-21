@@ -6,6 +6,24 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-20]
 
+- **Traced footage can reach a bid — one line per run type, per material.**
+  "1/2" EMT on this job" becomes a pipe line, a wire line and a ground line,
+  each with its own quantity and its own price, the way your materials list
+  already splits them. Six homeruns across four sheets are one purchase, not
+  six lines.
+
+  A type with no wire — empty conduit for future use — is just the pipe line,
+  and a cable is a single line because the cable IS the raceway and its ground
+  is inside the jacket.
+
+  Rows that cannot go yet are skipped with the reason rather than blocking the
+  rest: a type whose pipe is named and whose ground is not still puts the pipe
+  on the bid. Sending again after tracing more refreshes the footage and never
+  re-prices what is already there.
+
+  **Runs you marked as branch wiring are left out**, because your devices
+  already carry that cable.
+
 - **The per-job branch-wire dial now has a control, and says what it is doing.**
   It sits with the other per-bid pricing settings and reads back the
   arithmetic — "every device's branch wire counted as 1.15x, 20 ft becomes 23

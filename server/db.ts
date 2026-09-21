@@ -159,6 +159,7 @@ import {
   type TakeoffMountingHeight,
   type BidMountingHeight,
   type InsertTakeoffMountingHeight,
+  type RunMaterialRole,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import {
@@ -8417,4 +8418,128 @@ export async function countBidsInheritingHeights(
       )
     );
   return Number(rows[0]?.n ?? 0);
+}
+
+/**
+ * Put ONE of a run type's material rows on the bid.
+ *
+ * ── The snapshot is a MATERIAL's, not an assembly's, and that is the whole
+ *    difference from `addCountToBid` ────────────────────────────────────────
+ * A counted assembly freezes the recipe's material cost, its typed hours and
+ * its modifiers. A traced run has none of those: it is so many feet of one
+ * thing, and D17 says its labour comes off that same material row — hours per
+ * foot, times the feet. So the four snapshot inputs are the material's cost per
+ * unit, the material's labour unit, no modifiers, and the company's default
+ * rate.
+ *
+ * ── Zero hours is SNAPSHOTTED as zero, and says so on the screen ────────────
+ * A material with no labour unit freezes at 0 h, exactly as it would price
+ * today. It is not refused: the footage and the material cost are real and
+ * worth having on the bid, and the run panel already flags a type whose
+ * materials have no hours. Refusing would leave the estimator with nothing.
+ *
+ * ── THE QUANTITY IS STORED, AND THAT DIFFERS FROM A COUNTED GROUP ──────────
+ * A counted group's line has its quantity re-resolved on every read
+ * (`withPlanCounts`), so removing a mark moves the bid immediately. A run
+ * type's does NOT yet: the feet are written at send time and stay until the
+ * type is sent again, which updates them.
+ *
+ * This paragraph used to claim the opposite. It said every read re-resolved
+ * from the runs — which was the intention and was never built, and a comment
+ * that says something else handles it is the failure CLAUDE.md names, because
+ * it is the reason nobody writes the check.
+ *
+ * **Why it is not simply done here.** Resolving run footage needs the sheet
+ * scales and the resolved verticals, and `heightContextForBid` lives in
+ * `server/runVerticals.ts`, which imports this file — so doing it inside
+ * `withPlanCounts` is an import cycle. The fix is to split the pure grouping
+ * out of `server/runTypeFootage.ts` so both sides can call it without the
+ * cycle. Until then, re-sending is the refresh, and it says so on screen.
+ *
+ * The PRICING is frozen either way: R4 holds exactly as it does for any other
+ * line, and re-sending never re-snapshots it.
+ */
+export async function addRunTypeRowToBid(
+  bidId: number,
+  userId: number,
+  input: {
+    runTypeId: number;
+    role: RunMaterialRole;
+    materialId: number;
+    /** What the line is called — the type's label plus what this row is. */
+    name: string;
+    feet: number;
+  }
+): Promise<{ id: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+
+  const [materialRows, rates, defaults] = await Promise.all([
+    getMaterialsByIds([input.materialId], userId),
+    getLibraryLaborRates(userId),
+    getPricingDefaults(userId),
+  ]);
+  // Follows a fork, like every other read of a stored material id.
+  const material = resolveMaterial(materialRows, input.materialId);
+  if (!material) throw new Error("Material not found");
+
+  const laborRate = hourlyCostFor(rates, defaults?.defaultLaborRateId ?? null);
+
+  const [result] = await db.insert(bidLineItems).values({
+    bidId,
+    takeoffRunTypeId: input.runTypeId,
+    runMaterialRole: input.role,
+    name: input.name,
+    qty: input.feet.toFixed(4),
+    snapshotMaterialCost: Number(material.costPerUnit).toFixed(4),
+    // Hours per unit of sale — per FOOT here — so hours scale with the footage
+    // the way material cost does. D17.
+    snapshotLaborHours: Number(material.laborHours ?? 0).toFixed(4),
+    // A traced run carries no job-condition modifiers of its own. They describe
+    // an operation, and this is a length of pipe.
+    snapshotModifierPct: "0.0000",
+    snapshotLaborRate: laborRate.toFixed(4),
+    snapshotModifierNames: [],
+    sortOrder: await nextBidSortOrder(bidId),
+  });
+  return { id: result.insertId };
+}
+
+/** The live bid lines for a run type, by role. */
+export async function getBidLinesForRunType(
+  bidId: number,
+  runTypeId: number
+): Promise<BidLineItem[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(bidLineItems)
+    .where(
+      and(
+        eq(bidLineItems.bidId, bidId),
+        eq(bidLineItems.takeoffRunTypeId, runTypeId)
+      )
+    );
+}
+
+/**
+ * Refresh a run-type line's footage after more has been traced.
+ *
+ * The quantity only — the four snapshot columns are never touched, so R4 holds
+ * exactly as it does for any other line and a bid priced last week keeps last
+ * week's prices. This is what makes "send to bid" idempotent AND useful: press
+ * it again after tracing more and the line follows the drawing, rather than
+ * being refused with nothing to do about it.
+ */
+export async function refreshRunTypeLineQty(
+  lineId: number,
+  feet: number
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .update(bidLineItems)
+    .set({ qty: feet.toFixed(4) })
+    .where(eq(bidLineItems.id, lineId));
 }

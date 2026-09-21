@@ -1,0 +1,55 @@
+-- Traced footage reaches the bid: one line per run TYPE per MATERIAL.
+--
+-- One ALTER, like 0060, which is the migration this deliberately mirrors — the
+-- counted-group link and this one are the same idea applied to the other half
+-- of a takeoff, and they should read the same.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- Two nullable columns and an index. Every existing line is NULL in both, which
+-- is exactly what a hand-added line is. Old code ignores them; new code against
+-- an old database dies on a bare select(). CLAUDE.md § "THREE STEPS, NOT TWO".
+-- Step 3 is empty: nothing is backfilled and no existing column changes meaning.
+--
+-- Hand-written, not generated, for the reason 0065 and 0067 give.
+--
+-- ── WHY A TYPE AND NOT A RUN ────────────────────────────────────────────────
+-- Six homeruns of 1/2" EMT across four sheets are ONE purchase. A line per
+-- traced path would put six rows on a bid that the estimator thinks of as one,
+-- and § 5f.2 rejects it by name. So the grouping is the run TYPE, the same way
+-- a counted group holds exit signs across five sheets together.
+--
+-- ── WHY A ROLE, AND WHY THREE ROWS RATHER THAN ONE ──────────────────────────
+-- A run type is not one quantity. 1/2" EMT with 2 #12 and a ground is pipe, and
+-- insulated conductor, and bare ground — three different purchases at three
+-- different prices, which `shared/takeoffQuantities.ts` goes to deliberate
+-- lengths to keep apart and which the materials list already splits the same
+-- way. One row per type would have collapsed them, which § 5f.2 also rejects.
+--
+-- So the line says WHICH of the type's three material links it stands for, and
+-- the quantity for that role is derived from the runs. The role rather than a
+-- materialId, because the role is what decides which footage feeds it; the
+-- material is then resolved from the type, and re-pointing a type at a
+-- different pipe moves the line's material without orphaning the line.
+--
+-- **A type may have fewer than three.** An empty conduit run for future use is
+-- pipe and nothing else, and that is a real thing to bid — it gets one row. A
+-- cable type has one too: the cable IS the raceway, so it carries only the
+-- conductor link, and its ground is inside the jacket.
+--
+-- ── RESTRICT, for the reason 0060 gives ─────────────────────────────────────
+-- `set null` would leave a line with frozen costs and a quantity following
+-- nothing, looking exactly like a line that is fine. `cascade` would take money
+-- off a bid because somebody tidied a palette. So a run type that is on a bid
+-- cannot be deleted — and it could not be anyway, since the palette retires
+-- rather than deletes.
+--
+-- ── THE UNIQUE INDEX IS R3's HALF OF THIS ───────────────────────────────────
+-- One type, one role, at most one live line on a bid — so traced footage cannot
+-- be sent twice. MySQL allows many NULLs in a unique index, which is what lets
+-- every hand-added line and every counted-group line share it without
+-- colliding, exactly as `bid_line_items_bid_group_uq` already does.
+ALTER TABLE `bid_line_items`
+	ADD `takeoffRunTypeId` int,
+	ADD `runMaterialRole` enum('raceway','conductor','ground'),
+	ADD CONSTRAINT `bid_line_items_takeoffRunTypeId_takeoff_run_types_id_fk` FOREIGN KEY (`takeoffRunTypeId`) REFERENCES `takeoff_run_types`(`id`) ON DELETE restrict ON UPDATE no action,
+	ADD UNIQUE INDEX `bid_line_items_bid_runtype_role_uq` (`bidId`,`takeoffRunTypeId`,`runMaterialRole`);

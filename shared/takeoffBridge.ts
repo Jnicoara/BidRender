@@ -252,3 +252,164 @@ export function sendWarning(
     `Sending this count adds a second line, so check the two before you price.`
   );
 }
+
+// ── Traced footage: one line per run TYPE per MATERIAL ───────────────────────
+/**
+ * What ONE run type contributes to a bid.
+ *
+ * ── Why a type produces several lines, not one ───────────────────────────────
+ * A run type is not one quantity. 1/2" EMT with 2 #12 and a ground is pipe, and
+ * insulated conductor, and bare ground: three purchases, three prices, three
+ * lines somebody can order from. `shared/takeoffQuantities.ts` goes to
+ * deliberate lengths to keep those apart and the materials list already splits
+ * them the same way, so folding them into one row here would throw that away —
+ * which § 5f.2 rejects by name.
+ *
+ * ── Why the grouping is the TYPE and not the run ─────────────────────────────
+ * Six homeruns of 1/2" EMT across four sheets are one purchase. A line per
+ * traced path would put six rows on a bid the estimator thinks of as one.
+ *
+ * ── Fewer than three rows is NORMAL, and one of them is the point ────────────
+ * An **empty conduit run for future use** is pipe and nothing else — a real
+ * thing to bid, and it produces exactly one row. A cable type also produces
+ * one: the cable IS the raceway, so it is carried by the conductor link, and
+ * its ground is inside the jacket where the cable's own footage already pays
+ * for it.
+ */
+export type RunTypeMaterialRole = "raceway" | "conductor" | "ground";
+
+/** The footage a type's runs came to, already split by what it buys. */
+export type RunTypeFootage = {
+  /** Pipe. Conduit types only. */
+  conduitFeet: number;
+  /** The cable itself. Cable types only. */
+  cableFeet: number;
+  /** Insulated conductors, all circuits. Conduit types only. */
+  insulatedFeet: number;
+  /** Bare or green ground. Conduit types only. */
+  groundFeet: number;
+};
+
+/** One line a run type wants on the bid. */
+export type RunTypeRow = {
+  role: RunTypeMaterialRole;
+  /** The material this role points at, or null when the type never said. */
+  materialId: number | null;
+  materialName: string | null;
+  feet: number;
+};
+
+/**
+ * The rows this type wants on a bid, in purchase order: pipe, wire, ground.
+ *
+ * ── A row exists when the type NAMES the material or the runs produced the
+ *    footage, and those are not the same test ──────────────────────────────
+ * Naming it without footage is an empty conduit, or a type nobody has traced
+ * yet — worth a row so the estimator can see it is there and priced at nothing.
+ * Footage without a name is a half-specified type, and the row exists so the
+ * footage is VISIBLE rather than silently dropped; it simply cannot be sent.
+ * Dropping either case would lose something the estimator needs to see, which
+ * is the failure this whole area is written against.
+ */
+export function runTypeRows(type: {
+  pathType: "conduit" | "cable";
+  racewayMaterialId: number | null;
+  racewayMaterialName: string | null;
+  conductorMaterialId: number | null;
+  conductorMaterialName: string | null;
+  groundMaterialId: number | null;
+  groundMaterialName: string | null;
+  footage: RunTypeFootage;
+}): RunTypeRow[] {
+  const feet = (value: number) =>
+    Number.isFinite(value) && value > 0 ? round2(value) : 0;
+
+  /*
+    A CABLE IS ONE ROW. The cable is the raceway and the conductor link holds
+    it, so there is no pipe to buy and no separate ground — it is in the jacket
+    and `cableFeet` has already paid for it. Same rule `runTypeComponentsPerFoot`
+    applies to labour, and reading it the other way would buy a ground nobody
+    pulls.
+  */
+  if (type.pathType === "cable") {
+    return [
+      {
+        role: "conductor",
+        materialId: type.conductorMaterialId,
+        materialName: type.conductorMaterialName,
+        feet: feet(type.footage.cableFeet),
+      },
+    ];
+  }
+
+  const rows: RunTypeRow[] = [
+    // The pipe always exists on a conduit type — that is what makes it one.
+    {
+      role: "raceway",
+      materialId: type.racewayMaterialId,
+      materialName: type.racewayMaterialName,
+      feet: feet(type.footage.conduitFeet),
+    },
+  ];
+  const insulated = feet(type.footage.insulatedFeet);
+  if (type.conductorMaterialId !== null || insulated > 0) {
+    rows.push({
+      role: "conductor",
+      materialId: type.conductorMaterialId,
+      materialName: type.conductorMaterialName,
+      feet: insulated,
+    });
+  }
+  const ground = feet(type.footage.groundFeet);
+  if (type.groundMaterialId !== null || ground > 0) {
+    rows.push({
+      role: "ground",
+      materialId: type.groundMaterialId,
+      materialName: type.groundMaterialName,
+      feet: ground,
+    });
+  }
+  return rows;
+}
+
+/** Whether one of those rows can become a bid line yet, and if not, why not. */
+export type RunRowSendability =
+  | { ok: true }
+  | { ok: false; reason: "no-material"; message: string }
+  | { ok: false; reason: "no-footage"; message: string };
+
+/**
+ * Every refusal is a named reason, never a bare false — the same shape
+ * `sendability` uses for counted groups, so a screen can say WHICH of these a
+ * row is in rather than showing a disabled button with no explanation.
+ *
+ * **No material means no line.** A row with footage and nothing to call it is
+ * unorderable: a supplier cannot quote "125 ft of something". The footage is
+ * still shown on the run panel, so it is not lost — it just cannot cross until
+ * somebody says what it is.
+ *
+ * **No footage means nothing to send yet**, which is the ordinary state of a
+ * type nobody has traced with, and of the wire rows on an empty conduit.
+ */
+export function runRowSendability(row: RunTypeRow): RunRowSendability {
+  if (row.materialId === null) {
+    return {
+      ok: false,
+      reason: "no-material",
+      message:
+        "This type does not say what this is, so it cannot be priced or ordered. Say what it is made of first.",
+    };
+  }
+  if (row.feet <= 0) {
+    return {
+      ok: false,
+      reason: "no-footage",
+      message: "Nothing traced under this type yet.",
+    };
+  }
+  return { ok: true };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}

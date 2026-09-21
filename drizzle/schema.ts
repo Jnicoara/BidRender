@@ -2334,6 +2334,19 @@ export type InsertTakeoffRunType = typeof takeoffRunTypes.$inferInsert;
 export type RunPathType = (typeof RUN_PATH_TYPES)[number];
 
 /** Draft = still being traced or autosaved; committed = the user finished. */
+/**
+ * Which of a run type's three materials a bid line stands for (D18, § 5f.2).
+ *
+ * `raceway`   the pipe — or, on a cable type, nothing: the cable is the raceway
+ *             and it is carried by the conductor link.
+ * `conductor` the insulated wire, or the cable itself on a cable type.
+ * `ground`    the bare or green ground, on a conduit type only. A cable's
+ *             ground is inside the jacket and is already in the cable's own
+ *             footage — counting it here would count it twice.
+ */
+export const RUN_MATERIAL_ROLES = ["raceway", "conductor", "ground"] as const;
+export type RunMaterialRole = (typeof RUN_MATERIAL_ROLES)[number];
+
 export const RUN_STATUSES = ["draft", "committed"] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
 
@@ -3347,6 +3360,44 @@ export const bidLineItems = mysqlTable(
       onDelete: "restrict",
     }),
 
+    /**
+     * The run TYPE this line's footage comes from, if it came from the plans.
+     *
+     * ── A TYPE, not a run ──────────────────────────────────────────────────
+     * Six homeruns of 1/2" EMT across four sheets are one purchase. A line per
+     * traced path would put six rows on a bid the estimator thinks of as one,
+     * which § 5f.2 rejects by name — the same reason a counted group holds exit
+     * signs from five sheets together.
+     *
+     * RESTRICT for the reason `takeoffGroupId` gives: `set null` leaves a line
+     * with frozen costs following nothing, `cascade` takes money off a bid
+     * because somebody tidied a palette.
+     */
+    takeoffRunTypeId: int("takeoffRunTypeId").references(
+      () => takeoffRunTypes.id,
+      { onDelete: "restrict" }
+    ),
+    /**
+     * WHICH of the type's three materials this line stands for.
+     *
+     * A run type is not one quantity: 1/2" EMT with 2 #12 and a ground is pipe,
+     * insulated conductor and bare ground — three purchases at three prices
+     * that `shared/takeoffQuantities.ts` keeps deliberately apart and the
+     * materials list already splits the same way. One row per type would
+     * collapse them.
+     *
+     * The ROLE rather than a materialId, because the role is what decides which
+     * footage feeds the line; the material is resolved from the type, so
+     * re-pointing a type at a different pipe moves the line without orphaning
+     * it.
+     *
+     * **Fewer than three is normal.** An empty conduit run for future use is
+     * pipe and nothing else. A cable type has one row: the cable IS the
+     * raceway, so it carries only the conductor link, and its ground is inside
+     * the jacket.
+     */
+    runMaterialRole: mysqlEnum("runMaterialRole", RUN_MATERIAL_ROLES),
+
     // ── The snapshot: four inputs, frozen ──
     /** Material cost for ONE of this assembly. */
     snapshotMaterialCost: decimal("snapshotMaterialCost", {
@@ -3405,6 +3456,14 @@ export const bidLineItems = mysqlTable(
     // MySQL allows many NULLs here, which is what lets every hand-added line on
     // every bid share the index without colliding. See drizzle/0060.
     unique("bid_line_items_bid_group_uq").on(t.bidId, t.takeoffGroupId),
+    // The same half of R3 for traced footage: one type, one role, at most one
+    // live line. MySQL allows many NULLs in a unique index, which is what lets
+    // every hand-added line share it without colliding. See drizzle/0070.
+    unique("bid_line_items_bid_runtype_role_uq").on(
+      t.bidId,
+      t.takeoffRunTypeId,
+      t.runMaterialRole
+    ),
   ]
 );
 

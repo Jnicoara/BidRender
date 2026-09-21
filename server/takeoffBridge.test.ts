@@ -21,6 +21,8 @@ import {
   sendability,
   type BridgeGroup,
   type BridgeLine,
+  runTypeRows,
+  runRowSendability,
 } from "../shared/takeoffBridge";
 
 function group(over: Partial<BridgeGroup> = {}): BridgeGroup {
@@ -264,5 +266,136 @@ describe("what is said at the moment of sending", () => {
     const lines = [line({ name: "Duplex receptacle", assemblyId: 90 })];
     expect(sendWarning(group(), lines)).not.toBeNull();
     expect(sendability(group(), lines)).toEqual({ sendable: true });
+  });
+});
+
+describe("a run type becomes one line per material", () => {
+  const conduit = {
+    pathType: "conduit" as const,
+    racewayMaterialId: 90,
+    racewayMaterialName: '1/2" EMT',
+    conductorMaterialId: 2,
+    conductorMaterialName: "#12 THHN",
+    groundMaterialId: 68,
+    groundMaterialName: "#12 bare copper, solid",
+  };
+
+  it("splits pipe, wire and ground into three orderable rows", () => {
+    /*
+      125 ft of pipe with 2 #12 and a ground through it. Three purchases at
+      three prices — one row holding 375 ft of "wire and pipe" is not orderable
+      and is what § 5f.2 rejects.
+    */
+    const rows = runTypeRows({
+      ...conduit,
+      footage: {
+        conduitFeet: 125,
+        cableFeet: 0,
+        insulatedFeet: 250,
+        groundFeet: 125,
+      },
+    });
+    expect(rows.map(r => [r.role, r.feet])).toEqual([
+      ["raceway", 125],
+      ["conductor", 250],
+      ["ground", 125],
+    ]);
+    expect(rows.every(r => runRowSendability(r).ok)).toBe(true);
+  });
+
+  it("EMPTY CONDUIT FOR FUTURE USE IS JUST THE PIPE ROW", () => {
+    // A real thing to bid, and the case that would be easiest to lose by
+    // assuming every conduit type carries wire.
+    const rows = runTypeRows({
+      pathType: "conduit",
+      racewayMaterialId: 90,
+      racewayMaterialName: '1/2" EMT',
+      conductorMaterialId: null,
+      conductorMaterialName: null,
+      groundMaterialId: null,
+      groundMaterialName: null,
+      footage: {
+        conduitFeet: 80,
+        cableFeet: 0,
+        insulatedFeet: 0,
+        groundFeet: 0,
+      },
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].role).toBe("raceway");
+    expect(rows[0].feet).toBe(80);
+    expect(runRowSendability(rows[0]).ok).toBe(true);
+  });
+
+  it("a CABLE type is one row, and its ground is not a second one", () => {
+    /*
+      The cable IS the raceway, and its ground is inside the jacket where
+      cableFeet has already paid for it. A ground row here would buy bare
+      copper nobody pulls.
+    */
+    const rows = runTypeRows({
+      pathType: "cable",
+      racewayMaterialId: null,
+      racewayMaterialName: null,
+      conductorMaterialId: 45,
+      conductorMaterialName: "12-2 MC cable",
+      groundMaterialId: 68,
+      groundMaterialName: "#12 bare copper, solid",
+      footage: {
+        conduitFeet: 0,
+        cableFeet: 210,
+        insulatedFeet: 0,
+        groundFeet: 0,
+      },
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ role: "conductor", feet: 210 });
+  });
+
+  it("keeps a row for a named material nobody has traced yet", () => {
+    // Priced at nothing and visibly so, rather than the type vanishing off a
+    // bid the estimator has already set up.
+    const rows = runTypeRows({
+      ...conduit,
+      footage: {
+        conduitFeet: 0,
+        cableFeet: 0,
+        insulatedFeet: 0,
+        groundFeet: 0,
+      },
+    });
+    expect(rows).toHaveLength(3);
+    expect(runRowSendability(rows[0])).toMatchObject({
+      ok: false,
+      reason: "no-footage",
+    });
+  });
+
+  it("SHOWS footage the type cannot name, but refuses to send it", () => {
+    /*
+      A half-specified type. The footage is real and must not disappear, but
+      "125 ft of something" cannot be quoted by a supplier — so the row exists
+      and the refusal says what to do about it.
+    */
+    const rows = runTypeRows({
+      pathType: "conduit",
+      racewayMaterialId: null,
+      racewayMaterialName: null,
+      conductorMaterialId: null,
+      conductorMaterialName: null,
+      groundMaterialId: null,
+      groundMaterialName: null,
+      footage: {
+        conduitFeet: 125,
+        cableFeet: 0,
+        insulatedFeet: 250,
+        groundFeet: 0,
+      },
+    });
+    expect(rows.map(r => r.feet)).toEqual([125, 250]);
+    expect(runRowSendability(rows[0])).toMatchObject({
+      ok: false,
+      reason: "no-material",
+    });
   });
 });
