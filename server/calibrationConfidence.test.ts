@@ -2,16 +2,34 @@
  * Reading a scale in plain words, and catching a plausible wrong one.
  *
  * ── The job these come from ──────────────────────────────────────────────────
- * Bid 23, the Decant Facility, 2026-09-21. Sheet 11 carried a graphic scale bar
- * reading 10-5-0-10-20. End to end that is THIRTY feet, because the bar starts
- * to the left of its zero. Clicking the two ends and typing 20 set the scale to
- * two thirds of the truth, and a 100 ft building measured 67 ft.
+ * Bid 23, the Decant Facility, 2026-09-21.
  *
- * The arithmetic is the reason this file exists. The sheet was 1/8" = 1'-0", so
- * the mistake produced 96 x 20/30 = exactly 64 — which is 3/16" = 1'-0", a
- * textbook scale. Every check the app had said yes: the span was long, the
- * ratio was standard, the arithmetic was right. A second known dimension is the
- * only thing that can tell a right scale from a plausible wrong one.
+ * **Sheet 11** is drawn at 1" = 10', ratio 120. Its graphic scale bar reads
+ * 10-5-0-10-20 — THIRTY feet end to end, because the bar starts to the left of
+ * its zero. Clicking the two ends and typing 20 gave 120 x 20/30 = **80**, so a
+ * 100 ft building measured 67 ft.
+ *
+ * **Sheet 13** was right all along: 1:64, which is 3/16" = 1'-0".
+ *
+ * ── What each guard would have done, stated honestly ─────────────────────────
+ * 1:80 is NOT a standard scale — it sits 17% below 1/8" = 1'-0" — so the
+ * off-standard warning WOULD have caught sheet 11 the moment it was set. That
+ * warning was real and was only shown for the few seconds before Apply; making
+ * it stay on the toolbar is what fixes this particular job.
+ *
+ * ── And why the second measurement still matters ─────────────────────────────
+ * Because the same misread does NOT always land somewhere suspicious. Read a
+ * 1/8" = 1'-0" sheet the same way and you get 96 x 20/30 = exactly 64, which is
+ * 3/16" = 1'-0", a textbook scale that no amount of looking at the ratio can
+ * question. That case is hypothetical here rather than what happened on bid 23
+ * — it is the reason the check exists, and the tests below keep the two apart.
+ *
+ * ── Corrected 2026-09-21 ─────────────────────────────────────────────────────
+ * The first version of this file said sheet 11 was 1/8" and had produced 64,
+ * conflating it with sheet 13's correct 1:64. That told the wrong story about a
+ * real job AND overstated the case for the check by claiming the warning could
+ * not have caught it. The general point survives; the worked example was wrong.
+ * The v6.8 commit message still carries the old version and cannot be edited.
  */
 import { describe, it, expect } from "vitest";
 import { describeScale, COMMON_SCALES, formatRatio } from "../shared/planScale";
@@ -68,26 +86,40 @@ describe("a scale reads in plain words", () => {
 });
 
 describe("the standard-scale warning, and what it cannot see", () => {
-  it("flags a ratio that is nowhere near a standard scale", () => {
-    const check = compareToStandardScales(80, COMMON_SCALES);
+  it("WOULD have caught sheet 11 of bid 23", () => {
+    // 1" = 10' misread off the scale bar gives 1:80, which is 17% below the
+    // nearest rung. This is the guard that was already right and was simply
+    // not shown for long enough — it now lives on the toolbar.
+    const wrong = 120 * (20 / 30);
+    expect(wrong).toBe(80);
+    const check = compareToStandardScales(wrong, COMMON_SCALES);
     expect(check?.worthMentioning).toBe(true);
+    expect(check?.nearestText).toBe('1/8" = 1\'-0"');
+    expect(check?.percentOff).toBeCloseTo(-16.7, 1);
   });
 
-  it("CANNOT flag the Decant Facility error, and that is the point", () => {
+  it("cannot see the same misread on a 1/8 inch sheet, which is why the check exists", () => {
     /*
-      This test asserts a LIMITATION on purpose, so nobody reads the warning as
-      the protection it is not.
+      A LIMITATION asserted on purpose, so nobody reads the warning as
+      protection it does not give.
 
-      1/8" misread off a scale bar gives exactly 3/16". The result is a real
-      scale, sitting exactly on a rung of the ladder, so every check based on
-      "does this look like a scale" is satisfied. Only a second measurement
-      catches it — see checkCalibration below.
+      This is not what happened on bid 23 — sheet 11 was 1" = 10' and WAS
+      flagged, above. It is what happens on the next sheet along: read a 1/8"
+      sheet from the ends of its bar and the answer is exactly 3/16", a real
+      scale sitting exactly on a rung, so every check based on "does this look
+      like a scale" is satisfied. Only a second measurement catches that one.
     */
     const wrong = 96 * (20 / 30);
     expect(wrong).toBe(64);
     const check = compareToStandardScales(wrong, COMMON_SCALES);
     expect(check?.worthMentioning).toBe(false);
     expect(check?.nearestText).toBe('3/16" = 1\'-0"');
+  });
+
+  it("leaves sheet 13 alone, because it was right", () => {
+    const check = compareToStandardScales(64, COMMON_SCALES);
+    expect(check?.worthMentioning).toBe(false);
+    expect(describeScale(64)).toBe('3/16" = 1\'-0"');
   });
 });
 
@@ -103,16 +135,18 @@ describe("checking a scale against a second known dimension", () => {
     expect(checkCalibration(1200 * 0.985, 1200)?.agrees).toBe(true);
   });
 
-  it("catches the Decant Facility error and names the factor", () => {
+  it("catches sheet 11 of bid 23 and names the factor", () => {
     /*
-      The whole job, end to end. The scale is wrong by 20/30, so a 100 ft
-      building measures 66.67 ft — exactly what was reported.
+      The whole job, end to end, with the real numbers: 1" = 10' misread as
+      20 ft across a 30 ft bar. A 100 ft building then measures 66.67 ft —
+      exactly what was reported.
     */
-    const trueRatio = 96;
+    const trueRatio = 120;
     const wrongRatio = trueRatio * (20 / 30);
+    expect(wrongRatio).toBe(80);
+
     const realInches = 100 * 12;
     const measuredInches = realInches * (wrongRatio / trueRatio);
-
     expect(measuredInches / 12).toBeCloseTo(66.67, 1);
 
     const check = checkCalibration(measuredInches, realInches);

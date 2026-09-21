@@ -100,17 +100,18 @@ export function CalibrateLayer({
    * ── Why the check is not optional, and not a separate button ─────────────
    * Added 2026-09-21 after bid 23. A scale bar reading 10-5-0-10-20 is thirty
    * feet end to end, because it starts left of its zero. Clicking the ends and
-   * typing 20 set that sheet to two thirds of the truth, and a 100 ft building
+   * typing 20 set sheet 11 — a 1" = 10' sheet — to 1:80, and a 100 ft building
    * measured 67 ft.
    *
-   * Every check the app had said yes. The span was long and rated "good". The
-   * arithmetic was exact. And the standard-scale warning stayed quiet, because
-   * the sheet was 1/8" and two thirds of 1/8" is EXACTLY 3/16" — a textbook
-   * scale (server/calibrationConfidence.test.ts asserts that limitation).
+   * On THAT sheet the off-standard warning was enough on its own, once it was
+   * moved somewhere it stays visible: 1:80 is 17% off the nearest rung.
    *
-   * A single measurement cannot be checked against itself. A second known
-   * distance is the only thing that can tell a right scale from a plausible
-   * wrong one, so it is part of calibrating rather than something to remember.
+   * The check is for the sheet where that guard has nothing to say. The same
+   * misread on a 1/8" sheet gives exactly 3/16" — a textbook scale, long span,
+   * exact arithmetic, nothing to flag (server/calibrationConfidence.test.ts
+   * asserts that limitation). A single measurement cannot be checked against
+   * itself, so a second known distance is part of calibrating rather than
+   * something to remember.
    */
   const [phase, setPhase] = useState<"set" | "check">("set");
   /** The ratio actually written to the sheet, which the check measures with. */

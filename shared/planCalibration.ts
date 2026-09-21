@@ -365,22 +365,28 @@ const FACTOR_TOLERANCE_PERCENT = 3;
  * Check a scale by measuring a SECOND thing whose length is known.
  *
  * ── Why a second measurement is the only thing that catches this ─────────────
- * Added 2026-09-21, from a real job. Sheet 11 of the Decant Facility carried a
- * graphic scale bar reading 10-5-0-10-20 — thirty feet end to end, because the
- * bar starts to the LEFT of its zero. Clicking the two ends and typing 20 set
- * the scale to two thirds of the truth, and a 100 ft building then measured
- * 67 ft.
+ * Added 2026-09-21, from a real job. Sheet 11 of the Decant Facility is drawn
+ * at 1" = 10' and carries a graphic scale bar reading 10-5-0-10-20 — thirty
+ * feet end to end, because the bar starts to the LEFT of its zero. Clicking the
+ * two ends and typing 20 gave 120 x 20/30 = 1:80, and a 100 ft building then
+ * measured 67 ft.
  *
- * Nothing in the app could have caught it, and the reason is worth stating
- * exactly, because it is the argument for this function. The sheet was 1/8" =
- * 1'-0" — ratio 96 — so the error produced 96 x 20/30 = **exactly 64**, which
- * is 3/16" = 1'-0". A textbook scale. `compareToStandardScales` looks for a
- * ratio that is not a standard scale, and this one was one; the span was long
- * and scored "good"; the arithmetic was right at every step. Every check the
- * app had said yes.
+ * **On that sheet the off-standard warning would have been enough**, and saying
+ * otherwise would overstate this function: 1:80 is 17% below 1/8" = 1'-0", so
+ * `compareToStandardScales` flags it. What failed was WHERE the warning lived —
+ * inside the calibrate panel, for the few seconds before Apply.
+ *
+ * The argument for a second measurement is the sheet where that guard has
+ * nothing to say. Read a 1/8" = 1'-0" sheet from the ends of the same bar and
+ * the answer is 96 x 20/30 = **exactly 64**, which is 3/16" = 1'-0": a textbook
+ * scale, on a rung of the ladder, with a long span and exact arithmetic. Every
+ * check based on the ratio alone is satisfied.
  *
  * The only thing that distinguishes a right scale from a plausible wrong one is
  * a SECOND known distance. That is what this is.
+ *
+ * (Corrected 2026-09-21: the first version of this note said sheet 11 was the
+ * 1/8" case, conflating it with sheet 13's correct 1:64.)
  *
  * ── Naming the factor, not just the gap ──────────────────────────────────────
  * "33% out" is a number to interpret. "The two disagree by exactly 1.5x, which

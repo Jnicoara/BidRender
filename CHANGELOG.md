@@ -9,12 +9,14 @@ This is the human-readable companion to the git history — read this to see wha
 - **Setting a sheet's scale now asks you to check it, and says the scale in
   plain words.** A scale bar reading 10-5-0-10-20 is thirty feet end to end, not
   twenty, because it starts left of its zero — reading it wrong on a real job
-  made a 100 ft building measure 67 ft, and nothing in the app could tell.
-  Calibrating now ends by asking you to measure one more thing you know; if the
-  two disagree it says so, and names the likely cause. The toolbar reads
-  `3/16" = 1'-0"` instead of `1:64.015002`, warns when a sheet is off standard,
-  and the calibration screen now says to prefer a printed dimension over the
-  scale bar.
+  put a 1" = 10' sheet at 1:80, and a 100 ft building measured 67 ft. The app
+  had the right warning for that one and showed it for only a few seconds, so
+  it now stays on the toolbar. Calibrating also ends by asking you to measure
+  one more thing you know, because the same misread on a different sheet can
+  land on a perfectly ordinary scale with nothing to flag; if the two disagree
+  it says so, and names the likely cause. Scales read as `3/16" = 1'-0"` rather
+  than `1:64.015002`, and the calibration screen now says to prefer a printed
+  dimension over the scale bar.
 
 - **The run readout labels its two numbers.** It showed the length including the
   dotted line to your cursor next to a Finish button showing only the points you
