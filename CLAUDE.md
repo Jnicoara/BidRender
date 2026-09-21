@@ -307,6 +307,34 @@ are worth copying:
 **Where a forcing function is genuinely impossible, say so in the rule** rather
 than implying the rule is enough.
 
+### Where to be structural, and where to be explicit
+
+**SILENT IN THE MATHS IS A WRONG NUMBER. SILENT ON THE SCREEN IS CLUTTER.**
+Added 2026-09-20. It decides a question that comes up every time a row is
+turned into something else, and the answer is not the same in both directions.
+
+A mapping that feeds a CALCULATION should be **structural** — take the row, or
+spread it, so nothing can be left out. A field that goes missing there does not
+announce itself: it is a smaller number on a bid, and nobody sees a gap where a
+column used to be. Three routers each hand-built `{ name, conductorCount }` from
+a circuit row, and the day the ground moved into its own column every one of
+them reported a circuit one conductor short.
+
+A mapping that feeds a SCREEN should be **explicit** — list the fields. The
+failure mode inverts: a column that arrives automatically is a column nobody
+chose to show, and screens accumulate junk that way. There is also nothing
+quiet about it, because somebody looking at the screen sees it immediately.
+
+So in `takeoffRuns.listForSheet` the same rows are mapped twice on purpose: once
+through `circuitWire` for the arithmetic, and once by hand for the panel — which
+also lets the panel keep a NULL the arithmetic has to flatten to zero.
+
+**The general form, for anything with the same shape:** ask what a missing
+field would DO. If it would change a number, make it impossible to miss. If it
+would change what somebody sees, make it impossible to add by accident. And
+when both apply to one row, map it twice rather than picking a winner — the
+cost is a few lines and the alternative is one of the two failures.
+
 ### The forcing functions stop at the test boundary, and that is a real hole
 
 **Found 2026-09-20 while closing a different one.** `tsconfig.json` excludes
