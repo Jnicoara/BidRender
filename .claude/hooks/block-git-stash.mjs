@@ -25,6 +25,36 @@
  * not a permission system, and a guard rail that can wedge every Bash call in
  * the project is worse than the mistake it prevents.
  *
+ * ── SO YOU MUST TEST IT, AND HERE IS HOW ────────────────────────────────────
+ * Failing open has a cost that is easy to miss: **"this hook is not running"
+ * and "this hook looked and was happy" are indistinguishable from outside.**
+ * A missing node, a wrong path, a session that started before the hook was
+ * registered — every one of them is silent, and the person typing the command
+ * believes they are protected when they are not.
+ *
+ * That is not hypothetical. On 2026-09-20 a `git stash` ran in this repo, was
+ * not blocked, and the script below was afterwards shown to deny that exact
+ * command when fed it directly. The script was right the whole time; the
+ * SESSION had no hooks registered. Claude Code captures hook configuration at
+ * startup and requires it to be reviewed in `/hooks` before newly added config
+ * takes effect, so a hook added mid-session does nothing until then.
+ *
+ * **Verify it, do not assume it:**
+ *
+ *   1. In the CLI, run `/hooks` and confirm the PreToolUse -> Bash entry is
+ *      listed and approved. A fresh session also picks it up.
+ *   2. Then run `git stash list`. It must be REFUSED with the message below.
+ *      If it prints stash output, the hook is not active.
+ *
+ * Step 2 is the real check. Step 1 can look right while step 2 fails.
+ *
+ * The script itself can be tested without any of that:
+ *
+ *   echo '{"tool_input":{"command":"git stash list"}}' | node .claude/hooks/block-git-stash.mjs
+ *
+ * A `deny` payload on stdout means the script is fine and the problem is
+ * registration. Silence means the script is the problem.
+ *
  * ── The known false positive, stated rather than hidden ──────────────────────
  * It matches the TEXT of the command, so a command that merely mentions the
  * phrase is refused too — `grep -rn "git stash" todo.md` is blocked, and so is
