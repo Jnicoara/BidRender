@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-20]
 
+- **Pricing a starter material now reaches the assemblies built from it.** It
+  did not before, and nothing said so: editing one of the materials BidRidge
+  ships makes your own copy of it, and any assembly using that material went on
+  reading the shipped $0 row. So you could price a single-gang box at $3.45,
+  see $3.45 on the Materials screen, and have the receptacle assembly still
+  price its box at nothing. Assemblies now follow your copy.
+
+  **Bids you have already written do not move.** Every bid line froze its costs
+  when it was added and that is deliberate — this changes what an assembly
+  PREVIEWS at, which is the number that was wrong.
+
 - **Materials can carry a labour unit again.** Every material can now hold the
   hours it takes to install one of them — per foot on pipe and wire, each on a
   box or a device — so the figure lives in one place and prices both an assembly

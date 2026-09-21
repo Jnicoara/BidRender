@@ -176,6 +176,7 @@ import {
 import { BASELINE_KITS } from "./seed/baselineKits";
 import { TRADE_ALL, normalizeTradeId, resolveForTrade } from "../shared/trades";
 import { hourlyCostFor } from "../shared/laborRateLookup";
+import { resolveMaterial, materialIdsToFetch } from "../shared/materialLookup";
 import {
   containsPattern,
   dateRangeBounds,
@@ -2489,6 +2490,10 @@ export type AssemblyMaterialLine = {
   name: string;
   unitOfSale: Material["unitOfSale"];
   costPerUnit: string;
+  /** The MATERIAL's own labor unit. NULL means nobody has set one. */
+  laborHours: string | null;
+  /** THIS recipe's disagreement with it. NULL means follow the material. */
+  overrideLaborHours: string | null;
   category: Material["category"];
 };
 
@@ -2538,28 +2543,93 @@ export async function getAssemblyById(
   return result[0];
 }
 
-/** Material lines for an assembly, with each material's current cost joined in. */
+/**
+ * Material lines for an assembly, each resolved to the material the USER means.
+ *
+ * ── This used to innerJoin on the stored id, and that was a money bug ───────
+ * Editing a shipped material forks it, so the stored id goes on pointing at the
+ * baseline — the $0 row the user has already replaced. The join fetched that
+ * row, and pricing a starter material therefore did nothing for any assembly
+ * built from it. Measured 2026-09-20: $3.45 on the Materials screen, 0.0000
+ * here, and a priced material cost of 0. See `shared/materialLookup.ts`.
+ *
+ * ── `materialId` is the STORED id and must stay that way ────────────────────
+ * Resolution decides what this line SHOWS and PRICES; it does not change what
+ * the row points at. `copyAssemblyChildren` copies these lines into a forked
+ * assembly, so a resolved id here would silently re-point every copy at the
+ * user's material forks — the reference rewrite this design deliberately
+ * rejected, arriving through the back door.
+ */
 export async function getAssemblyMaterialLines(
-  assemblyId: number
+  assemblyId: number,
+  userId: number
 ): Promise<AssemblyMaterialLine[]> {
   const db = await getDb();
   if (!db) return [];
-  const rows = await db
+
+  const lines = await db
     .select({
       id: assemblyMaterials.id,
       materialId: assemblyMaterials.materialId,
       qty: assemblyMaterials.qty,
       sortOrder: assemblyMaterials.sortOrder,
-      name: materials.name,
-      unitOfSale: materials.unitOfSale,
-      costPerUnit: materials.costPerUnit,
-      category: materials.category,
+      /*
+        The recipe's own labor override lives on THIS row, not on the material,
+        so it is read here and is unaffected by any fork. Which of the two wins
+        is decided once, in `componentLaborUnit`.
+      */
+      overrideLaborHours: assemblyMaterials.overrideLaborHours,
     })
     .from(assemblyMaterials)
-    .innerJoin(materials, eq(assemblyMaterials.materialId, materials.id))
     .where(eq(assemblyMaterials.assemblyId, assemblyId))
     .orderBy(asc(assemblyMaterials.sortOrder), asc(assemblyMaterials.id));
-  return rows;
+  if (lines.length === 0) return [];
+
+  /*
+    One query for both halves: the stored ids, and any fork OF those ids owned
+    by this user. Built from the same list so a fork can never come back
+    without the baseline it supersedes.
+  */
+  const wanted = materialIdsToFetch(lines.map(line => line.materialId));
+  const candidates = await db
+    .select()
+    .from(materials)
+    .where(
+      or(
+        inArray(materials.id, wanted),
+        and(eq(materials.userId, userId), inArray(materials.baselineId, wanted))
+      )
+    );
+
+  /*
+    MERGE BEFORE RESOLVING. The query above deliberately returns both a
+    baseline and any fork of it, and `resolveMaterial` takes a direct hit
+    first — so handing it the raw list would return the baseline the fork
+    exists to replace, which is the bug this function is fixing. Same merge the
+    library screens use, so "which row supersedes which" is decided once.
+  */
+  const visible = mergeLibraryRows(candidates, userId);
+
+  const resolved: AssemblyMaterialLine[] = [];
+  for (const line of lines) {
+    const material = resolveMaterial(visible, line.materialId);
+    // A material deleted outright drops its line rather than pricing at zero.
+    // A missing material is a missing line, not a free one.
+    if (!material) continue;
+    resolved.push({
+      id: line.id,
+      materialId: line.materialId,
+      qty: line.qty,
+      sortOrder: line.sortOrder,
+      overrideLaborHours: line.overrideLaborHours,
+      name: material.name,
+      unitOfSale: material.unitOfSale,
+      costPerUnit: material.costPerUnit,
+      laborHours: material.laborHours,
+      category: material.category,
+    });
+  }
+  return resolved;
 }
 
 export async function getAssemblyModifierIds(
@@ -2583,7 +2653,7 @@ export async function getAssemblyDetail(
   const assembly = await getAssemblyById(id, userId);
   if (!assembly) return undefined;
   const [materialLines, modifierIds] = await Promise.all([
-    getAssemblyMaterialLines(id),
+    getAssemblyMaterialLines(id, userId),
     getAssemblyModifierIds(id),
   ]);
   return { ...assembly, materials: materialLines, modifierIds };
@@ -2637,7 +2707,12 @@ export async function deleteAssemblyForever(id: number, userId: number) {
 /** Replace an assembly's material lines wholesale. */
 export async function setAssemblyMaterials(
   assemblyId: number,
-  lines: Array<{ materialId: number; qty: string }>
+  lines: Array<{
+    materialId: number;
+    qty: string;
+    /** NULL follows the material's own unit — it does not mean "no hours". */
+    overrideLaborHours?: string | null;
+  }>
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -2650,6 +2725,7 @@ export async function setAssemblyMaterials(
       assemblyId,
       materialId: line.materialId,
       qty: line.qty,
+      overrideLaborHours: line.overrideLaborHours ?? null,
       sortOrder: index,
     }))
   );
@@ -2711,22 +2787,39 @@ export async function forkAssembly(
   const forkId = result.insertId;
 
   // The recipe is the assembly — a fork without its lines is an empty shell.
-  await copyAssemblyChildren(baseline.id, forkId);
+  await copyAssemblyChildren(baseline.id, forkId, userId);
   return forkId;
 }
 
 /** Copy material lines and modifier links from one assembly onto another. */
 async function copyAssemblyChildren(
   fromAssemblyId: number,
-  toAssemblyId: number
+  toAssemblyId: number,
+  userId: number
 ) {
   const [lines, modifierIds] = await Promise.all([
-    getAssemblyMaterialLines(fromAssemblyId),
+    getAssemblyMaterialLines(fromAssemblyId, userId),
     getAssemblyModifierIds(fromAssemblyId),
   ]);
+  /*
+    `line.materialId` is the STORED id, not the resolved one — see the note on
+    getAssemblyMaterialLines. Forking an assembly must copy what it points at,
+    not what it currently resolves to, or the fork quietly acquires references
+    the original never had.
+
+    `overrideLaborHours` travels too. It was omitted when this mapping was two
+    fields long, which is the hand-written-field-list trap: a recipe that had
+    disagreed with a material's labor unit would have silently gone back to
+    following it the moment the assembly was forked, and nothing on screen
+    would have said so.
+  */
   await setAssemblyMaterials(
     toAssemblyId,
-    lines.map(line => ({ materialId: line.materialId, qty: line.qty }))
+    lines.map(line => ({
+      materialId: line.materialId,
+      qty: line.qty,
+      overrideLaborHours: line.overrideLaborHours,
+    }))
   );
   await setAssemblyModifiers(toAssemblyId, modifierIds);
 }
@@ -2769,7 +2862,7 @@ export async function revertAssemblyToBaseline(id: number, userId: number) {
 
   // Reverting the header without the lines would leave the user's edited recipe
   // priced against the starter's hours — worse than either state alone.
-  await copyAssemblyChildren(baseline.id, id);
+  await copyAssemblyChildren(baseline.id, id, userId);
 }
 
 /**
@@ -4969,7 +5062,7 @@ export async function duplicateAssembly(
   } as InsertAssembly);
   const newId = result.insertId;
 
-  await copyAssemblyChildren(source.id, newId);
+  await copyAssemblyChildren(source.id, newId, userId);
   return newId;
 }
 
