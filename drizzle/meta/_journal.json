@@ -498,6 +498,13 @@
       "when": 1789956000000,
       "tag": "0070_bid_lines_from_run_types",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "5",
+      "when": 1789956100000,
+      "tag": "0071_sheet_scale_checked",
+      "breakpoints": true
     }
   ]
 }

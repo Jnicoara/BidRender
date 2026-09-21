@@ -128,6 +128,13 @@ function toSheetView(row: db.BidPdfSheetRow) {
     scaleText: row.scaleText,
     scaleSource: row.scaleSource,
     detectedScaleText: row.detectedScaleText,
+    /**
+     * NULL means nobody has confirmed this scale against a second distance.
+     *
+     * Sent even when there is no scale at all, so the client never has to guess
+     * the difference between "unchecked" and "not loaded yet".
+     */
+    scaleCheckedAt: row.scaleCheckedAt,
   };
 }
 
@@ -616,6 +623,43 @@ export const bidPdfsRouter = router({
         scaleRatio: String(parsed.ratio),
         scaleText: parsed.text,
         scaleSource: "manual",
+        /*
+          A new scale is an UNCHECKED scale, always.
+
+          A confirmation belongs to the ratio it was made against and says
+          nothing about the next one. Leaving the old stamp in place would put
+          a "checked" badge on a number nobody has ever verified, which is
+          worse than no badge — it is the badge lying in the one direction that
+          matters.
+        */
+        scaleCheckedAt: null,
+      });
+      const updated = await db.getBidPdfSheet(input.id, ctx.scope.dataUserId);
+      return toSheetView(updated!);
+    }),
+
+  /**
+   * Record that this sheet's scale was confirmed against a second distance.
+   *
+   * Takes no measurement and stores no result: whether the two agreed is a
+   * judgement the estimator makes, and they are allowed to keep a scale the
+   * check disputed — a drawing really can be inconsistent with itself. What is
+   * stored is only that somebody looked.
+   */
+  confirmSheetScale: procedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const sheet = await db.getBidPdfSheet(input.id, ctx.scope.dataUserId);
+      if (!sheet)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Sheet not found." });
+      if (sheet.scaleRatio === null) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "That sheet has no scale to check yet.",
+        });
+      }
+      await db.updateBidPdfSheet(input.id, ctx.scope.dataUserId, {
+        scaleCheckedAt: new Date(),
       });
       const updated = await db.getBidPdfSheet(input.id, ctx.scope.dataUserId);
       return toSheetView(updated!);
@@ -632,6 +676,8 @@ export const bidPdfsRouter = router({
         scaleRatio: null,
         scaleText: null,
         scaleSource: "none",
+        // Nothing left to have checked.
+        scaleCheckedAt: null,
       });
       const updated = await db.getBidPdfSheet(input.id, ctx.scope.dataUserId);
       return toSheetView(updated!);

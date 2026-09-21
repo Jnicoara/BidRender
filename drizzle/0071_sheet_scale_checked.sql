@@ -1,0 +1,12 @@
+-- When a sheet's scale was last confirmed against a SECOND known distance.
+--
+-- ADDITIVE. Nullable, no default, no UPDATE: this file adds a column and
+-- nothing else, so it goes BEFORE the deploy (CLAUDE.md, three steps not two).
+-- Old code ignores the column; new code reads NULL as "nobody has checked
+-- this", which is true of every sheet that exists today and is exactly what
+-- the badge should say about them.
+--
+-- Deliberately NOT given a default of CURRENT_TIMESTAMP or a backfill. Marking
+-- existing sheets as checked would be the app asserting something nobody did,
+-- on the screen whose whole job is telling you which numbers to trust.
+ALTER TABLE `bid_pdf_sheets` ADD COLUMN `scaleCheckedAt` timestamp NULL;

@@ -27,13 +27,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { CrosshairGuides } from "./CrosshairGuides";
-import {
-  Check,
-  MoveHorizontal,
-  RotateCcw,
-  TriangleAlert,
-  X,
-} from "lucide-react";
+import { Check, RotateCcw, Ruler, TriangleAlert, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { selectOnFocus } from "@/lib/selectOnFocus";
@@ -54,6 +48,15 @@ import {
 } from "@shared/planCalibration";
 import { COMMON_SCALES, describeScale } from "@shared/planScale";
 
+/**
+ * The colour of the measured span ON THE DRAWING.
+ *
+ * Kept when the blue was taken out of this panel's chrome, because this is not
+ * chrome: it is the measurement, drawn over a black-and-white sheet, and it has
+ * to be unmistakable against both the drawing and the app's yellow — which
+ * means marks and stamps. A line here that looked like a mark would be worse
+ * than a line that stands out.
+ */
 const SPAN_COLOR = "#38BDF8";
 
 const QUALITY_STYLE = {
@@ -69,7 +72,10 @@ export function CalibrateLayer({
   points,
   onPointsChange,
   onApply,
+  onChecked,
   onCancel,
+  startInCheck,
+  sheetRatio,
   chromeTarget,
   busy,
 }: {
@@ -86,7 +92,24 @@ export function CalibrateLayer({
    * is the check — see the `phase` state.
    */
   onApply: (scaleText: string) => Promise<unknown>;
+  /**
+   * Record that the scale was confirmed against a second distance.
+   *
+   * Called only when a check was actually MADE — not when it is skipped, and
+   * not when the two disagreed but the estimator kept the scale anyway. The
+   * stamp means "somebody looked", so it must not be set by walking past.
+   */
+  onChecked: () => Promise<unknown>;
   onCancel: () => void;
+  /**
+   * Open straight into checking the scale the sheet already has.
+   *
+   * This is the path from "Check it" and from picking a scale off the list:
+   * there is nothing to set, only something to verify.
+   */
+  startInCheck?: boolean;
+  /** The sheet's current ratio, which `startInCheck` measures against. */
+  sheetRatio?: number | null;
   chromeTarget?: HTMLElement | null;
   busy?: boolean;
 }) {
@@ -113,9 +136,13 @@ export function CalibrateLayer({
    * itself, so a second known distance is part of calibrating rather than
    * something to remember.
    */
-  const [phase, setPhase] = useState<"set" | "check">("set");
+  const [phase, setPhase] = useState<"set" | "check">(
+    startInCheck && sheetRatio ? "check" : "set"
+  );
   /** The ratio actually written to the sheet, which the check measures with. */
-  const [appliedRatio, setAppliedRatio] = useState<number | null>(null);
+  const [appliedRatio, setAppliedRatio] = useState<number | null>(
+    startInCheck ? (sheetRatio ?? null) : null
+  );
   const [checkText, setCheckText] = useState("");
   const [applyError, setApplyError] = useState<string | null>(null);
 
@@ -263,10 +290,18 @@ export function CalibrateLayer({
     <div className="absolute top-3 left-1/2 -translate-x-1/2 w-[26rem] max-w-[calc(100%-1.5rem)] pointer-events-auto">
       <div className="rounded-xl border border-border bg-card/95 shadow-xl p-3 space-y-2">
         <div className="flex items-center gap-2">
-          {/* Matches the Calibrate button that opened this. NOT `Ruler`,
-              which means the scale itself everywhere else in the app. */}
-          <MoveHorizontal className="w-4 h-4 text-[#38BDF8] shrink-0" />
-          <p className="text-sm font-medium flex-1">Set scale by measuring</p>
+          {/*
+            `Ruler`, matching the one control this now opens from.
+
+            It used to be MoveHorizontal in blue, to match a separate Calibrate
+            button — and that pairing is gone: there is one scale control now,
+            and the blue double-arrow was the only blue on the screen, which
+            made the least-used thing in the toolbar the most eye-catching.
+          */}
+          <Ruler className="w-4 h-4 shrink-0 text-muted-foreground" />
+          <p className="text-sm font-medium flex-1">
+            {phase === "check" ? "Check the scale" : "Set scale by measuring"}
+          </p>
           <Button
             size="sm"
             variant="ghost"
@@ -361,6 +396,23 @@ export function CalibrateLayer({
                   )}
                   <span>{check.message}</span>
                 </p>
+                {/*
+                  The cause nothing else on screen can point at.
+
+                  If the scale was TYPED, the ratio is standard and the
+                  arithmetic is exact — the only thing left that explains a
+                  disagreement is the paper. Said here rather than in
+                  checkCalibration's message because it is a fact about how the
+                  scale was chosen, which that function does not know.
+                */}
+                {!check.agrees && (
+                  <p className="mt-1 text-muted-foreground">
+                    If you picked this scale from the list rather than measuring
+                    it, the set may be printed at a reduced size — half-size
+                    prints are common and read exactly half length. Measuring
+                    the scale instead fixes that.
+                  </p>
+                )}
               </div>
             )}
 
@@ -369,11 +421,33 @@ export function CalibrateLayer({
                 size="sm"
                 variant={check?.agrees === false ? "outline" : "default"}
                 className="h-7 gap-1.5 text-xs flex-1"
-                onClick={onCancel}
-                title="Keep this scale and close"
+                onClick={async () => {
+                  /*
+                    The stamp records that somebody LOOKED, not that the two
+                    agreed. Keeping a scale the check disputed is a legitimate
+                    answer — a drawing really can be inconsistent with itself,
+                    and the estimator can see which of the two dimensions to
+                    believe in a way the app cannot.
+
+                    But it is only written when a check was actually made.
+                    Closing with nothing measured leaves the badge up, which is
+                    the whole point of the badge.
+                  */
+                  if (check) await onChecked();
+                  onCancel();
+                }}
+                title={
+                  check
+                    ? "Record that this scale has been checked, and close"
+                    : "Close without checking"
+                }
               >
                 <Check className="w-3.5 h-3.5" />
-                {check?.agrees === false ? "Keep it anyway" : "Done"}
+                {check?.agrees === false
+                  ? "Keep it anyway"
+                  : check
+                    ? "Done"
+                    : "Close"}
               </Button>
               <Button
                 size="sm"
@@ -518,7 +592,7 @@ export function CalibrateLayer({
 
             {/* The result, in plain terms. */}
             {ratio !== null && (
-              <div className="rounded-lg border border-[#38BDF8]/40 bg-[#38BDF8]/5 px-2.5 py-2 space-y-1">
+              <div className="rounded-lg border border-border bg-muted/20 px-2.5 py-2 space-y-1">
                 <div className="flex items-baseline gap-2">
                   <span className="text-[0.7rem] text-muted-foreground">
                     This sheet is

@@ -60,18 +60,35 @@ export type ScaleSheet = {
   scaleText: string | null;
   scaleSource: "detected" | "manual" | "none";
   detectedScaleText: string | null;
+  /** NULL until somebody confirms the scale against a second distance. */
+  scaleCheckedAt?: Date | string | null;
 };
 
 export function ScaleControl({
   sheet,
   onSet,
   onClear,
+  onMeasure,
+  onCheck,
   notToScale,
   wanted,
 }: {
   sheet: ScaleSheet;
-  onSet: (scaleText: string) => void;
+  onSet: (scaleText: string) => Promise<unknown>;
   onClear: () => void;
+  /**
+   * Start setting the scale by MEASURING a known dimension.
+   *
+   * ── One control, two ways in ─────────────────────────────────────────────
+   * "Calibrate" used to be its own button in the toolbar, beside this one, for
+   * the same job — two controls with different names and different icons,
+   * neither of which said it was an alternative to the other. They are one
+   * question with two answers: what is this sheet drawn at, and do you want to
+   * type it or measure it.
+   */
+  onMeasure: () => void;
+  /** Check the scale already set, against a second known dimension. */
+  onCheck: () => void;
   /** The sheet states NOT TO SCALE — worth saying rather than nagging. */
   notToScale?: boolean;
   /**
@@ -115,6 +132,21 @@ export function ScaleControl({
       : compareToStandardScales(Number(sheet.scaleRatio), COMMON_SCALES);
   const offStandard = standard?.worthMentioning === true;
 
+  /**
+   * A scale nobody has checked, which is a different worry from an odd one.
+   *
+   * ── Why a TYPED scale needs this as much as a measured one ───────────────
+   * Picking `1/8" = 1'-0"` from the list is only true if the PDF is at its
+   * true print size. A half-size set reads half length with nothing looking
+   * wrong: the ratio is standard, the arithmetic is exact, and every number is
+   * quietly half. There is no signal in the file to catch that — only a second
+   * measurement does.
+   *
+   * So the badge stays up until somebody checks, and picking from the list
+   * offers the check as the next thing rather than closing the panel.
+   */
+  const unchecked = isSet && !sheet.scaleCheckedAt;
+
   useEffect(
     () => () => {
       if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
@@ -128,8 +160,14 @@ export function ScaleControl({
     flashTimer.current = window.setTimeout(() => setFlash(false), FLASH_MS);
   };
 
-  /** Commit the typed scale. Unreadable or unchanged input writes nothing. */
-  const commit = () => {
+  /**
+   * Commit the typed scale. Unreadable or unchanged input writes nothing.
+   *
+   * `thenCheck` is false on blur and true on Enter. Blur fires when the pointer
+   * goes anywhere at all, and throwing the user into a measuring overlay
+   * because they looked away would be the app grabbing the wheel.
+   */
+  const commit = async (thenCheck: boolean) => {
     const text = draft.trim();
     if (!text) {
       setDraft("");
@@ -147,16 +185,26 @@ export function ScaleControl({
       setDraft("");
       return;
     }
-    onSet(text);
+    await onSet(text);
     setDraft("");
     showFlash();
     setOpen(false);
+    if (thenCheck) onCheck();
   };
 
-  const pick = (text: string) => {
-    onSet(text);
+  /**
+   * Take a scale from the list, then go straight to checking it.
+   *
+   * The check is the next thing on screen rather than a suggestion left behind
+   * in a closed popover, because the failure it catches — a set printed at
+   * half size — is invisible everywhere else. Awaited so the overlay opens
+   * against the ratio that was just saved rather than the one before it.
+   */
+  const pick = async (text: string) => {
+    await onSet(text);
     showFlash();
     setOpen(false);
+    onCheck();
   };
 
   return (
@@ -199,6 +247,17 @@ export function ScaleControl({
                   <TriangleAlert className="w-3 h-3 text-orange-400" />
                 )}
                 <span className="font-mono">{label}</span>
+                {/*
+                  Quieter than the off-standard triangle on purpose. "Not
+                  checked" is the ordinary state of a scale somebody just set —
+                  it is a nudge, not an alarm, and an alarm on every sheet is
+                  one nobody reads by Thursday.
+                */}
+                {unchecked && (
+                  <span className="text-[0.65rem] text-muted-foreground">
+                    · not checked
+                  </span>
+                )}
               </span>
             ) : (
               <span className="flex items-center gap-1">
@@ -217,6 +276,44 @@ export function ScaleControl({
               their own.
             </p>
           </div>
+
+          {/*
+            ── The check, offered first when it is outstanding ────────────────
+            Above the ways to CHANGE the scale, because on a sheet that already
+            has one the likeliest next action is confirming it, not replacing
+            it. A typed scale is as exposed here as a measured one: a half-size
+            print reads half length with a perfectly standard ratio.
+          */}
+          {unchecked && (
+            <div className="rounded-lg border border-[#F5C518]/40 bg-[#F5C518]/5 p-2.5 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                <span className="text-foreground">
+                  This scale has not been checked.
+                </span>{" "}
+                A drawing printed at half size reads half length with nothing
+                looking wrong — measuring one known dimension is what catches
+                it.
+              </p>
+              <Button
+                size="sm"
+                className="h-7 w-full gap-1.5 text-xs"
+                onClick={() => {
+                  setOpen(false);
+                  onCheck();
+                }}
+              >
+                <Ruler className="w-3 h-3" /> Check it: trace a dimension you
+                know
+              </Button>
+            </div>
+          )}
+
+          {isSet && sheet.scaleCheckedAt && (
+            <p className="text-[0.7rem] text-emerald-400 flex items-center gap-1.5">
+              <Check className="w-3 h-3 shrink-0" />
+              Checked against a second dimension.
+            </p>
+          )}
 
           {/*
             Off-standard, explained where there is room to explain it.
@@ -299,6 +396,38 @@ export function ScaleControl({
             </p>
           )}
 
+          {/*
+            ── MEASURE IT, first of the two ways ─────────────────────────────
+            Ahead of the list because it is the answer that does not depend on
+            the PDF being at its true print size. Typing is faster when the
+            sheet says its scale and the print is honest; measuring is right
+            either way, which is why it leads.
+          */}
+          <div className="space-y-1.5">
+            <Button
+              size="sm"
+              variant={isSet ? "outline" : "default"}
+              className="h-8 w-full gap-1.5 text-xs"
+              onClick={() => {
+                setOpen(false);
+                onMeasure();
+              }}
+            >
+              <Ruler className="w-3.5 h-3.5" />
+              Measure it — click two points you know
+            </Button>
+            <p className="text-[0.7rem] text-muted-foreground">
+              Works even on a sheet that states no scale, or one printed at the
+              wrong size.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-[0.65rem] text-muted-foreground">or</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
           <div className="space-y-1.5">
             <label className="text-xs text-muted-foreground">
               Type a scale
@@ -307,11 +436,11 @@ export function ScaleControl({
               value={draft}
               onChange={e => setDraft(e.target.value)}
               onFocus={selectOnFocus}
-              onBlur={commit}
+              onBlur={() => void commit(false)}
               onKeyDown={e => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  commit();
+                  void commit(true);
                 }
                 if (e.key === "Escape") {
                   e.preventDefault();

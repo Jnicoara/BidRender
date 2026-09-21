@@ -67,7 +67,6 @@ import {
   Maximize2,
   Minimize2,
   Minus,
-  MoveHorizontal,
   Trash2,
   Upload,
   X,
@@ -209,6 +208,7 @@ import { runAppearance } from "@shared/takeoffMarks";
 import type { PageRect } from "@shared/planRegion";
 import type { PagePoint } from "@shared/takeoffGeometry";
 import type { RunPathType } from "@shared/takeoffQuantities";
+import { describeScale } from "@shared/planScale";
 
 // The upload queue's shape and its operations live in lib/uploadQueue.ts, so
 // that retrying and dismissing can be tested without rendering this page.
@@ -1828,6 +1828,15 @@ export default function TakeoffPage({
    * every other measurement on the sheet means.
    */
   const [calibrating, setCalibrating] = useState(false);
+  /**
+   * Whether the overlay opens on SETTING a scale or on CHECKING the one there.
+   *
+   * Both come from the single scale control now: "Measure it" sets, "Check it"
+   * and picking from the list verify. Held here rather than inside
+   * CalibrateLayer because the layer is remounted per sheet and the intent
+   * belongs to the click that opened it.
+   */
+  const [calibrateMode, setCalibrateMode] = useState<"set" | "check">("set");
   const [calibratePoints, setCalibratePoints] = useState<PagePoint[]>([]);
 
   /**
@@ -2088,7 +2097,19 @@ export default function TakeoffPage({
 
   const setSheetScale = trpc.bidPdfs.setSheetScale.useMutation({
     onSuccess: sheet => {
-      toast.success(`Scale set to ${sheet.scaleText}.`);
+      // Plain words, matching the chip — "Scale set to 1:64.015002" is a
+      // confirmation nobody can read back to check.
+      toast.success(
+        `Scale set to ${sheet.scaleRatio === null ? "none" : describeScale(sheet.scaleRatio)}.`
+      );
+      refreshSheets();
+    },
+    onError: error => toast.error(error.message),
+  });
+
+  const confirmSheetScale = trpc.bidPdfs.confirmSheetScale.useMutation({
+    onSuccess: () => {
+      toast.success("Scale checked.");
       refreshSheets();
     },
     onError: error => toast.error(error.message),
@@ -3735,8 +3756,8 @@ export default function TakeoffPage({
               */}
               <p className="text-xs text-muted-foreground">
                 Set each sheet&apos;s scale, then mark and trace what is on it.
-                Counts you send to the bid price it; the rest stay here until
-                you do.
+                Counts you send to the bid change its price; the rest stay here
+                until you do.
               </p>
             </div>
             {/* Left of "Add PDF" and available from the first mark, not at the
@@ -4059,22 +4080,13 @@ export default function TakeoffPage({
               </>
             )}
 
-            {activeSheet && !tracing && !calibrating && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 gap-1.5 text-xs"
-                onClick={() => {
-                  setCalibratePoints([]);
-                  setCalibrating(true);
-                  setArmedGroup(null);
-                }}
-                title="Set this sheet's scale by clicking two points you know the distance between"
-              >
-                <MoveHorizontal className="w-3.5 h-3.5 text-[#38BDF8]" />{" "}
-                Calibrate
-              </Button>
-            )}
+            {/*
+              ── The Calibrate button is GONE, folded into the scale chip ─────
+              It sat here, beside the scale, doing the same job under a
+              different name and a different icon — two controls for one
+              question, neither saying it was an alternative to the other. The
+              chip below now offers both ways in: measure it, or type it.
+            */}
 
             {/*
               ── The scale, as ONE status chip ──────────────────────────────
@@ -4102,9 +4114,21 @@ export default function TakeoffPage({
                 }
                 notToScale={notToScaleBySheet[activeSheet.id] ?? false}
                 onSet={scaleText =>
-                  setSheetScale.mutate({ id: activeSheet.id, scaleText })
+                  setSheetScale.mutateAsync({ id: activeSheet.id, scaleText })
                 }
                 onClear={() => clearSheetScale.mutate({ id: activeSheet.id })}
+                onMeasure={() => {
+                  setCalibratePoints([]);
+                  setCalibrateMode("set");
+                  setCalibrating(true);
+                  setArmedGroup(null);
+                }}
+                onCheck={() => {
+                  setCalibratePoints([]);
+                  setCalibrateMode("check");
+                  setCalibrating(true);
+                  setArmedGroup(null);
+                }}
               />
             )}
 
@@ -4362,6 +4386,11 @@ export default function TakeoffPage({
                             scaleText,
                           })
                         }
+                        onChecked={() =>
+                          confirmSheetScale.mutateAsync({ id: activeSheet.id })
+                        }
+                        startInCheck={calibrateMode === "check"}
+                        sheetRatio={activeSheet.scaleRatio}
                         onCancel={() => {
                           setCalibrating(false);
                           setCalibratePoints([]);

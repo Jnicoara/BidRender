@@ -2149,6 +2149,24 @@ export const bidPdfSheets = mysqlTable(
     detectedScaleText: varchar("detectedScaleText", { length: 255 }),
 
     /**
+     * When somebody last confirmed this scale against a SECOND known distance.
+     *
+     * NULL means "not checked", and that is the honest default for every sheet
+     * that has one today — nobody has checked them, and pretending otherwise
+     * would make the badge meaningless on exactly the sheets it is for.
+     *
+     * ── Why a typed scale needs this as much as a measured one ───────────────
+     * Picking `1/8" = 1'-0"` from a list is only right if the PDF is at its
+     * true print size. A half-size set reads half length with nothing on screen
+     * looking wrong — no warning, no odd ratio, every number quietly halved. A
+     * second measurement is the only thing that catches it.
+     *
+     * Cleared whenever the scale changes, because a check belongs to the scale
+     * it was made against and means nothing about the next one.
+     */
+    scaleCheckedAt: timestamp("scaleCheckedAt"),
+
+    /**
      * The sheet states it is NOT TO SCALE.
      *
      * Phase 2a detected this but only held it in browser state, so it vanished

@@ -6,6 +6,19 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-21]
 
+- **One scale control instead of two, with both ways to set a scale in it.**
+  "Calibrate" and "Set scale" sat side by side doing the same job under
+  different names. Now the scale chip is the only one: it shows the scale in
+  plain words, and opening it offers either measuring two points or picking
+  from the common architectural and engineering scales.
+
+- **A scale you picked from the list gets checked too.** Typing `1/8" = 1'-0"`
+  is only right if the PDF is at its true print size — a half-size set reads
+  half length with nothing looking wrong. So after picking one, the next thing
+  on screen is "Check it: trace a dimension you know". You can skip it, and the
+  sheet says "not checked" until somebody does. If the check disagrees it says
+  so, and raises the half-size possibility.
+
 - **Setting a sheet's scale now asks you to check it, and says the scale in
   plain words.** A scale bar reading 10-5-0-10-20 is thirty feet end to end, not
   twenty, because it starts left of its zero — reading it wrong on a real job
