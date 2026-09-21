@@ -5238,3 +5238,125 @@ rather than by a measurement, and the measurement costs an afternoon.
   result, and the one worth spending an afternoon to find out before spending
   weeks. The reader becomes a first pass that speeds up a human count rather
   than a count, and it should be described that way in the product.
+
+---
+
+## 16. Mark first, name it after
+
+**Planned 2026-09-21, not built.** Requested after bid 23: a way to just drop
+marks, which land unassigned and flagged, then select them and assign them to a
+MATERIAL, an ASSEMBLY, or a plain name.
+
+**Pick-first stays the normal flow**, and that is a decision rather than a
+concession. Arming a count and clicking forty times is the fastest way to do
+forty of the same thing, which is most of what a takeoff is. This adds a second
+door for the case pick-first is bad at — walking a sheet noticing things — and
+it is also the shape AI suggestions will arrive in (§ 16.6).
+
+### 16.1 What already exists, measured rather than remembered
+
+More than half of it. Checked against the code on 2026-09-21:
+
+| Piece                        | State                                                                                                 |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| The four levels              | `TAKEOFF_GROUP_KINDS` is already `plain \| typed \| material \| assembly` (`drizzle/schema.ts`).      |
+| Plain counts                 | Built and shipping. `takeoffGroups.create` makes a group with `kind: "plain"` and no price behind it. |
+| A group's material           | `takeoff_groups.materialId` exists, with an FK and `onDelete: "set null"`.                            |
+| Per-group cost and hours     | `unitCost` and `unitHours` columns exist, for level 2.                                                |
+| Counting without a library   | The Mark picker already lets you type a name and count it.                                            |
+| Growing a count into a price | § 3 promised it and the group concept delivers it — clicks belong to the group, not to the price.     |
+
+**So the data model is largely there.** What is missing is a way to mark with
+NOTHING armed, a way to select marks afterwards, and — the one with teeth —
+materials are not yet a price source.
+
+### 16.2 The three real gaps
+
+**1. A mark needs an armed group today.** `TakeoffPage` refuses the click
+outright: `if (!activeSheet || !armedGroup) return;`. Unassigned marks need
+somewhere to go, and a group is the only thing marks can belong to.
+
+**2. The Mark picker lists assemblies and only assemblies.** `StampPicker`
+takes `assemblies: PickableAssembly[]` and searches that one list. Materials
+must be choosable, which is a picker change rather than a model change —
+`MaterialPicker` already exists and already ranks well (v6.3/v6.6).
+
+**3. A material-backed count CANNOT REACH A BID, and this is the blocking one.**
+`sendability` in `shared/takeoffBridge.ts` handles `plain` (refuses, by design)
+and `assembly` (sends), and everything else falls through to
+`unsupported-level`. So "assign to a material" is half a feature until the
+bridge prices one: the count would look assigned and then refuse to send, which
+is worse than not offering it.
+
+### 16.3 The trap nobody would notice until a bid was wrong
+
+**`takeoff_groups.materialId` is registered `unreviewed` in
+`server/forkableReferences.test.ts`** — "Level 3 counts price from a material
+directly; not traced."
+
+The moment materials become a price source, that entry is a live instance of
+the fork bug, and it is the money kind. Editing a shipped material FORKS it; the
+group keeps the baseline's id; `mergeLibraryRows` hides the baseline. A count
+assigned to a material the estimator has priced would snapshot the SHIPPED row's
+$0 onto the bid line, permanently, because a snapshot is never re-priced.
+
+**So step one of pricing a material count is `resolveMaterial`**, exactly as
+`assembly_materials.materialId` already does, and the registry entry moves from
+`unreviewed` to `resolver`. This is the sixth and seventh instances all over
+again (v6.4) and it is cheap to get right BEFORE the feature, and expensive
+after.
+
+### 16.4 What it would take
+
+Roughly in order, each shippable on its own:
+
+1. **Price a material count.** `sendability` accepts `kind: "material"` with a
+   `materialId`; the bridge prices it through `resolveMaterial` and snapshots
+   like any other line. Registry entry updated. **No migration.** This is the
+   piece that makes the rest honest.
+2. **Materials in the Mark picker.** One picker, two sources, with the kind
+   recorded on the group. Reuses `MaterialPicker`'s ranking rather than growing
+   a second search. **No migration.**
+3. **Mark with nothing armed.** A toolbar mode that drops marks into a
+   per-sheet holding group — `kind: "plain"`, a reserved label, created on the
+   first click. Everything downstream already understands a plain group, which
+   is why this is small. **No migration**, if the holding group is an ordinary
+   group with a known label. **A migration only if** it needs its own flag,
+   which it probably does eventually: a reserved label is a string somebody can
+   type, and § 16.5 says why that matters.
+4. **Select marks and assign them.** The genuinely new interaction: rubber-band
+   or click-to-toggle over existing marks, then "Assign to…" offering a
+   material, an assembly, or a plain name. Moving marks between groups is a
+   `takeoff_stamps.groupId` update — the column is already there.
+5. **Flag the unassigned.** A count of unassigned marks per sheet, and a mark
+   style that reads as provisional. Derived, not stored.
+
+**Estimate: steps 1–2 are a day each, step 3 half a day, step 4 is the real
+work — two to three days — and step 5 half a day.** Step 4 carries all the
+interaction risk, because selecting on a zoomable canvas has to coexist with
+panning and with the armed tools, and CLAUDE.md § "a comment claiming that
+SOMETHING ELSE handles it" records what happened last time a drawing gesture
+was assumed not to reach another layer.
+
+### 16.5 Two decisions to make before building step 3
+
+- **Is the holding group per SHEET or per BID?** Per sheet reads better — "11
+  unassigned on this sheet" — but a bid-wide holding group makes assigning in
+  one pass easier. Leaning per sheet, matching how every other count panel is
+  keyed.
+- **Does a reserved label need a real flag?** A label like "Unassigned" is a
+  string an estimator can type themselves, and then their count silently joins
+  the holding pen. A boolean column is one additive migration and removes the
+  class. Recommend the column when step 3 is built, not before.
+
+### 16.6 Why this is also the AI landing strip
+
+An AI suggestion has exactly the shape of an unassigned mark: a position on a
+sheet, no price behind it, and a human decision pending. If marks can already
+land unassigned, be reviewed and be assigned in bulk, the reader's output needs
+no second mechanism — it becomes a source of marks in the holding group, with
+the same select-and-assign flow and the same flag.
+
+That also keeps CLAUDE.md § "manual mode is the product" true by construction:
+the manual path is not a degraded version of the AI path, it is the SAME path,
+and the AI just fills it faster.
