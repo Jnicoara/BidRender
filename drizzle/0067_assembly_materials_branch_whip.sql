@@ -1,0 +1,51 @@
+-- Mark which component line is the branch wire to the NEXT device.
+--
+-- One statement — see 0053, 0061, 0065. The per-bid dial that scales it is
+-- 0068; two tables means two files, so a failure can only ever mean "that
+-- statement failed and nothing was applied".
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- A plain ADD with a default that reproduces today's behaviour exactly. Old
+-- code ignores it; new code against an old database dies on a bare select().
+-- CLAUDE.md § "Deploying a migration: THREE STEPS, NOT TWO". **Step 3 is empty
+-- in this file and in 0068** — no existing column changes meaning, and the
+-- backfill that marks the shipped recipes is a SEEDER repair pass rather than
+-- SQL, for the reason below. Saying step 3 is empty is the point; an empty
+-- step 3 is still three steps.
+--
+-- Hand-written, not generated. `drizzle-kit generate` diffs against its own
+-- snapshot and `drizzle/meta/` has none for the hand-written files since 0046,
+-- so it re-emits everything and would die on `Duplicate column name`.
+--
+-- ── WHY THIS IS ON THE LINE AND NOT A NUMBER ON THE ASSEMBLY ────────────────
+-- D18 says devices carry the branch wiring between each other and traced runs
+-- are homeruns only. The first design put a `whipFeet` number on `assemblies` —
+-- and that would have counted the same wire twice INSIDE the recipe, because
+-- the starter assemblies already carry it as a component line: the standard
+-- receptacle's `12-2 NM-B, qty 25` IS the cable to the next receptacle.
+--
+-- It also has to be a flag rather than an assumption that "the wire line is the
+-- whip", because it is not always. The dedicated 20A receptacle carries 35 ft
+-- and its own seed comment says that INCLUDES its own home run; the panel's
+-- 40 ft of #8 THHN is feeder. Only the recipe's author knows which is which.
+--
+-- And a marked line keeps the whip attached to a real MATERIAL. You cannot
+-- order "20 ft of whip"; you order 12-2 NM-B, and the materials list needs the
+-- name, the unit and the price that come with it.
+--
+-- ── NOT NULL DEFAULT FALSE, and that is not the rule-6 mistake ──────────────
+-- Elsewhere in this app a new nullable column exists so "nobody has said" and
+-- "deliberately zero" stay apart. There is no third state here: a line either
+-- IS the branch wire to the next device or it is not, and every line that
+-- exists today is not. So false is a correct answer for every existing row
+-- rather than a guess standing in for one, and the app behaves exactly as it
+-- did until somebody marks a line.
+--
+-- ── WHAT THE FLAG BUYS, once the code reads it ──────────────────────────────
+-- The per-job dial (0068) scales these lines and nothing else, so a building
+-- laid out tighter or looser is one number instead of editing every assembly.
+-- Traced footage is never scaled — it is measured, and § 5a forbids padding it.
+-- And when AI routing between fixtures lands, it retires these lines for the
+-- devices that run covers, PER DEVICE: routing one circuit of six troffers must
+-- leave the other forty alone.
+ALTER TABLE `assembly_materials` ADD `isBranchWhip` boolean DEFAULT false NOT NULL;

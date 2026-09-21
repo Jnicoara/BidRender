@@ -40,6 +40,15 @@ const qtySchema = z.number().min(0).max(999999);
 const materialLineSchema = z.object({
   materialId: z.number().int().positive(),
   qty: qtySchema,
+  /**
+   * This line is the branch wire to the NEXT device (D18).
+   *
+   * Defaults false, which is what every line was before the flag existed, so an
+   * older caller that omits it changes nothing. Only a marked line is scaled by
+   * the per-bid dial and only a marked line is retired when AI routing covers
+   * the device — traced footage is never touched by either.
+   */
+  isBranchWhip: z.boolean().default(false),
 });
 
 const materialsSchema = z.array(materialLineSchema).max(200);
@@ -151,6 +160,7 @@ export const assembliesRouter = router({
       input.materials.map(line => ({
         materialId: line.materialId,
         qty: toDecimal(line.qty),
+        isBranchWhip: line.isBranchWhip,
       }))
     );
     await db.setAssemblyModifiers(id, input.modifierIds);
@@ -205,6 +215,10 @@ export const assembliesRouter = router({
         materials.map(line => ({
           materialId: line.materialId,
           qty: toDecimal(line.qty),
+          // Carried, not defaulted. A save that omitted this would clear every
+          // whip on the recipe — CLAUDE.md § rule 7: a form that cannot edit a
+          // field must not clear it.
+          isBranchWhip: line.isBranchWhip,
         }))
       );
     }

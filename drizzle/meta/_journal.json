@@ -470,6 +470,13 @@
       "when": 1789955600000,
       "tag": "0066_assembly_materials_labor_override",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "5",
+      "when": 1789955700000,
+      "tag": "0067_assembly_materials_branch_whip",
+      "breakpoints": true
     }
   ]
 }

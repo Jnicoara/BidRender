@@ -35,10 +35,24 @@
  */
 import type { ProjectType } from "../../drizzle/schema";
 
+/**
+ * ── Which line is the BRANCH WHIP (D18) ──────────────────────────────────────
+ * Devices carry the wiring between each other and a traced run is the homerun
+ * back to the panel, so the cable already in these recipes IS the whip — a
+ * receptacle's 25 ft of 12-2 NM-B is what reaches the next receptacle.
+ *
+ * It is declared per LINE rather than assumed, because "the wire line is the
+ * whip" is false twice in this very file: the dedicated 20A receptacle's 35 ft
+ * includes its own home run, and the panel's 40 ft of #8 THHN is feeder.
+ * Neither is branch wire and neither may be scaled by the per-job dial or
+ * retired by AI routing.
+ */
 export type BaselineAssemblyMaterial = {
   /** Must match a BASELINE_MATERIALS name exactly. */
   material: string;
   qty: number;
+  /** This line is the branch wire to the next device. Omitted means no. */
+  branchWhip?: boolean;
 };
 
 export type BaselineAssembly = {
@@ -102,7 +116,7 @@ export const BASELINE_ASSEMBLIES: BaselineAssembly[] = [
       { material: "Single-gang box", qty: 1 },
       { material: "Duplex receptacle", qty: 1 },
       { material: "Wall plate", qty: 1 },
-      { material: "12-2 NM-B", qty: 25 },
+      { material: "12-2 NM-B", qty: 25, branchWhip: true },
       { material: "Wire nuts", qty: 3 },
     ],
   },
@@ -115,13 +129,19 @@ export const BASELINE_ASSEMBLIES: BaselineAssembly[] = [
       { material: "Single-gang box", qty: 1 },
       { material: "GFCI receptacle", qty: 1 },
       { material: "Wall plate", qty: 1 },
-      { material: "12-2 NM-B", qty: 25 },
+      { material: "12-2 NM-B", qty: 25, branchWhip: true },
       { material: "Wire nuts", qty: 3 },
     ],
   },
   {
     // 35 ft rather than 25: this one includes its own home run, and so also
     // the breaker — it creates a new circuit rather than extending one.
+    //
+    // DELIBERATELY NOT a branch whip (D18). Part of that 35 ft is the homerun,
+    // which a traced run would own, so marking it would scale and retire wire
+    // that is not branch wiring. Splitting it into a marked branch line and an
+    // unmarked homerun line is the honest fix whenever somebody wants the dial
+    // to reach it.
     name: "Dedicated 20A receptacle",
     category: "Devices",
     projectType: "both",
@@ -144,7 +164,7 @@ export const BASELINE_ASSEMBLIES: BaselineAssembly[] = [
       { material: "Single-gang box", qty: 1 },
       { material: "Single-pole switch", qty: 1 },
       { material: "Wall plate", qty: 1 },
-      { material: "14-2 NM-B", qty: 20 },
+      { material: "14-2 NM-B", qty: 20, branchWhip: true },
       { material: "Wire nuts", qty: 3 },
     ],
   },
@@ -157,7 +177,7 @@ export const BASELINE_ASSEMBLIES: BaselineAssembly[] = [
       { material: "Single-gang box", qty: 1 },
       { material: "Dimmer", qty: 1 },
       { material: "Wall plate", qty: 1 },
-      { material: "14-2 NM-B", qty: 20 },
+      { material: "14-2 NM-B", qty: 20, branchWhip: true },
       { material: "Wire nuts", qty: 3 },
     ],
   },
@@ -173,7 +193,7 @@ export const BASELINE_ASSEMBLIES: BaselineAssembly[] = [
     materials: [
       { material: '4" square box', qty: 1 },
       { material: "Fixture mounting bracket", qty: 1 },
-      { material: "14-2 NM-B", qty: 20 },
+      { material: "14-2 NM-B", qty: 20, branchWhip: true },
       { material: "Wire nuts", qty: 3 },
     ],
   },
@@ -184,7 +204,7 @@ export const BASELINE_ASSEMBLIES: BaselineAssembly[] = [
     baseLaborHours: 1.5,
     materials: [
       { material: "Fan-rated ceiling box", qty: 1 },
-      { material: "14-2 NM-B", qty: 20 },
+      { material: "14-2 NM-B", qty: 20, branchWhip: true },
       { material: "Wire nuts", qty: 4 },
     ],
     // Fans go in overhead, on a ladder, every time.

@@ -152,6 +152,14 @@ type MaterialLine = {
    */
   laborHours: string | null;
   overrideLaborHours: string | null;
+  /**
+   * This line is the branch wire to the NEXT device (D18).
+   *
+   * Carried in the draft and sent on save. A save that dropped it would clear
+   * every whip on the recipe — CLAUDE.md § rule 7, a form that cannot edit a
+   * field must not clear it. Here the form CAN edit it, so it must round-trip.
+   */
+  isBranchWhip: boolean;
 };
 
 type Draft = {
@@ -608,6 +616,9 @@ function AssemblyBuilder({
             // no override — the recipe has not disagreed with anything yet.
             laborHours: material.laborHours ?? null,
             overrideLaborHours: null,
+            // Nothing is branch wire until the estimator says it is. Guessing
+            // from the category would mark the panel's feeder as a whip.
+            isBranchWhip: false,
           },
         ],
       };
@@ -846,6 +857,45 @@ function AssemblyBuilder({
                     <span className="text-xs text-muted-foreground w-12 shrink-0">
                       {line.unitOfSale === "foot" ? "ft" : line.unitOfSale}
                     </span>
+                    {/*
+                      WHICH LINE IS THE WIRE TO THE NEXT DEVICE (D18).
+
+                      A per-ROW control rather than one picker under the list,
+                      because the data allows more than one marked line and a
+                      single picker would silently drop the others on save —
+                      rule 7 again. It maps one-to-one with what is stored, so
+                      there is nothing it can fail to round-trip.
+
+                      Quiet when off: an outline button that says what it would
+                      do. Most rows are never marked, and a loud control on
+                      every part of every recipe is the clutter § "Customization
+                      available, but never in the way" is about.
+                    */}
+                    <Button
+                      size="sm"
+                      variant={line.isBranchWhip ? "secondary" : "ghost"}
+                      className={cn(
+                        "h-7 px-2 text-[0.7rem] shrink-0",
+                        line.isBranchWhip
+                          ? "text-foreground"
+                          : "text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                      )}
+                      onClick={() =>
+                        setDraft(d => ({
+                          ...d,
+                          materials: d.materials.map((l, i) =>
+                            i === index
+                              ? { ...l, isBranchWhip: !l.isBranchWhip }
+                              : l
+                          ),
+                        }))
+                      }
+                      aria-pressed={line.isBranchWhip}
+                      aria-label={`Mark ${line.name} as the branch wire to the next device`}
+                      title="Branch wire — the cable this device carries to the next one"
+                    >
+                      Branch wire
+                    </Button>
                     <span className="font-mono text-sm w-20 text-right shrink-0">
                       {money(line.costPerUnit * line.qty)}
                     </span>
@@ -1239,6 +1289,8 @@ export default function AssembliesLibraryPage() {
             materials: draft.materials.map(m => ({
               materialId: m.materialId,
               qty: m.qty,
+              // Round-trips, so saving a recipe cannot unmark its whips.
+              isBranchWhip: m.isBranchWhip,
             })),
             modifierIds: draft.modifierIds,
           });
@@ -1274,6 +1326,7 @@ export default function AssembliesLibraryPage() {
         costPerUnit: Number(m.costPerUnit),
         laborHours: m.laborHours,
         overrideLaborHours: m.overrideLaborHours,
+        isBranchWhip: m.isBranchWhip,
       })),
       modifierIds: detail.modifierIds,
     };
@@ -1299,6 +1352,8 @@ export default function AssembliesLibraryPage() {
               materials: draft.materials.map(m => ({
                 materialId: m.materialId,
                 qty: m.qty,
+                // Round-trips, so saving a recipe cannot unmark its whips.
+                isBranchWhip: m.isBranchWhip,
               })),
               modifierIds: draft.modifierIds,
             },

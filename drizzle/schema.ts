@@ -1033,6 +1033,40 @@ export const assemblyMaterials = mysqlTable(
       scale: 4,
     }),
 
+    /**
+     * This line is the branch wire to the NEXT device (D18).
+     *
+     * ── Devices own the wire between each other; runs own the homerun ───────
+     * A troffer includes an average whip of MC to the next fixture, a
+     * receptacle the cable to the next receptacle — and the starter recipes
+     * already carry exactly that, as a component line. So the whip is a
+     * PROPERTY OF THE LINE rather than a number on the assembly: a separate
+     * number would count the same wire twice inside one recipe.
+     *
+     * ── Why a flag, and not "the wire line is the whip" ─────────────────────
+     * Because that is not always true. The dedicated 20A receptacle carries
+     * 35 ft INCLUDING its own home run; the 200A panel's 40 ft of #8 THHN is
+     * feeder. Only whoever wrote the recipe knows which line is branch wire.
+     *
+     * ── It keeps the whip attached to a real material ───────────────────────
+     * You cannot order "20 ft of whip". The marked line names 12-2 NM-B, with
+     * its unit and its price, so the materials list stays orderable.
+     *
+     * ── NOT NULL, unlike most new columns here ──────────────────────────────
+     * There is no "nobody has said" state: a line either is the branch wire or
+     * it is not, and every line that existed before this was not. So false is
+     * an answer rather than a guess, and nothing changes until a line is
+     * marked. Contrast `overrideLaborHours` above, where NULL genuinely means
+     * "follow the material".
+     *
+     * ── What reads it ───────────────────────────────────────────────────────
+     * `shared/branchWire.ts`, which decides whether a foot belongs to the
+     * assembly or the traced run before anything sums. The per-bid dial scales
+     * these lines only — measured footage is never padded (§ 5a) — and AI
+     * routing later retires them per DEVICE, never per assembly.
+     */
+    isBranchWhip: boolean("isBranchWhip").default(false).notNull(),
+
     sortOrder: int("sortOrder").default(0).notNull(),
   },
   t => [

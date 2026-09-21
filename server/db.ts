@@ -2523,6 +2523,13 @@ export type AssemblyMaterialLine = {
   laborHours: string | null;
   /** THIS recipe's disagreement with it. NULL means follow the material. */
   overrideLaborHours: string | null;
+  /**
+   * This line is the branch wire to the next device (D18).
+   *
+   * Required rather than optional, so a mapping that drops it cannot compile —
+   * which is what `assemblyMaterialLine` exists to guarantee at the copy sites.
+   */
+  isBranchWhip: boolean;
   category: Material["category"];
 };
 
@@ -2608,6 +2615,9 @@ export async function getAssemblyMaterialLines(
         is decided once, in `componentLaborUnit`.
       */
       overrideLaborHours: assemblyMaterials.overrideLaborHours,
+      // Whether this line is the branch wire to the next device. Lives on the
+      // recipe's row like the override above, so a material fork cannot move it.
+      isBranchWhip: assemblyMaterials.isBranchWhip,
     })
     .from(assemblyMaterials)
     .where(eq(assemblyMaterials.assemblyId, assemblyId))
@@ -2651,6 +2661,7 @@ export async function getAssemblyMaterialLines(
       qty: line.qty,
       sortOrder: line.sortOrder,
       overrideLaborHours: line.overrideLaborHours,
+      isBranchWhip: line.isBranchWhip,
       name: material.name,
       unitOfSale: material.unitOfSale,
       costPerUnit: material.costPerUnit,
@@ -2734,6 +2745,33 @@ export async function deleteAssemblyForever(id: number, userId: number) {
 }
 
 /** Replace an assembly's material lines wholesale. */
+/**
+ * A stored component line, in the shape `setAssemblyMaterials` writes.
+ *
+ * Takes the ROW. Every field that decides a quantity travels by construction,
+ * so adding a fourth cannot be forgotten at a copy site — which has now
+ * happened twice in this file's history with hand-written lists. Same reasoning
+ * as `circuitWire` in shared/takeoffQuantities.ts.
+ */
+export function assemblyMaterialLine(row: {
+  materialId: number;
+  qty: string;
+  overrideLaborHours: string | null;
+  isBranchWhip: boolean;
+}): {
+  materialId: number;
+  qty: string;
+  overrideLaborHours: string | null;
+  isBranchWhip: boolean;
+} {
+  return {
+    materialId: row.materialId,
+    qty: row.qty,
+    overrideLaborHours: row.overrideLaborHours,
+    isBranchWhip: row.isBranchWhip,
+  };
+}
+
 export async function setAssemblyMaterials(
   assemblyId: number,
   lines: Array<{
@@ -2741,6 +2779,8 @@ export async function setAssemblyMaterials(
     qty: string;
     /** NULL follows the material's own unit — it does not mean "no hours". */
     overrideLaborHours?: string | null;
+    /** This line is the branch wire to the next device. See D18. */
+    isBranchWhip?: boolean;
   }>
 ) {
   const db = await getDb();
@@ -2755,6 +2795,7 @@ export async function setAssemblyMaterials(
       materialId: line.materialId,
       qty: line.qty,
       overrideLaborHours: line.overrideLaborHours ?? null,
+      isBranchWhip: line.isBranchWhip ?? false,
       sortOrder: index,
     }))
   );
@@ -2841,15 +2882,18 @@ async function copyAssemblyChildren(
     disagreed with a material's labor unit would have silently gone back to
     following it the moment the assembly was forked, and nothing on screen
     would have said so.
+
+    ── SO IT IS NO LONGER A HAND-WRITTEN LIST ──────────────────────────────
+    It went to three fields on 2026-09-20 when `isBranchWhip` arrived, which
+    is the same trap arriving a second time in the same mapping. A forked
+    assembly that lost its whip flags would quietly stop carrying its branch
+    wire, and the only symptom would be a smaller bid.
+
+    `assemblyMaterialLine` takes the ROW, so there is nothing to destructure
+    and therefore nothing to forget — the shape CLAUDE.md prescribes for a
+    mapping that feeds a calculation, and the same reasoning as `circuitWire`.
   */
-  await setAssemblyMaterials(
-    toAssemblyId,
-    lines.map(line => ({
-      materialId: line.materialId,
-      qty: line.qty,
-      overrideLaborHours: line.overrideLaborHours,
-    }))
-  );
+  await setAssemblyMaterials(toAssemblyId, lines.map(assemblyMaterialLine));
   await setAssemblyModifiers(toAssemblyId, modifierIds);
 }
 
@@ -2948,6 +2992,65 @@ export async function seedBaselineAssemblies(): Promise<void> {
         .where(and(isNull(assemblies.userId), isNull(assemblies.laborRateId)));
     }
 
+    /**
+     * Mark the branch whips on recipes that shipped BEFORE the flag existed.
+     *
+     * Same shape and same reason as the role repair above: **the insert below
+     * only runs for assemblies not already present**, so without this D18 would
+     * reach nobody who already has a database — the flag would be false
+     * everywhere, the per-job dial would move nothing, and the guard would have
+     * no branch wire to point at. It would look built and do nothing.
+     *
+     * Deliberately narrow, three ways. Baseline rows only (`userId IS NULL`),
+     * so a user's own recipe is never touched. Only the exact
+     * assembly-name/material-name pairs the seed file declares, so a line
+     * somebody added to a starter is left alone. And it only ever sets the flag
+     * TRUE — if an estimator has unmarked one of ours, that is a decision, and
+     * re-marking it on the next restart is the "fills a gap, does not overwrite
+     * a decision" line the role pass draws, crossed.
+     *
+     * Idempotent: running it twice marks the same rows.
+     */
+    const whipPairs = BASELINE_ASSEMBLIES.flatMap(spec =>
+      spec.materials
+        .filter(line => line.branchWhip)
+        .map(line => ({ assembly: spec.name, material: line.material }))
+    );
+    for (const pair of whipPairs) {
+      await db
+        .update(assemblyMaterials)
+        .set({ isBranchWhip: true })
+        .where(
+          and(
+            eq(assemblyMaterials.isBranchWhip, false),
+            inArray(
+              assemblyMaterials.assemblyId,
+              db
+                .select({ id: assemblies.id })
+                .from(assemblies)
+                .where(
+                  and(
+                    isNull(assemblies.userId),
+                    eq(assemblies.name, pair.assembly)
+                  )
+                )
+            ),
+            inArray(
+              assemblyMaterials.materialId,
+              db
+                .select({ id: materials.id })
+                .from(materials)
+                .where(
+                  and(
+                    isNull(materials.userId),
+                    eq(materials.name, pair.material)
+                  )
+                )
+            )
+          )
+        );
+    }
+
     const existingRows = await db
       .select({ name: assemblies.name })
       .from(assemblies)
@@ -2977,6 +3080,7 @@ export async function seedBaselineAssemblies(): Promise<void> {
       const lines = spec.materials.map(line => ({
         materialId: materialIdByName.get(line.material),
         qty: line.qty.toFixed(4),
+        isBranchWhip: line.branchWhip ?? false,
       }));
       if (lines.some(line => line.materialId === undefined)) {
         const missing = spec.materials
@@ -3001,7 +3105,11 @@ export async function seedBaselineAssemblies(): Promise<void> {
 
       await setAssemblyMaterials(
         assemblyId,
-        lines as Array<{ materialId: number; qty: string }>
+        lines as Array<{
+          materialId: number;
+          qty: string;
+          isBranchWhip: boolean;
+        }>
       );
 
       const modifierIds = (spec.modifiers ?? [])

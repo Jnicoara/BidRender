@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-20]
 
+- **Say which part of a recipe is the wire to the next device.** Open an
+  assembly and each component now offers a "Branch wire" mark; the starter
+  recipes come with it already on the right line — the receptacle's 25 ft of
+  12-2 NM-B, the fixture's 20 ft of 14-2. That is the cable this device
+  carries to the next one, and marking it is what lets a later per-job dial
+  scale it, and what stops it being counted twice once traced runs reach a bid.
+
+  Two starters are deliberately NOT marked: the dedicated 20A receptacle,
+  because its 35 ft includes its own home run, and the 200A panel, because its
+  #8 THHN is feeder. Neither is branch wire.
+
 - **Groundwork so the wire between your devices is never counted twice.** Your
   device assemblies carry the branch wiring between each other — the whip of MC
   to the next fixture, the cable to the next receptacle — and a traced run is
