@@ -29,6 +29,17 @@ left as written rather than rewritten to match the rename.
 
 ## Pending / Future
 
+- [ ] **Before the priced catalog ships: give "nobody has priced this" its own
+      signal.** `shared/materialPricing.ts` and the Materials screen's unpriced
+      filter both decide it from `costPerUnit === 0`. That works only while
+      every shipped row is zero. The moment the pricing sheet lands in
+      `server/seed/materials/*` (CLAUDE.md § "Where a priced catalog lands"),
+      a zero stops meaning unpriced and the screen will report a fully-priced
+      catalog that no contractor has checked a line of — which is the exact
+      failure the $0 rule was written to prevent, arriving from the other side.
+      Needs a way to say "this is our example price, not yours": a column, or
+      comparing against the seed value. **Blocks the upload, not the sheet.**
+
 - [ ] Replace fractional resize recentering with true page-box centering in the PDF viewer
 - [ ] Ensure the PDF canvas stays fully within the left pane as the divider moves
 - [ ] Connect estimate engine to user's custom materials DB (fall back to built-in DB)

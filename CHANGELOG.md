@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-21]
 
+- **Wrote down where the catalog's prices will live, so nobody loads them the
+  wrong way.** Shipped prices belong in the seed files; the app re-applies them
+  from there on every start, which is how they reach existing databases and new
+  ones alike. Typing a price straight onto a shipped row would be silently
+  undone at the next restart. Prices a contractor types are their own copy and
+  are never touched — now proved by a test rather than promised by a comment.
+
 - **Fixed a pricing bug where a kit showed the shipped price instead of yours.**
   Editing a starter assembly makes your own copy of it, but a kit built before
   that edit still pointed at the original — so the kit priced at the shipped $0

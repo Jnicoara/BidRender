@@ -821,12 +821,62 @@ that differ in two words — so per-family slang is written once in a generator
 rather than 225 times by hand. Guidance and worked examples are in
 `server/seed/materials/types.ts`.
 
-**Every shipped material costs $0.** A stale estimate is indistinguishable on
-screen from a price the user checked, so it can be bid and won on numbers nobody
-verified; zero cannot be mistaken for a quote. The Materials screen flags every
+**Every shipped material costs $0 — until the pricing sheet lands, and then it
+comes from the SEED FILE.** See § "Where a priced catalog lands" below, which
+narrows this rule and says what has to be decided before it changes. A stale
+estimate is indistinguishable on screen from a price the user checked, so it can
+be bid and won on numbers nobody verified; zero cannot be mistaken for a quote. The Materials screen flags every
 unpriced row and filters down to exactly those (`shared/materialPricing.ts`).
 Tests must not borrow a shipped price for their arithmetic — price a fixture
 material instead, or the test is really asserting the seed data has not changed.
+
+## Where a priced catalog lands: THE SEED FILES, AND NOTHING ELSE
+
+**Decided 2026-09-21.** `server/seed/materials/*.ts` is the source of truth for
+every shipped price. When the pricing spreadsheet is finished, the numbers go
+**into those files**, not into a database.
+
+**Why there and nowhere else.** `seedBaselineMaterials` re-stamps every baseline
+row from the seed file on every server start, `costPerUnit` included
+(`backfillMaterialMetadata`). So a price written into the seed:
+
+- reaches **every existing database** on the next deploy, with no migration;
+- is what a **brand-new database** gets on its first boot;
+- is **re-applied** if anything ever edits a baseline row by hand, which makes
+  the seed file the thing that is actually true rather than the thing that was
+  true once.
+
+**The baseline account writes to the seed, never around it.** The plan to upload
+the sheet through a baseline account is a way of AUTHORING the seed file, not an
+alternative to it. Anything that ends with prices sitting only in `materials`
+rows is wrong, because the next startup re-stamps them from the file and the
+work silently disappears — or, worse, does not, and two databases then disagree
+about what the catalog costs with nothing saying which is right.
+
+**So: never type a price onto a baseline row.** Not in SQL, not through an admin
+screen, not "just to try it". Edit the seed module and deploy.
+
+**What this does NOT touch, ever: a price the contractor typed.** Editing a
+shipped material FORKS it — a new row carrying their `userId` — and the
+re-stamping pass is scoped `isNull(materials.userId)`, so it cannot reach a
+fork. That one `WHERE` clause is the whole protection, and
+`server/seedPreservesUserPrices.test.ts` is what stops it being a matter of
+care: remove the filter and the suite goes red with the contractor's $12.50
+coming back as the shipped zero.
+
+**This narrows the \"every shipped material costs $0\" rule below — it does not
+delete it.** The reason for zero was that a plausible number nobody chose is
+indistinguishable on screen from one the contractor checked. That reasoning
+still holds for a number nobody has looked at. What changes is that a price the
+sheet has been through HAS been chosen, by the person who owns the product.
+
+**The part that still needs deciding, and it must not be skipped:** once shipped
+rows carry non-zero prices, `costPerUnit === 0` stops meaning "nobody has
+priced this". `shared/materialPricing.ts` and the Materials screen's unpriced
+filter both read it that way today. A separate signal is needed for "this is our
+example price, not yours" before the sheet lands, or the screen will quietly
+report a fully-priced catalog that no contractor has checked a line of. Written
+down here rather than discovered later — see `todo.md`.
 
 ## Brands — generic everywhere except panels and breakers
 

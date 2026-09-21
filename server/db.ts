@@ -1778,22 +1778,30 @@ async function seedBaselineMaterialsUnlocked(): Promise<void> {
  * clear survives the next startup; do not widen these NULL checks to cover
  * blank text, or a user who deletes a term will find it back tomorrow.
  *
- * NULL therefore means "never set, inherit it" — never "empty". Clearing the
- * aliases in the Materials editor stores an empty string on purpose, so the
- * clear survives the next startup; do not widen these NULL checks to cover
- * blank text, or a user who deletes a term will find it back tomorrow.
- *
  * Fully custom rows (no baselineId) are left alone — there is nothing to
  * inherit from, and guessing would be worse than leaving them blank.
  *
- * ── Price is re-stamped too, and only ever downward to zero ──────────────────
- * Every shipped row is priced at zero (see UNPRICED), so this pass drags a
- * baseline row that still carries one of the old estimate prices back to zero.
- * That is the point rather than a side effect: a stale estimate is
- * indistinguishable on screen from a price the user checked, so it can be bid
- * on without anyone noticing, whereas zero is flagged as needing a price and
- * can be filtered for. It cannot touch a user's own number — a user who edits
- * a price is editing their FORK, and forks are not in this pass at all.
+ * ── Price is re-stamped too, and THIS IS WHERE SHIPPED PRICES COME FROM ──────
+ * The seed file is the source of truth for `costPerUnit` on a baseline row, so
+ * this pass is how a catalog price reaches every existing database with no
+ * migration and how a fresh one gets it on first boot. Decided 2026-09-21;
+ * CLAUDE.md § "Where a priced catalog lands" has the whole rule, including why
+ * nothing may type a price onto a baseline row by hand.
+ *
+ * Every shipped row is priced at zero today (see UNPRICED), so what the pass
+ * currently does is drag a baseline still carrying one of the old estimate
+ * prices back down. That is deliberate rather than incidental: a stale estimate
+ * is indistinguishable on screen from a price the user checked, whereas zero is
+ * flagged as needing one. When the pricing sheet lands the same mechanism
+ * carries real numbers instead, unchanged.
+ *
+ * ── It cannot touch a user's own number, and that is ONE `WHERE` clause ──────
+ * A user who edits a price is editing their FORK, and the query above is scoped
+ * `isNull(materials.userId)`, so forks are not in this pass at all. Widening
+ * that filter would walk over every price a contractor has typed, on every
+ * startup, silently. `server/seedPreservesUserPrices.test.ts` goes red if it
+ * ever does — proven red by deleting the filter, which returned the fixture's
+ * $12.50 as $0.
  */
 async function backfillMaterialMetadata(): Promise<void> {
   const db = await getDb();
