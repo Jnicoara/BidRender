@@ -6,6 +6,20 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-20]
 
+- **Editing a job-condition modifier no longer switches it off.** Open one of
+  the modifiers BidRidge ships — "Working at height", "Occupied building" —
+  save it, and it silently stopped applying to every assembly that used it.
+  Saving it at the SAME percentage did it too, so there was nothing about the
+  edit to notice: a ceiling fan carrying +12% quietly went back to 1.50 hours
+  from 1.68. Fixed, and the same fix covers assemblies, kits and the figures
+  frozen onto a bid line.
+
+  This was the third place the same underlying fault turned up — editing
+  anything BidRidge ships makes your own copy, and things pointing at the
+  original were not following the copy. Labour rates had it and were fixed
+  before; materials were fixed this morning. There is now one rule all three
+  read, so a fourth cannot behave differently.
+
 - **Pricing a starter material now reaches the assemblies built from it.** It
   did not before, and nothing said so: editing one of the materials BidRidge
   ships makes your own copy of it, and any assembly using that material went on

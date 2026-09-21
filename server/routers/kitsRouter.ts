@@ -16,6 +16,7 @@ import { router, scoped } from "../_core/trpc";
 import { LIBRARY_STATUSES } from "../../drizzle/schema";
 import { calculateLineItem, sumDirectCost } from "../../shared/pricing";
 import { hourlyCostFor } from "../../shared/laborRateLookup";
+import { appliedModifiers } from "../../shared/modifierLookup";
 import { DEFAULT_TRADE } from "../../shared/trades";
 import * as db from "../db";
 
@@ -65,12 +66,15 @@ async function priceAssemblyAt(
   const detail = await db.getAssemblyDetail(assemblyId, userId);
   if (!detail) return null;
 
-  const applied = cache.modifiers
-    .filter(m => detail.modifierIds.includes(m.id))
-    .map(m => ({
-      name: m.name,
-      laborAdjustmentPct: Number(m.laborAdjustmentPct),
-    }));
+  // Resolved rather than matched by id — see shared/modifierLookup.ts. A kit
+  // repeats its assemblies, so a modifier lost here is lost once per unit.
+  const applied = appliedModifiers(
+    cache.modifiers,
+    detail.modifierIds
+  ).applied.map(m => ({
+    name: m.name,
+    laborAdjustmentPct: Number(m.laborAdjustmentPct),
+  }));
 
   const laborRate = hourlyCostFor(cache.rates, detail.laborRateId);
 

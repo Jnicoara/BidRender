@@ -176,6 +176,7 @@ import {
 import { BASELINE_KITS } from "./seed/baselineKits";
 import { TRADE_ALL, normalizeTradeId, resolveForTrade } from "../shared/trades";
 import { hourlyCostFor } from "../shared/laborRateLookup";
+import { appliedModifiers } from "../shared/modifierLookup";
 import { resolveMaterial, materialIdsToFetch } from "../shared/materialLookup";
 import {
   containsPattern,
@@ -4421,9 +4422,16 @@ async function snapshotForAssembly(
     getLibraryLaborRates(userId),
   ]);
 
-  const applied = activeModifiers.filter(m =>
-    detail.modifierIds.includes(m.id)
-  );
+  /*
+    Resolved, not filtered by id. Editing a shipped modifier forks it and the
+    stored id stops matching, so the old filter came back empty and the
+    adjustment vanished — measured 0.12 -> 0 on 2026-09-20.
+
+    This path is the worst place for that to happen: it builds the SNAPSHOT
+    frozen onto a bid line, so a modifier lost here is lost on that bid for
+    ever, and re-pricing later cannot bring it back.
+  */
+  const { applied } = appliedModifiers(activeModifiers, detail.modifierIds);
   const modifierPct = applied.reduce(
     (sum, m) => sum + Number(m.laborAdjustmentPct),
     0

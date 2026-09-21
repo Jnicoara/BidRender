@@ -46,12 +46,10 @@
  * arriving by accident.
  */
 
+import { resolveForkedRow, type ForkableRow } from "./forkedRows";
+
 /** The subset of a material row needed to follow a fork. */
-export type ResolvableMaterial = {
-  id: number;
-  /** The shipped row this is a fork OF, or null for a baseline / own row. */
-  baselineId: number | null;
-};
+export type ResolvableMaterial = ForkableRow;
 
 /**
  * The material an assembly means by `materialId`, following a fork if one
@@ -80,14 +78,8 @@ export function resolveMaterial<T extends ResolvableMaterial>(
   materials: readonly T[],
   materialId: number | null | undefined
 ): T | undefined {
-  if (materialId == null) return undefined;
-
-  const direct = materials.find(material => material.id === materialId);
-  if (direct) return direct;
-
-  // The id points at a starter the user has since forked; the fork is what
-  // they now mean by that material.
-  return materials.find(material => material.baselineId === materialId);
+  // Delegates so the three resolvers cannot drift. See shared/forkedRows.ts.
+  return resolveForkedRow(materials, materialId);
 }
 
 /**

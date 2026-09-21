@@ -19,6 +19,7 @@
  * failing that, for the user's fork OF that id.
  */
 import { effectiveHourlyRate } from "./pricing";
+import { resolveForkedRow } from "./forkedRows";
 
 /** The subset of a labor rate row needed to resolve and price it. */
 export type ResolvableLaborRate = {
@@ -39,14 +40,9 @@ export function resolveLaborRate<T extends ResolvableLaborRate>(
   rates: T[],
   laborRateId: number | null | undefined
 ): T | undefined {
-  if (laborRateId == null) return undefined;
-
-  const direct = rates.find(rate => rate.id === laborRateId);
-  if (direct) return direct;
-
-  // The id points at a starter the user has since forked; the fork is what
-  // they now mean by that role.
-  return rates.find(rate => rate.baselineId === laborRateId);
+  // Delegates so the resolvers for every forkable thing cannot drift apart.
+  // This one was written first and the generic was lifted out of it.
+  return resolveForkedRow(rates, laborRateId);
 }
 
 /**

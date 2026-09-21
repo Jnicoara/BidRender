@@ -21,6 +21,7 @@ import {
 } from "../../drizzle/schema";
 import { calculateLineItem, calculateBidPrice } from "../../shared/pricing";
 import { hourlyCostOf, resolveLaborRate } from "../../shared/laborRateLookup";
+import { appliedModifiers } from "../../shared/modifierLookup";
 import * as db from "../db";
 
 /**
@@ -398,12 +399,15 @@ export const assembliesRouter = router({
         db.getLibraryLaborRates(ctx.scope.dataUserId),
       ]);
 
-      const applied = allModifiers
-        .filter(m => detail.modifierIds.includes(m.id))
-        .map(m => ({
-          name: m.name,
-          laborAdjustmentPct: Number(m.laborAdjustmentPct),
-        }));
+      // Resolved rather than matched by id, so a forked modifier still
+      // applies. See shared/modifierLookup.ts for what it cost when it did not.
+      const applied = appliedModifiers(
+        allModifiers,
+        detail.modifierIds
+      ).applied.map(m => ({
+        name: m.name,
+        laborAdjustmentPct: Number(m.laborAdjustmentPct),
+      }));
 
       // Follows a fork: editing a starter role gives it a new id, and the
       // assembly is still pointing at the old one. See shared/laborRateLookup.
