@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-20]
 
+- **Groundwork so the wire between your devices is never counted twice.** Your
+  device assemblies carry the branch wiring between each other — the whip of MC
+  to the next fixture, the cable to the next receptacle — and a traced run is
+  the homerun back to the panel. Each foot belongs to one of them, decided in
+  one place before anything is added up, so the overlap cannot happen rather
+  than being caught afterwards. Nothing visible changes yet; this is the rule
+  the next few pieces are built on.
+
 - **An assembly shows what its parts add up to, beside what you typed.** Build
   a duplex rough-in out of a box, a device, a plate and some wire and it says
   "Your parts add to 0.62 h; you typed 0.45 h". **The gap is the point, not a
