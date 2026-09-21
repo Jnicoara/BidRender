@@ -3540,6 +3540,120 @@ and the colour separates counts within a shape. Nothing here needs building; it
 needs connecting to step 3, so the shape a symbol will be marked with is visible
 in the list before a single mark is placed.
 
+### REORDERED 2026-09-21 — memory first, bulk scanning last
+
+**At the estimator's instruction, and it inverts the order above.** The flow in
+steps 1–5 is still the right flow. What changed is which end of it gets built
+first, and the reason is one sentence from the person who would use it:
+
+> One symbol at a time is fine if it only happens ONCE.
+
+Circling a symbol and saying what it is was never the burden this section
+assumed. Doing it again on the next set is. So the value is not in reading
+twenty symbols in one press — it is in never reading the same symbol twice.
+
+**The order now:**
+
+|         | What                                                                          | Blocked on                           |
+| ------- | ----------------------------------------------------------------------------- | ------------------------------------ |
+| **(a)** | **Capture remembers, and suggests on the next set.**                          | Nothing.                             |
+| **(b)** | **An AI suggestion can become a PLAIN COUNT**, with no library row behind it. | Nothing.                             |
+| **(c)** | **Bulk scan the legend, then the set.** Steps 1 and 4 above.                  | § 15's bake-off, which needs tiling. |
+
+**The ordering is not a preference, it is what is unblocked.** (c) is the tiled
+read, and the tiled read is gated on a bake-off nobody has run — § 5m says so at
+length and § 15 has said so since it was written. (a) and (b) are gated on
+nothing at all. Shipping the blocked half first is how a captured legend that
+counts nothing becomes setup work with no payoff, which is the exact failure the
+2026-09-19 rewrite was written to avoid — arriving from the other direction.
+
+**(b) is small and it is the one that removes a precondition.** A reader finding
+is a proposal about a SHAPE on a drawing; it does not need a library entry to
+become a count. Level 1 already exists for exactly this (§ 5e), and the four-way
+picker in step 3 already offers it. What is missing is that an accepted AI
+finding currently wants somewhere to land. Letting it land on a plain count is
+the same rule CLAUDE.md states for the catalog: setup before value is what made
+the old stamp tool unusable on a fresh set.
+
+### THE RULE THAT DOES NOT MOVE: a remembered match never silently applies
+
+A remembered symbol comes back as a **suggestion on the next set, confirmed
+there**, and never as a mark that appeared because a previous job had one.
+
+This is § 5c applied to memory rather than to a model, and it matters more here,
+because a remembered match is more plausible than a fresh guess and therefore
+easier to accept without looking. Two architects draw a duplex receptacle
+differently; one of them draws it the way the other draws a floor box. A
+silently applied memory is a wrong count with a confident provenance, which is
+the worst kind this app produces.
+
+So: remembered matches arrive in the same list, in the same unticked state an
+uncertain finding arrives in, and the set they came from is named on the row.
+
+### What is already built, measured 2026-09-21 rather than assumed
+
+**MOST OF (a) IS ALREADY SHIPPED, and a first draft of this section said
+otherwise.** It claimed "there is no suggestion surface on a new set". That is
+wrong, and C9 in `references/takeoff-spec.md` has said so all along — it is
+marked **Works**, with "the link is remembered on every future job". Checked
+2026-09-21 rather than argued with:
+
+- `symbol_links` is scoped to the USER, not the bid — `label`, `lookupKey`,
+  `assemblyId`, `thumbnail`, `capturedFromSheetId`.
+- `takeoffStamps.symbols` is documented in its own comment as "every symbol
+  this user has captured, across all their jobs", and takes no bid argument.
+- `TakeoffPage` loads it unconditionally, so opening a brand-new set already
+  shows every symbol you have ever captured, one click from stamping.
+
+**So (a) is not "build memory". It is "make the memory notice THIS set".** The
+gap is narrower and more interesting than a missing surface:
+
+- **Nothing matches a remembered symbol against what is on the sheet in front
+  of you.** The panel is a flat list of everything you have ever captured, in
+  capture order, whether or not any of it appears here. On the tenth job that
+  list is the problem rather than the feature.
+- **Nothing populates `capturedFromSheetId`**, so a row cannot say which set it
+  was learned from — and the rule above requires saying so on the row.
+- **`assemblyId` is the only destination**, which is exactly what (b) widens.
+
+**The rule is not currently violated, and that is worth stating.** A remembered
+symbol appears in a list; it does not place a mark. Nothing silently applies
+today. What (a) must not do is buy matching at the price of that property.
+
+### And the overlap question, asked and NOT answered
+
+**The instruction was to check rather than assume how often the two real sets
+share symbols. The honest answer is that it cannot be measured from anything
+the app or the files currently hold**, and saying so is worth more than a
+number nobody could reproduce:
+
+- **Neither set has ever been counted.** `takeoff_stamps` holds zero rows for
+  Old Blueridge school and zero for pine st. The stamps in the database belong
+  to small scratch bids.
+- **`symbol_links` holds three rows**, all generic fixtures with a NULL
+  `capturedFromSheetId`. Nothing was ever captured from either set.
+- **pine st has NO text layer at all** — 0 characters across 5 pages. Old
+  Blueridge has ~4,500 characters, and it is OCR of a scan rather than drawn
+  text: "oondut", "Normetalle", "Riating", and a Cyrillic е inside "Surface".
+  So the two sets cannot even be compared by name.
+- **They are different kinds of job** — a school against a set whose first sheet
+  is "IL01 Illumination Plan" — which is the LEAST favourable pair for overlap.
+  Two sets from one architect doing similar work is where memory pays, and that
+  is not what these two are.
+
+**So do not order the work on this.** The value of memory comes from a
+contractor bidding similar work repeatedly, which is a fact about their year and
+not about two fixtures. The cheap way to learn it is to **instrument (a) once it
+ships** — record how often a remembered suggestion is accepted, rejected, or
+never offered — which answers the real question with real sets instead of
+answering a smaller question with these.
+
+**One correction to step 1 above, from the same measurement.** It says the text
+layer was "measured worthless on both real sets". That is right about the
+legend, and it is worth being precise: one set has no text whatsoever, and the
+other's is OCR too degraded to trust — which is a stronger statement than
+"worthless" and it also decides § 5m's schedule cross-check. See there.
+
 ### What this rewrite changes, and what it does not
 
 **The build order does not change.** § 9.6 stands: legend capture is Phase 9a
@@ -3654,7 +3768,14 @@ Three things attack it. Only one is cheap, and the first one is not optional:
    10 is actually next, because the answer goes stale if the model or the detail
    level moves in between.
 2. **Cross-check against a schedule — C14 in takeoff-spec, essential, not
-   built.** A lighting or panel schedule on the drawings states quantities
+   built.** **Measured 2026-09-21, and it changes how this gets built:** Old
+   Blueridge school DOES carry a lighting fixture schedule (page 3, with types,
+   catalogue numbers and wattages) and panel schedules (page 2) — but only as
+   OCR of a scan, degraded enough to read "Riating" for "Rating". So the
+   schedule must be read as an IMAGE, not lifted from the text layer. That
+   matters most for the numbers, which is the whole point of the cross-check: a
+   quantity mis-OCRed is a confident wrong comparison, and pine st has no text
+   layer at all to fall back on. A lighting or panel schedule on the drawings states quantities
    independently of any symbol on a plan. **"The schedule says 43 type-A
    fixtures; the reader found 40"** is the single most valuable sentence this
    feature could ever print, because it is the only one that names a MISS rather
@@ -3669,6 +3790,94 @@ certainty about what it did not see is the least reliable number it produces,
 and "94% complete" printed beside a count would do precisely the damage the
 third tier exists to prevent — an unreliable number, styled like a fact, one
 glance from a quantity.
+
+### 5m.2 AI ROUTING — the wire between devices. Specified 2026-09-21, not built
+
+Everything above is about the reader COUNTING. This is the other half of the AI
+work and it is the one D18 was designed around: the app already knows the whip
+is an interim that retires per device when something routes the circuit. This
+says what that something is.
+
+#### The drawing does not show the route, so the AI ESTIMATES one
+
+**Say that first, because everything else follows from it.** A lighting plan
+shows where fixtures are and which circuit they are on. It almost never shows
+the physical path of the wire between them. So the AI is not READING a route
+off the drawing — it is proposing one, the way an estimator does: **square to
+the building, along walls and ceilings**, not diagonal, not through anything.
+
+That makes routed footage an **estimate**, and it must be labelled as one
+wherever it appears. It is a better estimate than a whip, because a whip is one
+average number for every device of a type on every job, and this one has looked
+at where the fixtures actually are. It is still not a measurement, and the
+moment it is presented as one, § 5a's rule is broken.
+
+#### What it routes, on a lighting plan
+
+**Between all the lights on one circuit, and back to the switch or the
+occupancy sensor.** That is the branch wiring D18 gave to the devices, and it is
+exactly the footage the whip stands in for.
+
+**The homerun to the panel is a separate question**, and it is traced — by the
+AI or by hand. **The manual option never goes away.** § 5c and CLAUDE.md's
+standing AI rule both say it; here it is load-bearing rather than decorative,
+because a homerun is one line an estimator can draw in three seconds and the AI
+guessing it wrong is a long wrong number.
+
+#### The order, and each step is a gate on the next
+
+|       | Step                      | Why it is here and not earlier                                                                                                                                                                                                              |
+| ----- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1** | **Counting is reliable.** | Routing between devices it did not find is a route with holes in it, and the holes do not announce themselves. This is § 15's bake-off again, and § 5m's recall problem: until the miss rate is known, every number downstream inherits it. |
+| **2** | **Find the circuits.**    | You cannot route a circuit you cannot identify. Circuit identity comes from the drawing's own labelling, and reading it is a different job from recognising a symbol.                                                                       |
+| **3** | **Route.**                | Only now is there something to route: known devices, grouped by a known circuit.                                                                                                                                                            |
+| **4** | **Homeruns.**             | Last, and optional forever, because the manual path is complete without it.                                                                                                                                                                 |
+
+**Step 1 is the real gate and it is unchanged.** Nothing in this section can be
+built usefully before the bake-off, which is the same sentence § 5m already
+carries about checking. That is not a coincidence: routing is downstream of
+counting, so it inherits counting's unknown recall and multiplies it by footage.
+
+#### Review one CIRCUIT at a time
+
+The review unit for counting is a TYPE — forty lights in one row (§ 5m). **The
+review unit for routing is a circuit**, and that is a different shape on
+purpose: a route is a path between specific fixtures, and "accept all routes" is
+a press nobody can honestly make. One circuit shows as one proposed path over
+the drawing, with its footage, and is accepted or redrawn.
+
+That also makes the manual path the obvious fallback rather than a separate
+mode: rejecting a proposed route leaves the circuit exactly where a hand-traced
+run starts.
+
+#### The footage lands on the devices it covers, and ONLY those
+
+**This is already designed for and half-built.** D18's whip retires **per device
+instance, never per assembly** — routing one circuit of six troffers must not
+zero the whip for the other forty on the job. `shared/branchWire.ts` takes a
+per-device `routedByRunId` and excludes exactly those devices from the whip
+total, with `retiredWhipCount` travelling beside the number so a screen can say
+how many.
+
+What is missing is the claim itself: nothing sets `routedByRunId` yet, because
+nothing routes. The mechanism is the same shape as `endStampId` claiming a
+vertical — **a claimed answer, never inferred from proximity** (§ 5c).
+
+#### And it says, in words, that it is counting the wire between devices
+
+**Not a tooltip.** The estimator has to know, at the moment the footage appears,
+that this run is the branch wiring their assemblies would otherwise have
+carried — or they will trace it again by hand and count it twice. That is the
+double count D18 exists to prevent, arriving through the one door D18 does not
+guard.
+
+The voice already exists and should be reused rather than invented: "a cable's
+ground is inside the cable and is already in the Cable figure", "no vertical
+footage is in these numbers". Same register, on the totals, next to the number.
+
+**The standing AI rules apply unchanged.** Routing is a BUTTON — never a page
+load, never a sheet opening. And hand-tracing stays complete for somebody who
+never turns it on; a feature that only exists in the AI path is not shipped.
 
 ## 5n. A run type you can edit, and a run you can retype — ONE piece
 
