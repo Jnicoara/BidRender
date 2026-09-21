@@ -126,6 +126,7 @@ import { JobHeightsChip } from "@/components/takeoff/JobHeightsChip";
 import { RunEndsEditor, TraceEndsPickers } from "@/components/takeoff/runEnds";
 import {
   DISTRIBUTION_KIND,
+  traceEndsLabel,
   SUGGEST_WITHIN_INCHES,
   shouldSuggestStampLink,
 } from "@shared/takeoffHeights";
@@ -1631,8 +1632,29 @@ function PlanPane({
   );
 }
 
-/** Where the sticky trace ends are remembered. Machine-only name. */
-const TRACE_ENDS_KEY = "helixbid:trace-ends";
+/**
+ * Where the sticky trace ends are remembered — PER BID. Machine-only name.
+ *
+ * ── It used to be one key for every job, and that was the bug ──────────────
+ * Fixed 2026-09-20. `helixbid:trace-ends` carried no bid, so the pickers a
+ * job was left on became the pickers the NEXT job opened with — a different
+ * building, possibly months later, with "Panel → Receptacle" already loaded
+ * and nothing on screen having been decided for that job.
+ *
+ * Sticky is right and stays: § 5d argues it from "thirty homeruns off one
+ * panel", and thirty homeruns is one decision rather than sixty. But that is
+ * an argument about runs WITHIN a job. It never reached across jobs, and
+ * across jobs is where a stale end is least likely to be noticed, because
+ * nothing about opening a new bid suggests a picker is already set.
+ *
+ * So a new bid starts at the trap-2 default — `Distribution → not answered` —
+ * which counts no verticals until somebody says what is there.
+ *
+ * The old global key is deliberately left where it is rather than deleted.
+ * Nothing reads it, it holds no work, and removing somebody's stored data to
+ * tidy up is not worth the line.
+ */
+const traceEndsKey = (bidId: number) => `helixbid:trace-ends:${bidId}`;
 
 // ── The page ─────────────────────────────────────────────────────────────────
 
@@ -1819,14 +1841,21 @@ export default function TakeoffPage({
    * pipe per box that does not exist.
    *
    * Kept in localStorage under the same prefix as its siblings — the prefix is
-   * machine-only and CLAUDE.md keeps it that way.
+   * machine-only and CLAUDE.md keeps it that way — and keyed PER BID, for the
+   * reason written on `traceEndsKey`.
+   *
+   * Reading the key in the initialiser is enough, with no effect watching
+   * `bidId`, because `BidRenderShell` mounts this page keyed on the bid — a
+   * different bid is a different component instance. Do not add a defensive
+   * effect here: it would re-read on a bid change that cannot happen, and on
+   * nothing else.
    */
   const [traceEnds, setTraceEnds] = useState<{
     startKind: string | null;
     endKind: string | null;
   }>(() => {
     try {
-      const held = window.localStorage.getItem(TRACE_ENDS_KEY);
+      const held = window.localStorage.getItem(traceEndsKey(bidId));
       if (held) return JSON.parse(held);
     } catch {
       // A blocked or corrupt store is not a reason to fail to trace.
@@ -1834,16 +1863,37 @@ export default function TakeoffPage({
     return { startKind: DISTRIBUTION_KIND, endKind: null };
   });
 
+  /**
+   * The armed ends, named, for the readout over the drawing.
+   *
+   * The query is the one `EndKindSelect` already makes, so this shares its
+   * cache entry rather than costing a second request — and sharing it is also
+   * what stops the pill and the picker naming the same key differently while
+   * one of them is still loading.
+   *
+   * Types may not have arrived yet, and that is fine: `traceEndsLabel` falls
+   * through to the shipped list, which covers everything except a type this
+   * company invented. Worst case for one frame is a humanised slug, never a
+   * blank — a readout that disappears while loading is a readout nobody trusts.
+   */
+  const { data: heightsForBid } = trpc.takeoffHeights.forBid.useQuery({
+    bidId,
+  });
+  const armedEndsLabel = useMemo(
+    () => traceEndsLabel(traceEnds, heightsForBid?.types),
+    [traceEnds, heightsForBid?.types]
+  );
+
   const updateTraceEnds = useCallback(
     (next: { startKind: string | null; endKind: string | null }) => {
       setTraceEnds(next);
       try {
-        window.localStorage.setItem(TRACE_ENDS_KEY, JSON.stringify(next));
+        window.localStorage.setItem(traceEndsKey(bidId), JSON.stringify(next));
       } catch {
         // Remembering it is a convenience; tracing still works without it.
       }
     },
-    []
+    [bidId]
   );
   /**
    * A gated measuring tool is under the pointer or holds focus.
@@ -4271,6 +4321,7 @@ export default function TakeoffPage({
                       measurability={measurability}
                       tracing={tracing}
                       pathType={tracePathType}
+                      endsLabel={armedEndsLabel}
                       points={tracePoints}
                       onPointsChange={setTracePoints}
                       existingRuns={visibleRuns}

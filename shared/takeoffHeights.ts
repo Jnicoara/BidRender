@@ -474,6 +474,59 @@ export function heightTypeLabel(
   return humanised.charAt(0).toUpperCase() + humanised.slice(1);
 }
 
+/** What an UNANSWERED end is called, wherever one is shown. */
+export const NOT_ANSWERED_LABEL = "Not set";
+
+/**
+ * What ONE end of a run is called on a closed control or a readout.
+ *
+ * ── Three kinds of answer, and the first two are not types ─────────────────
+ * Nobody has said (`null`), carries on at run height (`DISTRIBUTION_KIND`), or a
+ * device. Only the third is in the heights list, so a function that only knew
+ * how to look a key up would print "Not set" as a slug or lose it entirely.
+ *
+ * ── Deliberately shorter than the option it stands for ─────────────────────
+ * The open picker has room for "Continues at run height" and for each type's
+ * height beside it, and that is what makes the choice. A closed trigger is
+ * 36 units wide in a toolbar and truncates both to uselessness — "Continues at
+ * run…" and "Receptacle — 1'…" say nothing you did not already know.
+ *
+ * ── It lives here because TWO things show it ───────────────────────────────
+ * The picker's own trigger and the readout over the drawing. Those are the
+ * same fact on one screen, two inches apart, and CLAUDE.md's rule about
+ * copying a layout is explicit: when two places show the same thing they share
+ * the code, not the shape of it. A pill reading "Panel" beside a picker
+ * reading something else would be the worst version of this feature.
+ */
+export function endKindLabel(
+  kind: string | null | undefined,
+  types?: readonly { typeKey: string; label: string }[]
+): string {
+  if (kind === null || kind === undefined || kind === "")
+    return NOT_ANSWERED_LABEL;
+  if (kind === DISTRIBUTION_KIND) return DISTRIBUTION_LABEL;
+  return heightTypeLabel(kind, types) ?? kind;
+}
+
+/**
+ * The armed ends as one sentence: `Panel → Receptacle`.
+ *
+ * Shown over the drawing while tracing, because that is where the estimator is
+ * looking — the pickers themselves sit in the toolbar at the top of the screen
+ * and the whole failure this addresses is a sticky value going unnoticed while
+ * somebody watches their pointer (2026-09-20).
+ *
+ * The arrow is the same one `endsName` uses on a finished run, so the thing you
+ * read while tracing and the thing the run is called afterwards are the same
+ * string in the same order.
+ */
+export function traceEndsLabel(
+  ends: { startKind: string | null; endKind: string | null },
+  types?: readonly { typeKey: string; label: string }[]
+): string {
+  return `${endKindLabel(ends.startKind, types)} → ${endKindLabel(ends.endKind, types)}`;
+}
+
 /**
  * Every height type this company can use, with the number in effect.
  *

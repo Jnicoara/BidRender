@@ -130,6 +130,7 @@ export function TraceLayer({
   measurability,
   tracing,
   pathType,
+  endsLabel,
   points,
   onPointsChange,
   existingRuns,
@@ -165,6 +166,28 @@ export function TraceLayer({
   measurability: Measurability;
   tracing: boolean;
   pathType: RunPathType;
+  /**
+   * The armed ends as one sentence — `Panel → Receptacle` — or null.
+   *
+   * ── Why a READOUT here when a PICKER already exists ────────────────────────
+   * The pickers are sticky on purpose (§ 5d: thirty homeruns is one decision,
+   * not sixty) and they live in the toolbar at the top of the SCREEN. While
+   * tracing, the estimator is watching their pointer in the middle of the
+   * DRAWING, several hundred pixels away, so the one value most likely to be
+   * stale is the one thing not in view. Reported 2026-09-20: "sticky is right
+   * for thirty homeruns off one panel and wrong when I change what I'm tracing
+   * and don't notice."
+   *
+   * It is a string rather than the two kinds, because naming an end needs the
+   * company's own height types and this layer draws — it does not query. The
+   * page builds the sentence with `traceEndsLabel`, which the pickers' own
+   * triggers also read, so the two cannot disagree.
+   *
+   * It is NOT a control. Changing an end stays in the toolbar: a second place
+   * to edit the same value is a second place for them to drift, and this pill
+   * is click-through by design — see the comment on its container.
+   */
+  endsLabel: string | null;
   points: PagePoint[];
   onPointsChange: (points: PagePoint[]) => void;
   existingRuns: ExistingRun[];
@@ -610,8 +633,21 @@ export function TraceLayer({
               pointer events. The readout is something to look at, not something
               to hit, and a pointer passing over a number should not change
               what the tool is doing.
+
+              ── `w-max` is load-bearing, not tidying ────────────────────────
+              An absolutely positioned box at `left-1/2` is laid out in the half
+              of its container to the RIGHT of that point, so shrink-to-fit
+              caps it at HALF the drawing's width — `-translate-x-1/2` moves it
+              back into the middle afterwards but never gives the width back.
+              Measured when the ends were added: parent 796px, left 398px,
+              pill 398px exactly, and three of its four labels wrapping onto
+              two lines. `w-max` takes the width from the content instead.
+
+              The counting pill below has the same `left-1/2` pattern and the
+              same latent ceiling. It is not over it today, so it is left
+              alone — but it is the same one line if it ever gets a term added.
             */
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-max whitespace-nowrap flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none">
               <span className="text-xs text-muted-foreground">
                 {pathType === "conduit" ? "Conduit run" : "Cable run"}
               </span>
@@ -621,6 +657,18 @@ export function TraceLayer({
               <span className="text-[0.7rem] text-muted-foreground">
                 {points.length} {points.length === 1 ? "point" : "points"}
               </span>
+
+              {endsLabel && (
+                <>
+                  <div className="w-px h-4 bg-border" />
+                  <span
+                    className="text-[0.7rem] text-muted-foreground"
+                    title="What this run starts and ends at — change it in the toolbar"
+                  >
+                    {endsLabel}
+                  </span>
+                </>
+              )}
 
               <div className="w-px h-4 bg-border" />
 

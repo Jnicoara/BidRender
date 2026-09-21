@@ -42,9 +42,9 @@ import {
 import { HeightFields } from "@/components/HeightFields";
 import {
   DISTRIBUTION_KIND,
-  DISTRIBUTION_LABEL,
+  NOT_ANSWERED_LABEL,
+  endKindLabel,
   formatElevation,
-  heightTypeLabel,
 } from "@shared/takeoffHeights";
 import type { EndVertical, RunVerticals } from "@shared/takeoffHeights";
 
@@ -84,20 +84,11 @@ export function EndKindSelect({
   const { data } = trpc.takeoffHeights.forBid.useQuery({ bidId });
   const types = (data?.types ?? []).filter(row => row.isActive);
 
-  /**
-   * What the closed picker reads.
-   *
-   * Deliberately shorter than the option it stands for. The open list has room
-   * to say "Continues at run height" and to put each type's height beside it,
-   * which is what makes the choice; the closed trigger is 36 units wide in a
-   * toolbar and truncates both to uselessness — "Continues at run…" and
-   * "Receptacle — 1'…" tell you nothing you did not already know.
-   */
-  const closedLabel = () => {
-    if (value === null) return "Not set";
-    if (value === DISTRIBUTION_KIND) return DISTRIBUTION_LABEL;
-    return heightTypeLabel(value, types) ?? value;
-  };
+  /*
+    What the closed picker reads — and the readout over the drawing reads the
+    SAME function, so the two cannot come to disagree about what an end is
+    called. The reasoning for the wording is on `endKindLabel`.
+  */
 
   return (
     <Select
@@ -108,10 +99,10 @@ export function EndKindSelect({
         className={className ?? "h-7 w-40 text-xs"}
         aria-label={ariaLabel}
       >
-        <SelectValue>{closedLabel()}</SelectValue>
+        <SelectValue>{endKindLabel(value, types)}</SelectValue>
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={NOT_ANSWERED}>Not set</SelectItem>
+        <SelectItem value={NOT_ANSWERED}>{NOT_ANSWERED_LABEL}</SelectItem>
         <SelectItem value={DISTRIBUTION_KIND}>
           Continues at run height
         </SelectItem>

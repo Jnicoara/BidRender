@@ -6,6 +6,20 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-20]
 
+- **A new job no longer starts with the last job's run ends loaded.** The From
+  and To pickers on the trace toolbar stay where you leave them, which is the
+  point — thirty homeruns off one panel is one decision, not sixty. But they
+  were being remembered for ALL jobs, so opening a different building months
+  later armed you with whatever you finished the last one on. They are now
+  remembered per job, and a new job starts at "carries on at run height → not
+  set", which counts no drops until you say what is there.
+
+- **And you can see what the ends are set to without looking away from the
+  drawing.** The readout that floats over the sheet while tracing now reads
+  "Run height → Receptacle" beside the length and the point count. The pickers
+  stay in the toolbar and are still where you change it; this is so the value
+  most likely to be stale is not the one thing off screen while you work.
+
 - **A run that only counted ONE of its two drops now says so.** Before, a run
   said nothing unless it had no drops at all — so a homerun from a panel with
   no height set to a receptacle with one reported half its vertical footage and

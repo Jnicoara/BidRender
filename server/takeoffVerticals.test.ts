@@ -27,6 +27,9 @@ import {
   heightTypeLabel,
   slugForHeightType,
   shouldSuggestStampLink,
+  endKindLabel,
+  traceEndsLabel,
+  NOT_ANSWERED_LABEL,
   SUGGEST_WITHIN_INCHES,
   resolveDistributionHeight,
   resolveMountingHeight,
@@ -1334,6 +1337,72 @@ describe("what the BID TOTAL says about half-counted verticals", () => {
       const flaggedByTotal =
         totals.flatOnlyCount + totals.partialVerticalCount === 1;
       expect(flaggedByTotal).toBe(verticalsNotice(verticals) !== null);
+    }
+  });
+});
+
+describe("what the ARMED ENDS are called over the drawing", () => {
+  /*
+    The pickers sit in the toolbar and the estimator is watching the pointer in
+    the middle of the sheet, so the armed ends are also written into the trace
+    readout. Both read these functions — if they ever stop, the pill and the
+    picker start naming the same end differently, two inches apart, and the one
+    that is wrong is whichever the estimator is not looking at.
+  */
+  const companyOwn = [{ typeKey: "attic-junction", label: "Attic junction" }];
+
+  it("names an unanswered end rather than showing a gap", () => {
+    // A blank here reads as "not applicable" and this is the opposite: it is
+    // the end nobody has decided, which is the whole thing worth seeing.
+    expect(endKindLabel(null)).toBe(NOT_ANSWERED_LABEL);
+    expect(endKindLabel(undefined)).toBe(NOT_ANSWERED_LABEL);
+    expect(endKindLabel("")).toBe(NOT_ANSWERED_LABEL);
+  });
+
+  it("calls run height by its SHORT name, not the picker's sentence", () => {
+    // The open list says "Continues at run height" because it has the room.
+    expect(endKindLabel(DISTRIBUTION_KIND)).toBe(DISTRIBUTION_LABEL);
+    expect(endKindLabel(DISTRIBUTION_KIND)).not.toMatch(/continues/i);
+  });
+
+  it("names a shipped type with no list loaded yet", () => {
+    // The first frame after arming has no query result. A readout that goes
+    // blank while loading is a readout nobody trusts.
+    expect(endKindLabel("receptacle")).toBe("Receptacle");
+  });
+
+  it("names a type this company invented, once its list is there", () => {
+    expect(endKindLabel("attic-junction", companyOwn)).toBe("Attic junction");
+  });
+
+  it("humanises a key nothing knows rather than dropping it", () => {
+    // A retired or unknown key still has to read as half a sentence.
+    expect(endKindLabel("attic-junction")).toBe("Attic junction");
+  });
+
+  it("reads as one sentence in the same order a finished run is named", () => {
+    expect(traceEndsLabel({ startKind: "panel", endKind: "receptacle" })).toBe(
+      "Panel → Receptacle"
+    );
+  });
+
+  it("says so when the sticky END is the half nobody has set", () => {
+    // The default state after the per-bid key change: a new job arms at
+    // "carries on at run height" with nothing said about where it finishes.
+    expect(
+      traceEndsLabel({ startKind: DISTRIBUTION_KIND, endKind: null })
+    ).toBe(`${DISTRIBUTION_LABEL} → ${NOT_ANSWERED_LABEL}`);
+  });
+
+  it("agrees with the run row about what an end is called", () => {
+    /*
+      The guard. `heightTypeLabel` names an end inside an opened run and
+      `endKindLabel` names it on the pill; they must not drift for any key that
+      is an actual device. The two legitimately differ on null and on
+      DISTRIBUTION_KIND, which is why those are asserted above instead.
+    */
+    for (const type of SHIPPED_HEIGHT_TYPES) {
+      expect(endKindLabel(type.key)).toBe(heightTypeLabel(type.key));
     }
   });
 });
