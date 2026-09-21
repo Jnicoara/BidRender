@@ -38,7 +38,7 @@ import {
   toBillableFeet,
   type PagePoint,
 } from "./takeoffGeometry";
-import type { RunVerticals } from "./takeoffHeights";
+import { uncountedEnds, type RunVerticals } from "./takeoffHeights";
 
 /** What kind of raceway a traced run represents. */
 export const RUN_PATH_TYPES = ["conduit", "cable"] as const;
@@ -545,14 +545,35 @@ export function totalQuantities(
   /** How many runs could not be measured, and so are NOT in the totals above. */
   unmeasurableCount: number;
   /**
-   * Measured runs carrying NO vertical footage at all.
+   * Measured runs where NEITHER end's vertical has been answered for.
    *
    * The zero has to shout. An unset height makes a total quietly low and
    * nothing on screen says so, which is the failure § 2.3 describes for an
    * unset allowance. This count is what lets the panel say "23 runs are
    * counted flat only" instead of leaving it to be noticed.
+   *
+   * ── It used to mean `verticalFeet <= 0`, and that was wrong BOTH ways ─────
+   * Corrected 2026-09-20, the same day and for the same reason as the run row
+   * (`uncountedEnds`). Testing the FOOTAGE rather than the ENDS both
+   * over-reported and under-reported, and the two mistakes hid each other:
+   *
+   *   - a run passing through two boxes AT RUN HEIGHT counts nothing, which is
+   *     correct, and was reported as a problem. A warning that fires on
+   *     correct work is how people learn to read past the warning;
+   *   - a run with ONE end unanswered was not counted here at all, because its
+   *     footage is not zero — it is half. On the real fixture that meant one
+   *     warning where four runs were incomplete.
    */
   flatOnlyCount: number;
+  /**
+   * Measured runs carrying SOME vertical footage with an end still unanswered.
+   *
+   * Separate from `flatOnlyCount` because the sentence has to be different: a
+   * flat run says "no drops are in this number", and this one says the number
+   * you are reading is LOW BY AN UNKNOWN AMOUNT — which is the more alarming
+   * of the two and the one that had no way of being said.
+   */
+  partialVerticalCount: number;
 } {
   let conduit = 0;
   let cable = 0;
@@ -570,6 +591,7 @@ export function totalQuantities(
   let wireVertical = 0;
   let unmeasurable = 0;
   let flatOnly = 0;
+  let partialVertical = 0;
 
   for (const entry of runs) {
     const quantities = quantitiesForRun(
@@ -588,10 +610,21 @@ export function totalQuantities(
     for (const circuit of quantities.wireByCircuit)
       wireGround += circuit.groundFeet;
 
-    if (quantities.verticalFeet <= 0) {
-      flatOnly++;
-      continue;
+    /*
+      ASK THE ENDS, NEVER THE FOOTAGE — and ask through the same function the
+      run row asks through, so a total and the row above it cannot disagree
+      about whether a run is finished. See `uncountedEnds`.
+    */
+    const unanswered = quantities.verticals
+      ? uncountedEnds(quantities.verticals).length
+      : 2;
+    if (unanswered > 0) {
+      if (quantities.verticalFeet > 0) partialVertical++;
+      else flatOnly++;
     }
+
+    // A flat run still contributes nothing to the vertical shares below.
+    if (quantities.verticalFeet <= 0) continue;
     if (quantities.pathType === "conduit") {
       conduitVertical += quantities.verticalFeet;
       for (const circuit of quantities.wireByCircuit)
@@ -611,5 +644,6 @@ export function totalQuantities(
     wireVerticalFeet: round2(wireVertical),
     unmeasurableCount: unmeasurable,
     flatOnlyCount: flatOnly,
+    partialVerticalCount: partialVertical,
   };
 }

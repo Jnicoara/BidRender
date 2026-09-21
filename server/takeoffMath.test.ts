@@ -614,6 +614,7 @@ describe("a shared run across a whole takeoff", () => {
       wireVerticalFeet: 0,
       unmeasurableCount: 0,
       flatOnlyCount: 0,
+      partialVerticalCount: 0,
     });
   });
 
@@ -772,6 +773,10 @@ describe("a realistic takeoff, checked by hand", () => {
       cableVerticalFeet: 0,
       wireVerticalFeet: 0,
       flatOnlyCount: 2,
+      // Neither run has ONE end answered — they have none — so nothing is
+      // half-counted. This is the pair that must not be confused: flat-only
+      // and partial are different faults with different fixes.
+      partialVerticalCount: 0,
       unmeasurableCount: 0,
     });
   });

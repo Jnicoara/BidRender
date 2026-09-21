@@ -711,3 +711,92 @@ export function totalVerticalFeet(input: {
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
+
+/** Why ONE end counted nothing, in the fewest words that still name the fix. */
+function endReason(reason: string): string {
+  const words: Record<string, string> = {
+    "no-kind": "say what is there",
+    "no-distribution-height": "no run height set for this job",
+    "height-not-set": "no height set for that type",
+  };
+  return words[reason] ?? "not counted";
+}
+
+/**
+ * The ends of a run whose vertical NOBODY HAS ANSWERED FOR, start first.
+ *
+ * ── One decision, because two readers ask the same question ─────────────────
+ * The run row asks it to write a sentence and the bid total asks it to count
+ * runs, and before 2026-09-20 they each decided it themselves — both by testing
+ * whether the footage came to zero. That test is wrong in both directions and
+ * the two were wrong together: a run with one end missing reported half its
+ * drop and neither of them said a word, while a run passing straight through
+ * two boxes at run height was reported as a problem it does not have.
+ *
+ * So the question is answered HERE, once, and a caller may only choose what to
+ * say about the answer. Being right in one place and stale in the other is the
+ * failure mode this shape removes.
+ *
+ * ── "level" is an answer, not an omission ───────────────────────────────────
+ * An end at run height genuinely has no vertical, and § 5d's second trap is
+ * that pretending otherwise invents a phantom rise per box. So it is not
+ * missing, and a run with two level ends comes back empty — quiet, and right.
+ */
+export function uncountedEnds(
+  verticals: RunVerticals
+): { where: "start" | "end"; end: EndVertical }[] {
+  const ends = [
+    { where: "start" as const, end: verticals.start },
+    { where: "end" as const, end: verticals.end },
+  ];
+  return ends.filter(({ end }) => !end.counted && end.reason !== "level");
+}
+
+/**
+ * What the ROW has to say about this run's verticals, or null when it is fine.
+ *
+ * ── The bug this replaces, because it is the whole point ────────────────────
+ * This used to be read only when `verticalFeet === 0`, so it described a run
+ * with NEITHER end counted and never one with a single end missing. A run from
+ * one device to another, where the start had no height, reported half its drop
+ * — six feet where twelve belonged — and said nothing at all, because six is
+ * not zero. Reported from a real sheet on 2026-09-20.
+ *
+ * The comment on the old condition already stated the rule it failed to keep:
+ * "an unset height makes a total quietly low and nothing on screen says so".
+ * A HALF-counted run is exactly that total. Being wrong by half is not more
+ * acceptable than being wrong by all of it — it is less visible.
+ *
+ * ── "level" is not a problem, and must not be warned about ─────────────────
+ * An end at run height genuinely has no vertical: a run continuing through a
+ * junction box adds nothing there, and § 5d's second trap is that pretending
+ * otherwise invents a phantom rise per box. So a run whose ends are both level
+ * returns null and the row stays quiet, which is the one case where quiet is
+ * the truth.
+ */
+export function verticalsNotice(
+  verticals: RunVerticals | null | undefined
+): string | null {
+  if (!verticals) return "not set";
+
+  const missing = uncountedEnds(verticals);
+  if (missing.length === 0) return null;
+
+  if (missing.length === 2) {
+    const [a, b] = missing.map(m =>
+      m.end.counted ? "" : endReason(m.end.reason)
+    );
+    return a === b
+      ? `neither end counted — ${a}`
+      : `neither end counted — ${a} at the start, ${b} at the end`;
+  }
+
+  /*
+    The sentence that would have caught it: say the COUNT is partial before
+    saying why. "only one end counted" is the fact an estimator can act on
+    without opening anything; the reason is the next three words.
+  */
+  const [only] = missing;
+  const reason = only.end.counted ? "" : endReason(only.end.reason);
+  return `only one end counted — ${reason} at the ${only.where}`;
+}

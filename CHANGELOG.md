@@ -6,6 +6,22 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-20]
 
+- **A run that only counted ONE of its two drops now says so.** Before, a run
+  said nothing unless it had no drops at all — so a homerun from a panel with
+  no height set to a receptacle with one reported half its vertical footage and
+  looked finished. On the test job that was four runs out of five. The run's own
+  row now reads "only one end counted — no height set for that type at the
+  start", and the totals under the panel say how many runs are in that state.
+
+- **The same fix on the materials list.** A list whose drops were half-counted
+  went to a supplier with a confident quantity on it and nothing to say the
+  figure was low. It now carries a line saying the vertical footage is
+  incomplete and how many runs are waiting on a height.
+
+- **And a warning that used to fire on correct work no longer does.** A run
+  passing straight through boxes at run height genuinely has no drops, and was
+  being reported as a problem. Only unanswered ends count as unanswered now.
+
 - **You can finally say what a run is made of.** The Conduit and Cable dropdowns have always let you pick a kind of run and name it; now each one has a pencil beside it that opens a short form — the pipe, the wire, and how many conductors go in a circuit. Every run traced under that kind takes it. Editing one of the kinds BidRidge ships makes your own copy instead of changing everyone's, and the form says so before you save rather than after.
 
 - **And you can change your mind after tracing.** Open a run in the right-hand panel and there is a line reading "This run is" with the kind it was traced under. Change it and the run renames itself, because the name was never stored: a run is called what its kind is called.

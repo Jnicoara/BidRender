@@ -35,6 +35,7 @@ import {
   totalVerticalFeet,
   verticalAtEnd,
   verticalsForRun,
+  verticalsNotice,
   type HeightLayers,
 } from "../shared/takeoffHeights";
 import {
@@ -1134,5 +1135,205 @@ describe("resolving a stored run's verticals", () => {
     expect(verticals.start.counted && verticals.start.feet).toBe(4);
     expect(verticals.end.counted && verticals.end.feet).toBe(8.5);
     expect(verticals.feet).toBe(12.5);
+  });
+});
+
+describe("what the run ROW says about a partial vertical", () => {
+  /**
+   * ── The bug this exists for ────────────────────────────────────────────────
+   * Reported from a real sheet on 2026-09-20. A run traced device to device —
+   * both ends needing a drop — reported six feet where twelve belonged, because
+   * one end's kind was left on a stale value from an earlier run and had no
+   * height behind it. Nothing on screen said so.
+   *
+   * The arithmetic was never wrong: `verticalsForRun` sums both ends and always
+   * has. The panel's warning was gated on `verticalFeet === 0`, so a run with
+   * ONE end counted sailed past it showing half a drop. Being wrong by half is
+   * less visible than being wrong by all of it, not more acceptable.
+   */
+  const counted = {
+    kind: "receptacle",
+    endInches: RECEPTACLE,
+    distributionInches: DISTRIBUTION_10FT,
+  };
+
+  it("says when only one end counted, and which", () => {
+    const verticals = verticalsForRun(
+      { kind: null, endInches: null, distributionInches: DISTRIBUTION_10FT },
+      counted
+    );
+    // The half total that used to be silent.
+    expect(verticals.feet).toBeGreaterThan(0);
+    expect(verticalsNotice(verticals)).toMatch(/only one end counted/i);
+    expect(verticalsNotice(verticals)).toMatch(/at the start/i);
+  });
+
+  it("says it for the other end too", () => {
+    const verticals = verticalsForRun(counted, {
+      kind: "switch",
+      endInches: null,
+      distributionInches: DISTRIBUTION_10FT,
+    });
+    expect(verticalsNotice(verticals)).toMatch(/at the end/i);
+    expect(verticalsNotice(verticals)).toMatch(/no height set for that type/i);
+  });
+
+  it("stays quiet when both ends counted", () => {
+    const verticals = verticalsForRun(counted, {
+      kind: "panel",
+      endInches: 72,
+      distributionInches: DISTRIBUTION_10FT,
+    });
+    expect(verticals.feet).toBeGreaterThan(0);
+    expect(verticalsNotice(verticals)).toBeNull();
+  });
+
+  it("stays quiet when an end is legitimately level", () => {
+    // A run continuing through a junction box at run height adds nothing there,
+    // and § 5d's second trap is that pretending otherwise invents a phantom
+    // rise per box. "None" is an answer, not an omission.
+    const verticals = verticalsForRun(
+      {
+        kind: DISTRIBUTION_KIND,
+        endInches: null,
+        distributionInches: DISTRIBUTION_10FT,
+      },
+      counted
+    );
+    expect(verticalsNotice(verticals)).toBeNull();
+  });
+
+  it("still speaks up when neither end counted", () => {
+    const verticals = verticalsForRun(
+      { kind: null, endInches: null, distributionInches: DISTRIBUTION_10FT },
+      { kind: null, endInches: null, distributionInches: DISTRIBUTION_10FT }
+    );
+    expect(verticals.feet).toBe(0);
+    expect(verticalsNotice(verticals)).toMatch(/neither end counted/i);
+  });
+
+  it("names both reasons when the two ends fail differently", () => {
+    const verticals = verticalsForRun(
+      { kind: null, endInches: null, distributionInches: DISTRIBUTION_10FT },
+      { kind: "switch", endInches: null, distributionInches: DISTRIBUTION_10FT }
+    );
+    const notice = verticalsNotice(verticals)!;
+    expect(notice).toMatch(/say what is there at the start/i);
+    expect(notice).toMatch(/no height set for that type at the end/i);
+  });
+});
+
+describe("what the BID TOTAL says about half-counted verticals", () => {
+  /*
+    The same fault as the run row, one level up, and it survived the row's fix
+    for an hour: `flatOnlyCount` was `verticalFeet <= 0`, so the footer under
+    the totals said "1 run is counted flat only" on a fixture where FOUR runs
+    were incomplete. Measured on bid 1164558 on 2026-09-20, on screen.
+
+    These assert the two halves that a footage test gets wrong in opposite
+    directions, which is why one number could not be stretched to cover both.
+  */
+  const DROPS_TO_RECEPTACLE = {
+    kind: "receptacle",
+    endInches: RECEPTACLE,
+    distributionInches: DISTRIBUTION_10FT,
+  };
+  const NO_HEIGHT_FOR_PANEL = {
+    kind: "panel",
+    endInches: null,
+    distributionInches: DISTRIBUTION_10FT,
+  };
+  const CARRIES_ON_AT_RUN_HEIGHT = {
+    kind: DISTRIBUTION_KIND,
+    endInches: null,
+    distributionInches: DISTRIBUTION_10FT,
+  };
+
+  const bid = (verticals: ReturnType<typeof verticalsForRun>) =>
+    totalQuantities([
+      { run: RUN_100FT, circuits: [], ratio: QUARTER_INCH, verticals },
+    ]);
+
+  it("counts a run with ONE end unanswered as partial, not as finished", () => {
+    // 8.5 ft of drop is in the total and the panel's drop is not. The old test
+    // asked whether the footage was zero; 8.5 is not zero, so nothing was said.
+    const totals = bid(
+      verticalsForRun(NO_HEIGHT_FOR_PANEL, DROPS_TO_RECEPTACLE)
+    );
+    expect(totals.conduitVerticalFeet).toBe(8.5);
+    expect(totals.partialVerticalCount).toBe(1);
+    expect(totals.flatOnlyCount).toBe(0);
+  });
+
+  it("says nothing about a run that is correctly flat at BOTH ends", () => {
+    // A pipe passing through two boxes at run height has no vertical, and that
+    // is right. Reporting it is how an estimator learns to read past the line.
+    const totals = bid(
+      verticalsForRun(CARRIES_ON_AT_RUN_HEIGHT, CARRIES_ON_AT_RUN_HEIGHT)
+    );
+    expect(totals.conduitVerticalFeet).toBe(0);
+    expect(totals.flatOnlyCount).toBe(0);
+    expect(totals.partialVerticalCount).toBe(0);
+  });
+
+  it("still calls a run with NEITHER end answered flat-only", () => {
+    const totals = bid(
+      verticalsForRun(NO_HEIGHT_FOR_PANEL, NO_HEIGHT_FOR_PANEL)
+    );
+    expect(totals.flatOnlyCount).toBe(1);
+    expect(totals.partialVerticalCount).toBe(0);
+  });
+
+  it("keeps the two apart across a mixed bid", () => {
+    const totals = totalQuantities([
+      {
+        run: RUN_100FT,
+        circuits: [],
+        ratio: QUARTER_INCH,
+        verticals: verticalsForRun(NO_HEIGHT_FOR_PANEL, DROPS_TO_RECEPTACLE),
+      },
+      {
+        run: RUN_100FT,
+        circuits: [],
+        ratio: QUARTER_INCH,
+        verticals: verticalsForRun(NO_HEIGHT_FOR_PANEL, NO_HEIGHT_FOR_PANEL),
+      },
+      {
+        run: RUN_100FT,
+        circuits: [],
+        ratio: QUARTER_INCH,
+        verticals: verticalsForRun(
+          CARRIES_ON_AT_RUN_HEIGHT,
+          DROPS_TO_RECEPTACLE
+        ),
+      },
+    ]);
+    expect(totals.partialVerticalCount).toBe(1);
+    expect(totals.flatOnlyCount).toBe(1);
+    // The third run is finished — one real drop, one end that carries on.
+    expect(totals.conduitVerticalFeet).toBe(17);
+  });
+
+  it("agrees with the RUN ROW about which runs are incomplete", () => {
+    /*
+      The guard on the whole design. The row and the total read one function
+      now (`uncountedEnds`), and this is what goes red if somebody re-derives
+      either of them: every run the footer counts must be a run whose own row
+      is saying something, and every quiet row must be one the footer ignored.
+    */
+    const cases = [
+      verticalsForRun(NO_HEIGHT_FOR_PANEL, DROPS_TO_RECEPTACLE),
+      verticalsForRun(DROPS_TO_RECEPTACLE, NO_HEIGHT_FOR_PANEL),
+      verticalsForRun(NO_HEIGHT_FOR_PANEL, NO_HEIGHT_FOR_PANEL),
+      verticalsForRun(CARRIES_ON_AT_RUN_HEIGHT, CARRIES_ON_AT_RUN_HEIGHT),
+      verticalsForRun(CARRIES_ON_AT_RUN_HEIGHT, DROPS_TO_RECEPTACLE),
+      verticalsForRun(DROPS_TO_RECEPTACLE, DROPS_TO_RECEPTACLE),
+    ];
+    for (const verticals of cases) {
+      const totals = bid(verticals);
+      const flaggedByTotal =
+        totals.flatOnlyCount + totals.partialVerticalCount === 1;
+      expect(flaggedByTotal).toBe(verticalsNotice(verticals) !== null);
+    }
   });
 });

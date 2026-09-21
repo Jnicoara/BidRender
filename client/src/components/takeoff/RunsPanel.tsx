@@ -28,7 +28,8 @@ import { Input } from "@/components/ui/input";
 import { InlineNumberField } from "@/components/InlineNumberField";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { runAppearance } from "@shared/takeoffMarks";
-import type { RunQuantities } from "@shared/takeoffQuantities";
+import type { RunQuantities, totalQuantities } from "@shared/takeoffQuantities";
+import { verticalsNotice } from "@shared/takeoffHeights";
 
 export type PanelRun = {
   id: number;
@@ -190,27 +191,6 @@ function wireGround(run: PanelRun): number {
   return Math.round(total * 100) / 100;
 }
 
-/**
- * Why this run counts no vertical footage, in the estimator's words.
- *
- * Four different situations with four different fixes, and a blank would
- * make them one. "Nothing to add" and "nobody said" are not the same state,
- * and only one of them is finished.
- */
-function verticalsMissingReason(run: PanelRun): string {
-  const verticals = run.quantities?.verticals;
-  if (!verticals) return "not set";
-  const reasons = [verticals.start, verticals.end]
-    .filter(end => !end.counted)
-    .map(end => (end.counted ? null : end.reason));
-  if (reasons.includes("no-distribution-height"))
-    return "no run height set for this job";
-  if (reasons.includes("height-not-set"))
-    return "no height set for one of these types";
-  if (reasons.includes("no-kind")) return "not set — say what is at each end";
-  return "none — this run stays at run height";
-}
-
 /** Stamped assemblies, grouped, as the list shows them. */
 /**
  * What a count's relationship to the bid is — the bridge, as this panel needs
@@ -305,18 +285,22 @@ export function RunsPanel({
    * shows runs rather than one that knows about palettes.
    */
   renderRunType?: (run: PanelRun) => React.ReactNode;
-  totals:
-    | {
-        conduitFeet: number;
-        cableFeet: number;
-        wireFeet: number;
-        conduitVerticalFeet: number;
-        cableVerticalFeet: number;
-        wireVerticalFeet: number;
-        unmeasurableCount: number;
-        flatOnlyCount: number;
-      }
-    | undefined;
+  /**
+   * The bid's totals, typed AS WHAT PRODUCES THEM rather than re-listed here.
+   *
+   * ── It was a hand-written shape, and it had already gone stale ────────────
+   * Eight fields copied out of `totalQuantities`'s return. `wireGroundFeet`
+   * was added to that return and never arrived here, so the panel could not
+   * have shown the bare copper even if somebody wrote the line — the field was
+   * not on the type. Nothing failed; a number simply had no way in.
+   *
+   * That is the "hand-listed fields go stale" trap from CLAUDE.md, in the
+   * direction that does not announce itself. Restating a return type is not
+   * the explicit-mapping rule in that file — that rule is about which fields a
+   * screen CHOOSES to render, and this component still chooses. It is about
+   * what it is allowed to see.
+   */
+  totals: ReturnType<typeof totalQuantities> | undefined;
   selectedRunId: number | null;
   onSelectRun: (id: number | null) => void;
   onRemoveRun: (id: number) => void;
@@ -737,17 +721,44 @@ export function RunsPanel({
                     )}
 
                     {/*
-                      The zero has to shout. An unset height makes a total
-                      quietly low and nothing on screen says so — the same
-                      argument § 2.3 makes about an unset allowance. A blank
-                      where a drop belongs is indistinguishable from a run
-                      that genuinely has none.
+                      An incomplete total has to shout, and a HALF total is
+                      incomplete. An unset height makes a run quietly low and
+                      nothing on screen says so — the same argument § 2.3 makes
+                      about an unset allowance — and being wrong by half is
+                      less visible than being wrong by all of it, not more
+                      acceptable.
+
+                      Driven by which ENDS counted rather than by whether the
+                      figure is zero. The old condition asked `verticalFeet ===
+                      0`, so a run with one end counted and one refused sailed
+                      past it showing half a drop.
+
+                      And it says this on the ROW, at the level the number is
+                      read. The per-end reason exists in the ENDS block of an
+                      opened run, in grey — which is a reason nobody reads,
+                      because it needs you to already suspect the run you are
+                      about to open.
                     */}
-                    {run.quantities.verticalFeet === 0 && (
-                      <div className="flex items-baseline justify-between text-xs">
-                        <span className="text-muted-foreground">Verticals</span>
-                        <span className="text-[0.7rem] text-[#F5C518]">
-                          {verticalsMissingReason(run)}
+                    {verticalsNotice(run.quantities?.verticals) && (
+                      <div className="flex items-baseline text-xs gap-2">
+                        <span className="text-muted-foreground shrink-0">
+                          Verticals
+                        </span>
+                        {/*
+                          LEFT, where every other value in this panel is right.
+
+                          The rows above it hold numbers, and a number is read
+                          from its last digit, so they are right-aligned to a
+                          common edge. This is a SENTENCE. Right-aligning it
+                          wrapped "…at the / start" with the location orphaned
+                          on a line of its own — and the location is the half
+                          that says where to go. Seen on screen, 2026-09-20;
+                          the markup was copied from the row above it, which is
+                          the "copying a layout does not copy the behaviour"
+                          trap in CLAUDE.md arriving as typography.
+                        */}
+                        <span className="text-[0.7rem] text-[#F5C518] text-left">
+                          {verticalsNotice(run.quantities?.verticals)}
                         </span>
                       </div>
                     )}
@@ -996,6 +1007,25 @@ export function RunsPanel({
               totals.wireVerticalFeet === 0
                 ? `No vertical footage is in these numbers. ${totals.flatOnlyCount} run${totals.flatOnlyCount === 1 ? " is" : "s are"} counted flat only.`
                 : `${totals.flatOnlyCount} run${totals.flatOnlyCount === 1 ? " is" : "s are"} counted flat only — no drop or rise on ${totals.flatOnlyCount === 1 ? "it" : "them"}.`}
+            </p>
+          )}
+          {/*
+            THE HALF-COUNTED RUN, WHICH IS THE WORSE OF THE TWO.
+
+            The line above says a number is missing its drops entirely. This
+            one says the number you are reading INCLUDES some drops and is
+            still short — and it is more alarming precisely because it looks
+            finished. A total with no verticals at all is visibly unstarted; a
+            total with half of them is a plausible figure that loses a job.
+
+            Its own sentence rather than a widened count, because the two
+            situations need opposite actions and a single number covering both
+            could not say which one to take.
+          */}
+          {totals.partialVerticalCount > 0 && (
+            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+              {`${totals.partialVerticalCount} run${totals.partialVerticalCount === 1 ? " has" : "s have"} only one end counted — ${totals.partialVerticalCount === 1 ? "its" : "their"} drops are short by whatever is missing.`}
             </p>
           )}
           {totals.unmeasurableCount > 0 && (

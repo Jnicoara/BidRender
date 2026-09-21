@@ -301,6 +301,29 @@ export const materialsListRouter = router({
             "heights in Settings."
         );
       }
+
+      /*
+        A SHORTFALL IS NOT AN ALTERNATIVE TO A FIGURE — it is said ALONGSIDE
+        one, which is why this is its own `if` and not another `else`.
+
+        The branch above reads "includes N ft of vertical raceway" and stops
+        there, so a list whose drops are half-counted went to a supplier
+        carrying a confident number and no hint that it was low. Both
+        sentences are true at once whenever some runs are finished and others
+        are not, and the quantity on this page is what somebody orders from.
+      */
+      if (totals.partialVerticalCount > 0) {
+        notes.push(
+          "Vertical footage is INCOMPLETE: " +
+            totals.partialVerticalCount +
+            (totals.partialVerticalCount === 1
+              ? " traced run has"
+              : " traced runs have") +
+            " only one end counted, so the raceway and wire above are short " +
+            "by the drops still missing. Set the mounting heights for those " +
+            "ends before ordering."
+        );
+      }
       notes.push(
         "Quantities are taken off the drawings and carry no allowance for waste, " +
           "spoilage or cut lengths unless the assemblies already include it."
