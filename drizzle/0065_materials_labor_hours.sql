@@ -1,0 +1,41 @@
+-- Give a material somewhere to carry its labor unit.
+--
+-- One statement — see 0053 and 0061. The override on the assembly component
+-- line is 0066; two tables means two files, so a failure can only ever mean
+-- "that statement failed and nothing was applied".
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- A plain ADD of a nullable column with no default. Old code ignores it; new
+-- code against an old database dies on a bare select(). See CLAUDE.md
+-- § "Deploying a migration: THREE STEPS, NOT TWO" — this is the ordinary case,
+-- and there is no backfill anywhere in this pair, so step 3 is empty. Say it
+-- is empty rather than calling this a two-step release.
+--
+-- ── NULLABLE, WITH NO DEFAULT, AND IT DIFFERS FROM costPerUnit ON PURPOSE ────
+-- `materials.costPerUnit` is NOT NULL DEFAULT 0, and `needsPricing` reads that
+-- zero itself as "unpriced". The reasoning in shared/materialPricing.ts is
+-- sound and does not carry over: it works because $0 is never a real answer for
+-- a part you buy.
+--
+-- **Zero hours IS a real answer.** Wire nuts add no time of their own when they
+-- are made up as part of terminating a device. So a deliberate 0 and a row
+-- nobody has touched must not be the same value, which is CLAUDE.md § rule 6 —
+-- money-unset shows 0 and shouts, MEASUREMENT-unset must never read as 0.
+--
+-- NULL is not the `pricedAt` flag that shared/materialPricing.ts rejects. That
+-- would be a second fact that can drift out of step with the number. This is
+-- the number's own absence, and it cannot disagree with itself.
+--
+-- ── WHY THIS COLUMN IS A RESTORATION, NOT A NEW IDEA ────────────────────────
+-- `master_items.masterLaborHours` held exactly this, with
+-- `project_assembly_items.overrideLaborHours` as the per-line override. The
+-- catalog rewrite to `materials` dropped both and nothing recorded the loss.
+-- ASSEMBLIES_PLAN.md § "Materials carry a labor unit" has the history.
+--
+-- ── WHAT MUST SHIP WITH THE CODE THAT READS IT ──────────────────────────────
+-- Every one of the 629 shipped rows is NULL after this runs, and that is
+-- correct — nobody has set them. But an hour that is not set is multiplied by
+-- the rate on every line that touches the material, where a price that is not
+-- set understates one line. So the flag-and-filter in shared/materialLabor.ts
+-- is part of this work, not a follow-up.
+ALTER TABLE `materials` ADD `laborHours` decimal(10,4);

@@ -636,6 +636,42 @@ export const materials = mysqlTable(
     version: int("version").default(1).notNull(),
 
     name: varchar("name", { length: 512 }).notNull(),
+    /**
+     * The DEFAULT LABOR UNIT: hours to install ONE `unitOfSale` of this
+     * material. Hours per foot on EMT, hours each on a device box.
+     *
+     * ── Restored, not invented ────────────────────────────────────────────
+     * This shipped once as `master_items.masterLaborHours`, with
+     * `project_assembly_items.overrideLaborHours` as the per-line override. The
+     * catalog rewrite to `materials` dropped it and nothing recorded the loss,
+     * so for a long time the written record said BOTH that the app had it and
+     * that it never had. Re-decided 2026-09-20; the history is in
+     * `ASSEMBLIES_PLAN.md` § "Materials carry a labor unit".
+     *
+     * It is how the trade's own reference works — NECA is a book of hours per
+     * installed item, not per recipe — and it is what lets a traced run price
+     * its labour off the same row an assembly reads, instead of a second figure
+     * typed on the run type (`references/takeoff-spec.md` D17).
+     *
+     * ── NULLABLE, no default, and that DIFFERS from costPerUnit on purpose ──
+     * `costPerUnit` is NOT NULL DEFAULT 0 and `needsPricing` reads the zero
+     * itself as "unpriced". That works for money because $0 is never a real
+     * answer for a part you buy.
+     *
+     * **Zero hours IS a real answer** — wire nuts add no time of their own when
+     * they are made up as part of terminating a device — so a zero here must be
+     * distinguishable from a row nobody has touched. That is CLAUDE.md § rule
+     * 6: money-unset shows 0 and shouts, MEASUREMENT-unset must never read as
+     * 0. NULL is not a second fact that can drift out of step with the number,
+     * the way the `pricedAt` column `materialPricing` rejects would be — it is
+     * the number's own absence.
+     *
+     * A NULL here is flagged and filtered exactly like an unpriced row. See
+     * `shared/materialLabor.ts`, and the warning there about why a missing hour
+     * is worse than a missing price.
+     */
+    laborHours: decimal("laborHours", { precision: 10, scale: 4 }),
+
     unitOfSale: mysqlEnum("unitOfSale", MATERIAL_UNITS_OF_SALE)
       .default("each")
       .notNull(),
@@ -976,6 +1012,27 @@ export const assemblyMaterials = mysqlTable(
       .notNull()
       .references(() => materials.id, { onDelete: "cascade" }),
     qty: decimal("qty", { precision: 10, scale: 4 }).default("1").notNull(),
+
+    /**
+     * This recipe's own labor unit for this component, overriding the
+     * material's default. NULL means "follow the material", never "no hours".
+     *
+     * The same inheritance rule as every other setting in this app: absent
+     * means ask the level above, so re-pricing a material's labour moves every
+     * recipe still following it. See CLAUDE.md § Company defaults.
+     *
+     * ── What this does NOT do ──────────────────────────────────────────────
+     * It does not feed the assembly's price. An assembly's hours are the number
+     * typed on the assembly — the operation, not the sum of its parts — and the
+     * components only ever produce a CROSS-CHECK shown beside it. The one
+     * function allowed to decide that is `laborForAssembly` in
+     * `shared/materialLabor.ts`; nothing else may add these up for money.
+     */
+    overrideLaborHours: decimal("overrideLaborHours", {
+      precision: 10,
+      scale: 4,
+    }),
+
     sortOrder: int("sortOrder").default(0).notNull(),
   },
   t => [

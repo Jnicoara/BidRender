@@ -135,6 +135,44 @@ bid archive: `getArchivedBids` names `isSample` (0043) and the four tax columns
 migrations threw on opening the archive. The query was fine. The database was
 behind.
 
+### NEVER RUN GENERATED MIGRATION OUTPUT WITHOUT READING WHAT IT ADDS
+
+**`drizzle-kit generate` writes a diff against its own SNAPSHOT, not against the
+database.** When the snapshot is behind, the diff is wrong — and it is wrong in
+the most ordinary-looking way possible: a normal-shaped file full of plausible
+`ALTER TABLE` statements, in the right format, with the right name.
+
+**This happened on 2026-09-20.** A generate for two new labour columns emitted
+SIX `ALTER`s and three constraints, re-adding `groundCount`,
+`groundMaterialId` and `takeoffGroupId` — all already live in production from
+0060-0064. Running it would have died on `Duplicate column name`, mid-file,
+with drizzle recording nothing as applied.
+
+**The cause, and it is permanent here:** `drizzle/meta/` holds snapshots for
+0050-0053, 0057 and 0058 and **nothing for 0059-0064**, because those were
+hand-written. So generate diffs from 0058 and re-emits everything since. Any
+hand-written migration leaves this hole behind it, which means **this repo's
+snapshots will keep being stale and generate will keep being wrong.**
+
+So:
+
+1. **Read every statement a generate produces before it goes anywhere near a
+   database.** Not the file name, not the count — the statements.
+2. **If it touches anything you did not just change, throw it away** and write
+   the migration by hand, one statement per file, registering it in
+   `drizzle/meta/_journal.json` yourself. That is what 0061-0066 are.
+3. **`pnpm db:push` runs generate first**, so it carries the same risk. To
+   apply already-written migrations without generating, run the migrator
+   directly: `npx tsx scripts/migrate.mts`.
+4. Delete the stray `<n>_snapshot.json` along with the `.sql`, or the next
+   generate diffs from a snapshot describing a migration that never ran.
+
+**The general rule this belongs to:** a tool that generates code from a model of
+the world is only as right as that model, and it never says how confident it is.
+Same family as § "A number that can be measured should not be asserted" in
+CLAUDE.md — the generated file is an assertion about the database, and
+`scripts/schemaDrift.mts` is the measurement.
+
 Ask the database directly, rather than counting files:
 
 ```bash

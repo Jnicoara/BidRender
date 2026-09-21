@@ -21,6 +21,7 @@ import {
   Boxes,
   Check,
   CircleDollarSign,
+  Clock,
   Loader2,
   Pencil,
   Plus,
@@ -58,6 +59,11 @@ import {
 import { AliasSuggestions } from "@/components/AliasSuggestions";
 import { countNeedingPricing, needsPricing } from "@shared/materialPricing";
 import {
+  countNeedingLaborUnit,
+  needsLaborUnit,
+  laborUnitHours,
+} from "@shared/materialLabor";
+import {
   MATERIAL_CATEGORY_ORDER,
   groupByType,
   groupMaterialsByCategory,
@@ -86,6 +92,11 @@ type Material = {
   name: string;
   unitOfSale: "each" | "foot" | "box";
   costPerUnit: string;
+  /**
+   * The default labor unit: hours per unit of sale. NULL is "nobody has said",
+   * and is NOT zero — a deliberate 0 means the part adds no time of its own.
+   */
+  laborHours: string | null;
   category: Category | null;
   /** Space-separated trade slang, fed to smartSearch. Editable inline. */
   searchAliases: string | null;
@@ -139,6 +150,15 @@ type Draft = {
   name: string;
   unitOfSale: Material["unitOfSale"];
   costPerUnit: string;
+  /**
+   * Hours to install ONE unit of sale. Held as a STRING, like the cost.
+   *
+   * Empty means "unset", which is a different thing from "0" and is what the
+   * flag and the filter look for. A draft that held 0 for empty would make it
+   * impossible to ever put a material BACK to unanswered, which is the state
+   * the whole nullable column exists to keep sayable.
+   */
+  laborHours: string;
   category: Category | null;
   /**
    * Per-item trade slang — the second alias layer.
@@ -162,6 +182,7 @@ const emptyDraft: Draft = {
   name: "",
   unitOfSale: "each",
   costPerUnit: "",
+  laborHours: "",
   category: null,
   searchAliases: "",
   brandNote: "",
@@ -282,6 +303,10 @@ function MaterialRow({
       name: material.name,
       unitOfSale: material.unitOfSale,
       costPerUnit: String(Number(material.costPerUnit)),
+      // Empty string for unset, so an untouched material opens with a blank
+      // box rather than a 0 nobody typed. See the Draft field's own note.
+      laborHours:
+        material.laborHours == null ? "" : String(Number(material.laborHours)),
       category: material.category,
       brandNote: material.brandNote ?? "",
       // Seeded from the row, so the field opens showing the slang the material
@@ -306,6 +331,7 @@ function MaterialRow({
   };
 
   const unpriced = needsPricing(material.costPerUnit);
+  const unhoured = needsLaborUnit(material.laborHours);
 
   if (editing) {
     return (
@@ -349,6 +375,26 @@ function MaterialRow({
             inputMode="decimal"
             onFocus={selectOnFocus}
             placeholder="0.00"
+          />
+          {/*
+            Hours per unit of sale, and the PLACEHOLDER is doing real work:
+            "hours" rather than "0.00", because an empty box here means unset
+            and a 0 shown in grey would read as the answer. CLAUDE.md § rule 6 —
+            a measurement that nobody has set must never render as a zero.
+
+            Not InlineNumberField: this row is a draft form with its own Save
+            button, and that component saves as you type. The rule for a draft
+            is to hold the null and render a blank with a placeholder.
+          */}
+          <Input
+            value={draft.laborHours}
+            onChange={e => setDraft({ ...draft, laborHours: e.target.value })}
+            className="h-8 w-28 text-sm text-right"
+            inputMode="decimal"
+            onFocus={selectOnFocus}
+            placeholder="hours"
+            aria-label="Labor hours per unit"
+            title="Hours to install one of these. Leave blank if you have not decided; 0 means it adds no time of its own."
           />
           <div className="flex items-center gap-1">
             <Button
@@ -458,6 +504,45 @@ function MaterialRow({
         </span>
       )}
 
+      {/*
+        The LABOR column, saying "Needs hours" for the same reason the price
+        column says "Needs price" — with one difference that matters.
+
+        A blank here would read as "this part takes no time", which is a claim,
+        and a wrong one on 629 rows at once. And an unset hour is worse than an
+        unset price: a missing price understates ONE line by the cost of a
+        part, while a missing hour is multiplied by the labor rate on every
+        line that touches this material, on every bid, until somebody sets it.
+
+        A DELIBERATE zero prints as "0 h" and stays quiet. That is the whole
+        reason the column is nullable rather than defaulting to zero the way
+        the price does: "wire nuts add no time of their own" is an answer
+        somebody is allowed to give, and having given it they should not go on
+        being asked for it.
+      */}
+      {unhoured ? (
+        <span
+          className="text-xs w-24 text-right shrink-0 font-medium text-[#F5C518]"
+          title="No labor unit yet — work using this material carries no hours until you set one."
+        >
+          Needs hours
+        </span>
+      ) : (
+        <span
+          className="text-sm font-mono w-24 text-right shrink-0"
+          /*
+            No "per" here: UNIT_LABEL already carries it, and inconsistently —
+            "each" but "per ft" and "per box". Written as "h per {label}" this
+            read "0.04 h per per ft" on screen. Seen 2026-09-20, after it had
+            typechecked clean; a doubled preposition is invisible to everything
+            except looking at it.
+          */
+          title={`Labor: ${laborUnitHours(material.laborHours)} h ${UNIT_LABEL[material.unitOfSale]}`}
+        >
+          {laborUnitHours(material.laborHours)} h
+        </span>
+      )}
+
       <div className="flex items-center gap-0.5 w-28 justify-end shrink-0">
         <Button
           size="sm"
@@ -552,6 +637,14 @@ export default function MaterialsLibraryPage() {
    * and rows leave the list as you go.
    */
   const [onlyUnpriced, setOnlyUnpriced] = useState(false);
+  /**
+   * The same worklist idea for hours. SEPARATE from the pricing filter, not a
+   * combined "needs attention", because they are two different jobs done at two
+   * different times — pricing comes off a supplier quote, hours come out of the
+   * estimator's own head or their NECA book — and merging them would produce a
+   * list that can never be finished in one sitting.
+   */
+  const [onlyUnhoured, setOnlyUnhoured] = useState(false);
   const [pendingArchive, setPendingArchive] = useState<PendingItem | null>(
     null
   );
@@ -638,16 +731,31 @@ export default function MaterialsLibraryPage() {
     let inScope = filterByScope(materials, scope);
     if (onlyUnpriced)
       inScope = inScope.filter(m => needsPricing(m.costPerUnit));
+    if (onlyUnhoured)
+      inScope = inScope.filter(m => needsLaborUnit(m.laborHours));
     if (!searching) return inScope;
     const hits = smartSearch(searchable, query, 500);
     const order = new Map(hits.map((hit, index) => [Number(hit.id), index]));
     return inScope
       .filter(m => order.has(m.id))
       .sort((a, b) => order.get(a.id)! - order.get(b.id)!);
-  }, [materials, searchable, query, searching, scope, onlyUnpriced]);
+  }, [
+    materials,
+    searchable,
+    query,
+    searching,
+    scope,
+    onlyUnpriced,
+    onlyUnhoured,
+  ]);
 
   const unpricedCount = useMemo(
     () => countNeedingPricing(materials),
+    [materials]
+  );
+
+  const unhouredCount = useMemo(
+    () => countNeedingLaborUnit(materials),
     [materials]
   );
 
@@ -747,6 +855,22 @@ export default function MaterialsLibraryPage() {
           name: draft.name.trim(),
           unitOfSale: draft.unitOfSale,
           costPerUnit: Number(draft.costPerUnit),
+          /*
+            A BLANK BOX CLEARS IT BACK TO UNSET, and that is the point of the
+            nullable column rather than an oversight to tidy into a zero.
+
+            "Nobody has decided" and "this part adds no time of its own" are
+            different answers with different consequences — the first should
+            keep showing up in the Needs hours worklist and the second should
+            not — so the estimator has to be able to get back to the first one
+            after typing into the box by mistake.
+
+            Sent unconditionally for the same reason the aliases are: omitting
+            the key would leave the old value and make a deliberate clear look
+            like it silently failed.
+          */
+          laborHours:
+            draft.laborHours.trim() === "" ? null : Number(draft.laborHours),
           category: draft.category,
           // Sent unconditionally now the editor shows it: blank means the user
           // cleared the field, which is a real edit, where omitting the key
@@ -846,6 +970,13 @@ export default function MaterialsLibraryPage() {
         name: newDraft.name.trim(),
         unitOfSale: newDraft.unitOfSale,
         costPerUnit: Number(newDraft.costPerUnit),
+        // A new material starts with no labor unit unless one was typed —
+        // NULL, never 0, so it joins the Needs hours worklist rather than
+        // claiming to take no time.
+        laborHours:
+          newDraft.laborHours.trim() === ""
+            ? null
+            : Number(newDraft.laborHours),
         category: newDraft.category,
         searchAliases: newDraft.searchAliases.trim() || null,
         brandNote: newDraft.brandNote.trim() || null,
@@ -935,12 +1066,38 @@ export default function MaterialsLibraryPage() {
               {unpricedCount}
             </span>
           </Button>
+          <Button
+            size="sm"
+            variant={onlyUnhoured ? "default" : "outline"}
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => setOnlyUnhoured(v => !v)}
+            aria-pressed={onlyUnhoured}
+            title="Show only the materials with no labor unit set"
+          >
+            <Clock className="w-3.5 h-3.5" />
+            Needs hours
+            <span
+              className={cn(
+                "tabular-nums",
+                onlyUnhoured ? "opacity-80" : "text-muted-foreground"
+              )}
+            >
+              {unhouredCount}
+            </span>
+          </Button>
         </div>
 
         {onlyUnpriced && unpricedCount === 0 && (
           <p className="text-xs text-muted-foreground mb-3">
             Every material in your library has a price. Switch the filter off to
             see them all.
+          </p>
+        )}
+
+        {onlyUnhoured && unhouredCount === 0 && (
+          <p className="text-xs text-muted-foreground mb-3">
+            Every material in your library has a labor unit. Switch the filter
+            off to see them all.
           </p>
         )}
 
@@ -990,6 +1147,21 @@ export default function MaterialsLibraryPage() {
                 inputMode="decimal"
                 onFocus={selectOnFocus}
                 placeholder="0.00"
+              />
+              {/* Blank is the honest default for a brand-new material: it has
+                  no labor unit until somebody decides one, and the placeholder
+                  says "hours" rather than showing a 0 that would read as it. */}
+              <Input
+                value={newDraft.laborHours}
+                onChange={e =>
+                  setNewDraft({ ...newDraft, laborHours: e.target.value })
+                }
+                className="h-8 w-28 text-sm text-right"
+                inputMode="decimal"
+                onFocus={selectOnFocus}
+                placeholder="hours"
+                aria-label="Labor hours per unit"
+                title="Hours to install one of these. Leave blank if you have not decided; 0 means it adds no time of its own."
               />
               <Button
                 size="sm"

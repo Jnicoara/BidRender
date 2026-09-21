@@ -47,7 +47,21 @@ const procedure = scoped("library.view", "library.edit");
 
 /** decimal(10,4) — four decimal places, and it must stay under 10 total digits. */
 const MAX_COST = 999999.9999;
+const MAX_LABOR_UNIT_HOURS = 12;
 const costSchema = z.number().min(0).max(MAX_COST);
+
+/**
+ * The material's default labor unit: hours per unit of sale.
+ *
+ * NULLABLE, and null is a REAL value here meaning "unset this again" — the same
+ * omitted-versus-null distinction `categorySchema` makes. It is not the same as
+ * zero: a deliberate 0 says "this part adds no time of its own", while null says
+ * nobody has decided. See `shared/materialLabor.ts`.
+ *
+ * Capped well above any real unit. A day and a half to install one of anything
+ * is not a labor unit, it is a typo or a number typed in minutes.
+ */
+const laborUnitSchema = z.number().min(0).max(MAX_LABOR_UNIT_HOURS).nullable();
 const nameSchema = z.string().trim().min(1).max(512);
 
 /**
@@ -207,6 +221,7 @@ export const materialsRouter = router({
         name: nameSchema,
         unitOfSale: z.enum(MATERIAL_UNITS_OF_SALE).default("each"),
         costPerUnit: costSchema.default(0),
+        laborHours: laborUnitSchema.optional(),
         category: categorySchema.default(null),
         searchAliases: aliasSchema.default(null),
         brandNote: brandNoteSchema.default(null),
@@ -231,6 +246,10 @@ export const materialsRouter = router({
         name: input.name,
         unitOfSale: input.unitOfSale,
         costPerUnit: toDecimal(input.costPerUnit),
+        // Absent stays NULL: a new material has no labor unit until somebody
+        // says so, and NULL is what the flag and the filter look for.
+        laborHours:
+          input.laborHours == null ? null : toDecimal(input.laborHours),
         category: input.category,
         searchAliases: input.searchAliases,
         brandNote: input.brandNote,
@@ -258,6 +277,7 @@ export const materialsRouter = router({
         name: nameSchema.optional(),
         unitOfSale: z.enum(MATERIAL_UNITS_OF_SALE).optional(),
         costPerUnit: costSchema.optional(),
+        laborHours: laborUnitSchema.optional(),
         category: categorySchema.optional(),
         searchAliases: aliasSchema.optional(),
         brandNote: brandNoteSchema.optional(),
@@ -265,7 +285,7 @@ export const materialsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { id, costPerUnit, ...rest } = input;
+      const { id, costPerUnit, laborHours, ...rest } = input;
 
       const target = await db.getMaterialById(id, ctx.scope.dataUserId);
       if (!target)
@@ -283,6 +303,18 @@ export const materialsRouter = router({
         ...rest,
         ...(costPerUnit !== undefined
           ? { costPerUnit: toDecimal(costPerUnit), priceUpdatedAt: new Date() }
+          : {}),
+        /*
+          OMITTED leaves it alone; NULL clears it back to unset.
+
+          Spelled out rather than folded into `rest`, because the two cases
+          have to stay apart: a form that does not show this field must not
+          write it, and a user emptying the box must be able to get back to
+          "nobody has said" rather than being stuck at a zero that prices work
+          at nothing. CLAUDE.md § rule 7.
+        */
+        ...(laborHours !== undefined
+          ? { laborHours: laborHours === null ? null : toDecimal(laborHours) }
           : {}),
       });
 

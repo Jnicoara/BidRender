@@ -774,6 +774,17 @@ else can produce, and have the code read NULL as the OLD meaning. Then there is
 no window in either direction. A `DEFAULT 0` throws that away — "not yet split"
 and "deliberately none" become the same value.
 
+**NEVER RUN GENERATED MIGRATION OUTPUT WITHOUT READING WHAT IT ADDS.**
+`drizzle-kit generate` diffs against its own SNAPSHOT, not against the database,
+and `drizzle/meta/` has no snapshots for the hand-written migrations — so it
+re-emits everything since the last one it knows about. On 2026-09-20 a generate
+for two new columns produced six `ALTER`s, re-adding three columns already live
+in production; it would have died on `Duplicate column name` with nothing
+recorded as applied. **A wrong generated migration looks exactly like a right
+one.** Read every statement; if it touches anything you did not just change,
+throw it away and hand-write it. `pnpm db:push` generates first and carries the
+same risk — `npx tsx scripts/migrate.mts` applies without generating.
+
 Full version, with the worked example and the deploy sequence:
 `references/deploying.md` § 5, "Which goes first, the migration or the code?".
 
@@ -1499,11 +1510,49 @@ This matters because the older version of this note said `_core` handled OAuth l
 
 **Data model** (`drizzle/schema.ts`) — everything is scoped by `userId` with cascade deletes:
 
-- `masterItems` / `masterAssemblies` / `masterAssemblyItems` / `masterLaborRates` — the user's reusable catalog (a "master assembly" is a named group of master items with quantities).
-- `projects` — one bid. Carries its own PDF plan reference (`pdfUrl`/`pdfKey`/`pdfFilename`, uploaded to S3) alongside bid metadata (customer, address, status).
-- `projectAssemblies` / `projectAssemblyItems` — master assemblies _copied_ into a project as a snapshot (`masterMaterialCost`/`masterLaborHours` frozen at add-time) plus separate `override*` fields the user edits per-bid. Never mutate the snapshot fields after creation; write to the override fields instead.
-- `projectItems` — standalone items added directly to a project outside any assembly, same override pattern.
-- `bidSummary` — one row per project holding global labor/markup multipliers (`percentageLaborFactor`, `lumpSumHours`, `markupPct`) and the default labor rate to price against.
+**THE LIVE MODEL:**
+
+- `materials` — the catalog. 629 shipped rows plus the user's own; `costPerUnit`,
+  `unitOfSale` (each/foot/box), category, search aliases. Seeded from
+  `server/seed/materials/*`.
+- `assemblies` / `assembly_materials` / `assembly_modifiers` — a reusable recipe:
+  components with quantities, plus `baseLaborHours` and `overheadLaborHours`
+  typed on the assembly itself and a `laborRateId` for the role that does it.
+- `labor_rates` — hourly cost per role.
+- `bids` — one job. `bid_pdfs` holds its plan sets; the takeoff tables
+  (`takeoff_groups`, `takeoff_stamps`, `takeoff_runs`, `takeoff_run_types`) hang
+  off the bid and its sheets.
+- `bid_line_items` — what is ON the bid, with the four pricing inputs SNAPSHOT
+  at add time (`snapshotMaterialCost`, `snapshotLaborHours`,
+  `snapshotModifierPct`, `snapshotLaborRate`). A line may point at a
+  `takeoffGroupId`, and then its QUANTITY is derived live from the marks while
+  its pricing stays frozen — see `shared/takeoffBridge.ts`. **Never mutate a
+  snapshot field; that freeze is what stops last week's bid re-pricing itself.**
+
+**THE LEGACY MODEL — still in `drizzle/schema.ts`, read by nothing a user can
+reach. Do not build against it.**
+
+`masterItems` / `masterAssemblies` / `masterAssemblyItems` / `masterLaborRates`,
+`projectAssemblies` / `projectAssemblyItems`, `projectItems`, `bidSummary`. Each
+still has query functions in `server/db.ts` and some have routers; **measured
+2026-09-20, every one of them has ZERO references in `client/src`**, against 41
+files for `bids`, 27 for `materials` and 26 for `assemblies`. They are the
+four-workspace design whose screens were deleted (see the note further down).
+
+**This section described the legacy model as the current one until 2026-09-20,
+and that is the most expensive kind of error this file can hold.** It is loaded
+into every session, so it was not a stale note somebody might catch — it was the
+first answer anybody got. It also hid a real capability: `master_items` carried
+`masterLaborHours`, a default labor unit per catalog item, with
+`overrideLaborHours` on the per-bid line. That was decided and built, and the
+replacement catalog dropped it with nothing recording the loss — so the written
+record simultaneously described a model that no longer existed HERE and a plan
+that had never been built THERE (`ASSEMBLIES_PLAN.md`). Finding out which was
+true meant reading the schema.
+
+**The rule: when a rewrite replaces a model, the old entry says what replaced it
+on the same day.** A replacement documented only in its own file is
+indistinguishable from a plan that never included what it dropped.
 
 **Feature availability is decided by access tier**, not by a flags table: `users.accessTier` (`standard` | `internal`) against the `FEATURES` map in `shared/permissions.ts`, resolved server-side into `scope.features` and read client-side through `useCompany().hasFeature(key)`. The `featureFlags` table and its admin toggles are retired — nothing reads them, and the table survives in `drizzle/schema.ts` only so drizzle-kit does not queue a `DROP TABLE`. Gate a new unreleased feature by adding it to `FEATURES` with `availability: "internal"`; there is no flag row to create.
 

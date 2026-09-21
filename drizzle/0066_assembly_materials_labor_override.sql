@@ -1,0 +1,31 @@
+-- Let one recipe disagree with a material's labor unit, for that recipe only.
+--
+-- One statement — see 0065, which adds the default this overrides.
+--
+-- ── ADDITIVE. STEP 1. Nothing is backfilled, here or in 0065 ────────────────
+--
+-- ── NULL MEANS "FOLLOW THE MATERIAL", NEVER "NO HOURS" ──────────────────────
+-- The same inheritance rule as every other setting in this app: absent means
+-- ask the level above, so re-pricing a material's labor moves every recipe
+-- still following it. A NOT NULL DEFAULT 0 would freeze every existing
+-- component line at zero hours and quietly detach it from the material for
+-- ever — the copy-instead-of-inherit failure CLAUDE.md § Company defaults says
+-- not to build.
+--
+-- ── THIS DOES NOT FEED AN ASSEMBLY'S PRICE, AND THAT IS NOT AN OVERSIGHT ────
+-- An assembly's hours are the number typed on the assembly: the operation, not
+-- the sum of its parts. A duplex rough-in is 0.45 h because that is what doing
+-- the whole thing at once takes, and summing the components would throw away
+-- exactly the efficiency being claimed.
+--
+-- What the components produce is a CROSS-CHECK shown beside the typed number —
+-- "your parts add to 0.62, you typed 0.45" — always visible and never a
+-- warning. The gap IS the claim; a screen that nags toward closing it is
+-- arguing against the model.
+--
+-- `laborForAssembly` in shared/materialLabor.ts is the only function allowed to
+-- decide which of the two prices. One function deciding ownership before
+-- anything sums is the shape `totalVerticalFeet` uses for the double-count
+-- rule, and for the same reason: a rule enforced in two places survives only
+-- until somebody edits one of them.
+ALTER TABLE `assembly_materials` ADD `overrideLaborHours` decimal(10,4);

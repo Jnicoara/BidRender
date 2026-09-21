@@ -4,7 +4,10 @@ Planning document for the assemblies/estimating rebuild. No code changes — thi
 
 ## DATA MODEL
 
-- **Materials** — name, unit of sale (each / foot / box), cost per unit.
+- **Materials** — name, unit of sale (each / foot / box), cost per unit, **and a
+  default labor unit** (hours per unit of sale). See
+  [Materials carry a labor unit](#materials-carry-a-labor-unit) — this was
+  decided, built, and then lost in a rewrite, and is being restored.
 - **Labor Rates** — hourly cost per role (apprentice / journeyman / foreman). Fully separate from assemblies.
 - **Modifiers** — adjust labor hours. Two kinds:
   - A shared **global list** usable by most assemblies (height, outdoor, existing/retrofit, etc.).
@@ -23,6 +26,83 @@ Project Type exists to **filter** the library, nothing more. It does not fork th
 - Where labor genuinely differs by context, that is handled through the existing fork/customize system (see [CUSTOMIZATION MODEL](#customization-model)) — a user forks the one assembly and adjusts it. The library is never duplicated wholesale.
 
 **Not the same thing as Trade.** Trade separates electrical from plumbing/HVAC for unlock gating; Project Type separates residential from commercial work _within_ a trade. Two independent axes — every starter assembly in [STARTER_LIBRARY.md](STARTER_LIBRARY.md) already carries this tag.
+
+### Materials carry a labor unit
+
+**Decided originally, built, then silently dropped. Re-decided 2026-09-20.**
+
+**The model.** A material carries a **default labor unit** — hours per its unit
+of sale, so hours-per-foot on EMT and hours-each on a device box. An assembly's
+component line can **override** it for that recipe. This is how the trade's own
+reference works: the NECA Manual of Labor Units is a book of hours per installed
+item, not per recipe.
+
+**It was built.** `master_items.masterLaborHours` held the default;
+`project_items` and `project_assembly_items` held it snapshotted as
+`masterLaborHours` alongside an `overrideLaborHours` the user edited per bid.
+Those columns are still in `drizzle/schema.ts` today and the build is recorded
+in `todo.md` (the `project_items` / `project_assembly_items` entries, and
+"Inline edit for qty, overrideMaterialCost, overrideLaborHours per item").
+
+**Then the catalog was replaced and the field did not come across.**
+`master_items` became `materials`, which carries `costPerUnit` and no hours at
+all. `master_assembly_items` became `assembly_materials`, which is
+`assemblyId, materialId, qty, sortOrder` — no hours and no override. The
+`master_*` tables survive in the schema with a server router and **zero client
+references**; they are vestigial.
+
+**Nothing recorded the reversal, and that is the actual fault.** This document
+described the new model as though it had always been the plan. CLAUDE.md's
+"Data model" section still described the OLD one as current. So the written
+record disagreed with itself in both directions at once, and the only way to
+find out which was true was to read the schema. On 2026-09-20 that cost a
+design conversation that had to be stopped and restarted: an answer was given
+from the live schema ("materials cannot carry hours") that read as a decision
+when it was only a consequence.
+
+**The rule this earns:** when a rewrite drops a capability, say so where the
+capability was decided — not only where the replacement is described. A
+replacement documented on its own is indistinguishable from a plan that never
+included the thing it replaced.
+
+### What must come with it
+
+Three things are part of the job, not follow-ups:
+
+1. **A missing hour has to be as visible as a missing price.**
+   `shared/materialPricing.ts` flags every unpriced material and the Materials
+   screen filters to exactly those; hours need the same flag and the same
+   filter. **A missing hour is worse than a missing price** — a price that is
+   not set understates one line, while an hour that is not set is multiplied by
+   the rate on every line that touches that material. The column is therefore
+   NULLABLE with no default: nobody-set-it and deliberately-zero must not be the
+   same value.
+2. **Two places can hold hours, so ownership is decided in ONE function.** Not
+   a rule in a comment — a guard, the same shape as `totalVerticalFeet` in
+   `shared/takeoffHeights.ts`, which decides who owns a vertical before it sums
+   anything. A rule enforced in two places survives until somebody edits one.
+3. **The typed number on an assembly prices. Always.** An assembly's hours are
+   **the operation, not the sum of its parts** — 0.45 h for a duplex rough-in is
+   what it takes to do the whole thing at once, and summing the components would
+   throw away exactly the efficiency being claimed. Component hours are shown
+   **beside** it as a cross-check — "your parts add to 0.62, you typed 0.45" —
+   **always visible, never a warning.** It exists so the gap can be seen and
+   judged, not closed. A 27% gap IS the efficiency; a screen that nags toward
+   making them match is arguing against the model.
+
+### Run types read the same number
+
+A traced run's labor comes from the **same material rows**, not from a second
+figure typed on the run type: pipe hours off the raceway material, wire hours
+off the conductor material times the conductor count. One number in one place
+serving both assemblies and runs — the same figure is never maintained twice.
+
+This **supersedes the shape of D17 in `references/takeoff-spec.md`**, which
+picked two hand-entered numbers on the run type. What survives from D17 is the
+**fixed amount per counted end** — the stop, the strap, the connector and the
+box at a termination — which is an interim standing in for fittings that cannot
+carry hours yet, and which retires to zero rather than being deleted when they
+can. See D17(b) and the open fork at D17(c).
 
 ### Where labor hours come from
 

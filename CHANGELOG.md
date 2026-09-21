@@ -6,6 +6,26 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-20]
 
+- **Materials can carry a labour unit again.** Every material can now hold the
+  hours it takes to install one of them — per foot on pipe and wire, each on a
+  box or a device — so the figure lives in one place and prices both an assembly
+  that uses it and a run traced on a drawing. This was decided and built once
+  before and was lost when the catalog was rebuilt; nothing recorded that it had
+  gone, which is why the plan and the app disagreed about it for months.
+
+- **A material with no hours is flagged the way one with no price is.** The
+  Materials screen has a "Needs hours" filter beside "Needs pricing", and a row
+  with nothing set says so instead of showing a blank that would read as "takes
+  no time". A missing hour is worse than a missing price: a price that is not
+  set understates one line, while an hour that is not set is multiplied by your
+  labour rate on every line that uses that material. Typing **0** is a real
+  answer — some parts genuinely add no time of their own — and a row you have
+  answered stops asking.
+
+- **An assembly still prices at the number you typed on it, always.** Your 0.45
+  hours for a duplex is what it takes to do the whole thing at once, not the sum
+  of its parts, and nothing about the components can change it.
+
 - **A new job no longer starts with the last job's run ends loaded.** The From
   and To pickers on the trace toolbar stay where you leave them, which is the
   point — thirty homeruns off one panel is one decision, not sixty. But they

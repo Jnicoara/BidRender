@@ -340,9 +340,33 @@ from now on.
   on an answer for labor on a run, and on the allowances that turn a measured
   length into a purchased one. Written up as a gate rather than a note in
   `references/plan-viewer-overhaul.md` § 5f.2.
+
+  **The labour half of that gate was answered on 2026-09-20 — see D17.** And the
+  sentence above needs reading with care, because it is true of the schema and
+  was wrong as a premise: **"materials carry no labor hours" was the state, not
+  the design.** A default labour unit per catalog item with a per-line override
+  was decided and built, and lost when the catalog was rewritten — see
+  "Materials carry a labor unit" in `ASSEMBLIES_PLAN.md`. D17 was first answered
+  under the wrong premise and revised within the hour once that came to light.
+
+  **The answer:** a run's labour reads the same material rows everything else
+  does — pipe hours off the raceway, wire hours off the conductor times the
+  conductor count — plus D17(b)'s fixed amount per counted end, which is an
+  interim for fittings that are not yet COUNTED and which retires to zero rather
+  than being deleted.
+
+  **Also still true and still unbuilt: there is no run → bid link at all.**
+  `bid_line_items` has `takeoffGroupId` and no run equivalent, so runs reach the
+  materials list and nothing else. R2 is that bridge, and the labour answer is
+  what unblocks writing it — not a fix to something already wrong.
+
 - **R6** — On the old screen these lived on each run's calculator card, all
   defaulting to 0 and typed by hand per run. Makeup has moved to R7 and routing
   waste to T16; what remains here is service loop, pull points and fittings.
+  **Since D17(b), fittings also carry an interim that retires when they land:**
+  the per-end labour number on a run goes to zero once a run type can COUNT its
+  couplings, connectors and straps. Hours themselves stopped being the blocker
+  on 2026-09-20, when materials gained labour units.
   See D15 before bringing any of it back: it is the biggest bloat risk in this
   document.
 - **Watch for double counting before R2 ships:** starter device assemblies
@@ -682,6 +706,107 @@ Everything else below is still open until you say so.
 - (b) Add a new dated entry that corrects them.
 - **Pick:** (b). The changelog is a history; a dated correction keeps the record
   honest about when things were claimed.
+
+**D17 — Where labour for a traced run lives (R2). Decided 2026-09-20, then
+REVISED the same day. Read the revision; the first pick is kept only to show
+what changed.**
+
+The gate R2 had been blocked since 2026-09-19 on the belief that materials
+carry no hours anywhere in the schema.
+
+- **(a)** One number on the run type, hours per foot, entered by hand.
+- **(b)** Two numbers on the run type — pipe per foot, plus wire per
+  conductor-foot.
+- **(c)** Pipe only; the wire pull is a line the estimator adds themselves.
+- **First pick, and SUPERSEDED within the hour: (b).**
+
+**Why it was superseded, because the reason matters more than the answer.** All
+three options existed only because materials were believed unable to carry
+hours. That belief was true of the live schema and false as a decision: a
+default labour unit per catalog item, with a per-line override, **was decided
+and built** — `master_items.masterLaborHours` and
+`project_assembly_items.overrideLaborHours` — and was dropped when the catalog
+was rewritten to `materials` / `assembly_materials`, with nothing recording the
+loss. See "Materials carry a labor unit" in `ASSEMBLIES_PLAN.md`.
+
+So the question "where do a run's hours live" had been asked with the only good
+answer already removed from the board.
+
+- **REVISED PICK: a run's labour comes from the SAME material rows everything
+  else reads.** Pipe hours off the raceway material, wire hours off the
+  conductor material times the conductor count. Nothing is typed on the run
+  type, and the same figure is never maintained in two places.
+
+**This gets (b)'s benefit for free.** (b) was picked so that changing 2 #12 to
+3 #12 would move the labour by itself rather than leaving a type reading "3 #12"
+priced as if it were two. Reading the material row does that, and also means
+re-pricing #12 THHN's labour once updates every run and every assembly that
+touches it.
+
+**What still has to be entered by hand is an ASSEMBLY's hours**, and that half
+of the rule is untouched: an assembly's number is the operation, not the sum of
+its parts. Materials carrying units does not change that — see the cross-check
+rule in `ASSEMBLIES_PLAN.md`.
+
+**D17(b) — The fixed cost at the end of a run. Decided 2026-09-20. INTERIM.**
+
+- (a) A vertical foot costs the same as a flat foot.
+- (b) Per foot, plus **a fixed amount per counted end**.
+- (c) Verticals priced per foot at their own higher rate — which is how the
+  trade actually factors them, as a labour condition.
+- **Pick: (b), knowingly as an interim. (c) is the eventual right answer.**
+
+**Why (c) is right in the trade and not yet reachable here.** In a real
+estimating package the fixed cost of a drop does not live in the run's per-foot
+number at all: every strap, fitting, connector and box carries its own labour
+unit and is counted separately. With that in place the run is just pipe and (c)
+is correct.
+
+**The blocker moved on 2026-09-20 and is now much narrower.** It used to be that
+a fitting could not carry hours at all. Once materials carry labour units, a
+strap and an EMT connector have hours like anything else. **What is still
+missing is only the COUNTING** — a run type names one raceway, one conductor and
+one ground, and has no model for "a coupling every 10 ft, a connector at each
+end, a strap every 4 ft". That is R6, still **Missing** and **Nice-to-have**.
+
+**The measured consequence of picking (c) before that exists**, at a generous
+vertical rate: a 2'-0" drop bills 0.22 h where the work is a stop, a strap, a
+connector and a box. (b) bills 0.38 h for the same drop and 0.78 h for an 8'-6"
+one. The short drop is where (c) fails, and short drops are the common case.
+
+**NAME IT FOR WHAT IT IS.** The per-end number is **the stop, the strap, the
+connector and the box at a termination** — never "vertical overhead" and never
+"end allowance". The honest name is what makes the retirement below legible.
+
+**How this ends, and it is not a deletion.** When a run type can count its
+fittings, this number **goes to zero** rather than being removed. A zero with an
+honest name tells the next reader what it stood in for; a deleted field tells
+them nothing. Anyone reaching this section because the number looks redundant
+should check whether fittings are being counted before touching it.
+
+**D17(c) — The fork behind all of it. RESOLVED 2026-09-20.**
+
+Recorded as open earlier the same day, and closed hours later once the history
+above came to light. Kept rather than deleted, because the fork is the thing a
+future reader would otherwise re-open.
+
+- **(a) Materials gain an hours column.** Direct; every fitting in the catalog
+  becomes priceable at once.
+- **(b) Run fittings are expressed as ASSEMBLIES**, keeping hours in one place.
+- **RESOLVED: (a).** It is not a new idea — it is the restoration of a capability
+  this app shipped and then lost in a rewrite, and it is how the trade's own
+  reference works, NECA being a book of hours per installed item rather than per
+  recipe. (b) would have needed an assembly wrapping every material, which is a
+  different product from the one planned.
+
+**The objection that survives, and is part of the build rather than after it:**
+a material with no hours set is invisible in a way a material with no price is
+not. `shared/materialPricing.ts` flags unpriced rows and the Materials screen
+filters to exactly those; hours need the same flag and the same filter. **A
+missing hour is worse than a missing price** — a missing price understates one
+line, a missing hour is multiplied by the rate across every line that touches
+that material. Hence a NULLABLE column with no default: never-set and
+deliberately-zero must not be the same value.
 
 **Smaller calls:**
 
