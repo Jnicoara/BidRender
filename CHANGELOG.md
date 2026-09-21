@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-21]
 
+- **The Materials screen now ranks a search the same way the material picker
+  does.** Searching "wire" there still led with wire nuts and "fixture" with
+  fixture wire, because only the picker had been fixed — the same catalog
+  answering two different ways depending on which screen you opened.
+
 - **Wrote down where the catalog's prices will live, so nobody loads them the
   wrong way.** Shipped prices belong in the seed files; the app re-applies them
   from there on every start, which is how they reach existing databases and new

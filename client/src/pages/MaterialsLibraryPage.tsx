@@ -42,6 +42,11 @@ import {
 } from "@/components/ui/select";
 import { smartSearch } from "@/lib/smartSearch";
 import {
+  compareByRole,
+  familyKey,
+  familySizes,
+} from "@shared/materialSearchRank";
+import {
   ScopeFilter,
   ViewTabs,
   type LibraryView,
@@ -723,6 +728,12 @@ export default function MaterialsLibraryPage() {
 
   const searching = query.trim().length > 0;
 
+  /*
+    How many rows share each type, for the role ranking's family tiebreak.
+    Counted over the whole catalog once, not per comparison.
+  */
+  const families = useMemo(() => familySizes(materials), [materials]);
+
   const visible = useMemo(() => {
     // Scope first: "Mine" is about what you own, and applying it before the
     // search means the result count matches what the filter promised. The
@@ -736,9 +747,46 @@ export default function MaterialsLibraryPage() {
     if (!searching) return inScope;
     const hits = smartSearch(searchable, query, 500);
     const order = new Map(hits.map((hit, index) => [Number(hit.id), index]));
+    /*
+      Grouped by ROLE, exactly as MaterialPicker does it.
+
+      Relevance alone put "Wire nuts" above every reel of wire and "#16 fixture
+      wire" above every light fixture. The picker got the fix first; running it
+      here too is not tidiness — CLAUDE.md is explicit that one catalog listed
+      two ways is the same class of bug as two catalogs, because the answer
+      then depends on which screen you happened to open.
+
+      ── Position stands in for the score, and that is deliberate ────────────
+      smartSearch does not expose its score. Adding a variant that did, so
+      equally-relevant rows could fall through to trade size order, was built
+      and MEASURED and then thrown away: it moved 32 of the 58 sweep queries
+      instead of 7, and several went backwards — "recep" led with "20A duplex
+      receptacle" instead of "Duplex receptacle", "box" with cast boxes, and
+      "switch" with a 3-way. Real scores tie often, and every tie then fell to
+      a size comparison between unrelated families. Position never ties, which
+      keeps smartSearch's own ordering intact wherever the tiers agree.
+    */
     return inScope
       .filter(m => order.has(m.id))
-      .sort((a, b) => order.get(a.id)! - order.get(b.id)!);
+      .sort((a, b) =>
+        compareByRole(
+          {
+            name: a.name,
+            score: -order.get(a.id)!,
+            aliases: a.searchAliases,
+            category: a.category,
+            family: families.get(familyKey(a.name)),
+          },
+          {
+            name: b.name,
+            score: -order.get(b.id)!,
+            aliases: b.searchAliases,
+            category: b.category,
+            family: families.get(familyKey(b.name)),
+          },
+          query
+        )
+      );
   }, [
     materials,
     searchable,
@@ -747,6 +795,7 @@ export default function MaterialsLibraryPage() {
     scope,
     onlyUnpriced,
     onlyUnhoured,
+    families,
   ]);
 
   const unpricedCount = useMemo(
@@ -762,9 +811,14 @@ export default function MaterialsLibraryPage() {
   /**
    * Browsing shelves the catalog by category, in the declared order, with
    * Uncategorized last and empty sections dropped. Searching deliberately does
-   * NOT group: sections would bury the best match under whichever shelf it
-   * happens to sit on, so those results stay flat and relevance-ordered, and
-   * each row prints its own category instead.
+   * NOT group into shelves: sections would bury the best match under whichever
+   * shelf it happens to sit on, so those results stay flat and each row prints
+   * its own category instead.
+   *
+   * Flat is not unordered. Search results go through `compareByRole` — the
+   * product first, then its fittings, supports and consumables — the same
+   * comparison MaterialPicker uses, so the two screens cannot disagree about
+   * which row answers "wire".
    *
    * ── Within a shelf: Type, then Size — never alphabetically ───────────────
    * Rows arrive name-sorted from the server, which is the wrong order for
