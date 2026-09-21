@@ -127,6 +127,108 @@ equivalent of `takeoffGroupId`, so runs still reach the materials list and
 nothing else. The labour answer is what unblocked writing it; it is not itself
 the bridge, and R2 also wants R7's allowances and R3's double-count handling.
 
+### Parent items and brand variants
+
+**Decided 2026-09-17, written down 2026-09-21, NOT BUILT.** The rule is in
+CLAUDE.md § Brands; this is the build. **It has to land before the pricing list
+uploads**, because `pricing/starter-catalog-pricing.xlsx` already carries the
+relationship in a Parent column and 407 branded rows are waiting on somewhere
+to put it.
+
+**The shape.** A generic parent — "20A 1-Pole breaker" — with brand variants
+underneath it: Square D Homeline, Square D QO, Eaton BR, Eaton CH, Siemens, ABB,
+Leviton, plus the bolt-on lines QOB, BAB, BQD, THQB. Each is its own family and
+they do not interchange, which is why brand is a real property here and nowhere
+else.
+
+**The rule that makes it safe: an assembly points at the PARENT, never a
+variant.** A recipe built on one job then prices correctly on the next with a
+different panel in it, and changing which brand a company buys cannot break
+anything. The variant is chosen at pricing time from a company preferred-brand
+setting, overridable per bid for a spec'd job.
+
+#### The six steps, in order
+
+**1. `materials.parentId`** — nullable self-reference, `ON DELETE RESTRICT`.
+NULL means "this row is its own parent", so every existing row is already
+correct the moment the column exists and nothing needs backfilling. Additive,
+so step 1 of the three-step rule with an empty step 3.
+
+`RESTRICT` for the reason `takeoffGroupId` gives: `set null` would leave a
+variant orphaned and looking like a generic, and `cascade` would delete a
+contractor's priced variants because somebody retired a parent.
+
+**2. A real `brand` column** — do NOT overload `brandNote`. That field is
+documented as the place a USER records what their own supply house stocks; a
+catalog fact and a user's note are different owners of different data, and
+merging them means neither can be trusted.
+
+**3. Seeding order.** The baseline seeder matches rows BY NAME, so a variant
+cannot resolve its parent until the parent exists. Either seed parents first and
+variants in a second pass, or resolve links in a repair pass afterwards — the
+seeder already has exactly that pattern from the branch-whip backfill, and the
+same warning applies: **the insert only runs for rows not already present**, so
+a first pass alone reaches nobody who already has a database.
+
+**4. The Materials screen, which is where this gets expensive.** 1,555 rows
+where 629 sit today. A flat list is the failure CLAUDE.md § "Customization
+available, but never in the way" names: a screen showing twenty rows gets
+closed. **A parent row with its variants behind ONE disclosure** — one, not a
+hierarchy — and a user's own variant pinned visible, never demoted below a fold
+to keep our shipped list tidy.
+
+**5. Which variant a price comes from.** A parent has no price of its own; a
+variant does. So pricing resolves parent → preferred brand → variant, and:
+
+- a company setting names the preferred line per family, defaulting to none;
+- a per-bid override names one for a spec'd job;
+- **with no preference set, a parent prices from nothing and says so** rather
+  than silently picking the cheapest or the first. A plausible number nobody
+  chose is the failure the whole $0 convention exists to prevent.
+
+**6. The "1-Pole" rename, through `RENAMED_BASELINE_MATERIALS`.** "20A breaker"
+becomes "20A 1-Pole breaker" so parents and variants can be named from each
+other mechanically. That map renames IN PLACE — the row keeps its id, so every
+assembly, kit and takeoff stamp pointing at it is unaffected — and the file
+already did this for "20/2 breaker" → "20A 2-Pole breaker". Add the old name as
+a search alias in the same change.
+
+**Do the rename in this step and not before.** On its own it is churn against
+live data for no user-visible gain; as part of this it is what makes the naming
+mechanical.
+
+#### Three new categories ride along, and they are an ENUM
+
+`pricing/starter-catalog-pricing.xlsx` uses three categories the app does not
+have: **Surface Raceway**, **Underground** and **Service Entrance**. They came
+out of walking real jobs — surface raceway alone is twenty rows and was the
+single largest hole in the catalog, because a retail remodel is mostly
+Wiremold and the catalog had none of it.
+
+`materials.category` is a **MySQL enum**, not a free string, so these cannot
+arrive with the upload. Extending it is an `ALTER TABLE ... MODIFY`, which is
+additive and safe, but it is a MIGRATION and it belongs in the same release as
+`parentId` rather than being discovered on upload day.
+
+Worth noting the enum is also why the shelves stay curated: a category nobody
+can add by accident is the reason "Category is NOT user-extendable" holds
+further up this document.
+
+#### A third axis, and it is independent of the other two
+
+`parentId` is not `baselineId` and not `userId`. A row can be a shipped parent,
+a shipped variant, a user's fork of either, or a user's own variant of a shipped
+parent. **Do not wire them together** — the same warning `trade` and
+`projectType` already carry, for the same reason: two axes collapsed into one
+is a filter that quietly becomes a pricing input.
+
+And note what this means for the resolvers: a variant reached through
+`resolveMaterial` is still subject to fork resolution, so the order is
+**parent → preferred variant → fork of that variant**. Getting that order wrong
+is the fifth-instance bug with an extra step in it, and
+`server/forkableReferences.test.ts` will demand an answer for the new column
+the moment it exists.
+
 ### Where labor hours come from
 
 The CORE assemblies in [STARTER_LIBRARY.md](STARTER_LIBRARY.md) ship with materials but **no labor hours**. Those get populated by the user, from their own field experience, with the **NECA Manual of Labor Units** as a general reference.

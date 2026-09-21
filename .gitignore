@@ -135,3 +135,6 @@ client/public/__manus__/version.json
 # On-disk file storage for running locally (LOCAL_STORAGE_DIR)
 .local-storage/
 
+
+# Regenerable: `npx tsx pricing/buildPricingSheet.mts` rebuilds it from the catalog.
+pricing/rows.json

@@ -828,6 +828,59 @@ unpriced row and filters down to exactly those (`shared/materialPricing.ts`).
 Tests must not borrow a shipped price for their arithmetic — price a fixture
 material instead, or the test is really asserting the seed data has not changed.
 
+## Brands — generic everywhere except panels and breakers
+
+**Decided 2026-09-17, in conversation, and it never reached the repo until
+2026-09-21.** Writing it down now is the point: a decision that lives only in a
+chat is invisible to everyone who opens the code, which is the exact failure
+§ "Where decisions live" describes — and this one had already started shaping a
+1,500-row pricing sheet before anybody could read it.
+
+**Commodity items are GENERIC.** The catalog says "Wire nuts", not an Ideal
+30-176, because a shipped catalog naming one manufacturer is wrong for everyone
+who buys another. `materials.brandNote` exists for a user to record what their
+own supply house stocks; the shipped names never pretend to.
+
+**Brands exist on PANELS and BREAKERS only**, because there brand is a
+functional property rather than marketing: a Homeline breaker does not fit a QO
+panel, and an estimator who buys the wrong family has bought scrap. Everything
+else is bought on type and size.
+
+> **Narrowed 2026-09-21.** Disconnects, safety switches and sensors are
+> GENERIC. They had been drifting toward brand variants on the strength of
+> "panels and breakers" being read loosely. More sizes and types beats more
+> brands on anything that interchanges.
+
+**The shape is a PARENT with brand variants underneath**, and one rule makes it
+safe:
+
+- **An assembly points at the PARENT, never at a variant.** So changing which
+  brand a company buys can never break a recipe, and a recipe built on one job
+  prices correctly on the next with a different panel in it.
+- **A company preferred-brand setting picks which variant a parent resolves
+  to**, with a **per-bid override** for a job spec'd to a named line.
+- A variant is still a real material with its own cost, because a QO 20A and a
+  Homeline 20A are different prices.
+
+**Not built yet** — `materials` has no `parentId`. The plan is in
+`ASSEMBLIES_PLAN.md` § "Parent items and brand variants", and it has to land
+before the pricing list uploads, because the list already carries the
+relationship in a Parent column.
+
+### One convention for single-pole breakers: "1-Pole"
+
+The catalog says `20A 2-Pole breaker` but `20A breaker` for a single pole,
+which reads as though the pole count is optional. **The convention is
+"1-Pole" everywhere** — `20A 1-Pole breaker` — so the two rows are the same
+shape and a brand variant can be named from its parent mechanically.
+
+**Nothing is renamed yet, deliberately**, and the rename is part of the
+parent/variant work rather than a tidy-up on its own. When it happens it goes
+through `RENAMED_BASELINE_MATERIALS`, which renames in place — see below, and
+note the file already did exactly this for `20/2 breaker` → `20A 2-Pole
+breaker`. Add the old spoken form as a search alias in the same change, so
+anybody typing the old name still lands on the row.
+
 **Renaming a shipped material is not a text edit.** Baseline rows are matched by
 name, so changing one inserts a second row and orphans the first, and every
 assembly, kit and takeoff stamp points at the original's id. Add an entry to
