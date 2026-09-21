@@ -651,9 +651,41 @@ export function TraceLayer({
               <span className="text-xs text-muted-foreground">
                 {pathType === "conduit" ? "Conduit run" : "Cable run"}
               </span>
+              {/*
+                TWO NUMBERS, EACH SAYING WHICH IT IS.
+
+                This pill showed the length INCLUDING the rubber-band segment
+                to the cursor, while the Finish button showed only the placed
+                points. Two different figures, a few inches apart, neither
+                labelled — so the big one read as "the run" and it was not:
+                move the mouse and it changes, and what gets saved is the
+                other one. Reported from bid 23 on 2026-09-21.
+
+                Placed comes first and stays put, because it is the number
+                that will exist after the next click. "To cursor" appears only
+                while there IS a rubber band, so a finished path shows one
+                figure rather than the same figure twice.
+              */}
               <span className="font-mono text-sm tabular-nums">
-                {liveInches === null ? "—" : formatFeetInches(liveInches)}
+                {committedInches === null
+                  ? "—"
+                  : formatFeetInches(committedInches)}
               </span>
+              <span className="text-[0.7rem] text-muted-foreground">
+                placed
+              </span>
+              {liveInches !== null &&
+                committedInches !== null &&
+                Math.abs(liveInches - committedInches) > 0.5 && (
+                  <>
+                    <span className="font-mono text-sm tabular-nums text-muted-foreground">
+                      {formatFeetInches(liveInches)}
+                    </span>
+                    <span className="text-[0.7rem] text-muted-foreground">
+                      to cursor
+                    </span>
+                  </>
+                )}
               <span className="text-[0.7rem] text-muted-foreground">
                 {points.length} {points.length === 1 ? "point" : "points"}
               </span>
