@@ -656,6 +656,54 @@ in the stash's third parent, which `git stash show` does not list.
 `todo.md` § "Working on this repo — traps" has the four commands, and the
 `git diff stash@{0} --stat` check to run before dropping anything.
 
+## EDIT CODE WITH THE EDIT TOOL — never through shell text replacement
+
+**Added 2026-09-21, after three garbled edits in one day.** Applying a change by
+piping text through a shell — a `node -e` one-liner, a heredoc patch script,
+`sed` — puts every backslash through at least one layer of escaping that nobody
+is tracking. What arrives on disk is not what was typed, and the difference is
+usually invisible.
+
+The three, all silent, all in one day:
+
+| Typed            | Landed as       | What it did                                                  |
+| ---------------- | --------------- | ------------------------------------------------------------ |
+| `\b` in a regex  | a literal 0x08  | A word boundary became a control character. Matched nothing. |
+| `\\d`            | `d`             | A digit class matched the letter d.                          |
+| `q.split(/\s+/)` | `q.split(/s+/)` | Split a search query on the LETTER "s".                      |
+
+**The third is the one to remember, because the CHECK was garbled too.** The
+verification — `s.includes("q.split(/\\s+/)")`, typed into the same kind of
+shell one-liner — was mangled identically, so it searched for the broken text
+and reported success. Meanwhile "wire" returned 51 results either way while
+"sealtite", "gem box" and "1/2 emt" returned nothing. A check that travels
+through the same pipe as the bug cannot catch the bug.
+
+**So: use `Edit` (or `Write` for a new file).** Those take the text literally.
+No escaping layer, nothing to get wrong.
+
+**Where a shell edit is genuinely the only way** — repairing a character you
+cannot type, which is exactly how the 0x08 above had to be removed — then build
+the strings from **character codes**, never from typed escapes
+(`String.fromCharCode(92) + "b"`), and **read the file back and print the
+result** rather than trusting the write.
+
+**And never verify an edit with a command shaped like the edit.** Read the bytes
+back: `cat -A`, or a script that prints `JSON.stringify(line)`. That is what
+found all three.
+
+`server/sourceHygiene.test.ts` is the net under this — it fails on any control
+character, any U+FFFD, and a short list of regex literals that are one lost
+backslash from something people write constantly. It cannot catch a mangling
+that stays plausible (`/\./` becoming `/./`), which is why the rule above exists
+as well: **the rule prevents, the test catches.** It found a live one the hour
+it was written — `scopeDiscipline.test.ts` had `/<0x08>(protectedProcedure|companyProcedure)<0x08>/`,
+a check that could never match and so could never fail.
+
+A file that needs a control character on purpose says so with the marker
+`source-hygiene: control characters are deliberate` and the reason, next to the
+bytes. `server/pdfUpload.test.ts` is the one today: the ZIP magic number.
+
 ## Changelog — do this on every meaningful commit
 
 Whenever you commit a meaningful change, **also add a one-or-two-line plain-English entry to `CHANGELOG.md`** describing what changed, in addition to the normal commit message. Do this automatically, as part of the same commit — do not wait to be asked.

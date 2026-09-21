@@ -1,6 +1,11 @@
 /**
  * The plan-upload size limit and its refusals.
  *
+ * source-hygiene: control characters are deliberate — the magic-number check
+ * below writes the real first bytes of a ZIP file, `PK` then 0x03 0x04, which
+ * is what a renamed .docx actually starts with. Testing it with anything else
+ * would be testing something else. See server/sourceHygiene.test.ts.
+ *
  * ── Why the boundary is tested from both sides ───────────────────────────────
  * A limit is only two things: the largest file that works and the smallest that
  * does not. Everything between is the same code path. So these press right up

@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-21]
 
+- **Internal safety: the build now refuses source code with invisible garbled
+  characters in it.** Several edits today were silently corrupted in transit —
+  an invisible control character where a symbol should have been — which breaks
+  code in ways that look fine on screen. A check now fails the build on any of
+  them. It immediately found one already in the codebase: a safety test that
+  could never have failed, because the pattern it searched for had been garbled
+  the same way.
+
 - **The Materials screen now ranks a search the same way the material picker
   does.** Searching "wire" there still led with wire nuts and "fixture" with
   fixture wire, because only the picker had been fixed — the same catalog

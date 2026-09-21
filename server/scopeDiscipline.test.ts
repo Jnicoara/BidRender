@@ -108,7 +108,7 @@ describe("every data router is company-scoped", () => {
         // would have unguarded routes hiding behind this exemption.
         expect({
           file,
-          mixed: /(protectedProcedure|companyProcedure)/.test(src),
+          mixed: /\b(protectedProcedure|companyProcedure)\b/.test(src),
         }).toEqual({ file, mixed: false });
         continue;
       }
