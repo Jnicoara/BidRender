@@ -30,6 +30,10 @@ const { generic, branded } = JSON.parse(
 const HEADERS = [
   "Parent",
   "Category",
+  // The name with its leading size removed, so a filter on "EMT connector"
+  // picks the nine sizes of one part rather than everything containing "EMT".
+  // Derived by the app's own materialTypeName, never by a second rule here.
+  "Type",
   "Name",
   "Size",
   "Unit of sale",
@@ -41,7 +45,7 @@ const HEADERS = [
   "Pack price",
   "Price per unit",
 ];
-const WIDTHS = [34, 24, 44, 12, 12, 7, 11, 40, 18, 10, 12, 14];
+const WIDTHS = [34, 24, 26, 44, 12, 12, 7, 11, 40, 18, 10, 12, 14];
 
 /**
  * Where a row gets priced.
@@ -206,28 +210,29 @@ function buildSheet(name, rows, note) {
     const [packText, packQty] = packFor(row);
     ws.getCell(r, 1).value = row.parent;
     ws.getCell(r, 2).value = row.category;
-    ws.getCell(r, 3).value = row.name;
-    ws.getCell(r, 4).value = row.size;
-    ws.getCell(r, 5).value = row.unit;
-    ws.getCell(r, 6).value = row.isNew ? "NEW" : "";
-    ws.getCell(r, 7).value = priceAt(row);
-    ws.getCell(r, 8).value = searchTerm(row);
-    ws.getCell(r, 9).value = packText;
-    ws.getCell(r, 10).value = packQty;
-    ws.getCell(r, 11).value = null; // the only column to type in
-    ws.getCell(r, 12).value = {
-      formula: `IFERROR(IF(N(K${r})=0,"",K${r}/J${r}),"")`,
+    ws.getCell(r, 3).value = row.type;
+    ws.getCell(r, 4).value = row.name;
+    ws.getCell(r, 5).value = row.size;
+    ws.getCell(r, 6).value = row.unit;
+    ws.getCell(r, 7).value = row.isNew ? "NEW" : "";
+    ws.getCell(r, 8).value = priceAt(row);
+    ws.getCell(r, 9).value = searchTerm(row);
+    ws.getCell(r, 10).value = packText;
+    ws.getCell(r, 11).value = packQty;
+    ws.getCell(r, 12).value = null; // the only column to type in
+    ws.getCell(r, 13).value = {
+      formula: `IFERROR(IF(N(L${r})=0,"",L${r}/K${r}),"")`,
     };
     for (let c = 1; c <= HEADERS.length; c++) {
       const cell = ws.getCell(r, c);
       cell.font = { name: "Arial", size: 10 };
-      cell.alignment = { vertical: "top", wrapText: c === 3 || c === 8 };
+      cell.alignment = { vertical: "top", wrapText: c === 4 || c === 9 };
     }
-    if (row.isNew) ws.getCell(r, 6).fill = NEW_FILL;
-    ws.getCell(r, 11).fill = INPUT_FILL;
-    ws.getCell(r, 11).numFmt = "$#,##0.00";
-    ws.getCell(r, 12).numFmt = "$#,##0.0000";
-    ws.getCell(r, 10).numFmt = "0";
+    if (row.isNew) ws.getCell(r, 7).fill = NEW_FILL;
+    ws.getCell(r, 12).fill = INPUT_FILL;
+    ws.getCell(r, 12).numFmt = "$#,##0.00";
+    ws.getCell(r, 13).numFmt = "$#,##0.0000";
+    ws.getCell(r, 11).numFmt = "0";
   });
   ws.autoFilter = {
     from: { row: 2, column: 1 },
@@ -238,7 +243,7 @@ function buildSheet(name, rows, note) {
 buildSheet(
   "Generic catalog",
   generic,
-  "STARTER CATALOG — GENERIC ITEMS. Fill in the YELLOW 'Pack price' column only; 'Price per unit' calculates itself as Pack price / Pack qty. 'NEW' marks a row not yet in the app's catalog. Rows with no NEW flag already exist and keep their exact name, unit and category. Sorted by category, then by physical size."
+  "STARTER CATALOG — GENERIC ITEMS. Fill in the YELLOW 'Pack price' column only; 'Price per unit' calculates itself as Pack price / Pack qty. 'NEW' marks a row not yet in the app's catalog. Rows with no NEW flag already exist and keep their exact name, unit and category. Sorted by category, then type, then physical size — so the nine sizes of one part sit together. Filter the Type column to work one part at a time."
 );
 buildSheet(
   "Brand variants",
@@ -286,8 +291,13 @@ const lines = [
   ],
   ["", ""],
   [
+    "Type column",
+    'The name with its leading size removed — "EMT connector", "THHN stranded", "1-Pole breaker". It is what the sheet groups by, and it is derived by the same code the app sorts its Materials screen with, so filtering here and browsing there agree.',
+  ],
+  ["", ""],
+  [
     "Sort order",
-    "Category, then physical size — the app's own size table, not alphabetical. AWG runs backwards and inverts at 1/0, so a text or numeric sort puts the heaviest conductor among the thin ones.",
+    "Category, then TYPE (the name with the size taken out), then physical size — the app's own size table, not alphabetical. AWG runs backwards and inverts at 1/0, so a text or numeric sort puts the heaviest conductor among the thin ones.",
   ],
   [
     "Units",

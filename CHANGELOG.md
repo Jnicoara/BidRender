@@ -6,6 +6,25 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-21]
 
+- **Searching the catalog puts the product first, then the parts that attach
+  to it.** Typing "pvc" used to return PVC cement above every length of PVC
+  conduit; "emt" returned a strap; "panel" returned a filler plate. Results
+  are now grouped by what a thing IS — the product, then its fittings, then
+  what holds it up, then what gets used up installing it — worked out from the
+  end of each item's name, so it applies to every part in the catalog and to
+  every part added later, with no per-word list to keep up. Typing two words
+  still lets the search decide: "pvc connector" gives connectors, not pipe.
+
+- **The materials list now groups by type before size, and a few shelves were
+  in the wrong order.** Three-pole breakers were filed among the single-pole
+  ones, breaker accessories sat in the middle of the breakers, and an item
+  named without a size — a plain "3-way switch" — was parked at the bottom of
+  its shelf instead of beside the sized ones it belongs with.
+
+- **The starter-catalog pricing spreadsheet gained a Type column** so a whole
+  part can be filtered and priced in one go — all nine sizes of EMT connector
+  together — and both sheets are re-sorted category, then type, then size.
+
 - **Internal safety: a script cannot write to a database that is not on this
   machine unless it is told to.** A maintenance script once reached the live
   database because it was run with the production settings file loaded for

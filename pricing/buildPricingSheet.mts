@@ -23,7 +23,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { BASELINE_MATERIALS } from "../server/seed/materials/index";
-import { compareBySize } from "../shared/materialSizeOrder";
+import { compareBySize, materialTypeName } from "../shared/materialSizeOrder";
+import { compareMaterials } from "../shared/materialOrder";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -32,6 +33,7 @@ type Row = {
   category: string;
   name: string;
   size: string;
+  type: string;
   unit: string;
   isNew: boolean;
   brand: string;
@@ -57,6 +59,7 @@ const add = (
     category,
     name,
     size: "",
+    type: "",
     unit,
     isNew,
     brand: "",
@@ -1277,6 +1280,12 @@ const SIZE_RX =
 for (const r of [...rows, ...brandRows]) {
   const m = r.name.match(SIZE_RX);
   r.size = m ? m[0].trim() : "";
+  /*
+    TYPE is the name with its leading size removed, from the app s own helper
+    rather than a second rule here — so a column somebody filters on cannot
+    disagree with the order the app sorts in. Unsized rows are their own type.
+  */
+  r.type = materialTypeName(r.name) ?? r.name;
 }
 const CATEGORY_ORDER = [
   "Wire & Cable",
@@ -1306,12 +1315,21 @@ const catRank = (c: string) => {
   const i = CATEGORY_ORDER.indexOf(c);
   return i === -1 ? CATEGORY_ORDER.length : i;
 };
+/*
+  CATEGORY, then TYPE, then SIZE — through the app s own comparison.
+
+  This used to sort category-then-size here, which interleaved every product at
+  each size: nine EMT connectors mixed with nine couplings and nine PVC ones.
+  compareMaterials already solved that for the Materials screen, so the sheet
+  calls it rather than growing a second opinion. The local category order is
+  kept only for the three categories the app does not have yet.
+*/
 const sortRows = (list: Row[]) =>
-  [...list].sort((a, b) =>
-    a.category !== b.category
-      ? catRank(a.category) - catRank(b.category)
-      : compareBySize(a.name, b.name)
-  );
+  [...list].sort((a, b) => {
+    if (a.category !== b.category)
+      return catRank(a.category) - catRank(b.category);
+    return compareMaterials(a, b);
+  });
 
 const generic = sortRows(rows);
 const branded = sortRows(brandRows);

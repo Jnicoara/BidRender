@@ -159,6 +159,12 @@ describe("Breakers order by pole count, then amperage", () => {
   it("keeps a protected breaker with its own pole count", () => {
     // A 20A AFCI is a single-pole breaker. Someone looking for "the 20 amp
     // singles" wants it there, not in a separate AFCI block.
+    //
+    // Updated 2026-09-21: within the pole class, protection now orders ahead of
+    // size — plain, then AFCI, GFCI, dual-function — so "20A breaker" comes
+    // above "15A AFCI breaker" although 15 is the smaller number. The rule this
+    // test is FOR is unchanged; what moved is the order among the protected
+    // ones, which used to leave the plain breaker buried between them.
     const sorted = sortMaterialsForDisplay([
       m("20A 2-Pole GFCI breaker", "Breakers"),
       m("15A AFCI breaker", "Breakers"),
@@ -167,8 +173,8 @@ describe("Breakers order by pole count, then amperage", () => {
     ]);
     expect(names(sorted)).toEqual([
       "15/20 tandem breaker",
-      "15A AFCI breaker",
       "20A breaker",
+      "15A AFCI breaker",
       "20A 2-Pole GFCI breaker",
     ]);
   });
@@ -417,5 +423,111 @@ describe("type as a grouping level", () => {
         .filter(s => s.typeLabel === null)
         .flatMap(s => s.items.map(i => i.name))
     ).toEqual(["Wire nuts"]);
+  });
+});
+
+/**
+ * Breakers: the shelf order an estimator reaches for, and two faults that were
+ * invisible in the code and obvious in the printed shelf.
+ *
+ * Both were found by sorting the real catalog and reading it — see CLAUDE.md
+ * § "A number that can be measured should not be asserted". Neither would have
+ * failed a typecheck, and the first was a MISSING entry in a list, which is the
+ * kind of thing no amount of reading the function finds.
+ */
+describe("breakers sort by pole class, then protection, then size", () => {
+  const shelf = (names: string[]) =>
+    names
+      .map(n => m(n, "Breakers"))
+      .sort(compareMaterials)
+      .map(r => r.name);
+
+  it("runs tandem, 1-pole, 2-pole, 3-pole", () => {
+    // 3-Pole had no test of its own, so it fell through to the single-pole
+    // rank and the shelf read 1-Pole, 3-Pole, AFCI, GFCI, then 2-Pole.
+    expect(
+      shelf([
+        "20A 3-Pole breaker",
+        "20A 2-Pole breaker",
+        "20A 1-Pole breaker",
+        "20/20 tandem breaker",
+      ])
+    ).toEqual([
+      "20/20 tandem breaker",
+      "20A 1-Pole breaker",
+      "20A 2-Pole breaker",
+      "20A 3-Pole breaker",
+    ]);
+  });
+
+  it("keeps a tandem at the front though its name carries no size", () => {
+    // "15/15" is two circuits, not an amperage, so there is nothing for the
+    // size parser to strip — which made every tandem look like an accessory
+    // and sent the lot to the end of the shelf.
+    expect(shelf(["20A 1-Pole breaker", "15/15 tandem breaker"])[0]).toBe(
+      "15/15 tandem breaker"
+    );
+  });
+
+  it("puts plain before AFCI, GFCI, then dual-function, inside a pole class", () => {
+    expect(
+      shelf([
+        "20A GFCI breaker",
+        "20A dual-function breaker",
+        "20A AFCI breaker",
+        "20A breaker",
+      ])
+    ).toEqual([
+      "20A breaker",
+      "20A AFCI breaker",
+      "20A GFCI breaker",
+      "20A dual-function breaker",
+    ]);
+  });
+
+  it("sends the accessories after every breaker", () => {
+    expect(
+      shelf([
+        "Breaker filler plate",
+        "20A 3-Pole breaker",
+        "Breaker handle tie",
+        "15A 1-Pole breaker",
+      ])
+    ).toEqual([
+      "15A 1-Pole breaker",
+      "20A 3-Pole breaker",
+      "Breaker filler plate",
+      "Breaker handle tie",
+    ]);
+  });
+});
+
+describe("a row with no size joins its own family", () => {
+  it("keeps the bare name beside the sized ones", () => {
+    // Unsized rows used to sort after every typed family, which put a plain
+    // "3-way switch" four unrelated products away from "20A 3-way switch" —
+    // read off the finished pricing sheet, not off the code.
+    const sorted = sortMaterialsForDisplay([
+      m("20A single-pole switch", "Switches"),
+      m("3-way switch", "Switches"),
+      m("20A 3-way switch", "Switches"),
+      m("Dimmer", "Switches"),
+    ]).map(r => r.name);
+    const threeWay = sorted.filter(n => n.includes("3-way"));
+    expect(threeWay).toEqual(["20A 3-way switch", "3-way switch"]);
+    expect(sorted.indexOf("3-way switch")).toBe(
+      sorted.indexOf("20A 3-way switch") + 1
+    );
+  });
+
+  it("labels it by its whole name rather than by nothing", () => {
+    expect(materialTypeKey("GFCI receptacle", "Receptacles")).toEqual([
+      0,
+      "gfci receptacle",
+    ]);
+    expect(materialTypeKey("15A GFCI receptacle", "Receptacles")).toEqual([
+      0,
+      "gfci receptacle",
+    ]);
   });
 });

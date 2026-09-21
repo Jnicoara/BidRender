@@ -8,11 +8,20 @@
  * "the right row is missing" — they are "the right row is fourth, behind three
  * fittings that share a word with it", which no assertion thought to check.
  *
- *   pnpm tsx scripts/searchSpotCheck.mts            # the standard sweep
- *   pnpm tsx scripts/searchSpotCheck.mts romex 1900 # ad-hoc queries
+ * ── It ranks the way the app ranks ───────────────────────────────────
+ * MaterialPicker asks smartSearch for a generous page and then groups it by
+ * ROLE — the product first, then fittings, supports, consumables. A spot check
+ * that skipped that step would print an order no user ever sees, which is
+ * worse than not checking: it would look like evidence.
+ *
+ *   pnpm tsx scripts/searchSpotCheck.mts             # the standard sweep
+ *   pnpm tsx scripts/searchSpotCheck.mts --diff      # raw vs role-ranked
+ *   pnpm tsx scripts/searchSpotCheck.mts romex 1900  # ad-hoc queries
  */
 import { BASELINE_MATERIALS } from "../server/seed/baselineMaterials";
 import { smartSearch } from "../client/src/lib/smartSearch";
+import { compareByRole } from "../shared/materialSearchRank";
+import { compareBySize } from "../shared/materialSizeOrder";
 
 const index = BASELINE_MATERIALS.map((m, i) => ({
   id: String(i),
@@ -92,16 +101,66 @@ const SWEEP = [
   "spa",
 ];
 
-const queries = process.argv.slice(2).length ? process.argv.slice(2) : SWEEP;
+/** How many rows to show, and how deep to look before grouping them. */
+const SHOW = 5;
+const OVERSAMPLE = 6;
 
-for (const query of queries) {
-  const hits = smartSearch(index, query, 5);
-  console.log(`\n"${query}"`);
-  if (hits.length === 0) {
-    console.log("   (nothing)");
-    continue;
+const rowOf = (id: string) => BASELINE_MATERIALS[Number(id)];
+const nameOf = (id: string) => rowOf(id).name;
+
+/** smartSearch alone, in the order it returns. */
+function raw(query: string, limit = SHOW): string[] {
+  return smartSearch(index, query, limit).map(hit => nameOf(hit.id));
+}
+
+/**
+ * What the picker actually shows: a deep page, grouped by role, then cut.
+ *
+ * The oversample is not a detail — grouping AFTER the cut would be cosmetic,
+ * because a product that fell outside the first few on score could never be
+ * brought back. smartSearch does not expose its score, so position stands in
+ * for it, which is all the role comparison needs to break a tie.
+ */
+function ranked(query: string, limit = SHOW): string[] {
+  const hits = smartSearch(index, query, limit * OVERSAMPLE);
+  return hits
+    .map((hit, index) => ({
+      name: nameOf(hit.id),
+      score: -index,
+      aliases: rowOf(hit.id).searchAliases,
+    }))
+    .sort((a, b) => compareByRole(a, b, query, compareBySize))
+    .slice(0, limit)
+    .map(row => row.name);
+}
+
+const args = process.argv.slice(2);
+const diff = args.includes("--diff");
+const given = args.filter(a => a !== "--diff");
+const queries = given.length ? given : SWEEP;
+
+if (diff) {
+  let changed = 0;
+  for (const query of queries) {
+    const before = raw(query, 3);
+    const after = ranked(query, 3);
+    const moved = before.join(" | ") !== after.join(" | ");
+    if (moved) changed++;
+    console.log(`\n"${query}"  ${moved ? "CHANGED" : "same"}`);
+    console.log(`   before  ${before.join("  ·  ") || "(nothing)"}`);
+    if (moved) console.log(`   after   ${after.join("  ·  ")}`);
   }
-  hits.forEach((hit, i) => {
-    console.log(`   ${i + 1}. ${BASELINE_MATERIALS[Number(hit.id)].name}`);
-  });
+  console.log(
+    `\n${queries.length} queries, ${changed} reordered by role grouping.`
+  );
+} else {
+  for (const query of queries) {
+    const hits = ranked(query);
+    console.log(`\n"${query}"`);
+    if (hits.length === 0) {
+      console.log("   (nothing)");
+      continue;
+    }
+    hits.forEach((name, i) => console.log(`   ${i + 1}. ${name}`));
+  }
 }

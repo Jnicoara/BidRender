@@ -32,6 +32,8 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/money";
 import { smartSearch } from "@/lib/smartSearch";
+import { compareByRole } from "@shared/materialSearchRank";
+import { compareBySize } from "@shared/materialSizeOrder";
 import { trpc } from "@/lib/trpc";
 
 export type PickableMaterial = {
@@ -108,11 +110,40 @@ export function MaterialPicker({
         .filter(m => !chosen.has(m.id))
         .slice(0, MAX_RECENT);
     }
-    const hits = smartSearch(searchable, query, MAX_RESULTS);
+    /*
+      Ask for more than will be shown, then group by ROLE before trimming.
+
+      Ranking after the cut would be cosmetic: if the product itself fell
+      outside the first MAX_RESULTS on score, no reordering could bring it back.
+      Searching "emt" matches 202 rows, and the strap used to outscore the pipe.
+
+      smartSearch returns items in score order and does not expose the score, so
+      position stands in for it — which is all the role comparison needs, since
+      it only ever uses the score to break a tie inside one role.
+    */
+    const hits = smartSearch(searchable, query, MAX_RESULTS * 6);
     const byId = new Map(all.map(m => [m.id, m]));
     return hits
-      .map(hit => byId.get(Number(hit.id)))
-      .filter((m): m is PickableMaterial => Boolean(m));
+      .map((hit, index) => ({ hit, index }))
+      .sort((a, b) =>
+        compareByRole(
+          {
+            name: a.hit.description,
+            score: -a.index,
+            aliases: a.hit.searchAliases,
+          },
+          {
+            name: b.hit.description,
+            score: -b.index,
+            aliases: b.hit.searchAliases,
+          },
+          query,
+          compareBySize
+        )
+      )
+      .map(({ hit }) => byId.get(Number(hit.id)))
+      .filter((m): m is PickableMaterial => Boolean(m))
+      .slice(0, MAX_RESULTS);
   }, [query, searchable, catalog, recent, exclude]);
 
   const showingRecent = !query.trim() && results.length > 0;

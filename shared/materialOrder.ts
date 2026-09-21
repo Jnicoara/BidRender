@@ -84,11 +84,21 @@ const CONDUIT_FAMILIES: string[] = [
 
 /**
  * Breaker classes, in the order asked for: the half-size tandems first, then
- * ordinary single-pole, then everything two-pole.
+ * single-pole, two-pole, three-pole.
  *
  * Protected types (AFCI/GFCI/combo) sort within their pole count rather than
  * forming their own block — a 20A AFCI is a single-pole breaker, and an
  * estimator looking for "the 20 amp singles" wants them together.
+ *
+ * ── Three-pole needed its own test, and the gap was invisible here ──────────
+ * This list held tandem and two-pole only, so every three-pole breaker fell
+ * through to SINGLE_POLE_RANK and the shelf read 1-Pole, 3-Pole, AFCI, GFCI,
+ * then 2-Pole. Nothing in the code said so: the fault was in what the list did
+ * NOT contain. It was found by printing the sorted shelf and reading it, and
+ * server/materialOrder.test.ts now pins the pole order so it cannot reopen.
+ *
+ * Order matters — a tandem is named "15/15", so it has to be claimed before
+ * the two-pole test goes looking for a slash.
  */
 const BREAKER_CLASSES: Array<{
   rank: number;
@@ -98,14 +108,34 @@ const BREAKER_CLASSES: Array<{
   { rank: 0, test: n => /tandem|peanut|half[- ]size/i.test(n) },
   // Anything explicitly two-pole.
   { rank: 2, test: n => /\b2-pole\b|\b\d+\/2\b|double pole|two pole/i.test(n) },
+  { rank: 3, test: n => /\b3-pole\b|three pole|triple pole/i.test(n) },
 ];
 
 /** Everything not matched above is an ordinary single-pole breaker. */
 const SINGLE_POLE_RANK = 1;
 
-function breakerClassRank(name: string): number {
+/**
+ * Where the things that are not breakers go: after every pole class.
+ *
+ * An ordinary breaker is named by its amperage, so a row on this shelf that
+ * names no pole class AND carries no size is an accessory — a filler plate, a
+ * handle tie, a lock-off. They used to take SINGLE_POLE_RANK with a numeric
+ * label, which dropped them between the tandems and the 1-Pole run, in the
+ * middle of the breakers.
+ *
+ * ── Both halves of that test are load-bearing ───────────────────────────────
+ * The first version asked only about the size, and sent every tandem to the
+ * end: "15/15 tandem breaker" has no size marker to strip — 15/15 is two
+ * circuits, not an amperage — so it looked exactly like an accessory. A row
+ * that names its class has already said what it is, and its rank comes from
+ * that whatever its name does about size.
+ */
+const BREAKER_ACCESSORY_RANK = 4;
+
+/** The class a name declares, or null when it declares none. */
+function breakerClass(name: string): number | null {
   for (const cls of BREAKER_CLASSES) if (cls.test(name)) return cls.rank;
-  return SINGLE_POLE_RANK;
+  return null;
 }
 
 /**
@@ -147,9 +177,31 @@ export function materialTypeKey(
   }
 
   if (category === "Breakers") {
-    const rank = breakerClassRank(trimmed);
-    // Within a class, AFCI, GFCI and plain are still separate products.
-    return [rank, derived === null ? String(rank) : derived.toLowerCase()];
+    const declared = breakerClass(trimmed);
+    /*
+      Within a pole class: standard, then AFCI, GFCI, dual-function.
+
+      Asked for 2026-09-21, and it REFINES the note above rather than
+      contradicting it — protected types still sort inside their pole count, so
+      "the 20 amp singles" stay together. What changes is the order among them.
+      Left alphabetical, the derived labels run AFCI, AFCI/GFCI, breaker,
+      dual-function, GFCI — which buries the plain breaker in the middle of the
+      protected ones, and the plain one is what most jobs reach for.
+
+      The digit is a sort prefix on the label, not part of it. The label is only
+      ever compared, never shown.
+    */
+    const protection = /dual-function|afci\/gfci|combo/i.test(trimmed)
+      ? 3
+      : /\bgfci\b/i.test(trimmed)
+        ? 2
+        : /\bafci\b/i.test(trimmed)
+          ? 1
+          : 0;
+    const rank =
+      declared ??
+      (derived === null ? BREAKER_ACCESSORY_RANK : SINGLE_POLE_RANK);
+    return [rank, protection + "|" + (derived ?? trimmed).toLowerCase()];
   }
 
   /**
@@ -167,11 +219,18 @@ export function materialTypeKey(
    * grouping UI exists, because the catalog is named {size} {type} — largely
    * because most of it is generated that way (server/seed/materials).
    *
-   * A name with no size returns [1, ""], which sorts it after every typed
-   * family and leaves the order to compareBySize — the same place unsized rows
-   * already landed.
+   * ── An unsized row is labelled by its WHOLE NAME, not parked at the end ───
+   * This used to return [1, ""] for a name with no size, which sorted every
+   * such row after all the typed families. Read back off the finished pricing
+   * sheet, that had separated a bare "3-way switch" from "20A 3-way switch" by
+   * four unrelated products, and a plain "GFCI receptacle" from the 15A and
+   * 20A ones — the two rows an estimator is most likely to be comparing.
+   *
+   * Labelling by the full name puts them back together, because a sized row
+   * derives exactly the same label. It is also what the raceway branch above
+   * has always done, so this is one rule now rather than two.
    */
-  return derived === null ? [1, ""] : [0, derived.toLowerCase()];
+  return [0, (derived ?? trimmed).toLowerCase()];
 }
 
 /**
