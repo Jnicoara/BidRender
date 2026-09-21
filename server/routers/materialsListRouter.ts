@@ -48,7 +48,7 @@ import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import { groupStamps, stampName } from "../../shared/takeoffCounts";
 import { circuitWire, totalQuantities } from "../../shared/takeoffQuantities";
-import { heightContextForBid, verticalsForRunRow } from "../runVerticals";
+import { verticalsForRunRow } from "../runVerticals";
 import {
   aggregateMaterials,
   measuredEntries,
@@ -229,7 +229,7 @@ export const materialsListRouter = router({
       const realRuns = runs.filter(run => !run.isSuggestion);
       // Verticals reach the bill of materials through the same resolver the
       // takeoff panel uses, so the two cannot report different footage.
-      const heights = await heightContextForBid(
+      const heights = await db.heightContextForBid(
         input.bidId,
         ctx.scope.dataUserId,
         bid.distributionHeightInches

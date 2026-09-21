@@ -27,7 +27,15 @@ import {
   type HeightRow,
   type RunVerticals,
 } from "../shared/takeoffHeights";
-import * as db from "./db";
+/*
+  NO DATABASE IMPORT, DELIBERATELY.
+
+  This file is reached from server/db.ts (bid lines resolve their footage
+  through it), so importing db here would be a cycle. The loader that fetches
+  the three height tables lives in db.ts and hands the rows to
+  `buildHeightContext` below — which is the whole reason that function takes
+  rows rather than ids.
+*/
 
 /** Everything needed to resolve any run on one bid, loaded once. */
 export type HeightContext = {
@@ -48,23 +56,31 @@ export type HeightContext = {
 };
 
 /**
- * Load the height settings for one bid.
+ * Build the height settings for one bid, from rows somebody else fetched.
+ *
+ * ── Takes ROWS, not ids, and that is what breaks the import cycle ───────────
+ * The loader is `heightContextForBid` in server/db.ts. It lives there because
+ * db.ts needs this context to resolve a bid line's traced footage, and a
+ * loader in this file would mean db.ts importing a module that imports db.ts.
  *
  * Loaded ONCE per request and passed down, rather than per run: a sheet with
  * forty runs would otherwise issue a hundred and twenty queries to answer a
  * question whose answer is identical every time.
  */
-export async function heightContextForBid(
-  bidId: number,
-  userId: number,
-  bidDistributionInches: number | null
-): Promise<HeightContext> {
-  const [defaults, company, job] = await Promise.all([
-    db.getHeightDefaults(userId),
-    db.getMountingHeights(userId),
-    db.getBidMountingHeights(bidId, userId),
-  ]);
-
+export function buildHeightContext(input: {
+  defaults: { distributionHeightInches: number | null } | undefined;
+  /** Rows from `takeoff_mounting_heights` — the same shape heightList takes. */
+  company: readonly {
+    typeKey: string;
+    label: string;
+    heightInches: number | null;
+    isActive: boolean;
+  }[];
+  /** Rows from `bid_mounting_heights`. */
+  job: readonly { typeKey: string; heightInches: number }[];
+  bidDistributionInches: number | null;
+}): HeightContext {
+  const { defaults, company, job, bidDistributionInches } = input;
   return {
     companyInches: defaults?.distributionHeightInches ?? null,
     jobInches: bidDistributionInches,

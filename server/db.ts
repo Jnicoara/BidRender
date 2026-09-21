@@ -179,6 +179,8 @@ import { TRADE_ALL, normalizeTradeId, resolveForTrade } from "../shared/trades";
 import { hourlyCostFor } from "../shared/laborRateLookup";
 import { appliedModifiers } from "../shared/modifierLookup";
 import { resolveMaterial, materialIdsToFetch } from "../shared/materialLookup";
+import { buildHeightContext, type HeightContext } from "./runVerticals";
+import { groupRunFootage } from "./runTypeFootageCore";
 import {
   containsPattern,
   dateRangeBounds,
@@ -4350,10 +4352,120 @@ async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
  * A group with no marks left resolves to 0 and the LINE STAYS, deliberately.
  * See `resolveLineQty` in shared/takeoffBridge.ts.
  */
+/**
+ * Re-resolve the FOOTAGE on every line that came from a traced run type.
+ *
+ * ── Why this exists, and why it is not optional ──────────────────────────────
+ * The same rule counted groups follow: the plans own how many, the bid owns
+ * what it costs. A line whose footage froze at send time is a bid that stays
+ * short after somebody traces three more homeruns, with nothing on screen
+ * saying so — which is the honest-numbers rule broken in the direction that
+ * looks like a competitive bid.
+ *
+ * It shipped that way for one commit, with a comment claiming otherwise. The
+ * blocker was real and is now gone: resolving footage needs the height context,
+ * whose loader used to live in a module that imports this one. The pure
+ * grouping is `runTypeFootageCore.ts` and the loader is in this file, so there
+ * is no cycle left to route around.
+ *
+ * ── The four snapshot columns are NEVER touched ──────────────────────────────
+ * R4 holds exactly as it does for any other line. Only the quantity follows the
+ * drawing; the prices are whatever they were when the line was created.
+ *
+ * ── A type with no runs left resolves to 0 and the LINE STAYS ────────────────
+ * Same decision as a counted group with no marks: deleting somebody's line
+ * because they tidied a drawing is worse than showing a zero they can see.
+ */
+async function withTracedFootage(
+  bidId: number,
+  rows: BidLineItem[]
+): Promise<BidLineItem[]> {
+  if (!rows.some(row => row.takeoffRunTypeId !== null)) return rows;
+
+  /*
+    The bid owns the scope. This function is reached with a bidId alone, and
+    every loader below is user-scoped — so the owner is read off the bid rather
+    than threaded through every caller, which would be the same userId arriving
+    by a longer route.
+  */
+  const db = await getDb();
+  if (!db) return rows;
+  const [bid] = await db
+    .select({
+      userId: bids.userId,
+      distributionHeightInches: bids.distributionHeightInches,
+    })
+    .from(bids)
+    .where(eq(bids.id, bidId))
+    .limit(1);
+  if (!bid) return rows;
+
+  const [runs, scales] = await Promise.all([
+    getRunsForBid(bidId, bid.userId),
+    getSheetScalesForBid(bidId, bid.userId),
+  ]);
+  const circuits = await getCircuitsForRuns(
+    runs.map(run => run.id),
+    bid.userId
+  );
+  const circuitsByRun = new Map<number, typeof circuits>();
+  for (const circuit of circuits) {
+    const list = circuitsByRun.get(circuit.runId) ?? [];
+    list.push(circuit);
+    circuitsByRun.set(circuit.runId, list);
+  }
+  const heights = await heightContextForBid(
+    bidId,
+    bid.userId,
+    bid.distributionHeightInches
+  );
+  const footage = groupRunFootage({ runs, circuitsByRun, scales, heights });
+
+  return rows.map(row => {
+    if (row.takeoffRunTypeId === null || row.runMaterialRole === null) {
+      return row;
+    }
+    const f = footage.get(row.takeoffRunTypeId);
+    /*
+      A type with nothing traced under it any more is 0, not the stored number.
+      Falling back to what the line last held is how a bid keeps money for work
+      the drawing no longer shows — the failure the derived count exists to
+      prevent, arriving through the door nobody was watching.
+    */
+    const feet = f ? feetForRole(f, row.runMaterialRole) : 0;
+    return { ...row, qty: feet.toFixed(4) };
+  });
+}
+
+/** Which of a type's three footages this line's role is paid in. */
+function feetForRole(
+  footage: {
+    conduitFeet: number;
+    cableFeet: number;
+    insulatedFeet: number;
+    groundFeet: number;
+  },
+  role: RunMaterialRole
+): number {
+  switch (role) {
+    case "raceway":
+      return footage.conduitFeet;
+    case "conductor":
+      // A cable type carries its cable on the conductor link, so whichever of
+      // the two is non-zero is this row's footage. They are never both set:
+      // quantitiesForRun returns null for the one that does not apply.
+      return footage.cableFeet > 0 ? footage.cableFeet : footage.insulatedFeet;
+    case "ground":
+      return footage.groundFeet;
+  }
+}
+
 async function withPlanCounts(
   bidId: number,
   rows: BidLineItem[]
 ): Promise<BidLineItem[]> {
+  const withRunFootage = await withTracedFootage(bidId, rows);
+  rows = withRunFootage;
   if (!rows.some(row => row.takeoffGroupId !== null)) return rows;
 
   const [counted, groups] = await Promise.all([
@@ -8438,26 +8550,21 @@ export async function countBidsInheritingHeights(
  * worth having on the bid, and the run panel already flags a type whose
  * materials have no hours. Refusing would leave the estimator with nothing.
  *
- * ── THE QUANTITY IS STORED, AND THAT DIFFERS FROM A COUNTED GROUP ──────────
- * A counted group's line has its quantity re-resolved on every read
- * (`withPlanCounts`), so removing a mark moves the bid immediately. A run
- * type's does NOT yet: the feet are written at send time and stay until the
- * type is sent again, which updates them.
+ * ── The quantity is written AND derived, exactly like a counted group's ────
+ * The column gets the feet at send time so an old reader sees something sane,
+ * and `withTracedFootage` re-resolves it on every read — so tracing three more
+ * homeruns moves the bid without anybody pressing anything.
  *
- * This paragraph used to claim the opposite. It said every read re-resolved
- * from the runs — which was the intention and was never built, and a comment
- * that says something else handles it is the failure CLAUDE.md names, because
- * it is the reason nobody writes the check.
+ * This paragraph has been wrong in BOTH directions and the history is kept on
+ * purpose. It first claimed derived resolution that had never been built, which
+ * is the "something else handles it" comment CLAUDE.md names. It was then
+ * corrected to say the footage was frozen, which was true for exactly one
+ * commit. The blocker was an import cycle — the height loader lived in a module
+ * that imports this one — and splitting the pure grouping into
+ * `runTypeFootageCore.ts` removed it.
  *
- * **Why it is not simply done here.** Resolving run footage needs the sheet
- * scales and the resolved verticals, and `heightContextForBid` lives in
- * `server/runVerticals.ts`, which imports this file — so doing it inside
- * `withPlanCounts` is an import cycle. The fix is to split the pure grouping
- * out of `server/runTypeFootage.ts` so both sides can call it without the
- * cycle. Until then, re-sending is the refresh, and it says so on screen.
- *
- * The PRICING is frozen either way: R4 holds exactly as it does for any other
- * line, and re-sending never re-snapshots it.
+ * The PRICING stays frozen either way: R4 holds as it does for any other line,
+ * and nothing here re-snapshots it.
  */
 export async function addRunTypeRowToBid(
   bidId: number,
@@ -8542,4 +8649,31 @@ export async function refreshRunTypeLineQty(
     .update(bidLineItems)
     .set({ qty: feet.toFixed(4) })
     .where(eq(bidLineItems.id, lineId));
+}
+
+/**
+ * Load the height settings for one bid.
+ *
+ * ── The loader lives HERE, and the build lives in runVerticals ─────────────
+ * db.ts resolves a bid line's traced footage, which needs these heights — so a
+ * loader inside runVerticals.ts would mean this file importing a module that
+ * imports this file. The three queries are db's own anyway; the assembly is
+ * pure and stays where it is tested.
+ */
+export async function heightContextForBid(
+  bidId: number,
+  userId: number,
+  bidDistributionInches: number | null
+): Promise<HeightContext> {
+  const [defaults, company, job] = await Promise.all([
+    getHeightDefaults(userId),
+    getMountingHeights(userId),
+    getBidMountingHeights(bidId, userId),
+  ]);
+  return buildHeightContext({
+    defaults,
+    company,
+    job,
+    bidDistributionInches,
+  });
 }

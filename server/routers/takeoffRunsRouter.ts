@@ -45,11 +45,7 @@ import {
   runNameParts,
 } from "../../shared/takeoffCounts";
 import * as db from "../db";
-import {
-  EMPTY_HEIGHT_CONTEXT,
-  heightContextForBid,
-  verticalsForRunRow,
-} from "../runVerticals";
+import { EMPTY_HEIGHT_CONTEXT, verticalsForRunRow } from "../runVerticals";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -189,7 +185,7 @@ export const takeoffRunsRouter = router({
       const heights =
         bidId === null
           ? EMPTY_HEIGHT_CONTEXT
-          : await heightContextForBid(
+          : await db.heightContextForBid(
               bidId,
               ctx.scope.dataUserId,
               bid?.distributionHeightInches ?? null
@@ -737,7 +733,7 @@ export const takeoffRunsRouter = router({
         );
       }
 
-      const heights = await heightContextForBid(
+      const heights = await db.heightContextForBid(
         input.bidId,
         ctx.scope.dataUserId,
         bid.distributionHeightInches

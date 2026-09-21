@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-21]
 
+- **A bid line from traced runs now follows the drawing.** Trace three more
+  homeruns of 1/2" EMT and the pipe line on the bid moves by itself, the same
+  way a counted item does — you do not have to remember to send it again. Take
+  runs away and it moves back down. What stays frozen is the PRICE: the rates
+  on a line are whatever they were when it was created, so an old bid never
+  re-prices itself.
+
 - **A guard so the "edits to a starter did not follow through" bug cannot
   happen a fifth time unnoticed.** It has bitten four times — labour rates,
   materials, job-condition modifiers and run types — and every one was found by
