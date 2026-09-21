@@ -133,9 +133,10 @@ const REGISTRY: Record<string, Entry> = {
   // bid rather than the fork the user priced. Found by writing this file,
   // 2026-09-21, and not yet fixed.
   "takeoff_groups.assemblyId": {
-    kind: "unreviewed",
-    since: "2026-09-21",
-    why: "Reaches getAssemblyById, a direct id lookup, on the path that SNAPSHOTS money onto a bid line. Very likely the fifth instance.",
+    kind: "resolver",
+    resolver: "getAssemblyForStoredReference",
+    readBy: "server/db.ts",
+    note: "THE FIFTH INSTANCE, and the first found on purpose rather than by accident — this file found it on 2026-09-21. addCountToBid used the literal lookup, so counting with a shipped assembly and then pricing it froze the SHIPPED row onto the bid line, permanently, because a snapshot is never re-priced. server/takeoffBridgeFlow.test.ts is the red: 0.5 h instead of 1.25 h.",
   },
   "takeoff_groups.materialId": {
     kind: "unreviewed",
@@ -311,6 +312,6 @@ describe("every stored id into a forkable row is accounted for", () => {
     const unreviewed = Object.entries(REGISTRY).filter(
       ([, entry]) => entry.kind === "unreviewed"
     );
-    expect(unreviewed.length).toBeLessThanOrEqual(10);
+    expect(unreviewed.length).toBeLessThanOrEqual(9);
   });
 });

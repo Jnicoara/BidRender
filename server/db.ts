@@ -179,6 +179,7 @@ import { TRADE_ALL, normalizeTradeId, resolveForTrade } from "../shared/trades";
 import { hourlyCostFor } from "../shared/laborRateLookup";
 import { appliedModifiers } from "../shared/modifierLookup";
 import { resolveMaterial, materialIdsToFetch } from "../shared/materialLookup";
+import { resolveAssembly } from "../shared/assemblyLookup";
 import { buildHeightContext, type HeightContext } from "./runVerticals";
 import { groupRunFootage } from "./runTypeFootageCore";
 import {
@@ -2689,6 +2690,56 @@ export async function getAssemblyModifierIds(
 }
 
 /** An assembly and everything it is made of. */
+/**
+ * The assembly a STORED id refers to — a fork followed.
+ *
+ * ── Why this is separate from `getAssemblyById`, which stays literal ────────
+ * Two different questions share one shape. "Show me assembly 7" wants row 7,
+ * and every library screen, fork, archive and revert means exactly that. "What
+ * does this counted group point at" is a stored REFERENCE, and when the user
+ * has forked the shipped row they meant, row 7 is the row their fork replaced.
+ *
+ * Making `getAssemblyById` resolve would have broken the first question:
+ * reverting a fork, or editing the shipped row, would silently act on the wrong
+ * one. So the reference-following paths call this by name instead.
+ *
+ * ── The fifth instance of the fork bug, and the money one ───────────────────
+ * `addCountToBid` used the literal lookup, so a count made with a shipped
+ * assembly and then priced by the user FROZE the shipped row's $0 and shipped
+ * hours onto the bid line. A snapshot is never re-priced, so that bid stays
+ * wrong for ever. Found by `server/forkableReferences.test.ts` on 2026-09-21.
+ */
+export async function getAssemblyForStoredReference(
+  storedId: number,
+  userId: number
+): Promise<AssemblyDetail | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  /*
+    Both halves in one query, built from the same id: the stored row, and this
+    user's fork OF it. A fork returned without its baseline would resolve
+    inconsistently depending on which arrived.
+  */
+  const candidates = await db
+    .select()
+    .from(assemblies)
+    .where(
+      or(
+        and(
+          eq(assemblies.id, storedId),
+          or(isNull(assemblies.userId), eq(assemblies.userId, userId))
+        ),
+        and(eq(assemblies.userId, userId), eq(assemblies.baselineId, storedId))
+      )
+    );
+  // MERGE BEFORE RESOLVING — resolveAssembly takes a direct hit first, so a raw
+  // list holding both would return the baseline the fork exists to replace.
+  const visible = mergeLibraryRows(candidates, userId);
+  const resolved = resolveAssembly(visible, storedId);
+  if (!resolved) return undefined;
+  return getAssemblyDetail(resolved.id, userId);
+}
+
 export async function getAssemblyDetail(
   id: number,
   userId: number
@@ -4757,7 +4808,13 @@ export async function addCountToBid(
   if (group.assemblyId === null)
     throw new Error("This count has no assembly to price from");
 
-  const detail = await getAssemblyDetail(group.assemblyId, userId);
+  /*
+    RESOLVED, not the literal row. The group stores the id it was counted
+    under, which is a baseline once the user forks that assembly — and the
+    snapshot below is frozen for ever, so reading the shipped row here puts its
+    $0 on the bid permanently. See getAssemblyForStoredReference.
+  */
+  const detail = await getAssemblyForStoredReference(group.assemblyId, userId);
   if (!detail) throw new Error("Assembly not found");
 
   const snapshot = await snapshotForAssembly(userId, detail);

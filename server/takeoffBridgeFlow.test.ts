@@ -21,6 +21,7 @@ import { eq, inArray } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
 import {
+  takeoffGroups,
   assemblies,
   assemblyMaterials,
   bidPdfs,
@@ -463,5 +464,60 @@ withDb("what the screens are told", () => {
       countedWithNoPrice: 0,
       doubleCounted: [],
     });
+  });
+});
+
+withDb("a count follows YOUR fork of a shipped assembly", () => {
+  it("SNAPSHOTS THE FORK'S NUMBERS, not the starter's $0", async () => {
+    /*
+      ── The fifth instance of the fork bug, and the money one ────────────────
+      Counting is done with whatever is in the library, which for a new user is
+      a shipped assembly at $0. Pricing that assembly FORKS it — a new row, a
+      new id — and the counted group still stores the baseline's id.
+
+      `addCountToBid` read that id literally, so sending the count froze the
+      SHIPPED row's $0 onto the bid line. A snapshot is never re-priced, so the
+      bid stayed wrong permanently, and nothing on screen said so.
+
+      Found by server/forkableReferences.test.ts on 2026-09-21 rather than by
+      somebody pricing a job, which is the whole point of that file.
+    */
+    const { bidId, sheetId } = await scenario();
+    const database = await getDb();
+
+    // A "shipped" assembly: userId NULL, priced at nothing, like every starter.
+    const [shipped] = await database!.insert(assemblies).values({
+      userId: null,
+      name: `Fork flow starter ${Date.now()}`,
+      category: "Devices",
+      baseLaborHours: "0.5000",
+      overheadLaborHours: "0.0000",
+    });
+    const baselineId = shipped.insertId;
+
+    // Count with it FIRST, the way a real user does.
+    const group = await countOf(bidId, sheetId, baselineId, 10);
+
+    // Now price it. Editing a shipped row forks it.
+    const forked = await caller().assemblies.update({
+      id: baselineId,
+      baseLaborHours: 1.25,
+    });
+    expect(forked!.id).not.toBe(baselineId);
+
+    // The group still points at the baseline — that is the whole situation.
+    const [stored] = await database!
+      .select({ assemblyId: takeoffGroups.assemblyId })
+      .from(takeoffGroups)
+      .where(eq(takeoffGroups.id, group.id));
+    expect(stored.assemblyId).toBe(baselineId);
+
+    await caller().takeoffGroups.sendToBid({ id: group.id });
+    const lines = await lineFor(bidId);
+    expect(lines).toHaveLength(1);
+    // 1.25 h is the fork's. 0.5 h is the starter's, and is what shipped before.
+    expect(Number(lines[0].snapshotLaborHours)).toBe(1.25);
+
+    await database!.delete(assemblies).where(eq(assemblies.id, baselineId));
   });
 });

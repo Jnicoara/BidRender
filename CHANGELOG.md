@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-21]
 
+- **Counting with a starter and then pricing it now freezes YOUR numbers.**
+  Count exit signs with an assembly BidRidge ships, then put your own labour
+  hours on it — pricing a starter makes your own copy — and sending that count
+  to the bid used to freeze the STARTER's $0 and its hours, not yours. Because
+  a bid line's prices are frozen on purpose and never re-calculated, the bid
+  stayed wrong for good, and nothing on screen said so.
+
+  This was the fifth time a customised copy was not being followed, and the
+  first one found deliberately — by the guard added this morning rather than by
+  somebody pricing a job.
+
 - **Send traced footage to the bid, from the takeoff screen.** A "Traced
   footage" section lists every run type you have traced with, what each one
   would put on the bid — the pipe, the wire, the ground, with their feet — and
