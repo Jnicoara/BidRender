@@ -63,7 +63,20 @@ async function priceAssemblyAt(
     rates: Awaited<ReturnType<typeof db.getLibraryLaborRates>>;
   }
 ) {
-  const detail = await db.getAssemblyDetail(assemblyId, userId);
+  /*
+    Resolved, never looked up directly — the SIXTH instance of the fork bug.
+
+    A kit stores the id of the assembly it contained when it was built. Editing
+    a shipped assembly forks it, and the kit still points at the baseline, so a
+    direct lookup priced the SHIPPED row: $0 materials and the shipped hours,
+    on the screen people quote a whole job from. Measured before the fix, a kit
+    holding two of an assembly the user had just costed at 3 hours reported 1.2
+    — the starter's 0.6, doubled.
+
+    Worse than the bid-line instance in reach, if not in permanence: a stale
+    assembly here understates every job that kit is used on.
+  */
+  const detail = await db.getAssemblyForStoredReference(assemblyId, userId);
   if (!detail) return null;
 
   // Resolved rather than matched by id — see shared/modifierLookup.ts. A kit

@@ -5434,10 +5434,51 @@ export async function getKitById(
   return row;
 }
 
-export async function getKitItems(kitId: number): Promise<KitItemLine[]> {
+/**
+ * What a kit STORES: the assembly ids and quantities, unresolved.
+ *
+ * Forking, reverting and duplicating a kit copy these across verbatim. They
+ * must NOT go through `getKitItems`, because that resolves a fork — and
+ * writing a resolved id back would re-point a stored reference, which is the
+ * one thing every resolver in shared/ refuses to do (see
+ * shared/materialLookup.ts for why). The copy has to mean what the original
+ * meant, including "the shipped one, unless this user has forked it".
+ */
+export async function getKitItemRefs(
+  kitId: number
+): Promise<Array<{ assemblyId: number; qty: string }>> {
   const db = await getDb();
   if (!db) return [];
   return db
+    .select({ assemblyId: kitAssemblies.assemblyId, qty: kitAssemblies.qty })
+    .from(kitAssemblies)
+    .where(eq(kitAssemblies.kitId, kitId))
+    .orderBy(asc(kitAssemblies.sortOrder), asc(kitAssemblies.id));
+}
+
+/**
+ * The assemblies a kit holds, each resolved through any fork of it.
+ *
+ * ── The join used to BE the bug, not just miss it ───────────────────────────
+ * This read `innerJoin(assemblies, eq(kitAssemblies.assemblyId, assemblies.id))`
+ * — a literal id match — so every field it returns described the SHIPPED row
+ * even after the user had forked and priced it. The router's pricing had the
+ * same fault and is fixed alongside; fixing only one would have been worse than
+ * fixing neither, because the row would then have shown one set of hours while
+ * the total below it used another.
+ *
+ * Kept as a join for the ORDER and the quantities, with the assembly fields
+ * overlaid from the merged library afterwards. Resolving inside SQL would mean
+ * teaching the query about `baselineId`, which is exactly the logic
+ * `shared/assemblyLookup.ts` exists to hold in one place.
+ */
+export async function getKitItems(
+  kitId: number,
+  userId: number
+): Promise<KitItemLine[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
     .select({
       id: kitAssemblies.id,
       assemblyId: kitAssemblies.assemblyId,
@@ -5453,6 +5494,22 @@ export async function getKitItems(kitId: number): Promise<KitItemLine[]> {
     .innerJoin(assemblies, eq(kitAssemblies.assemblyId, assemblies.id))
     .where(eq(kitAssemblies.kitId, kitId))
     .orderBy(asc(kitAssemblies.sortOrder), asc(kitAssemblies.id));
+
+  const visible = await getLibraryAssemblies(userId);
+  return rows.map(row => {
+    const resolved = resolveAssembly(visible, row.assemblyId);
+    // No fork, or the assembly was archived outright: leave the row as the
+    // join built it. A missing assembly is a missing line, never a free one.
+    if (!resolved) return row;
+    return {
+      ...row,
+      name: resolved.name,
+      category: resolved.category,
+      baseLaborHours: resolved.baseLaborHours,
+      overheadLaborHours: resolved.overheadLaborHours,
+      laborRateId: resolved.laborRateId,
+    };
+  });
 }
 
 export async function getKitDetail(
@@ -5461,7 +5518,7 @@ export async function getKitDetail(
 ): Promise<KitDetail | undefined> {
   const kit = await getKitById(id, userId);
   if (!kit) return undefined;
-  return { ...kit, items: await getKitItems(id) };
+  return { ...kit, items: await getKitItems(id, userId) };
 }
 
 export async function createKit(data: InsertKit): Promise<number> {
@@ -5547,7 +5604,7 @@ export async function forkKit(
   } as InsertKit);
   const forkId = result.insertId;
 
-  const items = await getKitItems(baseline.id);
+  const items = await getKitItemRefs(baseline.id);
   await setKitItems(
     forkId,
     items.map(i => ({ assemblyId: i.assemblyId, qty: i.qty }))
@@ -5587,7 +5644,7 @@ export async function revertKitToBaseline(id: number, userId: number) {
     })
     .where(and(eq(kits.id, id), eq(kits.userId, userId)));
 
-  const items = await getKitItems(baseline.id);
+  const items = await getKitItemRefs(baseline.id);
   await setKitItems(
     id,
     items.map(i => ({ assemblyId: i.assemblyId, qty: i.qty }))
@@ -5615,7 +5672,7 @@ export async function duplicateKit(
   } as InsertKit);
   const newId = result.insertId;
 
-  const items = await getKitItems(source.id);
+  const items = await getKitItemRefs(source.id);
   await setKitItems(
     newId,
     items.map(i => ({ assemblyId: i.assemblyId, qty: i.qty }))

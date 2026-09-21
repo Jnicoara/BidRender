@@ -1575,7 +1575,11 @@ This matters because the older version of this note said `_core` handled OAuth l
 
 **Auth:** email and password (`users.passwordHash`, `users.loginMethod` — both live columns, not vestigial). `sdk.authenticateRequest` (`server/_core/sdk.ts`) resolves the session cookie (or `Authorization: Bearer` fallback) to a `User` row; the row itself is created by `authRouter.signup`, not on first request. The OAuth branch in there still tries to sync an unknown `openId` from an OAuth server, which is why an invented `openId` fails with `Failed to sync user info` rather than being provisioned. tRPC procedures come in three tiers (`server/_core/trpc.ts`): `publicProcedure`, `protectedProcedure` (any logged-in user), `adminProcedure` (`user.role === "admin"`). Client-side gate is `AuthGuard` in `App.tsx`.
 
-**Data model** (`drizzle/schema.ts`) — everything is scoped by `userId` with cascade deletes:
+**Data model** (`drizzle/schema.ts`) — every table carries a `userId` with cascade deletes, and **that column holds the COMPANY OWNER's id, not the id of whoever is logged in.**
+
+**Corrected 2026-09-21.** This line used to read "everything is scoped by `userId`", which is true of the schema and misleading about the app: it reads as one user, one library, and the app has been multi-user per company for some time. A router that filters by `ctx.user.id` compiles, passes review and returns an employee an EMPTY library — their own rows, of which there are none — while the company's real data sits under the owner's id. Nothing errors.
+
+So: a data query filters on **`ctx.scope.dataUserId`**, which `server/_core/companyScope.ts` resolves to `membership.ownerUserId`. `ctx.scope.actorUserId` is the person, and is for authorship and audit only — never for deciding which rows to read. `server/scopeDiscipline.test.ts` is what stops this being a matter of remembering.
 
 **THE LIVE MODEL:**
 

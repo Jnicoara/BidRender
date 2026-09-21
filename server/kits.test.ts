@@ -532,3 +532,61 @@ describe.skipIf(!hasDb)("recently used materials", () => {
     expect(recent.length).toBeLessThanOrEqual(1);
   });
 });
+
+/**
+ * The SIXTH instance of the fork bug, and the second one found on purpose.
+ *
+ * A kit stores the id of each assembly it contains. Editing a shipped assembly
+ * FORKS it — a new row carrying the user's numbers, with `baselineId` pointing
+ * back — and `mergeLibraryRows` then hides the baseline from every list. The
+ * kit still stores the baseline's id.
+ *
+ * `priceAssemblyAt` reached it with `getAssemblyDetail`, a literal lookup, so a
+ * kit holding an assembly the estimator had priced showed the SHIPPED row's $0
+ * and shipped hours instead. Reported by `references/audit-2026-09-21.md` § 6
+ * as a live pricing bug; the fix is the one the fifth instance already has,
+ * `getAssemblyForStoredReference`.
+ *
+ * Why a kit is the worst place for it after a bid line: a kit is the thing
+ * people quote a whole job from, so one stale assembly understates every job
+ * that kit is used on, not one line of one bid.
+ */
+describe.skipIf(!hasDb)("a kit follows a forked assembly", () => {
+  it("prices the user's own numbers, not the shipped row's", async () => {
+    const rates = await caller().laborRates.list();
+    const journeyman = await caller().laborRates.update({
+      id: rates.find(r => r.name === "Journeyman")!.id,
+      hourlyCost: 40,
+    });
+
+    // A SHIPPED assembly: userId null, which is what makes it forkable.
+    const starter = (await caller().assemblies.list()).find(
+      a => a.name === "Single-pole switch" && a.userId === null
+    )!;
+    expect(starter.userId).toBeNull();
+
+    const kit = await caller().kits.create({
+      name: `Fork kit ${Date.now()}${Math.random()}`,
+      items: [{ assemblyId: starter.id, qty: 2 }],
+    });
+
+    // Now the estimator prices it. Editing a shipped row forks it, so the id
+    // the kit stored is no longer the row anybody can see.
+    const edit = await caller().assemblies.update({
+      id: starter.id,
+      laborRateId: journeyman.laborRate!.id,
+      baseLaborHours: 3,
+      overheadLaborHours: 0,
+    });
+    expect(edit.forked).toBe(true);
+    expect(edit.assembly?.id).not.toBe(starter.id);
+    expect(edit.assembly?.baselineId).toBe(starter.id);
+
+    const priced = await caller().kits.price({ id: kit!.id, quantity: 1 });
+
+    // 2 units x 3 hours x $40. The shipped row's hours would give something
+    // else entirely, and nothing on screen would say which had been used.
+    expect(priced.totals.totalLaborHours).toBeCloseTo(6, 5);
+    expect(priced.totals.laborCost).toBeCloseTo(240, 5);
+  });
+});

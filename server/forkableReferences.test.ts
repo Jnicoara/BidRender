@@ -159,9 +159,10 @@ const REGISTRY: Record<string, Entry> = {
     why: "Pricing is snapshotted so money is safe, but doubleCountedAssemblies matches on this id — a hand-added line on a fork and a plan line on the baseline would not be seen as the same thing.",
   },
   "kit_assemblies.assemblyId": {
-    kind: "unreviewed",
-    since: "2026-09-21",
-    why: "kitsRouter prices through getAssemblyDetail; same lookup as above.",
+    kind: "resolver",
+    resolver: "getAssemblyForStoredReference",
+    readBy: "server/routers/kitsRouter.ts, server/db.ts",
+    note: "The SIXTH instance, and the second this file caught. priceAssemblyAt used getAssemblyDetail and getKitItems joined on the literal id, so a kit holding an assembly the user had priced showed the shipped row's $0 and hours. Measured before the fix: 1.2 hours where the user had typed 3 x 2. Fixed 2026-09-21; both the total and the rows it is made of, because fixing one would have made them disagree.",
   },
   "symbol_links.assemblyId": {
     kind: "unreviewed",
@@ -288,13 +289,22 @@ describe("every stored id into a forkable row is accounted for", () => {
     const broken: string[] = [];
     for (const [ref, entry] of Object.entries(REGISTRY)) {
       if (entry.kind !== "resolver") continue;
-      const file = path.join(root, entry.readBy);
-      if (!fs.existsSync(file)) {
-        broken.push(`${ref}: ${entry.readBy} does not exist`);
-        continue;
-      }
-      if (!fs.readFileSync(file, "utf8").includes(entry.resolver)) {
-        broken.push(`${ref}: ${entry.readBy} never mentions ${entry.resolver}`);
+      /*
+        readBy may name SEVERAL files, comma separated, and every one of them
+        is checked. A reference read in two places — kit_assemblies.assemblyId
+        is priced in the router and displayed from db.ts — has to be resolved
+        in both, and listing only the one that happens to pass would make this
+        check weaker exactly where the risk is highest.
+      */
+      for (const cited of entry.readBy.split(",").map(part => part.trim())) {
+        const file = path.join(root, cited);
+        if (!fs.existsSync(file)) {
+          broken.push(`${ref}: ${cited} does not exist`);
+          continue;
+        }
+        if (!fs.readFileSync(file, "utf8").includes(entry.resolver)) {
+          broken.push(`${ref}: ${cited} never mentions ${entry.resolver}`);
+        }
       }
     }
     expect(broken).toEqual([]);

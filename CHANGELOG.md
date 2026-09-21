@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-21]
 
+- **Fixed a pricing bug where a kit showed the shipped price instead of yours.**
+  Editing a starter assembly makes your own copy of it, but a kit built before
+  that edit still pointed at the original — so the kit priced at the shipped $0
+  and shipped hours. A kit holding two of an assembly costed at 3 hours
+  reported 1.2. Both the total and the rows it is made of are fixed together.
+
 - **Searching a bare product word now gives the product an electrician means.**
   "fixture" gives light fixtures instead of fixture wire; "wire" gives building
   wire — THHN and Romex — instead of wire nuts. Building wire had been all but
