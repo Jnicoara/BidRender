@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-21]
 
+- **Send traced footage to the bid, from the takeoff screen.** A "Traced
+  footage" section lists every run type you have traced with, what each one
+  would put on the bid — the pipe, the wire, the ground, with their feet — and
+  a link to send them.
+
+  **It tells you why anything is held back, in words.** A type that does not
+  say what its ground is says so, rather than showing a dead button. A type
+  with runs on an unscaled sheet says those are not counted at all. And runs
+  you marked as branch wiring say they are excluded because your devices carry
+  that cable.
+
 - **A bid line from traced runs now follows the drawing.** Trace three more
   homeruns of 1/2" EMT and the pipe line on the bid moves by itself, the same
   way a counted item does — you do not have to remember to send it again. Take

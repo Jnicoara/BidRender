@@ -2147,6 +2147,18 @@ export default function TakeoffPage({
         sheetId: activeSheet.id,
       });
     void utils.takeoffRuns.totals.invalidate({ bidId });
+    /*
+      The bridge counts RUNS, so it goes stale on anything that touches one —
+      tracing, deleting, or answering the branch-wiring question.
+
+      It belongs HERE rather than on the one mutation that came to mind, which
+      is the lesson CLAUDE.md draws from the counted-items panel: a query added
+      to a screen that already has mutations goes into the screen s single
+      refresh helper, or it confidently shows the drawing as it was a minute
+      ago. Keyed by BID while the panel is per SHEET, deliberately — a run
+      traced on another sheet changes what this type would send.
+    */
+    void utils.takeoffRunTypes.bridgeForBid.invalidate({ bidId });
   }, [utils, activeSheet?.id, bidId]);
 
   const { data: stamps = [] } = trpc.takeoffStamps.listForSheet.useQuery(
@@ -3051,6 +3063,65 @@ export default function TakeoffPage({
   const setBranchWiring = trpc.takeoffRuns.setEnds.useMutation({
     onError: e => toast.error(e.message),
     onSettled: refreshRuns,
+  });
+
+  /**
+   * What each traced run type would put on this bid (R2).
+   *
+   * Refetched through `refreshRuns` like everything else on this screen, which
+   * matters more here than usual: this panel counts RUNS, so tracing one,
+   * deleting one, or answering the branch question all change what it says. A
+   * query invalidated only by its own mutation would leave the footage on
+   * screen describing the drawing as it was a minute ago.
+   */
+  const runTypeBridge = trpc.takeoffRunTypes.bridgeForBid.useQuery(
+    { bidId },
+    { enabled: Number.isFinite(bidId) }
+  );
+  const [sendingRunTypeId, setSendingRunTypeId] = useState<number | null>(null);
+  const sendRunType = trpc.takeoffRunTypes.sendToBid.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: result => {
+      /*
+        Say what actually happened, including what did NOT go and why.
+
+        "Sent to bid" on a type whose ground has no material named would be
+        true and useless: two lines crossed and one did not, and the estimator
+        needs to know which before they price the job.
+      */
+      const parts: string[] = [];
+      if (result.sent.length > 0)
+        parts.push(
+          `${result.sent.length} line${result.sent.length === 1 ? "" : "s"} added`
+        );
+      if (result.updated.length > 0)
+        parts.push(`${result.updated.length} updated`);
+      const blocked = result.skipped.filter(
+        s => s.why !== "Already on the bid, and unchanged."
+      );
+      if (parts.length === 0 && blocked.length === 0) {
+        toast.success("Already on the bid, and up to date.");
+      } else if (blocked.length > 0) {
+        /*
+          The skip is its OWN sentence, not clause-joined to the success.
+
+          "1 line added — Nothing traced under this type yet." reads as though
+          the skip explains the add. Saying how many did not go, and then why,
+          is the difference between a report and a riddle.
+        */
+        toast.success(
+          `${parts.join(", ") || "Nothing added"}. ${blocked.length} not sent: ` +
+            Array.from(new Set(blocked.map(s => s.why))).join(" ")
+        );
+      } else {
+        toast.success(parts.join(", "));
+      }
+    },
+    onSettled: () => {
+      setSendingRunTypeId(null);
+      // refreshRuns invalidates the bridge too — see the helper.
+      refreshRuns();
+    },
   });
 
   /**
@@ -4436,6 +4507,12 @@ export default function TakeoffPage({
               onAnswerBranchWiring={(runId, answer) =>
                 setBranchWiring.mutate({ id: runId, branchWiring: answer })
               }
+              runTypeBridge={runTypeBridge.data}
+              sendingRunTypeId={sendingRunTypeId}
+              onSendRunType={runTypeId => {
+                setSendingRunTypeId(runTypeId);
+                sendRunType.mutate({ bidId, runTypeId });
+              }}
               renderRunType={run => {
                 const armed = (runTypes.data ?? []).find(
                   t => t.id === run.runTypeId

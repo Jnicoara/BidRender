@@ -230,6 +230,34 @@ export type PanelStampGroup = {
   }[];
 };
 
+/**
+ * What one run type would put on the bid: one row per material (D18, § 5f.2).
+ *
+ * Pipe, wire and ground are three purchases at three prices, so they are three
+ * rows. A cable type has one — the cable IS the raceway. An empty conduit run
+ * for future use has one too, and that is a real thing to bid.
+ */
+export type RunTypeBridgeRow = {
+  role: "raceway" | "conductor" | "ground";
+  materialName: string | null;
+  feet: number;
+  onBid: boolean;
+  /** `ok` or a named refusal with a sentence a person can act on. */
+  sendable: { ok: true } | { ok: false; reason: string; message: string };
+};
+
+export type RunTypeBridgeEntry = {
+  runTypeId: number;
+  label: string;
+  rows: RunTypeBridgeRow[];
+  /** Runs of this type nobody has answered the branch-wiring question for. */
+  unansweredCount: number;
+  /** Runs excluded because the devices already carry them. */
+  branchCount: number;
+  /** Runs on a sheet with no scale, so not in these numbers at all. */
+  unmeasurableCount: number;
+};
+
 export function RunsPanel({
   runs,
   totals,
@@ -253,6 +281,9 @@ export function RunsPanel({
   renderRunEnds,
   renderRunType,
   onAnswerBranchWiring,
+  runTypeBridge,
+  onSendRunType,
+  sendingRunTypeId,
 }: {
   runs: PanelRun[];
   /**
@@ -261,6 +292,10 @@ export function RunsPanel({
    * show the question rather than showing a dead control.
    */
   onAnswerBranchWiring?: (runId: number, answer: boolean | null) => void;
+  /** What each traced type would put on the bid. Undefined while loading. */
+  runTypeBridge?: RunTypeBridgeEntry[];
+  onSendRunType?: (runTypeId: number) => void;
+  sendingRunTypeId?: number | null;
   /** Counted stamps, grouped by assembly. Quantities are derived, not typed. */
   stampGroups: PanelStampGroup[];
   /** Each count's relationship to the bid, by group id. */
@@ -512,6 +547,145 @@ export function RunsPanel({
                 : "Every priced count is on the bid."}
           </p>
         ) : null}
+
+        {/*
+          TRACED FOOTAGE, AND WHAT IT WOULD PUT ON THE BID.
+
+          Grouped by TYPE rather than by run, because six homeruns of 1/2" EMT
+          across four sheets are ONE purchase — § 5f.2 rejects a line per traced
+          path by name. Each type shows its rows because a type is not one
+          quantity: pipe, wire and ground are three things somebody orders
+          separately at three prices.
+
+          ── Refusals are shown, not hidden behind a disabled button ──────────
+          A row that cannot cross says why, in words: "this type does not say
+          what this is" is something an estimator can act on, and a greyed-out
+          control with no explanation is not. Same reasoning as the counted
+          groups above, where an unpriced count is said out loud rather than
+          quietly dropped from the total.
+
+          ── It never hides footage it cannot send ───────────────────────────
+          A half-specified type still shows its feet. The measurement is real
+          work somebody did; what is missing is only the name to order it under.
+        */}
+        {runTypeBridge && runTypeBridge.length > 0 && (
+          <div className="border-b border-border">
+            <div className="px-3 pt-2.5 pb-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+              Traced footage
+            </div>
+            {runTypeBridge.map(entry => {
+              const sendable = entry.rows.filter(
+                row => row.sendable.ok && !row.onBid
+              );
+              const busy = sendingRunTypeId === entry.runTypeId;
+              return (
+                <div key={entry.runTypeId} className="px-3 pb-2.5">
+                  <p className="text-xs font-medium truncate">{entry.label}</p>
+                  <div className="mt-1 space-y-0.5">
+                    {entry.rows.map(row => (
+                      <div
+                        key={row.role}
+                        className="flex items-baseline justify-between gap-2"
+                      >
+                        <span className="text-[0.7rem] text-muted-foreground truncate">
+                          {row.materialName ?? "Not said what this is"}
+                        </span>
+                        <span className="text-[0.7rem] font-mono tabular-nums shrink-0">
+                          {row.feet} ft
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Why a row cannot cross, in words, once per reason. */}
+                  {Array.from(
+                    new Set(
+                      entry.rows
+                        .filter(row => !row.onBid && !row.sendable.ok)
+                        .map(row =>
+                          row.sendable.ok ? "" : row.sendable.message
+                        )
+                    )
+                  ).map(message => (
+                    <p
+                      key={message}
+                      className="mt-1 text-[0.7rem] text-muted-foreground"
+                    >
+                      {message}
+                    </p>
+                  ))}
+
+                  {/*
+                    Why a number is smaller than the drawing looks. Each says a
+                    different true thing and none of them is the others: work
+                    the devices already carry, a question still open, and a
+                    sheet with no scale.
+                  */}
+                  {entry.branchCount > 0 && (
+                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                      {entry.branchCount} run
+                      {entry.branchCount === 1 ? " is" : "s are"} branch wiring
+                      your devices already include, so{" "}
+                      {entry.branchCount === 1 ? "it is" : "they are"} not in
+                      this.
+                    </p>
+                  )}
+                  {entry.unansweredCount > 0 && (
+                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                      {entry.unansweredCount} run
+                      {entry.unansweredCount === 1 ? " has" : "s have"} devices
+                      at both ends and{" "}
+                      {entry.unansweredCount === 1 ? "is" : "are"} counted here
+                      until you say otherwise.
+                    </p>
+                  )}
+                  {entry.unmeasurableCount > 0 && (
+                    <p className="mt-1 text-[0.7rem] text-[#F5C518]">
+                      {entry.unmeasurableCount} run
+                      {entry.unmeasurableCount === 1 ? " is" : "s are"} on a
+                      sheet with no scale, so not counted at all.
+                    </p>
+                  )}
+
+                  {/*
+                    SAY WHAT IS ON THE BID WHENEVER ANYTHING IS.
+
+                    This read `every` until 2026-09-21, which meant a type whose
+                    pipe had crossed and whose wire had no footage said nothing
+                    at all: the send link vanished and no confirmation replaced
+                    it, so the only way to know it had worked was to go and look
+                    at the bid. Found by pressing the button and reading the
+                    row, not from the diff.
+                  */}
+                  {entry.rows.some(row => row.onBid) && (
+                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                      {entry.rows.filter(row => row.onBid).length} on the bid —
+                      the{" "}
+                      {entry.rows.filter(row => row.onBid).length === 1
+                        ? "line follows"
+                        : "lines follow"}{" "}
+                      the drawing
+                    </p>
+                  )}
+                  {sendable.length > 0 && onSendRunType ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => onSendRunType(entry.runTypeId)}
+                      className="mt-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
+                    >
+                      {busy
+                        ? "Sending…"
+                        : `Send ${sendable.length} line${
+                            sendable.length === 1 ? "" : "s"
+                          } to bid`}
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {runs.length === 0 && stampGroups.length === 0 ? (
           <div className="p-6 text-center">
