@@ -4,6 +4,20 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-21]
+
+- **A guard so the "edits to a starter did not follow through" bug cannot
+  happen a fifth time unnoticed.** It has bitten four times — labour rates,
+  materials, job-condition modifiers and run types — and every one was found by
+  accident, after the wrong number had been on somebody’s screen for a
+  while. There is now a test that reads the database structure itself, finds
+  every place one thing points at something you can customise, and fails until
+  each has a recorded answer for how it follows your copy.
+
+  It immediately turned up several nobody had checked, including one on the
+  path that freezes prices onto a bid. Those are listed rather than quietly
+  passing, so they get worked through instead of found the hard way.
+
 ## [2026-09-20]
 
 - **Traced footage can reach a bid — one line per run type, per material.**
