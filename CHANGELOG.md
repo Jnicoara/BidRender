@@ -6,6 +6,24 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-21]
 
+- **Setting a sheet's scale now asks you to check it, and says the scale in
+  plain words.** A scale bar reading 10-5-0-10-20 is thirty feet end to end, not
+  twenty, because it starts left of its zero — reading it wrong on a real job
+  made a 100 ft building measure 67 ft, and nothing in the app could tell.
+  Calibrating now ends by asking you to measure one more thing you know; if the
+  two disagree it says so, and names the likely cause. The toolbar reads
+  `3/16" = 1'-0"` instead of `1:64.015002`, warns when a sheet is off standard,
+  and the calibration screen now says to prefer a printed dimension over the
+  scale bar.
+
+- **The run readout labels its two numbers.** It showed the length including the
+  dotted line to your cursor next to a Finish button showing only the points you
+  had placed — two different figures, neither labelled. Now: "89'-6" placed ·
+  156'-6" to cursor".
+
+- **Fixed wording that was out of date.** The plans screen said counts do not
+  affect the bid price. They have since counts could be sent to a bid.
+
 - **Internal safety: the build now refuses source code with invisible garbled
   characters in it.** Several edits today were silently corrupted in transit —
   an invisible control character where a symbol should have been — which breaks

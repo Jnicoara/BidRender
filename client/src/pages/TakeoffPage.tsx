@@ -3724,9 +3724,19 @@ export default function TakeoffPage({
               <h1 className="text-lg font-semibold truncate">
                 Plans{bid?.bid?.name ? ` — ${bid.bid.name}` : ""}
               </h1>
+              {/*
+                Corrected 2026-09-21. This read "Counts feed the materials
+                list, not the bid price", which stopped being true when the
+                takeoff bridge shipped: a counted group can carry a bid line
+                whose quantity is derived live from the marks
+                (shared/takeoffBridge.ts). Telling an estimator their counts do
+                not reach the price, while the price moves underneath them, is
+                worse than saying nothing.
+              */}
               <p className="text-xs text-muted-foreground">
-                Set each sheet's scale, then mark and trace what is on it.
-                Counts feed the materials list, not the bid price.
+                Set each sheet&apos;s scale, then mark and trace what is on it.
+                Counts you send to the bid price it; the rest stay here until
+                you do.
               </p>
             </div>
             {/* Left of "Add PDF" and available from the first mark, not at the
@@ -4339,17 +4349,19 @@ export default function TakeoffPage({
                         points={calibratePoints}
                         onPointsChange={setCalibratePoints}
                         busy={setSheetScale.isPending}
-                        onApply={scaleText => {
-                          setSheetScale.mutate(
-                            { id: activeSheet.id, scaleText },
-                            {
-                              onSuccess: () => {
-                                setCalibrating(false);
-                                setCalibratePoints([]);
-                              },
-                            }
-                          );
-                        }}
+                        /*
+                          Applying no longer CLOSES this. The layer moves on to
+                          checking the scale against a second known dimension,
+                          which is the half that catches a plausible wrong
+                          answer — see CalibrateLayer's `phase`. It closes
+                          through onCancel, from Done or from skipping.
+                        */
+                        onApply={scaleText =>
+                          setSheetScale.mutateAsync({
+                            id: activeSheet.id,
+                            scaleText,
+                          })
+                        }
                         onCancel={() => {
                           setCalibrating(false);
                           setCalibratePoints([]);

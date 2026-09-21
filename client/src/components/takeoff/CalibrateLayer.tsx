@@ -38,18 +38,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import {
+  POINTS_PER_INCH,
+  formatFeetInches,
   screenToPagePoints,
   segmentLength,
   type PagePoint,
 } from "@shared/takeoffGeometry";
 import {
   assessSpan,
+  checkCalibration,
   compareToStandardScales,
   describeErrorImpact,
   parseLengthText,
   ratioFromCalibration,
 } from "@shared/planCalibration";
-import { COMMON_SCALES, formatRatio } from "@shared/planScale";
+import { COMMON_SCALES, describeScale } from "@shared/planScale";
 
 const SPAN_COLOR = "#38BDF8";
 
@@ -75,8 +78,14 @@ export function CalibrateLayer({
   renderScale: number;
   points: PagePoint[];
   onPointsChange: (points: PagePoint[]) => void;
-  /** Hands back the scale as text, for the existing setSheetScale route. */
-  onApply: (scaleText: string) => void;
+  /**
+   * Hands back the scale as text, for the existing setSheetScale route.
+   *
+   * Returns a promise, and the caller must NOT close this layer when it
+   * settles: applying is the middle of the job now, not the end. What follows
+   * is the check — see the `phase` state.
+   */
+  onApply: (scaleText: string) => Promise<unknown>;
   onCancel: () => void;
   chromeTarget?: HTMLElement | null;
   busy?: boolean;
@@ -84,6 +93,30 @@ export function CalibrateLayer({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [hover, setHover] = useState<PagePoint | null>(null);
   const [distanceText, setDistanceText] = useState("");
+
+  /**
+   * Setting the scale, then CHECKING it — one flow, not two features.
+   *
+   * ── Why the check is not optional, and not a separate button ─────────────
+   * Added 2026-09-21 after bid 23. A scale bar reading 10-5-0-10-20 is thirty
+   * feet end to end, because it starts left of its zero. Clicking the ends and
+   * typing 20 set that sheet to two thirds of the truth, and a 100 ft building
+   * measured 67 ft.
+   *
+   * Every check the app had said yes. The span was long and rated "good". The
+   * arithmetic was exact. And the standard-scale warning stayed quiet, because
+   * the sheet was 1/8" and two thirds of 1/8" is EXACTLY 3/16" — a textbook
+   * scale (server/calibrationConfidence.test.ts asserts that limitation).
+   *
+   * A single measurement cannot be checked against itself. A second known
+   * distance is the only thing that can tell a right scale from a plausible
+   * wrong one, so it is part of calibrating rather than something to remember.
+   */
+  const [phase, setPhase] = useState<"set" | "check">("set");
+  /** The ratio actually written to the sheet, which the check measures with. */
+  const [appliedRatio, setAppliedRatio] = useState<number | null>(null);
+  const [checkText, setCheckText] = useState("");
+  const [applyError, setApplyError] = useState<string | null>(null);
 
   /**
    * Escape backs out one point at a time, then leaves.
@@ -164,11 +197,61 @@ export function CalibrateLayer({
     [ratio]
   );
 
-  const apply = () => {
+  const apply = async () => {
     if (ratio === null) return;
-    // Six decimals is exactly the stored column's precision, so this is
-    // lossless rather than a rounding with an opinion in it.
-    onApply(`1:${ratio.toFixed(6)}`);
+    setApplyError(null);
+    try {
+      // Six decimals is exactly the stored column's precision, so this is
+      // lossless rather than a rounding with an opinion in it.
+      await onApply(`1:${ratio.toFixed(6)}`);
+    } catch (error) {
+      // Staying in "set" is the point: a failed save must not look like a
+      // saved scale waiting to be checked.
+      setApplyError(
+        error instanceof Error ? error.message : "Could not save that scale."
+      );
+      return;
+    }
+    setAppliedRatio(ratio);
+    setPhase("check");
+    onPointsChange([]);
+    setHover(null);
+  };
+
+  /**
+   * What the sheet's NEW scale says the second span measures.
+   *
+   * Deliberately computed from `appliedRatio` — the number actually saved —
+   * rather than recomputed from the first calibration, so this is a real test
+   * of what the sheet now holds.
+   */
+  const checkMeasuredInches =
+    phase === "check" && appliedRatio !== null && spanPoints > 0
+      ? (spanPoints / POINTS_PER_INCH) * appliedRatio
+      : null;
+
+  const checkExpectedInches = useMemo(
+    () => parseLengthText(checkText),
+    [checkText]
+  );
+
+  const check = useMemo(
+    () =>
+      checkMeasuredInches === null || checkExpectedInches === null
+        ? null
+        : checkCalibration(checkMeasuredInches, checkExpectedInches),
+    [checkMeasuredInches, checkExpectedInches]
+  );
+
+  /** Back to setting, keeping nothing — a redo is a fresh measurement. */
+  const startOver = () => {
+    setPhase("set");
+    setAppliedRatio(null);
+    setDistanceText("");
+    setCheckText("");
+    setApplyError(null);
+    onPointsChange([]);
+    setHover(null);
   };
 
   const first = points[0] ? toScreen(points[0]) : null;
@@ -195,115 +278,277 @@ export function CalibrateLayer({
           </Button>
         </div>
 
-        {points.length < 2 ? (
-          <p className="text-xs text-muted-foreground">
-            {points.length === 0
-              ? "Click one end of a distance you know — a dimension line, a column grid, a wall."
-              : "Now click the other end."}{" "}
-            <span className="text-foreground">
-              Use the longest one you can find, and zoom in before each click.
-            </span>
-          </p>
-        ) : (
+        {phase === "check" ? (
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <label
-                htmlFor="calibrate-distance"
-                className="text-xs text-muted-foreground shrink-0"
-              >
-                That distance is
-              </label>
-              <Input
-                id="calibrate-distance"
-                value={distanceText}
-                onChange={e => setDistanceText(e.target.value)}
-                onFocus={selectOnFocus}
-                onKeyDown={e => {
-                  if (e.key === "Enter" && ratio !== null) apply();
-                  if (e.key === "Escape") onCancel();
-                }}
-                placeholder="e.g. 100, 24'-6&quot;"
-                className="h-7 text-xs font-mono"
-                autoFocus
-              />
+            <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 px-2.5 py-2">
+              <p className="text-xs">
+                Scale set to{" "}
+                <span className="font-mono">
+                  {describeScale(appliedRatio ?? 0)}
+                </span>
+                .
+              </p>
             </div>
-            <p className="text-[0.7rem] text-muted-foreground">
-              A plain number means <strong>feet</strong>. Inches need a mark —{" "}
-              <span className="font-mono">246&quot;</span>.
-            </p>
-          </div>
-        )}
 
-        {/* The span rating, live while the second point is being chosen. */}
-        {span && (
-          <div className="rounded-lg border border-border/60 bg-muted/20 px-2.5 py-2 space-y-1">
-            <div className="flex items-baseline gap-2">
-              <span className="text-[0.7rem] text-muted-foreground">Span</span>
-              <span className="font-mono text-xs tabular-nums">
-                {span.paperInches.toFixed(2)}&quot; of paper
-              </span>
-              <span
+            <p className="text-xs text-muted-foreground">
+              <span className="text-foreground">Now check it.</span> Measure one
+              MORE thing you know — a different dimension, the other side of the
+              building. A scale that agrees twice is worth far more than one
+              that looked fine once.
+            </p>
+
+            {points.length < 2 ? (
+              <p className="text-[0.7rem] text-muted-foreground">
+                {points.length === 0
+                  ? "Click one end of it."
+                  : "Now click the other end."}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="calibrate-check"
+                    className="text-xs text-muted-foreground shrink-0"
+                  >
+                    That should be
+                  </label>
+                  <Input
+                    id="calibrate-check"
+                    value={checkText}
+                    onChange={e => setCheckText(e.target.value)}
+                    onFocus={selectOnFocus}
+                    onKeyDown={e => {
+                      if (e.key === "Escape") onCancel();
+                    }}
+                    placeholder="e.g. 100, 24'-6&quot;"
+                    className="h-7 text-xs font-mono"
+                    autoFocus
+                  />
+                </div>
+                {checkMeasuredInches !== null && (
+                  <p className="text-[0.7rem] text-muted-foreground">
+                    This sheet makes it{" "}
+                    <span className="font-mono text-foreground">
+                      {formatFeetInches(checkMeasuredInches)}
+                    </span>
+                    .
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/*
+              The verdict, before anything is traced.
+
+              Stated plainly and in both directions: agreement is worth saying
+              out loud, because "no news" reads the same as "not checked".
+            */}
+            {check && (
+              <div
                 className={cn(
-                  "ml-auto text-[0.7rem] font-medium",
-                  QUALITY_STYLE[span.quality]
+                  "rounded-lg border px-2.5 py-2 text-[0.7rem] leading-snug",
+                  check.agrees
+                    ? "border-emerald-500/40 bg-emerald-500/5 text-emerald-300"
+                    : "border-orange-400/50 bg-orange-400/10 text-orange-300"
                 )}
               >
-                ±{span.errorPercent.toFixed(1)}%
-              </span>
+                <p className="flex items-start gap-1.5">
+                  {check.agrees ? (
+                    <Check className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  ) : (
+                    <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  )}
+                  <span>{check.message}</span>
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 pt-0.5">
+              <Button
+                size="sm"
+                variant={check?.agrees === false ? "outline" : "default"}
+                className="h-7 gap-1.5 text-xs flex-1"
+                onClick={onCancel}
+                title="Keep this scale and close"
+              >
+                <Check className="w-3.5 h-3.5" />
+                {check?.agrees === false ? "Keep it anyway" : "Done"}
+              </Button>
+              <Button
+                size="sm"
+                variant={check?.agrees === false ? "default" : "outline"}
+                className="h-7 gap-1.5 text-xs"
+                onClick={startOver}
+                title="Measure the scale again from a different dimension"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Set it again
+              </Button>
             </div>
-            <p
-              className={cn("text-[0.7rem] leading-snug", {
-                "text-muted-foreground": span.quality === "good",
-                "text-orange-400": span.quality === "short",
-              })}
-            >
-              {span.message}
-            </p>
+
             {/*
+              Skipping is allowed, and quietly. A sheet with exactly one known
+              dimension on it is a real sheet, and refusing to leave until a
+              second one is found would make calibration impossible there —
+              the same reasoning as never blocking on a short span.
+            */}
+            {points.length < 2 && (
+              <button
+                type="button"
+                className="text-[0.7rem] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                onClick={onCancel}
+              >
+                Nothing else to measure against — skip the check
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {points.length < 2 ? (
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">
+                  {points.length === 0
+                    ? "Click one end of a distance you know."
+                    : "Now click the other end."}{" "}
+                  <span className="text-foreground">
+                    Zoom in before each click.
+                  </span>
+                </p>
+                {/*
+              ── The order of this advice is the advice ─────────────────────
+              A printed dimension is a number the drawing states. A scale bar
+              is a picture you have to read, and reading it wrong is silent —
+              see the warning below. So the dimension comes first, and the bar
+              is named as the fallback it is.
+            */}
+                <ul className="text-[0.7rem] text-muted-foreground space-y-1 pl-3.5 list-disc marker:text-muted-foreground/60">
+                  <li>
+                    <span className="text-foreground">
+                      Best: a dimension printed on the drawing
+                    </span>{" "}
+                    — a dimension line, a column grid, an overall building
+                    width.
+                  </li>
+                  <li>
+                    <span className="text-foreground">Use the longest one</span>{" "}
+                    you can find. A short span multiplies its own error into
+                    every measurement on the sheet.
+                  </li>
+                  <li className="text-orange-300">
+                    <span className="font-medium">
+                      A scale bar often starts LEFT of zero.
+                    </span>{" "}
+                    One reading 10-5-0-10-20 is thirty feet end to end, not
+                    twenty. Click the numbers you are typing, never the
+                    bar&apos;s ends.
+                  </li>
+                </ul>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="calibrate-distance"
+                    className="text-xs text-muted-foreground shrink-0"
+                  >
+                    That distance is
+                  </label>
+                  <Input
+                    id="calibrate-distance"
+                    value={distanceText}
+                    onChange={e => setDistanceText(e.target.value)}
+                    onFocus={selectOnFocus}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && ratio !== null) apply();
+                      if (e.key === "Escape") onCancel();
+                    }}
+                    placeholder="e.g. 100, 24'-6&quot;"
+                    className="h-7 text-xs font-mono"
+                    autoFocus
+                  />
+                </div>
+                <p className="text-[0.7rem] text-muted-foreground">
+                  A plain number means <strong>feet</strong>. Inches need a mark
+                  — <span className="font-mono">246&quot;</span>.
+                </p>
+              </div>
+            )}
+
+            {/* The span rating, live while the second point is being chosen. */}
+            {span && (
+              <div className="rounded-lg border border-border/60 bg-muted/20 px-2.5 py-2 space-y-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[0.7rem] text-muted-foreground">
+                    Span
+                  </span>
+                  <span className="font-mono text-xs tabular-nums">
+                    {span.paperInches.toFixed(2)}&quot; of paper
+                  </span>
+                  <span
+                    className={cn(
+                      "ml-auto text-[0.7rem] font-medium",
+                      QUALITY_STYLE[span.quality]
+                    )}
+                  >
+                    ±{span.errorPercent.toFixed(1)}%
+                  </span>
+                </div>
+                <p
+                  className={cn("text-[0.7rem] leading-snug", {
+                    "text-muted-foreground": span.quality === "good",
+                    "text-orange-400": span.quality === "short",
+                  })}
+                >
+                  {span.message}
+                </p>
+                {/*
               The percentage turned into feet.
 
               "±4.6%" needs arithmetic before it means anything; "a 1,000 ft run
               could be off by about 46 ft" is the same fact already in the units
               of the decision being made.
             */}
-            {span.quality !== "good" && (
-              <p className="text-[0.7rem] text-muted-foreground">
-                {describeErrorImpact(span.errorPercent)}
-              </p>
+                {span.quality !== "good" && (
+                  <p className="text-[0.7rem] text-muted-foreground">
+                    {describeErrorImpact(span.errorPercent)}
+                  </p>
+                )}
+              </div>
             )}
-          </div>
-        )}
 
-        {/* The result, in plain terms. */}
-        {ratio !== null && (
-          <div className="rounded-lg border border-[#38BDF8]/40 bg-[#38BDF8]/5 px-2.5 py-2 space-y-1">
-            <div className="flex items-baseline gap-2">
-              <span className="text-[0.7rem] text-muted-foreground">
-                This sheet is
-              </span>
-              <span className="font-mono text-sm">{formatRatio(ratio)}</span>
-            </div>
-            <p className="text-[0.7rem] text-muted-foreground">
-              One inch of paper is{" "}
-              <span className="font-mono">{(ratio / 12).toFixed(1)} ft</span> of
-              building.
-            </p>
-            {standard?.worthMentioning && (
-              <p className="text-[0.7rem] text-orange-400 flex items-start gap-1.5 pt-0.5">
-                <TriangleAlert className="w-3 h-3 shrink-0 mt-0.5" />
-                <span>
-                  That is {Math.abs(standard.percentOff).toFixed(0)}%{" "}
-                  {standard.percentOff > 0 ? "above" : "below"} the nearest
-                  standard scale ({standard.nearestText}). It may be right — a
-                  printed set often is. Worth checking you clicked the ends of
-                  the dimension you meant.
-                </span>
-              </p>
+            {/* The result, in plain terms. */}
+            {ratio !== null && (
+              <div className="rounded-lg border border-[#38BDF8]/40 bg-[#38BDF8]/5 px-2.5 py-2 space-y-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[0.7rem] text-muted-foreground">
+                    This sheet is
+                  </span>
+                  <span className="font-mono text-sm">
+                    {describeScale(ratio)}
+                  </span>
+                </div>
+                <p className="text-[0.7rem] text-muted-foreground">
+                  One inch of paper is{" "}
+                  <span className="font-mono">
+                    {(ratio / 12).toFixed(1)} ft
+                  </span>{" "}
+                  of building.
+                </p>
+                {standard?.worthMentioning && (
+                  <p className="text-[0.7rem] text-orange-400 flex items-start gap-1.5 pt-0.5">
+                    <TriangleAlert className="w-3 h-3 shrink-0 mt-0.5" />
+                    <span>
+                      That is {Math.abs(standard.percentOff).toFixed(0)}%{" "}
+                      {standard.percentOff > 0 ? "above" : "below"} the nearest
+                      standard scale ({standard.nearestText}). It may be right —
+                      a printed set often is. Worth checking you clicked the
+                      ends of the dimension you meant.
+                    </span>
+                  </p>
+                )}
+              </div>
             )}
-          </div>
-        )}
 
-        {/*
+            {/*
           A short span NEVER blocks applying, and this button is never dimmed
           for it — only for "there is no number yet".
 
@@ -312,38 +557,47 @@ export function CalibrateLayer({
           at all, which is strictly worse than a scale they have been told is
           soft. The warning sits BESIDE this button, not in place of it.
         */}
-        <div className="flex items-center gap-2 pt-0.5">
-          <Button
-            size="sm"
-            className="h-7 gap-1.5 text-xs flex-1"
-            onClick={apply}
-            disabled={ratio === null || busy}
-            title={
-              span?.quality === "short"
-                ? "Applies the scale. It is on the soft side — the sheet will be marked so you remember."
-                : "Applies this scale to the sheet"
-            }
-          >
-            <Check className="w-3.5 h-3.5" />
-            {busy ? "Saving…" : "Use this scale"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 gap-1.5 text-xs"
-            onClick={() => {
-              // Points only. The typed distance survives, because redoing is
-              // almost always "I clicked that badly", not "I meant a different
-              // dimension" — and retyping it would punish the correction.
-              onPointsChange([]);
-              setHover(null);
-            }}
-            disabled={points.length === 0}
-            title="Click the two points again, keeping the distance"
-          >
-            <RotateCcw className="w-3.5 h-3.5" /> Redo points
-          </Button>
-        </div>
+            <div className="flex items-center gap-2 pt-0.5">
+              <Button
+                size="sm"
+                className="h-7 gap-1.5 text-xs flex-1"
+                onClick={apply}
+                disabled={ratio === null || busy}
+                title={
+                  span?.quality === "short"
+                    ? "Applies the scale. It is on the soft side — the sheet will be marked so you remember."
+                    : "Applies this scale to the sheet"
+                }
+              >
+                <Check className="w-3.5 h-3.5" />
+                {busy ? "Saving…" : "Use this scale"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => {
+                  // Points only. The typed distance survives, because redoing is
+                  // almost always "I clicked that badly", not "I meant a different
+                  // dimension" — and retyping it would punish the correction.
+                  onPointsChange([]);
+                  setHover(null);
+                }}
+                disabled={points.length === 0}
+                title="Click the two points again, keeping the distance"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Redo points
+              </Button>
+            </div>
+
+            {applyError && (
+              <p className="text-[0.7rem] text-orange-400 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 shrink-0 mt-0.5" />
+                <span>{applyError}</span>
+              </p>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

@@ -44,7 +44,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { COMMON_SCALES, parseScaleText } from "@shared/planScale";
+import {
+  COMMON_SCALES,
+  describeScale,
+  parseScaleText,
+} from "@shared/planScale";
+import { compareToStandardScales } from "@shared/planCalibration";
 
 const FLASH_MS = 1100;
 
@@ -80,6 +85,35 @@ export function ScaleControl({
   const [flash, setFlash] = useState(false);
   const flashTimer = useRef<number | null>(null);
   const isSet = sheet.scaleRatio !== null;
+
+  /*
+    The scale in plain words, from the RATIO rather than the stored text.
+
+    Calibration stores `1:64.015002`, because that number is what is true and
+    rounding it would throw away the accuracy just bought. It is also
+    unreadable: it sat in this toolbar on a real job and nobody could tell at a
+    glance that the sheet was at 3/16". `describeScale` changes the label and
+    never the ratio — see its own note for where it refuses to name a scale.
+  */
+  const label = isSet ? describeScale(Number(sheet.scaleRatio)) : null;
+
+  /**
+   * Off-standard, said where it STAYS said.
+   *
+   * This warning already existed inside the calibrate panel, where it appears
+   * for the few seconds before Apply is pressed and then is gone for ever. A
+   * scale is wrong for the whole life of the sheet, so the warning belongs
+   * where the scale is — here.
+   *
+   * It is a prompt to look, never a verdict: a printed set genuinely is off
+   * standard sometimes, and the calibrated ratio is then the truth about the
+   * paper. See compareToStandardScales.
+   */
+  const standard =
+    sheet.scaleRatio === null
+      ? null
+      : compareToStandardScales(Number(sheet.scaleRatio), COMMON_SCALES);
+  const offStandard = standard?.worthMentioning === true;
 
   useEffect(
     () => () => {
@@ -150,7 +184,9 @@ export function ScaleControl({
             )}
             title={
               isSet
-                ? "The scale this sheet is drawn at — click to change it"
+                ? offStandard
+                  ? `The scale this sheet is drawn at. It is ${Math.abs(standard!.percentOff).toFixed(0)}% off the nearest standard scale (${standard!.nearestText}) — worth a check. Click to change it.`
+                  : "The scale this sheet is drawn at — click to change it"
                 : wanted
                   ? "Measuring needs a scale — click to set one for this sheet"
                   : "No scale set. Counting works without one; only measuring needs it."
@@ -158,7 +194,12 @@ export function ScaleControl({
           >
             <Ruler className="w-3.5 h-3.5" />
             {isSet ? (
-              <span className="font-mono">{sheet.scaleText}</span>
+              <span className="flex items-center gap-1">
+                {offStandard && (
+                  <TriangleAlert className="w-3 h-3 text-orange-400" />
+                )}
+                <span className="font-mono">{label}</span>
+              </span>
             ) : (
               <span className="flex items-center gap-1">
                 {wanted && <TriangleAlert className="w-3 h-3" />}
@@ -176,6 +217,58 @@ export function ScaleControl({
               their own.
             </p>
           </div>
+
+          {/*
+            Off-standard, explained where there is room to explain it.
+
+            Deliberately NOT phrased as an error. Three things produce it and
+            only one is a mistake: a set scaled in printing (the calibration is
+            right and the printed ratio is wrong), a misread dimension, and a
+            drawing genuinely at an odd scale. The estimator can tell these
+            apart in a second and the app cannot tell them apart at all.
+          */}
+          {offStandard && standard && (
+            <div className="rounded-lg border border-orange-400/40 bg-orange-400/5 p-2.5 space-y-1">
+              <p className="text-xs text-orange-300 flex items-start gap-1.5">
+                <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>
+                  This is {Math.abs(standard.percentOff).toFixed(0)}%{" "}
+                  {standard.percentOff > 0 ? "above" : "below"}{" "}
+                  <span className="font-mono">{standard.nearestText}</span>, the
+                  nearest standard scale.
+                </span>
+              </p>
+              <p className="text-[0.7rem] text-muted-foreground">
+                It may well be right — a printed set often is a few percent off.
+                Worth a look if you set this by measuring.
+              </p>
+            </div>
+          )}
+
+          {/*
+            The exact ratio, kept reachable.
+
+            The button above says "3/16" = 1'-0"" because that is what anybody
+            needs to read. The number underneath is what every measurement
+            actually uses, and hiding it entirely would make a 0.5% snap
+            impossible to notice or check.
+          */}
+          {isSet && (
+            <p className="text-[0.7rem] text-muted-foreground">
+              One inch of paper is{" "}
+              <span className="font-mono text-foreground">
+                {(Number(sheet.scaleRatio) / 12).toFixed(2)} ft
+              </span>{" "}
+              of building.
+              {sheet.scaleText && sheet.scaleText !== label && (
+                <>
+                  {" "}
+                  Stored as <span className="font-mono">{sheet.scaleText}</span>
+                  .
+                </>
+              )}
+            </p>
+          )}
 
           {/* A reading found but not trusted enough to apply. One click to
               accept, and plainly labelled as something read off the sheet. */}

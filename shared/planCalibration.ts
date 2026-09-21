@@ -329,6 +329,121 @@ export function compareToStandardScales(
   };
 }
 
+export type CalibrationCheck = {
+  /** What the sheet's scale says this second span measures, in inches. */
+  measuredInches: number;
+  /** What the estimator says it really is, in inches. */
+  expectedInches: number;
+  /** Signed, as a percentage of the expected value. */
+  percentOff: number;
+  /** Close enough that the scale is confirmed. */
+  agrees: boolean;
+  /**
+   * The two are related by a simple factor — 1.5, 2, 3 — which is the
+   * fingerprint of a misread dimension rather than a sloppy click. Null when
+   * nothing clean fits.
+   */
+  suspectFactor: number | null;
+  /** One sentence, ready to show. */
+  message: string;
+};
+
+/**
+ * Within this, the second measurement CONFIRMS the scale.
+ *
+ * Two clicks of slip on each of two spans, plus the estimator rounding a
+ * dimension, lands inside 2% comfortably. Wider than that and there is
+ * something to look at rather than something to shrug at.
+ */
+const CHECK_TOLERANCE_PERCENT = 2;
+
+/** Factors a misread produces. Reading one end of a scale bar gives 1.5. */
+const SUSPECT_FACTORS = [1.5, 2, 3, 4, 12];
+const FACTOR_TOLERANCE_PERCENT = 3;
+
+/**
+ * Check a scale by measuring a SECOND thing whose length is known.
+ *
+ * ── Why a second measurement is the only thing that catches this ─────────────
+ * Added 2026-09-21, from a real job. Sheet 11 of the Decant Facility carried a
+ * graphic scale bar reading 10-5-0-10-20 — thirty feet end to end, because the
+ * bar starts to the LEFT of its zero. Clicking the two ends and typing 20 set
+ * the scale to two thirds of the truth, and a 100 ft building then measured
+ * 67 ft.
+ *
+ * Nothing in the app could have caught it, and the reason is worth stating
+ * exactly, because it is the argument for this function. The sheet was 1/8" =
+ * 1'-0" — ratio 96 — so the error produced 96 x 20/30 = **exactly 64**, which
+ * is 3/16" = 1'-0". A textbook scale. `compareToStandardScales` looks for a
+ * ratio that is not a standard scale, and this one was one; the span was long
+ * and scored "good"; the arithmetic was right at every step. Every check the
+ * app had said yes.
+ *
+ * The only thing that distinguishes a right scale from a plausible wrong one is
+ * a SECOND known distance. That is what this is.
+ *
+ * ── Naming the factor, not just the gap ──────────────────────────────────────
+ * "33% out" is a number to interpret. "The two disagree by exactly 1.5x, which
+ * is what reading a scale bar from the wrong end does" is a diagnosis, and it
+ * points straight at the cause. The factors listed are the ones misreads
+ * actually produce — 1.5 from a scale bar's left-of-zero lead-in, 2 and 3 from
+ * taking the wrong interval, 12 from feet typed where inches were meant.
+ *
+ * Returns null when there is nothing to compare yet.
+ */
+export function checkCalibration(
+  measuredInches: number,
+  expectedInches: number
+): CalibrationCheck | null {
+  if (!Number.isFinite(measuredInches) || measuredInches <= 0) return null;
+  if (!Number.isFinite(expectedInches) || expectedInches <= 0) return null;
+
+  const percentOff = ((measuredInches - expectedInches) / expectedInches) * 100;
+  const agrees = Math.abs(percentOff) <= CHECK_TOLERANCE_PERCENT;
+
+  // Looked for in both directions: the scale can be too large or too small.
+  const bigger = Math.max(measuredInches, expectedInches);
+  const smaller = Math.min(measuredInches, expectedInches);
+  const observed = bigger / smaller;
+  let suspectFactor: number | null = null;
+  for (const factor of SUSPECT_FACTORS) {
+    const gap = Math.abs((observed - factor) / factor) * 100;
+    if (gap <= FACTOR_TOLERANCE_PERCENT) {
+      suspectFactor = factor;
+      break;
+    }
+  }
+
+  if (agrees) {
+    return {
+      measuredInches,
+      expectedInches,
+      percentOff,
+      agrees: true,
+      suspectFactor: null,
+      message: "Checks out — the two measurements agree.",
+    };
+  }
+
+  const direction = percentOff > 0 ? "long" : "short";
+  const size = Math.abs(percentOff).toFixed(0);
+  const factorNote =
+    suspectFactor === null
+      ? " Re-measure, or set the scale again from a different dimension."
+      : suspectFactor === 12
+        ? " That is exactly 12x — feet and inches have been mixed up somewhere."
+        : ` That is almost exactly ${suspectFactor}x. A scale bar read from its end rather than its numbers does this, because the bar usually starts left of zero.`;
+
+  return {
+    measuredInches,
+    expectedInches,
+    percentOff,
+    agrees: false,
+    suspectFactor,
+    message: `This sheet's scale makes that ${size}% too ${direction}.${factorNote}`,
+  };
+}
+
 /**
  * The scale as text, for storing beside the ratio.
  *

@@ -178,6 +178,56 @@ export function formatRatio(ratio: number): string {
   return `1:${Number(ratio.toFixed(4))}`;
 }
 
+/**
+ * How close a calibrated ratio has to be before it is CALLED a standard scale.
+ *
+ * Tight on purpose. A calibrated sheet lands a hair off a round number through
+ * click precision alone — 64.015002 is 0.02% from 3/16" and is plainly that
+ * scale. A sheet genuinely stretched in printing sits 1–3% off, and naming THAT
+ * as the nominal scale would hide the very thing calibration exists to find.
+ *
+ * So: snap only where the gap is smaller than any real cause, and otherwise say
+ * what the paper actually measures.
+ */
+const STANDARD_SNAP_PERCENT = 0.5;
+
+/**
+ * The scale in the words an estimator uses, from the ratio alone.
+ *
+ * ── Why this exists ──────────────────────────────────────────────────────────
+ * Calibration stores its result as `1:64.015002`, because the ratio is what is
+ * true and rounding it would throw away the accuracy just bought. That number
+ * is correct and unreadable. It was in the toolbar of a real job on
+ * 2026-09-21, where nobody could tell at a glance that the sheet was at 3/16",
+ * and a wrong scale therefore looked exactly like a right one.
+ *
+ * This changes the LABEL and never the ratio. Two forms, both plain:
+ *
+ *   within 0.5% of a standard   `3/16" = 1'-0"` — the name people say
+ *   anything else               `1" = 6'-8"`    — what one inch of paper is
+ *
+ * The second form is deliberately engineering notation whatever the scale,
+ * because it is the one reading that is always true and always says something:
+ * an architectural sheet 9% off standard has no architect's name, and inventing
+ * the nearest one would be the lie this function exists to remove.
+ */
+export function describeScale(ratio: number): string {
+  if (!Number.isFinite(ratio) || ratio <= 0) return "—";
+
+  let nearest = COMMON_SCALES[0];
+  let bestGap = Infinity;
+  for (const scale of COMMON_SCALES) {
+    const gap = Math.abs((ratio - scale.ratio) / scale.ratio) * 100;
+    if (gap < bestGap) {
+      bestGap = gap;
+      nearest = scale;
+    }
+  }
+  if (bestGap <= STANDARD_SNAP_PERCENT) return nearest.text;
+
+  return `1" = ${formatFeetInches(ratio)}`;
+}
+
 /** Explicitly-not-to-scale markings. Recognised so they can be reported. */
 const NTS = /\b(N\.?\s?T\.?\s?S\.?|NOT\s+TO\s+SCALE)\b/i;
 
