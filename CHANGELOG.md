@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-20]
 
+- **Trace a run between two devices and the app asks whose wire it is.** Your
+  device assemblies already include the cable to the next device, so a run from
+  a junction box to a ceiling box may well be wire you have already counted.
+  The run row asks — "is this the branch wiring your devices already include?"
+  — and you answer. It never decides for you, and it never drops the footage on
+  its own.
+
+  **A run with the panel at one end is a homerun and is never asked about**,
+  which is most of them. An answer is one tap to change, and changing it puts
+  the question back rather than locking it in.
+
 - **One number per job for a building laid out tighter or looser.** Rather than
   editing the whip on every assembly, a bid carries a single adjustment that
   scales all of them at once — a sprawling house up, a tight commercial fit-out

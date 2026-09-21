@@ -45,6 +45,10 @@ export type PanelRun = {
   spec?: string | null;
   /** Where it GOES, or null if both ends are not answered. The second line. */
   endsName?: string | null;
+  /** Whose wire this run is (D18). Derived on the server, never here. */
+  wireOwnership?: "homerun" | "branch" | "unanswered";
+  /** What the estimator said. NULL means the question is still open. */
+  branchWiring?: boolean | null;
   /** Which kind of run — what its colour groups on. Null before types. */
   runTypeId: number | null;
   pathType: "conduit" | "cable";
@@ -248,8 +252,15 @@ export function RunsPanel({
   legend,
   renderRunEnds,
   renderRunType,
+  onAnswerBranchWiring,
 }: {
   runs: PanelRun[];
+  /**
+   * Answer "whose wire is this run?" — true branch, false homerun, null to put
+   * the question back. Optional so a caller that cannot answer simply does not
+   * show the question rather than showing a dead control.
+   */
+  onAnswerBranchWiring?: (runId: number, answer: boolean | null) => void;
   /** Counted stamps, grouped by assembly. Quantities are derived, not typed. */
   stampGroups: PanelStampGroup[];
   /** Each count's relationship to the bid, by group id. */
@@ -647,6 +658,81 @@ export function RunsPanel({
                     <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
+
+                {/*
+                  WHOSE WIRE IS THIS? ASKED, NEVER DECIDED (D18).
+
+                  Devices carry the branch wiring between each other and a
+                  traced run is the homerun back to the panel. A run with a
+                  panel at one end is settled and is never asked about — a
+                  warning that fires on correct work is as bad as silence, and
+                  those are most runs. Devices at BOTH ends is genuinely
+                  ambiguous, and only a person can close it.
+
+                  It does NOT refuse and it does not exclude anything on its
+                  own: the footage counts until somebody says otherwise,
+                  because a traced run is measured work somebody drew and
+                  dropping it over an open question loses footage silently.
+
+                  Shown only while the question is open. Once answered the row
+                  goes quiet — re-asking is how a confirmed answer gets
+                  un-confirmed.
+                */}
+                {run.wireOwnership === "unanswered" && onAnswerBranchWiring && (
+                  <div className="mt-1.5 rounded border border-border/60 bg-muted/20 px-2 py-1.5">
+                    <p className="text-[0.7rem] text-muted-foreground">
+                      Devices at both ends — is this the branch wiring your
+                      devices already include?
+                    </p>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 text-[0.7rem]"
+                        onClick={e => {
+                          e.stopPropagation();
+                          onAnswerBranchWiring(run.id, true);
+                        }}
+                      >
+                        Yes — don't count it twice
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 text-[0.7rem]"
+                        onClick={e => {
+                          e.stopPropagation();
+                          onAnswerBranchWiring(run.id, false);
+                        }}
+                      >
+                        No — it's a homerun
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/*
+                  Answered "branch", so the devices own it. Said out loud rather
+                  than the row quietly showing less, and reversible in one tap —
+                  an answer nobody can change is a trap, not a decision.
+                */}
+                {run.branchWiring === true && (
+                  <p className="text-[0.7rem] text-muted-foreground mt-1.5">
+                    Branch wiring — your devices already include this cable, so
+                    it is not counted again.{" "}
+                    {onAnswerBranchWiring && (
+                      <button
+                        className="underline hover:text-foreground"
+                        onClick={e => {
+                          e.stopPropagation();
+                          onAnswerBranchWiring(run.id, null);
+                        }}
+                      >
+                        Change
+                      </button>
+                    )}
+                  </p>
+                )}
 
                 {/* A run that cannot be measured says so instead of showing 0 */}
                 {run.quantities === null ? (

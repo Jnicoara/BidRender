@@ -1,0 +1,40 @@
+-- Record whether a traced run is branch wiring the devices already carry.
+--
+-- One statement — see 0053, 0061, 0065, 0067, 0068.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- A plain ADD of a nullable column with no default. Old code ignores it; new
+-- code against an old database dies on a bare select(). CLAUDE.md
+-- § "Deploying a migration: THREE STEPS, NOT TWO". Step 3 is empty: nothing is
+-- backfilled and no existing column changes meaning.
+--
+-- Hand-written, not generated, for the reason 0065 and 0067 give.
+--
+-- ── NULLABLE, AND THE NULL IS THE WHOLE POINT ───────────────────────────────
+-- Three states, and they are genuinely different:
+--
+--   NULL   nobody has been asked, or was asked and skipped
+--   false  a homerun — the estimator said the devices do NOT carry this
+--   true   branch wiring the devices already carry, so it is excluded
+--
+-- A boolean NOT NULL DEFAULT false would collapse the first two and quietly
+-- claim every run on every existing job had been confirmed a homerun. That is
+-- the wrong-number-shaped failure: it reads as an answer when nobody answered.
+-- Contrast 0067, where NOT NULL was right because a component line either IS
+-- the branch wire or is not and there was no third state to lose.
+--
+-- ── IT IS AN ANSWER, NOT A DERIVATION, AND THAT IS WHY IT IS STORED ─────────
+-- `runWireOwnership` in shared/branchWire.ts could compute a guess from the two
+-- end kinds every time it was asked. It must not: re-deriving would un-answer a
+-- settled question the moment an end kind changed, which is the exact mistake
+-- `shouldSuggestStampLink` refuses when it declines to re-ask about a stamp
+-- that is already claimed. So the recorded answer wins, always, and the ends
+-- only decide whether there is a question worth asking.
+--
+-- ── EVERY EXISTING RUN IS NULL, AND THAT CHANGES NO NUMBER ──────────────────
+-- An unanswered run is COUNTED — a traced run is measured work somebody drew
+-- across a drawing, and dropping it because a question is open would lose
+-- footage silently, which is the failure that looks like a competitive bid. The
+-- caveat travels with the total instead, the way `flatOnlyCount` already does
+-- for verticals. So this ships changing nothing until somebody answers.
+ALTER TABLE `takeoff_runs` ADD `branchWiring` boolean;

@@ -2378,6 +2378,28 @@ export const takeoffRuns = mysqlTable(
     location: mysqlEnum("location", TAKEOFF_LOCATIONS),
 
     /**
+     * Is this run branch wiring the devices already carry? (D18)
+     *
+     * NULL nobody has been asked, or was asked and skipped
+     * false a homerun — the devices do NOT carry this
+     * true  branch wiring, so the whips own it and this is excluded
+     *
+     * ── Why it is stored rather than derived from the two end kinds ────────
+     * `runWireOwnership` in shared/branchWire.ts could guess from the ends
+     * every time. It must not: re-deriving would un-answer a settled question
+     * the moment an end kind changed — the mistake `shouldSuggestStampLink`
+     * refuses when it declines to re-ask about an already-claimed stamp. The
+     * recorded answer wins; the ends only decide whether to ask at all.
+     *
+     * ── Why NULL rather than NOT NULL DEFAULT false ────────────────────────
+     * Collapsing "nobody asked" into "confirmed a homerun" would claim every
+     * run on every existing job had been answered. An unanswered run is still
+     * COUNTED — measured work is never dropped over an open question — and the
+     * caveat travels with the total instead, as `flatOnlyCount` does.
+     */
+    branchWiring: boolean("branchWiring"),
+
+    /**
      * This path was proposed by AI rather than traced by hand.
      *
      * Never treated as final: a suggested run stays visibly a suggestion until

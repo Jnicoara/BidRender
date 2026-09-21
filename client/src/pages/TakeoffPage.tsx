@@ -3038,6 +3038,20 @@ export default function TakeoffPage({
     onError: e => toast.error(e.message),
     onSettled: refreshRuns,
   });
+  /**
+   * Whose wire a traced run is (D18).
+   *
+   * Goes through `refreshRuns`, like every run mutation above it, rather than
+   * invalidating whichever query came to mind — CLAUDE.md § "a test that calls
+   * the server cannot see a screen showing yesterday's answer". The panel
+   * decides what to show from `wireOwnership`, which the SERVER derives, so a
+   * cache left alone here would leave the question on screen after it was
+   * answered and the totals unchanged after the answer changed them.
+   */
+  const setBranchWiring = trpc.takeoffRuns.setEnds.useMutation({
+    onError: e => toast.error(e.message),
+    onSettled: refreshRuns,
+  });
 
   /**
    * Autosave, on a timer while tracing.
@@ -4419,6 +4433,9 @@ export default function TakeoffPage({
                 window.setTimeout(() => setFocusPoint(null), 2200);
               }}
               onRemoveStamp={id => removeStamp.mutate({ id })}
+              onAnswerBranchWiring={(runId, answer) =>
+                setBranchWiring.mutate({ id: runId, branchWiring: answer })
+              }
               renderRunType={run => {
                 const armed = (runTypes.data ?? []).find(
                   t => t.id === run.runTypeId

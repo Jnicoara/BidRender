@@ -38,6 +38,7 @@ import {
   totalQuantities,
   type RunPathType,
 } from "../../shared/takeoffQuantities";
+import { runWireOwnership } from "../../shared/branchWire";
 import {
   runDisplayName,
   runName,
@@ -281,6 +282,24 @@ export const takeoffRunsRouter = router({
             startStampId: run.startStampId,
             endStampId: run.endStampId,
           },
+          /**
+           * Whose wire this run is, and what the estimator actually said (D18).
+           *
+           * Both, because they answer different questions: `wireOwnership`
+           * decides whether the footage counts, while `branchWiring` NULL is
+           * how the panel knows the question is still open rather than
+           * answered "homerun".
+           *
+           * Derived HERE rather than on the client, so a row and a total cannot
+           * disagree about the same run — which is what shared/branchWire.ts is
+           * for.
+           */
+          branchWiring: run.branchWiring,
+          wireOwnership: runWireOwnership({
+            startKind: run.startKind,
+            endKind: run.endKind,
+            branchWiring: run.branchWiring,
+          }),
           /**
            * The sheet's scale has changed since this was traced. The length
            * shown is against the CURRENT scale; this flags that it differs
@@ -764,6 +783,14 @@ export const takeoffRunsRouter = router({
         distributionHeightInches: runInchesSchema.optional(),
         startStampId: z.number().int().positive().nullable().optional(),
         endStampId: z.number().int().positive().nullable().optional(),
+        /**
+         * Whose wire this run is (D18).
+         *
+         * Nullable, and null is not a no-op: it puts the question BACK. "I do
+         * not know yet" has to be reachable or a mis-tap is permanent, which is
+         * the same reason an end kind can be cleared.
+         */
+        branchWiring: z.boolean().nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -803,6 +830,7 @@ export const takeoffRunsRouter = router({
         "distributionHeightInches",
         "startStampId",
         "endStampId",
+        "branchWiring",
       ] as const;
       for (const field of fields) {
         if (input[field] !== undefined) patch[field] = input[field];
