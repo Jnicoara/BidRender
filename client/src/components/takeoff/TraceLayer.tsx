@@ -40,7 +40,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { CrosshairGuides } from "./CrosshairGuides";
+import { CrosshairGuides, type CrosshairHandle } from "./CrosshairGuides";
+import { crosshairCursorStyle } from "@/lib/crosshairCursor";
 import { Check, Ruler, TriangleAlert, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -210,6 +211,8 @@ export function TraceLayer({
   chromeTarget?: HTMLElement | null;
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  /** Moved directly, never through a render. See CrosshairGuides. */
+  const guidesRef = useRef<CrosshairHandle | null>(null);
   /** Where the pointer is, for the rubber-band segment from the last vertex. */
   const [hover, setHover] = useState<PagePoint | null>(null);
 
@@ -327,12 +330,38 @@ export function TraceLayer({
         viewBox={`0 0 ${width} ${height}`}
         className={cn(
           "absolute inset-0 w-full h-full",
-          tracing || stamping ? "cursor-crosshair" : "pointer-events-none"
+          tracing || stamping ? "" : "pointer-events-none"
         )}
+        /*
+          The crosshair is the CURSOR, not something drawn into the overlay.
+          See @/lib/crosshairCursor — the compositor draws it with the pointer,
+          so it cannot trail behind the way the old drawn one did.
+        */
+        style={tracing || stamping ? crosshairCursorStyle : undefined}
         onPointerMove={e => {
-          if (tracing) setHover(pointerToPage(e));
+          if (!tracing) return;
+          const page = pointerToPage(e);
+          /*
+            The guides move IMPERATIVELY and the state update follows.
+
+            Both describe the same pointer, and that is deliberate rather than
+            redundant: the guides must be exact at pointer rate, while the
+            rubber-band preview and the length readout are allowed to arrive a
+            frame later. Routing the guides through `setHover` would put them
+            behind whatever React is doing, which is the lag this change is
+            for.
+          */
+          if (page)
+            guidesRef.current?.moveTo(
+              page.x * renderScale,
+              page.y * renderScale
+            );
+          setHover(page);
         }}
-        onPointerLeave={() => setHover(null)}
+        onPointerLeave={() => {
+          guidesRef.current?.hide();
+          setHover(null);
+        }}
         onPointerDown={e => {
           if (e.button !== 0) return;
           /*
@@ -370,10 +399,9 @@ export function TraceLayer({
         {/* Underneath every mark, so a guide never sits on top of a stamp. */}
         {tracing && (
           <CrosshairGuides
-            at={hover}
+            ref={guidesRef}
             width={width}
             height={height}
-            renderScale={renderScale}
             color={RUN_COLOR[pathType]}
           />
         )}

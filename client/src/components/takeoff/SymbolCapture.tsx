@@ -22,6 +22,7 @@ import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { selectOnFocus } from "@/lib/selectOnFocus";
+import { crosshairCursorStyle } from "@/lib/crosshairCursor";
 
 /** Longest edge of the stored thumbnail, in pixels. */
 const THUMBNAIL_MAX_EDGE = 96;
@@ -228,7 +229,13 @@ export function SymbolCaptureLayer({
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
-      className={cn("absolute inset-0 w-full h-full z-10 cursor-crosshair")}
+      className={cn("absolute inset-0 w-full h-full z-10")}
+      /*
+        The same cursor as tracing and calibrating. Boxing a symbol on a legend
+        is an aiming job too, and a crosshair that differs between overlays
+        reads as a different tool rather than the same one somewhere else.
+      */
+      style={crosshairCursorStyle}
       onPointerDown={e => {
         if (e.button !== 0) return;
         /*

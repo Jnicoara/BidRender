@@ -26,7 +26,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { CrosshairGuides } from "./CrosshairGuides";
+import { CrosshairGuides, type CrosshairHandle } from "./CrosshairGuides";
+import { crosshairCursorStyle } from "@/lib/crosshairCursor";
 import { Check, RotateCcw, Ruler, TriangleAlert, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -114,6 +115,8 @@ export function CalibrateLayer({
   busy?: boolean;
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  /** Moved directly, never through a render. See CrosshairGuides. */
+  const guidesRef = useRef<CrosshairHandle | null>(null);
   const [hover, setHover] = useState<PagePoint | null>(null);
   const [distanceText, setDistanceText] = useState("");
 
@@ -684,14 +687,33 @@ export function CalibrateLayer({
         width={width}
         height={height}
         viewBox={`0 0 ${width} ${height}`}
-        className="absolute inset-0 w-full h-full cursor-crosshair"
+        className="absolute inset-0 w-full h-full"
+        /*
+          The crosshair IS the cursor here, as it is when tracing. Calibration
+          is the place a lagging crosshair costs the most: both clicks land on
+          the ends of a dimension, and an error there multiplies into every
+          measurement on the sheet rather than into one run.
+        */
+        style={crosshairCursorStyle}
         onPointerMove={e => {
           // Tracked from the first move, not just between the two clicks: the
           // guides have to be there while the FIRST end is being lined up,
           // which is the click that has no rubber-band line to help it.
-          setHover(pointerToPage(e));
+          const page = pointerToPage(e);
+          // Guides first and directly; the state update behind it drives the
+          // rubber band and the live span rating, which may be a frame late.
+          if (page) {
+            guidesRef.current?.moveTo(
+              page.x * renderScale,
+              page.y * renderScale
+            );
+          }
+          setHover(page);
         }}
-        onPointerLeave={() => setHover(null)}
+        onPointerLeave={() => {
+          guidesRef.current?.hide();
+          setHover(null);
+        }}
         onPointerDown={e => {
           // Left button only. Right and middle are pan, and a pan that also
           // dropped a calibration point would be maddening — you would move the
@@ -707,10 +729,9 @@ export function CalibrateLayer({
             for — and here the alignment IS the accuracy of the whole sheet. */}
         {points.length < 2 && (
           <CrosshairGuides
-            at={hover}
+            ref={guidesRef}
             width={width}
             height={height}
-            renderScale={renderScale}
             color={SPAN_COLOR}
           />
         )}

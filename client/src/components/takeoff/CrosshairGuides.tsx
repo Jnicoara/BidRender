@@ -8,6 +8,28 @@
  * running off both edges tell you what you are LINED UP WITH, which is the
  * thing you cannot otherwise see.
  *
+ * ── The plus is GONE, and the cursor is now the crosshair ────────────────────
+ * This used to draw a plus at the pointer as well. That made TWO crosshairs on
+ * screen — the system cursor and this one — and the drawn one, being the bigger
+ * and the yellower, was the one the eye followed. It also arrived late: pointer
+ * moves, React re-renders, overlay repaints, and on a dense sheet with the
+ * render worker busy it trailed visibly behind the real pointer.
+ *
+ * The pointer itself is the crosshair now (`@/lib/crosshairCursor`), drawn by
+ * the compositor on the pointer's own clock. Only the long alignment guides are
+ * left here, because those are the part a cursor image cannot provide.
+ *
+ * ── Moved IMPERATIVELY, for the same reason ──────────────────────────────────
+ * The guides are positioned by writing attributes straight onto two `<line>`
+ * elements through a ref, not by re-rendering. A guide that lags is a guide
+ * that lies about what you are lined up with, and putting it back on React
+ * state would reintroduce exactly the lag the cursor change removes — the
+ * overlay's parent re-renders on every pointer move for the rubber-band
+ * preview and the readout, and those are allowed to be a frame late. This is
+ * not.
+ *
+ * Callers therefore hold a ref and call `moveTo` from their pointer handler.
+ *
  * ── Faint on purpose ─────────────────────────────────────────────────────────
  * These cross the whole drawing, so anything heavy enough to notice is heavy
  * enough to obscure. They sit just above the background and below every mark:
@@ -18,73 +40,77 @@
  * zoom. Without it a guide drawn at fit zoom becomes a band several feet wide
  * across the building at 400%, and a hairline is the entire point.
  */
-import type { PagePoint } from "@shared/takeoffGeometry";
+import { forwardRef, useImperativeHandle, useRef } from "react";
 
-export function CrosshairGuides({
-  at,
-  width,
-  height,
-  renderScale,
-  color,
-}: {
-  /** Cursor position in page points, or null when the pointer is away. */
-  at: PagePoint | null;
-  /** The overlay's coordinate space. */
-  width: number;
-  height: number;
-  renderScale: number;
-  color: string;
-}) {
-  if (!at) return null;
-  const x = at.x * renderScale;
-  const y = at.y * renderScale;
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+export type CrosshairHandle = {
+  /** Put the guides at this point, in the overlay's own coordinates. */
+  moveTo: (x: number, y: number) => void;
+  /** Pointer has left the drawing. */
+  hide: () => void;
+};
+
+export const CrosshairGuides = forwardRef<
+  CrosshairHandle,
+  { width: number; height: number; color: string }
+>(function CrosshairGuides({ width, height, color }, ref) {
+  const groupRef = useRef<SVGGElement | null>(null);
+  const horizontalRef = useRef<SVGLineElement | null>(null);
+  const verticalRef = useRef<SVGLineElement | null>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      moveTo(x: number, y: number) {
+        const group = groupRef.current;
+        const horizontal = horizontalRef.current;
+        const vertical = verticalRef.current;
+        if (!group || !horizontal || !vertical) return;
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+        horizontal.setAttribute("y1", String(y));
+        horizontal.setAttribute("y2", String(y));
+        vertical.setAttribute("x1", String(x));
+        vertical.setAttribute("x2", String(x));
+        // Hidden until the first move, so a stale position never flashes up
+        // where the pointer used to be.
+        group.style.display = "";
+      },
+      hide() {
+        const group = groupRef.current;
+        if (group) group.style.display = "none";
+      },
+    }),
+    []
+  );
 
   return (
-    <g pointerEvents="none" aria-hidden="true">
+    <g
+      ref={groupRef}
+      pointerEvents="none"
+      aria-hidden="true"
+      style={{ display: "none" }}
+    >
       <line
+        ref={horizontalRef}
         x1={0}
-        y1={y}
+        y1={0}
         x2={width}
-        y2={y}
+        y2={0}
         stroke={color}
         strokeWidth={1}
         strokeOpacity={0.35}
         vectorEffect="non-scaling-stroke"
       />
       <line
-        x1={x}
+        ref={verticalRef}
+        x1={0}
         y1={0}
-        x2={x}
+        x2={0}
         y2={height}
         stroke={color}
         strokeWidth={1}
         strokeOpacity={0.35}
         vectorEffect="non-scaling-stroke"
       />
-      {/*
-        The plus stays. The guides say what you are aligned with; this says
-        exactly where the point will land, and at low zoom the two lines cross
-        over enough drawing that the intersection alone is hard to pick out.
-      */}
-      <line
-        x1={x - 8}
-        y1={y}
-        x2={x + 8}
-        y2={y}
-        stroke={color}
-        strokeWidth={1.5}
-        vectorEffect="non-scaling-stroke"
-      />
-      <line
-        x1={x}
-        y1={y - 8}
-        x2={x}
-        y2={y + 8}
-        stroke={color}
-        strokeWidth={1.5}
-        vectorEffect="non-scaling-stroke"
-      />
     </g>
   );
-}
+});

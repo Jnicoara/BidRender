@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-21]
 
+- **One crosshair when tracing and measuring, and it no longer trails behind
+  the pointer.** There were two — the small system cursor and a big yellow one
+  drawn on the sheet, which arrived a frame or more late and was the one your
+  eye followed. The pointer itself is the crosshair now, drawn by the operating
+  system, so it cannot lag. It is dark with a white outline so it reads on white
+  paper and on black linework alike, and the click lands exactly at its centre —
+  measured, not assumed. The long alignment guides stay, and they now move
+  directly rather than waiting on a redraw.
+
 - **One scale control instead of two, with both ways to set a scale in it.**
   "Calibrate" and "Set scale" sat side by side doing the same job under
   different names. Now the scale chip is the only one: it shows the scale in
