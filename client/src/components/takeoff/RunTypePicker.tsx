@@ -59,6 +59,18 @@ import {
 import { MaterialPicker } from "@/components/MaterialPicker";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { smartSearch } from "@/lib/smartSearch";
+import { matchesTradeQuery } from "@shared/tradeSizeQuery";
+import { compareBySize } from "@shared/materialSizeOrder";
+
+/**
+ * Which catalog shelves each kind of run is drawn from.
+ *
+ * Conduit runs are pipe; cable runs are the cable itself. Named here rather
+ * than inferred so a new shelf cannot silently start appearing in a picker
+ * nobody expected it in.
+ */
+const CONDUIT_SHELF = ["Conduit"];
+const CABLE_SHELF = ["Wire & Cable"];
 import { runTypeSpec } from "@shared/takeoffCounts";
 import { laborPerFootSentence } from "@shared/runTypeLabor";
 import { cn } from "@/lib/utils";
@@ -282,9 +294,33 @@ function MaterialSlot({
 /** Enough to choose from without the list becoming the screen. */
 const MAX_RESULTS = 8;
 
+/** A catalog row this picker can turn straight into a run type. */
+export type PickableRunMaterial = {
+  id: number;
+  name: string;
+  category: string | null;
+};
+
+/**
+ * What a new run type is made of, as handed to the caller.
+ *
+ * Nothing but the label is required, because typing a name for something the
+ * catalog does not stock is still a legitimate way to start — see CLAUDE.md
+ * § "As manual or as automated as the user wants".
+ */
+export type NewRunTypeSpec = {
+  label: string;
+  racewayMaterialId?: number | null;
+  conductorMaterialId?: number | null;
+  conductorCount?: number | null;
+  groundMaterialId?: number | null;
+  groundCount?: number | null;
+};
+
 export function RunTypePicker({
   pathType,
   types,
+  catalog = [],
   armedId,
   onPick,
   onCreate,
@@ -294,10 +330,26 @@ export function RunTypePicker({
 }: {
   pathType: "conduit" | "cable";
   types: PickableRunType[];
+  /** The materials catalog, so a run needs no type defined first. */
+  catalog?: PickableRunMaterial[];
   armedId: number | null;
   onPick: (type: PickableRunType) => void;
   /** Define one that does not exist yet, from whatever was typed. */
-  onCreate: (label: string) => void;
+  /**
+   * Define one that does not exist yet.
+   *
+   * ── It carries the MATERIAL now, not just a name ──────────────────────────
+   * Widened 2026-09-24. This used to take a bare label, so a type created here
+   * had no `racewayMaterialId` — it traced footage and priced the pipe at
+   * nothing. That was survivable while the only way in was typing a name
+   * nobody had a material for; it is not survivable now that the list below
+   * offers the catalog, because picking `2" PVC Sch 40` and getting a $0 line
+   * would look exactly like picking it and getting a priced one.
+   *
+   * Every field the create route already accepts is passed through. The route
+   * has taken them since it was written — the gap was only ever here.
+   */
+  onCreate: (spec: NewRunTypeSpec) => void;
   /**
    * Save what a type is made of. Omitted hides the editor entirely.
    *
@@ -343,6 +395,36 @@ export function RunTypePicker({
       .map(hit => byId.get(Number(hit.id)))
       .filter((t): t is PickableRunType => Boolean(t));
   }, [query, searchable, mine]);
+
+  /**
+   * The catalog, for a run whose type nobody has defined yet.
+   *
+   * ── Why the whole shelf and not just saved types ─────────────────────────
+   * Reported 2026-09-24: "2 inch pvc" and "10/2" returned nothing but "New
+   * conduit type", because this list only ever held run types somebody had
+   * already created. That makes defining a type a toll gate in front of the
+   * first trace, which is the thing CLAUDE.md § "As manual or as automated"
+   * rules out — a plain 2" PVC run should need no setup at all.
+   *
+   * Saved types stay FIRST and keep their role as shortcuts: they carry
+   * conductors, grounds and a name somebody chose. The catalog is the fallback
+   * underneath, and picking from it creates the type in one step.
+   *
+   * Matching goes through `matchesTradeQuery` rather than `smartSearch`
+   * because the failure here is spelling, not ranking: the catalog says
+   * `2" PVC Sch 40` and `10-2 NM-B` while people type `2 inch pvc` and `10/2`.
+   */
+  const catalogHits = useMemo(() => {
+    if (!query.trim() || catalog.length === 0) return [];
+    const shelf = pathType === "conduit" ? CONDUIT_SHELF : CABLE_SHELF;
+    const alreadyNamed = new Set(mine.map(t => t.label.toLowerCase()));
+    return catalog
+      .filter(m => shelf.includes(m.category ?? ""))
+      .filter(m => !alreadyNamed.has(m.name.toLowerCase()))
+      .filter(m => matchesTradeQuery(m.name, query))
+      .sort((a, b) => compareBySize(a.name, b.name))
+      .slice(0, MAX_RESULTS);
+  }, [query, catalog, pathType, mine]);
 
   return (
     <Popover
@@ -649,7 +731,7 @@ export function RunTypePicker({
                       onPick(results[0]);
                       setOpen(false);
                     } else if (query.trim()) {
-                      onCreate(query.trim());
+                      onCreate({ label: query.trim() });
                       setOpen(false);
                     }
                   }
@@ -766,6 +848,52 @@ export function RunTypePicker({
                   No {pathType} types yet — type a name to make one.
                 </p>
               )}
+
+              {/*
+                ── The catalog, underneath the saved types ───────────────────
+                Second, not first: a saved type carries conductors, grounds and
+                a name somebody chose, and it should keep winning. This is the
+                fallback that means a plain 2" PVC run needs no setup at all.
+
+                Picking one creates the type WITH its raceway material, so the
+                pipe prices. That is the whole point of the change — a row here
+                that produced a $0 line would be worse than no row.
+              */}
+              {catalogHits.length > 0 && (
+                <>
+                  <div className="h-px bg-border my-1.5" />
+                  <p className="px-2 pb-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+                    From the catalog
+                  </p>
+                  {catalogHits.map(material => (
+                    <button
+                      key={material.id}
+                      className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted flex items-start gap-2"
+                      onClick={() => {
+                        onCreate({
+                          label: material.name,
+                          racewayMaterialId:
+                            pathType === "conduit" ? material.id : null,
+                          // A cable IS the run, so it goes in the conductor
+                          // slot — there is no pipe to put it in.
+                          conductorMaterialId:
+                            pathType === "cable" ? material.id : null,
+                          conductorCount: pathType === "cable" ? 1 : null,
+                        });
+                        setOpen(false);
+                      }}
+                    >
+                      <Plus className="w-3 h-3 mt-0.5 shrink-0 text-muted-foreground" />
+                      <span className="flex-1 min-w-0">
+                        <span className="block truncate">{material.name}</span>
+                        <span className="block text-[0.7rem] text-muted-foreground">
+                          Makes a {pathType} type from this material
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
 
             {/*
@@ -780,7 +908,7 @@ export function RunTypePicker({
                 <button
                   className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted"
                   onClick={() => {
-                    onCreate(query.trim());
+                    onCreate({ label: query.trim() });
                     setOpen(false);
                   }}
                 >

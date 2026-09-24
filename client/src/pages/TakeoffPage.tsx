@@ -2189,6 +2189,15 @@ export default function TakeoffPage({
   const { data: symbols = [] } = trpc.takeoffStamps.symbols.useQuery();
   const { data: allAssemblies = [] } = trpc.assemblies.list.useQuery();
 
+  /**
+   * The catalog, for the run-type pickers.
+   *
+   * Fetched here rather than inside the picker because React Query dedupes by
+   * key and the Count picker's materials will want the same rows — one request
+   * either way, and the page is where the other library lists already live.
+   */
+  const { data: allMaterials = [] } = trpc.materials.list.useQuery();
+
   const refreshStamps = useCallback(() => {
     if (activeSheet) {
       void utils.takeoffStamps.listForSheet.invalidate({
@@ -3954,9 +3963,10 @@ export default function TakeoffPage({
                 types={runTypes.data ?? []}
                 armedId={armedRunType.conduit?.id ?? null}
                 onPick={type => armRunType("conduit", type, false)}
-                onCreate={label =>
+                catalog={allMaterials}
+                onCreate={spec =>
                   createRunType
-                    .mutateAsync({ label, pathType: "conduit" })
+                    .mutateAsync({ ...spec, pathType: "conduit" })
                     .then(type => armRunType("conduit", type, false))
                     .catch(() => {
                       /* the mutation's onError has already said so */
@@ -4006,9 +4016,10 @@ export default function TakeoffPage({
                 types={runTypes.data ?? []}
                 armedId={armedRunType.cable?.id ?? null}
                 onPick={type => armRunType("cable", type, false)}
-                onCreate={label =>
+                catalog={allMaterials}
+                onCreate={spec =>
                   createRunType
-                    .mutateAsync({ label, pathType: "cable" })
+                    .mutateAsync({ ...spec, pathType: "cable" })
                     .then(type => armRunType("cable", type, false))
                     .catch(() => {
                       /* the mutation's onError has already said so */
@@ -4573,9 +4584,10 @@ export default function TakeoffPage({
                           runTypeId: type.id,
                         })
                       }
-                      onCreate={label =>
+                      catalog={allMaterials}
+                      onCreate={spec =>
                         createRunType
-                          .mutateAsync({ label, pathType: run.pathType })
+                          .mutateAsync({ ...spec, pathType: run.pathType })
                           .then(type =>
                             setRunTypeFor.mutate({
                               id: run.id,
