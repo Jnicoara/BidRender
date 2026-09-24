@@ -37,20 +37,62 @@
  * looks like a mark is a cursor you lose among them.
  */
 
-/** Odd, so there is one centre pixel rather than a seam between two. */
-export const CROSSHAIR_SIZE = 25;
+/**
+ * EVEN, so the image's geometric centre lands on a whole number.
+ *
+ * ── This was 25, and that was half a pixel wrong ─────────────────────────────
+ * Corrected 2026-09-24. An odd size gives a single centre PIXEL, index 12 of
+ * 0..24 — which sounded right and is not, because a CSS hotspot is a
+ * COORDINATE, not a pixel index. Pixel 12 spans 12.0 to 13.0, so its centre is
+ * at 12.5, while the hotspot could only be declared as the integer 12. Every
+ * point therefore landed half a CSS pixel up and to the left of where the
+ * crosshair appeared to be — one whole device pixel at the 2x scaling this
+ * machine runs at.
+ *
+ * The first verification missed it by measuring the ink centroid in INDEX
+ * space, where the answer comes out as a clean 12 and looks like a pass. A
+ * measurement in the wrong units is not a measurement.
+ *
+ * With an even size, the geometric centre of a 24px image is exactly 12.0, an
+ * integer, so the hotspot can name it precisely. The arms are then 2px wide and
+ * centred on that line, which keeps them crisp — spanning 11.0 to 13.0, whole
+ * pixel columns, symmetric about 12.0.
+ */
+export const CROSSHAIR_SIZE = 24;
 
-/** The centre pixel's index, and the hotspot. */
+/** The image's exact geometric centre, and the hotspot. */
 export const CROSSHAIR_CENTRE = 12;
+
+/** Arms straddle the centre line, so 2 and 4 rather than 1 and 3. */
+const CORE_WIDTH = 2;
+const HALO_WIDTH = 4;
 
 /**
  * Half the gap at the middle, in pixels.
  *
- * The arms stop short so the pixel being aimed at is never covered by the
- * cursor aiming at it. Four arms converging on a hole locate a point more
- * precisely than a solid plus does.
+ * The arms stop short of the centre so the drawing under the exact point stays
+ * visible. They no longer stop short of a HOLE, though — see CENTRE_DOT.
  */
 const GAP = 3;
+
+/**
+ * A dot on the exact point, inside the gap.
+ *
+ * ── The open gap lost the spot ───────────────────────────────────────────────
+ * Reported 2026-09-24. Four arms converging on emptiness makes the eye infer
+ * the centre, and inferring is not aiming: on a busy sheet the gap fills with
+ * linework and the precise pixel stops being obvious at all.
+ *
+ * So the gap keeps its job — the arms still do not cover the target — and a
+ * single dot marks it. One pixel of dark core with a light ring, which is the
+ * same contrast trick the arms use and for the same reason: it has to survive
+ * both white paper and black line.
+ *
+ * Kept to r=1.6 for the ring and r=0.6 for the core. Bigger reads as a blob and
+ * covers the thing it is pointing at, which is what the gap exists to avoid.
+ */
+const DOT_CORE_R = 0.6;
+const DOT_RING_R = 1.6;
 
 /** How far the arms reach. Slightly smaller than the drawn one it replaces. */
 const ARM = CROSSHAIR_CENTRE;
@@ -58,18 +100,24 @@ const ARM = CROSSHAIR_CENTRE;
 const CORE = "#111827";
 const HALO = "#FFFFFF";
 
-/** Where a line sits to cover exactly the centre pixel. */
-const LINE = CROSSHAIR_CENTRE + 0.5;
+/**
+ * The centre line. THE HOTSPOT ITSELF, not half a pixel beside it.
+ *
+ * A 2px stroke centred here spans whole pixel columns either side, so the mark
+ * is crisp AND its centre of area is the coordinate the hotspot names.
+ */
+const LINE = CROSSHAIR_CENTRE;
 
-/** The four arm segments, as [x1, y1, x2, y2]. */
+/** The four arm segments, as [x1, y1, x2, y2]. Symmetric about LINE. */
 export function crosshairArms(): Array<[number, number, number, number]> {
   const near = CROSSHAIR_CENTRE - GAP;
-  const far = CROSSHAIR_CENTRE + GAP + 1;
-  const end = CROSSHAIR_CENTRE + ARM + 1;
+  const far = CROSSHAIR_CENTRE + GAP;
+  const start = CROSSHAIR_CENTRE - ARM;
+  const end = CROSSHAIR_CENTRE + ARM;
   return [
-    [LINE - ARM - 0.5, LINE, near, LINE], // left
+    [start, LINE, near, LINE], // left
     [far, LINE, end, LINE], // right
-    [LINE, LINE - ARM - 0.5, LINE, near], // up
+    [LINE, start, LINE, near], // up
     [LINE, far, LINE, end], // down
   ];
 }
@@ -95,8 +143,12 @@ export function crosshairSvg(): string {
     .join("");
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${CROSSHAIR_SIZE}" height="${CROSSHAIR_SIZE}" viewBox="0 0 ${CROSSHAIR_SIZE} ${CROSSHAIR_SIZE}">`,
-    `<g stroke="${HALO}" stroke-width="3" stroke-linecap="butt">${arms}</g>`,
-    `<g stroke="${CORE}" stroke-width="1" stroke-linecap="butt">${arms}</g>`,
+    `<g stroke="${HALO}" stroke-width="${HALO_WIDTH}" stroke-linecap="butt">${arms}</g>`,
+    `<g stroke="${CORE}" stroke-width="${CORE_WIDTH}" stroke-linecap="butt">${arms}</g>`,
+    // The centre dot, on the hotspot itself: light ring first, dark core over
+    // it, so it reads on paper and on linework exactly as the arms do.
+    `<circle cx="${LINE}" cy="${LINE}" r="${DOT_RING_R}" fill="${HALO}"/>`,
+    `<circle cx="${LINE}" cy="${LINE}" r="${DOT_CORE_R}" fill="${CORE}"/>`,
     `</svg>`,
   ].join("");
 }
@@ -118,23 +170,38 @@ export function crosshairCursorValue(): string {
 export const crosshairCursorStyle = { cursor: crosshairCursorValue() };
 
 /**
- * Which pixels the crosshair paints, as a grid, for measuring the centre.
+ * Which pixels the ARMS paint, as a grid, for measuring the centre.
  *
  * A stand-in for rasterising the SVG, which jsdom cannot do. It walks the same
- * arm geometry the SVG is built from, so what it reports is what is drawn —
- * and a test can then assert that the ink's centroid and bounding box agree
- * with the declared hotspot. `armPath` is unused by the SVG itself and exists
- * only to keep this honest if the drawing ever moves to a path.
+ * arm geometry the SVG is built from, so what it reports is what is drawn.
+ *
+ * ── Arms only, and that is the stricter measurement ─────────────────────────
+ * The centre dot added on 2026-09-24 is drawn exactly on the hotspot, so
+ * including it could only ever pull a centroid TOWARDS the right answer — it
+ * would mask an arm that had drifted. Leaving it out means the symmetry test
+ * is carried entirely by the four arms, which are the part that can be wrong.
+ *
+ * So `grid[CENTRE][CENTRE]` being false here says the ARMS leave the target
+ * clear; it does not say the cursor paints nothing there. It paints a dot.
+ * `armPath` is unused by the SVG itself and exists only to keep this honest if
+ * the drawing ever moves to a path.
  */
 export function crosshairInk(): boolean[][] {
   void armPath;
   const grid: boolean[][] = Array.from({ length: CROSSHAIR_SIZE }, () =>
     Array.from({ length: CROSSHAIR_SIZE }, () => false)
   );
+  const half = CORE_WIDTH / 2;
   for (const [x1, y1, x2, y2] of crosshairArms()) {
-    // Every arm is axis-aligned, so one of the two spans is a single pixel.
-    const xs = x1 === x2 ? [CROSSHAIR_CENTRE] : range(x1, x2);
-    const ys = y1 === y2 ? [CROSSHAIR_CENTRE] : range(y1, y2);
+    /*
+      Every arm is axis-aligned. Along its length it covers the span between
+      its ends; across its width it covers the stroke, which straddles the
+      centre line — so the thin axis is a RANGE too, not a single column. That
+      is the whole point of the even-sized image: the stroke sits symmetrically
+      on the hotspot instead of one pixel to its side.
+    */
+    const xs = x1 === x2 ? range(x1 - half, x1 + half) : range(x1, x2);
+    const ys = y1 === y2 ? range(y1 - half, y1 + half) : range(y1, y2);
     for (const x of xs) {
       for (const y of ys) {
         if (x < 0 || y < 0 || x >= CROSSHAIR_SIZE || y >= CROSSHAIR_SIZE) {

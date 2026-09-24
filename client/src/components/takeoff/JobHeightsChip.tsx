@@ -79,8 +79,14 @@ export function JobHeightsChip({ bidId }: { bidId: number }) {
           ) : (
             <ArrowUpDown className="w-3.5 h-3.5 text-[#38BDF8]" />
           )}
+          {/*
+            "No heights" was insider language — it names the setting, not the
+            consequence, and the consequence is the part that costs money.
+            Reworded 2026-09-24 to say what is actually happening: the vertical
+            footage is not being counted.
+          */}
           {unset
-            ? "No heights"
+            ? "Drop heights not set — drops not counted"
             : `Runs at ${formatFeetInches(distribution!.inches!)}`}
         </Button>
       </PopoverTrigger>

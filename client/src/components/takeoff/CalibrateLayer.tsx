@@ -290,7 +290,18 @@ export function CalibrateLayer({
   const live = hover && points.length === 1 ? toScreen(hover) : null;
 
   const chrome = (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 w-[26rem] max-w-[calc(100%-1.5rem)] pointer-events-auto">
+    /*
+      ── DOCKED BOTTOM-LEFT, off the drawing ──────────────────────────────────
+      This sat `top-3 left-1/2`, centred over the sheet, which put it exactly
+      where the first point of a measurement usually goes. Reported 2026-09-24:
+      the panel covered the thing it was asking to be clicked.
+
+      Bottom-left is the corner with least competition — the toolbar owns the
+      top, the counts panel owns the right, and a title block occupying the
+      bottom-left of a drawing is not something you calibrate against. Narrower
+      too, so it takes less of whatever it does cover.
+    */
+    <div className="absolute bottom-3 left-3 w-[21rem] max-w-[calc(100%-1.5rem)] pointer-events-auto">
       <div className="rounded-xl border border-border bg-card/95 shadow-xl p-3 space-y-2">
         <div className="flex items-center gap-2">
           {/*
@@ -319,21 +330,19 @@ export function CalibrateLayer({
 
         {phase === "check" ? (
           <div className="space-y-2">
-            <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 px-2.5 py-2">
-              <p className="text-xs">
-                Scale set to{" "}
-                <span className="font-mono">
-                  {describeScale(appliedRatio ?? 0)}
-                </span>
-                .
-              </p>
-            </div>
-
+            {/*
+              Kept SHORT on purpose. This panel sits over the drawing, so every
+              line of reassurance it prints is a line of drawing it hides — and
+              the scale it is checking is already named on the toolbar chip a
+              few inches away. The green "Scale set to …" box that used to head
+              this was the worst offender: a restatement, in the largest box.
+            */}
             <p className="text-xs text-muted-foreground">
-              <span className="text-foreground">Now check it.</span> Measure one
-              MORE thing you know — a different dimension, the other side of the
-              building. A scale that agrees twice is worth far more than one
-              that looked fine once.
+              <span className="text-foreground">
+                Measure something else you know.
+              </span>{" "}
+              A scale that agrees twice is worth far more than one that looked
+              fine once.
             </p>
 
             {points.length < 2 ? (

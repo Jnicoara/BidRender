@@ -103,7 +103,14 @@ export function StampPicker({
           disabled={disabled}
           title="Count things by clicking them on the drawing"
         >
-          <MapPin className="w-3.5 h-3.5" /> Mark
+          {/*
+            "Count", not "Mark". Renamed 2026-09-24: an estimator counts
+            devices; "mark" is what the app calls the dot it leaves behind,
+            which is our word for our artefact rather than theirs for the job.
+            The popover has always asked "What are you counting?", so the
+            button was the odd one out.
+          */}
+          <MapPin className="w-3.5 h-3.5" /> Count
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-2">

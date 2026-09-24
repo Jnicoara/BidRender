@@ -63,64 +63,48 @@ const base = {
 } as const;
 
 /**
- * CONDUIT — a length of pipe with a coupling near the right end.
+ * CONDUIT — the line style a conduit run is drawn in. Solid.
  *
- * Two parallel lines read as pipe in elevation, which is how it is drawn on a
- * plan and how it is pictured by anyone who has bent any. The coupling is a
- * narrow box standing proud of the pipe above and below — proud is what makes
- * it a fitting rather than a cap, and it is the only cue that survives at 14
- * pixels.
+ * ── These are SWATCHES now, not pictures of objects ──────────────────────────
+ * Rewritten 2026-09-24. They used to be miniature drawings: a length of pipe
+ * with a coupling, and a sheath with three conductors splaying out of a cut
+ * end. A great deal of care went into those and the verdict from using them was
+ * that they "don't read as anything" — which is the honest outcome for detailed
+ * objects at 14 pixels, however carefully drawn.
  *
- * **The pipe continues past the coupling, and that short tail is load-bearing.**
- * Drawn five times and looked at on screen at 14px: with the box on the very
- * end and nothing after it, the two lines become prongs and the whole thing
- * reads as a PLUG going into a socket. A coupling sits in the middle of a run,
- * not on the end of one, so putting pipe on both sides of it is both the
- * truthful picture and the one that stops the wrong reading.
+ * What replaces them is not a better picture. It is a different idea: the
+ * button now shows THE LINE IT WILL DRAW. Conduit is solid and cable is dashed
+ * on the sheet already — `RUN_DASH` in shared/takeoffMarks.ts, chosen there
+ * because colour was freed up to mean grouping — so the toolbar can simply
+ * show that, and the button becomes a sample of its own output.
  *
- * Also tried and rejected at size: a ring on the pipe (reads as a key), and two
- * vertical bars at the end (reads as a stop, not a fitting).
+ * The advantage is that it cannot go stale in the way the old pair did: if the
+ * line style ever changes, these are wrong in an obvious way rather than
+ * quietly depicting a thing nobody recognises.
  */
 export function ConduitIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>
-      <path d="M2 9h12" />
-      <path d="M2 15h12" />
-      <rect x="14" y="6.5" width="4" height="11" rx="1" />
-      <path d="M18 9h4" />
-      <path d="M18 15h4" />
+      <path d="M2 12h20" />
     </svg>
   );
 }
 
 /**
- * CABLE — a sheath with three conductors coming out of the cut end.
+ * CABLE — the line style a cable run is drawn in. Dashed.
  *
- * The jacket is two long parallel lines running off the left edge — the reel
- * it came from is out of frame — and the right end is where it was cut. Three
- * conductors splay out of the opening, which is both the literal picture and
- * the one thing that separates this from the conduit above at a glance: **pipe
- * is closed and parallel, cable is open and splayed.**
+ * The dash ratio matches `RUN_DASH.cable` ("10 6") rather than being picked by
+ * eye, so the swatch and the line keep the same rhythm. It is scaled down
+ * because this is a 24-unit viewBox shown at 14px while the run is drawn in
+ * overlay units: "5 3" is the same 10:6 proportion at a size where the gaps
+ * survive.
  *
- * **The jacket has to be much longer than the conductors**, and this was the
- * whole difficulty. Drawn with the two at similar lengths — the obvious
- * proportions — it reads as a bowtie, or as a pair of scissors, and at 14px it
- * is unrecognisable. Roughly two thirds jacket to one third conductors is where
- * it starts reading as a cable with wires coming out rather than as a symmetric
- * shape. A closed rounded rectangle for the jacket was also tried: it reads as
- * a battery with leads.
- *
- * Three conductors rather than two or four on purpose — two reads as a lamp
- * cord and four turns to mush at 14 pixels. Three is also the common case.
+ * See ConduitIcon for why these stopped being drawings of objects.
  */
 export function CableIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg {...base} {...props}>
-      <path d="M2 7.5h12" />
-      <path d="M2 16.5h12" />
-      <path d="m14 10.5 7.5-2" />
-      <path d="M14 12h8" />
-      <path d="m14 13.5 7.5 2" />
+    <svg {...base} {...props} strokeDasharray="5 3">
+      <path d="M2 12h20" />
     </svg>
   );
 }

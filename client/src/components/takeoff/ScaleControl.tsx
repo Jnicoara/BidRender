@@ -142,8 +142,9 @@ export function ScaleControl({
    * quietly half. There is no signal in the file to catch that — only a second
    * measurement does.
    *
-   * So the badge stays up until somebody checks, and picking from the list
-   * offers the check as the next thing rather than closing the panel.
+   * So the badge stays up until somebody checks — and the badge, plus the
+   * link beside it, is the WHOLE of the nudge. Picking a scale used to open
+   * the check overlay itself; see `commit` for why that was wrong.
    */
   const unchecked = isSet && !sheet.scaleCheckedAt;
 
@@ -161,13 +162,22 @@ export function ScaleControl({
   };
 
   /**
-   * Commit the typed scale. Unreadable or unchanged input writes nothing.
+   * ── SETTING A SCALE SETS IT. Nothing else. ─────────────────────────────────
    *
-   * `thenCheck` is false on blur and true on Enter. Blur fires when the pointer
-   * goes anywhere at all, and throwing the user into a measuring overlay
-   * because they looked away would be the app grabbing the wheel.
+   * Both of these used to open the check overlay the moment a scale was saved.
+   * The intent was good and the behaviour was wrong in two ways at once
+   * (reported 2026-09-24): it answered a question nobody asked, and the panel
+   * it opened landed over the middle of the drawing — exactly where the first
+   * point of a trace has to go. Setting a scale is usually the step BEFORE
+   * doing something, so hijacking it costs a dismissal every single time.
+   *
+   * **This supersedes the "strongly recommend measuring after picking" rule**
+   * written into this file on 2026-09-21. The reasoning behind it still holds —
+   * a typed scale is only true if the print is at full size — but the way to
+   * act on it is the `not checked` chip and a link beside it. Encourage, never
+   * hijack.
    */
-  const commit = async (thenCheck: boolean) => {
+  const commit = async () => {
     const text = draft.trim();
     if (!text) {
       setDraft("");
@@ -189,22 +199,13 @@ export function ScaleControl({
     setDraft("");
     showFlash();
     setOpen(false);
-    if (thenCheck) onCheck();
   };
 
-  /**
-   * Take a scale from the list, then go straight to checking it.
-   *
-   * The check is the next thing on screen rather than a suggestion left behind
-   * in a closed popover, because the failure it catches — a set printed at
-   * half size — is invisible everywhere else. Awaited so the overlay opens
-   * against the ratio that was just saved rather than the one before it.
-   */
+  /** Take a scale from the list. Saves, closes, and stops there. */
   const pick = async (text: string) => {
     await onSet(text);
     showFlash();
     setOpen(false);
-    onCheck();
   };
 
   return (
@@ -291,9 +292,14 @@ export function ScaleControl({
                   This scale has not been checked.
                 </span>{" "}
                 A drawing printed at half size reads half length with nothing
-                looking wrong — measuring one known dimension is what catches
-                it.
+                looking wrong. Trace one dimension you know and this will say
+                whether the two agree.
               </p>
+              {/*
+                Two lines of label in a one-line button wrapped and overflowed
+                it. The instruction moved into the paragraph above, where there
+                is room for it, and the button says the action only.
+              */}
               <Button
                 size="sm"
                 className="h-7 w-full gap-1.5 text-xs"
@@ -302,8 +308,7 @@ export function ScaleControl({
                   onCheck();
                 }}
               >
-                <Ruler className="w-3 h-3" /> Check it: trace a dimension you
-                know
+                <Ruler className="w-3 h-3 shrink-0" /> Check it
               </Button>
             </div>
           )}
@@ -436,11 +441,11 @@ export function ScaleControl({
               value={draft}
               onChange={e => setDraft(e.target.value)}
               onFocus={selectOnFocus}
-              onBlur={() => void commit(false)}
+              onBlur={() => void commit()}
               onKeyDown={e => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  void commit(true);
+                  void commit();
                 }
                 if (e.key === "Escape") {
                   e.preventDefault();
@@ -453,8 +458,18 @@ export function ScaleControl({
               className="h-8 text-sm font-mono"
               aria-label={`Scale for ${sheet.name}`}
             />
+            {/*
+              These are FORMATS, not alternative scales.
+
+              It read "Also reads 1" = 20' and 1:100" under a field showing
+              1/4" = 1'-0", which lands as three different scales being offered
+              — reported 2026-09-24. Saying "any of these forms" makes it a
+              statement about notation rather than about this sheet.
+            */}
             <p className="text-[0.7rem] text-muted-foreground">
-              Also reads <span className="font-mono">1" = 20'</span> and{" "}
+              Any of these forms works:{" "}
+              <span className="font-mono">1/4&quot; = 1&apos;-0&quot;</span>,{" "}
+              <span className="font-mono">1&quot; = 20&apos;</span>,{" "}
               <span className="font-mono">1:100</span>.
             </p>
           </div>
@@ -496,6 +511,24 @@ export function ScaleControl({
           )}
         </PopoverContent>
       </Popover>
+
+      {/*
+        ── The whole nudge: a chip that says so, and one link ─────────────────
+        Outside the popover, so acting on it costs one click rather than three,
+        and outside the trigger so it does not open the popover on the way
+        past. This is what REPLACED the overlay that used to open itself the
+        moment a scale was saved — see `commit`. Encourage, never hijack.
+      */}
+      {unchecked && (
+        <button
+          type="button"
+          onClick={onCheck}
+          className="text-[0.7rem] text-[#F5C518] underline underline-offset-2 hover:text-[#F5C518]/80 shrink-0"
+          title="Measure one known dimension to confirm this scale"
+        >
+          Check it
+        </button>
+      )}
 
       {/* Labelled, so a scale the app read is never mistaken for one chosen. */}
       {isSet && sheet.scaleSource === "detected" && (

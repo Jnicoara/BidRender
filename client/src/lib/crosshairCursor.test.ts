@@ -22,13 +22,23 @@ import {
   crosshairSvg,
 } from "./crosshairCursor";
 
-/** Every painted pixel, as coordinates. */
+/**
+ * Every painted pixel, as GEOMETRIC coordinates — the centre of each pixel.
+ *
+ * ── The +0.5 is the whole correction ─────────────────────────────────────────
+ * The first version of this file measured pixel INDICES, which made a cursor
+ * that was half a pixel off report a clean, symmetric, exactly-centred pass. A
+ * CSS hotspot is a coordinate; pixel index 12 occupies 12.0 to 13.0 and its
+ * centre is 12.5. Comparing an index against a coordinate is comparing two
+ * different units, and it hid a real offset of half a CSS pixel — one whole
+ * device pixel at 2x — for three days.
+ */
 function inkPixels(): Array<{ x: number; y: number }> {
   const grid = crosshairInk();
   const out: Array<{ x: number; y: number }> = [];
   for (let y = 0; y < grid.length; y++) {
     for (let x = 0; x < grid[y].length; x++) {
-      if (grid[y][x]) out.push({ x, y });
+      if (grid[y][x]) out.push({ x: x + 0.5, y: y + 0.5 });
     }
   }
   return out;
@@ -61,10 +71,46 @@ describe("the crosshair is centred on its hotspot", () => {
     expect(meanY).toBeCloseTo(CROSSHAIR_CENTRE, 10);
   });
 
-  it("leaves the aimed-at pixel uncovered", () => {
-    // The four arms converge on a hole. Painting the centre would hide the one
-    // pixel the whole cursor exists to identify.
+  it("keeps the ARMS off the aimed-at pixel", () => {
+    // The arms stop short so they never cover the target. What sits there is
+    // the dot, which is a different thing and is asserted below.
     expect(crosshairInk()[CROSSHAIR_CENTRE][CROSSHAIR_CENTRE]).toBe(false);
+  });
+
+  it("uses an EVEN size, so the geometric centre is a whole number", () => {
+    /*
+      The correction of 2026-09-24. An odd size gives a single centre pixel,
+      whose CENTRE is at .5 — unreachable by an integer hotspot, so the cursor
+      sat half a pixel off its own click point.
+    */
+    expect(CROSSHAIR_SIZE % 2).toBe(0);
+    expect(CROSSHAIR_CENTRE).toBe(CROSSHAIR_SIZE / 2);
+  });
+
+  it("marks the exact point with a dot", () => {
+    /*
+      Added 2026-09-24. The open gap lost the spot: four arms converging on
+      emptiness makes the eye INFER a centre, and on a busy sheet the gap fills
+      with linework and the precise pixel stops being obvious.
+
+      The dot sits on the hotspot, ring first then core, so it survives white
+      paper and black line the same way the arms do.
+    */
+    const svg = crosshairSvg();
+    const circles = svg.match(/<circle[^>]*>/g) ?? [];
+    expect(circles).toHaveLength(2);
+    // On the hotspot exactly — the same coordinate, not half a pixel beside it.
+    for (const circle of circles) {
+      expect(circle).toContain(`cx="${CROSSHAIR_CENTRE}"`);
+      expect(circle).toContain(`cy="${CROSSHAIR_CENTRE}"`);
+    }
+    // Light ring under a dark core, in that order.
+    expect(circles[0]).toContain("#FFFFFF");
+    expect(circles[1]).toContain("#111827");
+    // Small. A big dot covers the thing it points at.
+    const radii = circles.map(c => Number(/r="([\d.]+)"/.exec(c)![1]));
+    expect(radii[0]).toBeLessThanOrEqual(2);
+    expect(radii[1]).toBeLessThan(radii[0]);
   });
 
   it("keeps every arm inside the image", () => {
@@ -78,11 +124,11 @@ describe("the crosshair is centred on its hotspot", () => {
     }
   });
 
-  it("uses an odd size, so a single centre pixel exists", () => {
-    // With an even size the centre falls on a seam and the hotspot has to be
-    // half a pixel out one way or the other.
-    expect(CROSSHAIR_SIZE % 2).toBe(1);
-    expect(CROSSHAIR_CENTRE).toBe((CROSSHAIR_SIZE - 1) / 2);
+  it("puts the hotspot at the image's own centre", () => {
+    // Belt and braces on the one number that cannot be allowed to drift: the
+    // hotspot has to be the middle of the picture, or the cursor and its click
+    // point are different places.
+    expect(CROSSHAIR_CENTRE).toBe(CROSSHAIR_SIZE / 2);
   });
 });
 
@@ -129,9 +175,11 @@ describe("the cursor value a browser is given", () => {
 
 describe("the crosshair reads on white paper and on black linework", () => {
   it("draws a light halo under a dark core, from one geometry", () => {
+    // Widths are 4 and 2, not 3 and 1: an even-sized image puts the centre on
+    // a pixel BOUNDARY, so a stroke has to straddle it to stay symmetric.
     const svg = crosshairSvg();
-    expect(svg).toContain('stroke="#FFFFFF" stroke-width="3"');
-    expect(svg).toContain('stroke="#111827" stroke-width="1"');
+    expect(svg).toContain('stroke="#FFFFFF" stroke-width="4"');
+    expect(svg).toContain('stroke="#111827" stroke-width="2"');
     // The halo has to come first, or it paints over the core.
     expect(svg.indexOf("#FFFFFF")).toBeLessThan(svg.indexOf("#111827"));
   });

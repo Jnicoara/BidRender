@@ -4,6 +4,24 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-24]
+
+- **Setting a scale now just sets it.** Typing or picking a scale used to open
+  the check overlay by itself, landing a panel over the middle of the drawing —
+  right where the first point usually goes. It saves and closes. The nudge is
+  the "not checked" chip and a small "Check it" link beside it, and when you do
+  ask for the check it opens down in the corner instead of over the sheet.
+
+- **The crosshair has a centre dot, and it now sits exactly on the click
+  point.** It was half a pixel up and to the left of its own target — one whole
+  pixel on a high-resolution screen — because the cursor image had no true
+  centre to put the hotspot on.
+
+- **Clearer toolbar.** "Mark" is now "Count". "No heights" now says "Drop
+  heights not set — drops not counted". The conduit and cable buttons show the
+  line each one draws — solid for conduit, dashed for cable — instead of tiny
+  pictures of a pipe and a cable that nobody could read at that size.
+
 ## [2026-09-21]
 
 - **One crosshair when tracing and measuring, and it no longer trails behind
