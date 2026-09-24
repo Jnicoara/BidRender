@@ -1126,6 +1126,39 @@ addAll(
   "Low voltage — data/TV/security"
 );
 
+// ── 3b. Round three: the BREAKER completeness check, 2026-09-24 ──────────────
+// Half-size ("peanut", 1/2 in per pole) breakers. Checked against what is
+// actually made: GE/ABB THQP is the only current line of standalone half-size
+// 1- and 2-pole breakers (THQP115–150, THQP215–250). Square D, Eaton and
+// Siemens get half-width circuits only through tandems, already listed above.
+// Common sizes only: 1-pole 15/20/30, 2-pole 15–50.
+// They sort in the TANDEM block at the top of the shelf, not beside the
+// full-size 1- and 2-pole runs: shared/materialOrder.ts puts "half-size" in the
+// same class as tandems on purpose, since both are half-width circuits.
+const HALF_1P = ["15A", "20A", "30A"];
+const HALF_2P = ["15A", "20A", "30A", "40A", "50A"];
+for (const a of HALF_1P)
+  add(`${a} 1-Pole half-size breaker`, "Breakers", E, true, "Breaker check");
+for (const a of HALF_2P)
+  add(`${a} 2-Pole half-size breaker`, "Breakers", E, true, "Breaker check");
+// The 3-pole run skipped the odd sizes a rooftop unit or a 3-phase motor
+// nameplate actually calls for.
+for (const a of ["15A", "25A", "35A", "45A", "80A", "90A"])
+  add(`${a} 3-Pole breaker`, "Breakers", E, true, "Breaker check");
+addAll(
+  [
+    // A dwelling service needs an SPD (NEC 230.67); the plug-on kind is the
+    // one most residential jobs use, and it takes two spaces like a breaker.
+    "Plug-on surge protective device",
+    // Required on any back-fed breaker (NEC 408.36(D)) — every generator
+    // interlock job and most solar tie-ins.
+    "Breaker hold-down kit",
+  ],
+  "Breakers",
+  E,
+  "Breaker check"
+);
+
 const genericCount = rows.length;
 
 // ── 4. Brand variants for panels and breakers only (CLAUDE.md § Brands) ─────
@@ -1274,6 +1307,80 @@ for (const L of LINES) {
   }
 }
 
+// ── 4b. Breaker completeness check, 2026-09-24 ──────────────────────────────
+// Kept out of the LINES loop because each block below is true of SOME lines
+// only, and the loop's flags would have to grow one per block to say which.
+const tagOf = (brand: string, line: string) =>
+  line === brand ? brand : `${brand} ${line}`;
+// Half-size: THQP only (see § 3b for why no other line gets any).
+for (const a of HALF_1P)
+  addBrand(
+    `ABB THQP ${a} 1-Pole half-size breaker`,
+    "Breakers",
+    `${a} 1-Pole half-size breaker`,
+    "ABB"
+  );
+for (const a of HALF_2P)
+  addBrand(
+    `ABB THQP ${a} 2-Pole half-size breaker`,
+    "Breakers",
+    `${a} 2-Pole half-size breaker`,
+    "ABB"
+  );
+// The plug-on residential lines. Leviton and the bolt-on lines are left out of
+// these blocks on purpose: they were not confirmed to make these ratings.
+const PLUG_ON: [string, string][] = [
+  ["Square D", "Homeline"],
+  ["Square D", "QO"],
+  ["Eaton", "BR"],
+  ["Eaton", "CH"],
+  ["Siemens", "Siemens"],
+  ["ABB", "ABB"],
+];
+for (const [brand, line] of PLUG_ON) {
+  const tag = tagOf(brand, line);
+  // 25/35/45A two-pole: the sizes an A/C condenser's max-OCPD asks for.
+  for (const a of ["25A", "35A", "45A"])
+    addBrand(
+      `${tag} ${a} 2-Pole breaker`,
+      "Breakers",
+      `${a} 2-Pole breaker`,
+      brand
+    );
+  // 60A two-pole GFCI: the hot tub breaker.
+  addBrand(
+    `${tag} 60A 2-Pole GFCI breaker`,
+    "Breakers",
+    "60A 2-Pole GFCI breaker",
+    brand
+  );
+  addBrand(
+    `${tag} plug-on surge protective device`,
+    "Breakers",
+    "Plug-on surge protective device",
+    brand
+  );
+}
+// Three-pole: the commercial lines, plug-on and bolt-on. Homeline, BR, the
+// ABB plug-on line and Leviton are residential single-phase in practice.
+const THREE_POLE: [string, string][] = [
+  ["Square D", "QO"],
+  ["Square D", "QOB"],
+  ["Eaton", "CH"],
+  ["Eaton", "BAB"],
+  ["Siemens", "Siemens"],
+  ["Siemens", "BQD"],
+  ["ABB", "THQB"],
+];
+for (const [brand, line] of THREE_POLE)
+  for (const a of ["20A", "30A", "40A", "50A", "60A", "100A"])
+    addBrand(
+      `${tagOf(brand, line)} ${a} 3-Pole breaker`,
+      "Breakers",
+      `${a} 3-Pole breaker`,
+      brand
+    );
+
 // ── 5. Size column, then sort by category and physical size ─────────────────
 const SIZE_RX =
   /(#\d+|\d+\/0|\d+\s*kcmil|\d+(?:-\d+\/\d+)?(?:\s*\d+\/\d+)?\s*(?:"|in\b|ft\b)|\d+\/\d+\s*(?:"|in\b)|\d+A\b|\d+\s*kVA|\d+-space|\d+x\d+|\d+\s*CFM)/i;
@@ -1338,6 +1445,40 @@ fs.writeFileSync(
   path.join(HERE, "rows.json"),
   JSON.stringify({ generic, branded }, null, 0)
 );
+
+/*
+  One plain-text file per category, generic rows only, for pasting into another
+  AI tool to spot gaps. No brand variants and no prices, on purpose: the
+  question is "what is missing", and both would only be noise for it. The
+  folder is rewritten whole so a category that disappears leaves no stale file.
+*/
+const REVIEW_DIR = path.join(HERE, "ai-review");
+fs.rmSync(REVIEW_DIR, { recursive: true, force: true });
+fs.mkdirSync(REVIEW_DIR);
+const byCategory = new Map<string, Row[]>();
+for (const r of generic) {
+  const list = byCategory.get(r.category) ?? [];
+  list.push(r);
+  byCategory.set(r.category, list);
+}
+for (const [cat, list] of byCategory) {
+  const slug = cat
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  const lines = [
+    `Category: ${cat}`,
+    `Items: ${list.length}`,
+    "",
+    "Category | Name | Size",
+    ...list.map(r => `${cat} | ${r.name} | ${r.size || "-"}`),
+  ];
+  fs.writeFileSync(
+    path.join(REVIEW_DIR, `${slug}.txt`),
+    lines.join("\n") + "\n"
+  );
+}
 
 // ── 6. Report ───────────────────────────────────────────────────────────────
 const NEW_CATEGORIES = CATEGORY_ORDER.filter(

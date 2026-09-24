@@ -1,0 +1,28 @@
+Category: Life Safety
+Items: 24
+
+Category | Name | Size
+Life Safety | Addressable module | -
+Life Safety | Beam detector | -
+Life Safety | Detector mounting bracket | -
+Life Safety | Detector relay module | -
+Life Safety | Dual-action pull station | -
+Life Safety | Duct smoke detector | -
+Life Safety | Emergency exit light combo | -
+Life Safety | End-of-line resistor | -
+Life Safety | Fire alarm battery | -
+Life Safety | Fire alarm control panel | -
+Life Safety | Fire alarm horn/strobe | -
+Life Safety | Fire alarm knox box | -
+Life Safety | Fire alarm pull station | -
+Life Safety | Fire alarm relay module | -
+Life Safety | Fire alarm remote annunciator | -
+Life Safety | Fire alarm speaker/strobe | -
+Life Safety | Fire alarm strobe | -
+Life Safety | Hardwired CO detector | -
+Life Safety | Hardwired smoke detector | -
+Life Safety | Hardwired smoke detector, 10-year | -
+Life Safety | Hardwired smoke/CO detector | -
+Life Safety | Heat detector | -
+Life Safety | Smoke detector base | -
+Life Safety | Smoke detector interconnect harness | -

@@ -1,0 +1,17 @@
+Category: Underground
+Items: 13
+
+Category | Name | Size
+Underground | Conduit spacer, 2 in | 2 in
+Underground | Conduit spacer, 4 in | 4 in
+Underground | Direct burial wire nut | -
+Underground | Duct bank spacer | -
+Underground | Mule tape, 1800 lb | -
+Underground | Pull rope, 1/4 in | 1/4 in
+Underground | PVC sweep, 2" 36 in radius | 2"
+Underground | PVC sweep, 3" 36 in radius | 3"
+Underground | PVC sweep, 4" 36 in radius | 4"
+Underground | Tracer wire | -
+Underground | Tracer wire access box | -
+Underground | Trench marker post | -
+Underground | Underground warning tape | -

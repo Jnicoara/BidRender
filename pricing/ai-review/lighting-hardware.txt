@@ -1,0 +1,173 @@
+Category: Lighting Hardware
+Items: 169
+
+Category | Name | Size
+Lighting Hardware | 5"/6" wafer LED downlight | 5"
+Lighting Hardware | 1x4 LED troffer | 1x4
+Lighting Hardware | 2x2 LED troffer | 2x2
+Lighting Hardware | 2x4 LED troffer | 2x4
+Lighting Hardware | 3" adjustable trim | 3"
+Lighting Hardware | 4" adjustable trim | 4"
+Lighting Hardware | 5" adjustable trim | 5"
+Lighting Hardware | 6" adjustable trim | 6"
+Lighting Hardware | 3" baffle trim | 3"
+Lighting Hardware | 4" baffle trim | 4"
+Lighting Hardware | 5" baffle trim | 5"
+Lighting Hardware | 6" baffle trim | 6"
+Lighting Hardware | Bollard light | -
+Lighting Hardware | 2" canless LED downlight | 2"
+Lighting Hardware | 3" canless LED downlight | 3"
+Lighting Hardware | 4" canless LED downlight | 4"
+Lighting Hardware | 5" canless LED downlight | 5"
+Lighting Hardware | 6" canless LED downlight | 6"
+Lighting Hardware | 8" canless LED downlight | 8"
+Lighting Hardware | Ceiling fan | -
+Lighting Hardware | Chandelier | -
+Lighting Hardware | Daylight sensor | -
+Lighting Hardware | Direct burial splice kit | -
+Lighting Hardware | Drum ceiling fixture | -
+Lighting Hardware | Emergency battery backup pack | -
+Lighting Hardware | Emergency light | -
+Lighting Hardware | Exit sign | -
+Lighting Hardware | Exit sign, double face | -
+Lighting Hardware | Exit sign, remote head | -
+Lighting Hardware | 3" eyeball trim | 3"
+Lighting Hardware | 4" eyeball trim | 4"
+Lighting Hardware | 5" eyeball trim | 5"
+Lighting Hardware | 6" eyeball trim | 6"
+Lighting Hardware | Fixture mounting bracket | -
+Lighting Hardware | Fixture whip, 4 ft | 4 ft
+Lighting Hardware | Fixture whip, 8 ft | 8 ft
+Lighting Hardware | Flood light | -
+Lighting Hardware | Flood light, adjustable knuckle | -
+Lighting Hardware | Flush mount ceiling fixture | -
+Lighting Hardware | 3" gimbal trim | 3"
+Lighting Hardware | 4" gimbal trim | 4"
+Lighting Hardware | 5" gimbal trim | 5"
+Lighting Hardware | 6" gimbal trim | 6"
+Lighting Hardware | High bay | -
+Lighting Hardware | In-grade uplight | -
+Lighting Hardware | In-ground junction box | -
+Lighting Hardware | Landscape hub connector | -
+Lighting Hardware | Landscape light stake | -
+Lighting Hardware | LED area light | -
+Lighting Hardware | LED canopy light | -
+Lighting Hardware | LED cylinder downlight | -
+Lighting Hardware | 4" LED disc light | 4"
+Lighting Hardware | 5" LED disc light | 5"
+Lighting Hardware | 6" LED disc light | 6"
+Lighting Hardware | 7" LED disc light | 7"
+Lighting Hardware | 4" LED disc light, CCT selectable | 4"
+Lighting Hardware | 5" LED disc light, CCT selectable | 5"
+Lighting Hardware | 6" LED disc light, CCT selectable | 6"
+Lighting Hardware | 7" LED disc light, CCT selectable | 7"
+Lighting Hardware | LED linear high bay | -
+Lighting Hardware | LED mirror light | -
+Lighting Hardware | LED pendant fixture | -
+Lighting Hardware | LED retrofit kit | -
+Lighting Hardware | LED round high bay | -
+Lighting Hardware | LED step light | -
+Lighting Hardware | 2 ft LED strip fixture | 2 ft
+Lighting Hardware | 4 ft LED strip fixture | 4 ft
+Lighting Hardware | 8 ft LED strip fixture | 8 ft
+Lighting Hardware | LED tape light | -
+Lighting Hardware | LED tape light power supply | -
+Lighting Hardware | LED wall sconce | -
+Lighting Hardware | 4 ft LED wraparound | 4 ft
+Lighting Hardware | 8 ft LED wraparound | 8 ft
+Lighting Hardware | 12 ft light pole | 12 ft
+Lighting Hardware | 20 ft light pole | 20 ft
+Lighting Hardware | 30 ft light pole | 30 ft
+Lighting Hardware | 4 ft lighting track | 4 ft
+Lighting Hardware | 6 ft lighting track | 6 ft
+Lighting Hardware | 8 ft lighting track | 8 ft
+Lighting Hardware | 6ft MC whip | 6ft
+Lighting Hardware | Occupancy sensor, ceiling mount | -
+Lighting Hardware | Occupancy sensor, high bay | -
+Lighting Hardware | 3" open trim | 3"
+Lighting Hardware | 4" open trim | 4"
+Lighting Hardware | 5" open trim | 5"
+Lighting Hardware | 6" open trim | 6"
+Lighting Hardware | Path light fixture | -
+Lighting Hardware | Photocell for wall pack | -
+Lighting Hardware | Photocell, stem mount | -
+Lighting Hardware | Pole anchor bolt kit | -
+Lighting Hardware | Pole base cover | -
+Lighting Hardware | Pole base grout | -
+Lighting Hardware | Pole handhole cover | -
+Lighting Hardware | Pole mounting arm | -
+Lighting Hardware | Pole wire harness | -
+Lighting Hardware | Recessed can conversion kit | -
+Lighting Hardware | 3" recessed can, airtight shallow | 3"
+Lighting Hardware | 4" recessed can, airtight shallow | 4"
+Lighting Hardware | 5" recessed can, airtight shallow | 5"
+Lighting Hardware | 6" recessed can, airtight shallow | 6"
+Lighting Hardware | 3" recessed can, new construction IC | 3"
+Lighting Hardware | 4" recessed can, new construction IC | 4"
+Lighting Hardware | 5" recessed can, new construction IC | 5"
+Lighting Hardware | 6" recessed can, new construction IC | 6"
+Lighting Hardware | 3" recessed can, new construction non-IC | 3"
+Lighting Hardware | 4" recessed can, new construction non-IC | 4"
+Lighting Hardware | 5" recessed can, new construction non-IC | 5"
+Lighting Hardware | 6" recessed can, new construction non-IC | 6"
+Lighting Hardware | 3" recessed can, remodel IC | 3"
+Lighting Hardware | 4" recessed can, remodel IC | 4"
+Lighting Hardware | 5" recessed can, remodel IC | 5"
+Lighting Hardware | 6" recessed can, remodel IC | 6"
+Lighting Hardware | 3" recessed can, remodel non-IC | 3"
+Lighting Hardware | 4" recessed can, remodel non-IC | 4"
+Lighting Hardware | 5" recessed can, remodel non-IC | 5"
+Lighting Hardware | 6" recessed can, remodel non-IC | 6"
+Lighting Hardware | 3" recessed can, sloped ceiling | 3"
+Lighting Hardware | 4" recessed can, sloped ceiling | 4"
+Lighting Hardware | 5" recessed can, sloped ceiling | 5"
+Lighting Hardware | 6" recessed can, sloped ceiling | 6"
+Lighting Hardware | 3" reflector trim | 3"
+Lighting Hardware | 4" reflector trim | 4"
+Lighting Hardware | 5" reflector trim | 5"
+Lighting Hardware | 6" reflector trim | 6"
+Lighting Hardware | Semi-flush ceiling fixture | -
+Lighting Hardware | 3" shower wet-rated trim | 3"
+Lighting Hardware | 4" shower wet-rated trim | 4"
+Lighting Hardware | 5" shower wet-rated trim | 5"
+Lighting Hardware | 6" shower wet-rated trim | 6"
+Lighting Hardware | Surface-mount ceiling fixture | -
+Lighting Hardware | Tape light channel | -
+Lighting Hardware | Tenon adapter | -
+Lighting Hardware | Track light connector | -
+Lighting Hardware | Track light end feed | -
+Lighting Hardware | Track light head | -
+Lighting Hardware | 12" under-cabinet light bar | 12"
+Lighting Hardware | 18" under-cabinet light bar | 18"
+Lighting Hardware | 24" under-cabinet light bar | 24"
+Lighting Hardware | 36" under-cabinet light bar | 36"
+Lighting Hardware | Vanity light bar | -
+Lighting Hardware | 4 ft vapor tight fixture | 4 ft
+Lighting Hardware | 8 ft vapor tight fixture | 8 ft
+Lighting Hardware | 4" wafer LED downlight | 4"
+Lighting Hardware | 2" wafer LED downlight, CCT selectable | 2"
+Lighting Hardware | 3" wafer LED downlight, CCT selectable | 3"
+Lighting Hardware | 4" wafer LED downlight, CCT selectable | 4"
+Lighting Hardware | 5" wafer LED downlight, CCT selectable | 5"
+Lighting Hardware | 6" wafer LED downlight, CCT selectable | 6"
+Lighting Hardware | 8" wafer LED downlight, CCT selectable | 8"
+Lighting Hardware | 2" wafer LED downlight, gimbal | 2"
+Lighting Hardware | 3" wafer LED downlight, gimbal | 3"
+Lighting Hardware | 4" wafer LED downlight, gimbal | 4"
+Lighting Hardware | 5" wafer LED downlight, gimbal | 5"
+Lighting Hardware | 6" wafer LED downlight, gimbal | 6"
+Lighting Hardware | 8" wafer LED downlight, gimbal | 8"
+Lighting Hardware | 2" wafer LED downlight, slim | 2"
+Lighting Hardware | 3" wafer LED downlight, slim | 3"
+Lighting Hardware | 4" wafer LED downlight, slim | 4"
+Lighting Hardware | 5" wafer LED downlight, slim | 5"
+Lighting Hardware | 6" wafer LED downlight, slim | 6"
+Lighting Hardware | 8" wafer LED downlight, slim | 8"
+Lighting Hardware | 2" wafer LED downlight, wet rated | 2"
+Lighting Hardware | 3" wafer LED downlight, wet rated | 3"
+Lighting Hardware | 4" wafer LED downlight, wet rated | 4"
+Lighting Hardware | 5" wafer LED downlight, wet rated | 5"
+Lighting Hardware | 6" wafer LED downlight, wet rated | 6"
+Lighting Hardware | 8" wafer LED downlight, wet rated | 8"
+Lighting Hardware | Wall pack | -
+Lighting Hardware | Well light fixture | -

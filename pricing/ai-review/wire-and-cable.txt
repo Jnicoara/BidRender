@@ -1,0 +1,125 @@
+Category: Wire & Cable
+Items: 121
+
+Category | Name | Size
+Wire & Cable | 10/2 MC cable | -
+Wire & Cable | 10/2 UF-B | -
+Wire & Cable | 10/3 MC cable | -
+Wire & Cable | 10/3 NM-B | -
+Wire & Cable | 12/2 UF-B | -
+Wire & Cable | 12/3 MC cable | -
+Wire & Cable | 12/3 NM-B | -
+Wire & Cable | 14/2 UF-B | -
+Wire & Cable | 14/3 NM-B | -
+Wire & Cable | 6/3 NM-B | -
+Wire & Cable | 8/3 MC cable | -
+Wire & Cable | 8/3 NM-B | -
+Wire & Cable | Aluminum SER, 4/0 | 4/0
+Wire & Cable | Aluminum URD, 1/0 | 1/0
+Wire & Cable | Bare copper, #2 | #2
+Wire & Cable | Bare copper, #4 | #4
+Wire & Cable | Bare copper, 1/0 | 1/0
+Wire & Cable | #14 bare copper, solid | #14
+Wire & Cable | #12 bare copper, solid | #12
+Wire & Cable | #10 bare copper, solid | #10
+Wire & Cable | #8 bare copper, solid | #8
+Wire & Cable | #10 bare copper, stranded | #10
+Wire & Cable | #8 bare copper, stranded | #8
+Wire & Cable | #6 bare copper, stranded | #6
+Wire & Cable | #4 bare copper, stranded | #4
+Wire & Cable | #2 bare copper, stranded | #2
+Wire & Cable | #1/0 bare copper, stranded | #1
+Wire & Cable | #2/0 bare copper, stranded | #2
+Wire & Cable | Fire alarm cable, 14/2 | -
+Wire & Cable | Fire alarm cable, 16/2 | -
+Wire & Cable | #18 fixture wire | #18
+Wire & Cable | #16 fixture wire | #16
+Wire & Cable | 14-2 MC cable | -
+Wire & Cable | 14-3 MC cable | -
+Wire & Cable | 12-2 MC cable | -
+Wire & Cable | 12-3 MC cable | -
+Wire & Cable | 10-2 MC cable | -
+Wire & Cable | 10-3 MC cable | -
+Wire & Cable | 10-4 MC cable | -
+Wire & Cable | 8-2 MC cable | -
+Wire & Cable | 8-3 MC cable | -
+Wire & Cable | 8-4 MC cable | -
+Wire & Cable | 6-2 MC cable | -
+Wire & Cable | 6-3 MC cable | -
+Wire & Cable | 6-4 MC cable | -
+Wire & Cable | 4-2 MC cable | -
+Wire & Cable | 4-3 MC cable | -
+Wire & Cable | 3-3 MC cable | -
+Wire & Cable | 3-4 MC cable | -
+Wire & Cable | 2-2 MC cable | -
+Wire & Cable | 2-3 MC cable | -
+Wire & Cable | 14-2 NM-B | -
+Wire & Cable | 14-3 NM-B | -
+Wire & Cable | 12-2 NM-B | -
+Wire & Cable | 12-3 NM-B | -
+Wire & Cable | 10-2 NM-B | -
+Wire & Cable | 10-3 NM-B | -
+Wire & Cable | 8-2 NM-B | -
+Wire & Cable | 8-3 NM-B | -
+Wire & Cable | 6-3 NM-B | -
+Wire & Cable | 1/0-3 SER aluminum | 1/0
+Wire & Cable | 2/0-3 SER aluminum | 2/0
+Wire & Cable | 3/0-3 SER aluminum | 3/0
+Wire & Cable | 4/0-3 SER aluminum | 4/0
+Wire & Cable | 4/0-4/0-2/0 SER aluminum | 4/0
+Wire & Cable | 4/0-4/0-4/0-2/0 SER aluminum | 4/0
+Wire & Cable | 250-250-250 SER aluminum | -
+Wire & Cable | SER cable, 1/0-1/0-1/0-2 | 1/0
+Wire & Cable | SER cable, 2-2-2-4 | -
+Wire & Cable | SER cable, 4-4-4-6 | -
+Wire & Cable | 8-3 SER copper | -
+Wire & Cable | 6-3 SER copper | -
+Wire & Cable | 4-3 SER copper | -
+Wire & Cable | 2-3 SER copper | -
+Wire & Cable | 1-3 SER copper | -
+Wire & Cable | SEU cable, 2-2-4 | -
+Wire & Cable | SEU cable, 4-4-6 | -
+Wire & Cable | SJOOW cord, 14/3 | -
+Wire & Cable | SOOW cord, 10/3 | -
+Wire & Cable | SOOW cord, 12/3 | -
+Wire & Cable | #14 THHN | #14
+Wire & Cable | #12 THHN | #12
+Wire & Cable | #10 THHN | #10
+Wire & Cable | #8 THHN | #8
+Wire & Cable | #6 THHN | #6
+Wire & Cable | #4 THHN | #4
+Wire & Cable | #3 THHN | #3
+Wire & Cable | #2 THHN | #2
+Wire & Cable | #1 THHN | #1
+Wire & Cable | #1/0 THHN | #1
+Wire & Cable | #2/0 THHN | #2
+Wire & Cable | #3/0 THHN | #3
+Wire & Cable | #4/0 THHN | #4
+Wire & Cable | 250 kcmil THHN | 250 kcmil
+Wire & Cable | 300 kcmil THHN | 300 kcmil
+Wire & Cable | 350 kcmil THHN | 350 kcmil
+Wire & Cable | 400 kcmil THHN | 400 kcmil
+Wire & Cable | 500 kcmil THHN | 500 kcmil
+Wire & Cable | #10 THHN stranded | #10
+Wire & Cable | Tray cable, 12/3 | -
+Wire & Cable | 12-2 UF-B | -
+Wire & Cable | 10-2 UF-B | -
+Wire & Cable | 8-2 UF-B | -
+Wire & Cable | USE-2, 4/0 | 4/0
+Wire & Cable | #8 XHHW aluminum | #8
+Wire & Cable | #6 XHHW aluminum | #6
+Wire & Cable | #4 XHHW aluminum | #4
+Wire & Cable | #2 XHHW aluminum | #2
+Wire & Cable | #1 XHHW aluminum | #1
+Wire & Cable | #1/0 XHHW aluminum | #1
+Wire & Cable | #2/0 XHHW aluminum | #2
+Wire & Cable | #3/0 XHHW aluminum | #3
+Wire & Cable | #4/0 XHHW aluminum | #4
+Wire & Cable | 250 kcmil XHHW aluminum | 250 kcmil
+Wire & Cable | 300 kcmil XHHW aluminum | 300 kcmil
+Wire & Cable | 350 kcmil XHHW aluminum | 350 kcmil
+Wire & Cable | 400 kcmil XHHW aluminum | 400 kcmil
+Wire & Cable | 500 kcmil XHHW aluminum | 500 kcmil
+Wire & Cable | XHHW-2, #2 | #2
+Wire & Cable | XHHW-2, 1/0 | 1/0
+Wire & Cable | XHHW-2, 4/0 | 4/0

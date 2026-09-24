@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-24]
 
+- **The pricing sheet now covers the breakers an electrician actually buys.**
+  Added half-size ("peanut") breakers — only GE/ABB THQP makes standalone ones
+  today, so only that line gets brand rows — plus the odd 3-pole sizes, 25/35/45
+  amp 2-pole for A/C condensers, the 60 amp spa GFCI, plug-on surge protectors,
+  hold-down kits, and brand rows for 3-pole commercial breakers. 16 generic and
+  80 brand rows, all unpriced. The sheet also now writes one plain list per
+  category to `pricing/ai-review/`, for asking another AI tool what is missing.
+
 - **A bid you have sent can now be locked, so its quantities stop following the
   drawing.** Until today, a line that came from your plans counted your marks
   for ever — right while you are building a bid, and wrong the day after you

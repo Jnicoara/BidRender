@@ -1,0 +1,43 @@
+Category: Switches
+Items: 39
+
+Category | Name | Size
+Switches | 0-10V dimmer | -
+Switches | 3-way dimmer | -
+Switches | 20A 3-way switch | 20A
+Switches | 3-way switch | -
+Switches | 20A 4-way switch | 20A
+Switches | 4-way switch | -
+Switches | Astronomic time switch | -
+Switches | Ceiling occupancy sensor, dual-tech | -
+Switches | Ceiling occupancy sensor, PIR | -
+Switches | Combination fan/light control | -
+Switches | Digital in-wall timer | -
+Switches | Dimmer | -
+Switches | Door jamb switch | -
+Switches | Double switch | -
+Switches | 30A double-pole switch | 30A
+Switches | Dual-tech occupancy sensor switch | -
+Switches | ELV dimmer | -
+Switches | Fan speed control | -
+Switches | Illuminated switch | -
+Switches | Key switch | -
+Switches | Low-voltage momentary switch | -
+Switches | MLV dimmer | -
+Switches | Momentary contact switch | -
+Switches | Motor-rated toggle switch | -
+Switches | Occupancy sensor switch | -
+Switches | Photocell | -
+Switches | Pilot-light switch | -
+Switches | Rotary dimmer | -
+Switches | 20A single-pole switch | 20A
+Switches | Single-pole switch | -
+Switches | Slide dimmer | -
+Switches | Smart dimmer | -
+Switches | Smart switch | -
+Switches | Spring-wound timer switch | -
+Switches | Timer switch | -
+Switches | Triple switch | -
+Switches | Vacancy sensor switch | -
+Switches | Wall-mount vacancy sensor | -
+Switches | Weatherproof toggle switch | -

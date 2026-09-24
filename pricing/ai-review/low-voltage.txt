@@ -1,0 +1,73 @@
+Category: Low Voltage
+Items: 69
+
+Category | Name | Size
+Low Voltage | 14/2 speaker wire | -
+Low Voltage | 150W landscape transformer | -
+Low Voltage | 16/2 speaker wire | -
+Low Voltage | 18/2 control wire | -
+Low Voltage | 18/2 thermostat wire | -
+Low Voltage | 18/4 control wire | -
+Low Voltage | 18/5 thermostat wire | -
+Low Voltage | 18/8 thermostat wire | -
+Low Voltage | 22/2 security cable | -
+Low Voltage | 22/4 security cable | -
+Low Voltage | 300W landscape transformer | -
+Low Voltage | 600W landscape transformer | -
+Low Voltage | Cable tester | -
+Low Voltage | Cat5e cable | -
+Low Voltage | Cat5e jack | -
+Low Voltage | Cat5e patch panel | -
+Low Voltage | Cat6 cable | -
+Low Voltage | Cat6 jack | -
+Low Voltage | Cat6 patch cord, 3 ft | 3 ft
+Low Voltage | Cat6 patch cord, 7 ft | 7 ft
+Low Voltage | Cat6 patch panel | -
+Low Voltage | Cat6 shielded cable | -
+Low Voltage | Cat6A cable | 6A
+Low Voltage | Cat6A jack | 6A
+Low Voltage | Chime extender kit | -
+Low Voltage | Coax amplifier | -
+Low Voltage | Coax F connector | -
+Low Voltage | Coax ground block | -
+Low Voltage | Coax splitter | -
+Low Voltage | Coax wall plate | -
+Low Voltage | D-ring cable guide | -
+Low Voltage | Doorbell button | -
+Low Voltage | Doorbell chime, wired | -
+Low Voltage | Doorbell chime, wireless | -
+Low Voltage | Doorbell diode | -
+Low Voltage | Doorbell wire | -
+Low Voltage | Fiber optic cable | -
+Low Voltage | Fiber patch panel | -
+Low Voltage | HDMI wall plate | -
+Low Voltage | Horizontal cable manager | -
+Low Voltage | In-ceiling speaker | -
+Low Voltage | Keypad mounting plate | -
+Low Voltage | Keystone wall plate, 1-port | -
+Low Voltage | Keystone wall plate, 2-port | -
+Low Voltage | Keystone wall plate, 4-port | -
+Low Voltage | Keystone wall plate, 6-port | -
+Low Voltage | Landscape light fixture | -
+Low Voltage | Landscape lighting cable | -
+Low Voltage | Lighted doorbell button | -
+Low Voltage | Low-voltage mounting bracket | -
+Low Voltage | Network rack, wall mount | -
+Low Voltage | NVR enclosure | -
+Low Voltage | Patch panel blank | -
+Low Voltage | Rack shelf | -
+Low Voltage | RG11 coax cable | -
+Low Voltage | RG6 coax cable | -
+Low Voltage | Security camera cable | -
+Low Voltage | Security camera, bullet | -
+Low Voltage | Security camera, dome | -
+Low Voltage | Speaker wall plate | -
+Low Voltage | Structured media enclosure | -
+Low Voltage | Thermostat wall plate | -
+Low Voltage | Velcro cable strap | -
+Low Voltage | Vertical cable manager | -
+Low Voltage | Video doorbell | -
+Low Voltage | Video doorbell chime kit | -
+Low Voltage | Video doorbell transformer | -
+Low Voltage | Volume control | -
+Low Voltage | Wire mold for low voltage | -

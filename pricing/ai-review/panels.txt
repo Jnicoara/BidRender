@@ -1,0 +1,75 @@
+Category: Panels
+Items: 71
+
+Category | Name | Size
+Panels | 60A 12-space main breaker panel | 60A
+Panels | 100A 12-space main breaker panel | 100A
+Panels | 60A 12-space main lug panel | 60A
+Panels | 100A 12-space main lug panel | 100A
+Panels | 100A 20-space main breaker panel | 100A
+Panels | 125A 20-space main breaker panel | 125A
+Panels | 100A 20-space main lug panel | 100A
+Panels | 125A 20-space main lug panel | 125A
+Panels | 100A 24-space main breaker panel | 100A
+Panels | 125A 24-space main breaker panel | 125A
+Panels | 100A 24-space main lug panel | 100A
+Panels | 125A 24-space main lug panel | 125A
+Panels | 125A 30-space main breaker panel | 125A
+Panels | 150A 30-space main breaker panel | 150A
+Panels | 200A 30-space main breaker panel | 200A
+Panels | 125A 30-space main lug panel | 125A
+Panels | 150A 30-space main lug panel | 150A
+Panels | 200A 30-space main lug panel | 200A
+Panels | 150A 40-space main breaker panel | 150A
+Panels | 200A 40-space main breaker panel | 200A
+Panels | 150A 40-space main lug panel | 150A
+Panels | 200A 40-space main lug panel | 200A
+Panels | 200A 42-space main breaker panel | 200A
+Panels | 225A 42-space main breaker panel | 225A
+Panels | 400A 42-space main breaker panel | 400A
+Panels | 200A 42-space main lug panel | 200A
+Panels | 225A 42-space main lug panel | 225A
+Panels | 400A 42-space main lug panel | 400A
+Panels | 60A 8-space main breaker panel | 60A
+Panels | 60A 8-space main lug panel | 60A
+Panels | 30A cartridge fuse | 30A
+Panels | 60A cartridge fuse | 60A
+Panels | 100A cartridge fuse | 100A
+Panels | 200A cartridge fuse | 200A
+Panels | 400A cartridge fuse | 400A
+Panels | 600A cartridge fuse | 600A
+Panels | Combination meter-main panel | -
+Panels | Feed-through lug kit | -
+Panels | 30A fused disconnect | 30A
+Panels | 60A fused disconnect | 60A
+Panels | 100A fused disconnect | 100A
+Panels | 200A fused disconnect | 200A
+Panels | Generator ready load center | -
+Panels | 100A main panel | 100A
+Panels | 125A main panel | 125A
+Panels | 150A main panel | 150A
+Panels | 200A main panel | 200A
+Panels | 400A main panel | 400A
+Panels | 100A main-lug sub-panel | 100A
+Panels | 125A main-lug sub-panel | 125A
+Panels | 150A main-lug sub-panel | 150A
+Panels | 200A main-lug sub-panel | 200A
+Panels | 400A main-lug sub-panel | 400A
+Panels | 100A meter base | 100A
+Panels | 200A meter base | 200A
+Panels | 400A meter base | 400A
+Panels | 30A non-fused disconnect | 30A
+Panels | 60A non-fused disconnect | 60A
+Panels | 100A non-fused disconnect | 100A
+Panels | 200A non-fused disconnect | 200A
+Panels | 100A outdoor main breaker panel | 100A
+Panels | 200A outdoor main breaker panel | 200A
+Panels | Panel cover, flush | -
+Panels | Panel cover, surface | -
+Panels | Panel ground bar | -
+Panels | Panel neutral bar | -
+Panels | Panel trim ring | -
+Panels | Panelboard interior only | -
+Panels | 50A spa disconnect | 50A
+Panels | 60A spa disconnect | 60A
+Panels | Sub-feed breaker kit | -
