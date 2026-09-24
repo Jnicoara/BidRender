@@ -496,9 +496,33 @@ export function calculateLineItem(input: LineItemInput): LineItemBreakdown {
       `laborRate cannot be negative, received: ${input.laborRate}`
     );
 
-  // Per-unit material rounds first, so a single unit's price is what the user
-  // sees on the recipe, then scales cleanly by quantity.
-  const materialCents = materialCostCents(input.materials) * quantity;
+  /*
+    Per-unit material rounds first, so a single unit's price is what the user
+    sees on the recipe, then scales by quantity — AND ROUNDS AGAIN, because a
+    line is a money amount somebody reads.
+
+    ── The penny this closes, found on a real bid 2026-09-24 ─────────────────
+    It used to stop at the multiplication, so a line could hold $40.0032 while
+    showing $40.00. Nothing was wrong with that number in isolation. What was
+    wrong is that the bid then added it up TWICE, two different ways:
+
+      Materials     summed the raw line values          -> $192.2376 -> $192.24
+      Direct cost   summed each line ROUNDED, in cents  -> $192.23
+
+    A cent, on a screen where the parts are shown above the whole, so the only
+    thing a reader can conclude is that the app cannot add. The rounding is
+    done once, here, at the line — which is the level the number is displayed
+    and billed at — so every total downstream is a sum of the same integers
+    and `materials + labor === direct cost` exactly. See `sumLineCosts`.
+
+    Rounding at the LINE rather than at each total is what makes that true for
+    any set of lines: rounding two components separately and adding them can
+    still miss the rounded sum by a cent (10.004 + 10.004 is 20.00 either side
+    but 20.008 rounds to 20.01), and no amount of care at the total fixes it.
+  */
+  const materialCents = roundToInt(
+    materialCostCents(input.materials) * quantity
+  );
 
   // Step one, before anything multiplies: the assembly's own overhead hours
   // join its material-driven hours. See addAssemblyOverheadHours — this is
@@ -545,9 +569,42 @@ export function calculateLineItem(input: LineItemInput): LineItemBreakdown {
 
 /** Roll several line items into one direct cost. Sums in cents — no drift. */
 export function sumDirectCost(lines: LineItemBreakdown[]): number {
-  return fromCents(
-    lines.reduce((cents, line) => cents + toCents(line.directCost), 0)
-  );
+  return sumLineCosts(lines).directCost;
+}
+
+/**
+ * THE THREE TOTALS, ADDED UP ONE WAY, so the parts equal the whole.
+ *
+ * ── Why this is one function and not three reduces ─────────────────────────
+ * The bid screen shows Materials and Labor above Direct cost, so a reader can
+ * check the app's arithmetic at a glance — and on 2026-09-24 they could, and
+ * it was out by a cent. `sumDirectCost` summed each line in integer cents
+ * while the two components above it were plain float reduces over unrounded
+ * line values, so the parts and the whole were computed by two different
+ * rules and disagreed whenever a line landed on a fraction of a cent.
+ *
+ * Every line's material and labor are now whole cents at the line
+ * (`calculateLineItem`), so all three of these are sums of the same integers
+ * and `materialCost + laborCost === directCost` holds exactly, for any lines.
+ * `server/pricing.test.ts` asserts that identity rather than three numbers,
+ * because the identity is the thing that must not break.
+ */
+export function sumLineCosts(lines: LineItemBreakdown[]): {
+  materialCost: number;
+  laborCost: number;
+  directCost: number;
+} {
+  let materialCents = 0;
+  let laborCents = 0;
+  for (const line of lines) {
+    materialCents += toCents(line.materialCost);
+    laborCents += toCents(line.laborCost);
+  }
+  return {
+    materialCost: fromCents(materialCents),
+    laborCost: fromCents(laborCents),
+    directCost: fromCents(materialCents + laborCents),
+  };
 }
 
 // ─── Step 2 — Overhead ────────────────────────────────────────────────────────

@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { InlineNumberField } from "@/components/InlineNumberField";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import {
+  groundSentence,
   newCircuitFor,
   nextCircuitName,
   suggestAfter,
@@ -85,6 +86,14 @@ export type PanelRun = {
      * while "not said" is not.
      */
     groundCount: number | null;
+    /**
+     * This circuit runs its OWN ground instead of sharing the pipe's (0072).
+     *
+     * Resolved, not raw: NULL and false both mean sharing, and the control is
+     * a two-state toggle. Nothing is lost by collapsing them, unlike
+     * `groundCount` above where null is genuinely not zero.
+     */
+    separateGround: boolean;
   }[];
   quantities: RunQuantities | null;
   /** What is at each end. Undefined only for a suggestion the AI proposed. */
@@ -160,22 +169,22 @@ function Footage({
   );
 }
 
-/** The traced share of a run's wire: every circuit's flat feet. */
+/**
+ * The traced and vertical shares of a run's wire.
+ *
+ * ── These added up the circuit rows, and that stopped being the whole run ───
+ * Since 2026-09-24 the shared ground belongs to the run rather than to any
+ * circuit, so summing the rows left it out of both — and the `flat + vertical
+ * = total` line below would have printed its own arithmetic failing, because
+ * `totalWireFeet` still counts it. The split is computed where the shared
+ * ground is known and read from there.
+ */
 function wireFlat(run: PanelRun): number {
-  const total = (run.quantities?.wireByCircuit ?? []).reduce(
-    (sum, circuit) => sum + circuit.flatFeet,
-    0
-  );
-  return Math.round(total * 100) / 100;
+  return run.quantities?.wireFlatFeet ?? 0;
 }
 
-/** The vertical share: the run's drops, once per conductor of every circuit. */
 function wireVertical(run: PanelRun): number {
-  const total = (run.quantities?.wireByCircuit ?? []).reduce(
-    (sum, circuit) => sum + circuit.verticalFeet,
-    0
-  );
-  return Math.round(total * 100) / 100;
+  return run.quantities?.wireVerticalFeet ?? 0;
 }
 
 /**
@@ -188,13 +197,15 @@ function wireVertical(run: PanelRun): number {
  *
  * Shown only when there IS bare copper: `200.00 + 0.00 = 200.00` is noise
  * standing where a number goes, the same reasoning the vertical line follows.
+ *
+ * ── The run's own figure, not a sum over its circuits ───────────────────────
+ * This summed `wireByCircuit[].groundFeet` until 2026-09-24. The shared ground
+ * belongs to the RUN now — it is pulled once for the pipe — so that sum reads
+ * zero on an ordinary run and this line would simply have vanished from a
+ * screen whose whole job is saying how much of which wire to buy.
  */
 function wireGround(run: PanelRun): number {
-  const total = (run.quantities?.wireByCircuit ?? []).reduce(
-    (sum, circuit) => sum + circuit.groundFeet,
-    0
-  );
-  return Math.round(total * 100) / 100;
+  return run.quantities?.groundFeet ?? 0;
 }
 
 /** Stamped assemblies, grouped, as the list shows them. */
@@ -362,7 +373,11 @@ export function RunsPanel({
   ) => void;
   onUpdateCircuit: (
     id: number,
-    patch: { conductorCount?: number; groundCount?: number }
+    patch: {
+      conductorCount?: number;
+      groundCount?: number;
+      separateGround?: boolean;
+    }
   ) => void;
   onRemoveCircuit: (id: number) => void;
 }) {
@@ -1164,9 +1179,45 @@ export function RunsPanel({
                           className="h-6 w-10 text-xs"
                           ariaLabel={`Grounds for ${circuit.name}`}
                         />
-                        <span className="text-[0.7rem] text-muted-foreground">
-                          gnd.
-                        </span>
+                        {/*
+                          SHARED OR ITS OWN — a toggle, not a checkbox buried
+                          in a dialog, because it moves a wire quantity.
+
+                          Sharing is the default and is what almost every
+                          circuit does, so the shared state is quiet. "Own" is
+                          the exception and says so, in the accent colour, at
+                          the point where the run's ground line will change.
+                        */}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onUpdateCircuit(circuit.id, {
+                              separateGround: !circuit.separateGround,
+                            })
+                          }
+                          className={cn(
+                            "text-[0.7rem] rounded px-1 py-0.5 border transition-colors",
+                            circuit.separateGround
+                              ? "border-[#F5C518]/60 text-[#F5C518]"
+                              : // Dotted underline at rest, because at 11px a
+                                // bare word beside "cond." reads as a label
+                                // and nobody would find the isolated-ground
+                                // option. It changes a wire quantity, so it
+                                // has to look like something you can press.
+                                "border-transparent text-muted-foreground underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 hover:text-foreground hover:border-border"
+                          )}
+                          title={
+                            circuit.separateGround
+                              ? "This circuit pulls its own ground. Click to share the run's."
+                              : "This circuit shares the run's ground. Click to give it its own."
+                          }
+                          aria-pressed={circuit.separateGround}
+                          aria-label={`Ground for ${circuit.name}: ${
+                            circuit.separateGround ? "its own" : "shared"
+                          }`}
+                        >
+                          {circuit.separateGround ? "own gnd." : "gnd."}
+                        </button>
                         <span className="text-[0.7rem] font-mono text-muted-foreground w-16 text-right">
                           {run.quantities
                             ? feet(
@@ -1235,10 +1286,48 @@ export function RunsPanel({
                       </Button>
                     )}
 
+                    {/*
+                      WHAT THE GROUND ACTUALLY COMES TO, said out loud.
+
+                      The sharing rule is invisible from the circuit rows: two
+                      circuits each showing a ground come to ONE ground in the
+                      pipe, and an estimator reading two rows would reasonably
+                      expect two. So the run states its own answer, with the
+                      footage beside it, at the point where changing a toggle
+                      changes it.
+
+                      Derived from `run.quantities`, which is the same figure
+                      the bid takes — not recomputed here, so the line and the
+                      bid cannot disagree.
+                    */}
+                    {run.circuits.length > 0 && run.quantities && (
+                      <div className="flex items-baseline justify-between text-[0.7rem] gap-2 pt-0.5">
+                        <span className="text-muted-foreground/70">
+                          {groundSentence(
+                            run.quantities.grounds,
+                            run.circuits.filter(c => !c.separateGround).length
+                          )}
+                        </span>
+                        <span className="font-mono text-muted-foreground/70 shrink-0">
+                          {feet(run.quantities.groundFeet)}
+                        </span>
+                      </div>
+                    )}
+
                     <p className="text-[0.7rem] text-muted-foreground/70">
+                      {/*
+                        BOTH RULES, because they are now different and the
+                        line above states the one that surprises people.
+
+                        This used to say only that each circuit pulls its own
+                        wire, which was the whole story while every circuit
+                        also pulled its own ground. Standing on its own under
+                        "1 ground shared by 2 circuits" it reads as a
+                        contradiction — so it says which is which.
+                      */}
                       {run.circuits.length === 0
                         ? "No wires in this pipe yet — an empty conduit counts pipe and no wire."
-                        : "Each circuit pulls its own full length of wire down this one conduit."}
+                        : "Each circuit pulls its own wire down this one conduit. They share one ground, sized to the largest — unless you give one its own."}
                     </p>
                   </div>
                 )}

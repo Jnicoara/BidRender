@@ -25,6 +25,7 @@ import {
   circuitWire,
   quantitiesForRun,
   type RunPathType,
+  type StoredCircuit,
 } from "../shared/takeoffQuantities";
 import { runWireOwnership } from "../shared/branchWire";
 import { verticalsForRunRow, type HeightContext } from "./runVerticals";
@@ -83,14 +84,17 @@ export type SheetScale = {
  */
 export function groupRunFootage(input: {
   runs: readonly GroupableRun[];
-  circuitsByRun: ReadonlyMap<
-    number,
-    readonly {
-      name: string;
-      conductorCount: number;
-      groundCount: number | null;
-    }[]
-  >;
+  /*
+    `StoredCircuit`, NAMED rather than restated field by field.
+
+    It was three fields written out here, and adding `separateGround` to the
+    row made this shape disagree with `circuitWire`'s argument — which the
+    compiler caught only because `circuitWire` takes the ROW. A restated shape
+    feeding ARITHMETIC is the trap CLAUDE.md § "Where to be structural"
+    describes: a column that never arrives does not leave a gap on a screen,
+    it makes a number smaller.
+  */
+  circuitsByRun: ReadonlyMap<number, readonly StoredCircuit[]>;
   scales: ReadonlyMap<number, SheetScale>;
   heights: HeightContext;
 }): Map<number, RunTypeFootageRow> {
@@ -158,10 +162,16 @@ export function groupRunFootage(input: {
       `totalQuantities` uses for `wireGroundFeet`. `totalWireFeet` is everything
       pulled and the ground is a share OF it, so adding both counts it twice.
     */
-    let groundShare = 0;
-    for (const circuit of quantities.wireByCircuit) {
-      groundShare += circuit.groundFeet;
-    }
+    /*
+      ── And the share comes from the RUN, not from summing its circuits ──────
+      This used to add up `wireByCircuit[].groundFeet`. Since the shared ground
+      belongs to the run rather than to any circuit (2026-09-24), that sum is
+      zero on an ordinary run — so the bid bridge would have reported NO bare
+      copper at all while still charging for it inside `insulatedFeet`. Caught
+      by the compiler, because the per-circuit field was renamed rather than
+      re-meant.
+    */
+    const groundShare = quantities.groundFeet;
     row.groundFeet += groundShare;
     row.insulatedFeet += Math.max(0, quantities.totalWireFeet - groundShare);
   }

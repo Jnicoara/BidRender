@@ -683,18 +683,22 @@ describe("the full breakdown for one run", () => {
     expect(quantities.wireByCircuit[0]).toEqual({
       name: "Panel A-12",
       conductorCount: 3,
-      groundCount: 1,
-      // The two purchases, apart: 300 ft of THHN and 100 ft of bare copper.
+      // Nothing of its own: it shares the run's ground, like every circuit
+      // does unless it says otherwise (2026-09-24).
+      ownGroundCount: 0,
       insulatedFeet: 300,
-      groundFeet: 100,
+      ownGroundFeet: 0,
       // Flat and vertical stay apart all the way to the bid — see § 7.1, which
       // gives the two allowances different reach over them. No verticals were
-      // supplied here, so the traced length is the whole of it. And 400 is the
-      // number this produced before the split, which is the point.
-      flatFeet: 400,
+      // supplied here, so the traced length is the whole of it.
+      flatFeet: 300,
       verticalFeet: 0,
-      feet: 400,
+      feet: 300,
     });
+    // The two purchases, apart: 300 ft of THHN and 100 ft of bare copper. The
+    // bare copper is the RUN's now, and 400 is still what the run comes to.
+    expect(quantities.groundFeet).toBe(100);
+    expect(quantities.totalWireFeet).toBe(400);
   });
 });
 
@@ -837,23 +841,40 @@ describe("counting the ground separately", () => {
         QUARTER_INCH,
         NO_VERTICALS
       )!;
+      /*
+        THE RUN TOTAL, not the circuit's own footage, and that changed on
+        2026-09-24. The ground left the circuit and became the RUN's — pulled
+        once for the pipe — so a circuit's `feet` is now its conductors only
+        while the run still comes to the same number it always did. Which is
+        the property this block exists for: the migration must not move a
+        total. It asserts it where the total now lives.
+      */
       expect(after.totalWireFeet).toBe(before.totalWireFeet);
-      expect(after.wireByCircuit[0].feet).toBe(before.wireByCircuit[0].feet);
       expect(after.conduitFeet).toBe(before.conduitFeet);
     });
   }
 
   it("splits the footage without changing it", () => {
-    const [circuit] = quantitiesForRun(
+    const run = quantitiesForRun(
       RUN_100FT,
       [{ name: "Ckt 1", conductorCount: 2, groundCount: 1 }],
       QUARTER_INCH,
       NO_VERTICALS
-    )!.wireByCircuit;
+    )!;
+    const [circuit] = run.wireByCircuit;
     expect(circuit.insulatedFeet).toBe(200);
-    expect(circuit.groundFeet).toBe(100);
-    expect(circuit.insulatedFeet + circuit.groundFeet).toBe(circuit.flatFeet);
-    expect(circuit.flatFeet).toBe(300);
+    // The circuit's OWN ground is nothing: it shares the run's single pull.
+    expect(circuit.ownGroundFeet).toBe(0);
+    expect(circuit.flatFeet).toBe(200);
+    // And the ground is on the run, once.
+    expect(run.grounds).toEqual({
+      sharedCount: 1,
+      separateCount: 0,
+      totalCount: 1,
+    });
+    expect(run.groundFeet).toBe(100);
+    expect(circuit.flatFeet + run.groundFeet).toBe(run.totalWireFeet);
+    expect(run.totalWireFeet).toBe(300);
   });
 
   it("reads a row the backfill has not reached as it always read", () => {
@@ -876,8 +897,11 @@ describe("counting the ground separately", () => {
       name: "Ckt 1",
       conductorCount: 3,
       groundCount: null,
+      separateGround: null,
     });
     expect(unsplit.groundCount).toBe(0);
+    // NULL shares, which is the default and what every existing row meant.
+    expect(unsplit.separateGround).toBe(false);
 
     const quantities = quantitiesForRun(
       RUN_100FT,
@@ -886,7 +910,7 @@ describe("counting the ground separately", () => {
       NO_VERTICALS
     )!;
     expect(quantities.totalWireFeet).toBe(300);
-    expect(quantities.wireByCircuit[0].groundFeet).toBe(0);
+    expect(quantities.groundFeet).toBe(0);
   });
 
   it("never guesses a ground onto an un-split row", () => {
@@ -894,8 +918,12 @@ describe("counting the ground separately", () => {
     // app on the day the column shipped. The migration moves 3 into 2 + 1;
     // this mapper must never do it by inference.
     expect(
-      circuitWire({ name: "x", conductorCount: 2, groundCount: null })
-        .groundCount
+      circuitWire({
+        name: "x",
+        conductorCount: 2,
+        groundCount: null,
+        separateGround: null,
+      }).groundCount
     ).toBe(0);
   });
 
@@ -926,8 +954,13 @@ describe("counting the ground separately", () => {
         feet: 10,
       }
     )!;
-    // Three conductors down a 10 ft drop is 30 ft of wire, ground included.
+    // Three conductors down a 10 ft drop is 30 ft of wire, ground included:
+    // two insulated on the circuit, plus the run's one shared ground, which
+    // goes down the drop once like the pipe around it.
     expect(dropped.totalWireFeet - flat.totalWireFeet).toBe(30);
+    // And the ground's share of that drop is on the run's ground figure, not
+    // lost between the circuit rows and the total.
+    expect(dropped.groundFeet - flat.groundFeet).toBe(10);
   });
 
   it("refuses to count a ground that is not a number", () => {
@@ -969,16 +1002,140 @@ describe("the two purchases a conduit run makes", () => {
       (sum, c) => sum + c.insulatedFeet,
       0
     );
-    const bare = quantities.wireByCircuit.reduce(
-      (sum, c) => sum + c.groundFeet,
-      0
-    );
 
     expect(insulated).toBe(500); // (2 + 3) conductors x 100 ft
-    expect(bare).toBe(200); //     (1 + 1) grounds    x 100 ft
-    // And the two still come to what the run has always reported.
-    expect(insulated + bare).toBe(quantities.totalWireFeet);
-    expect(quantities.totalWireFeet).toBe(700);
+    /*
+      ONE ground, not two, and this line is the whole change of 2026-09-24.
+
+      Both circuits want a ground and both are in the same pipe, so they share
+      one — 100 ft, not 200. The old figure billed a second ground for wire
+      that is pulled once, which is the same error as billing a second pipe.
+    */
+    expect(quantities.grounds).toEqual({
+      sharedCount: 1,
+      separateCount: 0,
+      totalCount: 1,
+    });
+    expect(quantities.groundFeet).toBe(100);
+    expect(insulated + quantities.groundFeet).toBe(quantities.totalWireFeet);
+    expect(quantities.totalWireFeet).toBe(600);
+  });
+
+  it("SIZES THE SHARED GROUND TO THE LARGEST CIRCUIT, never the smallest", () => {
+    // A circuit needing two grounds and one needing one share a single pull,
+    // and it has to be big enough for both. Taking the smallest — or the
+    // first — would under-buy the ground on the circuit that needs more.
+    const quantities = quantitiesForRun(
+      RUN_100FT,
+      [
+        { name: "Ckt 1", conductorCount: 2, groundCount: 1 },
+        { name: "Ckt 2", conductorCount: 2, groundCount: 2 },
+      ],
+      QUARTER_INCH,
+      NO_VERTICALS
+    )!;
+    expect(quantities.grounds.sharedCount).toBe(2);
+    expect(quantities.groundFeet).toBe(200);
+  });
+
+  it("gives an ISOLATED GROUND circuit its own, on top of the shared one", () => {
+    /*
+      The exception the flag exists for. An isolated-ground circuit runs its
+      own EGC back to the panel AND the pipe still carries the shared one for
+      everything else in it — so the two are added, never swapped.
+    */
+    const quantities = quantitiesForRun(
+      RUN_100FT,
+      [
+        { name: "Ckt 1", conductorCount: 2, groundCount: 1 },
+        {
+          name: "IG",
+          conductorCount: 2,
+          groundCount: 1,
+          separateGround: true,
+        },
+      ],
+      QUARTER_INCH,
+      NO_VERTICALS
+    )!;
+    expect(quantities.grounds).toEqual({
+      sharedCount: 1,
+      separateCount: 1,
+      totalCount: 2,
+    });
+    expect(quantities.groundFeet).toBe(200);
+    // The separate one belongs to its circuit; the shared one belongs to none.
+    expect(quantities.wireByCircuit[0].ownGroundFeet).toBe(0);
+    expect(quantities.wireByCircuit[1].ownGroundFeet).toBe(100);
+    expect(quantities.totalWireFeet).toBe(600); // 400 insulated + 200 ground
+  });
+
+  it("pulls NO shared ground when every circuit runs its own", () => {
+    const quantities = quantitiesForRun(
+      RUN_100FT,
+      [
+        {
+          name: "IG 1",
+          conductorCount: 2,
+          groundCount: 1,
+          separateGround: true,
+        },
+        {
+          name: "IG 2",
+          conductorCount: 2,
+          groundCount: 1,
+          separateGround: true,
+        },
+      ],
+      QUARTER_INCH,
+      NO_VERTICALS
+    )!;
+    expect(quantities.grounds).toEqual({
+      sharedCount: 0,
+      separateCount: 2,
+      totalCount: 2,
+    });
+    expect(quantities.groundFeet).toBe(200);
+  });
+
+  it("SPLITS INTO FLAT AND VERTICAL THAT ADD BACK TO THE TOTAL", () => {
+    /*
+      The run panel prints `flat + vertical = total` on its wire line, and it
+      used to build the two halves by adding up the circuit rows. The shared
+      ground is in none of them, so that sum silently stopped equalling the
+      total — a line showing its own arithmetic failing, on the screen whose
+      job is showing where every foot came from.
+
+      Asserted as an IDENTITY rather than as three numbers, so it stays true
+      whatever else is added to a run's wire later.
+    */
+    const quantities = quantitiesForRun(
+      RUN_100FT,
+      [
+        { name: "Ckt 1", conductorCount: 2, groundCount: 1 },
+        { name: "IG", conductorCount: 2, groundCount: 1, separateGround: true },
+      ],
+      QUARTER_INCH,
+      {
+        start: {
+          counted: true,
+          kind: "receptacle",
+          direction: "drop",
+          distributionInches: 120,
+          endInches: 0,
+          feet: 10,
+        },
+        end: { counted: false, kind: null, reason: "height-not-set" },
+        feet: 10,
+      }
+    )!;
+    expect(quantities.wireFlatFeet + quantities.wireVerticalFeet).toBe(
+      quantities.totalWireFeet
+    );
+    // And the shared ground is genuinely inside both halves, not missing from
+    // one of them in a way the identity above would hide.
+    expect(quantities.wireFlatFeet).toBe(600); // 400 insulated + 100 + 100 gnd
+    expect(quantities.wireVerticalFeet).toBe(60); // 6 wires down a 10 ft drop
   });
 
   it("reports no bare share when no circuit carries a ground", () => {
@@ -990,9 +1147,7 @@ describe("the two purchases a conduit run makes", () => {
       QUARTER_INCH,
       NO_VERTICALS
     )!;
-    expect(
-      quantities.wireByCircuit.reduce((sum, c) => sum + c.groundFeet, 0)
-    ).toBe(0);
+    expect(quantities.groundFeet).toBe(0);
     expect(quantities.totalWireFeet).toBe(300);
   });
 });

@@ -22,6 +22,7 @@ import {
   resolveBidPricingSettings,
   roundMoney,
   sumDirectCost,
+  sumLineCosts,
   sumModifiers,
   toCents,
 } from "@shared/pricing";
@@ -645,5 +646,122 @@ describe("priceLineItems end to end", () => {
     expect(result.lines[0].laborHoursClamped).toBe(true);
     expect(result.lines[0].laborCost).toBe(0);
     expect(result.lines[0].directCost).toBe(10);
+  });
+});
+
+// ─── The parts equal the whole ───────────────────────────────────────────────
+
+describe("Materials + Labor = Direct cost, to the cent", () => {
+  /**
+   * ── What this defends, and it was live on a real bid ───────────────────────
+   * The bid screen prints Materials and Labor directly above Direct cost, so a
+   * reader can check the app's arithmetic at a glance. On 2026-09-24 they
+   * could, and it did not: $192.24 of materials, $0.00 of labor, and a direct
+   * cost of $192.23.
+   *
+   * The cause was two rules for one column of figures. `sumDirectCost` summed
+   * each line in integer cents; the two components above it were plain float
+   * reduces over line values that had never been rounded, because a line's
+   * material cost stopped at `costPerUnit x qty` — $0.18 x 222.24 ft is
+   * $40.0032, shown as $40.00 and summed as $40.0032.
+   *
+   * These assert the IDENTITY rather than three numbers. The identity is what
+   * must not break; the numbers are just one example of it.
+   */
+  const FRACTIONAL = [
+    // The real bid: conduit, conductor and ground priced per foot against
+    // traced footage, every one of which lands off a whole cent.
+    { costPerUnit: 1.25, qty: 111.12 },
+    { costPerUnit: 0.18, qty: 222.24 },
+    { costPerUnit: 0.12, qty: 111.12 },
+  ];
+
+  const linesFrom = (specs: { costPerUnit: number; qty: number }[]) =>
+    specs.map(spec =>
+      calculateLineItem({
+        materials: [{ costPerUnit: spec.costPerUnit, qty: 1 }],
+        baseLaborHours: 0,
+        laborRate: 0,
+        quantity: spec.qty,
+      })
+    );
+
+  /**
+   * The sum a PERSON can do, reading the Cost column down the screen.
+   *
+   * Deliberately not `sumDirectCost` — that now shares an implementation with
+   * `sumLineCosts`, so comparing the two would assert nothing at all. This
+   * adds the line figures the way the screen presents them.
+   */
+  const addDownTheColumn = (lines: { directCost: number }[]) =>
+    lines.reduce((sum, line) => sum + line.directCost, 0);
+
+  it("adds up on the bid that found this", () => {
+    const lines = linesFrom(FRACTIONAL);
+    const totals = sumLineCosts(lines);
+    expect(totals.materialCost).toBe(192.23);
+    expect(totals.laborCost).toBe(0);
+    expect(totals.directCost).toBe(192.23);
+    // 138.90 + 40.00 + 13.33, exactly as shown. Before the line rounded, the
+    // three lines held 138.90, 40.0032 and 13.3344 and this came to 192.2376
+    // — which is the $192.24 that appeared above a $192.23.
+    expect(roundMoney(addDownTheColumn(lines))).toBe(192.23);
+    expect(lines.map(l => l.directCost)).toEqual([138.9, 40, 13.33]);
+  });
+
+  it("gives each line a whole number of cents", () => {
+    // A line is a money amount somebody reads. $40.0032 is not one, and it is
+    // where the two totals diverged.
+    for (const line of linesFrom(FRACTIONAL)) {
+      expect(toCents(line.materialCost) % 1).toBe(0);
+      expect(line.materialCost).toBe(roundMoney(line.materialCost));
+      expect(line.directCost).toBe(roundMoney(line.directCost));
+    }
+  });
+
+  it("holds for labor that lands off a cent too", () => {
+    const lines = [
+      calculateLineItem({
+        materials: [{ costPerUnit: 3.33, qty: 1 }],
+        baseLaborHours: 0.333,
+        laborRate: 87.5,
+        quantity: 7,
+      }),
+      calculateLineItem({
+        materials: [{ costPerUnit: 0.07, qty: 3 }],
+        baseLaborHours: 1.17,
+        laborRate: 62.25,
+        quantity: 13,
+      }),
+    ];
+    const totals = sumLineCosts(lines);
+    expect(totals.materialCost + totals.laborCost).toBe(totals.directCost);
+    // And the column a person can add still comes to the same total.
+    expect(roundMoney(addDownTheColumn(lines))).toBe(totals.directCost);
+  });
+
+  it("holds across a pile of awkward quantities", () => {
+    /*
+      A sweep rather than one case, because a penny mismatch is a property of
+      the ARITHMETIC and shows up on whichever combination happens to land on
+      a half cent. One hand-picked example proves the example.
+    */
+    const specs: { costPerUnit: number; qty: number }[] = [];
+    for (const cost of [0.07, 0.18, 1.25, 12.47, 0.995]) {
+      for (const qty of [1, 3.5, 17.77, 111.12, 222.24, 1000.01]) {
+        specs.push({ costPerUnit: cost, qty });
+      }
+    }
+    const lines = linesFrom(specs);
+    const totals = sumLineCosts(lines);
+    expect(totals.materialCost + totals.laborCost).toBe(totals.directCost);
+    expect(totals.directCost).toBe(roundMoney(totals.directCost));
+    // The reader's own addition agrees, on all 30 of them.
+    expect(roundMoney(addDownTheColumn(lines))).toBe(totals.directCost);
+  });
+
+  it("is still exact when there are no lines at all", () => {
+    const totals = sumLineCosts([]);
+    expect(totals).toEqual({ materialCost: 0, laborCost: 0, directCost: 0 });
   });
 });

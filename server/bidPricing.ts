@@ -25,6 +25,7 @@ import {
   type ResolvedPricingSettings,
   roundMoney,
   sumDirectCost,
+  sumLineCosts,
   type CompanyPricingDefaults,
 } from "../shared/pricing";
 import {
@@ -362,11 +363,19 @@ export function bidRollup(
     unitTotals.set(line.unitLabel, current);
   }
 
-  const materialCost = priced.reduce(
-    (sum, p) => sum + p.breakdown.materialCost,
-    0
-  );
-  const laborCost = priced.reduce((sum, p) => sum + p.breakdown.laborCost, 0);
+  /*
+    THE SAME ADDITION `workCost` USES, which is the whole point.
+
+    These were two float reduces over unrounded line values while `directCost`
+    summed the same lines in integer cents — two rules for one column of
+    figures, and on a real bid they came to $192.24 and $192.23. The screen
+    shows Materials and Labor directly above Direct cost, so the only thing a
+    reader could conclude was that the app cannot add up.
+
+    `sumLineCosts` returns all three from one pass, so the parts equal the
+    whole by construction rather than by both happening to round the same way.
+  */
+  const { materialCost, laborCost } = sumLineCosts(breakdowns);
 
   /**
    * Sales tax, computed here so the bid screen and the proposal cannot differ.

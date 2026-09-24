@@ -208,8 +208,19 @@ describe.skipIf(!hasDb)(
       expect(feetFor("raceway")).toBeCloseTo(100, 1);
       // Four insulated conductors: two circuits of two.
       expect(feetFor("conductor")).toBeCloseTo(400, 1);
-      // One ground per circuit.
-      expect(feetFor("ground")).toBeCloseTo(200, 1);
+      /*
+        ONE GROUND FOR THE PIPE, and this line used to read 200.
+
+        Corrected 2026-09-24. Two circuits sharing one raceway share one
+        equipment grounding conductor, sized for the largest of them — so a
+        100 ft run is 100 ft of bare copper however many circuits go down it,
+        exactly like the pipe on the line above. The old figure billed a second
+        ground for wire that is pulled once.
+
+        A circuit that genuinely runs its own says so (`separateGround`), and
+        then it is added ON TOP of this. See `runGrounds`.
+      */
+      expect(feetFor("ground")).toBeCloseTo(100, 1);
 
       // ── And the money ──────────────────────────────────────────────────────
       const sent = await caller().takeoffRunTypes.sendToBid({
@@ -239,12 +250,77 @@ describe.skipIf(!hasDb)(
         0
       );
       /*
-      100 ft of pipe at 1.25, 400 ft of conductor at 0.18, 200 ft of ground at
-      0.12 — 125 + 72 + 24 = 221. Asserted as a total rather than line by line
+      100 ft of pipe at 1.25, 400 ft of conductor at 0.18, 100 ft of ground at
+      0.12 — 125 + 72 + 12 = 209. Asserted as a total rather than line by line
       because how the lines are split is a presentation decision; that the
       money is all there is not.
+
+      It was 221 with a ground per circuit. The $12 difference is the second
+      ground this run does not pull.
     */
-      expect(total).toBeCloseTo(221, 0);
+      expect(total).toBeCloseTo(209, 0);
+    });
+
+    it("an ISOLATED GROUND circuit bids its own ground on top of the shared one", async () => {
+      /*
+        The exception, all the way to the bid. Sharing is the default because
+        that is how the wire goes in, but an isolated ground really does run
+        its own EGC back to the panel — and the pipe still carries the shared
+        one for everything else in it. So this run buys TWO grounds where the
+        test above buys one, and the difference has to show up in dollars
+        rather than only in a footage nobody reads.
+      */
+      const { bidId, sheetId } = await setup();
+      const emtId = await priceMaterial('1/2" EMT', 1.25);
+      const thhnId = await priceMaterial("#12 THHN", 0.18);
+      const bareId = await priceMaterial("#12 bare copper, solid", 0.12);
+
+      const type = await caller().takeoffRunTypes.create({
+        label: `1/2" EMT IG ${Date.now()}${Math.random()}`,
+        pathType: "conduit",
+        racewayMaterialId: emtId,
+        conductorMaterialId: thhnId,
+        conductorCount: 2,
+        groundMaterialId: bareId,
+        groundCount: 1,
+      });
+
+      const run = await caller().takeoffRuns.save({
+        bidId,
+        sheetId,
+        name: "Homerun IG",
+        pathType: "conduit",
+        runTypeId: type.id,
+        status: "committed",
+        points: [
+          { x: 0, y: 0 },
+          { x: HUNDRED_FEET_PTS, y: 0 },
+        ],
+      });
+
+      await caller().takeoffRuns.addCircuit({
+        runId: run!.id,
+        name: "Circuit 1",
+        conductorCount: 2,
+        groundCount: 1,
+      });
+      await caller().takeoffRuns.addCircuit({
+        runId: run!.id,
+        name: "IG receptacle",
+        conductorCount: 2,
+        groundCount: 1,
+        separateGround: true,
+      });
+
+      const bridge = await caller().takeoffRunTypes.bridgeForBid({ bidId });
+      const entry = bridge.find(e => e.runTypeId === type.id)!;
+      const feetFor = (role: string) =>
+        entry.rows.find(r => r.role === role)?.feet ?? 0;
+
+      expect(feetFor("raceway")).toBeCloseTo(100, 1); // still one pipe
+      expect(feetFor("conductor")).toBeCloseTo(400, 1); // still two circuits
+      // One shared, one isolated: 200 ft, against 100 for two sharing circuits.
+      expect(feetFor("ground")).toBeCloseTo(200, 1);
     });
 
     it("an EMPTY conduit bids the pipe and no wire at all", async () => {

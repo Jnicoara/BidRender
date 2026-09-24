@@ -505,6 +505,13 @@
       "when": 1789956100000,
       "tag": "0071_sheet_scale_checked",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "5",
+      "when": 1789956200000,
+      "tag": "0072_run_circuit_separate_ground",
+      "breakpoints": true
     }
   ]
 }

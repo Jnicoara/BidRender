@@ -2588,6 +2588,26 @@ export const takeoffRunCircuits = mysqlTable(
      */
     groundCount: int("groundCount"),
 
+    /**
+     * This circuit pulls its OWN ground rather than sharing the run's (0072).
+     *
+     * ── Sharing is the default, because that is how the wire goes in ────────
+     * Conductors in one raceway share one equipment grounding conductor, sized
+     * for the largest circuit in the pipe. Counting a ground per circuit bills
+     * three grounds for a pipe that gets one — the same error as counting the
+     * CONDUIT per circuit, which this codebase has refused from the start.
+     *
+     * So `groundCount` says how many grounds this circuit NEEDS, and the run
+     * pulls the largest of those once. This column is the exception: an
+     * isolated ground, or anything else the estimator knows runs separately.
+     * Its grounds are pulled on top of the shared one.
+     *
+     * NULL reads as false — sharing — and there is no third state to lose, so
+     * unlike `branchWiring` the null carries no meaning of its own. Read
+     * through `circuitWire`, like every other column here.
+     */
+    separateGround: boolean("separateGround"),
+
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },

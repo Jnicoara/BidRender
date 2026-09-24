@@ -6,6 +6,24 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-24]
 
+- **Circuits in one pipe now share one ground, which is how the wire actually
+  goes in.** Every circuit used to pull its own ground the full length of the
+  run, so a conduit with three circuits was billed three grounds — the same
+  mistake as billing three pipes. Conductors sharing a raceway share one
+  equipment grounding conductor, sized for the largest circuit in it, and that
+  is what the app counts now. **Existing bids with a multi-circuit conduit run
+  will show less bare copper than before; the old figure was too high.** A
+  circuit that genuinely runs its own — an isolated ground — gets a small
+  "gnd." toggle on its row, and its ground is added on top of the shared one.
+  The run says what it came to in words: "1 ground shared by 2 circuits".
+
+- **Materials and Direct cost always agree now.** A bid could show $192.24 of
+  materials above a direct cost of $192.23, because the two were added up by
+  different rules: one summed the lines as displayed, to the cent, and the
+  other summed them unrounded. A line is now a whole number of cents where it
+  is created, so the parts add to the whole and to the column you can read
+  down the screen.
+
 - **An empty pipe says so, and "Add wires" puts real circuits in it.** A conduit
   run with nothing pulled through it used to show "Wire (0 circuits) 0.00 ft" —
   a measured-looking zero for something nobody had measured. It now reads

@@ -116,6 +116,43 @@ export function suggestAfter(
   return "";
 }
 
+/**
+ * What the run's ground comes to, in words.
+ *
+ * ── Why the run has to say this at all ──────────────────────────────────────
+ * The sharing rule is invisible from the circuit rows. Two circuits each
+ * showing a ground come to ONE ground in the pipe, and anybody reading two
+ * rows would reasonably expect two — so the number would look like a bug, or
+ * worse, be taken for two and ordered as two. The run states its own answer
+ * beside the footage instead.
+ *
+ * `sharingCount` is how many circuits share that one ground, which is the part
+ * that makes the sentence worth reading: "1 ground shared by 3 circuits" says
+ * the rule as well as the number.
+ */
+export function groundSentence(
+  grounds: { sharedCount: number; separateCount: number },
+  sharingCount: number
+): string {
+  const { sharedCount, separateCount } = grounds;
+  const plural = (n: number) => (n === 1 ? "ground" : "grounds");
+
+  if (sharedCount === 0 && separateCount === 0) return "No ground in this pipe";
+  if (separateCount === 0) {
+    return sharingCount > 1
+      ? `${sharedCount} ${plural(sharedCount)} shared by ${sharingCount} circuits`
+      : `${sharedCount} ${plural(sharedCount)}`;
+  }
+  if (sharedCount === 0) {
+    return `${separateCount} ${plural(separateCount)}, each its own`;
+  }
+  return (
+    `${sharedCount} shared by ${sharingCount} ` +
+    `${sharingCount === 1 ? "circuit" : "circuits"}, ` +
+    `+${separateCount} on its own`
+  );
+}
+
 function takenNames(circuits: readonly NamedCircuit[]): Set<string> {
   return new Set(circuits.map(c => c.name.trim().toLowerCase()));
 }

@@ -230,6 +230,13 @@ export const takeoffRunsRouter = router({
           conductorCount: c.conductorCount,
           /** Raw: null is "not yet said", and the panel shows it as such. */
           groundCount: c.groundCount,
+          /**
+           * Resolved, not raw, because there is nothing to tell apart: NULL
+           * and false both mean this circuit shares the run's ground, and the
+           * panel's control is a two-state toggle. Contrast `groundCount`
+           * above, where null is a genuinely different thing from zero.
+           */
+          separateGround: c.separateGround ?? false,
         }));
 
         const traced = {
@@ -641,6 +648,15 @@ export const takeoffRunsRouter = router({
          * default's.
          */
         groundCount: z.number().int().min(0).max(10).default(0),
+        /**
+         * This circuit runs its OWN ground rather than sharing the pipe's.
+         *
+         * Defaults to false because sharing is how the wire actually goes in:
+         * one equipment grounding conductor per raceway, sized for the largest
+         * circuit. See `runGrounds` and migration 0072. An isolated ground is
+         * the exception and has to be asked for.
+         */
+        separateGround: z.boolean().default(false),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -658,6 +674,7 @@ export const takeoffRunsRouter = router({
         name: input.name,
         conductorCount: input.conductorCount,
         groundCount: input.groundCount,
+        separateGround: input.separateGround,
       });
       return { id };
     }),
@@ -677,6 +694,12 @@ export const takeoffRunsRouter = router({
          * and changing what they did not.
          */
         groundCount: z.number().int().min(0).max(10).optional(),
+        /**
+         * Omitted leaves it alone, like every other field on this path — a
+         * patch changes what it mentions. This one moves a wire quantity:
+         * turning it on pulls a second ground the length of the run.
+         */
+        separateGround: z.boolean().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {

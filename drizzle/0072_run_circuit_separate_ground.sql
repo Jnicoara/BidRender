@@ -1,0 +1,41 @@
+-- Does this circuit pull its OWN ground, instead of sharing the run's?
+--
+-- One statement — see 0053, 0061, 0065, 0067, 0068, 0069.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- A plain ADD of a nullable column with no default. Old code ignores it; new
+-- code against an old database dies on a bare select(). CLAUDE.md
+-- § "Deploying a migration: THREE STEPS, NOT TWO". Step 3 is empty: nothing is
+-- backfilled and no existing COLUMN changes meaning.
+--
+-- Hand-written, not generated, for the reason 0065 and 0067 give.
+--
+-- ── WHAT THIS IS FOR, AND WHY THE APP WAS OVER-COUNTING WITHOUT IT ──────────
+-- Every circuit carried its own ground and every ground was pulled the full
+-- length of the run, so a pipe with three circuits was billed three grounds.
+-- That is not how the wire goes in. Conductors sharing a raceway share ONE
+-- equipment grounding conductor, sized for the largest circuit in the pipe —
+-- which is the same reasoning that has always made the CONDUIT one pipe
+-- however many circuits go down it (shared/takeoffQuantities.ts, header).
+--
+-- So sharing is the DEFAULT and this column is the exception: an isolated
+-- ground, or anything else the estimator knows needs a ground of its own.
+--
+-- ── NULL IS NOT AMBIGUOUS HERE, UNLIKE 0069 ─────────────────────────────────
+-- `branchWiring` is nullable because "nobody was asked" and "answered no" are
+-- genuinely different states and collapsing them would claim an answer nobody
+-- gave. There is no third state here: a circuit either pulls its own ground or
+-- it shares the run's, and sharing is what the code does with NULL. It is left
+-- nullable rather than NOT NULL DEFAULT false only so that adding it cannot
+-- rewrite a single existing row — `ALTER ... ADD col boolean` touches metadata
+-- where a DEFAULT has to be reasoned about per row.
+--
+-- ── THIS CHANGES EXISTING NUMBERS, DELIBERATELY, AND NOT IN THIS FILE ───────
+-- A bid with a multi-circuit conduit run WILL report less bare copper after
+-- the code that reads this ships. That is the correction, not a regression:
+-- the old figure billed a ground per circuit for wire that is pulled once.
+--
+-- The change of behaviour lives in the CODE, not here. This file adds a column
+-- and writes nothing, so it is safe in either order and safe to re-run. What
+-- makes it step 1 rather than step 3 is only that the new code selects it.
+ALTER TABLE `takeoff_run_circuits` ADD `separateGround` boolean;

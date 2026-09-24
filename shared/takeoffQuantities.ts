@@ -15,6 +15,12 @@
  *           wire, not 100 and not 300. Undercounting here is money the
  *           contractor spends and never quoted for.
  *
+ *   GROUND  is counted ONCE PER PIPE — like the conduit, and unlike the wire.
+ *           Conductors sharing a raceway share one equipment grounding
+ *           conductor, sized for the largest circuit in it. See `runGrounds`.
+ *           This was counted per circuit until 2026-09-24, which billed three
+ *           grounds for a pipe that gets one.
+ *
  * They are computed by separate functions taking separate inputs so there is
  * no path where one silently becomes the other.
  *
@@ -63,7 +69,19 @@ export type RunCircuit = {
    */
   conductorCount: number;
   /**
-   * Grounds this circuit pulls. Usually one; two on an isolated-ground circuit.
+   * Grounds this circuit NEEDS. Usually one.
+   *
+   * ── It is a requirement, not a pull, and that changed on 2026-09-24 ───────
+   * This used to be counted straight into the footage: every circuit pulled
+   * its own ground the full length of the run, so a pipe with three circuits
+   * was billed three grounds. That is not how the wire goes in — conductors
+   * sharing a raceway share ONE equipment grounding conductor, sized for the
+   * largest circuit in the pipe.
+   *
+   * So the run pulls the LARGEST of these once (`runGrounds`), and this number
+   * sizes that pull rather than adding to it. A circuit that genuinely runs
+   * its own — an isolated ground — says so with `separateGround`, and then
+   * this count is pulled on top.
    *
    * ── REQUIRED, AND THAT IS THE POINT ────────────────────────────────────────
    * It was optional for one afternoon, so that a caller which had not been told
@@ -80,6 +98,15 @@ export type RunCircuit = {
    * between a rule and a mechanism.
    */
   groundCount: number;
+  /**
+   * This circuit pulls its OWN ground instead of sharing the run's.
+   *
+   * REQUIRED for the same reason `groundCount` is: it decides a wire quantity,
+   * and an optional field that decides a wire quantity is a reminder rather
+   * than a mechanism. Every existing caller had to say which it meant, and
+   * `circuitWire` is the one place that turns a stored NULL into `false`.
+   */
+  separateGround: boolean;
 };
 
 /**
@@ -190,12 +217,24 @@ export type CircuitWire = {
   name: string;
   /** Insulated conductors. Since 2026-09-20 this excludes the ground. */
   conductorCount: number;
-  /** Grounds. Zero on a circuit written before the split, and on none. */
-  groundCount: number;
+  /**
+   * Grounds THIS CIRCUIT pulls on its own. Zero for a circuit that shares.
+   *
+   * ── Renamed from `groundCount` on 2026-09-24, deliberately loudly ─────────
+   * The old field meant "grounds this circuit has" and was counted into the
+   * footage. The shared ground now belongs to the RUN (`RunQuantities.grounds`)
+   * and only an isolated-ground circuit has one of its own, so the old name
+   * over-reports on every sharing circuit — which is every circuit by default.
+   *
+   * Renaming rather than re-meaning is the point: a reader of the old name
+   * gets a compile error instead of a number that is quietly too big. See
+   * CLAUDE.md § "a label describing the OLD meaning is worse than no label".
+   */
+  ownGroundCount: number;
   /** The insulated conductors' share of `flatFeet`. */
   insulatedFeet: number;
-  /** The grounds' share. Bare copper is a different purchase from THHN. */
-  groundFeet: number;
+  /** This circuit's own grounds' share. Zero when it shares the run's. */
+  ownGroundFeet: number;
   /** The traced length, once per conductor. */
   flatFeet: number;
   /**
@@ -220,6 +259,8 @@ export type StoredCircuit = {
   name: string;
   conductorCount: number;
   groundCount: number | null;
+  /** 0072. NULL reads as false — sharing — and carries no meaning of its own. */
+  separateGround: boolean | null;
 };
 
 /**
@@ -252,6 +293,55 @@ export function circuitWire(row: StoredCircuit): RunCircuit {
     // NULL is a row the backfill has not reached. Zero, never one — see the
     // type, and 0061 on why the column is nullable rather than defaulted.
     groundCount: row.groundCount ?? 0,
+    // NULL is a circuit written before there was a question. Sharing is the
+    // default and the physically correct answer, so false — see 0072.
+    separateGround: row.separateGround ?? false,
+  };
+}
+
+/**
+ * THE GROUNDS ACTUALLY IN THE PIPE — once for everything that shares one.
+ *
+ * ── The rule, and why it is not per circuit ─────────────────────────────────
+ * Conductors sharing a raceway share ONE equipment grounding conductor, sized
+ * for the largest circuit in the pipe. Two #12 circuits down one 1/2" EMT pull
+ * one ground, not two. Counting it per circuit is the same error as counting
+ * the CONDUIT per circuit, which this module's header has refused from the
+ * start — and it had been making it since grounds existed.
+ *
+ * ── "Sized to the largest" is a MAX, and today it is degenerate ─────────────
+ * A run type names ONE conductor material, so every circuit on a run is the
+ * same gauge and the largest is whatever they all are. The max is therefore
+ * exact today AND stays correct if a per-circuit conductor size ever arrives,
+ * which a `1` hard-coded here would not. It is written as the rule rather than
+ * as the shortcut the current schema would allow.
+ *
+ * ── A separate ground is ON TOP, never instead ─────────────────────────────
+ * An isolated-ground circuit runs its own EGC back to the panel AND the pipe
+ * still carries the shared one for everything else in it. So the two are added.
+ * The only case with no shared ground is one where EVERY circuit pulls its own.
+ */
+export type RunGrounds = {
+  /** The shared pull: the largest ground count among sharing circuits. */
+  sharedCount: number;
+  /** Grounds belonging to circuits that run their own. Summed, not maxed. */
+  separateCount: number;
+  /** Ground conductors physically in the pipe. What multiplies a length. */
+  totalCount: number;
+};
+
+export function runGrounds(circuits: readonly RunCircuit[]): RunGrounds {
+  let sharedCount = 0;
+  let separateCount = 0;
+  for (const circuit of circuits) {
+    const grounds = groundsOf(circuit);
+    if (circuit.separateGround) separateCount += grounds;
+    else sharedCount = Math.max(sharedCount, grounds);
+  }
+  return {
+    sharedCount,
+    separateCount,
+    totalCount: sharedCount + separateCount,
   };
 }
 /**
@@ -277,15 +367,24 @@ function groundsOf(circuit: RunCircuit): number {
 }
 
 /**
- * Everything pulled through the pipe for this circuit.
+ * Wires this circuit pulls ITSELF — its conductors, plus its own ground only.
  *
- * The number that multiplies a length, and the one that has to stay the same
- * across the split: a circuit written as 2 + 1 pulls exactly what one written
- * as 3 used to. Every footage below goes through here, so there is no path on
- * which the two can disagree.
+ * ── It used to be conductors + grounds, full stop ──────────────────────────
+ * That was right while every circuit carried its own ground. Since 2026-09-24
+ * the shared ground belongs to the RUN and is counted once there, so folding
+ * it in here would count it again per circuit — which is the over-count this
+ * whole change exists to remove.
+ *
+ * Every per-circuit footage goes through here, so there is no path on which
+ * the flat and the vertical can disagree about what a circuit pulls.
  */
-function conductorsOf(circuit: RunCircuit): number {
-  return insulatedOf(circuit) + groundsOf(circuit);
+function ownWiresOf(circuit: RunCircuit): number {
+  return insulatedOf(circuit) + ownGroundsOf(circuit);
+}
+
+/** A circuit's own grounds: what it pulls separately, or nothing if it shares. */
+function ownGroundsOf(circuit: RunCircuit): number {
+  return circuit.separateGround ? groundsOf(circuit) : 0;
 }
 
 /**
@@ -303,31 +402,38 @@ export function wireFeetByCircuit(
   run: TracedRun,
   circuits: RunCircuit[],
   ratio: number | null | undefined
-): { perCircuit: CircuitWire[]; totalFeet: number } | null {
+): {
+  perCircuit: CircuitWire[];
+  /** The shared ground's traced footage — once for the pipe, not per circuit. */
+  sharedGroundFeet: number;
+  /** Every conductor, shared ground included. */
+  totalFeet: number;
+} | null {
   if (run.pathType !== "conduit") return null;
   const length = runFeet(run, ratio);
   if (length === null) return null;
 
   const perCircuit = circuits.map(circuit => {
     const insulated = insulatedOf(circuit);
-    const grounds = groundsOf(circuit);
+    const ownGrounds = ownGroundsOf(circuit);
     /*
       Two footages and their sum, kept apart for the reason the vertical is
       kept apart from the traced length: they are different purchases. Bare
       copper cannot be ordered as THHN, and a ground is frequently a size down.
 
-      `flatFeet` is still both of them together, so every existing reader —
-      the panel, the totals, the materials list — is unchanged by the split.
+      The SHARED ground is not here at all — it belongs to the run, is pulled
+      once, and is returned beside this list. Only a circuit that runs its own
+      contributes ground footage of its own.
     */
     const insulatedFeet = round2(length * insulated);
-    const groundFeet = round2(length * grounds);
-    const flat = round2(insulatedFeet + groundFeet);
+    const ownGroundFeet = round2(length * ownGrounds);
+    const flat = round2(insulatedFeet + ownGroundFeet);
     return {
       name: circuit.name,
       conductorCount: insulated,
-      groundCount: grounds,
+      ownGroundCount: ownGrounds,
       insulatedFeet,
-      groundFeet,
+      ownGroundFeet,
       flatFeet: flat,
       // Traced wire only. Vertical wire is added by `quantitiesForRun`, which
       // is the one place that knows what is at the ends of this run.
@@ -336,8 +442,11 @@ export function wireFeetByCircuit(
     };
   });
 
-  const totalFeet = round2(perCircuit.reduce((sum, c) => sum + c.feet, 0));
-  return { perCircuit, totalFeet };
+  const sharedGroundFeet = round2(length * runGrounds(circuits).sharedCount);
+  const totalFeet = round2(
+    perCircuit.reduce((sum, c) => sum + c.feet, 0) + sharedGroundFeet
+  );
+  return { perCircuit, sharedGroundFeet, totalFeet };
 }
 
 /**
@@ -353,16 +462,25 @@ export function wireFeetByCircuit(
 export function verticalWireFeetByCircuit(
   verticalFeet: number,
   circuits: RunCircuit[]
-): { perCircuit: { name: string; feet: number }[]; totalFeet: number } {
+): {
+  perCircuit: { name: string; feet: number }[];
+  /** The shared ground goes down the drop ONCE, like the pipe around it. */
+  sharedGroundFeet: number;
+  totalFeet: number;
+} {
   const usable =
     Number.isFinite(verticalFeet) && verticalFeet > 0 ? verticalFeet : 0;
   const perCircuit = circuits.map(circuit => ({
     name: circuit.name,
-    feet: round2(usable * conductorsOf(circuit)),
+    feet: round2(usable * ownWiresOf(circuit)),
   }));
+  const sharedGroundFeet = round2(usable * runGrounds(circuits).sharedCount);
   return {
     perCircuit,
-    totalFeet: round2(perCircuit.reduce((sum, c) => sum + c.feet, 0)),
+    sharedGroundFeet,
+    totalFeet: round2(
+      perCircuit.reduce((sum, c) => sum + c.feet, 0) + sharedGroundFeet
+    ),
   };
 }
 
@@ -413,6 +531,44 @@ export type RunQuantities = {
   cableFeet: number | null;
   /** Wire per circuit, flat and vertical apart. Empty for a cable run. */
   wireByCircuit: CircuitWire[];
+  /**
+   * The ground conductors in this pipe, and where they came from.
+   *
+   * A run-level answer because the ground is a run-level thing: one shared
+   * pull sized to the largest circuit, plus any circuit that runs its own.
+   * `sharedCount` is 0 on a cable run — a cable's ground is inside the jacket.
+   */
+  grounds: RunGrounds;
+  /**
+   * BARE COPPER FOR THIS RUN — traced and vertical, shared and separate.
+   *
+   * The one number to read for ground footage. It used to be derived by
+   * summing `wireByCircuit[].groundFeet`, which three separate callers did by
+   * hand; the moment the shared ground stopped belonging to a circuit, every
+   * one of those would have reported zero ground on an ordinary run. So it is
+   * computed once, here, and the per-circuit field was renamed so the old
+   * summation cannot compile. 0 for a cable run, never null: a conduit run
+   * with no grounds really is zero bare copper.
+   */
+  groundFeet: number;
+  /**
+   * The TRACED share of all this run's wire — shared ground included.
+   *
+   * ── Here rather than summed from `wireByCircuit`, and that is the point ────
+   * The panel printed `flat + vertical = total` by adding up the circuit rows
+   * itself. The moment the shared ground stopped belonging to a circuit, those
+   * two sums stopped adding to `totalWireFeet` — so the line would have shown
+   * its own arithmetic failing, in public, on the screen whose job is showing
+   * where every foot came from. Same class as the three hand-mapped circuit
+   * rows of 2026-09-20: a total assembled by a caller goes stale silently when
+   * what it is made of changes.
+   *
+   * So the split is computed once, where the shared ground is known, and
+   * `wireFlatFeet + wireVerticalFeet === totalWireFeet` always.
+   */
+  wireFlatFeet: number;
+  /** The VERTICAL share of all this run's wire — shared ground included. */
+  wireVerticalFeet: number;
   /** All conductors, all circuits, verticals included. 0 for a cable run. */
   totalWireFeet: number;
 };
@@ -475,6 +631,12 @@ export function quantitiesForRun(
       conduitFeet: null,
       cableFeet: round2(length + verticalFeet),
       wireByCircuit: [],
+      // A cable's ground is inside the jacket and already paid for by
+      // `cableFeet`. Counting one here would buy it twice.
+      grounds: { sharedCount: 0, separateCount: 0, totalCount: 0 },
+      groundFeet: 0,
+      wireFlatFeet: 0,
+      wireVerticalFeet: 0,
       totalWireFeet: 0,
     };
   }
@@ -490,6 +652,25 @@ export function quantitiesForRun(
     };
   });
 
+  /*
+    Ground footage, added up in ONE place.
+
+    The shared pull, flat and vertical, plus whatever the circuits running
+    their own contribute. Every caller reads this rather than re-deriving it —
+    see the field's comment for what happened to the three that used to.
+  */
+  const groundFeet = round2(
+    (flatWire?.sharedGroundFeet ?? 0) +
+      verticalWire.sharedGroundFeet +
+      wireByCircuit.reduce((sum, c) => sum + c.ownGroundFeet, 0) +
+      // An own ground's share of that circuit's vertical: its drops, once per
+      // ground, which is exactly what `ownWiresOf` already counted for it.
+      circuits.reduce(
+        (sum, circuit) => sum + verticalFeet * ownGroundsOf(circuit),
+        0
+      )
+  );
+
   return {
     pathType: "conduit",
     runFeet: length,
@@ -498,6 +679,10 @@ export function quantitiesForRun(
     conduitFeet: round2(length + verticalFeet),
     cableFeet: null,
     wireByCircuit,
+    grounds: runGrounds(circuits),
+    groundFeet,
+    wireFlatFeet: round2(flatWire?.totalFeet ?? 0),
+    wireVerticalFeet: round2(verticalWire.totalFeet),
     totalWireFeet: round2((flatWire?.totalFeet ?? 0) + verticalWire.totalFeet),
   };
 }
@@ -607,8 +792,12 @@ export function totalQuantities(
     conduit += quantities.conduitFeet ?? 0;
     cable += quantities.cableFeet ?? 0;
     wire += quantities.totalWireFeet;
-    for (const circuit of quantities.wireByCircuit)
-      wireGround += circuit.groundFeet;
+    /*
+      The run's own figure, not a sum over its circuits. The shared ground does
+      not belong to any circuit, so summing them would report zero bare copper
+      on an ordinary run — which is every run, by default.
+    */
+    wireGround += quantities.groundFeet;
 
     /*
       ASK THE ENDS, NEVER THE FOOTAGE — and ask through the same function the
@@ -629,6 +818,14 @@ export function totalQuantities(
       conduitVertical += quantities.verticalFeet;
       for (const circuit of quantities.wireByCircuit)
         wireVertical += circuit.verticalFeet;
+      /*
+        The shared ground's drops, which belong to no circuit and so appear in
+        none of the rows above. It goes down the drop once, like the pipe
+        around it. Left out, this line's figure is short by exactly the
+        vertical bare copper — the quiet kind of wrong, since the flat footage
+        beside it would still look right.
+      */
+      wireVertical += quantities.verticalFeet * quantities.grounds.sharedCount;
     } else {
       cableVertical += quantities.verticalFeet;
     }
