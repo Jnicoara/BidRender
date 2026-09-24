@@ -105,11 +105,31 @@ below what you last saw, the script is not running everything it should, which
 is a different problem from a failure and is easy to read past. See CLAUDE.md
 § "A checklist that states a count".
 
-It is **idempotent** — safe to re-run; it normalises any fork left by a
-previous run and uses timestamped names for created rows.
+It is **safe to re-run, but not free**: it normalises any fork left by a
+previous run and uses timestamped names for created rows, but the archive
+checks leave one starter material permanently hidden for the account each run
+(a "deleted" tombstone, by design). Never point it at an account whose library
+matters.
 
 Overrides: `BASE_URL=http://localhost:3002` to skip probing, `OPEN_ID=<openId>`
 to act as a different user.
+
+### Against the live site
+
+There is a dedicated account for this on production: **`smoke-test@bidridge.com`**
+(user 1421, created 2026-09-24, password discarded because minting a token does
+not need it). It needs the production `JWT_SECRET`. Read that from
+`.env.production.local` into the environment. Never print it:
+
+```bash
+JWT_SECRET="$(grep '^JWT_SECRET=' .env.production.local | cut -d= -f2-)" \
+BASE_URL=https://bidridge.com OPEN_ID=email_FlPZhGneajyA1guRimb92GK4 \
+node .claude/skills/run-bidrender/smoke.mjs
+```
+
+Production has two real users besides it. Do not run the smoke as either one.
+If that openId stops resolving, look it up with `--list-users` and
+`DATABASE_URL` from the same file. That query is a SELECT, and it prints emails.
 
 Extend this script when you add routers — it is the fastest way to exercise
 real HTTP behaviour without a browser.

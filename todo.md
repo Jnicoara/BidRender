@@ -1059,6 +1059,10 @@ the one direction that loses work — the files it removed were the only copies.
 Almost certainly OneDrive: the folder is inside `OneDrive\Documents`, and the
 sync client holds handles on files while git is trying to move them.
 
+> **2026-09-24:** the working copy moved to `C:\dev\BidPhase`, outside OneDrive,
+> so this checkout no longer has the cause. The hook stays anyway — CLAUDE.md
+> § "Use `git worktree`, not `git stash`" says why.
+
 **If it has already happened, the work is recoverable and here is where.** An
 untracked file lives in the stash's third parent, which `git stash show` does
 not list:

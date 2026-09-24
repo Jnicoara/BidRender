@@ -630,29 +630,45 @@ rather than fixed three times. `HeightFields` takes `unsetLabel` and `setLabel`
 for exactly this; anything else that renders an inheritable value needs the
 same seam.
 
-## Never `git stash` in this checkout — use `git worktree` instead
+## The working copy is `C:\dev\BidPhase` — not the OneDrive folder
 
-**This repo lives inside `OneDrive\Documents`, and the sync client holds file
-handles while git is trying to move files.** `git stash` half-completes here.
-The documented case (2026-09-18) left the stash entry created, the tracked
-modifications still in the working tree, and **the untracked files deleted from
-disk** — half-applied in the one direction that loses work.
+**Moved 2026-09-24.** The live checkout is `C:\dev\BidPhase`, a fresh clone of
+the GitHub repo with the git-ignored files (`.env*`, `.local-storage/`,
+`.claude/settings.local.json`) copied across. The old folder,
+`OneDrive\Documents\GitHub\BidPhase`, is still on disk at the commit it was left
+at. **Do not edit it** — nothing there is what ships, and both folders share one
+local MySQL, so a server started from the old one quietly runs old code against
+current data.
+
+## Use `git worktree`, not `git stash` — a hook refuses stash
 
 ```bash
 git worktree add ../bidrender-check HEAD   # a clean tree in its own directory
 ```
 
-A worktree is a separate directory, so nothing touches the files being worked
-in, and it answers the question stash is usually reached for: _does this happen
-without my changes?_
+A worktree answers the question stash is usually reached for — _does this
+happen without my changes?_ — without touching the files being worked in.
+`.claude/hooks/block-git-stash.mjs` refuses every `git stash` command, including
+`list` and `show` (read `git reflog show refs/stash` instead), and any command
+that merely contains the phrase, such as a grep for it.
 
-**This note is here rather than only in todo.md because todo.md is a file you
-go looking in, and this is needed at the moment you are about to type the
-command.** It was written down, in detail, and then reached for anyway on the
-same day it was written — which says the location was wrong, not the warning.
+**Why the block existed, and why it outlived that reason.** Until 2026-09-24 the
+repo lived inside OneDrive, whose sync client holds file handles while git moves
+files. On 2026-09-18 `git stash push --include-untracked` half-completed there:
+the stash entry was created, the tracked changes stayed put, and **the untracked
+files were deleted from disk** — the only copies. `C:\dev` is not synced, so
+that fault is gone from this checkout. The hook stays because:
 
-**If it has already happened, the work is recoverable**: an untracked file lives
-in the stash's third parent, which `git stash show` does not list.
+- **the hook travels with the repo, the folder does not.** It is committed, so
+  it also guards the old OneDrive copy and any future clone into a synced
+  folder, which is exactly where the fault lives;
+- **a worktree is the better tool anyway.** Stash with untracked files still
+  loses work outside OneDrive — a `pop` that conflicts, or a stash forgotten
+  under three others — and a worktree cannot do either;
+- **it costs one rephrased command.** Remove it if that stops being true.
+
+**If a stash has been made anyway, the work is recoverable**: an untracked file
+lives in the stash's third parent, which `git stash show` does not list.
 `todo.md` § "Working on this repo — traps" has the four commands, and the
 `git diff stash@{0} --stat` check to run before dropping anything.
 

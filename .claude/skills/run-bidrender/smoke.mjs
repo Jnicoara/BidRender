@@ -53,7 +53,9 @@ async function findBaseUrl(token) {
         signal: AbortSignal.timeout(2000),
       });
       const body = await res.json().catch(() => null);
-      if (body?.result?.data?.json?.openId) return base;
+      // auth.me withholds openId (shared/publicUser.ts), so "signed in" is a
+      // numeric id coming back rather than null.
+      if (typeof body?.result?.data?.json?.id === "number") return base;
       if (body) rejected.push(port);
     } catch {
       // port not listening â€” try the next
@@ -125,17 +127,27 @@ async function expectReject(label, promise, pattern) {
 const token = await mintToken(OPEN_ID);
 const baseUrl = await findBaseUrl(token);
 console.log(`\nServer:  ${baseUrl}`);
-console.log(`Acting as: ${OPEN_ID}\n`);
+console.log(`Acting as: ${OPEN_ID}`);
+console.log(`User id:   ${(await makeClient(baseUrl, token).query("auth.me"))?.id}\n`);
 
 const api = makeClient(baseUrl, token);
 
 // â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 console.log("auth");
 const me = await api.query("auth.me");
+// Corrected 2026-09-24: this compared me.openId to OPEN_ID, and failed on every
+// run from v5.127 on, when auth.me stopped sending openId to the browser
+// (shared/publicUser.ts). The token was minted for OPEN_ID, so a user coming
+// back at all is the proof; the id and the absence of openId are checked too.
 check(
   "auth.me returns the signed-in user",
-  me?.openId === OPEN_ID,
-  `got ${me?.openId}`
+  typeof me?.id === "number",
+  `got ${JSON.stringify(me)}`
+);
+check(
+  "auth.me does not send openId to the browser",
+  me != null && !("openId" in me),
+  `got openId ${me?.openId}`
 );
 
 await expectReject(
@@ -342,10 +354,32 @@ console.log("\nmaterials.archive");
 const baselineRow = (await api.query("materials.list")).find(
   m => m.userId === null
 );
-await expectReject(
-  "refuses to remove a starter material",
-  api.mutate("materials.archive", { id: baselineRow.id }),
-  /cannot be removed/i
+// Corrected 2026-09-24: this expected a refusal, which stopped being the
+// contract at a051f53. Archiving a starter material now forks a private copy
+// and archives THAT, so it leaves this company's list while the shipped row —
+// shared by every company — stays exactly as it was.
+const archivedStarter = await api.mutate("materials.archive", {
+  id: baselineRow.id,
+});
+check(
+  "archiving a starter material archives a private copy, not the shipped row",
+  archivedStarter?.id != null && archivedStarter.id !== baselineRow.id,
+  `got id ${archivedStarter?.id}, shipped row is ${baselineRow.id}`
+);
+check(
+  "the archived starter leaves this user's list",
+  !(await api.query("materials.list")).some(m => m.name === baselineRow.name)
+);
+// Deleting that copy for good leaves a "deleted" tombstone (server/db.ts,
+// deleteLibraryRowForever), so the starter stays gone for this company rather
+// than reappearing as though the delete had failed. The cost: EVERY RUN HIDES
+// ONE MORE STARTER for the account it acts as. Run it as a disposable account,
+// never as somebody whose library is real — on bidridge.com that is
+// smoke-test@bidridge.com (see SKILL.md).
+await api.mutate("materials.deleteForever", { id: archivedStarter.id });
+check(
+  "deleting the private copy does not bring the shipped row back",
+  !(await api.query("materials.list")).some(m => m.id === baselineRow.id)
 );
 
 await api.mutate("materials.archive", { id: created.id });

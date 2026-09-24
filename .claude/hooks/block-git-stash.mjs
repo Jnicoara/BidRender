@@ -8,11 +8,16 @@
  * command is typed. This is.
  *
  * ── Why stash is unsafe here ─────────────────────────────────────────────────
- * The repo lives inside OneDrive. The sync client holds file handles while git
- * is trying to move files, so `git stash push` half-completes: the stash entry
- * is created, the tracked modifications stay in the working tree, and untracked
- * files can be deleted from disk. Half-applied in the one direction that loses
- * work — the files it removes are the only copies.
+ * The repo lived inside OneDrive until 2026-09-24. The sync client holds file
+ * handles while git is trying to move files, so `git stash push` half-completed:
+ * the stash entry was created, the tracked modifications stayed in the working
+ * tree, and untracked files were deleted from disk. Half-applied in the one
+ * direction that loses work — the files it removed were the only copies.
+ *
+ * The working copy is now C:\dev\BidPhase, which is not synced. The hook stays
+ * because it travels with the repo into any clone, including the old OneDrive
+ * copy, and because a worktree is the better tool regardless — see CLAUDE.md,
+ * "Use `git worktree`, not `git stash`".
  *
  * ── The contract ─────────────────────────────────────────────────────────────
  * Reads the PreToolUse payload on stdin, writes a `deny` decision when the Bash
@@ -68,7 +73,7 @@ const DENY_MESSAGE = `git stash is NOT safe in this checkout. Use a worktree ins
 
     git worktree add ../bidrender-check HEAD
 
-Why: this repo lives inside OneDrive, and the sync client holds file handles while git is trying to move files. stash half-completes here — the stash entry is created, tracked modifications stay in the working tree, and untracked files can be deleted from disk. That is half-applied in the one direction that loses work, and it has already happened.
+Why: this repo used to live inside OneDrive, where the sync client holds file handles while git moves files, and stash half-completed there — the stash entry was created, tracked modifications stayed in the working tree, and untracked files were deleted from disk. The working copy is now C:\\dev\\BidPhase, but this hook travels with every clone, including ones in synced folders, and a stash with untracked files can still lose work anywhere (a conflicting pop, a forgotten entry).
 
 A worktree is a separate directory, so nothing touches the files you are working in, and it answers the question stash is usually reached for: does this still happen without my changes?
 
