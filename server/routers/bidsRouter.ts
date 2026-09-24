@@ -50,6 +50,12 @@ import {
   type BridgeGroup,
   type BridgeLine,
 } from "../../shared/takeoffBridge";
+import {
+  followsDrawing,
+  quantitySource,
+  typedQuantityRefusal,
+  unlockChanges,
+} from "../../shared/quantityLock";
 import * as db from "../db";
 
 /**
@@ -638,6 +644,76 @@ export const bidsRouter = router({
       };
     }),
 
+  /**
+   * Where this bid stands with the quantity lock, and what unlocking would do.
+   *
+   * ── Why the changes are MEASURED rather than described ────────────────────
+   * "Unlocking may change some quantities" is a warning nobody can act on. This
+   * asks the drawing what it says today, compares it with what the bid is
+   * holding, and hands back the differences by name — so the confirmation can
+   * print "Exit sign LED: 14 → 16" and the estimator either recognises that or
+   * cancels. CLAUDE.md § "A number that can be measured should not be asserted".
+   *
+   * ── Empty `changes` on an UNLOCKED bid, always ────────────────────────────
+   * Its lines are already reading the drawing, so there is nothing pending.
+   * Comparing the stored column against the resolved one there would report
+   * every line sent before the last mark as a "change", which is a warning about
+   * nothing on a screen that is already correct.
+   */
+  quantityLock: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const { lockedAt, lines } = await db.compareBidQuantitiesWithPlans(
+        input.bidId
+      );
+      const following = lines.filter(followsDrawing);
+      return {
+        lockedAt,
+        /** Lines whose quantity comes from the plans — what a lock holds. */
+        followingLines: following.length,
+        changes: lockedAt === null ? [] : unlockChanges(following),
+      };
+    }),
+
+  /**
+   * Freeze the quantities — the estimator saying "this bid is what I sent".
+   *
+   * ── Never automatic, and never on a status change ─────────────────────────
+   * A bid marked Won is often still being adjusted, and a lock the app applied
+   * is a number frozen at an instant the app chose. Same reasoning as sending a
+   * count to the bid being a button (§ 5f.0 OVERRIDE 2). One deliberate act.
+   *
+   * ── Locking a bid twice is not an error ───────────────────────────────────
+   * It re-reads the drawing and re-stamps the time, which is what somebody who
+   * pressed it again meant. Refusing would be a dialog explaining a state they
+   * cannot see.
+   */
+  lockQuantities: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      // The clock is passed in rather than read inside, so the date on the
+      // banner and the date in the row are one value. See db.lockBidQuantities.
+      return db.lockBidQuantities(input.bidId, new Date());
+    }),
+
+  /**
+   * Let the quantities follow the plans again.
+   *
+   * The numbers this moves are named by `quantityLock` above, which the screen
+   * shows before asking. This mutation is the answer to that question, not the
+   * place the question is asked — a confirmation built server-side would be a
+   * second copy of the same comparison, computed at a different instant.
+   */
+  unlockQuantities: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      await db.unlockBidQuantities(input.bidId);
+      return { success: true };
+    }),
+
   /** Add an assembly to the bid, freezing its costs as they are right now. */
   addAssembly: procedure
     .input(
@@ -716,7 +792,7 @@ export const bidsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
 
       /*
         What a from-plans line IS and HOW MANY of it there are both belong to
@@ -739,13 +815,36 @@ export const bidsRouter = router({
       */
       if (input.qty !== undefined || input.name !== undefined) {
         const line = await db.getBidLineItem(input.id, input.bidId);
-        if (line && line.takeoffGroupId !== null) {
+        const source =
+          line === undefined
+            ? "typed"
+            : quantitySource(line, bid.quantitiesLockedAt);
+        if (input.qty !== undefined && source !== "typed") {
+          /*
+            A LOCKED bid is refused too, and the sentence is different.
+
+            "Change it by marking on the Plans screen" is true while the line is
+            following and a lie the moment it is frozen — marking is precisely
+            what will not move it. A message that quietly restates the old
+            meaning beside a number carrying the new one reads as confirmation
+            (CLAUDE.md § a label describing the OLD meaning), so the wording is
+            generated from the lock state by the module that owns it.
+
+            Why locked is refused at all, rather than becoming typeable: the
+            column now holds the drawing's answer, and a typed number over the
+            top of it would be lost the moment somebody unlocks — an edit
+            accepted and then dropped, which is worse than one refused. Unlock,
+            or change the marks.
+          */
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message:
-              input.qty !== undefined
-                ? `This line counts ${Number(line.qty)} marks on the plans. Change it by marking or unmarking on the Plans screen.`
-                : `This line is named by the count it came from. Rename that count on the Plans screen and the line follows.`,
+            message: typedQuantityRefusal(source, Number(line?.qty ?? 0)),
+          });
+        }
+        if (line && input.name !== undefined && line.takeoffGroupId !== null) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `This line is named by the count it came from. Rename that count on the Plans screen and the line follows.`,
           });
         }
       }

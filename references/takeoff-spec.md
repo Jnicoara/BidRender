@@ -540,7 +540,25 @@ Everything else below is still open until you say so.
   drawing, big enough for a finger.
 
 **D2 — How counts reach the bid (R1). Decided 2026-09-14: (a). AMENDED
-2026-09-19 — read the override below before building against this.**
+2026-09-19 and again 2026-09-24 — read both overrides below before building
+against this.**
+
+> **"Follows the marks for ever" now has ONE end: the estimator locking the
+> bid.** `references/plan-viewer-overhaul.md` § 5f.0 OVERRIDE 3 (2026-09-24)
+> amends (a) a second time: a bid carries `quantitiesLockedAt`, and while it is
+> set every from-plans line reads the number the drawing gave when it was
+> locked. Unlocking hands it back, after a confirmation naming every quantity
+> that will move.
+>
+> **Why:** (a)'s rule is right while a bid is being built and wrong the day
+> after it was sent, when opening the drawing to look at something moves a
+> number behind a price a customer already has. Nothing here is automatic — no
+> status change locks a bid — so (a) still describes every bid until somebody
+> says otherwise. The decision, the copy and the comparison live in
+> `shared/quantityLock.ts`; the check itself is in `withPlanCounts`
+> (`server/db.ts`), which is the one place every reader of a bid passes through.
+>
+> Recorded in both files per `CLAUDE.md` § "Where decisions live".
 
 > **The FIRST crossing is now an explicit act.** `references/plan-viewer-overhaul.md`
 > § 5f.0 OVERRIDE 2 amends (a): asking is what CREATES the line, and from then

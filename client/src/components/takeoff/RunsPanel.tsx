@@ -297,6 +297,7 @@ export function RunsPanel({
   runTypeBridge,
   onSendRunType,
   sendingRunTypeId,
+  quantitiesLocked = false,
 }: {
   runs: PanelRun[];
   /**
@@ -313,6 +314,16 @@ export function RunsPanel({
   stampGroups: PanelStampGroup[];
   /** Each count's relationship to the bid, by group id. */
   bridge?: ReadonlyMap<number, GroupBridgeState>;
+  /**
+   * Whether the bid's quantities are frozen (shared/quantityLock.ts).
+   *
+   * It changes what every "on the bid" line in this panel MEANS, so it is one
+   * prop read in three places rather than three separate booleans. Defaulted to
+   * false so a caller that does not know yet shows the ordinary wording — which
+   * is the right guess on the overwhelming majority of bids, and is corrected by
+   * the query landing rather than by a flicker.
+   */
+  quantitiesLocked?: boolean;
   /**
    * How many counts are priced, marked, and not yet on the bid.
    *
@@ -500,7 +511,21 @@ export function RunsPanel({
               if (state.onBid) {
                 return (
                   <p className="mt-1 text-[0.7rem] text-muted-foreground">
-                    On the bid — the line follows these marks
+                    {/*
+                      LOCKED IS SAID HERE, not left to the bid screen.
+
+                      This is the screen somebody is standing on while they
+                      place marks, and "the line follows these marks" is a
+                      promise that is false the moment the bid is frozen. A
+                      sentence that quietly restates the old behaviour beside
+                      work somebody is doing right now reads as confirmation —
+                      they would place fourteen and never wonder why the total
+                      did not move. CLAUDE.md § a label describing the OLD
+                      meaning.
+                    */}
+                    {quantitiesLocked
+                      ? "On the bid — locked, so these marks no longer change it"
+                      : "On the bid — the line follows these marks"}
                   </p>
                 );
               }
@@ -570,6 +595,23 @@ export function RunsPanel({
           badge on the drawing, where level 1's promise of a quiet count was
           made.
         */}
+        {/*
+          A frozen bid, said once, where the summary already lives.
+
+          Drawn whenever the bid is locked rather than only when something is
+          counted: somebody tracing a run on a locked bid needs it as much as
+          somebody marking one, and this is the panel both of them have open. It
+          does NOT go on the drawing — level 1's promise of a quiet count, and
+          § 5f, which forbids a badge on the sheet.
+        */}
+        {quantitiesLocked ? (
+          <p className="px-3 py-2 text-[0.7rem] text-muted-foreground border-b border-border">
+            This bid's quantities are locked, so nothing you mark or trace
+            changes what is on it. Unlock it on the bid to let the lines follow
+            again.
+          </p>
+        ) : null}
+
         {stampGroups.length > 0 && waitingToSend !== undefined ? (
           <p className="px-3 py-2 text-[0.7rem] text-muted-foreground border-b border-border">
             {waitingToSend > 0
@@ -691,12 +733,25 @@ export function RunsPanel({
                   */}
                   {entry.rows.some(row => row.onBid) && (
                     <p className="mt-1 text-[0.7rem] text-muted-foreground">
-                      {entry.rows.filter(row => row.onBid).length} on the bid —
-                      the{" "}
-                      {entry.rows.filter(row => row.onBid).length === 1
-                        ? "line follows"
-                        : "lines follow"}{" "}
-                      the drawing
+                      {entry.rows.filter(row => row.onBid).length} on the bid
+                      {quantitiesLocked ? (
+                        <>
+                          {" "}
+                          — locked, so tracing no longer changes{" "}
+                          {entry.rows.filter(row => row.onBid).length === 1
+                            ? "it"
+                            : "them"}
+                        </>
+                      ) : (
+                        <>
+                          {" "}
+                          — the{" "}
+                          {entry.rows.filter(row => row.onBid).length === 1
+                            ? "line follows"
+                            : "lines follow"}{" "}
+                          the drawing
+                        </>
+                      )}
                     </p>
                   )}
                   {sendable.length > 0 && onSendRunType ? (

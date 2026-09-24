@@ -145,7 +145,7 @@ export const takeoffGroupsRouter = router({
   list: procedure
     .input(z.object({ bidId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
-      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
       const [groups, counts] = await Promise.all([
         db.getGroupsForBid(input.bidId, ctx.scope.dataUserId),
         db.countStampsByGroup(input.bidId, ctx.scope.dataUserId),
@@ -186,6 +186,16 @@ export const takeoffGroupsRouter = router({
          * entirely. Caught by looking at the screen, not by a test.
          */
         countedWithNoPrice: countsWithNoPrice(rows, bridgeLines),
+        /**
+         * When this bid's quantities were frozen, or NULL while they follow.
+         *
+         * Here rather than in a query of its own because this is the call the
+         * panel already makes on every mark change — a second query would be a
+         * second thing to invalidate, and the one that got forgotten would leave
+         * the panel telling somebody their marks are moving the bid when they
+         * are not. shared/quantityLock.ts owns what the state means.
+         */
+        quantitiesLockedAt: bid.quantitiesLockedAt,
       };
     }),
 

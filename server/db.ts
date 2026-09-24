@@ -190,6 +190,7 @@ import {
 } from "../shared/bidSearch";
 import { addAssemblyOverheadHours } from "../shared/pricing";
 import { resolveLineQty } from "../shared/takeoffBridge";
+import { followsDrawing } from "../shared/quantityLock";
 import type { PlanRemovalImpact } from "../shared/planRemoval";
 
 let _db: MySql2Database | null = null;
@@ -4437,27 +4438,18 @@ async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
  */
 async function withTracedFootage(
   bidId: number,
+  /**
+   * The bid, already loaded by the caller.
+   *
+   * `withPlanCounts` has to read this row anyway — the lock lives on it — and
+   * two selects of the same row is one more query on every bid screen for
+   * nothing. The owner comes off the bid rather than being threaded through
+   * every caller, which would be the same userId arriving by a longer route.
+   */
+  bid: { userId: number; distributionHeightInches: number | null },
   rows: BidLineItem[]
 ): Promise<BidLineItem[]> {
   if (!rows.some(row => row.takeoffRunTypeId !== null)) return rows;
-
-  /*
-    The bid owns the scope. This function is reached with a bidId alone, and
-    every loader below is user-scoped — so the owner is read off the bid rather
-    than threaded through every caller, which would be the same userId arriving
-    by a longer route.
-  */
-  const db = await getDb();
-  if (!db) return rows;
-  const [bid] = await db
-    .select({
-      userId: bids.userId,
-      distributionHeightInches: bids.distributionHeightInches,
-    })
-    .from(bids)
-    .where(eq(bids.id, bidId))
-    .limit(1);
-  if (!bid) return rows;
 
   const [runs, scales] = await Promise.all([
     getRunsForBid(bidId, bid.userId),
@@ -4519,16 +4511,105 @@ function feetForRole(
   }
 }
 
+/**
+ * THE LOCK CHECK, in the one place every reader already passes through.
+ *
+ * ── Why here and nowhere else ────────────────────────────────────────────────
+ * The bid screen, the proposal, the accounting export, the close-out, the
+ * supplier list and the dashboard all read `getBidLineItems`, which is this.
+ * A lock applied in a router would be a lock the proposal did not have, and a
+ * proposal quoting a number the bid screen no longer shows is the exact failure
+ * a lock exists to prevent. One question, asked once, for every reader.
+ *
+ * Locked means the stored `qty` IS the answer — the lock wrote the drawing's
+ * number into that column, so there is nothing to re-derive. See
+ * shared/quantityLock.ts.
+ *
+ * ── THE NAME STILL FOLLOWS, and that is deliberate ───────────────────────────
+ * This freezes HOW MANY, which is what the estimator asked for and what the
+ * column is called. A count's label is not a quantity: renaming "Exit signs" to
+ * "Exit signs — type A" on the drawing is a correction to what the thing is
+ * called on this job, and a locked bid still showing the old word would be
+ * calling one thing two names for no benefit. Nothing about money moves either
+ * way (R4).
+ */
 async function withPlanCounts(
   bidId: number,
   rows: BidLineItem[]
 ): Promise<BidLineItem[]> {
-  const withRunFootage = await withTracedFootage(bidId, rows);
+  if (!rows.some(followsDrawing)) return rows;
+  const bid = await getBidResolutionContext(bidId);
+  if (!bid) return rows;
+  return resolveAgainstPlans(bidId, bid, rows, {
+    /*
+      Locked: hold the numbers, resolve the labels. The two halves are separated
+      here rather than by an early return, because an early return would freeze
+      the label as a side effect of freezing the quantity — a decision nobody
+      made, arriving as a line that goes on showing a name its count has not had
+      for a week.
+    */
+    quantities: bid.quantitiesLockedAt === null,
+  });
+}
+
+/**
+ * What the plans say about this bid's lines RIGHT NOW, lock or no lock.
+ *
+ * Two callers, and both of them are the lock itself: `lockBidQuantities` needs
+ * the drawing's answer in order to write it down, and the unlock confirmation
+ * needs it in order to say what would change. Nothing else may use this —
+ * every ordinary read goes through `getBidLineItems`, or the lock is not a lock.
+ */
+export async function resolveBidLinesFromPlans(
+  bidId: number,
+  rows: BidLineItem[]
+): Promise<BidLineItem[]> {
+  if (!rows.some(followsDrawing)) return rows;
+  const bid = await getBidResolutionContext(bidId);
+  if (!bid) return rows;
+  return resolveAgainstPlans(bidId, bid, rows, { quantities: true });
+}
+
+/** The three fields resolving a bid's lines needs, in one read. */
+async function getBidResolutionContext(bidId: number): Promise<
+  | {
+      userId: number;
+      distributionHeightInches: number | null;
+      quantitiesLockedAt: Date | null;
+    }
+  | undefined
+> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [bid] = await db
+    .select({
+      userId: bids.userId,
+      distributionHeightInches: bids.distributionHeightInches,
+      quantitiesLockedAt: bids.quantitiesLockedAt,
+    })
+    .from(bids)
+    .where(eq(bids.id, bidId))
+    .limit(1);
+  return bid;
+}
+
+async function resolveAgainstPlans(
+  bidId: number,
+  bid: { userId: number; distributionHeightInches: number | null },
+  rows: BidLineItem[],
+  options: { quantities: boolean }
+): Promise<BidLineItem[]> {
+  const withRunFootage = options.quantities
+    ? await withTracedFootage(bidId, bid, rows)
+    : rows;
   rows = withRunFootage;
   if (!rows.some(row => row.takeoffGroupId !== null)) return rows;
 
   const [counted, groups] = await Promise.all([
-    stampCountsForBid(bidId),
+    // Not asked for at all when the quantities are frozen: the marks cannot
+    // change the answer, and counting them to throw the result away is a query
+    // per bid on every dashboard for nothing.
+    options.quantities ? stampCountsForBid(bidId) : new Map<number, number>(),
     getGroupsForBidUnscoped(bidId),
   ]);
   const labels = new Map(groups.map(group => [group.id, group.label]));
@@ -4554,14 +4635,18 @@ async function withPlanCounts(
 
   return rows.map(row => {
     if (row.takeoffGroupId === null) return row;
-    const qty = resolveLineQty(
-      { takeoffGroupId: row.takeoffGroupId, qty: Number(row.qty) },
-      counts
-    );
+    const qty = options.quantities
+      ? resolveLineQty(
+          { takeoffGroupId: row.takeoffGroupId, qty: Number(row.qty) },
+          counts
+        ).toFixed(4)
+      : // Frozen. The stored column is the answer the lock wrote, so it is
+        // passed through untouched rather than re-derived and re-rounded.
+        row.qty;
     const label = labels.get(row.takeoffGroupId);
     return {
       ...row,
-      qty: qty.toFixed(4),
+      qty,
       // The live label wins while there is one; the snapshot on the line is
       // the fallback, which is the same two-step `stampName` and `runName`
       // already use for a name that lives somewhere else.
@@ -4571,14 +4656,144 @@ async function withPlanCounts(
 }
 
 export async function getBidLineItems(bidId: number): Promise<BidLineItem[]> {
+  return withPlanCounts(bidId, await storedBidLineItems(bidId));
+}
+
+/**
+ * The live lines exactly as the table holds them — nothing resolved.
+ *
+ * Only the lock reads this: it has to see the stored number to know whether it
+ * differs from the drawing's. Everything else wants `getBidLineItems`, because a
+ * stored quantity escaping to a screen is a bid disagreeing with its own plans.
+ */
+async function storedBidLineItems(bidId: number): Promise<BidLineItem[]> {
   const db = await getDb();
   if (!db) return [];
-  const rows = await db
+  return db
     .select()
     .from(bidLineItems)
     .where(and(eq(bidLineItems.bidId, bidId), isNull(bidLineItems.archivedAt)))
     .orderBy(asc(bidLineItems.sortOrder), asc(bidLineItems.id));
-  return withPlanCounts(bidId, rows);
+}
+
+/**
+ * Both numbers for every line that follows the plans: what the bid says, and
+ * what the drawing says today.
+ *
+ * This is what makes the unlock confirmation able to NAME what will change
+ * rather than warning that something might. See shared/quantityLock.ts
+ * § `unlockChanges`.
+ *
+ * `lockedQty` is the STORED column and `drawingQty` is the resolved one, so on
+ * an unlocked bid the pair reads "what was written when the line was sent" and
+ * "what it actually shows" — which is not a pending change and is why the router
+ * only compares them when the bid is locked.
+ */
+export async function compareBidQuantitiesWithPlans(bidId: number): Promise<{
+  lockedAt: Date | null;
+  lines: {
+    id: number;
+    name: string;
+    takeoffGroupId: number | null;
+    takeoffRunTypeId: number | null;
+    lockedQty: number;
+    drawingQty: number;
+  }[];
+}> {
+  const stored = await storedBidLineItems(bidId);
+  const [context, fromPlans] = await Promise.all([
+    getBidResolutionContext(bidId),
+    resolveBidLinesFromPlans(bidId, stored),
+  ]);
+  const storedById = new Map(stored.map(row => [row.id, row]));
+  return {
+    lockedAt: context?.quantitiesLockedAt ?? null,
+    lines: fromPlans.map(line => ({
+      id: line.id,
+      // The resolved name, because it is the one on the screen the estimator is
+      // reading the confirmation from.
+      name: line.name,
+      takeoffGroupId: line.takeoffGroupId,
+      takeoffRunTypeId: line.takeoffRunTypeId,
+      lockedQty: Number(storedById.get(line.id)?.qty ?? line.qty),
+      drawingQty: Number(line.qty),
+    })),
+  };
+}
+
+/**
+ * Freeze this bid's quantities: write the drawing's answer down, then stop
+ * following it.
+ *
+ * ── The order is the safety, and it only goes one way ────────────────────────
+ * Quantities first, the timestamp last. A failure in the middle leaves the bid
+ * UNLOCKED with some lines holding the number they were already showing, which
+ * is no change at all and finishes correctly on the next attempt. The other
+ * order would stamp a bid as locked while some of its lines still held whatever
+ * was written the day they were sent — a frozen bid quoting a stale number, with
+ * nothing on screen to say so. Same reasoning as the purge sweep: when the steps
+ * cannot be one statement, pick the failure that keeps following.
+ *
+ * ── It is NOT `updateBidLineItem`, on purpose ────────────────────────────────
+ * That one forks a linked unit, because an edit to a copy of "Room 101" means
+ * this room is different now. Locking is not a hand edit — it writes the number
+ * the line was already showing — so forking every linked unit on the bid would
+ * break the template link of a job somebody locks for entirely unrelated
+ * reasons.
+ *
+ * ── The clock is a parameter ─────────────────────────────────────────────────
+ * So a test can say when. Nothing on a path that decides what a screen says
+ * about a date may read `Date.now()` for itself (CLAUDE.md § Scheduled work).
+ */
+export async function lockBidQuantities(
+  bidId: number,
+  at: Date
+): Promise<{ lockedAt: Date; frozen: number; moved: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+
+  const stored = await storedBidLineItems(bidId);
+  const fromPlans = await resolveBidLinesFromPlans(bidId, stored);
+  const storedById = new Map(stored.map(row => [row.id, row]));
+
+  let frozen = 0;
+  let moved = 0;
+  for (const line of fromPlans) {
+    if (!followsDrawing(line)) continue;
+    frozen += 1;
+    const before = storedById.get(line.id);
+    if (before && before.qty === line.qty) continue;
+    moved += 1;
+    await db
+      .update(bidLineItems)
+      .set({ qty: line.qty, updatedAt: at })
+      .where(and(eq(bidLineItems.id, line.id), eq(bidLineItems.bidId, bidId)));
+  }
+
+  await db
+    .update(bids)
+    .set({ quantitiesLockedAt: at })
+    .where(eq(bids.id, bidId));
+
+  /*
+    `moved` is an OUTCOME, not an intent: it counts the rows whose stored number
+    actually differed from the drawing's and were rewritten. It is normally 0,
+    because every read has been showing the drawing's number all along — a
+    non-zero value means the column had drifted from what the screen said, which
+    is worth being able to see. CLAUDE.md § "A COUNT TAKEN BEFORE THE CHANGE IS
+    INTENT, NOT OUTCOME".
+  */
+  return { lockedAt: at, frozen, moved };
+}
+
+/** Let the quantities follow the plans again. One column, back to NULL. */
+export async function unlockBidQuantities(bidId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .update(bids)
+    .set({ quantitiesLockedAt: null })
+    .where(eq(bids.id, bidId));
 }
 
 /** Groups on a bid, without the user filter — see `stampCountsForBid`. */

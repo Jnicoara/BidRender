@@ -11,6 +11,14 @@
  * snapshot rule every other bid line follows. Anything in this module that
  * cannot be derived from that sentence is a decision nobody has made yet.
  *
+ * ── "Live for as long as it points at one" has ONE end ───────────────────────
+ * The estimator locking the bid (2026-09-24). While `bids.quantitiesLockedAt`
+ * is set, a from-plans line reads the number the drawing gave at that moment.
+ * **Nothing in this module knows about it**, deliberately: the lock is applied
+ * once, at the chokepoint in server/db.ts, so every reader of a bid gets the
+ * same answer and nothing here has to remember to ask. The decision lives in
+ * shared/quantityLock.ts.
+ *
  * ── Why the quantity is DERIVED and not stored ───────────────────────────────
  * `bid_line_items.qty` is a real column and a from-plans line still has one,
  * but for a linked line it is resolved from the marks before any reader sees
@@ -163,6 +171,12 @@ export function countsWithNoPrice(
  * For a hand-added line, the stored number. For a from-plans line, the number
  * of marks on the drawing — which is why `counts` is keyed by group id and is
  * the same map `takeoffGroupsRouter.list` already builds.
+ *
+ * ── ON A LOCKED BID THIS IS NOT CALLED AT ALL ───────────────────────────────
+ * `withPlanCounts` asks shared/quantityLock.ts first and passes the stored
+ * number straight through. So this function keeps meaning exactly one thing —
+ * "what do the plans say" — rather than growing a second question it would have
+ * to be told the answer to.
  *
  * ── A group with no marks left resolves to 0, and the line STAYS ─────────────
  * It does not vanish and it is not skipped. Money leaving a bid because

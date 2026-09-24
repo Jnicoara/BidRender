@@ -1,0 +1,33 @@
+-- When an estimator froze this bid's quantities.
+--
+-- ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE. Nullable, no default, no UPDATE:
+-- one column and nothing else, so it goes BEFORE the push. CLAUDE.md
+-- § "Deploying a migration: THREE STEPS, NOT TWO". **Step 3 is empty** — no
+-- existing column changes meaning and there is no backfill. Saying so is the
+-- point.
+--
+-- Old code ignores the column entirely and every bid goes on following its
+-- plans, which is what they all do today. New code against a database without
+-- it dies on a bare select() and takes every bid screen with it.
+--
+-- ── NULL IS THE WHOLE DESIGN, and a default would destroy it ────────────────
+-- NULL means "this bid's quantities still follow the drawing", which is true of
+-- every bid that exists right now. There is deliberately no default of
+-- CURRENT_TIMESTAMP and no backfill: stamping existing bids as locked would be
+-- the app asserting that somebody froze a number when nobody did, on the
+-- screens whose whole job is telling an estimator which numbers to trust.
+--
+-- ── A timestamp, not a boolean — the shape `archivedAt` already uses ────────
+-- A flag plus a date can disagree with each other, and "locked since when" is
+-- the first question asked about a quantity that stopped moving. One column
+-- cannot drift.
+--
+-- ── What it does NOT freeze ────────────────────────────────────────────────
+-- Money. The four snapshot columns on `bid_line_items` froze each line's cost
+-- inputs when it was added (R4) and nothing here touches them. This freezes
+-- HOW MANY; the prices were never following anything.
+--
+-- Hand-written, not generated: `drizzle-kit generate` diffs against its own
+-- snapshot, and `drizzle/meta/` has none for the hand-written files from 0053
+-- on, so it re-emits everything since. See CLAUDE.md.
+ALTER TABLE `bids` ADD COLUMN `quantitiesLockedAt` timestamp NULL;

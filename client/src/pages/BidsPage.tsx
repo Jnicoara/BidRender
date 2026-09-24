@@ -29,6 +29,7 @@ import {
   CalendarDays,
   Check,
   ClipboardList,
+  Lock,
   Receipt,
   FileSignature,
   FileText,
@@ -70,7 +71,9 @@ import { BidExtrasPanel } from "@/components/BidExtrasPanel";
 import { CloseoutPanel } from "@/components/CloseoutPanel";
 import { CollapsiblePanel } from "@/components/CollapsiblePanel";
 import { SampleBidNotice } from "@/components/SampleBidNotice";
+import { QuantityLockPanel } from "@/components/QuantityLockPanel";
 import { countUnpricedLaborLines } from "@shared/laborRatePricing";
+import { quantitySource } from "@shared/quantityLock";
 import { money } from "@/lib/money";
 
 const STATUSES = ["Draft", "Active", "Won", "Lost"] as const;
@@ -222,6 +225,13 @@ export default function BidsPage({
     // Pushing, forking and archiving all change roles rather than lines, so a
     // refresh that skipped this would leave stale badges beside fresh totals.
     void utils.bids.unitStates.invalidate({ bidId });
+    // The lock panel is drawn from its own query, so it goes stale on anything
+    // that adds or removes a line that follows the plans — "7 lines follow your
+    // plans" has to be the number that will actually freeze. CLAUDE.md § "A test
+    // that calls the server cannot see a screen showing yesterday's answer":
+    // added to the helper every mutation already invalidates through, not to the
+    // one mutation this was noticed on.
+    void utils.bids.quantityLock.invalidate({ bidId });
     void utils.bids.list.invalidate();
   }, [utils, bidId]);
 
@@ -608,6 +618,9 @@ export default function BidsPage({
 
       <div className="flex-1 overflow-y-auto px-6 py-5">
         {bid.isSample && <SampleBidNotice bidId={bid.id} />}
+        {/* Above everything, full width: it changes what every quantity below
+            it MEANS, so it cannot sit in a column somebody scrolls past. */}
+        <QuantityLockPanel bidId={bidId} />
         <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
           <div className="space-y-4 min-w-0">
             {/* Add an assembly — deliberately minimal */}
@@ -721,86 +734,145 @@ export default function BidsPage({
                         </span>
                       </div>
                     )}
-                    {group.lines.map(line => (
-                      <div
-                        key={line.id}
-                        className="flex items-center gap-3 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm truncate">{line.name}</span>
-                          {/*
-                            Where this line came from.
+                    {group.lines.map(line => {
+                      /*
+                        Where this line's quantity comes from, asked ONCE.
 
-                            GREY, not yellow. Yellow is spent twice already —
-                            conduit runs on the drawing, and every warning in
-                            the app — and this is not a warning. It is a line
-                            behaving exactly as intended, saying so.
+                        "typed" is a hand-added line, "drawing" follows the
+                        plans, "locked" is frozen. Both the note under the name
+                        and the quantity itself read it, and they must never
+                        disagree — a row saying "counts your marks" beside a
+                        number that has stopped counting them is exactly the
+                        confidently-wrong screen this feature is against. The
+                        decision is @shared/quantityLock, which the server reads
+                        too.
+                      */
+                      const source = quantitySource(
+                        line,
+                        bid.quantitiesLockedAt
+                      );
+                      return (
+                        <div
+                          key={line.id}
+                          className="flex items-center gap-3 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm truncate">
+                              {line.name}
+                            </span>
+                            {/*
+                            Where this line came from, and whether it is still
+                            listening.
+
+                            GREY, not yellow, in all three states. Yellow is
+                            spent twice already — conduit runs on the drawing,
+                            and every warning in the app — and none of these is
+                            a warning: a following line and a frozen one are
+                            both a line behaving exactly as intended, saying so.
+
+                            Traced footage says so too, which it did not until
+                            the lock landed. It follows the drawing just as a
+                            count does, so a row with no note at all was the one
+                            place on this screen where a live number looked like
+                            a typed one.
+
+                            The LOCK marker says "frozen from your plans" rather
+                            than just "locked", because the estimator has two
+                            freezes to keep apart and only one of them is this:
+                            prices froze per line at add time (R4) and are not
+                            what this is about.
                           */}
-                          {line.takeoffGroupId !== null ? (
-                            <div className="text-xs text-muted-foreground truncate">
-                              From plans — counts your marks
-                            </div>
-                          ) : null}
-                          {line.snapshotModifierNames?.length ? (
-                            <div className="text-xs text-muted-foreground truncate">
-                              {line.snapshotModifierNames.join(", ")} · frozen{" "}
-                              {new Date(line.snapshotAt).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "short",
-                                  day: "numeric",
-                                }
-                              )}
-                            </div>
-                          ) : null}
-                        </div>
-                        {/*
+                            {source !== "typed" ? (
+                              <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                                {source === "locked" ? (
+                                  <>
+                                    <Lock className="w-3 h-3 shrink-0" />
+                                    Locked — frozen from your plans
+                                  </>
+                                ) : line.takeoffGroupId !== null ? (
+                                  "From plans — counts your marks"
+                                ) : (
+                                  "From plans — follows what you traced"
+                                )}
+                              </div>
+                            ) : null}
+                            {line.snapshotModifierNames?.length ? (
+                              <div className="text-xs text-muted-foreground truncate">
+                                {line.snapshotModifierNames.join(", ")} · frozen{" "}
+                                {new Date(line.snapshotAt).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                  }
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
+                          {/*
                           A from-plans line's quantity is not typeable, because
                           it is not a number anybody typed — it is how many
-                          marks are on the drawing. D2(a): changed by marking,
-                          not by typing, one source of truth.
+                          marks are on the drawing, or how far the runs go.
+                          D2(a): changed by marking, not by typing, one source of
+                          truth.
 
                           It reads as a plain number rather than a disabled
                           field: a control that looks editable and refuses is
                           worse than one that never invited the click.
+
+                          ── A LOCKED line is not typeable either ─────────────
+                          The column now holds the drawing's answer, and a typed
+                          number over the top of it would be lost the moment
+                          somebody unlocks — an edit accepted and then dropped,
+                          which is worse than one refused. The tooltip says
+                          which of the two situations this is;
+                          `bidsRouter.updateLine` refuses with the same
+                          sentence, from the same module.
                         */}
-                        {line.takeoffGroupId !== null ? (
-                          <span
-                            className="font-mono text-sm w-16 text-center shrink-0 tabular-nums"
-                            title="Counted from the marks on your plans. Change it on the Plans screen."
-                          >
-                            {Number(line.qty)}
+                          {source !== "typed" ? (
+                            <span
+                              className="font-mono text-sm w-16 text-center shrink-0 tabular-nums"
+                              title={
+                                source === "locked"
+                                  ? "Frozen when you locked this bid's quantities. Unlock it to follow your plans again."
+                                  : line.takeoffGroupId !== null
+                                    ? "Counted from the marks on your plans. Change it on the Plans screen."
+                                    : "Measured from the runs you traced. Change it on the Plans screen."
+                              }
+                            >
+                              {Number(line.qty)}
+                            </span>
+                          ) : (
+                            <InlineNumberField
+                              value={Number(line.qty)}
+                              onSave={qty =>
+                                updateLine.mutate({ bidId, id: line.id, qty })
+                              }
+                              rules={{ min: 0, max: 999999 }}
+                              className="h-7 w-16 text-sm"
+                              ariaLabel={`Quantity of ${line.name}`}
+                            />
+                          )}
+                          <span className="font-mono text-xs w-24 text-right shrink-0 text-muted-foreground">
+                            {round(line.breakdown.totalLaborHours, 2)} h
                           </span>
-                        ) : (
-                          <InlineNumberField
-                            value={Number(line.qty)}
-                            onSave={qty =>
-                              updateLine.mutate({ bidId, id: line.id, qty })
+                          <span className="font-mono text-sm w-24 text-right shrink-0">
+                            {money(line.breakdown.directCost)}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                            onClick={() =>
+                              removeLine.mutate({ bidId, id: line.id })
                             }
-                            rules={{ min: 0, max: 999999 }}
-                            className="h-7 w-16 text-sm"
-                            ariaLabel={`Quantity of ${line.name}`}
-                          />
-                        )}
-                        <span className="font-mono text-xs w-24 text-right shrink-0 text-muted-foreground">
-                          {round(line.breakdown.totalLaborHours, 2)} h
-                        </span>
-                        <span className="font-mono text-sm w-24 text-right shrink-0">
-                          {money(line.breakdown.directCost)}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                          onClick={() =>
-                            removeLine.mutate({ bidId, id: line.id })
-                          }
-                          aria-label={`Remove ${line.name}`}
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    ))}
+                            aria-label={`Remove ${line.name}`}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
                 ))
               )}

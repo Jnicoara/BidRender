@@ -2494,6 +2494,64 @@ matters more once a send exists: level 1's whole promise is a quiet count, and a
 marker nagging toward the bid breaks that promise on the screen where it was
 made.
 
+#### OVERRIDE 3 — a sent bid can be LOCKED, and then nothing follows the drawing
+
+**Decided and built 2026-09-24. This amends D2(a) a second time, and it amends
+OVERRIDE 2's own sentence — "after that the count is live for ever" — which was
+true of every bid until this existed.** `references/takeoff-spec.md` D2 carries a
+line pointing here.
+
+**The problem it answers.** A quantity that follows the marks is exactly right
+while a bid is being built, and exactly wrong the day after it was sent: an
+estimator opens the drawing to check something, drags a run, and a number behind
+a price a customer is holding moves — silently, because every screen goes on
+reading the same live answer. This app's whole value is that its numbers can be
+trusted, and there was no way to say "this one is finished".
+
+**The shape, and what was rejected.**
+
+- **One column, three states.** `bids.quantitiesLockedAt` — NULL and a
+  from-plans line reads the drawing, set and it reads `bid_line_items.qty`,
+  which the lock wrote from those same marks. **No second quantity column:** two
+  numbers for one fact is the drift the derived count exists to prevent, and the
+  first missed write makes them disagree with nothing on screen saying which is
+  right. Locking WRITES the drawing's answer into the column that was always
+  there, and the timestamp says to stop re-deriving it.
+- **Never automatic.** Not on a status change, not on printing a proposal, not
+  on a due date passing. A bid marked Won is often still being adjusted, and a
+  lock the app applied is a number frozen at an instant the app chose — the same
+  reasoning that made the first crossing an explicit act in OVERRIDE 2.
+- **One check, in the chokepoint.** `withPlanCounts` in `server/db.ts`, which
+  the bid screen, the proposal, the accounting export, the close-out and the
+  supplier list all already read through. A lock applied in a router would be a
+  lock the proposal did not have, and a proposal quoting a number the bid screen
+  no longer shows is the failure this exists to prevent, rebuilt.
+- **Locking is one click; unlocking asks.** Locking writes down what the bid is
+  already showing, so nothing moves and there is nothing to warn about.
+  Unlocking hands the quantities back to a drawing that has moved on, so it
+  names every line that will change with both numbers — "Exit sign LED: 14 →
+  16" — and the estimator answers a fact rather than a risk.
+- **Said in all three places a person could be misled.** A banner on the bid, a
+  marker on every frozen line, and the takeoff panel saying "locked, so these
+  marks no longer change it" where it used to promise the opposite. That last
+  one is the important one: it is the screen somebody is standing on while they
+  place marks.
+- **And everywhere: the prices were frozen separately.** They snapshot per line
+  at add time (R4) and this does not touch them. An estimator who thinks the
+  lock is what holds their costs will unlock expecting fresh prices and get last
+  month's, so every surface says so and `server/quantityLock.test.ts` asserts
+  that it still does.
+
+**What it deliberately does not do.** A locked quantity is still not typeable —
+the column holds the drawing's answer, and a typed number over the top of it
+would be lost the moment somebody unlocks, which is an edit accepted and then
+dropped. Sending a new count to a locked bid is still allowed, and the line
+arrives frozen at the number it crossed with; refusing would be a second lock
+rule in a second place, and the one an estimator would meet with no way through.
+
+The name still follows the count while locked. This freezes HOW MANY, which is
+what the column is called and what the estimator asked for.
+
 ### The finding that made this its own phase
 
 **Nothing about money reads a stamp. Not level 2 — level 4 either.**

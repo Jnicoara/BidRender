@@ -1985,6 +1985,36 @@ export const bids = mysqlTable(
      */
     isSample: boolean("isSample").default(false).notNull(),
 
+    /**
+     * When the estimator froze this bid's quantities, or NULL while they still
+     * follow the plans.
+     *
+     * ── ONE column, three states, and no second quantity anywhere ────────────
+     * NULL and a from-plans line reads the marks live; set and it reads
+     * `bid_line_items.qty`, which the lock wrote from those same marks. A
+     * `lockedQty` column beside `qty` would be two numbers for one fact, and the
+     * first missed write makes them disagree with nothing on screen to say which
+     * is right — the failure the derived count exists to prevent. See
+     * shared/quantityLock.ts, which owns the decision, and `withPlanCounts` in
+     * server/db.ts, which is the single place it is applied.
+     *
+     * ── A timestamp rather than a boolean, for the reason `archivedAt` is ─────
+     * A flag plus a date can disagree, and "locked since when" is the first
+     * thing asked about a number that stopped moving. One column cannot drift.
+     *
+     * ── Independent of `status`, and never set by it ──────────────────────────
+     * A bid marked Won is often still being adjusted, and a lock the app applied
+     * on a status change is a number frozen at an instant the app chose. This is
+     * only ever written by `bids.lockQuantities` / `bids.unlockQuantities`,
+     * which a person presses.
+     *
+     * ── It does NOT freeze money ─────────────────────────────────────────────
+     * The four snapshot columns on a line already did that, at add time, and are
+     * untouched by this (R4). Anything that reads "locked" and means prices is
+     * wrong about both.
+     */
+    quantitiesLockedAt: timestamp("quantitiesLockedAt"),
+
     archivedAt: timestamp("archivedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -3365,7 +3395,13 @@ export const bidLineItems = mysqlTable(
      * ── This link is LIVE, and it is the only live thing on the line ────────
      * Set means the line is "from plans", and two facts follow it for as long
      * as it is set: the line's QUANTITY is the number of marks on the drawing,
-     * and its NAME is whatever the count is called. Everything to do with money
+     * and its NAME is whatever the count is called.
+     *
+     * **One exception, added 2026-09-24, and it is the bid's to make:** while
+     * `bids.quantitiesLockedAt` is set, the QUANTITY stops following and this
+     * column holds the number the drawing gave when it was locked. The name
+     * goes on following — the lock freezes how many, not what it is called.
+     * See shared/quantityLock.ts. Everything to do with money
      * stays frozen in the snapshot below, exactly as on every other line.
      *
      * The rule in one sentence, and every behaviour here falls out of it:

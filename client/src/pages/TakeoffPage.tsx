@@ -2360,6 +2360,17 @@ export default function TakeoffPage({
    */
   const bidCounts = trpc.takeoffGroups.list.useQuery({ bidId });
 
+  /**
+   * Whether this bid's quantities are frozen (shared/quantityLock.ts).
+   *
+   * Read off the count list rather than from a query of its own, because that
+   * one is already invalidated on every mark change (`refreshStamps`) and on
+   * every run change (`refreshRuns`). A second query would be a second thing to
+   * remember to invalidate, and the one that got forgotten would leave this
+   * screen promising that marks move a bid somebody has just locked.
+   */
+  const quantitiesLocked = bidCounts.data?.quantitiesLockedAt != null;
+
   const bridgeByGroup = useMemo(() => {
     const map = new Map<number, GroupBridgeState>();
     for (const row of bidCounts.data?.groups ?? []) {
@@ -2389,7 +2400,10 @@ export default function TakeoffPage({
         the hand-added line turns up afterwards.
       */
       toast.success(
-        `${result.count} on the bid. The line follows your marks from here.`
+        quantitiesLocked
+          ? `${result.count} on the bid, frozen at that number — this bid's ` +
+              `quantities are locked, so further marks will not change it.`
+          : `${result.count} on the bid. The line follows your marks from here.`
       );
       if (result.warning) toast.warning(result.warning);
     },
@@ -4570,6 +4584,7 @@ export default function TakeoffPage({
               }))}
               stampGroups={stampGroups}
               bridge={bridgeByGroup}
+              quantitiesLocked={quantitiesLocked}
               waitingToSend={bidCounts.data?.waitingToSend}
               countedWithNoPrice={bidCounts.data?.countedWithNoPrice}
               onSendToBid={id => sendToBid.mutate({ id })}

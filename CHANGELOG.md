@@ -6,6 +6,21 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-24]
 
+- **A bid you have sent can now be locked, so its quantities stop following the
+  drawing.** Until today, a line that came from your plans counted your marks
+  for ever — right while you are building a bid, and wrong the day after you
+  sent it, because opening the drawing to check something could quietly move a
+  number the customer is already holding. "Lock quantities" on the bid writes
+  down what the drawing says right now and freezes it there; from then on
+  marking, tracing and untracing change nothing on that bid, and the bid, the
+  takeoff panel and every frozen line say so in plain words. Unlocking asks
+  first, and names every quantity that will move and what it will move to
+  ("Exit sign LED: 14 → 16"), so you are agreeing to something you can see.
+  Nothing locks itself — not a status change, not sending a proposal — because
+  a number frozen at a moment the app picked is a number nobody chose. Prices
+  are a separate thing and always were: each line's costs froze the day it was
+  added, and locking and unlocking never touch them.
+
 - **Circuits in one pipe now share one ground, which is how the wire actually
   goes in.** Every circuit used to pull its own ground the full length of the
   run, so a conduit with three circuits was billed three grounds — the same
