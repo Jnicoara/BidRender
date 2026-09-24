@@ -27,6 +27,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { InlineNumberField } from "@/components/InlineNumberField";
 import { selectOnFocus } from "@/lib/selectOnFocus";
+import {
+  newCircuitFor,
+  nextCircuitName,
+  suggestAfter,
+} from "@/lib/runCircuits";
 import { runAppearance } from "@shared/takeoffMarks";
 import type { RunQuantities, totalQuantities } from "@shared/takeoffQuantities";
 import { verticalsNotice } from "@shared/takeoffHeights";
@@ -51,6 +56,20 @@ export type PanelRun = {
   branchWiring?: boolean | null;
   /** Which kind of run — what its colour groups on. Null before types. */
   runTypeId: number | null;
+  /**
+   * What the run's TYPE says one circuit of it pulls — the starting point for
+   * a circuit added here. Null on a run with no type, and either count may be
+   * null on a type that does not say. See `newCircuitFor`.
+   *
+   * Deliberately NOT what the run stores: a type's counts are a default the
+   * editor offers, and a run's wire comes only from circuits that exist. That
+   * distinction is what `server/runToBidWire.test.ts` asserts at the point it
+   * would otherwise be forgotten.
+   */
+  typeDefaults?: {
+    conductorCount: number | null;
+    groundCount: number | null;
+  } | null;
   pathType: "conduit" | "cable";
   status: "draft" | "committed";
   isSuggestion: boolean;
@@ -88,23 +107,6 @@ const feet = (value: number) =>
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   })} ft`;
-
-/**
- * What a new circuit starts as: two conductors and a ground.
- *
- * ── It used to be a bare 3, and that stopped being right ───────────────────
- * Three was "2 and a ground" while one column counted both. After 0063 split
- * them, a bare 3 means THREE UNGROUNDED CONDUCTORS — the same wire footage, and
- * a description of something nobody wires. Typing a lighting circuit would have
- * produced a row reading "3 cond. 0 gnd.".
- *
- * So the default moved rather than the number: the footage is unchanged at
- * three wires, and what the row SAYS is now what an electrician would say.
- * Named here rather than written twice, because the Enter key and the Add
- * button are two call sites and a default that disagrees with itself is worse
- * than either value.
- */
-const NEW_CIRCUIT = { conductors: 2, grounds: 1 } as const;
 
 /** Guards the subtraction below from floating-point dust like 1239.9999998. */
 const round2 = (value: number) => Math.round(value * 100) / 100;
@@ -366,6 +368,21 @@ export function RunsPanel({
 }) {
   const [addingTo, setAddingTo] = useState<number | null>(null);
   const [circuitName, setCircuitName] = useState("");
+
+  /**
+   * Add one circuit and stay ready for the next one.
+   *
+   * ONE function rather than a body on the Enter key and another on the Add
+   * button. They were two call sites passing the same pair of constants, and
+   * this is now three things — the counts from the run's type, the name, and
+   * the suggestion for the one after — which is three chances for the two
+   * paths to disagree about what a circuit starts as.
+   */
+  const addOneCircuit = (run: PanelRun, name: string) => {
+    const start = newCircuitFor(run.typeDefaults ?? null);
+    onAddCircuit(run.id, name, start.conductors, start.grounds);
+    setCircuitName(suggestAfter(name, run.circuits));
+  };
 
   return (
     <div className="h-full flex flex-col bg-card border-l border-border min-h-0">
@@ -935,26 +952,71 @@ export function RunsPanel({
                         total={run.quantities.cableFeet}
                       />
                     )}
-                    {run.pathType === "conduit" && (
-                      <Footage
-                        label={
-                          <>
-                            Wire
-                            <span className="text-muted-foreground/60">
-                              {" "}
-                              ({run.circuits.length}{" "}
-                              {run.circuits.length === 1
-                                ? "circuit"
-                                : "circuits"}
-                              )
+                    {/*
+                      WIRE, OR THE REASON THERE IS NONE.
+
+                      A newly traced run has no circuits — the type's
+                      conductor count is a default the editor offers, not
+                      something copied onto the run at save
+                      (server/runToBidWire.test.ts asserts exactly this). So
+                      the common state of a fresh conduit run is zero wire,
+                      and it used to render as `Wire (0 circuits) 0.00 ft`:
+                      a measurement-shaped zero for something nobody measured,
+                      standing in a column of real footages. CLAUDE.md
+                      § "UNSET is not zero" — a length is the case where a
+                      zero reads as a considered answer.
+
+                      An EMPTY PIPE IS A REAL ANSWER, though, so this is a
+                      statement and an offer rather than a warning: a sleeve, a
+                      spare, a future pull. Amber here would fire on correct
+                      work, which the branch-wiring guard above refuses to do
+                      for the same reason.
+                    */}
+                    {run.pathType === "conduit" &&
+                      (run.circuits.length === 0 ? (
+                        <div className="flex items-baseline justify-between text-xs gap-2">
+                          <span className="text-muted-foreground shrink-0">
+                            Wires in this pipe
+                          </span>
+                          <span className="flex items-baseline gap-2">
+                            <span className="font-mono text-muted-foreground/70">
+                              none
                             </span>
-                          </>
-                        }
-                        flat={wireFlat(run)}
-                        vertical={wireVertical(run)}
-                        total={run.quantities.totalWireFeet}
-                      />
-                    )}
+                            <button
+                              className="underline text-muted-foreground hover:text-foreground"
+                              onClick={e => {
+                                e.stopPropagation();
+                                // Opens the run, because the circuit rows this
+                                // is about only exist on an open one.
+                                onSelectRun(run.id);
+                                setAddingTo(run.id);
+                                setCircuitName(nextCircuitName(run.circuits));
+                              }}
+                            >
+                              Add wires
+                            </button>
+                          </span>
+                        </div>
+                      ) : (
+                        <Footage
+                          label={
+                            <>
+                              Wire
+                              <span className="text-muted-foreground/60">
+                                {" "}
+                                ({run.circuits.length}{" "}
+                                {run.circuits.length === 1
+                                  ? "circuit"
+                                  : "circuits"}
+                                )
+                              </span>
+                            </>
+                          }
+                          flat={wireFlat(run)}
+                          vertical={wireVertical(run)}
+                          total={run.quantities.totalWireFeet}
+                        />
+                      ))}
                     {/*
                       The bare copper, on its own line, and only when there is
                       some.
@@ -1134,13 +1196,7 @@ export function RunsPanel({
                           onFocus={selectOnFocus}
                           onKeyDown={e => {
                             if (e.key === "Enter" && circuitName.trim()) {
-                              onAddCircuit(
-                                run.id,
-                                circuitName.trim(),
-                                NEW_CIRCUIT.conductors,
-                                NEW_CIRCUIT.grounds
-                              );
-                              setCircuitName("");
+                              addOneCircuit(run, circuitName.trim());
                             }
                             if (e.key === "Escape") {
                               setAddingTo(null);
@@ -1156,13 +1212,7 @@ export function RunsPanel({
                           className="h-6 px-2 text-xs"
                           onClick={() => {
                             if (!circuitName.trim()) return;
-                            onAddCircuit(
-                              run.id,
-                              circuitName.trim(),
-                              NEW_CIRCUIT.conductors,
-                              NEW_CIRCUIT.grounds
-                            );
-                            setCircuitName("");
+                            addOneCircuit(run, circuitName.trim());
                           }}
                         >
                           Add
@@ -1173,15 +1223,22 @@ export function RunsPanel({
                         size="sm"
                         variant="ghost"
                         className="h-6 gap-1 text-xs text-muted-foreground"
-                        onClick={() => setAddingTo(run.id)}
+                        onClick={() => {
+                          setAddingTo(run.id);
+                          setCircuitName(nextCircuitName(run.circuits));
+                        }}
                       >
-                        <Plus className="w-3 h-3" /> Add a circuit to this run
+                        <Plus className="w-3 h-3" />{" "}
+                        {run.circuits.length === 0
+                          ? "Add wires to this run"
+                          : "Add another circuit"}
                       </Button>
                     )}
 
                     <p className="text-[0.7rem] text-muted-foreground/70">
-                      Each circuit pulls its own full length of wire down this
-                      one conduit.
+                      {run.circuits.length === 0
+                        ? "No wires in this pipe yet — an empty conduit counts pipe and no wire."
+                        : "Each circuit pulls its own full length of wire down this one conduit."}
                     </p>
                   </div>
                 )}

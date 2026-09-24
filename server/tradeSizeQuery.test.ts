@@ -14,9 +14,11 @@
 import { describe, it, expect } from "vitest";
 import {
   expandTradeQuery,
+  joinCompoundSize,
   matchesTradeQuery,
   swapCableSeparator,
 } from "../shared/tradeSizeQuery";
+import { compareBySize } from "../shared/materialSizeOrder";
 import { BASELINE_MATERIALS } from "./seed/baselineMaterials";
 
 /** Catalog rows whose name answers this query, by their names. */
@@ -86,6 +88,26 @@ describe("inches, however they are typed", () => {
     expect(expandTradeQuery("2 inch pvc")[0]).toBe("2 inch pvc");
   });
 
+  it("joins a compound size typed with a space", () => {
+    // The catalog spells it `1-1/4"`; people type `1 1/4`.
+    expect(joinCompoundSize("1 1/4 emt")).toBe("1-1/4 emt");
+    expect(joinCompoundSize("2 1/2 pvc")).toBe("2-1/2 pvc");
+    // No inch mark here: nothing in the query said "inch", so the joined form
+    // is what gets searched, and the boundary rule lets it sit against the
+    // `"` the catalog spells the row with.
+    expect(expandTradeQuery("1 1/4 emt")).toContain("1-1/4 emt");
+    expect(expandTradeQuery("1 1/4 inch emt")).toContain('1-1/4" emt');
+    expect(hits("1 1/4 emt", "Conduit")).toContain('1-1/4" EMT');
+  });
+
+  it("does NOT join two cable specs standing next to each other", () => {
+    // "10/2 12/3" is two sizes, not one — joining them would search for a
+    // thing that does not exist and return nothing at all.
+    expect(joinCompoundSize("10/2 12/3")).toBeNull();
+    expect(joinCompoundSize("4/0 2/0")).toBeNull();
+    expect(joinCompoundSize("emt pvc")).toBeNull();
+  });
+
   it("returns nothing for nothing", () => {
     expect(expandTradeQuery("")).toEqual([]);
     expect(expandTradeQuery("   ")).toEqual([]);
@@ -136,6 +158,65 @@ describe("against the real catalog", () => {
     expect(found.some(n => n.includes("4/0"))).toBe(true);
     // Nothing named 4-0 exists; if the swap fired we would match nothing.
     expect(found.length).toBeGreaterThan(0);
+  });
+
+  /*
+    ── The half of this that was missing, and it let a fault ship ────────────
+    Found on SCREEN on 2026-09-24, not here. Every assertion above asks
+    whether the right row is present, and it always was — so "2 inch pvc"
+    passed while the picker showed `1/2" PVC Sch 40`, `1/2" PVC Sch 80`,
+    `1-1/2" PVC Sch 40` and `1-1/2" PVC Sch 80` ABOVE it, because `1/2"`
+    contains `2"` and the list is then sorted by trade size.
+
+    CLAUDE.md § "A GREP IS A MEASUREMENT": the search found the shape it was
+    given, and the test asked the same question the search did. What was never
+    asked is what these ask — is the WRONG size out?
+  */
+  it('excludes 1/2" and 1-1/2" from "2 inch pvc"', () => {
+    const found = hits("2 inch pvc", "Conduit");
+    expect(found).toContain('2" PVC Sch 40');
+    expect(found).not.toContain('1/2" PVC Sch 40');
+    expect(found).not.toContain('1/2" PVC Sch 80');
+    expect(found).not.toContain('1-1/2" PVC Sch 40');
+    expect(found).not.toContain('2-1/2" PVC Sch 40');
+  });
+
+  it("puts the asked-for size FIRST once the picker sorts by size", () => {
+    // The picker sorts what it is handed by trade size, so the smallest
+    // matching row is what an estimator sees at the top. That makes "which
+    // rows match" and "which row is first" the same question here.
+    const bySize = hits("2 inch pvc", "Conduit").sort((a, b) =>
+      compareBySize(a, b)
+    );
+    expect(bySize[0]).toBe('2" PVC Sch 40');
+  });
+
+  it.each([
+    ["1/2 emt", '1/2" EMT', ['1-1/2" EMT', '2-1/2" EMT']],
+    ["3/4 emt", '3/4" EMT', ['1-3/4" EMT']],
+    ["1 inch emt", '1" EMT', ['1-1/2" EMT', '1-1/4" EMT', '2-1/2" EMT']],
+    ["2 inch emt", '2" EMT', ['1/2" EMT', '1-1/2" EMT', '2-1/2" EMT']],
+  ])("%s finds %s and not a size it is a fragment of", (query, wanted, not) => {
+    const found = hits(query, "Conduit");
+    expect(found).toContain(wanted);
+    for (const wrong of not) expect(found).not.toContain(wrong);
+  });
+
+  it("a bare number is still a size, not a digit anywhere in the name", () => {
+    // "2 pvc" typed without the word inch takes the same rule: the bare form
+    // is what the expansion produces, and it must not match 1/2" either.
+    const found = hits("2 pvc", "Conduit");
+    expect(found).toContain('2" PVC Sch 40');
+    expect(found).not.toContain('1/2" PVC Sch 40');
+  });
+
+  it("does not break a cable spec, whose digits are not a fraction", () => {
+    // 10-2 has a dash in the middle; the boundary rule must read the whole
+    // token rather than stopping at it.
+    expect(hits("10/2")).toContain("10-2 NM-B");
+    expect(hits("12-3")).toContain("12-3 NM-B");
+    // And "2" alone must not drag in every 12-2 on the shelf.
+    expect(hits("2 nm-b")).not.toContain("12-2 NM-B");
   });
 
   it("still needs every word, so a size alone does not match the shelf", () => {

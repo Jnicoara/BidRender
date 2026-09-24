@@ -2307,6 +2307,29 @@ export default function TakeoffPage({
     return map;
   }, [runTypes.data]);
 
+  /**
+   * What one circuit of each type pulls, so a circuit added to a run starts as
+   * what the run already says it is.
+   *
+   * Listed by hand rather than passing the whole type, because this feeds a
+   * SCREEN: the panel takes what it renders and nothing arrives there because
+   * it happened to be on the row (CLAUDE.md § "Where to be structural, and
+   * where to be explicit").
+   */
+  const circuitDefaultsByRunType = useMemo(() => {
+    const map = new Map<
+      number,
+      { conductorCount: number | null; groundCount: number | null }
+    >();
+    for (const type of runTypes.data ?? []) {
+      map.set(type.id, {
+        conductorCount: type.conductorCount,
+        groundCount: type.groundCount,
+      });
+    }
+    return map;
+  }, [runTypes.data]);
+
   /** Say what an already-traced run is. D3(b), the way to change it later. */
   const setRunTypeFor = trpc.takeoffRuns.setRunType.useMutation({
     onError: e => toast.error(e.message),
@@ -4540,6 +4563,10 @@ export default function TakeoffPage({
                   r.runTypeId === null
                     ? null
                     : (specByRunType.get(r.runTypeId) ?? null),
+                typeDefaults:
+                  r.runTypeId === null
+                    ? null
+                    : (circuitDefaultsByRunType.get(r.runTypeId) ?? null),
               }))}
               stampGroups={stampGroups}
               bridge={bridgeByGroup}

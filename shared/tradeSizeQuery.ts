@@ -92,6 +92,13 @@ export function expandTradeQuery(query: string): string[] {
   }
   if (spoken !== typed) add(spoken);
 
+  // Then compound sizes, so "1 1/4" reaches the inch rule as one size.
+  const compound = joinCompoundSize(spoken);
+  if (compound) {
+    spoken = compound;
+    add(compound);
+  }
+
   for (const base of [typed, spoken]) {
     // `2 inch` -> `2"`, and the bare number too: a row may be named either way
     // and the bare form is what "2 pvc" already looks like.
@@ -143,6 +150,35 @@ export function swapCableSeparator(text: string): string | null {
 }
 
 /**
+ * `1 1/4` -> `1-1/4`. Null when there is nothing to join.
+ *
+ * ── Why this had to exist before the boundary rule could ────────────────────
+ * The catalog spells it `1-1/4" EMT` and people type `1 1/4 emt`, with a space
+ * where the dash is. That used to work by accident: the match was a plain
+ * substring, so the word `1/4` was found INSIDE `1-1/4"` and the stray `1`
+ * was found in the same place. Tightening a size to its own boundaries took
+ * that away, and the existing "1 1/4 emt finds something" assertion went red —
+ * which is what a test is for. The accident is now a rule.
+ *
+ * Only a real FRACTION is joined, by the same arithmetic `isCableSpec` uses:
+ * `1 1/4` is one and a quarter, while `10/2 12/3` is two cable specs standing
+ * next to each other and must not become `10/2-12/3`. The lookbehind keeps a
+ * number that is already part of a size from starting a second one.
+ */
+export function joinCompoundSize(text: string): string | null {
+  let changed = false;
+  const joined = text.replace(
+    /(?<![\d/-])(\d+)\s+(\d+)\/(\d+)\b/g,
+    (whole, whole_: string, top: string, bottom: string) => {
+      if (!(Number(top) < Number(bottom))) return whole;
+      changed = true;
+      return `${whole_}-${top}/${bottom}`;
+    }
+  );
+  return changed ? joined : null;
+}
+
+/**
  * Does `left`/`right` read as {gauge}/{conductors} rather than a fraction?
  *
  * `0` on the right is an aught — a conductor SIZE, not a count — and must be
@@ -157,16 +193,65 @@ function isCableSpec(left: string, right: string): boolean {
 }
 
 /**
+ * Characters that make a size bigger than the one you were looking at.
+ *
+ * A digit, a decimal point, a slash or a dash next to a size means the size
+ * continues: `2` inside `1/2"` and inside `2-1/2"` is part of a different
+ * measurement, not the one that was typed.
+ *
+ * The INCH MARK is deliberately not in this set, on either side: `2` has to be
+ * able to match `2" PVC`, because the bare form is exactly what the expansion
+ * produces for somebody who typed "2 pvc" without one.
+ */
+const SIZE_CONTINUES = /[0-9./-]/;
+
+/**
+ * Does a SIZE appear in the haystack as itself, rather than inside a bigger one?
+ *
+ * ── Found on screen, 2026-09-24, and it is a ranking fault not a miss ───────
+ * `matchesTradeQuery` was a plain substring both ways, so "2 inch pvc"
+ * returned `1/2" PVC Sch 40`, `1/2" PVC Sch 80`, `1-1/2" PVC Sch 40` and
+ * `1-1/2" PVC Sch 80` ABOVE the `2" PVC Sch 40` that was asked for — because
+ * `1/2"` contains `2"`, and the picker then sorts what it is given by trade
+ * size. The right row was fifth.
+ *
+ * Nothing failed. The suite asked "is 2\" PVC in the results?" and it was, so
+ * the test passed while the screen was wrong: CLAUDE.md § "A GREP IS A
+ * MEASUREMENT, AND IT MEASURES THE PATTERN YOU TYPED", and § "the common
+ * failure is not a missing row but a right row ranked fourth".
+ *
+ * A word that does not start with a digit is not a size and is matched plainly
+ * — "pvc" inside "pvc" is the same pvc.
+ */
+function containsWord(haystack: string, word: string): boolean {
+  if (!word) return true;
+  if (!/^[0-9]/.test(word)) return haystack.includes(word);
+
+  let from = 0;
+  for (;;) {
+    const at = haystack.indexOf(word, from);
+    if (at === -1) return false;
+    const before = at === 0 ? "" : haystack[at - 1];
+    const after = haystack[at + word.length] ?? "";
+    if (!SIZE_CONTINUES.test(before) && !SIZE_CONTINUES.test(after)) {
+      return true;
+    }
+    from = at + 1;
+  }
+}
+
+/**
  * Does this catalog row answer the query, under any of its spellings?
  *
- * Substring on the normalised text, because the expansion has already done the
- * interesting work and what is left is a plain contains. Every word of the
- * query has to appear, so "2 inch pvc" does not match every 2" fitting in the
- * catalog — it has to be PVC too.
+ * The expansion has already done the interesting work; what is left is a
+ * contains, with the one exception above — a SIZE has to be the size that was
+ * typed rather than a fragment of a larger one. Every word of the query has to
+ * appear, so "2 inch pvc" does not match every 2" fitting in the catalog — it
+ * has to be PVC too.
  */
 export function matchesTradeQuery(name: string, query: string): boolean {
   const haystack = normalise(name);
   return expandTradeQuery(query).some(form =>
-    form.split(" ").every(word => haystack.includes(word))
+    form.split(" ").every(word => containsWord(haystack, word))
   );
 }

@@ -201,6 +201,43 @@ describeDb("editing a shipped type forks it", () => {
     expect(after.some(t => t.conductorCount === 9 && !t.isShipped)).toBe(true);
   });
 
+  it("GIVES THE SHIPPED ROW BACK when the fork is archived", async () => {
+    /*
+      Found on screen 2026-09-24, and it was a bid-facing fault rather than a
+      tidy-up. The fixture held an ARCHIVED fork of a shipped conduit type with
+      no ground material. `getRunTypesFor(user, includeArchived)` still counted
+      it as a fork, so it hid the active baseline; `resolveRunType` then
+      answered the runs' stored id with the archived row, and the bid bridge
+      said the ground was "Not said what this is" and refused to price the
+      type — while the picker, reading the ACTIVE list, showed the ground
+      material two inches away on the same screen.
+
+      Archiving a fork means going back to the shipped row. The archived row
+      still comes back in the list, because a bid line priced from it has to
+      resolve its own id, but it must not stand in front of the baseline.
+    */
+    const shipped = (await caller().takeoffRunTypes.list()).filter(
+      t => t.isShipped && t.groundMaterialId !== null
+    );
+    const target = shipped[shipped.length - 1];
+    if (!target) return; // No shipped row with a ground to fork; nothing to assert.
+
+    const fork = await caller().takeoffRunTypes.update({
+      id: target.id,
+      groundMaterialId: null,
+    });
+    expect(fork.forked).toBe(true);
+    await caller().takeoffRunTypes.archive({ id: fork.id });
+
+    const all = await caller().takeoffRunTypes.list({ includeArchived: true });
+    // The archived fork is still reachable, for anything already priced by it.
+    expect(all.some(t => t.id === fork.id)).toBe(true);
+    // And the baseline is back, with the ground the fork had dropped.
+    const baseline = all.find(t => t.id === target.id);
+    expect(baseline).toBeDefined();
+    expect(baseline!.groundMaterialId).toBe(target.groundMaterialId);
+  });
+
   it("edits a row that is already mine in place, without forking again", async () => {
     const mine = await caller().takeoffRunTypes.create({
       label: `Direct ${uniq()}`,

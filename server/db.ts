@@ -6043,9 +6043,33 @@ export async function getRunTypesFor(
     )
     .orderBy(asc(takeoffRunTypes.pathType), asc(takeoffRunTypes.label));
 
+  /*
+    AN ARCHIVED FORK DOES NOT SUPERSEDE ITS BASELINE.
+
+    Found on screen 2026-09-24, while checking that a wired run reaches the bid.
+    The fixture had an archived fork of the shipped `1/2" EMT, 2 #12 + ground`
+    with no ground material on it. With `includeArchived`, that fork landed in
+    `rows`, hid the active baseline, and `resolveRunType` then answered the
+    runs' stored id with it — so the bid bridge reported the ground as
+    "Not said what this is" and refused to price the type, while the picker and
+    the run's own spec line (which read the ACTIVE list) showed
+    `+ #12 bare copper, solid` two inches away.
+
+    Two screens describing one run's materials differently, and the bid-facing
+    one was the wrong one: the ground could never reach a bid. Nothing failed —
+    it just said the type was undefined when it is not.
+
+    Archived rows still come back, because a bid line priced from one has to
+    resolve its own stored id (CLAUDE.md § "Retire, never delete"). What they
+    must not do is stand in front of the row the user is actually tracing
+    under. Archiving a fork means going back to the shipped row, not losing it.
+  */
   const forkedFrom = new Set(
     rows
-      .filter(r => r.userId === userId && r.baselineId !== null)
+      .filter(
+        r =>
+          r.userId === userId && r.baselineId !== null && r.status === "active"
+      )
       .map(r => r.baselineId as number)
   );
   return rows.filter(r => !(r.userId === null && forkedFrom.has(r.id)));

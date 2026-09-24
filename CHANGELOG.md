@@ -6,6 +6,29 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-24]
 
+- **An empty pipe says so, and "Add wires" puts real circuits in it.** A conduit
+  run with nothing pulled through it used to show "Wire (0 circuits) 0.00 ft" —
+  a measured-looking zero for something nobody had measured. It now reads
+  "Wires in this pipe: none", with an "Add wires" link beside it. Adding starts
+  the circuit off with whatever the run's own type says it pulls — two #12 and a
+  ground on a 1/2" EMT homerun, rather than a fixed guess — and offers the next
+  name ready to go, so Ckt 1, Ckt 2, Ckt 3 is three keystrokes. An empty conduit
+  still bids the pipe and no wire at all, which is a real answer for a sleeve or
+  a spare.
+
+- **Searching the catalog for a size stopped returning the wrong sizes.** Typing
+  "2 inch pvc" listed 1/2" and 1-1/2" PVC above the 2" you asked for, because
+  `1/2"` contains `2"` and the list is then sorted smallest first — so the row
+  you wanted came fifth. A size now has to be the size you typed rather than a
+  fragment of a bigger one. "1 1/4 emt" typed with a space also finds 1-1/4" EMT
+  properly rather than by accident.
+
+- **Archiving your own version of a shipped run type gives the shipped one
+  back.** An archived copy was still standing in front of the original, so a run
+  traced under it reported its ground wire as "not said what this is" and
+  refused to price — while the picker two inches away showed the ground material
+  plainly. That wire could never have reached the bid.
+
 - **Setting a scale now just sets it.** Typing or picking a scale used to open
   the check overlay by itself, landing a panel over the middle of the drawing —
   right where the first point usually goes. It saves and closes. The nudge is
