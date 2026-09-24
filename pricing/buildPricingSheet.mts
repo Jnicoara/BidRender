@@ -44,6 +44,33 @@ const rows: Row[] = [];
 const seen = new Set<string>();
 const jobTally = new Map<string, number>();
 
+/*
+  Names that are the SAME PRODUCT as a shipped row, worded another way. Found in
+  the breaker duplicate check, 2026-09-24. Each one is folded into the shipped
+  row rather than listed twice, and any brand variant naming it as its parent is
+  re-pointed there — so a price typed once reaches every variant.
+
+  The SHIPPED name wins, whichever reads better, because this sheet cannot
+  rename a shipped row: baseline rows are matched by name, and a rename goes
+  through RENAMED_BASELINE_MATERIALS in server/seed/materials. The "1-Pole"
+  rename is already planned there as part of the parent/variant work (CLAUDE.md
+  § Brands); when it lands, these entries flip direction.
+*/
+const SAME_AS: Record<string, string> = {
+  // A single-pole breaker IS a 1-pole breaker.
+  "15A 1-Pole breaker": "15A breaker",
+  "20A 1-Pole breaker": "20A breaker",
+  "30A 1-Pole breaker": "30A breaker",
+  // One 15A and one 20A circuit in one slot; the order is only how a maker
+  // writes the part number (Square D HOMT1520, Eaton BD2015).
+  "20/15 tandem breaker": "15/20 tandem breaker",
+  // "Dual function" is the makers' word for AFCI + GFCI in one breaker; the
+  // shipped combo row already carries it as a search alias.
+  "15A dual-function breaker": "15A AFCI/GFCI combo breaker",
+  "20A dual-function breaker": "20A AFCI/GFCI combo breaker",
+};
+const canonical = (name: string) => SAME_AS[name] ?? name;
+
 const add = (
   name: string,
   category: string,
@@ -53,6 +80,7 @@ const add = (
 ) => {
   const key = name.trim().toLowerCase();
   if (seen.has(key)) return false;
+  if (SAME_AS[name]) return false;
   seen.add(key);
   rows.push({
     parent: name,
@@ -83,6 +111,13 @@ const addAll = (
 // ── 1. Every existing starter material, exactly as it is ────────────────────
 for (const m of BASELINE_MATERIALS) {
   add(m.name, m.category ?? "Consumables", m.unitOfSale, false);
+}
+// A merge into a row that does not exist would silently drop both. Refuse.
+for (const [from, to] of Object.entries(SAME_AS)) {
+  if (!rows.some(r => r.name === to))
+    throw new Error(`SAME_AS: "${from}" -> "${to}", which is not shipped`);
+  if (BASELINE_MATERIALS.some(m => m.name === from))
+    throw new Error(`SAME_AS: "${from}" is itself shipped; rename it instead`);
 }
 const existingCount = rows.length;
 
@@ -393,8 +428,11 @@ addAll(
     "200A 2-Pole main breaker",
     "20/15 tandem breaker",
     "30/30 tandem breaker",
-    "15A quad tandem breaker",
-    "20A quad tandem breaker",
+    // Not a tandem: a tandem is two 1-pole circuits in one space, a quad is two
+    // 2-POLE circuits in two spaces. "quad tandem" sat beside "15/15 tandem"
+    // and read as the same kind of part.
+    "15A quad breaker, two 2-pole circuits",
+    "20A quad breaker, two 2-pole circuits",
     "Breaker lock-off",
     "Breaker handle tie",
     "Breaker filler plate",
@@ -1187,7 +1225,7 @@ const addBrand = (
   if (seen.has(key)) return;
   seen.add(key);
   brandRows.push({
-    parent,
+    parent: canonical(parent),
     category,
     name,
     size: "",

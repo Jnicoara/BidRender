@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-24]
 
+- **Duplicate breakers removed from the pricing sheet, so nothing gets priced
+  twice.** Three pairs were the same breaker written two ways — "15A breaker"
+  and "15A 1-Pole breaker" (also 20A and 30A), "15/20" and "20/15 tandem", and
+  "AFCI/GFCI combo" and "dual-function". Each is now one row under the name the
+  app already ships, and the 47 brand rows that pointed at the other spelling
+  now point at it. The "quad tandem" rows were renamed "quad breaker, two
+  2-pole circuits", because a quad is a different part from a tandem and the old
+  name made them look alike. Generic rows 1,364 → 1,358; brand rows unchanged.
+
 - **The pricing sheet now covers the breakers an electrician actually buys.**
   Added half-size ("peanut") breakers — only GE/ABB THQP makes standalone ones
   today, so only that line gets brand rows — plus the odd 3-pole sizes, 25/35/45

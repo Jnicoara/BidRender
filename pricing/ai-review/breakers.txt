@@ -1,5 +1,5 @@
 Category: Breakers
-Items: 91
+Items: 85
 
 Category | Name | Size
 Breakers | 15A 1-Pole half-size breaker | 15A
@@ -12,15 +12,9 @@ Breakers | 20A 2-Pole half-size breaker | 20A
 Breakers | 30A 2-Pole half-size breaker | 30A
 Breakers | 40A 2-Pole half-size breaker | 40A
 Breakers | 50A 2-Pole half-size breaker | 50A
-Breakers | 20/15 tandem breaker | -
 Breakers | 20/20 tandem breaker | -
 Breakers | 30/30 tandem breaker | -
-Breakers | 15A quad tandem breaker | 15A
-Breakers | 20A quad tandem breaker | 20A
-Breakers | 15A 1-Pole breaker | 15A
-Breakers | 20A 1-Pole breaker | 20A
 Breakers | 25A 1-Pole breaker | 25A
-Breakers | 30A 1-Pole breaker | 30A
 Breakers | 35A 1-Pole breaker | 35A
 Breakers | 40A 1-Pole breaker | 40A
 Breakers | 45A 1-Pole breaker | 45A
@@ -39,8 +33,6 @@ Breakers | 20A GFCI breaker | 20A
 Breakers | 30A GFCI breaker | 30A
 Breakers | 15A AFCI/GFCI combo breaker | 15A
 Breakers | 20A AFCI/GFCI combo breaker | 20A
-Breakers | 15A dual-function breaker | 15A
-Breakers | 20A dual-function breaker | 20A
 Breakers | 15A 2-Pole breaker | 15A
 Breakers | 20A 2-Pole breaker | 20A
 Breakers | 25A 2-Pole breaker | 25A
@@ -63,6 +55,8 @@ Breakers | 100A 2-Pole main breaker | 100A
 Breakers | 125A 2-Pole main breaker | 125A
 Breakers | 150A 2-Pole main breaker | 150A
 Breakers | 200A 2-Pole main breaker | 200A
+Breakers | 15A quad breaker, two 2-pole circuits | 15A
+Breakers | 20A quad breaker, two 2-pole circuits | 20A
 Breakers | 20A 2-Pole AFCI breaker | 20A
 Breakers | 30A 2-Pole AFCI breaker | 30A
 Breakers | 20A 2-Pole GFCI breaker | 20A
