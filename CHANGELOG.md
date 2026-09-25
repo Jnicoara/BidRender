@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **The sheet list now shows each sheet's number and title — "E-101 Lighting
+  Plan" — read from the plan itself when it is uploaded.** The app looks
+  first at the names the drawing software stored in the PDF, then at its
+  bookmarks, and only then at the title block printed on the sheet. When it
+  cannot tell, it leaves the number blank rather than guessing. That is
+  common on scanned sets and some firms' drawings, and a blank is one click to
+  fill in. Any number or title you type is kept, even if the plan is read
+  again. Plans attached before today show a "Read" link that does the same.
+  The text of every page is kept too, so the whole set can be searched in a
+  later update.
+
 - **Large plan sets now actually open a page at a time, instead of
   downloading the whole file first.** Since mid-August every plan was being
   downloaded in full before the first sheet appeared, even though the

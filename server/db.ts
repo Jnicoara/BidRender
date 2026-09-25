@@ -118,6 +118,10 @@ import {
   takeoffRunCircuits,
   BidPdfSheet,
   bidPdfSheets,
+  bidPdfSheetIdentity,
+  bidPdfSheetText,
+  type SheetNumberSource,
+  type SheetTitleSource,
   BID_STATUSES,
   bidCloseouts,
   bidCloseoutLines,
@@ -4331,6 +4335,193 @@ export async function getBidPdfSheet(
     .where(and(eq(bidPdfSheets.id, id), eq(bidPdfSheets.userId, userId)))
     .limit(1);
   return row;
+}
+
+// ─── Sheet numbers, titles and page text (read at upload) ─────────────────────
+
+/** One page's number and title, as the client sees them. */
+export type SheetIdentityRow = {
+  pageNumber: number;
+  sheetNumber: string | null;
+  sheetNumberSource: SheetNumberSource | null;
+  sheetTitle: string | null;
+  sheetTitleSource: SheetTitleSource | null;
+};
+
+/**
+ * Every page's number and title for one plan, plus how many pages the reading
+ * pass has reached. Named columns, never a bare select — see the note on
+ * bid_pdf_sheet_text in drizzle/schema.ts.
+ */
+export async function getSheetIdentities(
+  bidPdfId: number,
+  userId: number
+): Promise<{ pages: SheetIdentityRow[]; pagesRead: number }> {
+  const db = await getDb();
+  if (!db) return { pages: [], pagesRead: 0 };
+  const pages = await db
+    .select({
+      pageNumber: bidPdfSheetIdentity.pageNumber,
+      sheetNumber: bidPdfSheetIdentity.sheetNumber,
+      sheetNumberSource: bidPdfSheetIdentity.sheetNumberSource,
+      sheetTitle: bidPdfSheetIdentity.sheetTitle,
+      sheetTitleSource: bidPdfSheetIdentity.sheetTitleSource,
+    })
+    .from(bidPdfSheetIdentity)
+    .where(
+      and(
+        eq(bidPdfSheetIdentity.bidPdfId, bidPdfId),
+        eq(bidPdfSheetIdentity.userId, userId)
+      )
+    )
+    .orderBy(asc(bidPdfSheetIdentity.pageNumber));
+  const [count] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(bidPdfSheetText)
+    .where(
+      and(
+        eq(bidPdfSheetText.bidPdfId, bidPdfId),
+        eq(bidPdfSheetText.userId, userId)
+      )
+    );
+  return { pages, pagesRead: Number(count?.n ?? 0) };
+}
+
+/**
+ * A field the reading pass found — or found nothing for, which is `value:
+ * null` — for one page. Omitting a field leaves whatever is stored alone.
+ */
+export type ReadField<S> = { value: string | null; source: S | null };
+
+export type SheetReadInput = {
+  pageNumber: number;
+  /** Present when this batch carries the page's text. */
+  text?: { text: string; hasTextLayer: boolean };
+  number?: ReadField<Exclude<SheetNumberSource, "user">>;
+  title?: ReadField<SheetTitleSource>;
+};
+
+/**
+ * Record what the reading pass found, page by page.
+ *
+ * ── A person's number is never overwritten, and the SQL says so ──────────────
+ * The number columns update through `IF(sheetNumberSource = 'user', …)`, so a
+ * re-read that finds `E-101` on a page somebody corrected to `E-102` keeps
+ * `E-102`. That is enforced here, in the one write the reading pass has,
+ * rather than by the caller remembering to skip those pages — the caller
+ * cannot see them, and the rule has to hold for every future caller too.
+ * `server/sheetIdentity.test.ts` goes red if it stops being true.
+ *
+ * Titles have no `user` source in this table: a typed title lives in
+ * bid_pdf_sheets.name and wins at display time (shared/sheetIdentity.ts).
+ */
+export async function recordSheetReads(
+  bidPdfId: number,
+  userId: number,
+  pages: SheetReadInput[]
+) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+
+  const texts = pages.filter(p => p.text);
+  if (texts.length > 0) {
+    await db
+      .insert(bidPdfSheetText)
+      .values(
+        texts.map(p => ({
+          bidPdfId,
+          userId,
+          pageNumber: p.pageNumber,
+          text: p.text!.text,
+          hasTextLayer: p.text!.hasTextLayer,
+        }))
+      )
+      .onDuplicateKeyUpdate({
+        set: {
+          text: sql`VALUES(\`text\`)`,
+          hasTextLayer: sql`VALUES(\`hasTextLayer\`)`,
+          extractedAt: sql`CURRENT_TIMESTAMP`,
+        },
+      });
+  }
+
+  // Grouped by which fields a page carries, because ON DUPLICATE KEY UPDATE
+  // names its columns once per statement: a page with no title in this batch
+  // must not have its stored title overwritten by a default.
+  const shapes = new Map<string, SheetReadInput[]>();
+  for (const p of pages) {
+    if (!p.number && !p.title) continue;
+    const key = `${p.number ? "n" : ""}${p.title ? "t" : ""}`;
+    shapes.set(key, [...(shapes.get(key) ?? []), p]);
+  }
+  const keepUserNumber = sql`IF(\`sheetNumberSource\` = 'user', \`sheetNumber\`, VALUES(\`sheetNumber\`))`;
+  const keepUserSource = sql`IF(\`sheetNumberSource\` = 'user', \`sheetNumberSource\`, VALUES(\`sheetNumberSource\`))`;
+  for (const [key, group] of Array.from(shapes.entries())) {
+    const withNumber = key.includes("n");
+    const withTitle = key.includes("t");
+    await db
+      .insert(bidPdfSheetIdentity)
+      .values(
+        group.map(p => ({
+          bidPdfId,
+          userId,
+          pageNumber: p.pageNumber,
+          ...(withNumber
+            ? {
+                sheetNumber: p.number!.value,
+                sheetNumberSource: p.number!.source,
+              }
+            : {}),
+          ...(withTitle
+            ? { sheetTitle: p.title!.value, sheetTitleSource: p.title!.source }
+            : {}),
+        }))
+      )
+      .onDuplicateKeyUpdate({
+        // MySQL applies these left to right, and a later IF sees an earlier
+        // assignment. Number is listed first, so it tests the STORED source.
+        // The source's own IF then keeps 'user' as 'user'. The order would not
+        // matter today anyway — the reading pass cannot send 'user' (the input
+        // type excludes it) — but the test covers the case, not the ordering.
+        set: {
+          ...(withNumber
+            ? { sheetNumber: keepUserNumber, sheetNumberSource: keepUserSource }
+            : {}),
+          ...(withTitle
+            ? {
+                sheetTitle: sql`VALUES(\`sheetTitle\`)`,
+                sheetTitleSource: sql`VALUES(\`sheetTitleSource\`)`,
+              }
+            : {}),
+        },
+      });
+  }
+}
+
+/**
+ * A number a person typed, or cleared (`null`). Sticky from then on: marked
+ * `user`, which `recordSheetReads` never overwrites.
+ */
+export async function setSheetNumberByHand(
+  bidPdfId: number,
+  userId: number,
+  pageNumber: number,
+  sheetNumber: string | null
+) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .insert(bidPdfSheetIdentity)
+    .values({
+      bidPdfId,
+      userId,
+      pageNumber,
+      sheetNumber,
+      sheetNumberSource: "user",
+    })
+    .onDuplicateKeyUpdate({
+      set: { sheetNumber, sheetNumberSource: "user" },
+    });
 }
 
 export async function insertBidPdfSheets(rows: InsertBidPdfSheet[]) {

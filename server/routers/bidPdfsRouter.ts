@@ -484,6 +484,102 @@ export const bidPdfsRouter = router({
       return { success: true };
     }),
 
+  // ── Sheet numbers and titles (viewer piece 2) ──────────────────────────────
+
+  /**
+   * Every page's number and title for one plan, and how many pages the
+   * reading pass has reached — which is how the client knows whether to offer
+   * "Read sheet numbers". Keyed by page, so it can land before the sheet rows
+   * exist. See drizzle/schema.ts, bid_pdf_sheet_identity.
+   */
+  sheetIdentities: procedure
+    .input(z.object({ bidPdfId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      await requirePdf(input.bidPdfId, ctx.scope.dataUserId);
+      return db.getSheetIdentities(input.bidPdfId, ctx.scope.dataUserId);
+    }),
+
+  /**
+   * What the reading pass found, in batches of pages.
+   *
+   * Sent from the uploader's browser, which read the file off its own disk
+   * (client/src/workers/sheetReader.worker.ts). A field left out of a page is
+   * left alone; a field sent with `value: null` means "looked, found nothing"
+   * and clears an older reading. A number a PERSON set is never overwritten —
+   * that rule is in the SQL (`db.recordSheetReads`), not here.
+   */
+  recordSheetReads: procedure
+    .input(
+      z.object({
+        bidPdfId: z.number().int().positive(),
+        pages: z
+          .array(
+            z.object({
+              pageNumber: z.number().int().min(1).max(10000),
+              text: z
+                .object({
+                  text: z.string().max(1_000_000),
+                  hasTextLayer: z.boolean(),
+                })
+                .optional(),
+              number: z
+                .object({
+                  value: z.string().trim().min(1).max(32).nullable(),
+                  source: z
+                    .enum(["label", "bookmark", "titleblock"])
+                    .nullable(),
+                })
+                .optional(),
+              title: z
+                .object({
+                  value: z.string().trim().min(1).max(255).nullable(),
+                  source: z
+                    .enum(["label", "bookmark", "titleblock"])
+                    .nullable(),
+                })
+                .optional(),
+            })
+          )
+          .max(100),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await requirePdf(input.bidPdfId, ctx.scope.dataUserId);
+      await db.recordSheetReads(
+        input.bidPdfId,
+        ctx.scope.dataUserId,
+        input.pages
+      );
+      return { recorded: input.pages.length };
+    }),
+
+  /**
+   * A sheet number typed by hand — or cleared, with `null`. Sticky from then
+   * on: no later read replaces it. The TITLE is edited through `renameSheet`,
+   * which has always been sticky the same way.
+   */
+  setSheetNumber: procedure
+    .input(
+      z.object({
+        bidPdfId: z.number().int().positive(),
+        pageNumber: z.number().int().min(1).max(10000),
+        sheetNumber: z.string().trim().min(1).max(32).nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await requirePdf(input.bidPdfId, ctx.scope.dataUserId);
+      await db.setSheetNumberByHand(
+        input.bidPdfId,
+        ctx.scope.dataUserId,
+        input.pageNumber,
+        input.sheetNumber
+      );
+      return {
+        pageNumber: input.pageNumber,
+        sheetNumber: input.sheetNumber,
+      };
+    }),
+
   // ── Sheets (phase 2a) ──────────────────────────────────────────────────────
 
   /** Every page of one document, in order, with its name and scale. */

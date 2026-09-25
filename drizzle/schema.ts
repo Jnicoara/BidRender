@@ -6,6 +6,7 @@ import {
   mysqlEnum,
   mysqlTable,
   text,
+  mediumtext,
   timestamp,
   varchar,
   float,
@@ -2219,6 +2220,107 @@ export const bidPdfSheets = mysqlTable(
 
 export type BidPdfSheet = typeof bidPdfSheets.$inferSelect;
 export type InsertBidPdfSheet = typeof bidPdfSheets.$inferInsert;
+
+// ─── Sheet numbers and titles (one row per page) ──────────────────────────────
+/**
+ * A page's sheet NUMBER and TITLE — `E-101`, `Lighting Plan` — and where each
+ * came from. references/plan-viewer-overhaul.md § 17.4.
+ *
+ * ── Keyed by (plan, page), not by sheet row ──────────────────────────────────
+ * The numbers are read at UPLOAD, from the file on the uploader's disk, and
+ * the sheet rows are created later, when the viewer first opens the plan
+ * (`ensureSheets`). Keying by page lets the read land first.
+ *
+ * ── A table of its own, not columns on bid_pdf_sheets ────────────────────────
+ * Decided 2026-09-25: this piece changes no existing table. So the title a
+ * PERSON typed stays where renaming has always put it — `bid_pdf_sheets.name`
+ * with `nameSource = 'user'` — and wins over anything here (see
+ * shared/sheetIdentity.ts, `sheetDisplay`). This table holds only what was
+ * read, plus a number a person typed, since there was nowhere else for one.
+ *
+ * ── A person's number is never overwritten ───────────────────────────────────
+ * `sheetNumberSource = 'user'` is sticky: a re-read leaves that row's number
+ * alone, whatever it finds — enforced in the SQL of the write
+ * (`recordSheetReads` in server/db.ts), not by the caller remembering. A
+ * `user` row with a NULL number means somebody deliberately cleared it.
+ *
+ * ── NULL is "nothing found", and that is the common, safe answer ─────────────
+ * Measured on real bid sets, the title-block reader mostly finds nothing when
+ * it fails, and only a CONFIDENT reading is stored at all, so a miss is a
+ * blank — never a plausible wrong number somebody has to notice.
+ */
+export const SHEET_NUMBER_SOURCES = [
+  "label",
+  "bookmark",
+  "titleblock",
+  "user",
+] as const;
+export type SheetNumberSource = (typeof SHEET_NUMBER_SOURCES)[number];
+export const SHEET_TITLE_SOURCES = ["label", "bookmark", "titleblock"] as const;
+export type SheetTitleSource = (typeof SHEET_TITLE_SOURCES)[number];
+
+export const bidPdfSheetIdentity = mysqlTable(
+  "bid_pdf_sheet_identity",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    bidPdfId: int("bidPdfId")
+      .notNull()
+      .references(() => bidPdfs.id, { onDelete: "cascade" }),
+    /** The company owner's id, as on every table here. */
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** 1-based, matching bid_pdf_sheets.pageNumber. */
+    pageNumber: int("pageNumber").notNull(),
+    sheetNumber: varchar("sheetNumber", { length: 32 }),
+    sheetNumberSource: mysqlEnum("sheetNumberSource", SHEET_NUMBER_SOURCES),
+    sheetTitle: varchar("sheetTitle", { length: 255 }),
+    sheetTitleSource: mysqlEnum("sheetTitleSource", SHEET_TITLE_SOURCES),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    unique("bid_pdf_sheet_identity_pdf_page_uq").on(t.bidPdfId, t.pageNumber),
+    index("bid_pdf_sheet_identity_userId_idx").on(t.userId),
+  ]
+);
+
+export type BidPdfSheetIdentity = typeof bidPdfSheetIdentity.$inferSelect;
+
+/**
+ * The text of each page, as read at upload — for searching the set (piece 4).
+ *
+ * A separate table from the numbers, and that is deliberate: nearly every read
+ * here is a bare `select()`, and this column averages ~10KB a page (4.8M
+ * characters for a 500-sheet set, measured). As a column beside the numbers,
+ * every sheet-list fetch would drag the whole set's text along.
+ *
+ * A row exists for every page the reading pass reached, INCLUDING pages with
+ * no text layer (`hasTextLayer = false`, a scan). So "how much of this plan has
+ * been read" is a count of rows, and a search can say how many sheets it could
+ * not see rather than pretending they were searched.
+ */
+export const bidPdfSheetText = mysqlTable(
+  "bid_pdf_sheet_text",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    bidPdfId: int("bidPdfId")
+      .notNull()
+      .references(() => bidPdfs.id, { onDelete: "cascade" }),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    pageNumber: int("pageNumber").notNull(),
+    /** In pdf.js drawing order, items joined with single spaces. */
+    text: mediumtext("text").notNull(),
+    hasTextLayer: boolean("hasTextLayer").notNull(),
+    extractedAt: timestamp("extractedAt").defaultNow().notNull(),
+  },
+  t => [
+    unique("bid_pdf_sheet_text_pdf_page_uq").on(t.bidPdfId, t.pageNumber),
+    index("bid_pdf_sheet_text_userId_idx").on(t.userId),
+  ]
+);
 
 // ─── Traced runs (takeoff phase 2b) ───────────────────────────────────────────
 /**

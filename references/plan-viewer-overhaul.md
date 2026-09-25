@@ -5648,7 +5648,63 @@ or a reload does not redraw them, is **not in this batch**. CLAUDE.md records
 that the old IndexedDB layer was removed on purpose. Revisit it only if people
 actually open the grid on big sets often enough for the redraw to matter.
 
-### 17.4 Piece 2 — sheet numbers and titles. ADDITIVE MIGRATION.
+### 17.4 Piece 2 — sheet numbers and titles. ADDITIVE MIGRATION. BUILT 2026-09-25
+
+> **Built, with these changes to what is specified below. Each one says why.**
+>
+> - **Two NEW TABLES, not columns on `bid_pdf_sheets`.** The request for this
+>   piece ruled out touching any existing table. So the migration section
+>   below (new columns, a widened `nameSource` enum, `bid_pdfs.sheetsReadAt`)
+>   is **superseded**: `bid_pdf_sheet_identity` (0076) holds number and title
+>   per page, and `bid_pdf_sheet_text` (0077) holds each page's text. Both are
+>   keyed by (plan, page), not by sheet row, because the read lands at upload,
+>   before the viewer has created any rows. "Has this plan been read" is a
+>   count of text rows, one per page reached, scans included, so no flag
+>   column was needed.
+> - **A typed TITLE still lives in `bid_pdf_sheets.name`** (`nameSource =
+'user'`, the existing rename) and wins at display time
+>   (`sheetDisplay`, shared/sheetIdentity.ts). A typed NUMBER is stored with
+>   source `user`, and the SQL of the only write the reader has refuses to
+>   overwrite it. `server/sheetIdentity.test.ts` goes red without that
+>   `IF()` — checked by removing it.
+> - **Per FIELD, not per page:** the title block fills a number or a title
+>   only when the label and the bookmark left THAT field empty.
+> - **Read after attach, not alongside the transfer.** Simpler, and it still
+>   reads from the local file (a byte-range transport over `File.slice`, so
+>   nothing crosses the network and nothing is held whole).
+> - **No low-confidence marker.** Only a CONFIDENT title-block number is
+>   stored at all, so there is nothing doubtful to mark. This is "blank, not
+>   wrong", as asked.
+> - **Two quiet-fail guards on titles, found on screen.** Colusa's E1.1A title
+>   came out as "(ALTERNATE)", the last line of a three-line title that runs
+>   above the search window. Old Blueridge (an OCR'd scan) came out as
+>   "DRAWNBY" and "DRAWINBY". So a title that visibly continues above the
+>   window is dropped, and a title-block title must name a kind of drawing
+>   (PLAN, SCHEDULE, LEGEND…). Both can only turn a title into a blank. Cost,
+>   measured: 3 of 71 real titles on the labelled sets turned blank, and none
+>   turned wrong.
+>
+> **Seen on screen, 2026-09-25** (bid "Sheet numbers check", five real sets
+> uploaded through the page's own file input):
+>
+> - **Weld:** all 5 from page labels, correct.
+> - **UNC Charlotte:** all 7 from bookmarks. Its labels, "18"…"24", were
+>   ignored.
+> - **Colusa:** 3 of 4 numbers off the title block. The cover sheet is blank
+>   (its number is SHX vector strokes).
+> - **Dundas:** 9 pages read, nothing found, blank.
+> - **pine st** (a scan): no text; its one bookmark named it.
+> - **Hand edits:** typed E0.1 and a title on Colusa's blank cover, and
+>   corrected E1.1 to E1.1B. Both survived "Read again", which re-ran the whole
+>   reader from storage.
+> - **500-sheet set:** read from storage in ~80s, with 416 numbers, 298 titles
+>   and the rest blank.
+>
+> **Known limit, not fixed (accuracy was out of scope):** "repeats on half
+> the sheets" is how project text is told apart from a title. On a set glued
+> together from several firms' sets, each firm's project text repeats on far
+> fewer than half the pages, so titles on those sheets come out blank. They
+> are blank, not wrong.
 
 #### How real sets lay it out — looked at, not assumed
 

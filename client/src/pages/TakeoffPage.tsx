@@ -112,6 +112,11 @@ import {
   thumbnailWants,
   type VisibleRange,
 } from "@/lib/thumbnailQueue";
+import {
+  startSheetRead,
+  type SheetReadProgress,
+  type SheetReadSource,
+} from "@/lib/sheetReadJob";
 // The tool button and the row it produces draw the same icon, from one place.
 import { CableIcon, ConduitIcon } from "@/components/takeoff/runIcons";
 import { SheetChip } from "@/components/takeoff/SheetChip";
@@ -2092,6 +2097,21 @@ export default function TakeoffPage({
       { enabled: Boolean(doc) }
     );
 
+  /**
+   * Sheet numbers and titles read at upload (viewer piece 2), per page. A
+   * separate query from `sheets` because the read can land before the sheet
+   * rows exist — so it is in `refreshSheets` below, and everything that
+   * changes it goes through there.
+   */
+  const { data: identityData } = trpc.bidPdfs.sheetIdentities.useQuery(
+    { bidPdfId: doc?.id ?? 0 },
+    { enabled: Boolean(doc) }
+  );
+  const identities = useMemo(
+    () => new Map((identityData?.pages ?? []).map(p => [p.pageNumber, p])),
+    [identityData]
+  );
+
   const thumbnailPageCount = doc?.pageCount ?? sheets.length;
   const wantedThumbnails = useMemo(
     () => thumbnailWants([gridRange, listRange], thumbnailPageCount),
@@ -2112,6 +2132,9 @@ export default function TakeoffPage({
    */
   const refreshSheets = () => {
     if (doc) void utils.bidPdfs.sheets.invalidate({ bidPdfId: doc.id });
+    // What the list SHOWS for a sheet is its row AND its read number/title.
+    if (doc)
+      void utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId: doc.id });
     void utils.takeoffRuns.measurability.invalidate();
     /*
       A sheet's SCALE is what every traced length on it is worked out from,
@@ -2205,6 +2228,90 @@ export default function TakeoffPage({
     },
     onSettled: refreshSheets,
   });
+
+  /**
+   * A sheet number typed by hand, or cleared. Optimistic like a rename, and
+   * sticky on the server: no later read replaces it (server/db.ts).
+   */
+  const setSheetNumber = trpc.bidPdfs.setSheetNumber.useMutation({
+    onMutate: async ({ bidPdfId, pageNumber, sheetNumber }) => {
+      await utils.bidPdfs.sheetIdentities.cancel({ bidPdfId });
+      const snapshot = utils.bidPdfs.sheetIdentities.getData({ bidPdfId });
+      utils.bidPdfs.sheetIdentities.setData({ bidPdfId }, old => {
+        const pages = old?.pages ?? [];
+        const existing = pages.find(p => p.pageNumber === pageNumber);
+        const edited = {
+          pageNumber,
+          sheetTitle: existing?.sheetTitle ?? null,
+          sheetTitleSource: existing?.sheetTitleSource ?? null,
+          sheetNumber,
+          sheetNumberSource: "user" as const,
+        };
+        return {
+          pagesRead: old?.pagesRead ?? 0,
+          pages: existing
+            ? pages.map(p => (p.pageNumber === pageNumber ? edited : p))
+            : [...pages, edited].sort((a, b) => a.pageNumber - b.pageNumber),
+        };
+      });
+      return { snapshot, bidPdfId };
+    },
+    onError: (error, _vars, context) => {
+      if (context?.snapshot)
+        utils.bidPdfs.sheetIdentities.setData(
+          { bidPdfId: context.bidPdfId },
+          context.snapshot
+        );
+      toast.error(error.message);
+    },
+    onSettled: refreshSheets,
+  });
+
+  /**
+   * Reading sheet numbers — one job per plan, at most.
+   *
+   * Started after an upload attaches, from the file still on this machine, or
+   * by hand from the sheet list for a plan attached before this existed. It
+   * belongs to this screen: leaving stops it, and every batch already sent is
+   * kept, so the list offers to read the rest next time.
+   */
+  const recordSheetReads = trpc.bidPdfs.recordSheetReads.useMutation();
+  const sheetReadJobs = useRef(new Map<number, { cancel: () => void }>());
+  const [sheetReads, setSheetReads] = useState<
+    Record<number, SheetReadProgress>
+  >({});
+  useEffect(() => {
+    const jobs = sheetReadJobs.current;
+    return () => {
+      jobs.forEach(job => job.cancel());
+      jobs.clear();
+    };
+  }, []);
+  const beginSheetRead = useCallback(
+    (bidPdfId: number, source: SheetReadSource) => {
+      sheetReadJobs.current.get(bidPdfId)?.cancel();
+      const job = startSheetRead({
+        source,
+        send: async pages => {
+          await recordSheetReads.mutateAsync({
+            bidPdfId,
+            pages: pages as Parameters<
+              typeof recordSheetReads.mutateAsync
+            >[0]["pages"],
+          });
+        },
+        onProgress: progress => {
+          setSheetReads(prev => ({ ...prev, [bidPdfId]: progress }));
+          if (progress.state !== "reading")
+            sheetReadJobs.current.delete(bidPdfId);
+        },
+        onBatchSaved: () =>
+          void utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId }),
+      });
+      sheetReadJobs.current.set(bidPdfId, job);
+    },
+    [recordSheetReads.mutateAsync, utils]
+  );
 
   /**
    * Put a scale mutation's saved row into the sheet list NOW.
@@ -3764,6 +3871,8 @@ export default function TakeoffPage({
             setPage(1);
             void utils.bidPdfs.list.invalidate({ bidId });
             toast.success(`${attached.filename} attached.`);
+            // Sheet numbers, read once from the copy on this machine.
+            beginSheetRead(attached.id, { file });
             return;
           }
         }
@@ -3811,6 +3920,9 @@ export default function TakeoffPage({
         setPage(1);
         void utils.bidPdfs.list.invalidate({ bidId });
         toast.success(`${attached.filename} attached.`);
+        // Sheet numbers, read once from the copy on this machine — the whole
+        // file is read, and here it costs no network at all.
+        beginSheetRead(attached.id, { file });
       } catch (err) {
         const message =
           err instanceof Error
@@ -3832,6 +3944,7 @@ export default function TakeoffPage({
       signUploadParts,
       completeMultipart,
       abortMultipart,
+      beginSheetRead,
     ]
   );
 
@@ -4039,6 +4152,7 @@ export default function TakeoffPage({
         <div className="border-b border-border bg-card px-3 py-1.5 shrink-0 flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <SheetChip
             sheets={sheets}
+            identities={identities}
             page={page}
             pageCount={doc?.pageCount ?? sheets.length}
             thumbnails={thumbnails}
@@ -4536,6 +4650,28 @@ export default function TakeoffPage({
             <div className="flex-1 min-h-0">
               <SheetIndex
                 sheets={sheets}
+                identities={identities}
+                readStatus={{
+                  progress: doc ? sheetReads[doc.id] : undefined,
+                  pagesRead: identityData?.pagesRead ?? 0,
+                  pageCount: doc?.pageCount ?? sheets.length,
+                  byteSize: doc?.byteSize ?? null,
+                }}
+                onReadNumbers={() => {
+                  if (!doc) return;
+                  beginSheetRead(doc.id, {
+                    url: doc.url,
+                    byteSize: doc.byteSize ?? null,
+                  });
+                }}
+                onSetNumber={(pageNumber, sheetNumber) => {
+                  if (!doc) return;
+                  setSheetNumber.mutate({
+                    bidPdfId: doc.id,
+                    pageNumber,
+                    sheetNumber,
+                  });
+                }}
                 activePage={page}
                 loading={sheetsLoading}
                 thumbnails={thumbnails}

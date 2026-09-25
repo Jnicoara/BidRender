@@ -1742,6 +1742,12 @@ So: a data query filters on **`ctx.scope.dataUserId`**, which `server/_core/comp
   components with quantities, plus `baseLaborHours` and `overheadLaborHours`
   typed on the assembly itself and a `laborRateId` for the role that does it.
 - `labor_rates` — hourly cost per role.
+- `bid_pdf_sheet_identity` / `bid_pdf_sheet_text` — each plan page's sheet
+  number and title, and its text, read ONCE at upload from the file on the
+  uploader's disk (`client/src/workers/sheetReader.worker.ts`). Keyed by
+  (plan, page), not sheet row. A number typed by hand is `user` and no re-read
+  replaces it. A typed title is still `bid_pdf_sheets.name`. See
+  `references/plan-viewer-overhaul.md` § 17.4.
 - `bids` — one job. `bid_pdfs` holds its plan sets; the takeoff tables
   (`takeoff_groups`, `takeoff_stamps`, `takeoff_runs`, `takeoff_run_types`) hang
   off the bid and its sheets.

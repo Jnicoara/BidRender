@@ -1,22 +1,31 @@
 /**
- * SheetIndex — every sheet in the set, by name, one click from the drawing.
+ * SheetIndex — every sheet in the set, by number and title, one click from the
+ * drawing.
  *
  * ── Why names and not page numbers ───────────────────────────────────────────
- * An estimator thinks "the panel schedule", not "page 23". Where the PDF
- * carries bookmarks — architectural sets very often do — those are the sheet's
- * real names and they go straight in. Where it does not, every sheet still gets
- * a label ("Sheet 3") that can be renamed, because a column of bare numbers is
- * the thing this panel exists to replace, and an unnamed row would send the
- * user back to clicking through pages to find out what each one is.
+ * An estimator thinks "the panel schedule", not "page 23". Each row shows the
+ * sheet's NUMBER and TITLE — `E-101  Lighting Plan` — read once at upload from
+ * the PDF's page labels, its bookmarks, or its title block, in that order
+ * (shared/sheetIdentity.ts, references/plan-viewer-overhaul.md § 17.4). Where
+ * nothing could be read, the row keeps its bookmark name or a `Sheet 3` label,
+ * shown as provisional, because a column of bare numbers is the thing this
+ * panel exists to replace.
  *
- * The page number stays visible beside the name regardless, since it is how
- * people cross-reference against a printed set.
+ * The page number stays visible beside it regardless, since it is how people
+ * cross-reference against a printed set.
  *
- * ── Renaming ─────────────────────────────────────────────────────────────────
- * In place, following CLAUDE.md § Editing fields: the text selects on focus,
- * commits on Enter and on blur, Escape abandons back to the stored name, and a
- * real write flashes green. A rename is sticky — reopening the document never
- * overwrites it from the bookmarks again.
+ * ── Fixing a wrong one, by hand ──────────────────────────────────────────────
+ * The pencil opens BOTH fields, number and title, in place. Following
+ * CLAUDE.md § Editing fields: the text selects on focus, Enter commits, Escape
+ * abandons back to what is stored, and a real write flashes green. Leaving the
+ * row commits too — but moving between its two fields does not, so a number
+ * and a title can be typed in one go. Only a field that CHANGED is written:
+ * editing the number never touches the title (§ Editing fields rule 7).
+ *
+ * **A hand edit is sticky.** A typed title is the sheet's `name`
+ * (`nameSource: 'user'`), and a typed number is stored as `user`, which no
+ * later read overwrites (server/db.ts `recordSheetReads`). Clearing a number
+ * leaves it blank on purpose — it does not bring the reader's guess back.
  *
  * ── Names or pictures ────────────────────────────────────────────────────────
  * A toggle at the top. Pictures mode shows one FULL-WIDTH thumbnail per row,
@@ -42,10 +51,13 @@ import {
   Image as ImageIcon,
   List,
   Pencil,
+  RotateCw,
   Ruler,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import type { VisibleRange } from "@/lib/thumbnailQueue";
+import type { SheetReadProgress } from "@/lib/sheetReadJob";
+import { sheetDisplay, type StoredSheetIdentity } from "@shared/sheetIdentity";
 
 const FLASH_MS = 1100;
 
@@ -80,30 +92,46 @@ export type IndexSheet = {
   scaleText: string | null;
 };
 
+export type SheetIdentities = Map<number, StoredSheetIdentity>;
+
+/** Where the reading of this plan's sheet numbers stands. */
+export type SheetReadStatus = {
+  /** The run in progress or just finished, if there is one this visit. */
+  progress: SheetReadProgress | undefined;
+  /** Pages the server holds a reading for. */
+  pagesRead: number;
+  pageCount: number;
+  byteSize: number | null;
+};
+
 function SheetRow({
   sheet,
+  identity,
   isActive,
   pictures,
   thumbnail,
   onOpen,
   onRename,
+  onSetNumber,
 }: {
   sheet: IndexSheet;
+  identity: StoredSheetIdentity | undefined;
   isActive: boolean;
   /** Pictures mode: a full-width thumbnail above the name. */
   pictures: boolean;
   thumbnail: string | undefined;
   onOpen: () => void;
   onRename: (name: string) => void;
+  onSetNumber: (sheetNumber: string | null) => void;
 }) {
+  const display = sheetDisplay(sheet, identity);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(sheet.name);
+  const [draftNumber, setDraftNumber] = useState(display.number ?? "");
+  const [draftTitle, setDraftTitle] = useState(display.title);
   const [flash, setFlash] = useState(false);
   const flashTimer = useRef<number | null>(null);
+  const editor = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (!editing) setDraft(sheet.name);
-  }, [sheet.name, editing]);
   useEffect(
     () => () => {
       if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
@@ -111,19 +139,45 @@ function SheetRow({
     []
   );
 
+  const startEditing = () => {
+    setDraftNumber(display.number ?? "");
+    setDraftTitle(display.title);
+    setEditing(true);
+  };
+
   const commit = () => {
     setEditing(false);
-    const next = draft.trim();
-    // Blank or unchanged writes nothing — and must not flash, because a
-    // confirmation for a save that did not happen is worse than none.
-    if (!next || next === sheet.name) {
-      setDraft(sheet.name);
-      return;
+    const number = draftNumber.trim().slice(0, 32);
+    const title = draftTitle.trim().slice(0, 255);
+    let wrote = false;
+    // Only a field that changed is written. A blank title is refused — every
+    // sheet keeps a name — while a blank number is a real answer: none.
+    if ((number || null) !== display.number) {
+      onSetNumber(number || null);
+      wrote = true;
     }
-    onRename(next);
+    if (title && title !== display.title) {
+      onRename(title);
+      wrote = true;
+    }
+    // No flash for a save that did not happen — see CLAUDE.md § Editing
+    // fields rule 4.
+    if (!wrote) return;
     setFlash(true);
     if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
     flashTimer.current = window.setTimeout(() => setFlash(false), FLASH_MS);
+  };
+
+  const fieldKeys = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commit();
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setEditing(false);
+    }
   };
 
   return (
@@ -174,48 +228,70 @@ function SheetRow({
             "font-mono text-[0.7rem] tabular-nums mt-0.5 w-6 shrink-0 text-right",
             isActive ? "text-[#F5C518]" : "text-muted-foreground/60"
           )}
+          title={`Page ${sheet.pageNumber} of the PDF`}
         >
           {sheet.pageNumber}
         </span>
 
         <div className="flex-1 min-w-0">
           {editing ? (
-            <Input
-              value={draft}
-              autoFocus
-              onChange={e => setDraft(e.target.value)}
-              onFocus={selectOnFocus}
-              onBlur={commit}
+            <div
+              ref={editor}
+              className="flex gap-1"
               onClick={e => e.stopPropagation()}
-              onKeyDown={e => {
-                e.stopPropagation();
-                if (e.key === "Enter") {
-                  e.preventDefault();
+              // Leaving the row commits; moving between its fields does not.
+              onBlur={e => {
+                if (!editor.current?.contains(e.relatedTarget as Node | null))
                   commit();
-                }
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  setDraft(sheet.name);
-                  setEditing(false);
-                }
               }}
-              className="h-6 text-xs px-1.5"
-              aria-label={`Name of sheet ${sheet.pageNumber}`}
-            />
+            >
+              <Input
+                value={draftNumber}
+                autoFocus
+                onChange={e => setDraftNumber(e.target.value)}
+                onFocus={selectOnFocus}
+                onKeyDown={fieldKeys}
+                placeholder="No."
+                className="h-6 w-16 shrink-0 text-xs px-1.5 font-mono"
+                aria-label={`Sheet number of page ${sheet.pageNumber}`}
+              />
+              <Input
+                value={draftTitle}
+                onChange={e => setDraftTitle(e.target.value)}
+                onFocus={selectOnFocus}
+                onKeyDown={fieldKeys}
+                className="h-6 flex-1 min-w-0 text-xs px-1.5"
+                aria-label={`Title of page ${sheet.pageNumber}`}
+              />
+            </div>
           ) : (
             <p
               className={cn(
                 "text-sm truncate transition-colors",
-                flash && "text-emerald-300",
-                // A default label is visibly provisional, so it reads as
-                // something to fix rather than as the sheet's actual name.
-                sheet.nameSource === "default" &&
-                  !flash &&
-                  "text-muted-foreground italic"
+                flash && "text-emerald-300"
               )}
-              title={sheet.name}
+              title={
+                display.number
+                  ? `${display.number} ${display.title}`
+                  : display.title
+              }
             >
-              {sheet.name}
+              {display.number && (
+                <span className="font-mono font-medium mr-1.5">
+                  {display.number}
+                </span>
+              )}
+              <span
+                className={cn(
+                  // A default label is visibly provisional, so it reads as
+                  // something to fix rather than as the sheet's actual name.
+                  display.provisional &&
+                    !flash &&
+                    "text-muted-foreground italic"
+                )}
+              >
+                {display.title}
+              </span>
             </p>
           )}
 
@@ -231,11 +307,11 @@ function SheetRow({
           <button
             onClick={e => {
               e.stopPropagation();
-              setDraft(sheet.name);
-              setEditing(true);
+              startEditing();
             }}
             className="shrink-0 p-1 rounded text-muted-foreground/60 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-foreground hover:bg-muted transition-all"
-            aria-label={`Rename sheet ${sheet.pageNumber}`}
+            aria-label={`Edit the number and title of page ${sheet.pageNumber}`}
+            title="Edit number and title"
           >
             <Pencil className="w-3 h-3" />
           </button>
@@ -243,22 +319,86 @@ function SheetRow({
       </div>
 
       <span className="sr-only" role="status" aria-live="polite">
-        {flash ? `Sheet ${sheet.pageNumber} renamed` : ""}
+        {flash ? `Sheet ${sheet.pageNumber} saved` : ""}
       </span>
     </div>
   );
 }
 
+function formatMb(bytes: number) {
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
+}
+
+/**
+ * One line under the header: reading in progress, stopped, or never done.
+ * Nothing at all once a plan is fully read — the numbers are the news.
+ */
+function ReadStatusLine({
+  status,
+  onRead,
+}: {
+  status: SheetReadStatus;
+  onRead: () => void;
+}) {
+  const { progress, pagesRead, pageCount, byteSize } = status;
+  // Reading the text of every page downloads nearly the whole file, so a
+  // read started from here says what it costs. From an upload it is free.
+  const cost = byteSize ? ` (reads the whole ${formatMb(byteSize)} file)` : "";
+  const action = (label: string) => (
+    <button
+      type="button"
+      onClick={onRead}
+      className="text-[#F5C518] hover:underline"
+      title={`Read sheet numbers and titles off this plan${cost}`}
+    >
+      {label}
+    </button>
+  );
+
+  let body: React.ReactNode = null;
+  if (progress?.state === "reading") {
+    body = (
+      <span role="status" aria-live="polite">
+        Reading sheet numbers…{" "}
+        {progress.total ? `${progress.read} of ${progress.total}` : ""}
+      </span>
+    );
+  } else if (progress?.state === "failed") {
+    body = <>Reading sheet numbers stopped. {action("Try again")}</>;
+  } else if (pageCount > 0 && pagesRead === 0) {
+    body = <>Sheet numbers not read yet. {action("Read")}</>;
+  } else if (pageCount > 0 && pagesRead < pageCount) {
+    body = (
+      <>
+        Sheet numbers read for {pagesRead} of {pageCount}. {action("Read all")}
+      </>
+    );
+  }
+  if (!body) return null;
+  return (
+    <p className="px-3 py-1.5 border-b border-border text-[0.7rem] text-muted-foreground shrink-0">
+      {body}
+    </p>
+  );
+}
+
 export function SheetIndex({
   sheets,
+  identities,
+  readStatus,
   activePage,
   thumbnails,
   onVisibleRange,
   onOpenPage,
   onRename,
+  onSetNumber,
+  onReadNumbers,
   loading,
 }: {
   sheets: IndexSheet[];
+  /** Numbers and titles read off the plan, by page. */
+  identities: SheetIdentities;
+  readStatus: SheetReadStatus;
   activePage: number;
   /** Page number to a data URL, as each one finishes drawing. */
   thumbnails: Record<number, string>;
@@ -269,6 +409,9 @@ export function SheetIndex({
   onVisibleRange: (range: VisibleRange | null) => void;
   onOpenPage: (pageNumber: number) => void;
   onRename: (sheetId: number, name: string) => void;
+  onSetNumber: (pageNumber: number, sheetNumber: string | null) => void;
+  /** Read (or re-read) this plan's numbers from storage. */
+  onReadNumbers: () => void;
   loading?: boolean;
 }) {
   const scaled = sheets.filter(s => s.scaleRatio !== null).length;
@@ -301,6 +444,10 @@ export function SheetIndex({
     if (!pictures) onVisibleRange(null);
   }, [pictures, onVisibleRange]);
 
+  const reading = readStatus.progress?.state === "reading";
+  const fullyRead =
+    readStatus.pageCount > 0 && readStatus.pagesRead >= readStatus.pageCount;
+
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="px-3 py-2 border-b border-border shrink-0">
@@ -309,6 +456,26 @@ export function SheetIndex({
           <span className="ml-auto normal-case tracking-normal">
             {sheets.length === 0 ? "" : `${scaled}/${sheets.length} scaled`}
           </span>
+          {/*
+            Reading again is rare — after a set is re-issued, or to pick up a
+            better reader — so once a plan is read it is one quiet icon, not a
+            line of text. Hand-typed numbers survive it.
+          */}
+          {fullyRead && !reading && (
+            <button
+              type="button"
+              onClick={onReadNumbers}
+              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
+              aria-label="Read sheet numbers again"
+              title={`Read sheet numbers and titles again${
+                readStatus.byteSize
+                  ? ` (reads the whole ${formatMb(readStatus.byteSize)} file)`
+                  : ""
+              }. Numbers you typed are kept.`}
+            >
+              <RotateCw className="w-3 h-3" />
+            </button>
+          )}
           <div
             className="flex items-center rounded border border-border ml-1"
             role="group"
@@ -348,6 +515,10 @@ export function SheetIndex({
         </div>
       </div>
 
+      {!loading && (
+        <ReadStatusLine status={readStatus} onRead={onReadNumbers} />
+      )}
+
       {loading ? (
         <div className="flex-1 min-h-0 p-3 space-y-2">
           {[0, 1, 2, 3].map(i => (
@@ -362,6 +533,7 @@ export function SheetIndex({
         <SheetRows
           key={mode}
           sheets={sheets}
+          identities={identities}
           activePage={activePage}
           pictures={pictures}
           startRow={startRow}
@@ -372,6 +544,7 @@ export function SheetIndex({
           onVisibleRange={onVisibleRange}
           onOpenPage={onOpenPage}
           onRename={onRename}
+          onSetNumber={onSetNumber}
         />
       )}
     </div>
@@ -384,6 +557,7 @@ export function SheetIndex({
  */
 function SheetRows({
   sheets,
+  identities,
   activePage,
   pictures,
   startRow,
@@ -392,8 +566,10 @@ function SheetRows({
   onVisibleRange,
   onOpenPage,
   onRename,
+  onSetNumber,
 }: {
   sheets: IndexSheet[];
+  identities: SheetIdentities;
   activePage: number;
   pictures: boolean;
   /** The row to open at. */
@@ -403,6 +579,7 @@ function SheetRows({
   onVisibleRange: (range: VisibleRange | null) => void;
   onOpenPage: (pageNumber: number) => void;
   onRename: (sheetId: number, name: string) => void;
+  onSetNumber: (pageNumber: number, sheetNumber: string | null) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   // Only sizes the scrollbar and the opening offset before rows are measured.
@@ -464,11 +641,13 @@ function SheetRows({
             >
               <SheetRow
                 sheet={sheet}
+                identity={identities.get(sheet.pageNumber)}
                 isActive={sheet.pageNumber === activePage}
                 pictures={pictures}
                 thumbnail={thumbnails[sheet.pageNumber]}
                 onOpen={() => onOpenPage(sheet.pageNumber)}
                 onRename={name => onRename(sheet.id, name)}
+                onSetNumber={number => onSetNumber(sheet.pageNumber, number)}
               />
             </div>
           );

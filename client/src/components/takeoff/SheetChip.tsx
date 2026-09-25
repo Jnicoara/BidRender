@@ -39,19 +39,38 @@ import {
 } from "@/components/ui/popover";
 import { ChevronDown, ChevronLeft, ChevronRight, Ruler } from "lucide-react";
 import type { VisibleRange } from "@/lib/thumbnailQueue";
+import {
+  sheetDisplay,
+  sheetLabel,
+  type StoredSheetIdentity,
+} from "@shared/sheetIdentity";
 
 export type ChipSheet = {
   id: number;
   pageNumber: number;
   name: string;
+  nameSource: "bookmark" | "default" | "user";
   scaleRatio: number | null;
   scaleText: string | null;
 };
+
+/**
+ * `E-101  Lighting Plan` — the same words the sheet list shows, from the same
+ * rule (shared/sheetIdentity.ts), so the chip, the grid and the list cannot
+ * disagree about what a sheet is called.
+ */
+function labelOf(
+  sheet: Pick<ChipSheet, "name" | "nameSource" | "pageNumber">,
+  identities: Map<number, StoredSheetIdentity>
+) {
+  return sheetLabel(sheetDisplay(sheet, identities.get(sheet.pageNumber)));
+}
 
 const COLUMNS = 3;
 
 export function SheetChip({
   sheets,
+  identities,
   page,
   pageCount,
   thumbnails,
@@ -60,6 +79,8 @@ export function SheetChip({
   disabled,
 }: {
   sheets: ChipSheet[];
+  /** Numbers and titles read off the plan, by page. */
+  identities: Map<number, StoredSheetIdentity>;
   page: number;
   pageCount: number;
   /** Page number to a data URL, as each one finishes drawing. */
@@ -72,7 +93,11 @@ export function SheetChip({
   const [open, setOpen] = useState(false);
 
   const active = sheets.find(s => s.pageNumber === page) ?? null;
-  const label = active?.name ?? (pageCount > 0 ? `Sheet ${page}` : "—");
+  const label = active
+    ? labelOf(active, identities)
+    : pageCount > 0
+      ? `Sheet ${page}`
+      : "—";
 
   /**
    * Every page, whether or not a sheet row exists for it yet.
@@ -87,18 +112,19 @@ export function SheetChip({
     return Array.from({ length: Math.max(pageCount, sheets.length) }).map(
       (_, index) => {
         const pageNumber = index + 1;
-        return (
-          byPage.get(pageNumber) ?? {
-            id: -pageNumber,
-            pageNumber,
-            name: `Sheet ${pageNumber}`,
-            scaleRatio: null,
-            scaleText: null,
-          }
-        );
+        const sheet: ChipSheet = byPage.get(pageNumber) ?? {
+          id: -pageNumber,
+          pageNumber,
+          name: `Sheet ${pageNumber}`,
+          nameSource: "default",
+          scaleRatio: null,
+          scaleText: null,
+        };
+        // The cell shows the label; `name` is not edited from here.
+        return { ...sheet, name: labelOf(sheet, identities) };
       }
     );
-  }, [sheets, pageCount]);
+  }, [sheets, pageCount, identities]);
 
   return (
     <div className="flex items-center gap-0.5">
