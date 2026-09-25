@@ -11,7 +11,9 @@ import {
   CONDUCTOR_SIZES,
   hasSize,
   materialSizeKey,
+  materialTypeName,
 } from "../shared/materialSizeOrder";
+import { sortMaterialsForDisplay } from "../shared/materialOrder";
 import { BASELINE_MATERIALS } from "./seed/baselineMaterials";
 
 const sorted = (names: string[]) => [...names].sort(compareBySize);
@@ -251,6 +253,107 @@ describe("amperages and lengths", () => {
       '12" under-cabinet light',
       '24" under-cabinet light',
       "4 ft LED strip fixture",
+    ]);
+  });
+});
+
+/**
+ * Two shapes the parser used to miss entirely, found 2026-09-25 in the pricing
+ * sheet's Boxes and Equipment shelves. A name it cannot read falls back to
+ * alphabetical, which looks sorted and is wrong the moment a number gains a
+ * digit: "12x12" before "4x4", "110 CFM" before "50 CFM".
+ */
+describe("dimensions and trailing sizes", () => {
+  it("orders a WxH box by its dimensions, not alphabetically", () => {
+    expect(
+      sorted([
+        "12x12 pull box",
+        "4x4 pull box",
+        "24x24 pull box",
+        "6x6 pull box",
+        "16x16 pull box",
+        "8x8 pull box",
+      ])
+    ).toEqual([
+      "4x4 pull box",
+      "6x6 pull box",
+      "8x8 pull box",
+      "12x12 pull box",
+      "16x16 pull box",
+      "24x24 pull box",
+    ]);
+  });
+
+  it("breaks a tie on the first dimension with the second", () => {
+    expect(
+      sorted(["2x4 LED troffer", "2x2 LED troffer", "1x4 LED troffer"])
+    ).toEqual(["1x4 LED troffer", "2x2 LED troffer", "2x4 LED troffer"]);
+  });
+
+  it("derives the type from a dimensioned name, so the family groups", () => {
+    expect(materialTypeName("12x12 pull box")).toBe("pull box");
+    expect(materialTypeName("4x4 wireway")).toBe("wireway");
+  });
+
+  it("orders airflow stated after the comma", () => {
+    expect(
+      sorted([
+        "Bath exhaust fan, 150 CFM",
+        "Bath exhaust fan, 50 CFM",
+        "Bath exhaust fan, 110 CFM",
+        "Bath exhaust fan, 80 CFM",
+      ])
+    ).toEqual([
+      "Bath exhaust fan, 50 CFM",
+      "Bath exhaust fan, 80 CFM",
+      "Bath exhaust fan, 110 CFM",
+      "Bath exhaust fan, 150 CFM",
+    ]);
+  });
+
+  it("orders a length stated after the comma", () => {
+    expect(
+      sorted(["Modular furniture whip, 10 ft", "Modular furniture whip, 6 ft"])
+    ).toEqual([
+      "Modular furniture whip, 6 ft",
+      "Modular furniture whip, 10 ft",
+    ]);
+  });
+
+  it("derives the type from a trailing size by dropping it", () => {
+    expect(materialTypeName("Bath exhaust fan, 50 CFM")).toBe(
+      "Bath exhaust fan"
+    );
+    expect(materialTypeName("Ground rod, 8 ft")).toBe("Ground rod");
+  });
+
+  it("does not read a size that is only PART of the text after the comma", () => {
+    // "3/4\" x 10 ft" is a diameter and a length. Reading only the length would
+    // file a different product as the 10 ft rod; leaving it unsized keeps it
+    // labelled by its whole name, which sorts it straight after the family.
+    expect(hasSize('Ground rod, 3/4" x 10 ft')).toBe(false);
+  });
+
+  it("puts the real catalog's pull boxes and fans in size order on screen", () => {
+    // Through compareMaterials, which is what the Materials screen calls — the
+    // type label has to agree across the family or the size never gets a say.
+    const shelf = (pattern: RegExp) =>
+      sortMaterialsForDisplay(
+        BASELINE_MATERIALS.filter(m => pattern.test(m.name))
+      ).map(m => m.name);
+    expect(shelf(/^\d+x\d+ pull box$/)).toEqual([
+      "4x4 pull box",
+      "6x6 pull box",
+      "8x8 pull box",
+      "12x12 pull box",
+      "16x16 pull box",
+      "24x24 pull box",
+    ]);
+    expect(shelf(/^Bath exhaust fan, \d+ CFM$/)).toEqual([
+      "Bath exhaust fan, 50 CFM",
+      "Bath exhaust fan, 80 CFM",
+      "Bath exhaust fan, 110 CFM",
+      "Bath exhaust fan, 150 CFM",
     ]);
   });
 });

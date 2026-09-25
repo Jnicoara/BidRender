@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **Pull boxes, bath fans and a few other families now list in size order.**
+  The materials list could not read a size written as "12x12" or one written
+  after the name ("Bath exhaust fan, 50 CFM", "Ground rod, 8 ft"), so those
+  rows fell back to alphabetical — which put a 12x12 pull box ahead of a 4x4,
+  and a 110 CFM fan ahead of a 50. They now sort smallest first and group
+  under one heading per family. Search results are unchanged apart from the
+  pull boxes coming back in size order.
+
 - **The test suite now refuses to run against real data.** Tests write
   throwaway accounts and bids into whatever database they are pointed at, and
   the default local settings point at the copy of real data, which is what

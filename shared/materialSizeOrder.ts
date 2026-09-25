@@ -104,9 +104,30 @@ const SCALE = {
   conductor: 0,
   tradeSize: 1,
   amps: 2,
-  length: 3,
-  none: 4,
+  airflow: 3,
+  dimension: 4,
+  length: 5,
+  none: 6,
 } as const;
+
+/**
+ * A two-dimension size at the front — "4x4 pull box", "2x4 LED troffer".
+ *
+ * Its own scale, not a length: the unit is not stated (boxes are inches,
+ * troffers are feet) and nothing needs the two compared. What matters is that
+ * 4x4 sorts before 12x12, which alphabetical order gets backwards.
+ */
+const DIMENSION = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)(?=\s)/i;
+
+/**
+ * A size stated AFTER the name — "Bath exhaust fan, 50 CFM", "Ground rod,
+ * 8 ft". The catalog's other naming convention: {type}, {size}.
+ *
+ * The whole remainder after the comma must be the size. "Ground rod, 3/4\" x
+ * 10 ft" is a diameter and a length, and reading only the length would file it
+ * as the plain 10 ft rod.
+ */
+const TRAILING = /,\s*(\d+(?:\.\d+)?)\s*(CFM|ft)$/i;
 
 type SizeKey = {
   scale: number;
@@ -214,6 +235,26 @@ function readSize(name: string): SizeKey | null {
   const amps = name.match(/^(\d{1,4})\s*(?:A\b|\/\d\b)/);
   if (amps) return { scale: SCALE.amps, value: Number(amps[1]), count: 0 };
 
+  // Width then height — "4x4 pull box". The second dimension breaks a tie on
+  // the first, so 2x2 sorts before 2x4; it is scaled down far enough that it
+  // can never outweigh a whole step of the first.
+  const dimension = name.match(DIMENSION);
+  if (dimension)
+    return {
+      scale: SCALE.dimension,
+      value: Number(dimension[1]) + Number(dimension[2]) / 10000,
+      count: 0,
+    };
+
+  // Last, because it reads the END of the name: a leading size always wins.
+  const trailing = name.match(TRAILING);
+  if (trailing) {
+    const value = Number(trailing[1]);
+    return trailing[2].toLowerCase() === "cfm"
+      ? { scale: SCALE.airflow, value, count: 0 }
+      : { scale: SCALE.length, value: value * 12, count: 0 };
+  }
+
   return null;
 }
 
@@ -300,6 +341,10 @@ const SIZE_PREFIXES: RegExp[] = [
   /^[\d.]+\s*ft\s+/i,
   // Amperage — "20A breaker".
   /^\d{1,4}\s*A\s+/,
+  // Dimensions — "12x12 pull box" -> "pull box".
+  /^\d+(?:\.\d+)?x\d+(?:\.\d+)?\s+/i,
+  // A size after the name — "Bath exhaust fan, 50 CFM" -> "Bath exhaust fan".
+  TRAILING,
 ];
 
 /**

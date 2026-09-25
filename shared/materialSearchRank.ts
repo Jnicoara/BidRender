@@ -346,10 +346,18 @@ export function queryTier(row: RankableRow, word: string): MatchTier {
     already — and a whole-word test sends it to TIER.MODIFIER, where "Duplex
     receptacle" lost to a combo device that claimed the word through its shelf.
     A term that starts the head noun IS the head noun.
+
+    But only EXACT when the type is the word typed, whole. A prefix cannot tell
+    "stopped typing wirewa" from "meant wire", and "wire" is a complete word in
+    its own right. This did not matter until 2026-09-25, when "4x4 wireway"
+    started deriving the one-word type "wireway" (the parser learned WxH sizes)
+    and a prefix match on a one-word type was promoted to EXACT — ranking
+    wireway above every THHN for "wire". A prefix now reaches IS_A, which is
+    where "recep" -> "Duplex receptacle" always landed anyway.
   */
   const headWord = type.split(" ").pop() ?? "";
   if (headWord.startsWith(term)) {
-    return type === headWord ? TIER.EXACT : TIER.IS_A;
+    return type === headWord && headWord === term ? TIER.EXACT : TIER.IS_A;
   }
   if (endsWithWord(type, term)) return TIER.IS_A;
 
