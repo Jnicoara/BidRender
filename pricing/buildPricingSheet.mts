@@ -25,7 +25,11 @@ import { fileURLToPath } from "node:url";
 import { BASELINE_MATERIALS } from "../server/seed/materials/index";
 import { compareBySize, materialTypeName } from "../shared/materialSizeOrder";
 import { compareMaterials } from "../shared/materialOrder";
-import { MOVED_FROM_SHEET, RENAMED_FROM_SHEET } from "./movedFromSheet";
+import {
+  DROPPED_FROM_SHEET,
+  MOVED_FROM_SHEET,
+  RENAMED_FROM_SHEET,
+} from "./movedFromSheet";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -45,6 +49,8 @@ type Row = {
 
 const rows: Row[] = [];
 const seen = new Set<string>();
+/** DROPPED_FROM_SHEET names this run actually generated, to catch stale ones. */
+const droppedSeen = new Set<string>();
 const jobTally = new Map<string, number>();
 
 /*
@@ -91,6 +97,10 @@ const add = (
   const key = name.trim().toLowerCase();
   if (seen.has(key)) return false;
   if (SAME_AS[name]) return false;
+  if (name in DROPPED_FROM_SHEET) {
+    droppedSeen.add(name);
+    return false;
+  }
   seen.add(key);
   rows.push({
     parent: name,
@@ -1569,6 +1579,15 @@ for (const [cat, list] of byCategory) {
     path.join(REVIEW_DIR, `${slug}.txt`),
     lines.join("\n") + "\n"
   );
+}
+
+// A dropped name that is shipped would be hidden from the sheet while it is
+// in the app; one never generated is a stale entry hiding nothing. Refuse both.
+for (const name of Object.keys(DROPPED_FROM_SHEET)) {
+  if (BASELINE_MATERIALS.some(m => m.name === name))
+    throw new Error(`DROPPED_FROM_SHEET: "${name}" is shipped`);
+  if (!droppedSeen.has(name))
+    throw new Error(`DROPPED_FROM_SHEET: "${name}" is no longer generated`);
 }
 
 // ── 6. Report ───────────────────────────────────────────────────────────────

@@ -429,7 +429,9 @@ export const EQUIPMENT: BaselineMaterial[] = [
     })),
     // Not "EV charger pedestal": it led "ev charger" above the chargers.
     { name: "EVSE pedestal", slang: "ev charging mount post stand" },
-    { name: "AC condenser whip", slang: "a/c liquidtight disconnect hvac" },
+    // No "disconnect": the whip runs FROM one, and the alias made it lead "ac
+    // disconnect" above the pullout disconnect itself (2026-09-25).
+    { name: "AC condenser whip", slang: "a/c liquidtight hvac flex" },
     { name: "Dishwasher whip", slang: "cord appliance hardwire flex" },
     { name: "Garbage disposal cord", slang: "disposer cord appliance plug" },
     ...["3", "4"].map(wires => ({

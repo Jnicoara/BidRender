@@ -83,6 +83,21 @@ export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
   "20A GFCI breaker": "20A Single-Pole GFCI breaker",
   "15A AFCI/GFCI combo breaker": "15A Single-Pole AFCI/GFCI combo breaker",
   "20A AFCI/GFCI combo breaker": "20A Single-Pole AFCI/GFCI combo breaker",
+  // Disconnects state their enclosure (2026-09-25, power.ts). The shipped
+  // eight already called themselves "nema 3r outdoor" in their aliases, so
+  // they are the 3R rows; the NEMA 1 ones are new.
+  ...Object.fromEntries(
+    ["30", "60", "100", "200"].flatMap(amps => [
+      [`${amps}A fused disconnect`, `${amps}A fused disconnect, NEMA 3R`],
+      [
+        `${amps}A non-fused disconnect`,
+        `${amps}A non-fused disconnect, NEMA 3R`,
+      ],
+    ])
+  ),
+  // GFCI is the spec that makes it a spa disconnect.
+  "50A spa disconnect": "50A GFCI spa disconnect",
+  "60A spa disconnect": "60A GFCI spa disconnect",
 };
 
 /**
@@ -116,6 +131,9 @@ export const RETIRED_BASELINE_MATERIALS: string[] = [
   "250 kcmil crimp lug",
   "350 kcmil crimp lug",
   "500 kcmil crimp lug",
+  // An unsized placeholder, replaced by the four sized 480V-208Y/120V
+  // transformers in power.ts (2026-09-25). Nothing in the code named it.
+  "Dry-type transformer",
 ];
 
 /**

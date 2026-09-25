@@ -201,9 +201,11 @@ export const RECEPTACLES: BaselineMaterial[] = [
     ),
   },
   ...[
-    { nema: "L5-20", slang: "l5-20r 20 amp 125v" },
-    { nema: "L6-30", slang: "l6-30r 30 amp 250v welder compressor" },
-    { nema: "L14-30", slang: "l14-30r 30 amp generator inlet 4 wire" },
+    // "20a"/"30a": the pricing sheet's "20A/30A twist-lock receptacle" rows
+    // are these (2026-09-25). A 30A twist-lock is either of the two 30s.
+    { nema: "L5-20", slang: "l5-20r 20 amp 20a 125v" },
+    { nema: "L6-30", slang: "l6-30r 30 amp 30a 250v welder compressor" },
+    { nema: "L14-30", slang: "l14-30r 30 amp 30a generator inlet 4 wire" },
   ].map(({ nema, slang }) => ({
     ...device("Receptacles"),
     name: `${nema} receptacle`,
@@ -586,6 +588,17 @@ export const COVER_PLATES: BaselineMaterial[] = [
     name: "Weatherproof in-use cover",
     searchAliases: aliases(
       "wp bubble while while-in-use outdoor exterior flip lid rain tight"
+    ),
+  },
+  {
+    // The pricing sheet's "Weatherproof cover, 2-gang", decided to be the
+    // in-use kind (2026-09-25). A two-gang outdoor location is almost always
+    // a cord left plugged in — an RV, a pool pump — which is what the NEC's
+    // in-use rule is for.
+    ...device("Wall Plates & Misc"),
+    name: "Weatherproof in-use cover, 2-gang",
+    searchAliases: aliases(
+      "wp bubble while while-in-use outdoor exterior lid rain tight double two gang"
     ),
   },
   {

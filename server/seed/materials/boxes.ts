@@ -303,7 +303,11 @@ const roughIn: BaselineMaterial[] = [
     ...each,
     name: "Single-gang box extender",
     searchAliases: aliases(
-      "extension ring goof ring tile backsplash recessed deep device"
+      "extension ring goof ring tile backsplash recessed deep device",
+      // The pricing sheet's "Wall plate extender" is this part (2026-09-25).
+      // Not the full phrase: "wall plate" is another row's name, and the
+      // catalog test forbids aliasing to one (materialsCatalog.test.ts).
+      "plate extender"
     ),
   },
   {

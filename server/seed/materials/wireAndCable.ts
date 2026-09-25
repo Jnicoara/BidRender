@@ -335,6 +335,10 @@ const serCopper: BaselineMaterial[] = ["8-3", "6-3", "4-3", "2-3", "1-3"].map(
 );
 
 const serAluminum: BaselineMaterial[] = [
+  // Named by the full conductor set, three insulated and the reduced ground —
+  // the pricing sheet's wording, 2026-09-25. 60A and 100A subpanel feeders.
+  { size: "4-4-4-6", note: undefined },
+  { size: "2-2-2-4", note: undefined },
   { size: "1/0-3", note: undefined },
   { size: "2/0-3", note: undefined },
   { size: "3/0-3", note: "3 conductors with a 1/0 ground." },
@@ -360,6 +364,54 @@ const serAluminum: BaselineMaterial[] = [
   description: note ? `${note} ${ALUMINUM_NOTE}` : ALUMINUM_NOTE,
 }));
 
+/**
+ * SEU: two insulated conductors inside a concentric bare neutral, flat. The
+ * overhead-to-meter and range/dryer cable where no separate ground is needed.
+ * Added from the pricing sheet, 2026-09-25, aluminum as it is stocked.
+ */
+const seuAluminum: BaselineMaterial[] = ["4-4-6", "2-2-4"].map(size => ({
+  name: `${size} SEU aluminum`,
+  unitOfSale: "foot" as const,
+  costPerUnit: UNPRICED,
+  category: "Wire & Cable" as const,
+  searchAliases: aliases(
+    size.replace(/-/g, "/"),
+    "al alum aluminium service entrance se cable flat concentric"
+  ),
+  description: ALUMINUM_NOTE,
+}));
+
+/**
+ * Direct-burial service conductors, metal stated in the name because both are
+ * sold in copper and aluminum. The sheet named neither metal; these are the
+ * aluminum ones, which is what a residential underground lateral is pulled
+ * in — the same call the sheet's XHHW rows got (pricing/movedFromSheet.ts).
+ */
+const undergroundService: BaselineMaterial[] = [
+  {
+    name: "#4/0 USE-2 aluminum",
+    unitOfSale: "foot",
+    costPerUnit: UNPRICED,
+    category: "Wire & Cable",
+    searchAliases: aliases(
+      gaugeAliases("#4/0"),
+      "al alum aluminium use rhh rhw-2 underground direct burial service lateral single conductor"
+    ),
+    description: ALUMINUM_NOTE,
+  },
+  {
+    name: "1/0 URD triplex aluminum",
+    unitOfSale: "foot",
+    costPerUnit: UNPRICED,
+    category: "Wire & Cable",
+    searchAliases: aliases(
+      gaugeAliases("#1/0"),
+      "al alum aluminium underground residential distribution direct burial service lateral"
+    ),
+    description: ALUMINUM_NOTE,
+  },
+];
+
 export const WIRE_AND_CABLE: BaselineMaterial[] = [
   ...copperThhn,
   ...aluminumFeeder,
@@ -373,4 +425,6 @@ export const WIRE_AND_CABLE: BaselineMaterial[] = [
   ...bareCopper,
   ...serCopper,
   ...serAluminum,
+  ...seuAluminum,
+  ...undergroundService,
 ];

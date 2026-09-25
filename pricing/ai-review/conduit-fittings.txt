@@ -1,5 +1,5 @@
 Category: Conduit Fittings
-Items: 235
+Items: 233
 
 Category | Name | Size
 Conduit Fittings | 1/2" EMT 90-degree elbow | 1/2"
@@ -201,9 +201,7 @@ Conduit Fittings | 1/2" flexible metal conduit coupling | 1/2"
 Conduit Fittings | 3/4" flexible metal conduit coupling | 3/4"
 Conduit Fittings | 1" flexible metal conduit coupling | 1"
 Conduit Fittings | 1-1/4" flexible metal conduit coupling | 1-1/4"
-Conduit Fittings | Chase nipple, 4" | 4"
 Conduit Fittings | Conduit body, 3-1/2" LB | 3-1/2"
-Conduit Fittings | Conduit body, 4" LB | 4"
 Conduit Fittings | 1/2" conduit bushing | 1/2"
 Conduit Fittings | 3/4" conduit bushing | 3/4"
 Conduit Fittings | 1" conduit bushing | 1"

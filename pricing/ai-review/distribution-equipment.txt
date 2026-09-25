@@ -1,11 +1,9 @@
 Category: Distribution Equipment
-Items: 55
+Items: 43
 
 Category | Name | Size
 Distribution Equipment | 208V 3-phase panelboard | -
 Distribution Equipment | 480V 3-phase panelboard | -
-Distribution Equipment | 4x4 wireway | 4x4
-Distribution Equipment | 6x6 wireway | 6x6
 Distribution Equipment | Automatic transfer switch | -
 Distribution Equipment | Busway | -
 Distribution Equipment | Busway elbow | -
@@ -16,44 +14,34 @@ Distribution Equipment | Cable tray tee | -
 Distribution Equipment | Combination motor starter | -
 Distribution Equipment | Current transformer cabinet | -
 Distribution Equipment | Desk grommet outlet | -
-Distribution Equipment | Dry-type transformer | -
+Distribution Equipment | 15 kVA dry-type transformer, 480V-208Y/120V 3-phase | 15 kVA
+Distribution Equipment | 30 kVA dry-type transformer, 480V-208Y/120V 3-phase | 30 kVA
+Distribution Equipment | 45 kVA dry-type transformer, 480V-208Y/120V 3-phase | 45 kVA
+Distribution Equipment | 75 kVA dry-type transformer, 480V-208Y/120V 3-phase | 75 kVA
 Distribution Equipment | Equipment shut-off relay | -
 Distribution Equipment | Floor monument, 2-gang | -
 Distribution Equipment | Furniture feed connector | -
 Distribution Equipment | 400A fused disconnect | 400A
 Distribution Equipment | 600A fused disconnect | 600A
-Distribution Equipment | Grease-rated cord set | -
 Distribution Equipment | Hood control interface relay | -
 Distribution Equipment | Hood suppression micro-switch | -
 Distribution Equipment | Lighting contactor | -
-Distribution Equipment | Modular furniture whip, 10 ft | 10 ft
 Distribution Equipment | Modular furniture whip, 6 ft | 6 ft
+Distribution Equipment | Modular furniture whip, 10 ft | 10 ft
 Distribution Equipment | Motor starter, size 0 | -
 Distribution Equipment | Motor starter, size 1 | -
 Distribution Equipment | Motor starter, size 2 | -
-Distribution Equipment | 30A NEMA 3R safety switch | 30A
-Distribution Equipment | 60A NEMA 3R safety switch | 60A
-Distribution Equipment | 100A NEMA 3R safety switch | 100A
-Distribution Equipment | 200A NEMA 3R safety switch | 200A
 Distribution Equipment | Poke-through device, 2-service | -
 Distribution Equipment | Poke-through device, 4-service | -
 Distribution Equipment | Power pole fitting kit | -
 Distribution Equipment | Raised floor box | -
-Distribution Equipment | 30A safety switch | 30A
-Distribution Equipment | 60A safety switch | 60A
-Distribution Equipment | 100A safety switch | 100A
-Distribution Equipment | 200A safety switch | 200A
-Distribution Equipment | 400A safety switch | 400A
-Distribution Equipment | 600A safety switch | 600A
-Distribution Equipment | Step-down transformer, 15 kVA | 15 kVA
-Distribution Equipment | Step-down transformer, 30 kVA | 30 kVA
-Distribution Equipment | Step-down transformer, 45 kVA | 45 kVA
-Distribution Equipment | Step-down transformer, 75 kVA | 75 kVA
 Distribution Equipment | Surge protective device | -
 Distribution Equipment | Tele-power pole, 10 ft | 10 ft
 Distribution Equipment | Tele-power pole, 15 ft | 15 ft
 Distribution Equipment | Time clock | -
 Distribution Equipment | Under-carpet flat cable | -
 Distribution Equipment | Variable frequency drive | -
+Distribution Equipment | 4x4 wireway | 4x4
+Distribution Equipment | 6x6 wireway | 6x6
 Distribution Equipment | Wireway coupling | -
 Distribution Equipment | Wireway elbow | -

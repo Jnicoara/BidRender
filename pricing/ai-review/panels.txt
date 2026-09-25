@@ -1,5 +1,5 @@
 Category: Panels
-Items: 69
+Items: 78
 
 Category | Name | Size
 Panels | 30A cartridge fuse | 30A
@@ -10,11 +10,17 @@ Panels | 400A cartridge fuse | 400A
 Panels | 600A cartridge fuse | 600A
 Panels | Combination meter-main | -
 Panels | Feed-through lug kit | -
-Panels | 30A fused disconnect | 30A
-Panels | 60A fused disconnect | 60A
-Panels | 100A fused disconnect | 100A
-Panels | 200A fused disconnect | 200A
+Panels | 30A fused disconnect, NEMA 1 | 30A
+Panels | 60A fused disconnect, NEMA 1 | 60A
+Panels | 100A fused disconnect, NEMA 1 | 100A
+Panels | 200A fused disconnect, NEMA 1 | 200A
+Panels | 30A fused disconnect, NEMA 3R | 30A
+Panels | 60A fused disconnect, NEMA 3R | 60A
+Panels | 100A fused disconnect, NEMA 3R | 100A
+Panels | 200A fused disconnect, NEMA 3R | 200A
 Panels | Generator-ready main panel | -
+Panels | 50A GFCI spa disconnect | 50A
+Panels | 60A GFCI spa disconnect | 60A
 Panels | 100A main panel | 100A
 Panels | 125A main panel | 125A
 Panels | 150A main panel | 150A
@@ -58,10 +64,15 @@ Panels | 60A main-lug sub-panel, 8-space | 60A
 Panels | 100A meter base | 100A
 Panels | 200A meter base | 200A
 Panels | 400A meter base | 400A
-Panels | 30A non-fused disconnect | 30A
-Panels | 60A non-fused disconnect | 60A
-Panels | 100A non-fused disconnect | 100A
-Panels | 200A non-fused disconnect | 200A
+Panels | 30A non-fused disconnect, NEMA 1 | 30A
+Panels | 60A non-fused disconnect, NEMA 1 | 60A
+Panels | 100A non-fused disconnect, NEMA 1 | 100A
+Panels | 200A non-fused disconnect, NEMA 1 | 200A
+Panels | 30A non-fused disconnect, NEMA 3R | 30A
+Panels | 60A non-fused disconnect, NEMA 3R | 60A
+Panels | 100A non-fused disconnect, NEMA 3R | 100A
+Panels | 200A non-fused disconnect, NEMA 3R | 200A
+Panels | 60A non-fused pullout disconnect | 60A
 Panels | 100A outdoor main panel | 100A
 Panels | 200A outdoor main panel | 200A
 Panels | Panel cover, flush | -
@@ -69,5 +80,3 @@ Panels | Panel cover, surface | -
 Panels | Panel neutral bar | -
 Panels | Panel trim ring | -
 Panels | Panelboard interior only | -
-Panels | 50A spa disconnect | 50A
-Panels | 60A spa disconnect | 60A

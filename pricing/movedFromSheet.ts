@@ -169,6 +169,26 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   // The shipped manual transfer switch already stands for both sizes.
   "Transfer switch, 6-circuit": "Manual transfer switch",
   "Transfer switch, 10-circuit": "Manual transfer switch",
+
+  // ── Batch 6: the held questions, answered by the owner 2026-09-25
+  // "-3" is three insulated conductors and the reduced ground, so these are
+  // the shipped rows written out in full.
+  "Aluminum SER, 4/0": "4/0-4/0-4/0-2/0 SER aluminum",
+  "SER cable, 1/0-1/0-1/0-2": "1/0-3 SER aluminum",
+  // At 400A and 600A a safety switch is the fused one the catalog ships.
+  "400A safety switch": "400A fused disconnect",
+  "600A safety switch": "600A fused disconnect",
+  // Appliance disconnects, given real specs by the owner.
+  "Heat pump disconnect": "60A non-fused pullout disconnect",
+  "Mini-split disconnect": "60A non-fused pullout disconnect",
+  "Water heater disconnect": "30A non-fused disconnect, NEMA 1",
+  "Spa manual disconnect": "50A GFCI spa disconnect",
+  "Hot tub GFCI panel": "50A GFCI spa disconnect",
+  "20A twist-lock receptacle": "L5-20 receptacle",
+  // The wafer's two-size rule: 5", 6" and 7" discs are one 5"/6" row.
+  '6" LED disc light': '5"/6" LED disc light',
+  '7" LED disc light': '5"/6" LED disc light',
+  "Wall plate extender": "Single-gang box extender",
 };
 
 export const RENAMED_FROM_SHEET: Record<string, string> = {
@@ -298,10 +318,61 @@ export const RENAMED_FROM_SHEET: Record<string, string> = {
   "Power inlet box, 30A": "30A power inlet box",
   "Power inlet box, 50A": "50A power inlet box",
   "200A outdoor main breaker panel": "200A outdoor main panel",
+
+  // ── Batch 6
+  // SE cable by its full conductor set, metal stated. The sheet named no
+  // metal; these are stocked in aluminum (wireAndCable.ts).
+  "SER cable, 2-2-2-4": "2-2-2-4 SER aluminum",
+  "SER cable, 4-4-4-6": "4-4-4-6 SER aluminum",
+  "SEU cable, 2-2-4": "2-2-4 SEU aluminum",
+  "SEU cable, 4-4-6": "4-4-6 SEU aluminum",
+  "USE-2, 4/0": "#4/0 USE-2 aluminum",
+  "Aluminum URD, 1/0": "1/0 URD triplex aluminum",
+  '5" LED disc light': '5"/6" LED disc light',
+  ...Object.fromEntries(
+    ["15", "30", "45", "75"].map(kva => [
+      `Step-down transformer, ${kva} kVA`,
+      `${kva} kVA dry-type transformer, 480V-208Y/120V 3-phase`,
+    ])
+  ),
+  "Weatherproof cover, 2-gang": "Weatherproof in-use cover, 2-gang",
 };
 
 /** Every sheet name that moved under a different name, whichever kind. */
 export const MOVED_FROM_SHEET: Record<string, string> = {
   ...MERGED_FROM_SHEET,
   ...RENAMED_FROM_SHEET,
+};
+
+/**
+ * Pricing-sheet rows the owner decided NOT to carry, with the reason.
+ *
+ * Kept as a list rather than deleted from buildPricingSheet.mts, so the next
+ * person who walks a job and thinks "the sheet is missing a 4\" LB" finds that
+ * it was considered and why it went. The builder skips these, and refuses to
+ * run if one is no longer generated (a stale entry) or has since shipped.
+ */
+export const DROPPED_FROM_SHEET: Record<string, string> = {
+  // ── Batch 6, 2026-09-25
+  'Conduit body, 4" LB': "No raceway type — EMT, rigid and PVC LBs differ.",
+  'Chase nipple, 4"': "A lone size with no family behind it.",
+  "30A twist-lock receptacle":
+    "Is L6-30 or L14-30; both shipped rows answer to 30A twist-lock.",
+  "50A twist-lock receptacle": "Dropped by the owner.",
+  "Generator inlet box":
+    "Is the shipped 30A or 50A power inlet box, both aliased generator inlet.",
+  // Superseded by the fused / non-fused x NEMA 1 / NEMA 3R disconnect family.
+  ...Object.fromEntries(
+    ["30", "60", "100", "200"].flatMap(amps => [
+      [`${amps}A safety switch`, "Superseded by the disconnect family."],
+      [
+        `${amps}A NEMA 3R safety switch`,
+        "Superseded by the disconnect family.",
+      ],
+    ])
+  ),
+  "Box relocation kit": "Dropped by the owner.",
+  "Cable support bushing": "Dropped by the owner.",
+  "Grease-rated cord set": "Dropped by the owner.",
+  "Cable tester": "A tool, not a material.",
 };

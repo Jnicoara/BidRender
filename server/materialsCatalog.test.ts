@@ -174,9 +174,13 @@ describe("alias hygiene across the whole catalog", () => {
   });
 
   it("stocks a fuse for every fused disconnect amperage", () => {
+    // Any enclosure: since 2026-09-25 the name ends ", NEMA 1" / ", NEMA 3R".
+    // An end-anchored pattern here matched NOTHING after that rename and the
+    // loop below passed over an empty list, so the count is asserted too.
     const fused = BASELINE_MATERIALS.filter(m =>
-      /^\d+A fused disconnect$/.test(m.name)
+      /^\d+A fused disconnect\b/.test(m.name)
     ).map(m => m.name.match(/^(\d+)/)![1]);
+    expect(new Set(fused).size).toBeGreaterThanOrEqual(6);
     const fuses = BASELINE_MATERIALS.filter(m =>
       /cartridge fuse$/.test(m.name)
     ).map(m => m.name.match(/^(\d+)/)![1]);
@@ -763,7 +767,10 @@ describe("the Panels / Breakers split", () => {
       "200A main panel",
       "200A main-lug sub-panel",
       "200A meter base",
-      "60A fused disconnect",
+      "60A fused disconnect, NEMA 1",
+      "60A fused disconnect, NEMA 3R",
+      "60A non-fused pullout disconnect",
+      "50A GFCI spa disconnect",
     ]) {
       expect(panels, `${name} should be on Panels`).toContain(name);
     }

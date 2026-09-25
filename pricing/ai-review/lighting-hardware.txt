@@ -1,10 +1,7 @@
 Category: Lighting Hardware
-Items: 188
+Items: 186
 
 Category | Name | Size
-Lighting Hardware | 1x4 LED troffer | 1x4
-Lighting Hardware | 2x2 LED troffer | 2x2
-Lighting Hardware | 2x4 LED troffer | 2x4
 Lighting Hardware | 3" adjustable trim | 3"
 Lighting Hardware | 4" adjustable trim | 4"
 Lighting Hardware | 5" adjustable trim | 5"
@@ -53,9 +50,7 @@ Lighting Hardware | LED corn bulb, E26 | -
 Lighting Hardware | LED corn bulb, E39 | -
 Lighting Hardware | LED cylinder downlight | -
 Lighting Hardware | 4" LED disc light | 4"
-Lighting Hardware | 5" LED disc light | 5"
-Lighting Hardware | 6" LED disc light | 6"
-Lighting Hardware | 7" LED disc light | 7"
+Lighting Hardware | 5"/6" LED disc light | 5"
 Lighting Hardware | 4" LED disc light, CCT selectable | 4"
 Lighting Hardware | 5" LED disc light, CCT selectable | 5"
 Lighting Hardware | 6" LED disc light, CCT selectable | 6"
@@ -84,6 +79,9 @@ Lighting Hardware | 2 ft LED T8 tube, ballast compatible | 2 ft
 Lighting Hardware | 4 ft LED T8 tube, ballast compatible | 4 ft
 Lighting Hardware | LED tape light | -
 Lighting Hardware | LED tape light power supply | -
+Lighting Hardware | 1x4 LED troffer | 1x4
+Lighting Hardware | 2x2 LED troffer | 2x2
+Lighting Hardware | 2x4 LED troffer | 2x4
 Lighting Hardware | LED troffer retrofit kit | -
 Lighting Hardware | LED wall sconce | -
 Lighting Hardware | 4 ft LED wraparound | 4 ft

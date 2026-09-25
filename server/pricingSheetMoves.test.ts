@@ -11,6 +11,7 @@
 import { describe, expect, it } from "vitest";
 import { BASELINE_MATERIALS } from "./seed/materials";
 import {
+  DROPPED_FROM_SHEET,
   MERGED_FROM_SHEET,
   RENAMED_FROM_SHEET,
 } from "../pricing/movedFromSheet";
@@ -42,5 +43,17 @@ describe("pricing-sheet rows moved into the catalog", () => {
       from => from in RENAMED_FROM_SHEET
     );
     expect(overlap).toEqual([]);
+    const droppedAndMoved = Object.keys(DROPPED_FROM_SHEET).filter(
+      from => from in MERGED_FROM_SHEET || from in RENAMED_FROM_SHEET
+    );
+    expect(droppedAndMoved).toEqual([]);
+  });
+
+  it("never drops a row the catalog ships", () => {
+    // A dropped name that is shipped would vanish from the sheet while it is
+    // still in the app, and so never get priced.
+    expect(Object.keys(DROPPED_FROM_SHEET).filter(n => shipped.has(n))).toEqual(
+      []
+    );
   });
 });

@@ -36,6 +36,25 @@ const recessed: BaselineMaterial[] = [
   ),
 }));
 
+/**
+ * Disc lights: a surface-mount LED that screws to a junction box or a can
+ * with no housing at all. The wafer's two-size rule applies for the same
+ * reason (2026-09-25): the sheet's 5", 6" and 7" discs cover the same range
+ * of openings and boxes, so they are one 5"/6" row that answers to all three
+ * sizes rather than three rows an estimator has to choose between.
+ */
+const discs: BaselineMaterial[] = [
+  { size: '4"', slang: "4 four" },
+  { size: '5"/6"', slang: "5 6 7 five six seven 5/6 7in" },
+].map(({ size, slang }) => ({
+  ...fixture,
+  name: `${size} LED disc light`,
+  searchAliases: aliases(
+    slang,
+    "surface mount junction box j box flush low profile round ceiling"
+  ),
+}));
+
 /** 2 ft moved from the pricing sheet, 2026-09-25. */
 const LINEAR_LENGTH_SLANG: Record<string, string> = {
   "2 ft": "two foot 24",
@@ -520,6 +539,7 @@ const moreFixtures: BaselineMaterial[] = [
 
 export const LIGHTING: BaselineMaterial[] = [
   ...recessed,
+  ...discs,
   ...linear,
   ...track,
   ...underCabinet,

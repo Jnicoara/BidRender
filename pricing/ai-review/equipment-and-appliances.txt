@@ -1,5 +1,5 @@
 Category: Equipment & Appliances
-Items: 68
+Items: 62
 
 Category | Name | Size
 Equipment & Appliances | AC condenser whip | -
@@ -9,11 +9,11 @@ Equipment & Appliances | 4" backdraft damper | 4"
 Equipment & Appliances | 6" backdraft damper | 6"
 Equipment & Appliances | Baseboard heater | -
 Equipment & Appliances | Baseboard heater thermostat | -
-Equipment & Appliances | Bath exhaust fan | -
-Equipment & Appliances | Bath exhaust fan, 110 CFM | 110 CFM
-Equipment & Appliances | Bath exhaust fan, 150 CFM | 150 CFM
 Equipment & Appliances | Bath exhaust fan, 50 CFM | 50 CFM
 Equipment & Appliances | Bath exhaust fan, 80 CFM | 80 CFM
+Equipment & Appliances | Bath exhaust fan, 110 CFM | 110 CFM
+Equipment & Appliances | Bath exhaust fan, 150 CFM | 150 CFM
+Equipment & Appliances | Bath exhaust fan | -
 Equipment & Appliances | Bath exhaust fan, heater combo | -
 Equipment & Appliances | Bath exhaust fan, light combo | -
 Equipment & Appliances | Ceiling fan remote kit | -
@@ -38,17 +38,13 @@ Equipment & Appliances | 30A generator cord | 30A
 Equipment & Appliances | 50A generator cord | 50A
 Equipment & Appliances | Generator cord cap, CS6365 | -
 Equipment & Appliances | Generator cord cap, L14-30 | -
-Equipment & Appliances | Generator inlet box | -
 Equipment & Appliances | Generator interlock kit | -
 Equipment & Appliances | Generator pad | -
-Equipment & Appliances | Heat pump disconnect | -
-Equipment & Appliances | Hot tub GFCI panel | -
 Equipment & Appliances | Humidity sensor switch | -
 Equipment & Appliances | Inline duct fan | -
 Equipment & Appliances | 4" insulated flex duct | 4"
 Equipment & Appliances | 6" insulated flex duct | 6"
 Equipment & Appliances | Manual transfer switch | -
-Equipment & Appliances | Mini-split disconnect | -
 Equipment & Appliances | 30A power inlet box | 30A
 Equipment & Appliances | 50A power inlet box | 50A
 Equipment & Appliances | Pump control relay | -
@@ -60,12 +56,10 @@ Equipment & Appliances | 4" roof vent cap | 4"
 Equipment & Appliances | Sloped ceiling fan adapter | -
 Equipment & Appliances | Snow melt controller | -
 Equipment & Appliances | Spa bonding lug | -
-Equipment & Appliances | Spa manual disconnect | -
 Equipment & Appliances | Submersible pump splice kit | -
 Equipment & Appliances | Sump pump alarm | -
 Equipment & Appliances | Unit heater | -
 Equipment & Appliances | 4" wall vent cap | 4"
-Equipment & Appliances | Water heater disconnect | -
 Equipment & Appliances | Well pump control box | -
 Equipment & Appliances | Well pump pitless adapter | -
 Equipment & Appliances | Well pump pressure switch | -

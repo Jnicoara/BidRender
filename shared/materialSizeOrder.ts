@@ -104,10 +104,11 @@ const SCALE = {
   conductor: 0,
   tradeSize: 1,
   amps: 2,
-  airflow: 3,
-  dimension: 4,
-  length: 5,
-  none: 6,
+  kva: 3,
+  airflow: 4,
+  dimension: 5,
+  length: 6,
+  none: 7,
 } as const;
 
 /**
@@ -235,6 +236,11 @@ function readSize(name: string): SizeKey | null {
   const amps = name.match(/^(\d{1,4})\s*(?:A\b|\/\d\b)/);
   if (amps) return { scale: SCALE.amps, value: Number(amps[1]), count: 0 };
 
+  // Transformer rating — "15 kVA dry-type transformer". Without it 15, 30,
+  // 45, 75 happen to sort, and a 112.5 kVA row would land first.
+  const kva = name.match(/^(\d+(?:\.\d+)?)\s*kVA\b/i);
+  if (kva) return { scale: SCALE.kva, value: Number(kva[1]), count: 0 };
+
   // Width then height — "4x4 pull box". The second dimension breaks a tie on
   // the first, so 2x2 sorts before 2x4; it is scaled down far enough that it
   // can never outweigh a whole step of the first.
@@ -327,6 +333,10 @@ const SIZE_PREFIXES: RegExp[] = [
   /^\d{2,4}\s*kcmil\s+/i,
   // kcmil element lists — "250-250-250 SER aluminum".
   /^\d{3,4}(?:-\d{3,4})+\s+/,
+  // A plain-gauge conductor set — "2-2-2-4 SER aluminum", "4-4-6 SEU
+  // aluminum". Before the two-element cable spec below, which would take only
+  // "2-2" and leave "-2-4 SER aluminum" as the type.
+  /^\d{1,2}(?:-\d{1,2}(?:\/0)?){2,}\s+/,
   // Cable specs — "12-2 NM-B", "14-3 MC cable".
   /^\d{1,4}-\d(?![\d/])\s*/,
   // A hashed gauge — "#12 THHN".
@@ -341,6 +351,8 @@ const SIZE_PREFIXES: RegExp[] = [
   /^[\d.]+\s*ft\s+/i,
   // Amperage — "20A breaker".
   /^\d{1,4}\s*A\s+/,
+  // Transformer rating — "15 kVA dry-type transformer".
+  /^\d+(?:\.\d+)?\s*kVA\s+/i,
   // Dimensions — "12x12 pull box" -> "pull box".
   /^\d+(?:\.\d+)?x\d+(?:\.\d+)?\s+/i,
   // A size after the name — "Bath exhaust fan, 50 CFM" -> "Bath exhaust fan".

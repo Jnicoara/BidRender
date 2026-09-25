@@ -9,12 +9,12 @@ Grounding & Bonding | Ground bar kit | -
 Grounding & Bonding | Ground lug, compression | -
 Grounding & Bonding | Ground lug, mechanical | -
 Grounding & Bonding | Ground plate electrode | -
+Grounding & Bonding | Ground rod, 8 ft | 8 ft
+Grounding & Bonding | Ground rod, 10 ft | 10 ft
 Grounding & Bonding | Ground rod clamp | -
 Grounding & Bonding | Ground rod coupling | -
 Grounding & Bonding | Ground rod driving stud | -
-Grounding & Bonding | Ground rod, 10 ft | 10 ft
 Grounding & Bonding | Ground rod, 3/4" x 10 ft | 3/4"
-Grounding & Bonding | Ground rod, 8 ft | 8 ft
 Grounding & Bonding | Ground wire staple | -
 Grounding & Bonding | Grounding bushing | -
 Grounding & Bonding | Grounding pigtail | -

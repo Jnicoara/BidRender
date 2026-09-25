@@ -458,7 +458,7 @@ export function roleRankFor(name: string, query: string): number {
  *
  * Only one question needs it: a row whose NAME says it is one of these, against
  * a row whose SHELF says so. "#16 fixture wire" against "#12 THHN" for "wire";
- * "100A main panel" against "50A spa disconnect" for "panel". Both are honestly
+ * "100A main panel" against "50A GFCI spa disconnect" for "panel". Both are honestly
  * the thing asked for, relevance cannot separate them — the name always wins on
  * score, 200 to 10 — and the catalog's own stock levels can.
  *

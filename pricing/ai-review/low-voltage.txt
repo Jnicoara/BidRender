@@ -1,5 +1,5 @@
 Category: Low Voltage
-Items: 65
+Items: 64
 
 Category | Name | Size
 Low Voltage | 14/2 speaker wire | -
@@ -13,7 +13,6 @@ Low Voltage | 22/2 security cable | -
 Low Voltage | 22/4 security cable | -
 Low Voltage | 300W landscape transformer | -
 Low Voltage | 600W landscape transformer | -
-Low Voltage | Cable tester | -
 Low Voltage | Cat5e cable | -
 Low Voltage | Cat5e jack | -
 Low Voltage | Cat5e patch panel | -

@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **Ten held catalog questions answered: 22 items added, 13 pricing-sheet
+  rows folded into existing items, 17 dropped from the sheet.** Disconnects are now a
+  full family — fused and non-fused, 30 to 200A, indoor (NEMA 1) and outdoor
+  (NEMA 3R) — plus the 60A pull-out A/C disconnect. Spa disconnects say GFCI.
+  New aluminum SE cable (2-2-2-4 and 4-4-4-6 SER, 2-2-4 and 4-4-6 SEU),
+  4/0 USE-2 and 1/0 URD, four sized 480V-to-208Y/120V transformers (15, 30,
+  45 and 75 kVA, replacing an unsized placeholder), 4" and 5"/6" disc lights,
+  and a 2-gang in-use cover. Heat pump, mini-split, water heater, hot tub and
+  twist-lock rows from the sheet now find the item they really are. Existing
+  disconnects kept their identity, so bids already using them are unaffected.
+
 - **Pull boxes, bath fans and a few other families now list in size order.**
   The materials list could not read a size written as "12x12" or one written
   after the name ("Bath exhaust fan, 50 CFM", "Ground rod, 8 ft"), so those

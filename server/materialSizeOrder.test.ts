@@ -320,6 +320,37 @@ describe("dimensions and trailing sizes", () => {
     ]);
   });
 
+  it("strips a whole conductor set, not just its first pair", () => {
+    // "2-2-2-4 SER aluminum" used to lose only "2-2", leaving the type
+    // "-2-4 SER aluminum" — a family of one per size, sorted by the leftover
+    // digits (found 2026-09-25, when the first plain-gauge sets shipped).
+    expect(materialTypeName("2-2-2-4 SER aluminum")).toBe("SER aluminum");
+    expect(materialTypeName("4-4-6 SEU aluminum")).toBe("SEU aluminum");
+    expect(materialTypeName("12-2 NM-B")).toBe("NM-B");
+    expect(
+      sorted([
+        "2-2-2-4 SER aluminum",
+        "1/0-3 SER aluminum",
+        "4-4-4-6 SER aluminum",
+      ])
+    ).toEqual([
+      "4-4-4-6 SER aluminum",
+      "2-2-2-4 SER aluminum",
+      "1/0-3 SER aluminum",
+    ]);
+  });
+
+  it("orders transformers by kVA, including a fractional rating", () => {
+    const t = (kva: string) => `${kva} kVA dry-type transformer`;
+    expect(sorted([t("75"), t("112.5"), t("15"), t("45")])).toEqual([
+      t("15"),
+      t("45"),
+      t("75"),
+      t("112.5"),
+    ]);
+    expect(materialTypeName(t("15"))).toBe("dry-type transformer");
+  });
+
   it("derives the type from a trailing size by dropping it", () => {
     expect(materialTypeName("Bath exhaust fan, 50 CFM")).toBe(
       "Bath exhaust fan"

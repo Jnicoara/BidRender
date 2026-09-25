@@ -1,5 +1,5 @@
 Category: Receptacles
-Items: 35
+Items: 32
 
 Category | Name | Size
 Receptacles | AFCI receptacle | -
@@ -32,8 +32,5 @@ Receptacles | 20A single receptacle | 20A
 Receptacles | Single receptacle | -
 Receptacles | Surge-protective receptacle | -
 Receptacles | Switch/receptacle combo device | -
-Receptacles | 20A twist-lock receptacle | 20A
-Receptacles | 30A twist-lock receptacle | 30A
-Receptacles | 50A twist-lock receptacle | 50A
 Receptacles | Twist-lock receptacle | -
 Receptacles | USB combo receptacle | -

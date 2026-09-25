@@ -1,9 +1,7 @@
 Category: Wire & Cable
-Items: 104
+Items: 102
 
 Category | Name | Size
-Wire & Cable | Aluminum SER, 4/0 | 4/0
-Wire & Cable | Aluminum URD, 1/0 | 1/0
 Wire & Cable | #14 bare copper, solid | #14
 Wire & Cable | #12 bare copper, solid | #12
 Wire & Cable | #10 bare copper, solid | #10
@@ -47,6 +45,8 @@ Wire & Cable | 10-3 NM-B | -
 Wire & Cable | 8-2 NM-B | -
 Wire & Cable | 8-3 NM-B | -
 Wire & Cable | 6-3 NM-B | -
+Wire & Cable | 4-4-4-6 SER aluminum | -
+Wire & Cable | 2-2-2-4 SER aluminum | -
 Wire & Cable | 1/0-3 SER aluminum | 1/0
 Wire & Cable | 2/0-3 SER aluminum | 2/0
 Wire & Cable | 3/0-3 SER aluminum | 3/0
@@ -54,16 +54,13 @@ Wire & Cable | 4/0-3 SER aluminum | 4/0
 Wire & Cable | 4/0-4/0-2/0 SER aluminum | 4/0
 Wire & Cable | 4/0-4/0-4/0-2/0 SER aluminum | 4/0
 Wire & Cable | 250-250-250 SER aluminum | -
-Wire & Cable | SER cable, 1/0-1/0-1/0-2 | 1/0
-Wire & Cable | SER cable, 2-2-2-4 | -
-Wire & Cable | SER cable, 4-4-4-6 | -
 Wire & Cable | 8-3 SER copper | -
 Wire & Cable | 6-3 SER copper | -
 Wire & Cable | 4-3 SER copper | -
 Wire & Cable | 2-3 SER copper | -
 Wire & Cable | 1-3 SER copper | -
-Wire & Cable | SEU cable, 2-2-4 | -
-Wire & Cable | SEU cable, 4-4-6 | -
+Wire & Cable | 4-4-6 SEU aluminum | -
+Wire & Cable | 2-2-4 SEU aluminum | -
 Wire & Cable | 14-3 SJOOW cord | -
 Wire & Cable | 12-3 SOOW cord | -
 Wire & Cable | 10-3 SOOW cord | -
@@ -91,7 +88,8 @@ Wire & Cable | 14-2 UF-B | -
 Wire & Cable | 12-2 UF-B | -
 Wire & Cable | 10-2 UF-B | -
 Wire & Cable | 8-2 UF-B | -
-Wire & Cable | USE-2, 4/0 | 4/0
+Wire & Cable | 1/0 URD triplex aluminum | 1/0
+Wire & Cable | #4/0 USE-2 aluminum | #4
 Wire & Cable | #8 XHHW aluminum | #8
 Wire & Cable | #6 XHHW aluminum | #6
 Wire & Cable | #4 XHHW aluminum | #4

@@ -455,27 +455,60 @@ const meterBases: BaselineMaterial[] = ["100", "200", "400"].map(amps => ({
  * interchangeable — a fused switch needs fuses bought with it and a non-fused
  * one will not provide the branch protection a spec may be calling for. Both
  * variants ship at every amperage rather than leaving the estimator to assume.
+ *
+ * And both enclosures, for the same reason (2026-09-25): NEMA 1 is the indoor
+ * box and NEMA 3R the rain-tight one, they are different parts at different
+ * prices, and a bid that assumes one when the plan calls for the other is
+ * wrong on every switch outside the building. The eight rows that shipped
+ * before this said "nema 3r outdoor" in their aliases and nothing in their
+ * name; they became the 3R rows (RENAMED_BASELINE_MATERIALS), so every bid
+ * already priced from them keeps pointing at the part it meant.
  */
+const ENCLOSURES = [
+  { nema: "NEMA 1", slang: "indoor general purpose" },
+  { nema: "NEMA 3R", slang: "outdoor exterior rainproof raintight" },
+];
 const disconnects: BaselineMaterial[] = ["30", "60", "100", "200"].flatMap(
-  amps => [
-    {
-      ...gear("Panels"),
-      name: `${amps}A fused disconnect`,
-      searchAliases: aliases(
-        `${amps} amp`,
-        "safety switch service ac unit nema 3r outdoor fusible"
-      ),
-    },
-    {
-      ...gear("Panels"),
-      name: `${amps}A non-fused disconnect`,
-      searchAliases: aliases(
-        `${amps} amp`,
-        "safety switch service ac unit nema 3r outdoor unfused"
-      ),
-    },
-  ]
+  amps =>
+    ENCLOSURES.flatMap(({ nema, slang }) => [
+      {
+        ...gear("Panels"),
+        name: `${amps}A fused disconnect, ${nema}`,
+        searchAliases: aliases(
+          `${amps} amp`,
+          "safety switch fusible heavy duty",
+          slang
+        ),
+      },
+      {
+        ...gear("Panels"),
+        name: `${amps}A non-fused disconnect, ${nema}`,
+        searchAliases: aliases(
+          `${amps} amp`,
+          "safety switch unfused nonfusible heavy duty",
+          slang,
+          // What a water heater is wired through (pricing sheet, 2026-09-25).
+          amps === "30" && nema === "NEMA 1" ? "water heater" : ""
+        ),
+      },
+    ])
 );
+
+/**
+ * The A/C disconnect: a pull-out block in a small 3R box beside the
+ * condenser. Not a safety switch — no handle, no fuses, a fraction of the
+ * price — which is why it is its own row rather than an alias on the 60A
+ * non-fused switch. Heat pumps and mini-splits take the same part.
+ */
+const acDisconnect: BaselineMaterial = {
+  ...gear("Panels"),
+  name: "60A non-fused pullout disconnect",
+  searchAliases: aliases(
+    "60 amp",
+    "ac a/c air conditioner condenser heat pump mini split minisplit hvac pull out outdoor nema 3r",
+    "heat pump disconnect mini-split disconnect"
+  ),
+};
 
 /**
  * Fuses are their own line, not a variant of the switch.
@@ -504,12 +537,14 @@ const fuses: BaselineMaterial[] = ["30", "60", "100", "200", "400", "600"].map(
   })
 );
 
+/** GFCI in the name since 2026-09-25: it is the spec that makes it a spa part. */
 const spaDisconnects: BaselineMaterial[] = ["50", "60"].map(amps => ({
   ...gear("Panels"),
-  name: `${amps}A spa disconnect`,
+  name: `${amps}A GFCI spa disconnect`,
   searchAliases: aliases(
     `${amps} amp`,
-    "hot tub pool gfci gfi outdoor panel gfci breaker included all in one"
+    "hot tub pool gfi outdoor panel gfci breaker included all in one",
+    amps === "50" ? "hot tub gfci panel spa manual disconnect" : ""
   ),
   description: "All-in-one enclosure with the GFCI breaker built in.",
 }));
@@ -527,14 +562,22 @@ const COMMERCIAL_NOTE =
   "Generic placeholder — size and price it per the job's schedule.";
 
 export const DISTRIBUTION: BaselineMaterial[] = [
-  {
+  /*
+    The commercial step-down, sized (2026-09-25). These replaced the unsized
+    "Dry-type transformer" placeholder, which is retired in index.ts: nothing
+    in the code referenced it, and retiring rather than deleting keeps any bid
+    already priced from it resolving. Other ratings and voltages are a row the
+    estimator adds, which is the failure the placeholder existed to avoid —
+    but these four are the ones a panel schedule asks for most.
+  */
+  ...["15", "30", "45", "75"].map(kva => ({
     ...gear("Distribution Equipment"),
-    name: "Dry-type transformer",
+    name: `${kva} kVA dry-type transformer, 480V-208Y/120V 3-phase`,
     searchAliases: aliases(
-      "xfmr kva step down 480 208 120 240 buck boost isolation"
+      `${kva}kva`,
+      "xfmr step down 480 208 120 three phase 3ph 3 phase general purpose ventilated"
     ),
-    description: COMMERCIAL_NOTE,
-  },
+  })),
   {
     ...gear("Distribution Equipment"),
     name: "Busway",
@@ -717,6 +760,7 @@ export const PANELS_AND_BREAKERS: BaselineMaterial[] = [
   ...panelParts,
   ...meterBases,
   ...disconnects,
+  acDisconnect,
   ...fuses,
   ...spaDisconnects,
 ];
