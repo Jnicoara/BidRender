@@ -2112,6 +2112,15 @@ export default function TakeoffPage({
     [identityData]
   );
 
+  /**
+   * Every sheet on the BID, across its plans, for "go to sheet" (press G).
+   * Derived from names and numbers, so it is refreshed wherever those change:
+   * `refreshSheets`, and each batch the sheet reader saves.
+   */
+  const { data: jumpList = [] } = trpc.bidPdfs.sheetJumpList.useQuery({
+    bidId,
+  });
+
   const thumbnailPageCount = doc?.pageCount ?? sheets.length;
   const wantedThumbnails = useMemo(
     () => thumbnailWants([gridRange, listRange], thumbnailPageCount),
@@ -2135,6 +2144,8 @@ export default function TakeoffPage({
     // What the list SHOWS for a sheet is its row AND its read number/title.
     if (doc)
       void utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId: doc.id });
+    // …and "go to sheet" matches on both, for every plan on the bid.
+    void utils.bidPdfs.sheetJumpList.invalidate({ bidId });
     void utils.takeoffRuns.measurability.invalidate();
     /*
       A sheet's SCALE is what every traced length on it is worked out from,
@@ -2305,8 +2316,10 @@ export default function TakeoffPage({
           if (progress.state !== "reading")
             sheetReadJobs.current.delete(bidPdfId);
         },
-        onBatchSaved: () =>
-          void utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId }),
+        onBatchSaved: () => {
+          void utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId });
+          void utils.bidPdfs.sheetJumpList.invalidate();
+        },
       });
       sheetReadJobs.current.set(bidPdfId, job);
     },
@@ -4162,6 +4175,12 @@ export default function TakeoffPage({
               setPage(next);
             }}
             onVisibleRange={setGridRange}
+            jumpList={jumpList}
+            onJump={(bidPdfId, pageNumber) => {
+              // Another plan on the same bid: switch to it, then the page.
+              if (bidPdfId !== doc?.id) setSelectedDocId(bidPdfId);
+              setPage(pageNumber);
+            }}
             disabled={!doc}
           />
 

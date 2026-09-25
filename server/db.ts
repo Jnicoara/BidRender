@@ -4388,6 +4388,54 @@ export async function getSheetIdentities(
 }
 
 /**
+ * Every page of every plan on a bid, as the "go to sheet" box needs it: the
+ * stored number and what the sheet list shows as its title. Named columns
+ * only — the page TEXT is never read here.
+ *
+ * Two reads merged rather than one join, because either side can exist
+ * without the other: a read lands at upload, before the viewer has created
+ * sheet rows, and a plan attached before the reader existed has sheet rows
+ * and no read.
+ */
+export async function getSheetJumpRows(bidId: number, userId: number) {
+  const db = await getDb();
+  const plans = db ? await getBidPdfs(bidId, userId) : [];
+  if (!db || plans.length === 0) return { plans, sheets: [], reads: [] };
+  const ids = plans.map(p => p.id);
+  const [sheets, reads] = await Promise.all([
+    db
+      .select({
+        bidPdfId: bidPdfSheets.bidPdfId,
+        pageNumber: bidPdfSheets.pageNumber,
+        name: bidPdfSheets.name,
+        nameSource: bidPdfSheets.nameSource,
+      })
+      .from(bidPdfSheets)
+      .where(
+        and(
+          inArray(bidPdfSheets.bidPdfId, ids),
+          eq(bidPdfSheets.userId, userId)
+        )
+      ),
+    db
+      .select({
+        bidPdfId: bidPdfSheetIdentity.bidPdfId,
+        pageNumber: bidPdfSheetIdentity.pageNumber,
+        sheetNumber: bidPdfSheetIdentity.sheetNumber,
+        sheetTitle: bidPdfSheetIdentity.sheetTitle,
+      })
+      .from(bidPdfSheetIdentity)
+      .where(
+        and(
+          inArray(bidPdfSheetIdentity.bidPdfId, ids),
+          eq(bidPdfSheetIdentity.userId, userId)
+        )
+      ),
+  ]);
+  return { plans, sheets, reads };
+}
+
+/**
  * A field the reading pass found — or found nothing for, which is `value:
  * null` — for one page. Omitting a field leaves whatever is stored alone.
  */

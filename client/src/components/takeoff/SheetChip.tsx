@@ -39,6 +39,13 @@ import {
 } from "@/components/ui/popover";
 import { ChevronDown, ChevronLeft, ChevronRight, Ruler } from "lucide-react";
 import type { VisibleRange } from "@/lib/thumbnailQueue";
+import { Input } from "@/components/ui/input";
+import {
+  enterTarget,
+  jumpMatches,
+  type JumpEntry,
+  type JumpMatch,
+} from "@/lib/sheetJump";
 import {
   sheetDisplay,
   sheetLabel,
@@ -76,6 +83,8 @@ export function SheetChip({
   thumbnails,
   onOpenPage,
   onVisibleRange,
+  jumpList,
+  onJump,
   disabled,
 }: {
   sheets: ChipSheet[];
@@ -88,9 +97,47 @@ export function SheetChip({
   onOpenPage: (page: number) => void;
   /** The sheets the grid has on screen, or null when it is closed. */
   onVisibleRange: (range: VisibleRange | null) => void;
+  /** Every sheet on the BID, every plan, for "go to sheet". */
+  jumpList: (JumpEntry & { filename: string })[];
+  /** Go to a page — possibly on another plan of the same bid. */
+  onJump: (bidPdfId: number, pageNumber: number) => void;
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const jumpInput = useRef<HTMLInputElement | null>(null);
+  /** The results list's key handler, which owns the highlight. */
+  const jumpKeys = useRef<((e: React.KeyboardEvent) => void) | null>(null);
+
+  /*
+    G opens this with the box ready to type in. Same guard as F (focus mode)
+    in TakeoffPage: not while typing somewhere, not with a modifier held.
+  */
+  useEffect(() => {
+    if (disabled) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.isContentEditable)
+      )
+        return;
+      if (e.key === "g" || e.key === "G") {
+        e.preventDefault();
+        setOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [disabled]);
+
+  // A fresh box every time it opens.
+  useEffect(() => {
+    if (!open) setQuery("");
+  }, [open]);
 
   const active = sheets.find(s => s.pageNumber === page) ?? null;
   const label = active
@@ -147,7 +194,7 @@ export function SheetChip({
             variant="ghost"
             className="h-7 gap-1.5 px-2 text-xs max-w-[15rem]"
             disabled={disabled}
-            title="Every sheet in this set"
+            title="Every sheet in this set — or press G and type a sheet number"
           >
             <span className="truncate">{label}</span>
             <span className="font-mono tabular-nums text-muted-foreground shrink-0">
@@ -157,25 +204,68 @@ export function SheetChip({
           </Button>
         </PopoverTrigger>
 
-        <PopoverContent align="start" className="w-[34rem] p-0">
+        <PopoverContent
+          align="start"
+          className="w-[34rem] p-0"
+          // The box takes focus, not Radix's first focusable element, so a
+          // click on the chip and a press of G both land ready to type.
+          onOpenAutoFocus={e => {
+            e.preventDefault();
+            jumpInput.current?.focus();
+          }}
+          // Escape clears what was typed first, and closes on the second press
+          // — CLAUDE.md § Editing fields: Escape abandons the edit.
+          onEscapeKeyDown={e => {
+            if (query) {
+              e.preventDefault();
+              setQuery("");
+            }
+          }}
+        >
           <div className="px-3 py-2 border-b border-border">
-            <p className="text-sm font-medium">
-              {pages.length} {pages.length === 1 ? "sheet" : "sheets"}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Pick by shape — a panel schedule looks nothing like a floor plan.
-            </p>
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-sm font-medium">
+                {pages.length} {pages.length === 1 ? "sheet" : "sheets"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Pick by shape, or type a sheet number
+              </p>
+            </div>
+            <Input
+              ref={jumpInput}
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Go to sheet — E-101, e101, lighting…"
+              className="h-8 mt-2 text-sm font-mono"
+              aria-label="Go to sheet by number"
+              // Enter, arrows and Escape are handled in JumpResults.
+              onKeyDown={e => jumpKeys.current?.(e)}
+            />
           </div>
-          <SheetGrid
-            pages={pages}
-            page={page}
-            thumbnails={thumbnails}
-            onVisibleRange={onVisibleRange}
-            onPick={pageNumber => {
-              onOpenPage(pageNumber);
-              setOpen(false);
-            }}
-          />
+          {query.trim() ? (
+            <JumpResults
+              query={query}
+              entries={jumpList}
+              showPlan={new Set(jumpList.map(j => j.bidPdfId)).size > 1}
+              keys={jumpKeys}
+              onClear={() => setQuery("")}
+              onPick={match => {
+                onJump(match.bidPdfId, match.pageNumber);
+                setOpen(false);
+              }}
+            />
+          ) : (
+            <SheetGrid
+              pages={pages}
+              page={page}
+              thumbnails={thumbnails}
+              onVisibleRange={onVisibleRange}
+              onPick={pageNumber => {
+                onOpenPage(pageNumber);
+                setOpen(false);
+              }}
+            />
+          )}
         </PopoverContent>
       </Popover>
 
@@ -190,6 +280,123 @@ export function SheetChip({
       >
         <ChevronRight className="w-4 h-4" />
       </Button>
+    </div>
+  );
+}
+
+/**
+ * What "go to sheet" found for what was typed, across every plan on the bid.
+ *
+ * Enter goes straight there when only one sheet can be meant; when two sheets
+ * share a number — real sets do this — both are listed and nothing is chosen
+ * until the person picks (lib/sheetJump.ts, `enterTarget`). Nothing found is a
+ * sentence, not an error.
+ */
+function JumpResults({
+  query,
+  entries,
+  showPlan,
+  keys,
+  onClear,
+  onPick,
+}: {
+  query: string;
+  entries: (JumpEntry & { filename: string })[];
+  /** Say which plan a sheet is in — only when the bid has more than one. */
+  showPlan: boolean;
+  keys: React.MutableRefObject<((e: React.KeyboardEvent) => void) | null>;
+  onClear: () => void;
+  onPick: (match: JumpMatch & { filename: string }) => void;
+}) {
+  const matches = useMemo(
+    () => jumpMatches(query, entries) as (JumpMatch & { filename: string })[],
+    [query, entries]
+  );
+  /** The row the person moved to with the arrows — null until they do. */
+  const [chosen, setChosen] = useState<number | null>(null);
+  const [asked, setAsked] = useState(false);
+  useEffect(() => {
+    setChosen(null);
+    setAsked(false);
+  }, [query]);
+
+  keys.current = e => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (matches.length === 0) return;
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      setChosen(current =>
+        current === null
+          ? step === 1
+            ? 0
+            : matches.length - 1
+          : (current + step + matches.length) % matches.length
+      );
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const target = enterTarget(matches, chosen);
+      if (target) onPick(target as JumpMatch & { filename: string });
+      else setAsked(true);
+    }
+  };
+  useEffect(() => () => void (keys.current = null), [keys]);
+
+  const exactCount = matches.filter(m => m.kind === "exact").length;
+
+  if (matches.length === 0) {
+    return (
+      <div className="px-3 py-6 text-sm text-muted-foreground" role="status">
+        No sheet numbered “{query.trim()}” on this bid.{" "}
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-[#F5C518] hover:underline"
+        >
+          Show all sheets
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-h-[60vh] overflow-y-auto py-1" role="listbox">
+      {exactCount > 1 && (
+        <p
+          className={cn(
+            "px-3 py-1.5 text-xs",
+            asked ? "text-amber-400" : "text-muted-foreground"
+          )}
+          role="status"
+        >
+          {exactCount} sheets are numbered {matches[0].number} — pick one.
+        </p>
+      )}
+      {matches.map((match, index) => (
+        <button
+          key={`${match.bidPdfId}:${match.pageNumber}`}
+          type="button"
+          role="option"
+          aria-selected={chosen === index}
+          onClick={() => onPick(match)}
+          // Hover is only a look, never a choice. Found on screen 2026-09-25: a
+          // pointer resting where the list happened to appear set the choice,
+          // and Enter then jumped to one of two sheets sharing a number —
+          // exactly the guess this list exists to avoid. Arrows or a click.
+          className={cn(
+            "w-full text-left px-3 py-1.5 flex items-baseline gap-2 text-sm",
+            chosen === index ? "bg-muted" : "hover:bg-muted/60"
+          )}
+        >
+          <span className="font-mono font-medium w-20 shrink-0 truncate">
+            {match.number ?? "—"}
+          </span>
+          <span className="flex-1 min-w-0 truncate">{match.title}</span>
+          <span className="shrink-0 text-xs text-muted-foreground font-mono">
+            {showPlan ? `${match.filename} · ` : ""}p{match.pageNumber}
+          </span>
+        </button>
+      ))}
     </div>
   );
 }

@@ -14,7 +14,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
-import { bidPdfs, bids, users } from "../drizzle/schema";
+import { bidPdfSheets, bidPdfs, bids, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 
 const USER = 7591;
@@ -185,6 +185,35 @@ describe.skipIf(!hasDb)("sheet numbers read at upload", () => {
       sheetNumber: "E-102",
       sheetTitle: "POWER PLAN",
     });
+  });
+
+  it("lists every sheet on the bid for 'go to sheet', typed titles winning", async () => {
+    const bidPdfId = await newPlan();
+    const caller = callerFor(USER);
+    await caller.bidPdfs.recordSheetReads({ bidPdfId, pages: firstRead });
+    // Page 1 also has a sheet row, renamed by hand; pages 2 and 3 only a read.
+    const db = await getDb();
+    await db!.insert(bidPdfSheets).values({
+      bidPdfId,
+      userId: USER,
+      pageNumber: 1,
+      name: "Level 1 lights",
+      nameSource: "user",
+    });
+    const [pdf] = await db!
+      .select({ bidId: bidPdfs.bidId })
+      .from(bidPdfs)
+      .where(eq(bidPdfs.id, bidPdfId));
+
+    const list = await caller.bidPdfs.sheetJumpList({ bidId: pdf.bidId });
+    expect(list.map(s => [s.pageNumber, s.number, s.title])).toEqual([
+      [1, "E-101", "Level 1 lights"],
+      [2, "E-102", "Sheet 2"],
+      [3, null, "Sheet 3"],
+    ]);
+    await expect(
+      callerFor(OTHER_USER).bidPdfs.sheetJumpList({ bidId: pdf.bidId })
+    ).rejects.toThrow();
   });
 
   it("another company can neither read nor write a plan's numbers", async () => {

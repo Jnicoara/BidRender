@@ -5852,7 +5852,36 @@ Every column is NULLABLE with no default, so NULL can only mean "not read yet":
 Hand-write it. `drizzle-kit generate` re-emits old hand-written migrations
 (CLAUDE.md), so read every statement it produces before trusting any of it.
 
-### 17.5 Piece 3 — go to a sheet by number. NO MIGRATION.
+### 17.5 Piece 3 — go to a sheet by number. NO MIGRATION. BUILT 2026-09-25
+
+> **Built as below, with three things made exact.** The rules are
+> `client/src/lib/sheetJump.ts` and its tests. The list covering every plan
+> on the bid is `bidPdfs.sheetJumpList`, refreshed through `refreshSheets`
+> and after each batch the sheet reader saves.
+>
+> - **Leading zeros are ignored too**, as asked: `e-1` finds `E-001`, and
+>   `e-0111` finds `E111`. Zeros after a DOT are kept, so `E1.1` and `E1.01`
+>   stay different sheets.
+> - **Enter never picks between duplicates.** It jumps only when one sheet can
+>   be meant, or when the person has arrowed onto a row. **Hover is not a
+>   choice**, and that was found on screen. A pointer resting where the list
+>   appeared set the choice, and Enter then jumped to one of Weld's two `E1.0`
+>   sheets. Hover now only highlights.
+> - **Title words match after numbers** (`lighting`), per the plan below.
+>   Sheets with no number never match by number.
+>
+> **Seen on screen** (bid "Sheet numbers check", seven real plans, real key
+> presses):
+>
+> - `E-100` jumped to weld1 page 4, from another plan.
+> - `e-0111` jumped to UNC Charlotte's E111.
+> - `e1.0` listed both of Weld's E1.0 sheets with "2 sheets are numbered E1.0
+>   — pick one", and Enter stayed put. Arrowing to the second and pressing
+>   Enter went to page 3.
+> - `e-1` listed E-001 (weld1) and E001 (UNC Charlotte) as a duplicate
+>   across plans.
+> - `z-999` showed "No sheet numbered 'z-999' on this bid", with no error.
+> - Escape clears what was typed first, and closes on a second press.
 
 - **Type into the sheet chip.** Click the chip, or press **G**, and it becomes
   a box. Type `E-101`, press Enter, and you are there. Matching ignores case,

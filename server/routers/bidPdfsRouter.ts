@@ -52,6 +52,7 @@ import {
   parseScaleText,
 } from "../../shared/planScale";
 import { checkPdfUpload } from "../../shared/uploadLimits";
+import { sheetDisplay } from "../../shared/sheetIdentity";
 import * as db from "../db";
 
 /**
@@ -497,6 +498,59 @@ export const bidPdfsRouter = router({
     .query(async ({ input, ctx }) => {
       await requirePdf(input.bidPdfId, ctx.scope.dataUserId);
       return db.getSheetIdentities(input.bidPdfId, ctx.scope.dataUserId);
+    }),
+
+  /**
+   * Every sheet on the bid, across all its plans, for "go to sheet": number
+   * and the title the sheet list shows. The title goes through the same
+   * `sheetDisplay` the list uses, so the box and the list cannot disagree
+   * about what a sheet is called. Pages are in plan order, then page order.
+   */
+  sheetJumpList: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const { plans, sheets, reads } = await db.getSheetJumpRows(
+        input.bidId,
+        ctx.scope.dataUserId
+      );
+      const key = (pdf: number, page: number) => `${pdf}:${page}`;
+      const sheetAt = new Map(
+        sheets.map(s => [key(s.bidPdfId, s.pageNumber), s])
+      );
+      const readAt = new Map(
+        reads.map(r => [key(r.bidPdfId, r.pageNumber), r])
+      );
+      const out: {
+        bidPdfId: number;
+        filename: string;
+        pageNumber: number;
+        number: string | null;
+        title: string;
+      }[] = [];
+      for (const plan of plans) {
+        const pages = new Set<number>();
+        for (const s of sheets)
+          if (s.bidPdfId === plan.id) pages.add(s.pageNumber);
+        for (const r of reads)
+          if (r.bidPdfId === plan.id) pages.add(r.pageNumber);
+        for (const pageNumber of Array.from(pages).sort((a, b) => a - b)) {
+          const sheet = sheetAt.get(key(plan.id, pageNumber));
+          const read = readAt.get(key(plan.id, pageNumber));
+          const display = sheetDisplay(
+            sheet ?? { name: `Sheet ${pageNumber}`, nameSource: "default" },
+            read
+          );
+          out.push({
+            bidPdfId: plan.id,
+            filename: plan.filename,
+            pageNumber,
+            number: display.number,
+            title: display.title,
+          });
+        }
+      }
+      return out;
     }),
 
   /**

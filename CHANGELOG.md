@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **Go straight to a sheet by typing its number.** Press G, or click the sheet
+  name at the top, and type "E-101", "e101" or even "e-1". Capital letters,
+  dashes and leading zeros don't matter, and it searches every plan on the
+  bid. When two sheets share a number, which real sets sometimes do, both are
+  listed and you pick. A number that isn't in the set just says so. Typing a
+  word like "lighting" finds sheets by title too.
+
 - **The sheet list now shows each sheet's number and title — "E-101 Lighting
   Plan" — read from the plan itself when it is uploaded.** The app looks
   first at the names the drawing software stored in the PDF, then at its
