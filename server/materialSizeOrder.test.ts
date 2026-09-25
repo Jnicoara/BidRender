@@ -288,8 +288,9 @@ describe("the real catalog", () => {
     // notices — the list still looks sorted.
     // "EMT strap" is the plain wall strap and is genuinely one-size-fits-most,
     // unlike the strut straps which are sized per trade size. It sorts to the
-    // end of its category by name, which is right.
-    const GENUINELY_UNSIZED = new Set(["EMT strap"]);
+    // end of its category by name, which is right. "Reducing washer set"
+    // (2026-09-25) is a mixed set of step-downs, not one size.
+    const GENUINELY_UNSIZED = new Set(["EMT strap", "Reducing washer set"]);
 
     const sizeNamed = BASELINE_MATERIALS.filter(
       m =>
