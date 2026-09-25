@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/money";
 import { useMaterialSearch } from "@/hooks/useMaterialSearch";
+import { SearchCorrectionNote } from "@/components/SearchCorrectionNote";
 import { trpc } from "@/lib/trpc";
 
 export type PickableMaterial = {
@@ -127,13 +128,19 @@ export function MaterialPicker({
   */
   const SEARCH_DEPTH = Math.max(MAX_RESULTS * 6, 80);
 
-  const results = useMemo<PickableMaterial[]>(() => {
+  const { rows: results, correctedQuery } = useMemo<{
+    rows: PickableMaterial[];
+    correctedQuery: string | null;
+  }>(() => {
     if (!query.trim()) {
       const chosen = new Set(exclude ?? []);
-      return (recent as PickableMaterial[])
-        .filter(m => !chosen.has(m.id))
-        .filter(m => !onShelf || onShelf(m))
-        .slice(0, MAX_RECENT);
+      return {
+        rows: (recent as PickableMaterial[])
+          .filter(m => !chosen.has(m.id))
+          .filter(m => !onShelf || onShelf(m))
+          .slice(0, MAX_RECENT),
+        correctedQuery: null,
+      };
     }
     /*
       Ask for more than will be shown, then rank before trimming.
@@ -146,7 +153,11 @@ export function MaterialPicker({
       real scores and this company's usage — see MaterialsLibraryPage for why
       this no longer passes a position in place of the score.
     */
-    return search(query, SEARCH_DEPTH).slice(0, MAX_RESULTS);
+    const found = search(query, SEARCH_DEPTH);
+    return {
+      rows: found.rows.slice(0, MAX_RESULTS),
+      correctedQuery: found.correctedQuery,
+    };
   }, [query, search, recent, exclude, onShelf]);
 
   const showingRecent = !query.trim() && results.length > 0;
@@ -222,6 +233,10 @@ export function MaterialPicker({
               search.
             </div>
           )}
+          <SearchCorrectionNote
+            correctedQuery={correctedQuery}
+            className={cn("mt-2", compact && "text-[0.7rem]")}
+          />
           <div className="mt-2 rounded-lg border border-border overflow-hidden">
             {results.map((m, index) => (
               <button

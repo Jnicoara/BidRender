@@ -24,7 +24,7 @@
  * Writing a price stamps `priceUpdatedAt` on the server, not here — every route
  * to a price has to age the same way.
  */
-import { useMemo, useRef, useState } from "react";
+import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InlineNumberField } from "@/components/InlineNumberField";
 import { useMaterialSearch } from "@/hooks/useMaterialSearch";
+import { SearchCorrectionNote } from "@/components/SearchCorrectionNote";
 import { sortMaterialsForDisplay } from "@shared/materialOrder";
 import { delimiterLabel, parsePriceList } from "@shared/priceListParse";
 import {
@@ -95,6 +96,15 @@ export default function MaterialDatabasePage() {
     onSuccess: () => refresh(),
   });
 
+  // Run once per query; `rows` filters it, the correction note reads it.
+  // Deferred, so the box never waits for the list to draw — the same reason
+  // as MaterialsLibraryPage gives.
+  const searchQuery = useDeferredValue(query);
+  const searched = useMemo(
+    () => (searchQuery.trim() ? search(searchQuery, 500) : null),
+    [search, searchQuery]
+  );
+
   const rows = useMemo(() => {
     let list = materials;
     if (ageFilter !== "all") {
@@ -102,7 +112,7 @@ export default function MaterialDatabasePage() {
         m => priceAgeDisplay(m.priceUpdatedAt, now).age === ageFilter
       );
     }
-    if (query.trim()) {
+    if (searched) {
       /*
         The shared ranking, the same the Materials tab and the picker use.
         This view used to order by relevance alone, so the same query on the
@@ -115,13 +125,13 @@ export default function MaterialDatabasePage() {
         bury the best match under whichever shelf it sits on.
       */
       const kept = new Set(list.map(m => m.id));
-      return search(query, 500).filter(m => kept.has(m.id));
+      return searched.rows.filter(m => kept.has(m.id));
     }
     // Category → Type → Size, the same rule the Materials screen uses. This
     // screen previously showed whatever order the server returned, so the two
     // listed one catalog two ways.
     return sortMaterialsForDisplay(list);
-  }, [materials, query, ageFilter, now, search]);
+  }, [materials, searched, ageFilter, now]);
 
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
@@ -180,6 +190,9 @@ export default function MaterialDatabasePage() {
               </button>
             )}
           </div>
+          <SearchCorrectionNote
+            correctedQuery={searched?.correctedQuery ?? null}
+          />
 
           <div className="flex flex-wrap items-center gap-1.5">
             {AGE_FILTERS.map(filter => {

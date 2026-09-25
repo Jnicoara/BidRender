@@ -451,6 +451,8 @@ interface IndexedItem<T extends SearchableItem> {
   text: string;
   /** Individual normalized words from the description only */
   descWords: string[];
+  /** The description, normalized — `descWords` joined, computed once. */
+  descNorm: string;
 }
 
 function getAliases(item: SearchableItem): string {
@@ -470,7 +472,7 @@ function buildIndex<T extends SearchableItem>(items: T[]): IndexedItem<T>[] {
       ].join(" ")
     );
     const descWords = descNorm.split(/\s+/).filter(Boolean);
-    return { item, text, descWords };
+    return { item, text, descWords, descNorm: descWords.join(" ") };
   });
 }
 
@@ -493,6 +495,37 @@ interface TokenExpansion {
   aliases: string[];
 }
 
+/**
+ * expandToken, remembered. The same few words are expanded on every keystroke
+ * — "recep" is expanded again when "recept" is typed after it, and "breaker"
+ * on every search that contains it — and each expansion walks the whole alias
+ * map twice. The map is a constant, so the answer for a word never changes.
+ */
+const expansionCache = new Map<string, TokenExpansion>();
+function expandTokenCached(token: string): TokenExpansion {
+  let hit = expansionCache.get(token);
+  if (!hit) {
+    hit = expandToken(token);
+    expansionCache.set(token, hit);
+  }
+  return hit;
+}
+
+/**
+ * Does the typed word run ON from `term` — "romexes" from "romex"?
+ *
+ * Only for terms of MIN_ALIAS_TERM_LENGTH or more. The map holds two-letter
+ * line codes ("br", "ch", "qo", "cb"), and every word that merely starts with
+ * one was treated as naming it: "brakr" became Eaton BR and returned a page of
+ * Eaton panels instead of breakers, and "brace" and "chase" did the same.
+ * Found 2026-09-25, because it also hid "brakr" from typo correction — it
+ * "matched" something, so nothing looked misspelled. Typing the code itself
+ * still reaches it through the equality test.
+ */
+function runsOnFrom(token: string, term: string): boolean {
+  return term.length >= MIN_ALIAS_TERM_LENGTH && token.startsWith(term);
+}
+
 function expandToken(token: string): TokenExpansion {
   const aliases = new Set<string>();
 
@@ -500,7 +533,7 @@ function expandToken(token: string): TokenExpansion {
   for (const [key, expansions] of Object.entries(ALIAS_MAP)) {
     const nk = normalize(key);
     // The typed token matches the alias key (starts-with for prefix typing)
-    if (nk === token || nk.startsWith(token) || token.startsWith(nk)) {
+    if (nk === token || nk.startsWith(token) || runsOnFrom(token, nk)) {
       aliases.add(nk);
       for (const e of expansions) aliases.add(normalize(e));
     }
@@ -510,7 +543,7 @@ function expandToken(token: string): TokenExpansion {
   for (const [key, expansions] of Object.entries(ALIAS_MAP)) {
     for (const exp of expansions) {
       const ne = normalize(exp);
-      if (ne === token || ne.startsWith(token) || token.startsWith(ne)) {
+      if (ne === token || ne.startsWith(token) || runsOnFrom(token, ne)) {
         aliases.add(normalize(key));
         for (const e2 of expansions) aliases.add(normalize(e2));
         break;
@@ -545,18 +578,34 @@ function matchTier(
   if (descNorm === term) return 1;
   if (descNorm.startsWith(term)) return 2;
   if (descWords.some(w => w.startsWith(term))) return 3;
-  const wbRe = new RegExp(
-    `(^|\\s)${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`
-  );
-  if (wbRe.test(descNorm)) return 4;
+  if (startsAWord(descNorm, term)) return 4;
   if (descNorm.includes(term)) return 5;
   // Tier 6 anchors at a word boundary rather than testing a raw substring.
   // The alias map holds two-letter manufacturer codes ("ch", "cb", "br"), and
   // an unanchored includes() found "ch" inside "switch" — which made searching
   // "breaker" return a single-gang box. Still prefix-friendly (a word may start
   // with the term), so typing "marret" continues to reach "marrette".
-  if (wbRe.test(text)) return 6;
+  if (startsAWord(text, term)) return 6;
   return 0;
+}
+
+/**
+ * Does `term` occur in `hay` at the start of a word — at 0, or after a space?
+ *
+ * The same test as the regex `(^|\s)term` this used to build, and after
+ * `normalize` the only whitespace left is a single space. It was a NEW RegExp
+ * per call, and this is called for every item, for every typed word and every
+ * alias it expands to: on a 2,000-row catalog, typing "r" built tens of
+ * thousands of them and took ~120 ms per keystroke (measured 2026-09-25).
+ */
+function startsAWord(hay: string, term: string): boolean {
+  let from = 0;
+  for (;;) {
+    const at = hay.indexOf(term, from);
+    if (at === -1) return false;
+    if (at === 0 || hay.charCodeAt(at - 1) === 32) return true;
+    from = at + 1;
+  }
 }
 
 /** Points per tier for the word the user actually typed. Index 0 is unused. */
@@ -594,14 +643,22 @@ function scoreItem<T extends SearchableItem>(
   indexed: IndexedItem<T>,
   tokenExpansions: TokenExpansion[]
 ): number {
-  const { text, descWords } = indexed;
-  const descNorm = descWords.join(" ");
+  const { text, descWords, descNorm } = indexed;
 
   let totalScore = 0;
 
   for (const { typed, aliases } of tokenExpansions) {
     let bestForToken =
       TYPED_POINTS[matchTier(typed, descNorm, descWords, text)];
+
+    // No alias can score more than ALIAS_POINTS[1], so once the typed word
+    // has reached it the alias loop cannot change the answer. Skipping it is
+    // what keeps a one-letter query — which expands to hundreds of aliases —
+    // inside a frame on a 2,000-row catalog.
+    if (bestForToken >= ALIAS_POINTS[1]) {
+      totalScore += bestForToken;
+      continue;
+    }
 
     for (const alias of aliases) {
       if (alias.length < MIN_ALIAS_TERM_LENGTH) continue;
@@ -626,6 +683,16 @@ export interface SmartSearchResult<T extends SearchableItem> {
 // Cache the last index to avoid rebuilding on every keystroke when items don't change
 let _cachedItems: SearchableItem[] | null = null;
 let _cachedIndex: IndexedItem<SearchableItem>[] | null = null;
+let _cachedVocabulary: Map<string, number> | null = null;
+
+function indexFor<T extends SearchableItem>(items: T[]): IndexedItem<T>[] {
+  if (items !== (_cachedItems as T[] | null)) {
+    _cachedItems = items as SearchableItem[];
+    _cachedIndex = buildIndex(items as SearchableItem[]);
+    _cachedVocabulary = null; // rebuilt on the first typo that needs it
+  }
+  return _cachedIndex as IndexedItem<T>[];
+}
 
 export function smartSearch<T extends SearchableItem>(
   items: T[],
@@ -650,26 +717,108 @@ export function smartSearch<T extends SearchableItem>(
  *
  * An empty query matches nothing here, unlike smartSearch, which returns the
  * list unfiltered: with no query there is no score to report.
+ *
+ * Typo-tolerant — see smartSearchCorrected, which this is the results of.
  */
 export function smartSearchScored<T extends SearchableItem>(
   items: T[],
   query: string,
   maxResults = 100
 ): SmartSearchResult<T>[] {
+  return smartSearchCorrected(items, query, maxResults).results;
+}
+
+/** What a search found, and the query it actually answered if it corrected one. */
+export interface CorrectedSearch<T extends SearchableItem> {
+  results: SmartSearchResult<T>[];
+  /**
+   * The query with its misspelled words replaced — "receptacle" for
+   * "recepticle" — when, and ONLY when, the results came from a correction.
+   * Null when the query was answered as typed. Screens show it as "Showing
+   * results for …", and rank with it rather than with the misspelling.
+   */
+  correctedQuery: string | null;
+}
+
+/**
+ * Search, correcting typos — but only where nothing matched as typed.
+ *
+ * ── The rules, and how each one is kept ─────────────────────────────────────
+ * Added 2026-09-25: "recepticle", "disconect", "romax", "flourescent" and
+ * "brakr" should find what they obviously mean.
+ *
+ *  1. Exact, starts-with and alias matches always rank above typo matches.
+ *     Kept structurally rather than by weighting: correction runs ONLY when
+ *     the query as typed matched nothing at all, and only on the words that
+ *     matched nothing anywhere in the catalog. So a typo match can never sit
+ *     beside, let alone above, a real one — they cannot both exist for the
+ *     same query.
+ *  2. Never fuzz numbers or sizes. Only an all-LETTER word is ever corrected,
+ *     and it is only ever corrected TO an all-letter word. "20a", "1/2", "#12"
+ *     and "3/4" cannot enter or leave the corrector, so "20a" can never find
+ *     30A — it finds 20A, or nothing.
+ *  3. No correction below MIN_TYPO_LENGTH letters, where one edit reaches too
+ *     many real words ("emt" is one letter from "ent", "emp", "met"…).
+ *  4. The caller is TOLD (correctedQuery), so a screen can say "Showing
+ *     results for receptacle" instead of silently answering a different
+ *     question.
+ *
+ * The vocabulary is the catalog's own words — names and aliases of the rows
+ * passed in, so a shop's own items correct as well as shipped ones — plus the
+ * shared ALIAS_MAP, which is how "romax" reaches "romex".
+ */
+export function smartSearchCorrected<T extends SearchableItem>(
+  items: T[],
+  query: string,
+  maxResults = 100
+): CorrectedSearch<T> {
   const q = normalize(query);
-  if (!q) return [];
-
-  // Rebuild index only when items reference changes
-  if (items !== (_cachedItems as T[] | null)) {
-    _cachedItems = items as SearchableItem[];
-    _cachedIndex = buildIndex(items as SearchableItem[]);
-  }
-  const index = _cachedIndex as IndexedItem<T>[];
-
-  // Split query into tokens and expand each independently
+  if (!q) return { results: [], correctedQuery: null };
+  const index = indexFor(items);
   const rawTokens = q.split(/\s+/).filter(Boolean);
-  const tokenExpansions = rawTokens.map(expandToken);
 
+  const asTyped = runSearch(index, rawTokens, maxResults);
+  if (asTyped.length > 0) return { results: asTyped, correctedQuery: null };
+
+  // Nothing matched. Which words matched NOTHING, anywhere? Only those are
+  // candidates — a word that matches something is spelled right, and the
+  // query is empty because the combination does not exist ("romex 400a").
+  const dead = rawTokens.map(
+    token =>
+      !index.some(indexed => scoreItem(indexed, [expandTokenCached(token)]) > 0)
+  );
+  if (!dead.some(Boolean)) return { results: [], correctedQuery: null };
+
+  if (!_cachedVocabulary) _cachedVocabulary = buildVocabulary(index);
+  const vocabulary = _cachedVocabulary;
+
+  // Every dead word must be correctable, or there is no honest answer.
+  const options = rawTokens.map((token, i) =>
+    dead[i] ? correctionsFor(token, vocabulary) : [token]
+  );
+  if (options.some(list => list.length === 0))
+    return { results: [], correctedQuery: null };
+
+  // The best-ranked correction that actually finds something. Tried in order
+  // for each dead word, so a closer-but-empty candidate cannot win.
+  for (let attempt = 0; attempt < MAX_CORRECTIONS_TRIED; attempt++) {
+    const tokens = options.map(
+      list => list[Math.min(attempt, list.length - 1)]
+    );
+    const results = runSearch(index, tokens, maxResults);
+    if (results.length > 0)
+      return { results, correctedQuery: tokens.join(" ") };
+  }
+  return { results: [], correctedQuery: null };
+}
+
+function runSearch<T extends SearchableItem>(
+  index: IndexedItem<T>[],
+  tokens: string[],
+  maxResults: number
+): SmartSearchResult<T>[] {
+  // Split query into tokens and expand each independently
+  const tokenExpansions = tokens.map(expandTokenCached);
   const scored: { item: T; score: number }[] = [];
   for (const indexed of index) {
     const score = scoreItem(indexed, tokenExpansions);
@@ -677,9 +826,123 @@ export function smartSearchScored<T extends SearchableItem>(
       scored.push({ item: indexed.item, score });
     }
   }
-
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, maxResults);
+}
+
+// ─── Typo correction ──────────────────────────────────────────────────────────
+
+/** Shorter words are never corrected — rule 3 in smartSearchCorrected. */
+export const MIN_TYPO_LENGTH = 4;
+
+/** How many alternatives per dead word are tried before giving up. */
+const MAX_CORRECTIONS_TRIED = 3;
+
+/** A word the corrector may touch, or offer: letters only, long enough. */
+const CORRECTABLE = /^[a-z]+$/;
+
+/**
+ * Every correctable word the catalog uses, with how often it appears.
+ *
+ * The count breaks ties between two equally close words in favour of the one
+ * the catalog is full of: "brakr" is two edits from "breaker" and from a rarer
+ * word or two, and "breaker" is on 60-odd rows.
+ */
+function buildVocabulary(
+  index: IndexedItem<SearchableItem>[]
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  const add = (source: string, weight: number) => {
+    for (const word of normalize(source).split(/[^a-z]+/)) {
+      if (word.length >= MIN_TYPO_LENGTH && CORRECTABLE.test(word))
+        counts.set(word, (counts.get(word) ?? 0) + weight);
+    }
+  };
+  for (const { text } of index) add(text, 1);
+  // The shared trade vocabulary counts too, lightly: it is how a misspelled
+  // slang word ("romax") reaches the slang ("romex") that then expands.
+  for (const [key, values] of Object.entries(ALIAS_MAP)) {
+    add(key, 0.5);
+    for (const value of values) add(value, 0.5);
+  }
+  return counts;
+}
+
+/**
+ * The words `token` is probably a misspelling of, best first.
+ *
+ * Distance is optimal-string-alignment (Levenshtein plus adjacent swaps, so
+ * "flourescent" is ONE edit from "fluorescent", not two). The budget grows
+ * with the word: one edit at four letters, two from five. The first letter
+ * must match — people misspell the middle of a word, rarely its start, and
+ * requiring it removes most of the wrong answers a two-edit budget allows.
+ *
+ * A word being typed is compared with the START of catalog words as well, at
+ * a half-edit penalty, so the correction appears while typing ("recepti" →
+ * receptacle) rather than only once the word is finished.
+ */
+function correctionsFor(
+  token: string,
+  vocabulary: Map<string, number>
+): string[] {
+  if (token.length < MIN_TYPO_LENGTH || !CORRECTABLE.test(token)) return [];
+  const budget = token.length === MIN_TYPO_LENGTH ? 1 : 2;
+  const found: { word: string; cost: number; count: number }[] = [];
+  vocabulary.forEach((count, word) => {
+    if (word[0] !== token[0] || word === token) return;
+    let cost = osaDistance(token, word, budget);
+    if (token.length >= 5 && word.length > token.length) {
+      for (let len = token.length - 1; len <= token.length + 1; len++) {
+        if (len > word.length) break;
+        const prefixCost = osaDistance(token, word.slice(0, len), budget) + 0.5;
+        if (prefixCost < cost) cost = prefixCost;
+      }
+    }
+    if (cost <= budget) found.push({ word, cost, count });
+  });
+  found.sort(
+    (a, b) =>
+      a.cost - b.cost ||
+      b.count - a.count ||
+      a.word.length - b.word.length ||
+      (a.word < b.word ? -1 : 1)
+  );
+  return found.slice(0, MAX_CORRECTIONS_TRIED).map(f => f.word);
+}
+
+/**
+ * Optimal string alignment distance, giving up past `max` (returns max + 1).
+ *
+ * Exported for the tests, which pin the five reported misspellings to their
+ * distances rather than trusting the arithmetic.
+ */
+export function osaDistance(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const d: number[][] = Array.from({ length: rows }, (_, i) => {
+    const row = new Array<number>(cols).fill(0);
+    row[0] = i;
+    return row;
+  });
+  for (let j = 0; j < cols; j++) d[0][j] = j;
+  for (let i = 1; i < rows; i++) {
+    let rowMin = Infinity;
+    for (let j = 1; j < cols; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let v = Math.min(
+        d[i - 1][j] + 1,
+        d[i][j - 1] + 1,
+        d[i - 1][j - 1] + cost
+      );
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1])
+        v = Math.min(v, d[i - 2][j - 2] + 1);
+      d[i][j] = v;
+      if (v < rowMin) rowMin = v;
+    }
+    if (rowMin > max) return max + 1;
+  }
+  return d[a.length][b.length];
 }
 
 // ─── Category-aware search ────────────────────────────────────────────────────

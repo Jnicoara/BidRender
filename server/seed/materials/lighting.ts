@@ -42,7 +42,15 @@ const linear: BaselineMaterial[] = ["4 ft", "8 ft"].map(length => ({
   searchAliases: aliases(
     length.replace(" ", ""),
     length.startsWith("4") ? "four foot 48" : "eight foot 96",
-    "shop light linear wrap industrial surface tube"
+    "shop light linear wrap industrial surface tube",
+    /*
+      "fluorescent t8": added 2026-09-25. A plan still says "4' fluorescent
+      strip", and this is what gets bought for it — so "fluorescent" found
+      NOTHING in the whole catalog until now (the shared ALIAS_MAP knew the
+      word but every term it pointed at was missing). Flagged for the owner:
+      it is the LED replacement, not a fluorescent fixture.
+    */
+    "fluorescent t8"
   ),
 }));
 

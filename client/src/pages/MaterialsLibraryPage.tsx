@@ -10,7 +10,13 @@
  * the first time a starter material is edited, and the fact that the row's id
  * can change underneath us — hence the refetch after every mutation.
  */
-import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -41,6 +47,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useMaterialSearch } from "@/hooks/useMaterialSearch";
+import { SearchCorrectionNote } from "@/components/SearchCorrectionNote";
 import {
   ScopeFilter,
   ViewTabs,
@@ -716,7 +723,25 @@ export default function MaterialsLibraryPage() {
   // screen; the search box should match materials, not shelves.
   const search = useMaterialSearch(materials);
 
-  const searching = query.trim().length > 0;
+  /*
+    The results follow the box a beat behind, never the other way round.
+
+    Searching is now ~5–10 ms, but DRAWING a few hundred result rows is not,
+    and a keystroke that waits for the list is a box that feels stuck. With
+    a deferred copy of the query the box shows each letter at once and React
+    renders the list at a lower priority — and throws that render away if
+    another letter arrives first. Added 2026-09-25 with typo-tolerant search.
+  */
+  const searchQuery = useDeferredValue(query);
+  const searching = searchQuery.trim().length > 0;
+
+  // Run once per query; `visible` below filters it, and the correction note
+  // reads what it searched for.
+  const searched = useMemo(
+    () => (searching ? search(searchQuery, 500) : null),
+    [search, searchQuery, searching]
+  );
+  const correctedQuery = searched?.correctedQuery ?? null;
 
   const visible = useMemo(() => {
     // Scope first: "Mine" is about what you own, and applying it before the
@@ -752,8 +777,8 @@ export default function MaterialsLibraryPage() {
       each read and judged in the commit that made this change.
     */
     const inScopeIds = new Set(inScope.map(m => m.id));
-    return search(query, 500).filter(m => inScopeIds.has(m.id));
-  }, [materials, search, query, searching, scope, onlyUnpriced, onlyUnhoured]);
+    return (searched?.rows ?? []).filter(m => inScopeIds.has(m.id));
+  }, [materials, searched, searching, scope, onlyUnpriced, onlyUnhoured]);
 
   const unpricedCount = useMemo(
     () => countNeedingPricing(materials),
@@ -1053,6 +1078,10 @@ export default function MaterialsLibraryPage() {
             </button>
           )}
         </div>
+        <SearchCorrectionNote
+          correctedQuery={correctedQuery}
+          className="-mt-1.5 mb-3"
+        />
 
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <ViewTabs

@@ -19,7 +19,10 @@
  *   pnpm tsx scripts/searchSpotCheck.mts romex 1900  # ad-hoc queries
  */
 import { BASELINE_MATERIALS } from "../server/seed/baselineMaterials";
-import { smartSearch, smartSearchScored } from "../client/src/lib/smartSearch";
+import {
+  smartSearch,
+  smartSearchCorrected,
+} from "../client/src/lib/smartSearch";
 import { familySizes, rankMaterialHits } from "../shared/materialSearchRank";
 import { commonnessPoints } from "../shared/materialCommonness";
 
@@ -130,11 +133,14 @@ function raw(query: string, limit = SHOW): string[] {
  */
 const NOW = new Date();
 function ranked(query: string, limit = SHOW): string[] {
-  const hits = smartSearchScored(index, query, DEPTH).map(hit => ({
+  // Typo-corrected and ranked by the CORRECTED query, as useMaterialSearch
+  // does — a misspelling is ordered exactly as its correction would be.
+  const { results, correctedQuery } = smartSearchCorrected(index, query, DEPTH);
+  const hits = results.map(hit => ({
     row: rowOf(hit.item.id),
     score: hit.score,
   }));
-  return rankMaterialHits(hits, query, {
+  return rankMaterialHits(hits, correctedQuery ?? query, {
     families: FAMILIES,
     commonness: row => commonnessPoints(row.name, undefined, NOW),
   })

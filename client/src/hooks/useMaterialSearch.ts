@@ -20,7 +20,7 @@
  */
 import { useCallback, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { smartSearchScored } from "@/lib/smartSearch";
+import { smartSearchCorrected } from "@/lib/smartSearch";
 import { familySizes, rankMaterialHits } from "@shared/materialSearchRank";
 import {
   commonnessPoints,
@@ -34,17 +34,34 @@ export type SearchableCatalogRow = {
   searchAliases?: string | null;
 };
 
+/** What a search found, and what it searched for if it corrected a typo. */
+export type MaterialSearchResult<T> = {
+  rows: T[];
+  /**
+   * The corrected query ("receptacle" for "recepticle") when these rows came
+   * from a typo correction, else null. Every screen that shows results says
+   * so with <SearchCorrectionNote> — a search that quietly answers a
+   * different question from the one typed is how a wrong part gets picked.
+   */
+  correctedQuery: string | null;
+};
+
 /**
  * Returns `search(query, depth)`, which gives the rows matching `query`, best
  * first. `depth` is how many scored hits to rank before the caller trims; see
  * MaterialPicker for why it has to be generous.
+ *
+ * Typo-tolerant, through smartSearchCorrected: a word that matches nothing is
+ * corrected against the catalog's own words, including this company's own
+ * rows, and the corrected query is what gets RANKED — so "recepticle" orders
+ * its results exactly as "receptacle" would.
  *
  * `rows` must be memoised by the caller: the search index is rebuilt whenever
  * its identity changes.
  */
 export function useMaterialSearch<T extends SearchableCatalogRow>(
   rows: T[]
-): (query: string, depth: number) => T[] {
+): (query: string, depth: number) => MaterialSearchResult<T> {
   const { data: usageRows } = trpc.materials.usage.useQuery(undefined, {
     // Usage moves when bids change, on other screens; a minute of staleness
     // in a tiebreak is invisible, and refetching on every mount is not free.
@@ -76,15 +93,23 @@ export function useMaterialSearch<T extends SearchableCatalogRow>(
   const families = useMemo(() => familySizes(rows), [rows]);
 
   return useCallback(
-    (query: string, depth: number) => {
-      if (!query.trim()) return [];
-      const hits = smartSearchScored(searchable, query, depth)
+    (query: string, depth: number): MaterialSearchResult<T> => {
+      if (!query.trim()) return { rows: [], correctedQuery: null };
+      const { results, correctedQuery } = smartSearchCorrected(
+        searchable,
+        query,
+        depth
+      );
+      const hits = results
         .map(hit => ({ row: byId.get(hit.item.id), score: hit.score }))
         .filter((h): h is { row: T; score: number } => Boolean(h.row));
-      return rankMaterialHits(hits, query, {
-        families,
-        commonness: row => commonnessPoints(row.name, usage.get(row.id), now),
-      });
+      return {
+        rows: rankMaterialHits(hits, correctedQuery ?? query, {
+          families,
+          commonness: row => commonnessPoints(row.name, usage.get(row.id), now),
+        }),
+        correctedQuery,
+      };
     },
     [searchable, byId, families, usage, now]
   );

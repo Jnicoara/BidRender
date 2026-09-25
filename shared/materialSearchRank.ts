@@ -463,21 +463,13 @@ export function roleRankFor(name: string, query: string): number {
  * what makes it safe. So it fires only between the two claim kinds, only inside
  * TIER.IS_A, and only for a single typed word.
  */
-function familyDecides(
-  a: RankableMatch,
-  b: RankableMatch,
-  query: string
-): boolean {
-  const words = norm(query).split(" ").filter(Boolean);
-  if (words.length !== 1) return false;
-  const word = words[0];
-  if (queryTier(a, word) !== TIER.IS_A) return false;
-  if (queryTier(b, word) !== TIER.IS_A) return false;
+function familyDecides(ka: RankKey, kb: RankKey): boolean {
+  // Only for a single typed word (null otherwise — see rankKey).
+  if (!ka.family || !kb.family) return false;
+  if (!ka.family.isA || !kb.family.isA) return false;
   // Exactly one of them names the word outright; the other is claiming it
   // through its shelf. Same kind on both sides means relevance can do the job.
-  return (
-    hasWordPrefix(norm(a.name), word) !== hasWordPrefix(norm(b.name), word)
-  );
+  return ka.family.namesIt !== kb.family.namesIt;
 }
 
 /**
@@ -545,25 +537,61 @@ export function phraseTier(name: string, query: string): PhraseTier {
   return PHRASE.NONE;
 }
 
-export function compareByRole(
-  a: RankableMatch,
-  b: RankableMatch,
-  query: string,
+/**
+ * Everything compareByRole reads about ONE row for one query, worked out once.
+ *
+ * ── Why this exists: the ranking was the slow part of search ────────────────
+ * Measured 2026-09-25 on the shipped catalog: typing "r" spent 8 ms finding
+ * matches and 173 ms RANKING them, "recep" 2 ms and 49 ms. compareByRole
+ * recomputed the phrase tier, match tier and role of both rows on every
+ * comparison — n log n times per keystroke, each one normalising strings and
+ * scanning aliases. None of them depends on the OTHER row, so they are
+ * computed once per row here and the comparison only reads numbers.
+ *
+ * compareByRole itself goes through this too, so there is one comparison and
+ * not a fast copy that can drift from the tested one.
+ */
+export type RankKey = {
+  match: RankableMatch;
+  phrase: PhraseTier;
+  tier: MatchTier;
+  role: number;
+  /** familyDecides' inputs: is the single typed word an IS_A claim for this
+   *  row, and does the row's own name start a word with it. Null when the
+   *  query is not a single word, where family never decides. */
+  family: { isA: boolean; namesIt: boolean } | null;
+};
+
+export function rankKey(match: RankableMatch, query: string): RankKey {
+  const words = norm(query).split(" ").filter(Boolean);
+  return {
+    match,
+    phrase: phraseTier(match.name, query),
+    tier: matchTier(match, query),
+    role: roleRankFor(match.name, query),
+    family:
+      words.length === 1
+        ? {
+            isA: queryTier(match, words[0]) === TIER.IS_A,
+            namesIt: hasWordPrefix(norm(match.name), words[0]),
+          }
+        : null,
+  };
+}
+
+/** compareByRole, on keys already worked out — see rankKey. */
+export function compareRankKeys(
+  ka: RankKey,
+  kb: RankKey,
   tiebreak: (x: string, y: string) => number = () => 0
 ): number {
-  const pa = phraseTier(a.name, query);
-  const pb = phraseTier(b.name, query);
-  if (pa !== pb) return pa - pb;
+  if (ka.phrase !== kb.phrase) return ka.phrase - kb.phrase;
+  if (ka.tier !== kb.tier) return ka.tier - kb.tier;
+  if (ka.role !== kb.role) return ka.role - kb.role;
 
-  const la = matchTier(a, query);
-  const lb = matchTier(b, query);
-  if (la !== lb) return la - lb;
-
-  const ra = roleRankFor(a.name, query);
-  const rb = roleRankFor(b.name, query);
-  if (ra !== rb) return ra - rb;
-
-  if (familyDecides(a, b, query)) {
+  const a = ka.match;
+  const b = kb.match;
+  if (familyDecides(ka, kb)) {
     const fa = a.family ?? 0;
     const fb = b.family ?? 0;
     if (fa !== fb) return fb - fa;
@@ -576,6 +604,15 @@ export function compareByRole(
   if (ca !== cb) return cb - ca;
 
   return tiebreak(a.name, b.name);
+}
+
+export function compareByRole(
+  a: RankableMatch,
+  b: RankableMatch,
+  query: string,
+  tiebreak: (x: string, y: string) => number = () => 0
+): number {
+  return compareRankKeys(rankKey(a, query), rankKey(b, query), tiebreak);
 }
 
 /** A material row, as much as the search ranking reads. */
@@ -626,8 +663,10 @@ export function rankMaterialHits<R extends SearchableMaterial>(
       { name: x, category: categoryOf.get(x) },
       { name: y, category: categoryOf.get(y) }
     ) || (x < y ? -1 : x > y ? 1 : 0);
+  // Keys once per row, then a sort that only compares them — see rankKey.
   return keyed
-    .sort((a, b) => compareByRole(a.match, b.match, query, total))
+    .map(k => ({ row: k.row, key: rankKey(k.match, query) }))
+    .sort((a, b) => compareRankKeys(a.key, b.key, total))
     .map(k => k.row);
 }
 

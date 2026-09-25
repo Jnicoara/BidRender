@@ -6,6 +6,27 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **Material search now forgives typos.** "recepticle" finds receptacles,
+  "disconect" disconnects, "romax" Romex, "flourescent" the LED strip
+  fixtures and "brakr" breakers — ranked exactly as the correct spelling
+  would be, with a small "Showing results for receptacle." under the box so
+  you always know what was searched. It only steps in when nothing matched
+  as typed, so it can never push a correct result down. Sizes and numbers are
+  never "corrected" — "20a" finds 20A or nothing, never 30A — and very short
+  words are left alone. It works on your own items too, and on the Materials
+  list, the Supplier pricing tab and the material pickers alike.
+
+- **Search is much faster as you type.** Each keystroke used to take up to a
+  tenth of a second on the full catalog, most of it spent ordering results.
+  The ordering is now about ten times faster with identical results, and the
+  search box never waits for the list to draw.
+
+- **Two search faults fixed on the way.** Any word starting with a two-letter
+  brand code (Eaton's "BR") was treated as that brand — "brace" returned
+  Eaton panels. And "fluorescent" found nothing at all; the 4 ft and 8 ft LED
+  strip fixtures, which are what gets bought for a fluorescent strip on a
+  plan, now answer to it.
+
 - **AI alias suggestions confirmed working on the live site**, and they now
   say so when they can't run. Tested on bidridge.com with the test account:
   asking for suggestions on a new material returned eight trade terms in
