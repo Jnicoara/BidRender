@@ -1,5 +1,5 @@
 Category: Breakers
-Items: 85
+Items: 87
 
 Category | Name | Size
 Breakers | 15/15 tandem breaker | -
@@ -55,8 +55,9 @@ Breakers | 100A 2-Pole main breaker | 100A
 Breakers | 125A 2-Pole main breaker | 125A
 Breakers | 150A 2-Pole main breaker | 150A
 Breakers | 200A 2-Pole main breaker | 200A
-Breakers | 15A quad breaker, two 2-pole circuits | 15A
-Breakers | 20A quad breaker, two 2-pole circuits | 20A
+Breakers | 15A 2-Pole quad breaker | 15A
+Breakers | 20A 2-Pole quad breaker | 20A
+Breakers | Shunt-trip breaker, 2-Pole | -
 Breakers | 20A 2-Pole AFCI breaker | 20A
 Breakers | 30A 2-Pole AFCI breaker | 30A
 Breakers | 20A 2-Pole GFCI breaker | 20A
@@ -82,8 +83,9 @@ Breakers | 100A 3-Pole breaker | 100A
 Breakers | 125A 3-Pole breaker | 125A
 Breakers | 150A 3-Pole breaker | 150A
 Breakers | 200A 3-Pole breaker | 200A
-Breakers | Breaker filler plate | -
+Breakers | Shunt-trip breaker, 3-Pole | -
 Breakers | Breaker handle tie | -
 Breakers | Breaker hold-down kit | -
 Breakers | Breaker lock-off | -
-Breakers | Plug-on surge protective device | -
+Breakers | Breaker-style surge protective device | -
+Breakers | Sub-feed breaker kit | -

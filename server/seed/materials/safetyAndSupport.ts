@@ -26,7 +26,7 @@ export const GROUNDING: BaselineMaterial[] = [
     // on the clamp that goes with it.
     name: "Ground rod, 8 ft",
     searchAliases: aliases(
-      "8ft eight foot copper clad galvanized earth stake driven electrode"
+      "8ft eight foot 5/8 copper clad galvanized earth stake driven electrode"
     ),
   },
   {
@@ -50,9 +50,50 @@ export const GROUNDING: BaselineMaterial[] = [
     ...item("Grounding & Bonding"),
     name: "Ground bar kit",
     searchAliases: aliases(
-      "bus bar strip panel egc terminal isolated neutral kit"
+      "bus bar strip panel egc terminal isolated neutral kit busbar"
     ),
   },
+  /*
+    ── Moved from the pricing sheet, 2026-09-25 ─────────────────────────────
+    Listed after the 8 ft rod on purpose: "ground rod" must still land on it
+    first, and a tie falls to catalog order.
+  */
+  ...[
+    { name: "Ground rod, 10 ft", slang: "10ft ten foot 5/8 copper clad" },
+    {
+      name: 'Ground rod, 3/4" x 10 ft',
+      slang: "10ft ten foot 3/4 three quarter copper clad heavy",
+    },
+    { name: "Ground rod coupling", slang: "threaded compression join extend" },
+    { name: "Ground rod driving stud", slang: "drive head cap sds hammer" },
+    {
+      name: "Ground plate electrode",
+      slang: "plate copper buried earth grounding",
+    },
+    {
+      name: "Water pipe bonding clamp",
+      slang: "cold water gas pipe bond bronze gec",
+    },
+    {
+      name: "Rebar ground clamp",
+      slang: "ufer concrete encased electrode cee",
+    },
+    {
+      name: "Intersystem bonding bridge",
+      slang: "ibt termination telecom cable tv bond service",
+    },
+    { name: "Ground lug, mechanical", slang: "lay in set screw bond egc" },
+    { name: "Ground lug, compression", slang: "crimp bond egc" },
+    { name: "Grounding pigtail", slang: "green ground wire lead device" },
+    { name: "Grounding screw", slang: "green 10-32 ground" },
+    { name: "Ground wire staple", slang: "bare copper gec fastener" },
+    { name: "Exothermic weld mold", slang: "cadweld thermoweld graphite" },
+    { name: "Exothermic weld powder", slang: "cadweld thermoweld shot charge" },
+  ].map(({ name, slang }) => ({
+    ...item("Grounding & Bonding"),
+    name,
+    searchAliases: aliases(slang),
+  })),
 ];
 
 export const LIFE_SAFETY: BaselineMaterial[] = [

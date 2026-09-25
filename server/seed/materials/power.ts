@@ -210,7 +210,128 @@ const protectedDouble: BaselineMaterial[] = [
  * Tandems fit two circuits in one slot. Named by both halves because that is
  * how they are ordered — a "15/20 tandem" is not a 15A or a 20A breaker.
  */
-const tandems: BaselineMaterial[] = ["15/15", "20/20", "15/20"].map(config => ({
+/**
+ * The larger single-pole protected breakers. Moved from the pricing sheet,
+ * 2026-09-25: a 25A or 30A single-pole circuit that still needs arc or ground
+ * fault protection.
+ */
+const protectedSingleLarge: BaselineMaterial[] = [
+  { amps: "25", type: PROTECTED_TYPES[0] },
+  { amps: "30", type: PROTECTED_TYPES[0] },
+  { amps: "30", type: PROTECTED_TYPES[1] },
+].map(({ amps, type }) => ({
+  ...gear("Breakers"),
+  name: `${amps}A Single-Pole ${type.suffix} breaker`,
+  searchAliases: aliases(
+    `${amps} amp`,
+    "single pole one pole 1p sp 1-pole",
+    type.slang,
+    BREAKER_SLANG
+  ),
+}));
+
+/**
+ * Half-size breakers take half a space on the lines built for them. Not the
+ * same part as a tandem (two circuits in one full space), so named apart.
+ * Moved from the pricing sheet, 2026-09-25.
+ */
+const halfSize: BaselineMaterial[] = [
+  ...["15", "20", "30"].map(amps => ({
+    amps,
+    pole: "Single-Pole",
+    slang: "single pole one pole 1p sp",
+  })),
+  ...["15", "20", "30", "40", "50"].map(amps => ({
+    amps,
+    pole: "2-Pole",
+    slang: TWO_POLE_SLANG,
+  })),
+].map(({ amps, pole, slang }) => ({
+  ...gear("Breakers"),
+  name: `${amps}A ${pole} half-size breaker`,
+  searchAliases: aliases(
+    `${amps} amp`,
+    slang,
+    "half inch 1/2 slim thin space saver",
+    BREAKER_SLANG
+  ),
+}));
+
+/**
+ * Quad breakers: two 2-pole circuits in the space of one 2-pole, the way a
+ * tandem is two single-poles in one space. Named "2-Pole" because each of its
+ * circuits is one. Moved from the pricing sheet, 2026-09-25.
+ */
+const quads: BaselineMaterial[] = ["15", "20"].map(amps => ({
+  ...gear("Breakers"),
+  name: `${amps}A 2-Pole quad breaker`,
+  searchAliases: aliases(
+    `${amps} amp ${amps}/2`,
+    "quadplex twin double tandem two circuits",
+    TWO_POLE_SLANG,
+    BREAKER_SLANG
+  ),
+}));
+
+/** Parts a breaker needs or a panel schedule calls for, beside the breakers. */
+const breakerAccessories: BaselineMaterial[] = [
+  {
+    ...gear("Breakers"),
+    name: "Breaker handle tie",
+    searchAliases: aliases("common trip tie bar multiwire mwbc shared neutral"),
+  },
+  {
+    ...gear("Breakers"),
+    name: "Breaker hold-down kit",
+    searchAliases: aliases("retainer backfed back fed generator main clip"),
+  },
+  {
+    ...gear("Breakers"),
+    name: "Breaker lock-off",
+    searchAliases: aliases("lockout lock out padlock loto handle lock"),
+  },
+  {
+    ...gear("Breakers"),
+    // The sheet calls it "Plug-on surge protective device". A name holding
+    // "plug" put it first for "plug", above every receptacle, and "Load
+    // center …" then put it first for "load center", above every panel.
+    name: "Breaker-style surge protective device",
+    searchAliases: aliases(
+      "plug-on plugon spd tvss whole house load center type 2 panel"
+    ),
+  },
+  {
+    ...gear("Breakers"),
+    name: "Sub-feed breaker kit",
+    searchAliases: aliases("subfeed lugs feed through main panel"),
+  },
+  // On the sheet's Distribution Equipment list; they are breakers, so they
+  // live on the Breakers shelf.
+  {
+    ...gear("Breakers"),
+    name: "Shunt-trip breaker, 2-Pole",
+    searchAliases: aliases(
+      "shunt trip remote hood suppression ansul restaurant",
+      TWO_POLE_SLANG
+    ),
+  },
+  {
+    ...gear("Breakers"),
+    name: "Shunt-trip breaker, 3-Pole",
+    searchAliases: aliases(
+      "shunt trip remote hood suppression ansul restaurant",
+      THREE_POLE_SLANG
+    ),
+  },
+];
+
+const tandems: BaselineMaterial[] = [
+  "15/15",
+  "20/20",
+  "15/20",
+  // Moved from the pricing sheet, 2026-09-25.
+  "30/30",
+].map(config => ({
   ...gear("Breakers"),
   name: `${config} tandem breaker`,
   searchAliases: aliases(
@@ -240,6 +361,84 @@ const subPanels: BaselineMaterial[] = PANEL_AMPS.map(amps => ({
   ),
   description:
     "Main-lug only — fed from an upstream breaker, with no main of its own.",
+}));
+
+/**
+ * Panels by amperage AND space count, beside the unsized rows above. Moved
+ * from the pricing sheet, 2026-09-25, where they are the parents the brand
+ * variants hang from. The unsized "200A main panel" stays: it is what a
+ * starter assembly names, and it is the right row when the space count is not
+ * known yet.
+ */
+const PANEL_SPACES: { amps: string; spaces: string[] }[] = [
+  { amps: "60", spaces: ["8", "12"] },
+  { amps: "100", spaces: ["12", "20", "24"] },
+  { amps: "125", spaces: ["20", "24", "30"] },
+  { amps: "150", spaces: ["30", "40"] },
+  { amps: "200", spaces: ["30", "40", "42"] },
+  { amps: "225", spaces: ["42"] },
+  { amps: "400", spaces: ["42"] },
+];
+const spacedPanels: BaselineMaterial[] = PANEL_SPACES.flatMap(
+  ({ amps, spaces }) =>
+    spaces.flatMap(spaces => [
+      {
+        ...gear("Panels"),
+        name: `${amps}A main panel, ${spaces}-space`,
+        searchAliases: aliases(
+          `${amps} amp ${spaces} space ${spaces} circuit`,
+          "load center loadcenter breaker box service panelboard main breaker"
+        ),
+      },
+      {
+        ...gear("Panels"),
+        name: `${amps}A main-lug sub-panel, ${spaces}-space`,
+        searchAliases: aliases(
+          `${amps} amp ${spaces} space ${spaces} circuit`,
+          "mlo subpanel load center loadcenter panelboard remote no main"
+        ),
+      },
+    ])
+);
+
+const outdoorPanels: BaselineMaterial[] = ["100", "200"].map(amps => ({
+  ...gear("Panels"),
+  name: `${amps}A outdoor main panel`,
+  searchAliases: aliases(
+    `${amps} amp`,
+    "nema 3r exterior raintight load center loadcenter main breaker"
+  ),
+}));
+
+/** Panel parts, sold apart from the panel. Moved from the pricing sheet. */
+const panelParts: BaselineMaterial[] = [
+  /*
+    Both renamed from the sheet's wording so the everyday rows still lead:
+    "Combination meter-main panel" led "panel", "Meter-main combo" then led
+    "meter" (a name that STARTS with the word scores above one that does not),
+    and "Generator ready load center" led "load center".
+  */
+  {
+    name: "Combination meter-main",
+    slang: "combo all in one service meter socket panel load center",
+  },
+  {
+    name: "Generator-ready main panel",
+    slang: "interlock transfer backup standby load center",
+  },
+  {
+    name: "Panelboard interior only",
+    slang: "guts insides replacement bus retrofit can",
+  },
+  { name: "Panel cover, flush", slang: "dead front door trim recessed" },
+  { name: "Panel cover, surface", slang: "dead front door trim" },
+  { name: "Panel trim ring", slang: "flush trim frame drywall gap" },
+  { name: "Panel neutral bar", slang: "bus bar terminal strip white" },
+  { name: "Feed-through lug kit", slang: "feedthru double lugs sub feed" },
+].map(({ name, slang }) => ({
+  ...gear("Panels"),
+  name,
+  searchAliases: aliases(slang),
 }));
 
 const meterBases: BaselineMaterial[] = ["100", "200", "400"].map(amps => ({
@@ -386,9 +585,117 @@ export const DISTRIBUTION: BaselineMaterial[] = [
     ...gear("Distribution Equipment"),
     name: "Time clock",
     searchAliases: aliases(
-      "astronomic timer programmable lighting control 7 day"
+      "astronomic timer programmable lighting control 7 day sign signage"
     ),
     description: COMMERCIAL_NOTE,
+  },
+  /*
+    ── Moved from the pricing sheet, 2026-09-25 ─────────────────────────────
+    Fittings for the placeholder runs above, and the tenant-improvement,
+    office and restaurant gear the sheet found by walking those jobs.
+  */
+  ...[
+    { name: "Busway elbow", slang: "bus duct fitting ell turn" },
+    { name: "Cable tray elbow", slang: "ladder basket fitting ell turn 90" },
+    { name: "Cable tray tee", slang: "ladder basket fitting branch t" },
+    {
+      name: "Cable tray support bracket",
+      slang: "ladder basket wall hanger trapeze",
+    },
+    /*
+      Size first, as "4x4 pull box" is. "Wireway, 4x4" made "Wireway" the head
+      noun, which a search for "wire" matched ahead of building wire; the same
+      went for "Panelboard, 208V" and "panel".
+    */
+    { name: "4x4 wireway", slang: "4 x 4 trough gutter lay in hinged nema 1" },
+    { name: "6x6 wireway", slang: "6 x 6 trough gutter lay in hinged nema 1" },
+    { name: "Wireway coupling", slang: "trough gutter connector joiner" },
+    { name: "Wireway elbow", slang: "trough gutter fitting ell turn 90" },
+    {
+      name: "208V 3-phase panelboard",
+      slang: "208y/120 three phase commercial lighting appliance mlo main",
+    },
+    {
+      name: "480V 3-phase panelboard",
+      slang: "480y/277 three phase commercial lighting power mlo main",
+    },
+    {
+      name: "Current transformer cabinet",
+      slang: "ct can cabinet utility metering service",
+    },
+    {
+      name: "Combination motor starter",
+      slang: "combo disconnect starter nema magnetic",
+    },
+    ...["0", "1", "2"].map(size => ({
+      name: `Motor starter, size ${size}`,
+      slang: `nema ${size} magnetic contactor overload`,
+    })),
+    {
+      name: "Variable frequency drive",
+      slang: "vfd ac drive inverter motor speed control",
+    },
+    {
+      name: "Hood suppression micro-switch",
+      slang: "ansul hood fire suppression micro switch restaurant",
+    },
+    {
+      name: "Equipment shut-off relay",
+      slang: "hood suppression restaurant shunt kill cooking equipment",
+    },
+    {
+      name: "Hood control interface relay",
+      slang: "restaurant exhaust fan makeup air",
+    },
+    {
+      name: "Poke-through device, 2-service",
+      slang: "pokethrough floor fire rated core drill power data",
+    },
+    {
+      name: "Poke-through device, 4-service",
+      slang: "pokethrough floor fire rated core drill power data",
+    },
+    {
+      name: "Floor monument, 2-gang",
+      slang: "tombstone surface floor outlet power data",
+    },
+    { name: "Raised floor box", slang: "access floor computer room" },
+    { name: "Desk grommet outlet", slang: "desktop power usb pop up" },
+    {
+      name: "Tele-power pole, 10 ft",
+      slang: "telepower power pole ceiling drop office cubicle",
+    },
+    {
+      name: "Tele-power pole, 15 ft",
+      slang: "telepower power pole ceiling drop office cubicle",
+    },
+    {
+      name: "Power pole fitting kit",
+      slang: "telepower tele-power ceiling drop fittings",
+    },
+    {
+      name: "Furniture feed connector",
+      slang: "modular systems furniture base feed cubicle office",
+    },
+    {
+      name: "Modular furniture whip, 6 ft",
+      slang: "cubicle systems furniture feed office",
+    },
+    {
+      name: "Modular furniture whip, 10 ft",
+      slang: "cubicle systems furniture feed office",
+    },
+  ].map(({ name, slang }) => ({
+    ...gear("Distribution Equipment"),
+    name,
+    searchAliases: aliases(slang),
+  })),
+  {
+    ...gear("Distribution Equipment"),
+    name: "Under-carpet flat cable",
+    // By the foot: the sheet had it as "each", which is not how it is bought.
+    unitOfSale: "foot",
+    searchAliases: aliases("flat wire undercarpet office floor ffc"),
   },
 ];
 
@@ -397,10 +704,17 @@ export const PANELS_AND_BREAKERS: BaselineMaterial[] = [
   ...doublePole,
   ...triplePole,
   ...protectedSingle,
+  ...protectedSingleLarge,
   ...protectedDouble,
   ...tandems,
+  ...halfSize,
+  ...quads,
+  ...breakerAccessories,
   ...mainPanels,
   ...subPanels,
+  ...spacedPanels,
+  ...outdoorPanels,
+  ...panelParts,
   ...meterBases,
   ...disconnects,
   ...fuses,

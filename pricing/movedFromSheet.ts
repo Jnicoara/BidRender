@@ -129,6 +129,17 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   "Rotary dimmer": "Dimmer",
   "Slide dimmer": "Dimmer",
   "Wall-mount vacancy sensor": "Vacancy sensor switch",
+
+  // ── Batch 3: panels, breakers, distribution, grounding
+  "Breaker filler plate": "Panel filler plate",
+  "Panel ground bar": "Ground bar kit",
+  "Ground busbar": "Ground bar kit",
+  "Photocell contactor": "Lighting contactor",
+  "Signage circuit timer": "Time clock",
+  "Acorn ground clamp": "Ground rod clamp",
+  "Gas line bonding clamp": "Water pipe bonding clamp",
+  // The shipped 8 ft rod is the 5/8" one.
+  "Ground rod, 5/8 in x 8 ft": "Ground rod, 8 ft",
 };
 
 export const RENAMED_FROM_SHEET: Record<string, string> = {
@@ -171,6 +182,48 @@ export const RENAMED_FROM_SHEET: Record<string, string> = {
   // It has no receptacle: a GFCI with a blank face, protecting downstream.
   // Ends in "device" so it is not read as THE GFCI for a search of "gfci".
   "Dead-front GFCI receptacle": "Dead-front GFCI device",
+
+  // ── Batch 3
+  "15A quad breaker, two 2-pole circuits": "15A 2-Pole quad breaker",
+  "20A quad breaker, two 2-pole circuits": "20A 2-Pole quad breaker",
+  "Ansul micro-switch": "Hood suppression micro-switch",
+  // A name holding "plug" led a search for "plug", above every receptacle.
+  // The six brand variants follow it as their parent.
+  "Plug-on surge protective device": "Breaker-style surge protective device",
+  // These two led "panel", "meter" and "load center" ahead of the everyday
+  // panels and meter bases.
+  "Combination meter-main panel": "Combination meter-main",
+  "Generator ready load center": "Generator-ready main panel",
+  "Wireway, 4x4": "4x4 wireway",
+  "Wireway, 6x6": "6x6 wireway",
+  "Panelboard, 208V 3-phase": "208V 3-phase panelboard",
+  "Panelboard, 480V 3-phase": "480V 3-phase panelboard",
+  "Ground rod, 3/4 in x 10 ft": 'Ground rod, 3/4" x 10 ft',
+  // Panels take the catalog's "main panel" / "main-lug sub-panel" wording.
+  ...Object.fromEntries(
+    [
+      ["60", ["8", "12"]],
+      ["100", ["12", "20", "24"]],
+      ["125", ["20", "24", "30"]],
+      ["150", ["30", "40"]],
+      ["200", ["30", "40", "42"]],
+      ["225", ["42"]],
+      ["400", ["42"]],
+    ].flatMap(([amps, spaces]) =>
+      (spaces as string[]).flatMap(n => [
+        [
+          `${amps}A ${n}-space main breaker panel`,
+          `${amps}A main panel, ${n}-space`,
+        ],
+        [
+          `${amps}A ${n}-space main lug panel`,
+          `${amps}A main-lug sub-panel, ${n}-space`,
+        ],
+      ])
+    )
+  ),
+  "100A outdoor main breaker panel": "100A outdoor main panel",
+  "200A outdoor main breaker panel": "200A outdoor main panel",
 };
 
 /** Every sheet name that moved under a different name, whichever kind. */

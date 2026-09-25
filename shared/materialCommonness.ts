@@ -66,6 +66,17 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   "15/15 tandem breaker": "common",
   "20/20 tandem breaker": "common",
 
+  // ── Panels: the service-upgrade pair ──
+  // Added 2026-09-25, when the pricing sheet's spaced and specialty panels
+  // joined the catalog. Every one of those ties the plain main panels on
+  // relevance for "panel" or "meter", and the tie then fell to the
+  // alphabet, which put "Generator-ready main panel" and "Meter-main combo"
+  // first.
+  "200A main panel": "common",
+  "100A main panel": "common",
+  "200A meter base": "common",
+  "100A meter base": "common",
+
   // ── Wire & Cable ──
   "14-2 NM-B": "core",
   "12-2 NM-B": "core",

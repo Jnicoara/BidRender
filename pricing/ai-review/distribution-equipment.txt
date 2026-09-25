@@ -1,8 +1,11 @@
 Category: Distribution Equipment
-Items: 60
+Items: 55
 
 Category | Name | Size
-Distribution Equipment | Ansul micro-switch | -
+Distribution Equipment | 208V 3-phase panelboard | -
+Distribution Equipment | 480V 3-phase panelboard | -
+Distribution Equipment | 4x4 wireway | 4x4
+Distribution Equipment | 6x6 wireway | 6x6
 Distribution Equipment | Automatic transfer switch | -
 Distribution Equipment | Busway | -
 Distribution Equipment | Busway elbow | -
@@ -21,6 +24,7 @@ Distribution Equipment | 400A fused disconnect | 400A
 Distribution Equipment | 600A fused disconnect | 600A
 Distribution Equipment | Grease-rated cord set | -
 Distribution Equipment | Hood control interface relay | -
+Distribution Equipment | Hood suppression micro-switch | -
 Distribution Equipment | Lighting contactor | -
 Distribution Equipment | Modular furniture whip, 10 ft | 10 ft
 Distribution Equipment | Modular furniture whip, 6 ft | 6 ft
@@ -31,9 +35,6 @@ Distribution Equipment | 30A NEMA 3R safety switch | 30A
 Distribution Equipment | 60A NEMA 3R safety switch | 60A
 Distribution Equipment | 100A NEMA 3R safety switch | 100A
 Distribution Equipment | 200A NEMA 3R safety switch | 200A
-Distribution Equipment | Panelboard, 208V 3-phase | -
-Distribution Equipment | Panelboard, 480V 3-phase | -
-Distribution Equipment | Photocell contactor | -
 Distribution Equipment | Poke-through device, 2-service | -
 Distribution Equipment | Poke-through device, 4-service | -
 Distribution Equipment | Power pole fitting kit | -
@@ -44,10 +45,6 @@ Distribution Equipment | 100A safety switch | 100A
 Distribution Equipment | 200A safety switch | 200A
 Distribution Equipment | 400A safety switch | 400A
 Distribution Equipment | 600A safety switch | 600A
-Distribution Equipment | Shunt-trip breaker, 2-Pole | -
-Distribution Equipment | Shunt-trip breaker, 3-Pole | -
-Distribution Equipment | Signage circuit timer | -
-Distribution Equipment | Stainless steel weatherproof cover | -
 Distribution Equipment | Step-down transformer, 15 kVA | 15 kVA
 Distribution Equipment | Step-down transformer, 30 kVA | 30 kVA
 Distribution Equipment | Step-down transformer, 45 kVA | 45 kVA
@@ -60,5 +57,3 @@ Distribution Equipment | Under-carpet flat cable | -
 Distribution Equipment | Variable frequency drive | -
 Distribution Equipment | Wireway coupling | -
 Distribution Equipment | Wireway elbow | -
-Distribution Equipment | Wireway, 4x4 | 4x4
-Distribution Equipment | Wireway, 6x6 | 6x6

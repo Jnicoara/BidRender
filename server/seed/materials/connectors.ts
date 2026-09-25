@@ -325,7 +325,7 @@ export const CONSUMABLES: BaselineMaterial[] = [
   {
     ...CONS,
     name: "Panel directory label",
-    searchAliases: aliases("circuit schedule card index sticker load center"),
+    searchAliases: aliases("circuit schedule card index sticker breaker"),
   },
   {
     // On the sheet's Boxes list; it is a pulling aid, so it lives here.

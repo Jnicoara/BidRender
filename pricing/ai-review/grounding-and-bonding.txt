@@ -1,14 +1,11 @@
 Category: Grounding & Bonding
-Items: 24
+Items: 20
 
 Category | Name | Size
-Grounding & Bonding | Acorn ground clamp | -
 Grounding & Bonding | Bonding jumper | -
 Grounding & Bonding | Exothermic weld mold | -
 Grounding & Bonding | Exothermic weld powder | -
-Grounding & Bonding | Gas line bonding clamp | -
 Grounding & Bonding | Ground bar kit | -
-Grounding & Bonding | Ground busbar | -
 Grounding & Bonding | Ground lug, compression | -
 Grounding & Bonding | Ground lug, mechanical | -
 Grounding & Bonding | Ground plate electrode | -
@@ -16,8 +13,7 @@ Grounding & Bonding | Ground rod clamp | -
 Grounding & Bonding | Ground rod coupling | -
 Grounding & Bonding | Ground rod driving stud | -
 Grounding & Bonding | Ground rod, 10 ft | 10 ft
-Grounding & Bonding | Ground rod, 3/4 in x 10 ft | 3/4 in
-Grounding & Bonding | Ground rod, 5/8 in x 8 ft | 5/8 in
+Grounding & Bonding | Ground rod, 3/4" x 10 ft | 3/4"
 Grounding & Bonding | Ground rod, 8 ft | 8 ft
 Grounding & Bonding | Ground wire staple | -
 Grounding & Bonding | Grounding bushing | -

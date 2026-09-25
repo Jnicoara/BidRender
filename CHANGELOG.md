@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **108 more panels, breakers, commercial gear and grounding parts in the
+  starter catalog, from the pricing sheet.** Main panels and sub-panels by
+  space count ("200A main panel, 40-space"), outdoor and generator-ready
+  panels, panel covers and parts; half-size and quad breakers, 25A/30A
+  protected breakers, a 30/30 tandem, shunt-trip breakers, handle ties and
+  lock-offs; wireway, cable tray and busway fittings, motor starters, a VFD,
+  poke-throughs, power poles and office furniture feeds; 10 ft ground rods,
+  bonding clamps, lugs and exothermic weld supplies. Searching "panel" or
+  "meter" still leads with the 200A main panel and the meter base.
+
 - **88 more boxes, devices and plates in the starter catalog, from the
   pricing sheet.** Old-work and masonry boxes, 4- and 5-gang boxes, nail
   plates, box extenders and blank covers; 20A GFCI and weather-resistant

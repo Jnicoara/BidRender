@@ -1,5 +1,5 @@
 Category: Wall Plates & Misc
-Items: 24
+Items: 25
 
 Category | Name | Size
 Wall Plates & Misc | 1-gang blank plate | -
@@ -20,6 +20,7 @@ Wall Plates & Misc | Jumbo wall plate | -
 Wall Plates & Misc | Panel filler plate | -
 Wall Plates & Misc | Screwless wall plate | -
 Wall Plates & Misc | Stainless steel wall plate | -
+Wall Plates & Misc | Stainless steel weatherproof cover | -
 Wall Plates & Misc | Wall plate | -
 Wall Plates & Misc | Wall plate gasket | -
 Wall Plates & Misc | Wall plate screws | -

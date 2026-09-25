@@ -487,6 +487,15 @@ export const COVER_PLATES: BaselineMaterial[] = [
     searchAliases: aliases(PLATE_SLANG, "two gang 2g combination mixed"),
   },
   {
+    // On the sheet's Distribution Equipment list (a restaurant job); it is a
+    // cover, so it lives with the covers.
+    ...device("Wall Plates & Misc"),
+    name: "Stainless steel weatherproof cover",
+    searchAliases: aliases(
+      "ss wp in-use while in use kitchen washdown restaurant outdoor"
+    ),
+  },
+  {
     ...device("Wall Plates & Misc"),
     name: "Jumbo wall plate",
     searchAliases: aliases(PLATE_SLANG, "oversize oversized large bad cut"),
