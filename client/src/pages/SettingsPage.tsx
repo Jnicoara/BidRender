@@ -68,7 +68,7 @@ const SECTION_INFO: Record<SettingsSection, { label: string; blurb: string }> =
     pricing: {
       label: "Pricing",
       blurb:
-        "Overhead, profit and productivity. These reach every new bid and every existing bid still following the default.",
+        "Material markup, overhead, profit and productivity. Each says below whether it reaches bids that already exist.",
     },
     heights: {
       label: "Heights",

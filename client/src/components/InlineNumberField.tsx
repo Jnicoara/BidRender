@@ -46,6 +46,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
+  otherPercentCaption,
+  percentKindSuffix,
+  type PercentKind,
+} from "@/lib/percentKind";
+import {
   commitNullableEdit,
   commitNumericEdit,
   formatForEdit,
@@ -67,6 +72,14 @@ type BaseProps = {
   ariaLabel: string;
   /** Static text after the field, e.g. "%" or "h". */
   suffix?: string;
+  /**
+   * A profit-style percentage: puts "% markup" or "% margin" INSIDE the field
+   * and the other number live beside it ("= 16.7% margin"), worked out from
+   * what is typed right now. Use this instead of `suffix="%"` on any field
+   * that is a markup or a margin — references/material-markup.md § Markup vs
+   * margin. The words and the arithmetic are @/lib/percentKind.
+   */
+  percentKind?: PercentKind;
   disabled?: boolean;
   /**
    * Close the panel this field sits in. Supplying it makes the field a "panel"
@@ -114,6 +127,7 @@ export function InlineNumberField({
   className,
   ariaLabel,
   suffix,
+  percentKind,
   disabled,
   onDismiss,
   onClear,
@@ -207,79 +221,101 @@ export function InlineNumberField({
     showFlash,
   ]);
 
+  const caption = percentKind ? otherPercentCaption(percentKind, draft) : null;
+
   return (
     <span className="inline-flex items-center">
-      <Input
-        value={draft}
-        disabled={disabled}
-        onChange={e => {
-          settledByKey.current = false;
-          setDraft(e.target.value);
-        }}
-        onFocus={e => {
-          editing.current = true;
-          // Select the lot so the first keystroke replaces it.
-          e.target.select();
-        }}
-        onBlur={() => {
-          editing.current = false;
-          if (settledByKey.current) return;
-          commit();
-        }}
-        onKeyDown={e => {
-          const plan = planFieldKey(e.key, onDismiss ? "panel" : "inline");
-          if (plan.action === "pass") return;
-
-          e.preventDefault();
-          const input = e.target as HTMLInputElement;
-
-          if (plan.action === "commit") {
+      <span className={cn(percentKind && "relative inline-flex")}>
+        <Input
+          value={draft}
+          disabled={disabled}
+          onChange={e => {
+            settledByKey.current = false;
+            setDraft(e.target.value);
+          }}
+          onFocus={e => {
+            editing.current = true;
+            // Select the lot so the first keystroke replaces it.
+            e.target.select();
+          }}
+          onBlur={() => {
+            editing.current = false;
+            if (settledByKey.current) return;
             commit();
-            if (plan.keepFocus) {
-              // Entering a column of numbers should not need a re-click after
-              // every one.
-              input.select();
-            }
-            if (plan.dismiss) {
-              settledByKey.current = true;
-              editing.current = false;
-              onDismiss?.();
-            }
-            return;
-          }
+          }}
+          onKeyDown={e => {
+            const plan = planFieldKey(e.key, onDismiss ? "panel" : "inline");
+            if (plan.action === "pass") return;
 
-          // Abandon: snap back to what is stored and write nothing.
-          // stopPropagation so Escape settles the field without also reaching
-          // whatever encloses it; closing is this field's call to make, below.
-          e.stopPropagation();
-          setDraft(blankWhenUnset ? "" : revertToSaved(shown));
-          editing.current = false;
-          settledByKey.current = true;
-          if (plan.dismiss) {
-            onDismiss?.();
-            return;
+            e.preventDefault();
+            const input = e.target as HTMLInputElement;
+
+            if (plan.action === "commit") {
+              commit();
+              if (plan.keepFocus) {
+                // Entering a column of numbers should not need a re-click after
+                // every one.
+                input.select();
+              }
+              if (plan.dismiss) {
+                settledByKey.current = true;
+                editing.current = false;
+                onDismiss?.();
+              }
+              return;
+            }
+
+            // Abandon: snap back to what is stored and write nothing.
+            // stopPropagation so Escape settles the field without also reaching
+            // whatever encloses it; closing is this field's call to make, below.
+            e.stopPropagation();
+            setDraft(blankWhenUnset ? "" : revertToSaved(shown));
+            editing.current = false;
+            settledByKey.current = true;
+            if (plan.dismiss) {
+              onDismiss?.();
+              return;
+            }
+            input.blur();
+          }}
+          inputMode="decimal"
+          // The word inside is drawn, not read, so it is said here as well.
+          aria-label={
+            percentKind ? `${ariaLabel} (percent ${percentKind})` : ariaLabel
           }
-          input.blur();
-        }}
-        inputMode="decimal"
-        aria-label={ariaLabel}
-        placeholder={
-          whenUnset !== undefined && whenUnset !== "zero"
-            ? whenUnset.placeholder
-            : undefined
-        }
-        // The confirmation is on the field itself rather than a floating tick:
-        // it cannot be clipped by a scrolling row, it shifts no layout, and it
-        // is unmissable next to the number that just changed.
-        data-saved={flash ? "true" : undefined}
-        className={cn(
-          "text-right transition-colors duration-200",
-          flash && "border-emerald-500 bg-emerald-500/10 text-emerald-300",
-          className
+          placeholder={
+            whenUnset !== undefined && whenUnset !== "zero"
+              ? whenUnset.placeholder
+              : undefined
+          }
+          // The confirmation is on the field itself rather than a floating tick:
+          // it cannot be clipped by a scrolling row, it shifts no layout, and it
+          // is unmissable next to the number that just changed.
+          data-saved={flash ? "true" : undefined}
+          className={cn(
+            "text-right transition-colors duration-200",
+            flash && "border-emerald-500 bg-emerald-500/10 text-emerald-300",
+            className,
+            // Room for the word inside, after the caller's width.
+            percentKind && "pr-[4.25rem]"
+          )}
+        />
+        {percentKind && (
+          <span
+            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground"
+            aria-hidden="true"
+          >
+            {percentKindSuffix(percentKind)}
+          </span>
         )}
-      />
-      {suffix && (
+      </span>
+      {suffix && !percentKind && (
         <span className="ml-1 text-xs text-muted-foreground">{suffix}</span>
+      )}
+      {caption && (
+        <span className="ml-2 text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+          {caption}
+        </span>
       )}
       {/* Announce the save to assistive tech, which cannot see the colour. */}
       <span className="sr-only" role="status" aria-live="polite">

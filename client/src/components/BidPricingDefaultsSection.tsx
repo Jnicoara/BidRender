@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/select";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { CompanyDefaultNotice } from "@/components/CompanyDefaultNotice";
+import { PercentKindInput } from "@/components/PercentKindInput";
 
 /** Fraction (0.1) → percent string ("10"). Blank stays blank. */
 const toPercent = (fraction: number | string | null | undefined) =>
@@ -58,6 +59,9 @@ export function BidPricingDefaultsSection() {
       void utils.bids.pricingDefaults.invalidate();
       void utils.bids.dashboard.invalidate();
       void utils.bids.get.invalidate();
+      // A new default markup changes what "Re-apply markup rules" would do on
+      // every Draft bid, so the offer on each has to be re-measured.
+      void utils.bids.markupReapplyPreview.invalidate();
     },
     onError: e => toast.error(e.message),
   });
@@ -67,9 +71,16 @@ export function BidPricingDefaultsSection() {
   const [overheadFlat, setOverheadFlat] = useState("0");
   const [profitPct, setProfitPct] = useState("0");
   const [productivityPct, setProductivityPct] = useState("0");
+  // Blank is "no company default" — a rule of nothing, not a rule of 0%.
+  const [materialMarkupPct, setMaterialMarkupPct] = useState("");
 
   useEffect(() => {
     if (!defaults) return;
+    setMaterialMarkupPct(
+      defaults.materialMarkupPct === null
+        ? ""
+        : toPercent(defaults.materialMarkupPct)
+    );
     const isPercentage = defaults.overheadMode === "percentage";
     setOverheadPct(isPercentage ? toPercent(defaults.overheadValue) : "0");
     setOverheadFlat(
@@ -94,6 +105,58 @@ export function BidPricingDefaultsSection() {
           one here moves every bid still set to follow it — finished bids keep
           the materials, hours and rates they were built from either way.
         </p>
+      </div>
+
+      {/* ── Material markup ──────────────────────────────────────────────────
+          First, because it is the first step after direct cost: overhead and
+          profit below are both added on top of marked-up material (D1,
+          references/material-markup.md). The last level of the markup rules —
+          a material's own markup, set on the Materials screen, wins over it.
+
+          Its notice says something DIFFERENT from the others, on purpose. A
+          line freezes its markup when it is added, so this does not move a
+          bid that already exists; saying "every existing bid" here, as the
+          overhead notice rightly does, would be false. */}
+      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <div>
+          <Label className="text-sm">Material markup</Label>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Added to each line's material cost when it goes on a bid, unless the
+            material has its own markup on the Materials screen. Leave it blank
+            for no markup. Overhead and profit below are added on top of the
+            marked-up material.
+          </p>
+        </div>
+
+        <PercentKindInput
+          kind="markup"
+          value={materialMarkupPct}
+          onChange={setMaterialMarkupPct}
+          onBlur={() => {
+            const next =
+              materialMarkupPct.trim() === ""
+                ? null
+                : toFraction(materialMarkupPct);
+            const current =
+              defaults.materialMarkupPct === null
+                ? null
+                : Number(defaults.materialMarkupPct);
+            if (next === current) return;
+            save.mutate({ materialMarkupPct: next });
+          }}
+          onKeyDown={e => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          whenBlank="No company default — lines get no markup unless their material has one"
+          ariaLabel="Default material markup"
+          className="h-8 w-36 text-sm"
+        />
+
+        <CompanyDefaultNotice>
+          This is your company default for lines added from now on. Lines
+          already on a bid keep their markup — a Draft bid offers "Re-apply
+          markup rules" when they differ.
+        </CompanyDefaultNotice>
       </div>
 
       {/* ── Overhead ─────────────────────────────────────────────────────── */}
@@ -150,10 +213,14 @@ export function BidPricingDefaultsSection() {
                     if (e.key === "Enter") e.currentTarget.blur();
                   }}
                   inputMode="decimal"
-                  aria-label="Default overhead percentage"
-                  className="h-8 w-28 pr-7 text-sm text-right"
+                  aria-label="Default overhead, percent of cost"
+                  className="h-8 w-32 pr-[4.25rem] text-sm text-right"
                 />
-                <Percent className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                {/* "of cost", not a bare "%": every percentage on this
+                    screen says what it is a percentage OF. */}
+                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                  % of cost
+                </span>
               </div>
             ) : (
               <div className="relative">
@@ -214,21 +281,19 @@ export function BidPricingDefaultsSection() {
             </SelectContent>
           </Select>
 
-          <div className="relative">
-            <Input
-              value={profitPct}
-              onChange={e => setProfitPct(e.target.value)}
-              onFocus={selectOnFocus}
-              onBlur={() => save.mutate({ profitValue: toFraction(profitPct) })}
-              onKeyDown={e => {
-                if (e.key === "Enter") e.currentTarget.blur();
-              }}
-              inputMode="decimal"
-              aria-label="Default profit percentage"
-              className="h-8 w-28 pr-7 text-sm text-right"
-            />
-            <Percent className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-          </div>
+          {/* The word inside and the other number beside — markup and margin
+              are different prices at the same number (Part 4). */}
+          <PercentKindInput
+            kind={defaults.profitMethod}
+            value={profitPct}
+            onChange={setProfitPct}
+            onBlur={() => save.mutate({ profitValue: toFraction(profitPct) })}
+            onKeyDown={e => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            ariaLabel="Default profit"
+            className="h-8 w-36 text-sm"
+          />
         </div>
 
         <CompanyDefaultNotice>

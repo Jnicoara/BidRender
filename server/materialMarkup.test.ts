@@ -255,6 +255,19 @@ describe("a stored line", () => {
         },
       })
     ).toBe("no markup rule set");
+    // A blend names its parts rather than one "from".
+    expect(
+      describeLineMarkup({
+        snapshotMarkupPct: "0.315531",
+        snapshotMarkupSource: {
+          level: "mixed",
+          label: "Mixed — 1 from company default, 1 from item override",
+          parts: [],
+        },
+      })
+    ).toBe(
+      "31.55% blended markup — 1 from company default, 1 from item override"
+    );
   });
 
   it("marks up material only, rounded to the cent at the line", () => {

@@ -312,12 +312,18 @@ export function storedMarkupPct(
 /** The sentence under a line: how much, and where it came from. */
 export function describeLineMarkup(line: {
   snapshotMarkupPct: string | number | null;
-  snapshotMarkupSource: LineMarkupSource | null;
+  /** As stored — the column's JSON type is looser than LineMarkupSource. */
+  snapshotMarkupSource: { level: string; label: string } | null;
 }): string {
   if (line.snapshotMarkupPct === null) return LEGACY_MARKUP_LABEL;
   const pct = storedMarkupPct(line.snapshotMarkupPct);
   const label = line.snapshotMarkupSource?.label ?? "markup";
   if (line.snapshotMarkupSource?.level === "none") return label;
+  // A blend is not one rule, so it does not say "from" one: "31.55% blended
+  // markup — 1 from company default, 1 from item override".
+  if (line.snapshotMarkupSource?.level === "mixed") {
+    return `${formatPct(pct)} blended markup — ${label.replace(/^Mixed — /, "")}`;
+  }
   return `${formatPct(pct)} markup ${label}`;
 }
 

@@ -36,6 +36,7 @@ import { selectOnFocus } from "@/lib/selectOnFocus";
 import { smartSearch } from "@/lib/smartSearch";
 import { addAssemblyOverheadHours } from "@shared/pricing";
 import { money } from "@/lib/money";
+import { otherPercentCaption } from "@/lib/percentKind";
 
 const round = (value: number, places = 2) => {
   const factor = 10 ** places;
@@ -511,10 +512,13 @@ export default function QuickBidPage({
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">
-                  {detail.settings.profit.method === "markup"
-                    ? "Markup"
-                    : "Target margin"}{" "}
-                  {round(detail.settings.profit.value * 100, 2)}%
+                  {/* Both numbers, as on the bid screen (Part 4). */}
+                  Profit {round(detail.settings.profit.value * 100, 2)}%{" "}
+                  {detail.settings.profit.method}{" "}
+                  {otherPercentCaption(
+                    detail.settings.profit.method,
+                    String(detail.settings.profit.value * 100)
+                  )}
                   <span className="ml-1 text-muted-foreground/70">
                     (
                     {detail.settings.profitSource === "bid"

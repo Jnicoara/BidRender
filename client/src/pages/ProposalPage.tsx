@@ -408,13 +408,21 @@ export default function ProposalPage({
               Not on the document — here so you can see the client-facing total
               is the bid price you approved.
             </p>
-            {[
-              ["Materials", internalTotals.materialCost],
-              ["Labor", internalTotals.laborCost],
-              ["Direct cost", internalTotals.directCost],
-              ["Overhead", internalTotals.overheadAmount],
-              ["Profit", internalTotals.profitAmount],
-            ].map(([label, value]) => (
+            {(
+              [
+                ["Materials", internalTotals.materialCost],
+                ["Labor", internalTotals.laborCost],
+                ["Direct cost", internalTotals.directCost],
+                // Between direct cost and overhead, where it is applied —
+                // without it these rows would not add up to the bid price.
+                // Only when there is some, as on the bid screen.
+                ...(internalTotals.materialMarkup > 0
+                  ? [["Material markup", internalTotals.materialMarkup]]
+                  : []),
+                ["Overhead", internalTotals.overheadAmount],
+                ["Profit", internalTotals.profitAmount],
+              ] as Array<[string, number]>
+            ).map(([label, value]) => (
               <div
                 key={label as string}
                 className="flex items-baseline justify-between gap-3"

@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { selectOnFocus } from "@/lib/selectOnFocus";
+import { PercentKindInput } from "@/components/PercentKindInput";
 import { laborForAssembly } from "@shared/materialLabor";
 import { LaborRateQuickEdit } from "@/components/LaborRateQuickEdit";
 import { resolveLaborRate } from "@shared/laborRateLookup";
@@ -439,13 +440,14 @@ function CostPreview({
             </SelectContent>
           </Select>
           {profitMethod !== "none" && (
-            <Input
+            // The word inside and the other number beside (Part 4) — the
+            // same component the Settings screen uses.
+            <PercentKindInput
+              kind={profitMethod}
               value={profitValue}
-              onChange={e => setProfitValue(e.target.value)}
-              className="h-7 w-20 text-xs text-right"
-              inputMode="decimal"
-              onFocus={selectOnFocus}
-              aria-label="Profit value"
+              onChange={setProfitValue}
+              ariaLabel="Profit value"
+              className="h-7 w-32 text-xs"
             />
           )}
         </div>

@@ -6,6 +6,20 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **You can now set a material markup.** Settings → Pricing has a company
+  default, and any material can carry its own markup (edit it on the
+  Materials screen) that wins over the default. Each line on a bid says how
+  much markup it carries and where it came from, for example "12% markup
+  from company default" or "40% markup from item override". Changing a rule
+  never moves a line already on a bid. A Draft bid offers "Re-apply markup
+  rules" and says how many lines it would change. A sent, won, lost or locked
+  bid never moves.
+
+- **Every markup and margin field now says which one it is, and shows the
+  other.** Type 20 and the box reads "20 % markup = 16.7% margin", or
+  "20 % margin = 25% markup". The two are different prices at the same
+  number, and mixing them up quietly underprices a bid.
+
 - **The groundwork for marking up material.** Each line on a bid can now
   carry its own material markup, worked out when the line is added: a
   material's own markup first, then its category, then the company default.

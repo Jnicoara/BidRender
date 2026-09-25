@@ -72,7 +72,10 @@ added (R4). The markup joins them:
 0%.** That is what makes the migration additive: every existing line reads as
 it always did, to the cent, with no backfill. Proven two ways — a unit test
 (`server/materialMarkup.test.ts`) and a before/after dump of every bid in the
-local copy of the data (4,231 bids, zero differences).
+local copy of the data: 4,231 bids through the bid screen, the dashboard, the
+proposal and the export, and no existing figure moved except two dashboard
+cards that had been leaving out a marked-up expense, now fixed to match their
+bids.
 
 **Changing a rule does not move an existing line.** The bid shows
 "Re-apply markup rules (N lines change)" instead, and **only on a Draft bid
@@ -166,9 +169,13 @@ behaviour with it").
 ## The pieces
 
 1. **Rule engine + per-line storage + source label + the five ratio fixes.**
-   Built 2026-09-25. Item override and company default are wired end to end.
-   The category level reads a category rule if one exists, but nothing can
-   create one until Piece 3.
+   Built 2026-09-25. Item override (Materials screen, in the row's editor —
+   saved on its own so it never forks the material) and company default
+   (Settings → Pricing) are wired end to end. The bid screen shows each line's
+   markup and source, a "Material markup" row, and "Re-apply markup rules" on
+   a Draft bid. The category level reads a category rule if one exists, but
+   nothing can create one until Piece 3. Open items: `todo.md` § Material
+   markup.
 2. **Price bands** — a pack size / pack price on materials (D3), the band
    rules, the D2 starter set with date and one-click accept, the shared
    starter component (D6).

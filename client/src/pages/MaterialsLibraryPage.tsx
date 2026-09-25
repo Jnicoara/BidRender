@@ -81,6 +81,8 @@ import {
 } from "@shared/materialOrder";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { unitCost } from "@/lib/money";
+import { materialItemKey } from "@shared/materialMarkup";
+import { PercentKindInput } from "@/components/PercentKindInput";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -291,6 +293,7 @@ function MaterialRow({
   onRemove,
   onRestore,
   onDeleteForever,
+  markupOverride,
 }: {
   material: Material;
   isBusy: boolean;
@@ -304,12 +307,42 @@ function MaterialRow({
   onRemove: (material: Material) => void;
   onRestore?: (material: Material) => void;
   onDeleteForever?: (material: Material) => void;
+  /**
+   * This material's own markup, as a fraction, or undefined when it has none
+   * and the rules below it apply (category, then company default). The first
+   * level of the markup rules — references/material-markup.md.
+   */
+  markupOverride?: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
+  /*
+    The markup is NOT part of the material draft, on purpose. Saving the draft
+    edits the material, and editing a shipped one FORKS it — which stops it
+    following the shipped catalog. An override lives in its own table and
+    needs no fork, so it is saved on its own, and a Save that changed only the
+    markup never touches the material row at all.
+  */
+  const [markupDraft, setMarkupDraft] = useState("");
+  const [openedWith, setOpenedWith] = useState<Draft | null>(null);
+
+  const utils = trpc.useUtils();
+  const setOverride = trpc.bids.setItemMarkupOverride.useMutation({
+    onSuccess: () => {
+      void utils.bids.markupRules.invalidate();
+      // A Draft bid's "Re-apply markup rules" offer counts on this.
+      void utils.bids.markupReapplyPreview.invalidate();
+    },
+    onError: e => toast.error(e.message),
+  });
 
   const startEditing = () => {
-    setDraft({
+    setMarkupDraft(
+      markupOverride === undefined
+        ? ""
+        : String(Math.round(markupOverride * 10000) / 100)
+    );
+    const opened: Draft = {
       name: material.name,
       unitOfSale: material.unitOfSale,
       costPerUnit: String(Number(material.costPerUnit)),
@@ -326,7 +359,9 @@ function MaterialRow({
       // findable — the protection moved from "never send it" to "always start
       // from the truth", and editing the terms is now possible either way.
       searchAliases: material.searchAliases ?? "",
-    });
+    };
+    setDraft(opened);
+    setOpenedWith(opened);
     setEditing(true);
   };
 
@@ -336,7 +371,22 @@ function MaterialRow({
       toast.error(problem);
       return;
     }
-    await onSave(material.id, draft);
+    const typedMarkup = markupDraft.trim();
+    const nextMarkup = typedMarkup === "" ? null : Number(typedMarkup) / 100;
+    if (nextMarkup !== null && !(nextMarkup >= 0 && nextMarkup <= 10)) {
+      toast.error("Markup must be between 0% and 1000%.");
+      return;
+    }
+    if (nextMarkup !== (markupOverride ?? null)) {
+      await setOverride.mutateAsync({
+        materialId: material.id,
+        markupPct: nextMarkup,
+      });
+    }
+    // Only when something ABOUT THE MATERIAL changed — see markupDraft above.
+    if (JSON.stringify(draft) !== JSON.stringify(openedWith)) {
+      await onSave(material.id, draft);
+    }
     setEditing(false);
   };
 
@@ -405,6 +455,20 @@ function MaterialRow({
             placeholder="hours"
             aria-label="Labor hours per unit"
             title="Hours to install one of these. Leave blank if you have not decided; 0 means it adds no time of its own."
+          />
+          {/*
+            This material's OWN markup — the first markup rule, over its
+            category and the company default. Blank means "no override", which
+            is not 0%: the placeholder says what happens instead.
+          */}
+          <PercentKindInput
+            kind="markup"
+            value={markupDraft}
+            onChange={setMarkupDraft}
+            whenBlank="own markup: none"
+            ariaLabel="This material's own markup"
+            disabled={isBusy}
+            className="h-8 w-32 text-sm"
           />
           <div className="flex items-center gap-1">
             <Button
@@ -479,6 +543,16 @@ function MaterialRow({
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium truncate">{material.name}</span>
           <OriginBadge material={material} />
+          {/* Only when this material has its own markup. Every other row
+              follows the rules, and saying so on 700 rows says nothing. */}
+          {markupOverride !== undefined && (
+            <span
+              className="shrink-0 text-[0.65rem] px-1.5 py-0.5 rounded border border-border text-muted-foreground"
+              title="This material's own markup — used instead of its category or the company default."
+            >
+              {Math.round(markupOverride * 10000) / 100}% markup
+            </span>
+          )}
           {showCategory && (
             <span className="text-xs text-muted-foreground truncate">
               {material.category ?? "Uncategorized"}
@@ -638,6 +712,23 @@ export default function MaterialsLibraryPage() {
 
   const [view, setView] = useState<LibraryView>("active");
   const [scope, setScope] = useState<LibraryScope>("all");
+
+  /**
+   * Item markup overrides, keyed the way the server matches them —
+   * `materialItemKey`, so a starter and the company's fork of it find the
+   * same override. One small query for the whole list: a company sets a
+   * handful of these, not one per row.
+   */
+  const { data: markupRuleRows = [] } = trpc.bids.markupRules.useQuery();
+  const itemOverrides = useMemo(
+    () =>
+      new Map(
+        markupRuleRows
+          .filter(r => r.kind === "item" && r.itemKey !== null)
+          .map(r => [r.itemKey as number, Number(r.markupPct)])
+      ),
+    [markupRuleRows]
+  );
   /**
    * Show only the rows still waiting for a real price.
    *
@@ -1359,6 +1450,9 @@ export default function MaterialsLibraryPage() {
                         onDeleteForever={m =>
                           setPendingDelete({ id: m.id, name: m.name })
                         }
+                        markupOverride={itemOverrides.get(
+                          materialItemKey(item.material)
+                        )}
                       />
                     )}
                   </div>

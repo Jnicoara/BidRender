@@ -79,6 +79,8 @@ import {
   handPricedGap,
 } from "@/components/HandPricedLineFields";
 import { quantitySource } from "@shared/quantityLock";
+import { describeLineMarkup } from "@shared/materialMarkup";
+import { otherPercentCaption } from "@/lib/percentKind";
 import { money } from "@/lib/money";
 
 const STATUSES = ["Draft", "Active", "Won", "Lost"] as const;
@@ -213,6 +215,7 @@ export default function BidsPage({
   const { data: unitStates = [] } = trpc.bids.unitStates.useQuery({ bidId });
   const { data: sheets = [] } = trpc.bidPdfs.list.useQuery({ bidId });
   const sheetCount = sheets.length;
+  const markupPreview = trpc.bids.markupReapplyPreview.useQuery({ bidId });
 
   /**
    * Link state for a unit header. Looked up rather than joined onto the line
@@ -237,8 +240,22 @@ export default function BidsPage({
     // added to the helper every mutation already invalidates through, not to the
     // one mutation this was noticed on.
     void utils.bids.quantityLock.invalidate({ bidId });
+    // What "Re-apply markup rules" would change depends on the lines, the
+    // bid's status and its lock — all of which the mutations here move. Added
+    // to this helper for the reason the lock query above was: a count of lines
+    // that has stopped being true, stated in the confident voice of a fresh one.
+    void utils.bids.markupReapplyPreview.invalidate({ bidId });
     void utils.bids.list.invalidate();
   }, [utils, bidId]);
+
+  const reapplyMarkup = trpc.bids.reapplyMarkupRules.useMutation({
+    onSuccess: ({ changed }) =>
+      toast.success(
+        `Markup rules re-applied — ${changed} line${changed === 1 ? "" : "s"} updated.`
+      ),
+    onError: error => toast.error(error.message),
+    onSettled: refresh,
+  });
 
   const addAssembly = trpc.bids.addAssembly.useMutation({
     onError: error => toast.error(error.message),
@@ -448,6 +465,18 @@ export default function BidsPage({
     settings.profitSource === "bid" ? "profit" : null,
     settings.productivitySource === "bid" ? "productivity" : null,
   ].filter((label): label is string => label !== null);
+
+  /** Whether any line carries material markup — see the note on each line. */
+  const showMarkupNotes = lines.some(l => l.breakdown.materialMarkupPct > 0);
+
+  /**
+   * "Re-apply markup rules", offered only when it would change something, and
+   * only on a bid that may move — the server decides both and refuses the
+   * mutation on anything else (shared/materialMarkup.ts, markupReapplyRefusal).
+   */
+  const reapplyChanges = markupPreview.data?.allowed
+    ? markupPreview.data.changes
+    : [];
 
   /** Lines grouped by unit, with un-labelled lines last under a null key. */
   const groups: Array<{ label: string | null; lines: typeof lines }> = [];
@@ -809,6 +838,26 @@ export default function BidsPage({
                                 )}
                               </div>
                             ) : null}
+                            {/*
+                              Where this line's MATERIAL MARKUP came from — "35%
+                              markup from Wire & Cable category · +$12.97".
+
+                              Shown on every line once the bid carries markup
+                              anywhere, including the lines at 0%, because then
+                              the contrast is the information: an estimator
+                              reading down the list needs to see which lines
+                              were NOT marked up as much as which were. On a bid
+                              with no markup at all it would be one grey
+                              sentence saying nothing on every line, forever.
+                            */}
+                            {showMarkupNotes ? (
+                              <div className="text-xs text-muted-foreground truncate">
+                                {describeLineMarkup(line)}
+                                {line.breakdown.materialMarkup > 0
+                                  ? ` · +${money(line.breakdown.materialMarkup)}`
+                                  : ""}
+                              </div>
+                            ) : null}
                             {line.snapshotModifierNames?.length ? (
                               <div className="text-xs text-muted-foreground truncate">
                                 {line.snapshotModifierNames.join(", ")} · frozen{" "}
@@ -1122,6 +1171,54 @@ export default function BidsPage({
                   {money(totals.directCost)}
                 </span>
               </div>
+              {/*
+                MATERIAL MARKUP, as its own step between direct cost and
+                overhead — which is where it is applied (D1): overhead and
+                profit below are added on top of it. Only when there is some;
+                a $0.00 row on every bid would be noise.
+              */}
+              {totals.materialMarkup > 0 && (
+                <div className="flex items-baseline justify-between gap-3 py-1">
+                  <span className="text-xs text-muted-foreground">
+                    Material markup
+                  </span>
+                  <span className="font-mono text-sm">
+                    {money(totals.materialMarkup)}
+                  </span>
+                </div>
+              )}
+              {/*
+                The offer to re-apply, beside the number it would move. Only
+                when the server says the bid may move AND something would; the
+                sentence names how many lines, measured, not "may change".
+              */}
+              {reapplyChanges.length > 0 && (
+                // Stacked, not side by side: this rail is narrow, and beside a
+                // button the sentence wrapped to a word or two a line.
+                <div className="flex flex-col items-start gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-2 my-1">
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      Your markup rules have changed since{" "}
+                      {reapplyChanges.length} line
+                      {reapplyChanges.length === 1 ? " was" : "s were"} added
+                    </span>{" "}
+                    —{" "}
+                    {reapplyChanges.length === 1
+                      ? "it keeps the markup it was added with"
+                      : "they keep the markup they were added with"}{" "}
+                    until you re-apply.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs shrink-0"
+                    disabled={reapplyMarkup.isPending}
+                    onClick={() => reapplyMarkup.mutate({ bidId })}
+                  >
+                    Re-apply markup rules
+                  </Button>
+                </div>
+              )}
               {settings.overhead.enabled && (
                 <div className="flex items-baseline justify-between gap-3 py-1">
                   <span className="text-xs text-muted-foreground">
@@ -1133,11 +1230,15 @@ export default function BidsPage({
                 </div>
               )}
               <div className="flex items-baseline justify-between gap-3 py-1">
-                <span className="text-xs text-muted-foreground capitalize">
-                  {settings.profit.method === "markup"
-                    ? "Markup"
-                    : "Target margin"}{" "}
-                  {round(settings.profit.value * 100, 2)}%
+                {/* Both numbers, always — "15% markup = 13% margin". A bare
+                    "Markup 15%" is the sentence Part 4 says gets misread. */}
+                <span className="text-xs text-muted-foreground">
+                  Profit {round(settings.profit.value * 100, 2)}%{" "}
+                  {settings.profit.method}{" "}
+                  {otherPercentCaption(
+                    settings.profit.method,
+                    String(settings.profit.value * 100)
+                  )}
                 </span>
                 <span className="font-mono text-sm">
                   {money(totals.profitAmount)}
@@ -1388,7 +1489,9 @@ export default function BidsPage({
                       rules={{ min: 0 }}
                       className="h-7 w-20 text-xs"
                       ariaLabel="Overhead value"
-                      suffix={bid.overheadMode === "flat" ? undefined : "%"}
+                      suffix={
+                        bid.overheadMode === "flat" ? undefined : "% of cost"
+                      }
                     />
                   </div>
                 )}
@@ -1460,9 +1563,9 @@ export default function BidsPage({
                     }
                     // Below 99%: at 100% the target-margin formula divides by zero.
                     rules={{ min: 0, max: 98.99 }}
-                    className="h-7 w-20 text-xs"
+                    className="h-7 w-32 text-xs"
                     ariaLabel="Profit value"
-                    suffix="%"
+                    percentKind={bid.profitMethod}
                   />
                 )}
                 <p className="text-xs text-muted-foreground">
