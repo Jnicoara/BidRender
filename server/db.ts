@@ -5567,6 +5567,91 @@ export async function getRecentMaterialsForUser(
   return seen.map(id => byId.get(id)).filter((m): m is Material => Boolean(m));
 }
 
+/**
+ * How often each material appears on THIS COMPANY'S bids, and when it last did.
+ *
+ * Feeds the search ranking's commonness tiebreak (shared/materialCommonness.ts):
+ * the parts a contractor actually bids rise among equally good matches. It is
+ * read for ONE company's bids, by `dataUserId`, and never pooled — another
+ * contractor's habits must not reorder this one's search.
+ *
+ * ── A material reaches a bid four ways, and missing one would undercount ─────
+ *   1. a line from an assembly — every material in that assembly's recipe;
+ *   2. a counted line whose takeoff group names a material directly;
+ *   3. a counted line whose takeoff group names an assembly — its recipe;
+ *   4. a traced-run line — the run type's conductor, ground or raceway,
+ *      whichever role the line prices.
+ * The recipe is read as it is NOW, not as it was when the line was added,
+ * because recipes are not snapshotted per line. For a ranking hint that is the
+ * right trade: it answers "what does this company reach for", not "what did
+ * bid 41 cost".
+ *
+ * Counted per distinct BID, so a job with forty receptacle lines counts once
+ * rather than burying everything else. Archived LINES are left out; archived
+ * BIDS are kept, because a bid that was sent and filed away is still evidence
+ * of what the company uses.
+ *
+ * ── Usage of a shipped row is credited to the company's fork of it ──────────
+ * An assembly written before a fork points at the shipped id, but the library
+ * shows the company's fork in its place. So an id with a fork resolves to the
+ * fork, and the count is taken after that, so one bid is never counted twice.
+ */
+export async function getMaterialUsageForCompany(
+  dataUserId: number
+): Promise<Array<{ materialId: number; bids: number; lastUsedAt: Date }>> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const [rows] = (await db.execute(sql`
+    SELECT COALESCE(fork.id, used.materialId) AS materialId,
+           COUNT(DISTINCT used.bidId)         AS bids,
+           MAX(used.at)                       AS lastUsedAt
+      FROM (
+        SELECT am.materialId, li.bidId, li.createdAt AS at
+          FROM bid_line_items li
+          JOIN bids b ON b.id = li.bidId
+          JOIN assembly_materials am ON am.assemblyId = li.assemblyId
+         WHERE b.userId = ${dataUserId} AND li.archivedAt IS NULL
+        UNION ALL
+        SELECT g.materialId, li.bidId, li.createdAt
+          FROM bid_line_items li
+          JOIN bids b ON b.id = li.bidId
+          JOIN takeoff_groups g ON g.id = li.takeoffGroupId
+         WHERE b.userId = ${dataUserId} AND li.archivedAt IS NULL
+        UNION ALL
+        SELECT am.materialId, li.bidId, li.createdAt
+          FROM bid_line_items li
+          JOIN bids b ON b.id = li.bidId
+          JOIN takeoff_groups g ON g.id = li.takeoffGroupId
+          JOIN assembly_materials am ON am.assemblyId = g.assemblyId
+         WHERE b.userId = ${dataUserId} AND li.archivedAt IS NULL
+        UNION ALL
+        SELECT CASE li.runMaterialRole
+                 WHEN 'conductor' THEN rt.conductorMaterialId
+                 WHEN 'ground'    THEN rt.groundMaterialId
+                 WHEN 'raceway'   THEN rt.racewayMaterialId
+               END,
+               li.bidId, li.createdAt
+          FROM bid_line_items li
+          JOIN bids b ON b.id = li.bidId
+          JOIN takeoff_run_types rt ON rt.id = li.takeoffRunTypeId
+         WHERE b.userId = ${dataUserId} AND li.archivedAt IS NULL
+      ) used
+      LEFT JOIN materials fork
+        ON fork.baselineId = used.materialId AND fork.userId = ${dataUserId}
+     WHERE used.materialId IS NOT NULL
+     GROUP BY COALESCE(fork.id, used.materialId)
+  `)) as unknown as [
+    Array<{ materialId: number; bids: number | string; lastUsedAt: Date }>,
+  ];
+
+  return rows.map(r => ({
+    materialId: Number(r.materialId),
+    bids: Number(r.bids),
+    lastUsedAt: new Date(r.lastUsedAt),
+  }));
+}
+
 // ─── Duplicating an assembly ──────────────────────────────────────────────────
 
 /**

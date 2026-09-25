@@ -634,6 +634,30 @@ export function smartSearch<T extends SearchableItem>(
 ): T[] {
   const q = normalize(query);
   if (!q) return items.slice(0, maxResults);
+  return smartSearchScored(items, query, maxResults).map(r => r.item);
+}
+
+/**
+ * smartSearch, with each hit's score.
+ *
+ * The score is what tells a REAL tie from an accidental one. smartSearch's own
+ * order breaks a tie by whatever order the items arrived in, and that differs
+ * between callers: the Materials screen hands over rows sorted by name, the
+ * spot-check script hands over seed order. So "20A breaker" listed the plain
+ * single-pole row 7th on screen and 1st in the script, from identical scores.
+ * A caller that ranks further (shared/materialSearchRank.ts) needs the number,
+ * so equal scores can be settled by something that means something.
+ *
+ * An empty query matches nothing here, unlike smartSearch, which returns the
+ * list unfiltered: with no query there is no score to report.
+ */
+export function smartSearchScored<T extends SearchableItem>(
+  items: T[],
+  query: string,
+  maxResults = 100
+): SmartSearchResult<T>[] {
+  const q = normalize(query);
+  if (!q) return [];
 
   // Rebuild index only when items reference changes
   if (items !== (_cachedItems as T[] | null)) {
@@ -655,7 +679,7 @@ export function smartSearch<T extends SearchableItem>(
   }
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, maxResults).map(r => r.item);
+  return scored.slice(0, maxResults);
 }
 
 // ─── Category-aware search ────────────────────────────────────────────────────

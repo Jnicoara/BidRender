@@ -19,13 +19,9 @@
  *   pnpm tsx scripts/searchSpotCheck.mts romex 1900  # ad-hoc queries
  */
 import { BASELINE_MATERIALS } from "../server/seed/baselineMaterials";
-import { smartSearch } from "../client/src/lib/smartSearch";
-import {
-  compareByRole,
-  familyKey,
-  familySizes,
-} from "../shared/materialSearchRank";
-import { compareBySize } from "../shared/materialSizeOrder";
+import { smartSearch, smartSearchScored } from "../client/src/lib/smartSearch";
+import { familySizes, rankMaterialHits } from "../shared/materialSearchRank";
+import { commonnessPoints } from "../shared/materialCommonness";
 
 const index = BASELINE_MATERIALS.map((m, i) => ({
   id: String(i),
@@ -120,24 +116,28 @@ function raw(query: string, limit = SHOW): string[] {
 }
 
 /**
- * What the picker actually shows: a deep page, grouped by role, then cut.
+ * What every material search box shows: a deep page, ranked, then cut.
  *
- * The oversample is not a detail — grouping AFTER the cut would be cosmetic,
+ * The oversample is not a detail — ranking AFTER the cut would be cosmetic,
  * because a product that fell outside the first few on score could never be
- * brought back. smartSearch does not expose its score, so position stands in
- * for it, which is all the role comparison needs to break a tie.
+ * brought back.
+ *
+ * It calls rankMaterialHits, the function the screens call, with the starter
+ * commonness and no usage — a fresh company's view. This header used to say
+ * the script "ranks the way the app ranks" while it broke ties by seed order
+ * and the screen broke them by name; the two agreed only where nothing tied.
+ * Sharing the function is what makes the sentence true.
  */
+const NOW = new Date();
 function ranked(query: string, limit = SHOW): string[] {
-  const hits = smartSearch(index, query, DEPTH);
-  return hits
-    .map((hit, index) => ({
-      name: nameOf(hit.id),
-      score: -index,
-      aliases: rowOf(hit.id).searchAliases,
-      category: rowOf(hit.id).category,
-      family: FAMILIES.get(familyKey(nameOf(hit.id))),
-    }))
-    .sort((a, b) => compareByRole(a, b, query, compareBySize))
+  const hits = smartSearchScored(index, query, DEPTH).map(hit => ({
+    row: rowOf(hit.item.id),
+    score: hit.score,
+  }));
+  return rankMaterialHits(hits, query, {
+    families: FAMILIES,
+    commonness: row => commonnessPoints(row.name, undefined, NOW),
+  })
     .slice(0, limit)
     .map(row => row.name);
 }

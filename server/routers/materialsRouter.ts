@@ -192,6 +192,15 @@ export const materialsRouter = router({
    * parts go into most recipes, and making them a click away beats making them
    * a search away.
    */
+  /**
+   * How often each material appears on this company's bids, for the search
+   * ranking's tiebreak. Per company (`dataUserId`), never pooled across
+   * companies — see getMaterialUsageForCompany.
+   */
+  usage: procedure.query(async ({ ctx }) => {
+    return db.getMaterialUsageForCompany(ctx.scope.dataUserId);
+  }),
+
   recent: procedure
     .input(
       z.object({ limit: z.number().int().min(1).max(24).default(8) }).optional()

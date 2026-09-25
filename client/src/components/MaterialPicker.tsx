@@ -31,13 +31,7 @@ import { Plus, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/money";
-import { smartSearch } from "@/lib/smartSearch";
-import {
-  compareByRole,
-  familyKey,
-  familySizes,
-} from "@shared/materialSearchRank";
-import { compareBySize } from "@shared/materialSizeOrder";
+import { useMaterialSearch } from "@/hooks/useMaterialSearch";
 import { trpc } from "@/lib/trpc";
 
 export type PickableMaterial = {
@@ -96,15 +90,7 @@ export function MaterialPicker({
     limit: MAX_RECENT + (exclude?.length ?? 0),
   });
 
-  const searchable = useMemo(
-    () =>
-      (catalog as PickableMaterial[]).map(m => ({
-        id: String(m.id),
-        description: m.name,
-        searchAliases: m.searchAliases ?? null,
-      })),
-    [catalog]
-  );
+  const search = useMaterialSearch(catalog as PickableMaterial[]);
 
   /*
     How deep to look before grouping, and it is not a tuning knob.
@@ -118,17 +104,7 @@ export function MaterialPicker({
   */
   const SEARCH_DEPTH = Math.max(MAX_RESULTS * 6, 80);
 
-  /*
-    How many rows share each type. Counted once over the catalog rather than
-    per comparison, because the comparator runs O(n log n) times per keystroke.
-  */
-  const families = useMemo(
-    () => familySizes(catalog as PickableMaterial[]),
-    [catalog]
-  );
-
   const results = useMemo<PickableMaterial[]>(() => {
-    const all = catalog as PickableMaterial[];
     if (!query.trim()) {
       const chosen = new Set(exclude ?? []);
       return (recent as PickableMaterial[])
@@ -136,44 +112,18 @@ export function MaterialPicker({
         .slice(0, MAX_RECENT);
     }
     /*
-      Ask for more than will be shown, then group by ROLE before trimming.
+      Ask for more than will be shown, then rank before trimming.
 
       Ranking after the cut would be cosmetic: if the product itself fell
       outside the first MAX_RESULTS on score, no reordering could bring it back.
       Searching "emt" matches 202 rows, and the strap used to outscore the pipe.
 
-      smartSearch returns items in score order and does not expose the score, so
-      position stands in for it — which is all the role comparison needs, since
-      it only ever uses the score to break a tie inside one role.
+      The ranking is the shared one (useMaterialSearch → rankMaterialHits), with
+      real scores and this company's usage — see MaterialsLibraryPage for why
+      this no longer passes a position in place of the score.
     */
-    const byId = new Map(all.map(m => [m.id, m]));
-    const hits = smartSearch(searchable, query, SEARCH_DEPTH);
-    return hits
-      .map((hit, index) => ({ hit, index }))
-      .sort((a, b) =>
-        compareByRole(
-          {
-            name: a.hit.description,
-            score: -a.index,
-            aliases: a.hit.searchAliases,
-            category: byId.get(Number(a.hit.id))?.category,
-            family: families.get(familyKey(a.hit.description)),
-          },
-          {
-            name: b.hit.description,
-            score: -b.index,
-            aliases: b.hit.searchAliases,
-            category: byId.get(Number(b.hit.id))?.category,
-            family: families.get(familyKey(b.hit.description)),
-          },
-          query,
-          compareBySize
-        )
-      )
-      .map(({ hit }) => byId.get(Number(hit.id)))
-      .filter((m): m is PickableMaterial => Boolean(m))
-      .slice(0, MAX_RESULTS);
-  }, [query, searchable, catalog, recent, exclude, families]);
+    return search(query, SEARCH_DEPTH).slice(0, MAX_RESULTS);
+  }, [query, search, recent, exclude]);
 
   const showingRecent = !query.trim() && results.length > 0;
 

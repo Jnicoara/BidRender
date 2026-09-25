@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-24]
 
+- **Material search now puts the part you most likely mean first.** Searching
+  "20A breaker" used to list the plain single-pole breaker 7th, behind 2-pole
+  variants, because all eight matched equally and the tie fell to alphabetical
+  order. Now, among results that match equally well, the more common part comes
+  first — judged by a starter list of everyday parts and, over time, by what
+  your own company actually puts on its bids (never anyone else's), with a
+  small nudge for things used in the last month. A search that names something
+  specific ("60A 2-pole GFCI") still finds exactly that first, however rare,
+  and typing a part's whole name always puts it on top. The Materials list,
+  the supplier-pricing view and the material picker now rank identically.
+
 - **Every breaker now says how many poles it has.** "20A breaker" is now "20A
   Single-Pole breaker", and the single-pole AFCI, GFCI and combo breakers read
   the same way ("20A Single-Pole AFCI breaker"), matching the 2-Pole and 3-Pole

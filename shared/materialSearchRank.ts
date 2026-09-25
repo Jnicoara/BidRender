@@ -73,6 +73,7 @@
  */
 
 import { materialTypeName } from "./materialSizeOrder";
+import { compareMaterials } from "./materialOrder";
 
 /** Words meaning "this joins, terminates or closes a product". */
 const FITTING_NOUNS = [
@@ -501,7 +502,48 @@ export type RankableMatch = RankableRow & {
    * tiebreak, and ranking falls through to relevance as before.
    */
   family?: number;
+  /**
+   * How common the row is, from shared/materialCommonness.ts. Only consulted
+   * between rows whose relevance score is EQUAL, so it settles a tie and can
+   * never outrank a better match. Optional: without it the tie falls through
+   * to the caller's tiebreak, as before.
+   */
+  commonness?: number;
 };
+
+export const PHRASE = {
+  /** The whole name, and nothing else, is what was typed. */
+  EXACT: 0,
+  /** The name begins with everything typed — two or more words of it. */
+  STARTS_WITH: 1,
+  NONE: 2,
+} as const;
+export type PhraseTier = (typeof PHRASE)[keyof typeof PHRASE];
+
+/**
+ * Does the name, read whole, answer the query read whole?
+ *
+ * ── STARTS_WITH needs two words, and the reason is a real regression ─────────
+ * For a single word, "the name starts with it" is exactly the wrong signal:
+ * "panel" would put "Panel filler plate" above every panel in the catalog,
+ * which is the fault this whole file was written to remove. One word is a
+ * product word, and the head-noun tiers below already know what to do with it.
+ * Two or more words are a description of one row — "90a 3 pole", "1/2 emt
+ * connector" — and a name that begins with the whole description is the row
+ * being described, however rare it is.
+ *
+ * EXACT has no such limit: typing a row's entire name is never ambiguous.
+ */
+export function phraseTier(name: string, query: string): PhraseTier {
+  const q = norm(query);
+  if (!q) return PHRASE.NONE;
+  const n = norm(name);
+  if (n === q) return PHRASE.EXACT;
+  if (q.includes(" ") && (n + " ").startsWith(q + " ")) {
+    return PHRASE.STARTS_WITH;
+  }
+  return PHRASE.NONE;
+}
 
 export function compareByRole(
   a: RankableMatch,
@@ -509,6 +551,10 @@ export function compareByRole(
   query: string,
   tiebreak: (x: string, y: string) => number = () => 0
 ): number {
+  const pa = phraseTier(a.name, query);
+  const pb = phraseTier(b.name, query);
+  if (pa !== pb) return pa - pb;
+
   const la = matchTier(a, query);
   const lb = matchTier(b, query);
   if (la !== lb) return la - lb;
@@ -524,7 +570,65 @@ export function compareByRole(
   }
 
   if (a.score !== b.score) return b.score - a.score;
+
+  const ca = a.commonness ?? 0;
+  const cb = b.commonness ?? 0;
+  if (ca !== cb) return cb - ca;
+
   return tiebreak(a.name, b.name);
+}
+
+/** A material row, as much as the search ranking reads. */
+export type SearchableMaterial = {
+  name: string;
+  category?: string | null;
+  searchAliases?: string | null;
+};
+
+/**
+ * Order scored search hits the way every material search box shows them.
+ *
+ * ONE function for the Materials screen, the supplier-pricing view, the
+ * material picker and scripts/searchSpotCheck.mts. They used to each assemble
+ * the comparison themselves, and they disagreed: two ranked by role, one by
+ * relevance alone, and the script broke ties by seed order while the screen
+ * broke them by name — which is how "20A breaker" came to be 1st in the
+ * script and 7th on screen.
+ *
+ * `score` must be the REAL relevance score (smartSearchScored), not a position:
+ * a position never ties, so nothing below it would ever get a say.
+ *
+ * The last tiebreak is the catalog's display order, then the name, so the
+ * result is TOTAL — it does not depend on what order the rows came in.
+ */
+export function rankMaterialHits<R extends SearchableMaterial>(
+  hits: ReadonlyArray<{ row: R; score: number }>,
+  query: string,
+  options: {
+    families: Map<string, number>;
+    commonness?: (row: R) => number;
+  }
+): R[] {
+  const keyed = hits.map(({ row, score }) => ({
+    row,
+    match: {
+      name: row.name,
+      category: row.category,
+      aliases: row.searchAliases,
+      score,
+      family: options.families.get(familyKey(row.name)),
+      commonness: options.commonness?.(row) ?? 0,
+    } satisfies RankableMatch,
+  }));
+  const categoryOf = new Map(keyed.map(k => [k.row.name, k.row.category]));
+  const total = (x: string, y: string): number =>
+    compareMaterials(
+      { name: x, category: categoryOf.get(x) },
+      { name: y, category: categoryOf.get(y) }
+    ) || (x < y ? -1 : x > y ? 1 : 0);
+  return keyed
+    .sort((a, b) => compareByRole(a.match, b.match, query, total))
+    .map(k => k.row);
 }
 
 /**

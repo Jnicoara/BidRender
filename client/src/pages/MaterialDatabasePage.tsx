@@ -34,7 +34,7 @@ import { Upload, Search, X, Store, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InlineNumberField } from "@/components/InlineNumberField";
-import { smartSearch } from "@/lib/smartSearch";
+import { useMaterialSearch } from "@/hooks/useMaterialSearch";
 import { sortMaterialsForDisplay } from "@shared/materialOrder";
 import { delimiterLabel, parsePriceList } from "@shared/priceListParse";
 import {
@@ -71,6 +71,7 @@ export default function MaterialDatabasePage() {
   }) as { data: Material[]; isLoading: boolean };
 
   const [query, setQuery] = useState("");
+  const search = useMaterialSearch(materials);
   const [ageFilter, setAgeFilter] = useState<PriceAge | "all">("all");
   const [importOpen, setImportOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -102,30 +103,25 @@ export default function MaterialDatabasePage() {
       );
     }
     if (query.trim()) {
-      // smartSearch scores aliases below the item's own name, which is what
-      // keeps "recep" returning the receptacle rather than its wall plate.
-      const searchable = list.map(m => ({
-        id: String(m.id),
-        description: m.name,
-        category: m.category,
-        unit: m.unitOfSale,
-        searchAliases: m.searchAliases,
-        supplierName: m.supplierName,
-      }));
-      const hits = smartSearch(searchable, query, 500);
-      const order = new Map(hits.map((h, i) => [h.id, i]));
-      list = list
-        .filter(m => order.has(String(m.id)))
-        .sort((a, b) => order.get(String(a.id))! - order.get(String(b.id))!);
-      // Search results stay relevance-ordered; imposing catalog order on them
-      // would bury the best match under whichever shelf it sits on.
-      return list;
+      /*
+        The shared ranking, the same the Materials tab and the picker use.
+        This view used to order by relevance alone, so the same query on the
+        two tabs of one screen could lead with different rows. It no longer
+        indexes the category: the other two never did, and a shelf's words
+        matching every row on it is the fault MaterialsLibraryPage documents.
+        (It also passed supplierName, which smartSearch never read — searching
+        by supplier did not work before this change and does not now.) Search
+        results stay relevance-ordered; imposing catalog order on them would
+        bury the best match under whichever shelf it sits on.
+      */
+      const kept = new Set(list.map(m => m.id));
+      return search(query, 500).filter(m => kept.has(m.id));
     }
     // Category → Type → Size, the same rule the Materials screen uses. This
     // screen previously showed whatever order the server returned, so the two
     // listed one catalog two ways.
     return sortMaterialsForDisplay(list);
-  }, [materials, query, ageFilter, now]);
+  }, [materials, query, ageFilter, now, search]);
 
   const rowVirtualizer = useVirtualizer({
     count: rows.length,

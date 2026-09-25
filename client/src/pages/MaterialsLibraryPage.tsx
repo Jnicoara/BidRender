@@ -40,12 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { smartSearch } from "@/lib/smartSearch";
-import {
-  compareByRole,
-  familyKey,
-  familySizes,
-} from "@shared/materialSearchRank";
+import { useMaterialSearch } from "@/hooks/useMaterialSearch";
 import {
   ScopeFilter,
   ViewTabs,
@@ -704,7 +699,8 @@ export default function MaterialsLibraryPage() {
     revertMaterial.isPending ||
     archiveMaterial.isPending;
 
-  // smartSearch caches its index by array identity, so this must stay memoised.
+  // The index, the ranking and this company's usage all live in the hook, so
+  // this screen, the supplier-pricing view and the picker cannot disagree.
   //
   // searchAliases feeds the index's non-name text, which scores below the name
   // itself — enough to surface "Duplex receptacle" for "plug", never enough to
@@ -715,24 +711,9 @@ export default function MaterialsLibraryPage() {
   // both breakers (category "Panels & Breakers") and "cover plate" return wire
   // nuts (category "Wall Plates & Misc"). The sections are already visible on
   // screen; the search box should match materials, not shelves.
-  const searchable = useMemo(
-    () =>
-      materials.map(m => ({
-        id: String(m.id),
-        description: m.name,
-        unit: m.unitOfSale,
-        searchAliases: m.searchAliases,
-      })),
-    [materials]
-  );
+  const search = useMaterialSearch(materials);
 
   const searching = query.trim().length > 0;
-
-  /*
-    How many rows share each type, for the role ranking's family tiebreak.
-    Counted over the whole catalog once, not per comparison.
-  */
-  const families = useMemo(() => familySizes(materials), [materials]);
 
   const visible = useMemo(() => {
     // Scope first: "Mine" is about what you own, and applying it before the
@@ -745,58 +726,31 @@ export default function MaterialsLibraryPage() {
     if (onlyUnhoured)
       inScope = inScope.filter(m => needsLaborUnit(m.laborHours));
     if (!searching) return inScope;
-    const hits = smartSearch(searchable, query, 500);
-    const order = new Map(hits.map((hit, index) => [Number(hit.id), index]));
     /*
-      Grouped by ROLE, exactly as MaterialPicker does it.
+      Ranked by the shared rule (rankMaterialHits), exactly as the picker and
+      the supplier-pricing view rank — CLAUDE.md is explicit that one catalog
+      listed two ways is the same class of bug as two catalogs.
 
-      Relevance alone put "Wire nuts" above every reel of wire and "#16 fixture
-      wire" above every light fixture. The picker got the fix first; running it
-      here too is not tidiness — CLAUDE.md is explicit that one catalog listed
-      two ways is the same class of bug as two catalogs, because the answer
-      then depends on which screen you happened to open.
+      ── Real scores now, where this used to say position, and why ───────────
+      Until 2026-09-24 this passed each row's POSITION as its score, and said
+      why: a version using real scores had been measured and thrown away,
+      because real scores tie often and every tie then fell to a size
+      comparison between unrelated families — "switch" led with a 3-way, "box"
+      with cast boxes, "recep" with "20A duplex receptacle".
 
-      ── Position stands in for the score, and that is deliberate ────────────
-      smartSearch does not expose its score. Adding a variant that did, so
-      equally-relevant rows could fall through to trade size order, was built
-      and MEASURED and then thrown away: it moved 32 of the 58 sweep queries
-      instead of 7, and several went backwards — "recep" led with "20A duplex
-      receptacle" instead of "Duplex receptacle", "box" with cast boxes, and
-      "switch" with a 3-way. Real scores tie often, and every tie then fell to
-      a size comparison between unrelated families. Position never ties, which
-      keeps smartSearch's own ordering intact wherever the tiers agree.
+      That was right about what happened, and position was hiding the same
+      fault instead of fixing it: a position breaks a tie by whatever order the
+      rows arrived in, which here is alphabetical, and that is how "20A
+      breaker" put the plain single-pole breaker 7th behind four 2-pole ones.
+      The missing piece was a signal that MEANS something inside a tie —
+      commonness (shared/materialCommonness.ts), from the shipped starter list
+      and this company's own bids. With it, the three regressions above rank
+      correctly, and the standard sweep's top result moved on 8 of 58 queries,
+      each read and judged in the commit that made this change.
     */
-    return inScope
-      .filter(m => order.has(m.id))
-      .sort((a, b) =>
-        compareByRole(
-          {
-            name: a.name,
-            score: -order.get(a.id)!,
-            aliases: a.searchAliases,
-            category: a.category,
-            family: families.get(familyKey(a.name)),
-          },
-          {
-            name: b.name,
-            score: -order.get(b.id)!,
-            aliases: b.searchAliases,
-            category: b.category,
-            family: families.get(familyKey(b.name)),
-          },
-          query
-        )
-      );
-  }, [
-    materials,
-    searchable,
-    query,
-    searching,
-    scope,
-    onlyUnpriced,
-    onlyUnhoured,
-    families,
-  ]);
+    const inScopeIds = new Set(inScope.map(m => m.id));
+    return search(query, 500).filter(m => inScopeIds.has(m.id));
+  }, [materials, search, query, searching, scope, onlyUnpriced, onlyUnhoured]);
 
   const unpricedCount = useMemo(
     () => countNeedingPricing(materials),
@@ -815,9 +769,10 @@ export default function MaterialsLibraryPage() {
    * shelf it happens to sit on, so those results stay flat and each row prints
    * its own category instead.
    *
-   * Flat is not unordered. Search results go through `compareByRole` — the
-   * product first, then its fittings, supports and consumables — the same
-   * comparison MaterialPicker uses, so the two screens cannot disagree about
+   * Flat is not unordered. Search results go through `rankMaterialHits` — the
+   * product first, then its fittings, supports and consumables, and the most
+   * common part first among equal matches — the same function MaterialPicker
+   * and the supplier-pricing view use, so no two screens can disagree about
    * which row answers "wire".
    *
    * ── Within a shelf: Type, then Size — never alphabetically ───────────────
