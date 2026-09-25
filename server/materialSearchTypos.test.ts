@@ -68,7 +68,9 @@ describe("a close misspelling finds what it obviously means", () => {
     ["recepticle", "receptacle", /receptacle/i],
     ["disconect", "disconnect", /disconnect/i],
     ["romax", "romex", /NM-B/],
-    ["flourescent", "fluorescent", /LED strip fixture/],
+    // Was /LED strip fixture/ until real T8 tubes joined the catalog the same
+    // day (lighting audit); a fluorescent tube's replacement is a tube.
+    ["flourescent", "fluorescent", /4 ft LED T8 tube/],
     ["brakr", "breaker", /breaker/i],
   ])('"%s" → "%s"', (typed, corrected, top) => {
     const r = search(typed);

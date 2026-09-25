@@ -291,7 +291,11 @@ const SIZE_PREFIXES: RegExp[] = [
   // A hashed gauge — "#12 THHN".
   /^#\d{1,4}\s+/,
   // Raceway trade size or a plain measurement — "1-1/4\" EMT", "4\" square box".
-  /^\d+(?:-\d+\/\d+)?(?:\/\d+)?"\s*/,
+  // An optional SECOND measurement is part of the size: a dual-size part like
+  // "5\"/6\" wafer LED downlight" fits either opening. Without it the type came
+  // out as "/6\" wafer LED downlight", a family of one that sorted to the top
+  // of the Lighting shelf, away from the 4" row (found 2026-09-25).
+  /^\d+(?:-\d+\/\d+)?(?:\/\d+)?"(?:\/\d+(?:-\d+\/\d+)?(?:\/\d+)?")?\s*/,
   // Feet — "4 ft LED strip fixture".
   /^[\d.]+\s*ft\s+/i,
   // Amperage — "20A breaker".

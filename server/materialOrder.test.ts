@@ -508,6 +508,36 @@ describe("breakers sort by pole class, then protection, then size", () => {
   });
 });
 
+describe("a dual-size part joins its single-size siblings", () => {
+  /*
+    Found 2026-09-25 with the lighting audit. "5\"/6\"" (a part that fits
+    either opening) was read as the size 5" followed by the TYPE "/6\" wafer
+    LED downlight" — a family of one, sorted to the top of the Lighting shelf
+    while the 4" row sat at the bottom. A shopper browsing the shelf saw two
+    unrelated-looking products.
+  */
+  it('derives the same type for 4" and 5"/6"', () => {
+    for (const noun of ["wafer LED downlight", "LED retrofit trim"])
+      expect(
+        materialTypeKey(`5"/6" ${noun}`, "Lighting Hardware"),
+        noun
+      ).toEqual(materialTypeKey(`4" ${noun}`, "Lighting Hardware"));
+  });
+
+  it("lists them side by side, smaller first", () => {
+    const shelf = sortMaterialsForDisplay([
+      m('5"/6" wafer LED downlight', "Lighting Hardware"),
+      m("Bollard light", "Lighting Hardware"),
+      m('4" wafer LED downlight', "Lighting Hardware"),
+      m("Wall pack", "Lighting Hardware"),
+    ]);
+    const at = (n: string) => names(shelf).indexOf(n);
+    expect(at('5"/6" wafer LED downlight') - at('4" wafer LED downlight')).toBe(
+      1
+    );
+  });
+});
+
 describe("a row with no size joins its own family", () => {
   it("keeps the bare name beside the sized ones", () => {
     // Unsized rows used to sort after every typed family, which put a plain

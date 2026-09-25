@@ -131,6 +131,12 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   Dimmer: "common",
   "Occupancy sensor switch": "common",
 
+  // ── Lighting: the 4 ft tube is the one most retrofits buy ──
+  // Added 2026-09-25 with the tubes. Without it "fluorescent" and "t8" led
+  // with the 2 ft tube, which only wins the size sort.
+  "4 ft LED T8 tube, ballast bypass": "common",
+  "4 ft LED T8 tube, ballast compatible": "common",
+
   // ── Grounding: on every service ──
   "Ground rod, 8 ft": "common",
 };

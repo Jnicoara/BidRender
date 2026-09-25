@@ -1,8 +1,7 @@
 Category: Lighting Hardware
-Items: 169
+Items: 200
 
 Category | Name | Size
-Lighting Hardware | 5"/6" wafer LED downlight | 5"
 Lighting Hardware | 1x4 LED troffer | 1x4
 Lighting Hardware | 2x2 LED troffer | 2x2
 Lighting Hardware | 2x4 LED troffer | 2x4
@@ -50,8 +49,15 @@ Lighting Hardware | In-grade uplight | -
 Lighting Hardware | In-ground junction box | -
 Lighting Hardware | Landscape hub connector | -
 Lighting Hardware | Landscape light stake | -
+Lighting Hardware | LED A19 bulb, 60W equivalent | -
+Lighting Hardware | LED A21 bulb, 100W equivalent | -
 Lighting Hardware | LED area light | -
+Lighting Hardware | LED BR30 flood bulb | -
+Lighting Hardware | LED BR40 flood bulb | -
+Lighting Hardware | LED candelabra bulb, E12 | -
 Lighting Hardware | LED canopy light | -
+Lighting Hardware | LED corn bulb, E26 | -
+Lighting Hardware | LED corn bulb, E39 | -
 Lighting Hardware | LED cylinder downlight | -
 Lighting Hardware | 4" LED disc light | 4"
 Lighting Hardware | 5" LED disc light | 5"
@@ -61,15 +67,31 @@ Lighting Hardware | 4" LED disc light, CCT selectable | 4"
 Lighting Hardware | 5" LED disc light, CCT selectable | 5"
 Lighting Hardware | 6" LED disc light, CCT selectable | 6"
 Lighting Hardware | 7" LED disc light, CCT selectable | 7"
+Lighting Hardware | LED G25 globe bulb | -
 Lighting Hardware | LED linear high bay | -
 Lighting Hardware | LED mirror light | -
+Lighting Hardware | LED PAR20 bulb | -
+Lighting Hardware | LED PAR30 bulb | -
+Lighting Hardware | LED PAR38 bulb | -
 Lighting Hardware | LED pendant fixture | -
+Lighting Hardware | LED PL-pin lamp, G24 | -
 Lighting Hardware | LED retrofit kit | -
+Lighting Hardware | 4" LED retrofit trim | 4"
+Lighting Hardware | 5"/6" LED retrofit trim | 5"
 Lighting Hardware | LED round high bay | -
+Lighting Hardware | LED security light, dusk-to-dawn | -
+Lighting Hardware | LED security light, motion-activated, 2-head | -
+Lighting Hardware | LED security light, motion-activated, 3-head | -
 Lighting Hardware | LED step light | -
 Lighting Hardware | 2 ft LED strip fixture | 2 ft
 Lighting Hardware | 4 ft LED strip fixture | 4 ft
 Lighting Hardware | 8 ft LED strip fixture | 8 ft
+Lighting Hardware | 2 ft LED T8 tube, ballast bypass | 2 ft
+Lighting Hardware | 4 ft LED T8 tube, ballast bypass | 4 ft
+Lighting Hardware | 8 ft LED T8 tube, ballast bypass, HO | 8 ft
+Lighting Hardware | 8 ft LED T8 tube, ballast bypass, single-pin | 8 ft
+Lighting Hardware | 2 ft LED T8 tube, ballast compatible | 2 ft
+Lighting Hardware | 4 ft LED T8 tube, ballast compatible | 4 ft
 Lighting Hardware | LED tape light | -
 Lighting Hardware | LED tape light power supply | -
 Lighting Hardware | LED wall sconce | -
@@ -82,6 +104,7 @@ Lighting Hardware | 4 ft lighting track | 4 ft
 Lighting Hardware | 6 ft lighting track | 6 ft
 Lighting Hardware | 8 ft lighting track | 8 ft
 Lighting Hardware | 6ft MC whip | 6ft
+Lighting Hardware | Non-shunted lampholder | -
 Lighting Hardware | Occupancy sensor, ceiling mount | -
 Lighting Hardware | Occupancy sensor, high bay | -
 Lighting Hardware | 3" open trim | 3"
@@ -142,9 +165,14 @@ Lighting Hardware | 18" under-cabinet light bar | 18"
 Lighting Hardware | 24" under-cabinet light bar | 24"
 Lighting Hardware | 36" under-cabinet light bar | 36"
 Lighting Hardware | Vanity light bar | -
+Lighting Hardware | Vanity light, 1-light | -
+Lighting Hardware | Vanity light, 2-light | -
+Lighting Hardware | Vanity light, 3-light | -
+Lighting Hardware | Vanity light, 4-light | -
 Lighting Hardware | 4 ft vapor tight fixture | 4 ft
 Lighting Hardware | 8 ft vapor tight fixture | 8 ft
 Lighting Hardware | 4" wafer LED downlight | 4"
+Lighting Hardware | 5"/6" wafer LED downlight | 5"
 Lighting Hardware | 2" wafer LED downlight, CCT selectable | 2"
 Lighting Hardware | 3" wafer LED downlight, CCT selectable | 3"
 Lighting Hardware | 4" wafer LED downlight, CCT selectable | 4"
@@ -170,4 +198,7 @@ Lighting Hardware | 5" wafer LED downlight, wet rated | 5"
 Lighting Hardware | 6" wafer LED downlight, wet rated | 6"
 Lighting Hardware | 8" wafer LED downlight, wet rated | 8"
 Lighting Hardware | Wall pack | -
+Lighting Hardware | Wall pack, full cutoff | -
+Lighting Hardware | Wall pack, large | -
+Lighting Hardware | Wall pack, mini | -
 Lighting Hardware | Well light fixture | -

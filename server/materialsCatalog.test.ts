@@ -43,7 +43,11 @@ describe("shipped catalog shape", () => {
     // being read. Falling outside this range means something generated too
     // much or a whole family went missing.
     expect(BASELINE_MATERIALS.length).toBeGreaterThan(500);
-    expect(BASELINE_MATERIALS.length).toBeLessThan(700);
+    // Raised from 700 to 800 on 2026-09-25, when the lighting audit added 49
+    // rows on purpose (tubes, lamps, promoted troffers/cans) and took the
+    // catalog to ~708. Still a ceiling: a generator that runs away blows
+    // through it, and so does anything that doubles a family.
+    expect(BASELINE_MATERIALS.length).toBeLessThan(800);
   });
 
   it("has no duplicate names", () => {

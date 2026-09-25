@@ -6,6 +6,31 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **The lighting catalog fills its gaps: 49 new starter items.**
+  - **LED tubes**, which the catalog had none of: 2 ft and 4 ft T8 in two
+    install types named so the difference is on screen — "ballast bypass"
+    (rewire, ballast removed) and "ballast compatible" (works on the existing
+    ballast, a.k.a. plug-and-play) — plus 8 ft bypass tubes (single-pin and HO)
+    and the non-shunted lampholder a bypass retrofit often needs. There are no
+    separate T12 rows: an LED T8 bypass tube is what replaces a T12, so it
+    answers to "t12".
+  - **Promoted from the pricing sheet** so search can finally find them:
+    1x4 / 2x2 / 2x4 troffers, 4 ft and 8 ft vapor tights, the vanity light
+    bar, and 4" and 6" recessed cans in six types (new construction and
+    remodel, IC and non-IC, airtight, sloped).
+  - **New**: 4" and 5"/6" LED retrofit trims for existing cans, mini / large /
+    full-cutoff wall packs, 1- to 4-light vanities, motion-activated and
+    dusk-to-dawn security lights, and twelve LED lamps (A19, A21, BR30, BR40,
+    PAR20/30/38, candelabra, globe, corn E26/E39, PL-pin G24).
+  - Brands are not separate rows — common names (Halo, Lithonia, RAB, Philips,
+    Cree, Feit) are search words on the generic items instead.
+  - "t8" now finds tubes first; the LED strip fixture no longer answers to it.
+
+- **Dual-size items sit next to their siblings.** "5"/6" wafer LED downlight"
+  was listed at the top of the lighting shelf, away from the 4" one, because
+  the size reader did not understand "5"/6"". It now does, for the retrofit
+  trims too.
+
 - **Material search now forgives typos.** "recepticle" finds receptacles,
   "disconect" disconnects, "romax" Romex, "flourescent" the LED strip
   fixtures and "brakr" breakers — ranked exactly as the correct spelling
