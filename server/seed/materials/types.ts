@@ -196,12 +196,23 @@ export function dropRestatedWords(
         .filter(Boolean)
     )
   );
-  const kept = material.searchAliases
+  /*
+    A spoken mixed number — "1 1/2" — is ONE size, and is judged as one.
+
+    Found 2026-09-25, while making "inch" searchable. Read as two words, the
+    "1" of "1 1/2" was in the name of `1-1/2" EMT` (the punctuation-stripped
+    reading of the name has a bare "1") and was dropped, and the "1/2" was not
+    — so the row was left with the alias "1/2" and answered a search for a
+    HALF-inch part. Every mixed trade size did the same: 1-1/4" rows offered
+    "1/4", 2-1/2" rows "1/2". Joined first, "1-1/2" is recognised as the name's
+    own size and goes as a whole.
+  */
+  const words = material.searchAliases
+    .replace(/(^|\s)(\d+) (\d+\/\d+)(?=\s|$)/g, "$1$2-$3")
     .split(/\s+/)
-    .filter(word => word && !inName.has(word));
-  if (
-    kept.length === material.searchAliases.split(/\s+/).filter(Boolean).length
-  ) {
+    .filter(Boolean);
+  const kept = words.filter(word => !inName.has(word));
+  if (kept.join(" ") === material.searchAliases.trim()) {
     return material;
   }
   return { ...material, searchAliases: kept.join(" ") };

@@ -453,6 +453,14 @@ interface IndexedItem<T extends SearchableItem> {
   descWords: string[];
   /** The description, normalized — `descWords` joined, computed once. */
   descNorm: string;
+  /** sizeKey() of each size-normalized description word, in order. */
+  descSizes: string[];
+  /** The same, only the words written in INCHES ('1/2"', "1/2 in"). */
+  descInches: Set<string>;
+  /** sizeKey() of every word in the size text that carries a digit. */
+  textSizes: Set<string>;
+  /** The same, only the words written in inches. */
+  textInches: Set<string>;
 }
 
 function getAliases(item: SearchableItem): string {
@@ -463,17 +471,270 @@ function getAliases(item: SearchableItem): string {
 function buildIndex<T extends SearchableItem>(items: T[]): IndexedItem<T>[] {
   return items.map(item => {
     const descNorm = normalize(item.description);
+    /*
+      No `item.id` in the searchable text — it used to be here. Every caller
+      passes an internal database id, which no user ever sees or types, so its
+      only effect was to let a typed number match whichever row happened to
+      have that id: "1900" could find item 1900. Removed 2026-09-25 with the
+      size rules, which forbid exactly that kind of numeric accident.
+    */
     const text = normalize(
-      [
-        item.description,
-        item.category ?? "",
-        item.id ?? "",
-        getAliases(item),
-      ].join(" ")
+      [item.description, item.category ?? "", getAliases(item)].join(" ")
     );
     const descWords = descNorm.split(/\s+/).filter(Boolean);
-    return { item, text, descWords, descNorm: descWords.join(" ") };
+    /*
+      Sizes come from the name, category and aliases — NOT the id, which
+      `text` carries: a typed "2" or "12" matched row ids, which is how "2
+      pole" led with a light pole in a test catalog. And the text goes
+      through the same size spelling as the query, so an alias written
+      "1 1/4 inch" is ONE size, 1-1/4 — as two words it offered a bare
+      "1/4", and "quarter inch" found 1-1/4" EMT.
+    */
+    const sizeText = normalizeSizeWords(
+      normalize(
+        [item.description, item.category ?? "", getAliases(item)].join(" ")
+      )
+    );
+    const textSizes = new Set<string>();
+    const textInches = new Set<string>();
+    for (const word of sizeText.split(" ")) {
+      if (!HAS_DIGIT.test(word)) continue;
+      for (const s of sizesOf(word)) {
+        textSizes.add(s);
+        if (isInches(word)) textInches.add(s);
+      }
+    }
+    const descSizeWords = normalizeSizeWords(descWords.join(" ")).split(" ");
+    return {
+      item,
+      text,
+      descWords,
+      descNorm: descWords.join(" "),
+      // Every size each word stands for — see sizesOf.
+      descSizes: descSizeWords.flatMap(sizesOf),
+      descInches: new Set(descSizeWords.filter(isInches).flatMap(sizesOf)),
+      textSizes,
+      textInches,
+    };
   });
+}
+
+// ─── Sizes: matched whole, never inside one another ──────────────────────────
+/*
+  Added 2026-09-25, with "inch" spelled out. A size was matched like any other
+  text, and the lowest tier is "appears anywhere", so every size matched
+  inside every size that CONTAINS it: "1/2 emt" returned 1-1/2" and 2-1/2"
+  EMT, '4" box' returned 3/4" cast boxes, '2" pvc' returned 1/2" pipe. They
+  ranked below the right size, which is why nobody saw them — and they broke
+  the rule that a number is never fuzzed: 4 must find 4, never 3/4 or 4-11/16.
+
+  So a term with a digit in it is compared by sizeKey, WHOLE:
+    - a complete size ("4", "1/2", "1-1/4", "20a", "#12") must EQUAL an item's
+      size word — '4"', "4 in", "4-inch" and plain "4" all key to "4";
+    - a size still being typed ("1-", "1/", "1-1", "12-2", "4x") may be the
+      START of one, so the list keeps up keystroke by keystroke — but never
+      the middle of one.
+*/
+const HAS_DIGIT = /\d/;
+
+/**
+ * Is the item's size `item` the size that was typed as `typed`? Equal, or the
+ * same number with a gauge "#" the typist left off — "12" is #12 wire, but a
+ * typed "#12" is a gauge and does not match a 12" light bar.
+ */
+function sameSize(typed: string, item: string): boolean {
+  return item === typed || (!typed.startsWith("#") && item === "#" + typed);
+}
+
+/** A size word written in inches: a digit, then the mark. */
+function isInches(word: string): boolean {
+  return /\d"[),.;:]*$/.test(word);
+}
+
+/** A size a person has finished typing — see sizeTier. */
+const COMPLETE_SIZE = /^#?\d+(?:-\d+\/\d+|\/\d+)?(?:"|a|v|w|ft|mm)?$/;
+
+/**
+ * A word's size, in one spelling: trailing punctuation off, the inch mark
+ * off, and a hyphenated word suffix off — so '1/2"', "1/2", "1/2," key alike,
+ * and "90-degree" or "3-pole" key as "90" and "3" (a typed "90" still finds
+ * the 90-degree elbow, "3 pole" the 3-pole breaker). Everything else — "#",
+ * "a" for amps, "x" in 4x4 — is kept, because it is part of what the size IS.
+ */
+function sizeKey(word: string): string {
+  return word
+    .replace(/^[("'[]+|[)\],.;:]+$/g, "")
+    .replace(/(\d)-[a-z].*$/, "$1")
+    .replace(/(\d)"$/, "$1");
+}
+
+/**
+ * matchTier's answer for a term that carries a digit — see the note above.
+ * Same tiers, so the points and the rest of the ranking are unchanged; only
+ * "somewhere inside a word" (tier 5) is gone, because for a size that is
+ * exactly the fuzz the rule forbids.
+ */
+function sizeTier(term: string, indexed: IndexedItem<SearchableItem>): number {
+  const { descNorm, descWords, descSizes, textSizes, text } = indexed;
+  if (descNorm === term) return 1;
+  const key = sizeKey(term);
+  if (COMPLETE_SIZE.test(key)) {
+    /*
+      A term that SAYS inches ('3/4"', or "3/4 inch" rewritten to it) only
+      matches sizes written in inches. Without the mark, "3/4" is also how a
+      3-4 MC cable is spelled, and "three quarter inch" listed it. A bare
+      "3/4" still matches both, as it always did.
+    */
+    const inSet = (set: Set<string>) =>
+      set.has(key) || (!key.startsWith("#") && set.has("#" + key));
+    if (isInches(term)) {
+      if (sameSize(key, descSizes[0] ?? "") && inSet(indexed.descInches))
+        return 2;
+      if (inSet(indexed.descInches)) return 3;
+      if (inSet(indexed.textInches)) return 6;
+      return 0;
+    }
+    if (sameSize(key, descSizes[0] ?? "")) return 2;
+    if (descSizes.some(s => sameSize(key, s))) return 3;
+    if (inSet(textSizes)) return 6;
+    return 0;
+  }
+  // Still being typed: the START of a size, never the middle.
+  if (descWords[0]?.startsWith(key)) return 2;
+  if (descWords.some(w => w.startsWith(key))) return 3;
+  if (startsAWord(text, key)) return 6;
+  return 0;
+}
+
+/**
+ * A COUNT, not a measurement: "2-gang", "3-way", "2-pole", "1-hole". The
+ * number says how many, and the word is the thing — so these are matched as
+ * words, the way they were before sizes became strict. As sizes they lost
+ * every item that spells the count out ("Double-gang box" for "2 gang box").
+ * The query joins "2 gang" into "2-gang" first; see normalizeQuerySizes.
+ */
+const COUNT_TOKEN = /^\d+-(?:gang|pole|way|hole|head|light|space|circuit)s?$/;
+
+/**
+ * A term carrying a digit that is matched as a SIZE (not a count).
+ *
+ * One WORD only. An alias phrase with a number in it — "2-gang wall plate",
+ * '4" square' — is a phrase and is matched as one. Put through sizeKey
+ * whole, "2-gang wall plate" lost everything after "2-" and became the size
+ * 2, which matched #2 THHN and every 2" fitting from "2 gang box".
+ */
+function isSizeTerm(term: string): boolean {
+  return (
+    HAS_DIGIT.test(term) &&
+    !term.includes(" ") &&
+    !COUNT_TOKEN.test(term) &&
+    // A number joined to a WORD — "4-square", "90-degree", "3-pole" — is a
+    // name, not a measurement. As a size, the map's "4-square" (an alias of
+    // "junction box") keyed as 4 and put every 4" conduit connector in "j box".
+    !/\d-[a-z]/.test(term)
+  );
+}
+
+/** The tier for any term: sizes by sizeTier, words by matchTier. */
+function termTier(term: string, indexed: IndexedItem<SearchableItem>): number {
+  return isSizeTerm(term)
+    ? sizeTier(term, indexed)
+    : matchTier(term, indexed.descNorm, indexed.descWords, indexed.text);
+}
+
+/**
+ * The conductor size at the front of a cable spec — "2/0" of "2/0-3", "12"
+ * of "12-2", "4/0" of "4/0-4/0-2/0" — or null. A spec is a size followed by
+ * counts or more sizes, and it answers to its leading size too: "2/0 ser"
+ * must find "2/0-3 SER aluminum", and did before sizes became strict.
+ */
+/**
+ * The sizes one size WORD stands for: itself, both halves of a dual size
+ * ('5"/6"' is a 5" part and a 6" part — "6 wafer" must find it), and a cable
+ * spec's leading conductor (see leadingConductor).
+ */
+function sizesOf(word: string): string[] {
+  const key = sizeKey(word);
+  const dual = /^(\d+(?:-\d+\/\d+)?)"\/(\d+(?:-\d+\/\d+)?)$/.exec(key);
+  if (dual) return [key, dual[1], dual[2]];
+  const lead = leadingConductor(key);
+  return lead ? [key, lead] : [key];
+}
+
+function leadingConductor(key: string): string | null {
+  // Every element whole or an aught size ("2/0"): so "1-1/4" and "4-11/16",
+  // which are ONE measurement, are never split into a lead of 1 or 4.
+  const m = /^(#?\d+(?:\/0)?)(?:-\d+(?:\/0)?)+$/.exec(key);
+  return m ? m[1] : null;
+}
+
+/*
+  ── "Inch" spelled out, and the sizes people say out loud ────────────────────
+  The catalog writes inches with the mark — 1/2" EMT, 4" square box — and a
+  search for "1/2 inch emt" found NOTHING, because "inch" is a word no item
+  contains; "4 inch box" was worse, returning connectors. Rewritten into the
+  mark here, in the QUERY only, before anything is matched:
+
+    1/2 inch, 1/2inch, 1/2 in, 1/2 in., 1/2 inches, 1/2-inch  →  1/2"
+    1 1/4 inch (a space in the mixed number)                   →  1-1/4"
+    half inch, quarter inch, three quarter inch                →  1/2" 1/4" 3/4"
+    inch and a half, inch and a quarter                        →  1-1/2" 1-1/4"
+
+  The spoken fractions need an "inch" after them: a bare "half" is also how
+  a half-size breaker is described, and must stay a word.
+*/
+const INCH = `(?:inch(?:es|s|e)?|in\\.?|")`;
+const SPOKEN_INCHES: Array<[RegExp, string]> = [
+  [new RegExp(`\\binch(?:es)? and a half\\b`, "g"), '1-1/2"'],
+  [new RegExp(`\\binch(?:es)? and a quarter\\b`, "g"), '1-1/4"'],
+  [new RegExp(`\\bthree[- ]quarters?[- ]?${INCH}(?=\\s|$)`, "g"), '3/4"'],
+  [new RegExp(`\\bquarter[- ]?${INCH}(?=\\s|$)`, "g"), '1/4"'],
+  [new RegExp(`\\bhalf[- ]?${INCH}(?=\\s|$)`, "g"), '1/2"'],
+];
+const NUMBER_INCHES = new RegExp(
+  `(^|\\s)(\\d+(?:[- ]\\d+\\/\\d+)?(?:\\/\\d+)?)\\s*-?\\s*${INCH}(?=\\s|$)`,
+  "g"
+);
+
+/**
+ * A mixed number written with a space — "1 1/4" — is one size, 1-1/4. Only
+ * a whole number followed by a proper fraction qualifies, so "12 2" or
+ * "4 x 4" are left alone.
+ */
+const MIXED_NUMBER = /(^|\s)(\d+) (\d+\/\d+)(?=["\s]|$)/g;
+
+/**
+ * Text with every spelling of inches turned into the mark, and mixed numbers
+ * joined. Applied to the QUERY and to each item's size text alike, so the two
+ * are compared in one spelling.
+ */
+export function normalizeSizeWords(text: string): string {
+  let q = text;
+  for (const [pattern, size] of SPOKEN_INCHES) q = q.replace(pattern, size);
+  q = q.replace(
+    NUMBER_INCHES,
+    (_, lead: string, size: string) => `${lead}${size.replace(" ", "-")}"`
+  );
+  q = q.replace(MIXED_NUMBER, "$1$2-$3");
+  return q.replace(/\s+/g, " ").trim();
+}
+
+/** Words that make the number before them a COUNT — "2 gang", "3 way". */
+const COUNT_NOUN = /^(?:gang|pole|way|hole|head|light|space|circuit)s?$/;
+
+/**
+ * A cable spec typed with a space — "12 2", "6 3", "10 3" — is the spec
+ * 12-2, 6-3, 10-3. Only a building-wire gauge followed by 2, 3 or 4
+ * conductors, so "4 11" or "20 3" (a 20 A 3-pole?) are left alone.
+ */
+const SPOKEN_CABLE = /(^|\s)(14|12|10|8|6|4|2) ([234])(?=\s|$)/g;
+
+/**
+ * The QUERY's spelling: normalizeSizeWords, plus the join only a person typing
+ * needs — a cable spec typed with a space. Not applied to item text.
+ */
+export function normalizeQuerySizes(query: string): string {
+  return normalizeSizeWords(query).replace(SPOKEN_CABLE, "$1$2-$3");
 }
 
 // ─── Expand a single token against the alias map ─────────────────────────────
@@ -493,6 +754,23 @@ interface TokenExpansion {
   typed: string;
   /** Everything reached through ALIAS_MAP. Never includes `typed`. */
   aliases: string[];
+  /**
+   * A number that is a COUNT, not a size — the "2" of "2 gang box", because
+   * the next word is a count noun (COUNT_NOUN). Matched as a word, exactly as
+   * before sizes became strict: "Double-gang box" spells its count out, and
+   * strict size matching lost it.
+   */
+  asWord?: boolean;
+}
+
+/** Each query word, expanded — counts flagged by the word after them. */
+function expandTokens(tokens: string[]): TokenExpansion[] {
+  return tokens.map((token, i) =>
+    expandTokenCached(
+      token,
+      HAS_DIGIT.test(token) && COUNT_NOUN.test(tokens[i + 1] ?? "")
+    )
+  );
 }
 
 /**
@@ -502,11 +780,14 @@ interface TokenExpansion {
  * map twice. The map is a constant, so the answer for a word never changes.
  */
 const expansionCache = new Map<string, TokenExpansion>();
-function expandTokenCached(token: string): TokenExpansion {
-  let hit = expansionCache.get(token);
+function expandTokenCached(token: string, asWord = false): TokenExpansion {
+  const cacheKey = asWord ? `${token} #count` : token;
+  let hit = expansionCache.get(cacheKey);
   if (!hit) {
-    hit = expandToken(token);
-    expansionCache.set(token, hit);
+    hit = asWord
+      ? { ...expandToken(token, true), asWord: true }
+      : expandToken(token);
+    expansionCache.set(cacheKey, hit);
   }
   return hit;
 }
@@ -526,8 +807,45 @@ function runsOnFrom(token: string, term: string): boolean {
   return term.length >= MIN_ALIAS_TERM_LENGTH && token.startsWith(term);
 }
 
-function expandToken(token: string): TokenExpansion {
+function expandToken(token: string, asWord = false): TokenExpansion {
   const aliases = new Set<string>();
+
+  /*
+    A finished SIZE expands only through a key that is exactly it. The prefix
+    tests below are for words being typed; for a size they are a fuzz: "4"
+    started the key "4-11/16" and so "4 box" offered the 4-11/16" square box
+    (2026-09-25). A size still being typed ("1-", "1/") keeps the prefix
+    behaviour like any partial word.
+  */
+  if (!asWord && isSizeTerm(token) && COMPLETE_SIZE.test(sizeKey(token))) {
+    /*
+      ...and only to phrases that CONTAIN that same size. A size is satisfied
+      by that size or not at all: the map's "4 square" entry also lists
+      "4-11/16" and "junction box", and either one, reached from a typed "4",
+      put the 4-11/16" box in "4 inch box"; "1-hole strap" keys as size 1 and
+      dragged in "one hole", which put crimp lugs in "1 inch emt". Kept: the
+      phrases that restate the size another way — "12 gauge" gives "#12", so
+      "12 thhn" finds #12 THHN.
+    */
+    const key = sizeKey(token);
+    const inches = isInches(token);
+    const carries = (phrase: string) =>
+      normalizeSizeWords(phrase)
+        .split(" ")
+        .some(
+          w =>
+            HAS_DIGIT.test(w) &&
+            sameSize(key, sizeKey(w)) &&
+            (!inches || isInches(w))
+        );
+    for (const [k, expansions] of Object.entries(ALIAS_MAP)) {
+      const phrases = [k, ...expansions].map(normalize);
+      if (!phrases.some(carries)) continue;
+      for (const p of phrases) if (carries(p)) aliases.add(p);
+    }
+    aliases.delete(token);
+    return { typed: token, aliases: Array.from(aliases) };
+  }
 
   // Direct key match (full or prefix of key)
   for (const [key, expansions] of Object.entries(ALIAS_MAP)) {
@@ -643,13 +961,15 @@ function scoreItem<T extends SearchableItem>(
   indexed: IndexedItem<T>,
   tokenExpansions: TokenExpansion[]
 ): number {
-  const { text, descWords, descNorm } = indexed;
-
   let totalScore = 0;
 
-  for (const { typed, aliases } of tokenExpansions) {
-    let bestForToken =
-      TYPED_POINTS[matchTier(typed, descNorm, descWords, text)];
+  for (const { typed, aliases, asWord } of tokenExpansions) {
+    // A count ("2" of "2 gang") is matched as a word — see TokenExpansion.
+    const tier = (term: string) =>
+      asWord
+        ? matchTier(term, indexed.descNorm, indexed.descWords, indexed.text)
+        : termTier(term, indexed);
+    let bestForToken = TYPED_POINTS[tier(typed)];
 
     // No alias can score more than ALIAS_POINTS[1], so once the typed word
     // has reached it the alias loop cannot change the answer. Skipping it is
@@ -662,7 +982,7 @@ function scoreItem<T extends SearchableItem>(
 
     for (const alias of aliases) {
       if (alias.length < MIN_ALIAS_TERM_LENGTH) continue;
-      const points = ALIAS_POINTS[matchTier(alias, descNorm, descWords, text)];
+      const points = ALIAS_POINTS[tier(alias)];
       if (points > bestForToken) bestForToken = points;
     }
 
@@ -738,6 +1058,14 @@ export interface CorrectedSearch<T extends SearchableItem> {
    * results for …", and rank with it rather than with the misspelling.
    */
   correctedQuery: string | null;
+  /**
+   * The query as it was actually MATCHED: inches rewritten to the mark
+   * ("1/2 inch emt" → '1/2" emt') and any typo correction applied. Always
+   * set. Callers rank with this, so ranking and matching read one query.
+   * Unlike correctedQuery it is not shown: rewriting "inch" as " is the same
+   * search, not a different one.
+   */
+  searchedQuery: string;
 }
 
 /**
@@ -772,22 +1100,25 @@ export function smartSearchCorrected<T extends SearchableItem>(
   query: string,
   maxResults = 100
 ): CorrectedSearch<T> {
-  const q = normalize(query);
-  if (!q) return { results: [], correctedQuery: null };
+  // Inches spelled out become the mark first — see normalizeSizeWords.
+  const q = normalizeQuerySizes(normalize(query));
+  const none = { results: [], correctedQuery: null, searchedQuery: q };
+  if (!q) return none;
   const index = indexFor(items);
   const rawTokens = q.split(/\s+/).filter(Boolean);
 
   const asTyped = runSearch(index, rawTokens, maxResults);
-  if (asTyped.length > 0) return { results: asTyped, correctedQuery: null };
+  if (asTyped.length > 0)
+    return { results: asTyped, correctedQuery: null, searchedQuery: q };
 
   // Nothing matched. Which words matched NOTHING, anywhere? Only those are
   // candidates — a word that matches something is spelled right, and the
   // query is empty because the combination does not exist ("romex 400a").
+  const expansions = expandTokens(rawTokens);
   const dead = rawTokens.map(
-    token =>
-      !index.some(indexed => scoreItem(indexed, [expandTokenCached(token)]) > 0)
+    (_, i) => !index.some(indexed => scoreItem(indexed, [expansions[i]]) > 0)
   );
-  if (!dead.some(Boolean)) return { results: [], correctedQuery: null };
+  if (!dead.some(Boolean)) return none;
 
   if (!_cachedVocabulary) _cachedVocabulary = buildVocabulary(index);
   const vocabulary = _cachedVocabulary;
@@ -796,8 +1127,7 @@ export function smartSearchCorrected<T extends SearchableItem>(
   const options = rawTokens.map((token, i) =>
     dead[i] ? correctionsFor(token, vocabulary) : [token]
   );
-  if (options.some(list => list.length === 0))
-    return { results: [], correctedQuery: null };
+  if (options.some(list => list.length === 0)) return none;
 
   // The best-ranked correction that actually finds something. Tried in order
   // for each dead word, so a closer-but-empty candidate cannot win.
@@ -806,10 +1136,12 @@ export function smartSearchCorrected<T extends SearchableItem>(
       list => list[Math.min(attempt, list.length - 1)]
     );
     const results = runSearch(index, tokens, maxResults);
-    if (results.length > 0)
-      return { results, correctedQuery: tokens.join(" ") };
+    if (results.length > 0) {
+      const corrected = tokens.join(" ");
+      return { results, correctedQuery: corrected, searchedQuery: corrected };
+    }
   }
-  return { results: [], correctedQuery: null };
+  return none;
 }
 
 function runSearch<T extends SearchableItem>(
@@ -818,7 +1150,7 @@ function runSearch<T extends SearchableItem>(
   maxResults: number
 ): SmartSearchResult<T>[] {
   // Split query into tokens and expand each independently
-  const tokenExpansions = tokens.map(expandTokenCached);
+  const tokenExpansions = expandTokens(tokens);
   const scored: { item: T; score: number }[] = [];
   for (const indexed of index) {
     const score = scoreItem(indexed, tokenExpansions);

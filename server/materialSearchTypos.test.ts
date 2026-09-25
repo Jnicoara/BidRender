@@ -38,10 +38,14 @@ function searcher(rows: Row[]) {
   const byId = new Map(rows.map(r => [String(r.id), r]));
   const families = familySizes(rows);
   return (query: string, limit = 5) => {
-    const { results, correctedQuery } = smartSearchCorrected(index, query, 500);
+    const { results, correctedQuery, searchedQuery } = smartSearchCorrected(
+      index,
+      query,
+      500
+    );
     const ranked = rankMaterialHits(
       results.map(h => ({ row: byId.get(h.item.id)!, score: h.score })),
-      correctedQuery ?? query,
+      searchedQuery,
       {
         families,
         commonness: row => commonnessPoints(row.name, undefined, new Date()),

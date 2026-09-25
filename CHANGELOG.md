@@ -6,6 +6,24 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **Search understands "inch" spelled out, and sizes said out loud.**
+  "1/2 inch emt", "1/2in", "1/2-inch", "inches" and the like now mean 1/2",
+  so "1/2 inch emt" finds 1/2" EMT (it found nothing) and "4 inch box" leads
+  with the 4" square box (it returned connectors). "Half inch", "quarter
+  inch", "three quarter inch", "inch and a half" and "inch and a quarter"
+  work too, as does "1 1/4" typed with a space. Cable specs typed with a
+  space ("6 3", "12 2") find the 6-3 and 12-2 cable.
+
+- **A size now only ever finds that size.** Searching "1/2 emt" used to list
+  1-1/2" and 2-1/2" EMT further down, and "4 box" listed 3/4" boxes, because a
+  size matched inside any bigger size that contained it. Now 1/2 finds 1/2,
+  4 finds 4 — never 3/4, 4-11/16 or 6. Counts still read as before ("2 gang
+  box", "3 way switch"), and a 5"/6" part still shows for a 6" search.
+
+- **A catalog fix behind it:** every mixed-size starter item (1-1/2" EMT,
+  1-1/4" PVC and so on) had quietly been given the fraction of a smaller size
+  as a search word — so a 1-1/2" part answered to "1/2". Fixed at the source.
+
 - **The lighting catalog fills its gaps: 49 new starter items.**
   - **LED tubes**, which the catalog had none of: 2 ft and 4 ft T8 in two
     install types named so the difference is on screen — "ballast bypass"

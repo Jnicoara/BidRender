@@ -95,7 +95,7 @@ export function useMaterialSearch<T extends SearchableCatalogRow>(
   return useCallback(
     (query: string, depth: number): MaterialSearchResult<T> => {
       if (!query.trim()) return { rows: [], correctedQuery: null };
-      const { results, correctedQuery } = smartSearchCorrected(
+      const { results, correctedQuery, searchedQuery } = smartSearchCorrected(
         searchable,
         query,
         depth
@@ -104,7 +104,7 @@ export function useMaterialSearch<T extends SearchableCatalogRow>(
         .map(hit => ({ row: byId.get(hit.item.id), score: hit.score }))
         .filter((h): h is { row: T; score: number } => Boolean(h.row));
       return {
-        rows: rankMaterialHits(hits, correctedQuery ?? query, {
+        rows: rankMaterialHits(hits, searchedQuery, {
           families,
           commonness: row => commonnessPoints(row.name, usage.get(row.id), now),
         }),

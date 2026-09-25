@@ -135,12 +135,16 @@ const NOW = new Date();
 function ranked(query: string, limit = SHOW): string[] {
   // Typo-corrected and ranked by the CORRECTED query, as useMaterialSearch
   // does — a misspelling is ordered exactly as its correction would be.
-  const { results, correctedQuery } = smartSearchCorrected(index, query, DEPTH);
+  const { results, correctedQuery, searchedQuery } = smartSearchCorrected(
+    index,
+    query,
+    DEPTH
+  );
   const hits = results.map(hit => ({
     row: rowOf(hit.item.id),
     score: hit.score,
   }));
-  return rankMaterialHits(hits, correctedQuery ?? query, {
+  return rankMaterialHits(hits, searchedQuery, {
     families: FAMILIES,
     commonness: row => commonnessPoints(row.name, undefined, NOW),
   })
