@@ -22,8 +22,14 @@ import { useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-/** The rail is this wide whether the panel is open or folded. */
+/** The rail's width while the panel is OPEN, where it is also the resize grip. */
 export const PANEL_RAIL_WIDTH = 18;
+
+/** Folded, the whole strip reopens the panel — wide enough to hit easily. */
+const FOLDED_STRIP_WIDTH = 28;
+
+/** Inert space between a folded LEFT panel and the app's own navigation. */
+const FOLDED_GUTTER = 10;
 
 export function SidePanel({
   side,
@@ -95,6 +101,52 @@ export function SidePanel({
    */
   const pointsLeft = side === "left" ? open : !open;
   const Chevron = pointsLeft ? ChevronLeft : ChevronRight;
+
+  /*
+    ── FOLDED: the whole rail is the button ───────────────────────────────────
+    Changed 2026-09-24. Folded, the only way back was a 18x36 chevron at the
+    top of the rail — small to see and smaller to hit. Now the full height of a
+    wider strip reopens the panel; the chevron stays small and quiet, and the
+    strip only shows itself as a faint tint on hover.
+
+    ── And on the LEFT, a gutter between it and the app's navigation ─────────
+    The app sidebar widens from 64 to 224px on hover and reflows the page, so
+    overshooting the arrow by a pixel opened the NAV — which then pushed the
+    arrow 160px away from the pointer. The gutter is inert on purpose: a
+    near-miss lands on nothing, or on the strip, never on the nav. The chevron
+    sits at the strip's inner side for the same reason — the visible target is
+    well clear of the nav's edge.
+  */
+  if (!open) {
+    return (
+      <div className="flex shrink-0 min-h-0">
+        {side === "left" && (
+          <div
+            className="shrink-0 bg-background"
+            style={{ width: FOLDED_GUTTER }}
+            aria-hidden="true"
+          />
+        )}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={false}
+          title={`Show ${label}`}
+          aria-label={`Show ${label}`}
+          className={cn(
+            "shrink-0 flex flex-col pt-2.5 bg-card text-muted-foreground",
+            "hover:bg-muted/60 hover:text-foreground transition-colors cursor-pointer",
+            side === "left"
+              ? "border-l border-r border-border items-end pr-1.5"
+              : "border-l border-r border-border items-start pl-1.5"
+          )}
+          style={{ width: FOLDED_STRIP_WIDTH }}
+        >
+          <Chevron className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  }
 
   const rail = (
     <div

@@ -112,7 +112,9 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   "GFCI receptacle": "core",
   "Single-pole switch": "core",
   "3-way switch": "core",
-  "20A duplex receptacle": "common",
+  // Core, not common: every kitchen, bath, laundry and garage circuit is 20A.
+  // Listed after the plain duplex so a bare "receptacle" still leads with it.
+  "20A duplex receptacle": "core",
   "USB combo receptacle": "common",
   "30A dryer receptacle": "common",
   "50A range receptacle": "common",

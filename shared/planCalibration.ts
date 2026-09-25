@@ -451,6 +451,47 @@ export function checkCalibration(
 }
 
 /**
+ * The check's verdict in a few words, for the small card beside the measured
+ * line. `checkCalibration`'s message is the full explanation; this is the
+ * headline an estimator reads in the second after clicking — "agrees", or how
+ * it is off, naming the likely cause when the ratio says what it is.
+ *
+ * Reads the SAME `CalibrationCheck`, so the two can never disagree about
+ * whether the scale agrees or which factor was suspected.
+ */
+export function checkHeadline(check: CalibrationCheck): string {
+  if (check.agrees) return "Agrees — the scale checks out.";
+  const short = check.measuredInches < check.expectedInches;
+  const factor = check.suspectFactor;
+  if (factor === 12) return "Off by 12x — feet and inches mixed up?";
+  if (factor !== null) {
+    const fraction: Record<number, string> = {
+      1.5: "two-thirds",
+      2: "half",
+      3: "a third",
+      4: "a quarter",
+    };
+    const multiple: Record<number, string> = {
+      1.5: "1.5x",
+      2: "double",
+      3: "triple",
+      4: "4x",
+    };
+    // Half size is the common reduced print (22x34 sets printed on 11x17),
+    // so it gets named. 1.5x is the signature of a scale bar read from its
+    // end — the bid 23 case — and says so instead.
+    if (factor === 2 && short) return "Reads half — printed at half size?";
+    if (factor === 1.5)
+      return `Reads ${short ? "two-thirds" : "1.5x"} — scale bar read from its end?`;
+    return short
+      ? `Reads ${fraction[factor]} — printed at reduced size?`
+      : `Reads ${multiple[factor]} — the scale may be set wrong.`;
+  }
+  const size = Math.abs(check.percentOff).toFixed(0);
+  return `Off — reads ${size}% ${short ? "short" : "long"}.`;
+}
+
+/**
  * The scale as text, for storing beside the ratio.
  *
  * Deliberately NOT forced into an architect's notation. A calibrated sheet

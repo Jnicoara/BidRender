@@ -69,8 +69,8 @@ import { compareBySize } from "@shared/materialSizeOrder";
  * than inferred so a new shelf cannot silently start appearing in a picker
  * nobody expected it in.
  */
-const CONDUIT_SHELF = ["Conduit"];
-const CABLE_SHELF = ["Wire & Cable"];
+export const CONDUIT_SHELF = ["Conduit"];
+export const CABLE_SHELF = ["Wire & Cable"];
 import { runTypeSpec } from "@shared/takeoffCounts";
 import { laborPerFootSentence } from "@shared/runTypeLabor";
 import { cn } from "@/lib/utils";
@@ -168,7 +168,7 @@ const draftOf = (type: PickableRunType): Draft => ({
  * component rather than a copied input so the next count beside it cannot make
  * the same choice independently.
  */
-function CountField({
+export function CountField({
   value,
   onChange,
   min = 1,
@@ -211,16 +211,19 @@ function CountField({
  * sitting blank — an unset material is the thing that makes a type unpriceable,
  * and it has to read as absent rather than as nothing-to-see.
  */
-function MaterialSlot({
+export function MaterialSlot({
   title,
   hint,
   name,
   onPick,
   onClear,
+  categories,
 }: {
   title: string;
   hint: string;
   name: string | null;
+  /** The catalog shelves this slot searches. See MaterialPicker. */
+  categories?: readonly string[];
   onPick: (material: {
     id: number;
     name: string;
@@ -240,6 +243,7 @@ function MaterialSlot({
             autoFocus
             ariaLabel={title}
             placeholder={hint}
+            categories={categories}
             onChoose={material => {
               onPick({
                 id: material.id,
@@ -504,6 +508,7 @@ export function RunTypePicker({
             {pathType === "conduit" && (
               <MaterialSlot
                 title="Raceway"
+                categories={CONDUIT_SHELF}
                 hint="Search conduit — “EMT”, “PVC”, “flex”…"
                 name={draft.racewayMaterialName}
                 onPick={m =>
@@ -527,6 +532,7 @@ export function RunTypePicker({
 
             <MaterialSlot
               title={pathType === "cable" ? "The cable" : "Conductor"}
+              categories={CABLE_SHELF}
               hint={
                 pathType === "cable"
                   ? "Search cable — “MC”, “romex”, “12-2”…"
@@ -562,6 +568,7 @@ export function RunTypePicker({
             {pathType === "conduit" && (
               <MaterialSlot
                 title="Ground"
+                categories={CABLE_SHELF}
                 hint="Search ground wire — “#12 bare”, “#10 green”…"
                 name={draft.groundMaterialName}
                 onPick={m =>

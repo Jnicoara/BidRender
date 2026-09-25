@@ -102,10 +102,13 @@ describe("a generic query puts the common part first", () => {
 
 describe("a specific query still finds the rare part first", () => {
   /*
-    The shipped catalog has no 3-pole breakers yet (they are in the pricing
-    sheet, not the seed), so "90A 3-Pole breaker" is a fixture here. It sits
-    among common breakers that also contain "90A"-free matches for "pole" and
-    "breaker", and it has no starter rank at all.
+    A small fixture, kept alongside the shipped-catalog test below because it
+    isolates the rule: "90A 3-Pole breaker" sits among common breakers that
+    also match "pole" and "breaker", and it has no starter rank at all.
+
+    This comment used to say the shipped catalog had no 3-pole breakers (they
+    were only in the pricing sheet). They were added to the seed 2026-09-24,
+    so the same query is now also asserted against the real catalog.
   */
   const rows: Row[] = [
     { id: 1, name: "20A Single-Pole breaker", category: "Breakers" },
@@ -134,6 +137,17 @@ describe("a specific query still finds the rare part first", () => {
     const search = searcher(byName);
     expect(search("100a 2-pole")[0]).toBe("100A 2-Pole breaker");
     expect(search("60a 2 pole gfci")[0]).toBe("60A 2-Pole GFCI breaker");
+  });
+
+  it('"90A 3-pole" finds the shipped 90A 3-Pole breaker first', () => {
+    // Against the real catalog, where the 90A sits beside fifteen other
+    // 3-pole sizes and every 2-pole — none of which may outrank it.
+    const search = searcher(byName);
+    for (const q of ["90A 3-pole", "90a 3 pole", "90/3", "90 amp three pole"]) {
+      expect(search(q)[0], q).toBe("90A 3-Pole breaker");
+    }
+    expect(search("100a 3-pole")[0]).toBe("100A 3-Pole breaker");
+    expect(search("15a 3 pole")[0]).toBe("15A 3-Pole breaker");
   });
 });
 

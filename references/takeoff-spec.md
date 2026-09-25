@@ -610,6 +610,14 @@ against this.**
 - (c) The old per-run calculator form: type, size, conductors, material,
   fittings, waste, makeup allowance, service loop, terminations, pull points.
 - **Pick:** (a), with (b) as the way to change it later.
+- **2026-09-24 — (b) gained a materials-first way in, and it is still (b).**
+  An open run in the panel now says what it is "Made of" with an Edit that
+  picks the conduit, wire and wire count from the catalog shelves
+  (`RunSpecEditor`, `takeoffRuns.respecify`). Saving points the run at the TYPE
+  that says exactly that — found in the palette or made there — and puts the
+  count on its circuit. No material columns on the run, and closed until asked,
+  so it is not (c). Refused on a quantity-locked bid. See
+  `shared/runRespecify.ts`.
 - **Bloat warning:** (c) puts a form on every run. Waste, makeup and fittings
   belong in the assembly or company defaults, set once.
 

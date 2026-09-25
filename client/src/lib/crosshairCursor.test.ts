@@ -16,6 +16,10 @@ import { describe, it, expect } from "vitest";
 import {
   CROSSHAIR_CENTRE,
   CROSSHAIR_SIZE,
+  CROSSHAIR_COLORS,
+  DEFAULT_CROSSHAIR_COLOR,
+  asCrosshairColor,
+  type CrosshairColor,
   crosshairArms,
   crosshairCursorValue,
   crosshairInk,
@@ -174,19 +178,48 @@ describe("the cursor value a browser is given", () => {
 });
 
 describe("the crosshair reads on white paper and on black linework", () => {
-  it("draws a light halo under a dark core, from one geometry", () => {
+  it("draws a thin dark outline under a coloured core, from one geometry", () => {
     // Widths are 4 and 2, not 3 and 1: an even-sized image puts the centre on
-    // a pixel BOUNDARY, so a stroke has to straddle it to stay symmetric.
+    // a pixel BOUNDARY, so a stroke has to straddle it to stay symmetric. That
+    // also makes the outline exactly 1px each side.
     const svg = crosshairSvg();
-    expect(svg).toContain('stroke="#FFFFFF" stroke-width="4"');
-    expect(svg).toContain('stroke="#111827" stroke-width="2"');
-    // The halo has to come first, or it paints over the core.
-    expect(svg.indexOf("#FFFFFF")).toBeLessThan(svg.indexOf("#111827"));
+    expect(svg).toContain('stroke="#111827" stroke-width="4"');
+    expect(svg).toContain('stroke="#F5C518" stroke-width="2"');
+    // The outline has to come first, or it paints over the core.
+    expect(svg.indexOf('stroke="#111827"')).toBeLessThan(
+      svg.indexOf('stroke="#F5C518"')
+    );
   });
 
-  it("is not the colour of a mark", () => {
-    // Yellow is what a stamp looks like. A cursor that looks like a mark is a
-    // cursor you lose among them.
-    expect(crosshairSvg()).not.toContain("F5C518");
+  /*
+    REVERSED 2026-09-24. This file used to assert the cursor was NOT yellow,
+    because yellow is the colour of a mark. On screen, the light halo that
+    replaced it read as a glowing white box on dark areas, and the owner chose
+    brand yellow with a dark outline — plus a per-person setting for anyone
+    whose sheets are dense with yellow marks.
+  */
+  it("is brand yellow by default", () => {
+    expect(DEFAULT_CROSSHAIR_COLOR).toBe("yellow");
+    expect(crosshairSvg()).toContain("#F5C518");
+  });
+
+  it("draws each offered colour, and only the geometry-free parts change", () => {
+    const base = crosshairSvg("yellow");
+    for (const key of Object.keys(CROSSHAIR_COLORS) as CrosshairColor[]) {
+      const svg = crosshairSvg(key);
+      expect(svg).toContain(`stroke="${CROSSHAIR_COLORS[key].hex}"`);
+      // Swapping the colour back must give the default image exactly — so the
+      // colour is the ONLY thing a setting can move.
+      expect(svg.replace(CROSSHAIR_COLORS[key].hex, "#F5C518")).toBe(base);
+      expect(crosshairCursorValue(key)).toContain(
+        `) ${CROSSHAIR_CENTRE} ${CROSSHAIR_CENTRE},`
+      );
+    }
+  });
+
+  it("reads an unknown stored colour as the default", () => {
+    expect(asCrosshairColor("cyan")).toBe("cyan");
+    expect(asCrosshairColor("chartreuse")).toBe("yellow");
+    expect(asCrosshairColor(null)).toBe("yellow");
   });
 });

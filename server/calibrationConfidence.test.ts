@@ -35,8 +35,35 @@ import { describe, it, expect } from "vitest";
 import { describeScale, COMMON_SCALES, formatRatio } from "../shared/planScale";
 import {
   checkCalibration,
+  checkHeadline,
   compareToStandardScales,
 } from "../shared/planCalibration";
+
+describe("the check's headline, for the card beside the line", () => {
+  const headline = (measured: number, expected: number) =>
+    checkHeadline(checkCalibration(measured, expected)!);
+
+  it("says it agrees when it does", () => {
+    expect(headline(1200, 1200)).toMatch(/^Agrees/);
+  });
+
+  it("names a half-size print when a sheet reads half", () => {
+    expect(headline(600, 1200)).toBe("Reads half — printed at half size?");
+  });
+
+  it("names the scale bar, not the print, at 1.5x — the bid 23 case", () => {
+    expect(headline(800, 1200)).toContain("scale bar");
+    expect(headline(800, 1200)).not.toContain("printed");
+  });
+
+  it("names feet-and-inches at 12x", () => {
+    expect(headline(1200, 100)).toContain("feet and inches");
+  });
+
+  it("gives the size and direction when no factor explains it", () => {
+    expect(headline(1200, 1000)).toBe("Off — reads 20% long.");
+  });
+});
 
 describe("a scale reads in plain words", () => {
   it("names a standard scale exactly on the number", () => {

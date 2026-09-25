@@ -69,6 +69,45 @@ const doublePole: BaselineMaterial[] = [
 }));
 
 /**
+ * Three-pole breakers — rooftop units, 3-phase motors, panel feeders on a
+ * commercial job. The amperage set is the pricing sheet's
+ * (pricing/buildPricingSheet.mts), including the odd 15/25/35/45/80/90A sizes
+ * a nameplate actually calls for.
+ *
+ * Added 2026-09-24. Until then the sheet listed these as NEW rows and the seed
+ * had none, while the changelog spoke of the "3-Pole rows beside" the others.
+ */
+const THREE_POLE_SLANG =
+  "3 pole three pole triple pole 3p tp 3 phase three phase 3ph";
+
+const triplePole: BaselineMaterial[] = [
+  "15",
+  "20",
+  "25",
+  "30",
+  "35",
+  "40",
+  "45",
+  "50",
+  "60",
+  "70",
+  "80",
+  "90",
+  "100",
+  "125",
+  "150",
+  "200",
+].map(amps => ({
+  ...gear("Breakers"),
+  name: `${amps}A 3-Pole breaker`,
+  searchAliases: aliases(
+    `${amps} amp ${amps}a ${amps}/3`,
+    THREE_POLE_SLANG,
+    BREAKER_SLANG
+  ),
+}));
+
+/**
  * The three protected types, single- and two-pole.
  *
  * AFCI and GFCI are separate products from the combo, not steps toward it: a
@@ -320,6 +359,7 @@ export const DISTRIBUTION: BaselineMaterial[] = [
 export const PANELS_AND_BREAKERS: BaselineMaterial[] = [
   ...singlePole,
   ...doublePole,
+  ...triplePole,
   ...protectedSingle,
   ...protectedDouble,
   ...tandems,

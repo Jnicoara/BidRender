@@ -118,6 +118,8 @@ import {
   RunTypePicker,
   type RunTypePatch,
 } from "@/components/takeoff/RunTypePicker";
+import { RunSpecEditor } from "@/components/takeoff/RunSpecEditor";
+import { resolveRunType } from "@shared/runTypeLookup";
 import { runTypeSpec } from "@shared/takeoffCounts";
 import { CalibrateLayer } from "@/components/takeoff/CalibrateLayer";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
@@ -2339,6 +2341,26 @@ export default function TakeoffPage({
         result.label
           ? `This run is a "${result.label}" now.`
           : "This run no longer says what it is."
+      );
+    },
+  });
+
+  /**
+   * Say what a FINISHED run is made of — conduit, wire, how many. The server
+   * finds or makes the type that says so; see shared/runRespecify.ts.
+   *
+   * A new type may have been made, so the palette refetches as well as the
+   * runs — otherwise the row would name a type the picker has never heard of.
+   */
+  const respecifyRun = trpc.takeoffRuns.respecify.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: result => {
+      void runTypes.refetch();
+      refreshRuns();
+      toast.success(
+        result.circuits === "several"
+          ? `This run is a "${result.label}" now. It has ${result.circuitCount} circuits — set the wires on each.`
+          : `This run is a "${result.label}" now.`
       );
     },
   });
@@ -4612,48 +4634,64 @@ export default function TakeoffPage({
                   t => t.id === run.runTypeId
                 );
                 return (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[0.7rem] text-muted-foreground shrink-0">
-                      This run is
-                    </span>
-                    <RunTypePicker
-                      pathType={run.pathType}
-                      types={runTypes.data ?? []}
-                      armedId={run.runTypeId}
-                      onPick={type =>
-                        setRunTypeFor.mutate({
-                          id: run.id,
-                          runTypeId: type.id,
-                        })
-                      }
-                      catalog={allMaterials}
-                      onCreate={spec =>
-                        createRunType
-                          .mutateAsync({ ...spec, pathType: run.pathType })
-                          .then(type =>
-                            setRunTypeFor.mutate({
-                              id: run.id,
-                              runTypeId: type.id,
-                            })
-                          )
-                          .catch(() => {
-                            /* the mutation's onError has already said so */
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[0.7rem] text-muted-foreground shrink-0">
+                        This run is
+                      </span>
+                      <RunTypePicker
+                        pathType={run.pathType}
+                        types={runTypes.data ?? []}
+                        armedId={run.runTypeId}
+                        onPick={type =>
+                          setRunTypeFor.mutate({
+                            id: run.id,
+                            runTypeId: type.id,
                           })
-                      }
-                      onSave={saveRunType}
-                    >
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-6 gap-1 px-2 text-[0.7rem] min-w-0"
-                        aria-label={`Change what this run is`}
+                        }
+                        catalog={allMaterials}
+                        onCreate={spec =>
+                          createRunType
+                            .mutateAsync({ ...spec, pathType: run.pathType })
+                            .then(type =>
+                              setRunTypeFor.mutate({
+                                id: run.id,
+                                runTypeId: type.id,
+                              })
+                            )
+                            .catch(() => {
+                              /* the mutation's onError has already said so */
+                            })
+                        }
+                        onSave={saveRunType}
+                        disabled={quantitiesLocked}
                       >
-                        <span className="truncate">
-                          {armed?.label ?? run.typeName ?? "Not said"}
-                        </span>
-                        <ChevronDown className="w-3 h-3 shrink-0" />
-                      </Button>
-                    </RunTypePicker>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-6 gap-1 px-2 text-[0.7rem] min-w-0"
+                          aria-label={`Change what this run is`}
+                          disabled={quantitiesLocked}
+                        >
+                          <span className="truncate">
+                            {armed?.label ?? run.typeName ?? "Not said"}
+                          </span>
+                          <ChevronDown className="w-3 h-3 shrink-0" />
+                        </Button>
+                      </RunTypePicker>
+                    </div>
+                    <RunSpecEditor
+                      pathType={run.pathType}
+                      current={resolveRunType(
+                        runTypes.data ?? [],
+                        run.runTypeId
+                      )}
+                      circuits={run.circuits}
+                      locked={quantitiesLocked}
+                      onSave={patch =>
+                        respecifyRun.mutateAsync({ id: run.id, ...patch })
+                      }
+                    />
                   </div>
                 );
               }}

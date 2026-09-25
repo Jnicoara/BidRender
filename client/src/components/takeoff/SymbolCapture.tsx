@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { crosshairCursorStyle } from "@/lib/crosshairCursor";
+import { useCrosshairColor } from "@/hooks/useCrosshairColor";
 
 /** Longest edge of the stored thumbnail, in pixels. */
 const THUMBNAIL_MAX_EDGE = 96;
@@ -186,6 +187,7 @@ export function SymbolCaptureLayer({
   onCancel: () => void;
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const [crosshairColor] = useCrosshairColor();
   const [start, setStart] = useState<{ x: number; y: number } | null>(null);
   const [current, setCurrent] = useState<{ x: number; y: number } | null>(null);
 
@@ -235,7 +237,7 @@ export function SymbolCaptureLayer({
         is an aiming job too, and a crosshair that differs between overlays
         reads as a different tool rather than the same one somewhere else.
       */
-      style={crosshairCursorStyle}
+      style={crosshairCursorStyle(crosshairColor)}
       onPointerDown={e => {
         if (e.button !== 0) return;
         /*

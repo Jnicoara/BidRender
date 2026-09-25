@@ -42,6 +42,7 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { CrosshairGuides, type CrosshairHandle } from "./CrosshairGuides";
 import { crosshairCursorStyle } from "@/lib/crosshairCursor";
+import { useCrosshairColor } from "@/hooks/useCrosshairColor";
 import { Check, Ruler, TriangleAlert, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -211,6 +212,7 @@ export function TraceLayer({
   chromeTarget?: HTMLElement | null;
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const [crosshairColor] = useCrosshairColor();
   /** Moved directly, never through a render. See CrosshairGuides. */
   const guidesRef = useRef<CrosshairHandle | null>(null);
   /** Where the pointer is, for the rubber-band segment from the last vertex. */
@@ -337,7 +339,9 @@ export function TraceLayer({
           See @/lib/crosshairCursor — the compositor draws it with the pointer,
           so it cannot trail behind the way the old drawn one did.
         */
-        style={tracing || stamping ? crosshairCursorStyle : undefined}
+        style={
+          tracing || stamping ? crosshairCursorStyle(crosshairColor) : undefined
+        }
         onPointerMove={e => {
           if (!tracing) return;
           const page = pointerToPage(e);
@@ -694,7 +698,22 @@ export function TraceLayer({
                 while there IS a rubber band, so a finished path shows one
                 figure rather than the same figure twice.
               */}
-              <span className="font-mono text-sm tabular-nums">
+              {/*
+                ── EVERY SLOT IN THIS PILL HAS A FIXED WIDTH ─────────────────
+                Fixed 2026-09-24: the undo arrow could not be clicked. The pill
+                is centred, so any change in its width moves every control in
+                it — and moving the pointer ONTO a control takes the hover off
+                the drawing, which dropped the "to cursor" figure, which shrank
+                the pill, which slid the arrow out from under the pointer. Back
+                on the drawing the figure returned and the pill grew again.
+
+                So the readouts reserve their width whether or not they have
+                anything to show (`invisible`, never unmounted), and the
+                numbers sit in slots sized for the longest ordinary figure.
+                The pill is the same width for the whole run, and nothing in
+                it can push or cover anything else.
+              */}
+              <span className="font-mono text-sm tabular-nums inline-block min-w-[9ch] text-right">
                 {committedInches === null
                   ? "—"
                   : formatFeetInches(committedInches)}
@@ -702,19 +721,25 @@ export function TraceLayer({
               <span className="text-[0.7rem] text-muted-foreground">
                 placed
               </span>
-              {liveInches !== null &&
-                committedInches !== null &&
-                Math.abs(liveInches - committedInches) > 0.5 && (
-                  <>
-                    <span className="font-mono text-sm tabular-nums text-muted-foreground">
-                      {formatFeetInches(liveInches)}
-                    </span>
-                    <span className="text-[0.7rem] text-muted-foreground">
-                      to cursor
-                    </span>
-                  </>
+              <span
+                className={cn(
+                  "flex items-center gap-2",
+                  !(
+                    liveInches !== null &&
+                    committedInches !== null &&
+                    Math.abs(liveInches - committedInches) > 0.5
+                  ) && "invisible"
                 )}
-              <span className="text-[0.7rem] text-muted-foreground">
+                aria-hidden={liveInches === null}
+              >
+                <span className="font-mono text-sm tabular-nums text-muted-foreground inline-block min-w-[9ch] text-right">
+                  {liveInches === null ? "" : formatFeetInches(liveInches)}
+                </span>
+                <span className="text-[0.7rem] text-muted-foreground">
+                  to cursor
+                </span>
+              </span>
+              <span className="text-[0.7rem] text-muted-foreground inline-block min-w-[4.5rem] tabular-nums">
                 {points.length} {points.length === 1 ? "point" : "points"}
               </span>
 
@@ -751,11 +776,11 @@ export function TraceLayer({
                 title="Finish this run (Enter or double-click)"
               >
                 <Check className="w-3 h-3" /> Finish
-                {committedInches !== null && points.length >= 2 && (
-                  <span className="font-mono">
-                    {formatFeetInches(committedInches)}
-                  </span>
-                )}
+                <span className="font-mono inline-block min-w-[9ch] text-left">
+                  {committedInches !== null && points.length >= 2
+                    ? formatFeetInches(committedInches)
+                    : ""}
+                </span>
               </Button>
               <Button
                 size="sm"

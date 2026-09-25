@@ -198,6 +198,12 @@ export const takeoffRunTypesRouter = router({
         conductorCount: type.conductorCount,
         groundCount: type.groundCount,
         status: type.status,
+        /**
+         * The shipped row this forks, so the screen can follow a run's STORED
+         * id to the fork it now means (shared/runTypeLookup.ts) instead of
+         * finding nothing and calling the run unspecified.
+         */
+        baselineId: type.baselineId,
         /** True for a row the app ships. Read-only until it is forked. */
         isShipped: type.userId === null,
         /**

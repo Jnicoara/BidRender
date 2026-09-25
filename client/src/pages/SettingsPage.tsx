@@ -41,6 +41,12 @@ import { BrandingSection } from "@/components/BrandingSection";
 import { SalesTaxSection } from "@/components/SalesTaxSection";
 import { ProposalDesignControls } from "@/components/proposal/ProposalDesignControls";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useCrosshairColor } from "@/hooks/useCrosshairColor";
+import {
+  CROSSHAIR_COLORS,
+  crosshairSvg,
+  type CrosshairColor,
+} from "@/lib/crosshairCursor";
 import {
   SETTINGS_SECTIONS,
   routeToPath,
@@ -84,7 +90,7 @@ const SECTION_INFO: Record<SettingsSection, { label: string; blurb: string }> =
     display: {
       label: "Display",
       blurb:
-        "Theme and text size. Saved on this device, and affects nothing else.",
+        "Theme, text size and the plan crosshair. Saved on this device, and affects nothing else.",
     },
     account: {
       label: "Account",
@@ -123,6 +129,65 @@ function AccountSection() {
 }
 
 // ── Display ───────────────────────────────────────────────────────────────────
+/**
+ * The plan viewer's crosshair colour.
+ *
+ * Each swatch is the REAL cursor image, drawn over a strip that is half white
+ * paper and half dark, because that pair is what the choice is being judged
+ * against — a flat colour chip would not show the outline doing its job.
+ */
+function CrosshairColorSetting() {
+  const [color, setColor] = useCrosshairColor();
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-0.5">
+          Crosshair colour
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          The cursor on a plan while you count, trace or measure. Pick one that
+          stands out from the marks on your sheets.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2" role="radiogroup">
+        {(Object.keys(CROSSHAIR_COLORS) as CrosshairColor[]).map(key => (
+          <button
+            key={key}
+            type="button"
+            role="radio"
+            aria-checked={color === key}
+            onClick={() => setColor(key)}
+            className={cn(
+              "flex flex-col items-center gap-1.5 rounded-lg border-2 p-1.5 transition-colors",
+              color === key
+                ? "border-[#F5C518] bg-[var(--bp-yellow-dim)]"
+                : "border-border hover:border-border/80 hover:bg-muted/30"
+            )}
+          >
+            <span
+              className="relative flex h-9 w-16 overflow-hidden rounded border border-border/60"
+              aria-hidden="true"
+            >
+              <span className="flex-1 bg-white" />
+              <span className="flex-1 bg-[#0f1117]" />
+              <img
+                src={`data:image/svg+xml,${encodeURIComponent(crosshairSvg(key))}`}
+                alt=""
+                width={24}
+                height={24}
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+              />
+            </span>
+            <span className="text-[0.7rem] text-foreground">
+              {CROSSHAIR_COLORS[key].label}
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /**
  * Theme and text size.
  *
@@ -307,6 +372,8 @@ function DisplaySection() {
           </p>
         </div>
       </section>
+
+      <CrosshairColorSetting />
     </div>
   );
 }

@@ -46,6 +46,14 @@ import {
 } from "../../shared/takeoffCounts";
 import * as db from "../db";
 import { EMPTY_HEIGHT_CONTEXT, verticalsForRunRow } from "../runVerticals";
+import { resolveRunType } from "../../shared/runTypeLookup";
+import { resolveMaterial } from "../../shared/materialLookup";
+import {
+  circuitPlan,
+  findMatchingRunType,
+  respecifiedLabel,
+  wantedSpec,
+} from "../../shared/runRespecify";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -110,6 +118,23 @@ async function requireRun(id: number, userId: number) {
   if (!run)
     throw new TRPCError({ code: "NOT_FOUND", message: "Run not found." });
   return run;
+}
+
+/**
+ * Refuse to change what a run IS on a bid whose quantities are locked.
+ * shared/quantityLock.ts says what the lock means; this is where changing a
+ * run's materials stops at it.
+ */
+async function refuseIfLocked(bidId: number, userId: number) {
+  const bid = await db.getBidById(bidId, userId);
+  if (!bid)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
+  if (bid.quantitiesLockedAt !== null)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "This bid's quantities are locked, so its runs cannot be changed. Unlock them on the bid first.",
+    });
 }
 
 /** The sheet's scale as the pure functions want it. */
@@ -568,6 +593,8 @@ export const takeoffRunsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const run = await requireRun(input.id, ctx.scope.dataUserId);
+      // Same refusal as `respecify`: retyping moves what a bid line is made of.
+      await refuseIfLocked(run.bidId, ctx.scope.dataUserId);
 
       if (input.runTypeId === null) {
         await db.updateRun(input.id, ctx.scope.dataUserId, {
@@ -606,6 +633,133 @@ export const takeoffRunsRouter = router({
         runTypeLabel: type.label,
       });
       return { success: true, label: type.label };
+    }),
+
+  /**
+   * Say what a FINISHED run is made of: its conduit, its wire, how many wires.
+   *
+   * For the run traced before anybody said — or traced under the wrong thing.
+   * The decisions are in shared/runRespecify.ts, which says why this points
+   * the run at a TYPE (found or made) rather than writing materials onto it:
+   * D3 rejected a per-run form, and the bid bridge reads types, so this
+   * reaches the bid exactly the way a trace-time choice does.
+   *
+   * ── A LOCKED BID'S RUNS DO NOT CHANGE ─────────────────────────────────────
+   * Refused here, not only greyed out on screen, because this moves what a
+   * bid line is made of — the thing the lock exists to hold still. The rest of
+   * the run editing on this router predates the rule; this is where it starts.
+   */
+  respecify: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        racewayMaterialId: z.number().int().positive().nullable(),
+        conductorMaterialId: z.number().int().positive().nullable(),
+        /** Insulated wires in the pipe. Null leaves the circuits alone. */
+        conductorCount: z.number().int().min(1).max(60).nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const run = await requireRun(input.id, userId);
+
+      await refuseIfLocked(run.bidId, userId);
+
+      // Materials must be ones this company can see — the same merged read
+      // every other material link goes through.
+      const wantedIds = [
+        input.racewayMaterialId,
+        input.conductorMaterialId,
+      ].filter((id): id is number => id !== null);
+      const materials = await db.getMaterialsByIds(wantedIds, userId);
+      const nameOf = (id: number | null) =>
+        id === null ? null : (resolveMaterial(materials, id)?.name ?? null);
+      for (const id of wantedIds) {
+        if (nameOf(id) === null)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "That material is not in your catalog.",
+          });
+      }
+
+      const palette = await db.getRunTypesFor(userId);
+      const current = resolveRunType(palette, run.runTypeId) ?? null;
+      const want = wantedSpec({
+        pathType: run.pathType,
+        racewayMaterialId: input.racewayMaterialId,
+        conductorMaterialId: input.conductorMaterialId,
+        conductorCount: input.conductorCount,
+        current,
+      });
+
+      let type = findMatchingRunType(palette, want, current?.id ?? null);
+      let created = false;
+      if (!type) {
+        const label = respecifiedLabel(
+          want,
+          {
+            raceway: nameOf(want.racewayMaterialId),
+            conductor: nameOf(want.conductorMaterialId),
+          },
+          new Set(
+            palette
+              .filter(t => t.pathType === want.pathType)
+              .map(t => t.label.trim().toLowerCase())
+          )
+        );
+        const id = await db.createRunType({ userId, label, ...want });
+        type = await db.getRunTypeById(id, userId);
+        if (!type)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "The new run type could not be read back.",
+          });
+        created = true;
+      }
+
+      // The stored id, then the label snapshot beside it — as setRunType does.
+      if (run.runTypeId !== type.id || run.runTypeLabel !== type.label) {
+        await db.updateRun(run.id, userId, {
+          runTypeId: type.id,
+          runTypeLabel: type.label,
+        });
+      }
+
+      const circuits = await db.getCircuitsForRuns([run.id], userId);
+      const plan = circuitPlan(
+        run.pathType,
+        circuits,
+        // The TYPE's count after matching, so a cable never reaches here and
+        // a conduit run gets exactly the number typed.
+        want.conductorMaterialId === null ? null : input.conductorCount
+      );
+      if (plan.kind === "add") {
+        await db.createRunCircuit({
+          runId: run.id,
+          userId,
+          name: "Ckt 1",
+          conductorCount: plan.conductors,
+          /*
+            What the type says, else one — the same answer "Add wires" gives
+            (client/src/lib/runCircuits.ts `newCircuitFor`), where a type's
+            deliberate zero is kept rather than replaced.
+          */
+          groundCount: type.groundCount ?? 1,
+          separateGround: false,
+        });
+      } else if (plan.kind === "update") {
+        await db.updateRunCircuit(plan.circuitId, userId, {
+          conductorCount: plan.conductors,
+        });
+      }
+
+      return {
+        runTypeId: type.id,
+        label: type.label,
+        created,
+        circuits: plan.kind,
+        circuitCount: plan.kind === "several" ? plan.count : undefined,
+      };
     }),
 
   remove: procedure

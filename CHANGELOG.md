@@ -6,6 +6,44 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-24]
 
+- **Checking a sheet's scale no longer covers the drawing.** "Check it" now
+  closes the scale menu at once and puts a thin one-line bar at the top of the
+  sheet — click one end, click the other, with "Skip the check" and Esc right
+  there. After the second click a small card appears beside the measured line:
+  type what it should be and it says "Agrees", or how it is off ("Reads half —
+  printed at half size?"), with Keep or Set it again. The scale arithmetic and
+  what gets saved are unchanged.
+
+- **The undo arrow on a run being traced can be clicked again.** Moving the
+  pointer onto it used to shrink the readout above the drawing, which slid the
+  arrow out from under the pointer. Every part of that readout now keeps a
+  fixed width, so nothing in it moves.
+
+- **The plan crosshair is brand yellow with a thin dark outline**, instead of
+  a white outline that read as a glowing box on dark areas. Settings → Display
+  has a new "Crosshair colour" choice (yellow, cyan, magenta, red, green) for
+  anyone whose sheets are thick with yellow marks. Saved per person on the
+  device. The aiming dot and the exact click point are unchanged.
+
+- **A finished run can now be told what it is made of.** Open it in the
+  right-hand panel and "Made of … Edit" lets you pick the conduit (type and
+  size), the wire (type and size) and how many wires, searching the catalog's
+  conduit or wire shelf. Saving updates the run's materials and what it puts on
+  the bid, exactly as choosing before tracing does. A bid whose quantities are
+  locked refuses the change, and so does the "This run is" picker beside it.
+
+- **Folded side panels are easier to reopen.** The whole edge strip now opens
+  the panel, not just a tiny arrow at the top, with a faint highlight on hover.
+  On the left there is a small gap before the app's main menu, so a near-miss
+  no longer opens the menu (which then pushed the arrow away).
+
+- **3-pole breakers are in the catalog, 15A to 200A** ("90A 3-Pole breaker"),
+  findable as "90/3", "3p 90" or "three pole 90". They had only ever been
+  added to the pricing sheet, never to the catalog itself — the entry below
+  that says the single-pole rename matched "the 3-Pole rows beside them" was
+  wrong when written; there were none until now. "20A duplex receptacle" now
+  counts as an everyday part in search.
+
 - **Material search now puts the part you most likely mean first.** Searching
   "20A breaker" used to list the plain single-pole breaker 7th, behind 2-pole
   variants, because all eight matched equally and the tie fell to alphabetical

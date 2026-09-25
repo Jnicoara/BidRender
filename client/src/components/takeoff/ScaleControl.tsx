@@ -269,7 +269,15 @@ export function ScaleControl({
           </Button>
         </PopoverTrigger>
 
-        <PopoverContent align="start" className="w-72 space-y-3">
+        {/*
+          No exit animation. Both measure buttons close this and hand the
+          drawing straight to a two-click tool — a dropdown fading out over the
+          spot the first click is aimed at is a dropdown still in the way.
+        */}
+        <PopoverContent
+          align="start"
+          className="w-72 space-y-3 data-[state=closed]:animate-none!"
+        >
           <div>
             <div className="text-sm font-medium">Scale for {sheet.name}</div>
             <p className="text-xs text-muted-foreground mt-1">

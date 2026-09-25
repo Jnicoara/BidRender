@@ -575,6 +575,56 @@ describe("breakers", () => {
     }
   });
 
+  it("ships the 3-pole run the pricing sheet lists", () => {
+    // Added 2026-09-24. The pricing sheet carried these as NEW rows and the
+    // seed had none, so a 3-phase job could not find a single one.
+    for (const amps of [
+      "15",
+      "20",
+      "25",
+      "30",
+      "35",
+      "40",
+      "45",
+      "50",
+      "60",
+      "70",
+      "80",
+      "90",
+      "100",
+      "125",
+      "150",
+      "200",
+    ]) {
+      const m = named(`${amps}A 3-Pole breaker`);
+      expect(m, `${amps}A 3-Pole breaker`).toBeDefined();
+      expect(m!.category).toBe("Breakers");
+      expect(m!.unitOfSale).toBe("each");
+    }
+  });
+
+  it("finds 3-pole breakers by the spoken forms", () => {
+    const index = BASELINE_MATERIALS.map((m, i) => ({
+      id: String(i),
+      description: m.name,
+      unit: m.unitOfSale,
+      searchAliases: m.searchAliases,
+    }));
+    const find = (query: string) =>
+      smartSearch(index, query, 8).map(
+        hit => BASELINE_MATERIALS[Number(hit.id)].name
+      );
+    // "90/3" is left out HERE on purpose: raw smartSearch ties it with every
+    // "90-degree elbow" and cuts at eight. The ranked search every screen
+    // uses puts the breaker first — materialSearchCommonness.test.ts.
+    expect(find("45/3")).toContain("45A 3-Pole breaker");
+    for (const term of ["three pole 90", "3p 90", "90 amp 3 pole"]) {
+      expect(find(term), `"${term}" should find it`).toContain(
+        "90A 3-Pole breaker"
+      );
+    }
+  });
+
   it("states the pole count on every amp-rated breaker", () => {
     // Reversed 2026-09-24. This test used to be "leaves single-pole unmarked"
     // and pinned the bare "20A breaker" form. Now every breaker named by its

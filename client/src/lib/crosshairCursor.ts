@@ -35,7 +35,40 @@
  * shows against paper, the halo shows against linework, and against grey it has
  * both. Yellow was rejected — it is the colour of marks, and a cursor that
  * looks like a mark is a cursor you lose among them.
+ *
+ * ── Reversed 2026-09-24: a COLOURED core with a thin dark outline ────────────
+ * The light halo is what made it wrong. On the app's dark chrome and on dark
+ * areas of a sheet, a 4px white band round a dark line read as a glowing white
+ * box rather than a cursor. The arms are now a saturated colour — brand yellow
+ * by default — with a 1px dark outline each side (the same 4px/2px geometry,
+ * colours swapped), which holds on white paper through the outline and on
+ * black linework through the colour.
+ *
+ * The colour is a per-person setting (Settings → Display) because the
+ * objection to yellow above is real for some sets: a sheet dense with yellow
+ * marks is exactly where someone wants cyan or magenta instead. The centre dot
+ * and every coordinate are unchanged — only the arm colours moved.
  */
+
+/** The choices offered in Settings. All saturated, all readable on white. */
+export const CROSSHAIR_COLORS = {
+  yellow: { label: "Yellow", hex: "#F5C518" },
+  cyan: { label: "Cyan", hex: "#22D3EE" },
+  magenta: { label: "Magenta", hex: "#FF2BD6" },
+  red: { label: "Red", hex: "#FF3B30" },
+  green: { label: "Green", hex: "#22E05A" },
+} as const;
+
+export type CrosshairColor = keyof typeof CROSSHAIR_COLORS;
+
+export const DEFAULT_CROSSHAIR_COLOR: CrosshairColor = "yellow";
+
+/** A stored value from an older build or a hand-edit falls back to default. */
+export function asCrosshairColor(value: unknown): CrosshairColor {
+  return typeof value === "string" && value in CROSSHAIR_COLORS
+    ? (value as CrosshairColor)
+    : DEFAULT_CROSSHAIR_COLOR;
+}
 
 /**
  * EVEN, so the image's geometric centre lands on a whole number.
@@ -97,8 +130,15 @@ const DOT_RING_R = 1.6;
 /** How far the arms reach. Slightly smaller than the drawn one it replaces. */
 const ARM = CROSSHAIR_CENTRE;
 
+/**
+ * The centre dot's two colours. UNCHANGED by the 2026-09-24 recolour on
+ * purpose: the dot is the aiming point and was specified as it is.
+ */
 const CORE = "#111827";
 const HALO = "#FFFFFF";
+
+/** The thin dark outline round the coloured arms. */
+const OUTLINE = "#111827";
 
 /**
  * The centre line. THE HOTSPOT ITSELF, not half a pixel beside it.
@@ -131,10 +171,14 @@ function armPath(): string {
 /**
  * The cursor as an SVG document.
  *
- * Two passes of the SAME path: a wide light one, then a narrow dark one over
- * it. One geometry, so the halo cannot drift away from the core.
+ * Two passes of the SAME path: a wide dark one, then a narrow coloured one
+ * over it — 1px of outline showing each side. One geometry, so the outline
+ * cannot drift away from the core.
  */
-export function crosshairSvg(): string {
+export function crosshairSvg(
+  color: CrosshairColor = DEFAULT_CROSSHAIR_COLOR
+): string {
+  const ink = CROSSHAIR_COLORS[color].hex;
   const arms = crosshairArms()
     .map(
       ([x1, y1, x2, y2]) =>
@@ -143,8 +187,8 @@ export function crosshairSvg(): string {
     .join("");
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${CROSSHAIR_SIZE}" height="${CROSSHAIR_SIZE}" viewBox="0 0 ${CROSSHAIR_SIZE} ${CROSSHAIR_SIZE}">`,
-    `<g stroke="${HALO}" stroke-width="${HALO_WIDTH}" stroke-linecap="butt">${arms}</g>`,
-    `<g stroke="${CORE}" stroke-width="${CORE_WIDTH}" stroke-linecap="butt">${arms}</g>`,
+    `<g stroke="${OUTLINE}" stroke-width="${HALO_WIDTH}" stroke-linecap="butt">${arms}</g>`,
+    `<g stroke="${ink}" stroke-width="${CORE_WIDTH}" stroke-linecap="butt">${arms}</g>`,
     // The centre dot, on the hotspot itself: light ring first, dark core over
     // it, so it reads on paper and on linework exactly as the arms do.
     `<circle cx="${LINE}" cy="${LINE}" r="${DOT_RING_R}" fill="${HALO}"/>`,
@@ -161,13 +205,30 @@ export function crosshairSvg(): string {
  * is survivable; losing the crosshair entirely would leave an arrow pointing at
  * a drawing, so the fallback is never omitted.
  */
-export function crosshairCursorValue(): string {
-  const encoded = encodeURIComponent(crosshairSvg());
+export function crosshairCursorValue(
+  color: CrosshairColor = DEFAULT_CROSSHAIR_COLOR
+): string {
+  const encoded = encodeURIComponent(crosshairSvg(color));
   return `url("data:image/svg+xml,${encoded}") ${CROSSHAIR_CENTRE} ${CROSSHAIR_CENTRE}, crosshair`;
 }
 
-/** Ready to spread onto a style prop. */
-export const crosshairCursorStyle = { cursor: crosshairCursorValue() };
+/**
+ * Ready to spread onto a style prop, one per colour, built once — so a
+ * component re-rendering on every pointer move hands React the same object
+ * and the browser never re-parses the cursor image.
+ */
+const STYLES = Object.fromEntries(
+  (Object.keys(CROSSHAIR_COLORS) as CrosshairColor[]).map(c => [
+    c,
+    { cursor: crosshairCursorValue(c) },
+  ])
+) as Record<CrosshairColor, { cursor: string }>;
+
+export function crosshairCursorStyle(color: CrosshairColor): {
+  cursor: string;
+} {
+  return STYLES[color];
+}
 
 /**
  * Which pixels the ARMS paint, as a grid, for measuring the centre.

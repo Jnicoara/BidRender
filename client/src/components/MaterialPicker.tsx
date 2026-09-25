@@ -66,7 +66,16 @@ export function MaterialPicker({
   inputRef,
   compact = false,
   showQty = false,
+  categories,
 }: {
+  /**
+   * Only these catalog shelves. Omitted searches everything, as before.
+   *
+   * Filtered BEFORE ranking, not after: trimming a ranked list to one shelf
+   * would leave "3/4 emt" showing only the fittings that happened to outrank
+   * the pipe — or nothing at all.
+   */
+  categories?: readonly string[];
   onChoose: (material: PickableMaterial) => void;
   /** Already chosen elsewhere — kept out of the recents shortlist. */
   exclude?: readonly number[];
@@ -90,7 +99,21 @@ export function MaterialPicker({
     limit: MAX_RECENT + (exclude?.length ?? 0),
   });
 
-  const search = useMaterialSearch(catalog as PickableMaterial[]);
+  const onShelf = useMemo(() => {
+    if (!categories) return null;
+    const allowed = new Set(categories);
+    return (m: { category: string | null }) => allowed.has(m.category ?? "");
+  }, [categories]);
+
+  const shelved = useMemo(
+    () =>
+      onShelf
+        ? (catalog as PickableMaterial[]).filter(onShelf)
+        : (catalog as PickableMaterial[]),
+    [catalog, onShelf]
+  );
+
+  const search = useMaterialSearch(shelved);
 
   /*
     How deep to look before grouping, and it is not a tuning knob.
@@ -109,6 +132,7 @@ export function MaterialPicker({
       const chosen = new Set(exclude ?? []);
       return (recent as PickableMaterial[])
         .filter(m => !chosen.has(m.id))
+        .filter(m => !onShelf || onShelf(m))
         .slice(0, MAX_RECENT);
     }
     /*
@@ -123,7 +147,7 @@ export function MaterialPicker({
       this no longer passes a position in place of the score.
     */
     return search(query, SEARCH_DEPTH).slice(0, MAX_RESULTS);
-  }, [query, search, recent, exclude]);
+  }, [query, search, recent, exclude, onShelf]);
 
   const showingRecent = !query.trim() && results.length > 0;
 
