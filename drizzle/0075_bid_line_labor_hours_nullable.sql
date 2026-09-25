@@ -1,0 +1,19 @@
+-- A bid line's labor hours may now be NOT TYPED YET, which is not 0 hours.
+--
+-- ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE. The twin of 0074, for the same
+-- reason and with the same shape: no UPDATE, default stays '0', every existing
+-- row keeps its number. **Step 3 is empty.**
+--
+-- ── Why hours need the distinction more than money does ─────────────────────
+-- A material-only line is ordinary work — a fixture the owner supplies, a part
+-- somebody else installs — so an estimator typing 0 hours has said something
+-- real. A free count that has never had hours typed has said nothing, and a
+-- bid full of them looks finished while carrying no labor at all. NULL keeps
+-- those apart; see shared/handPricedLines.ts.
+--
+-- The analytics SQL COALESCEs this to 0 before multiplying. Without that, one
+-- NULL here turns the line's whole direct cost NULL — GREATEST() and `+` both
+-- propagate it — and SUM() skips the row, dropping its MATERIAL too. That is a
+-- dashboard quietly short by a line, which is why server/db.ts says so where
+-- the COALESCE is.
+ALTER TABLE `bid_line_items` MODIFY COLUMN `snapshotLaborHours` decimal(10,4) NULL DEFAULT '0';

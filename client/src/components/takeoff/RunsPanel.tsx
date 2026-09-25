@@ -498,11 +498,13 @@ export function RunsPanel({
 
               Three states and three different things worth saying, all of them
               words rather than colour: it is over, it can go over, or there is
-              nothing to say here and the row stays quiet. A level 1 count falls
-              in the third — its whole promise is a quiet count, and a nudge
-              toward the bid on the drawing screen breaks that promise on the
-              screen where it was made. The footer and the bid's own strip
-              carry the summary instead.
+              nothing to say here and the row stays quiet.
+
+              A free count (level 1) CAN go over since 2026-09-25 — unpriced,
+              with the price typed on the bid line — so it gets the same quiet
+              "Send N to bid" link as an assembly count. A link in the list, not
+              a badge on the drawing, which is what level 1's promise of a quiet
+              count actually forbids.
             */}
             {(() => {
               const state =
@@ -617,8 +619,8 @@ export function RunsPanel({
             {waitingToSend > 0
               ? `${waitingToSend} count${waitingToSend === 1 ? " is" : "s are"} not on the bid yet.`
               : countedWithNoPrice
-                ? `${countedWithNoPrice} count${countedWithNoPrice === 1 ? " has" : "s have"} no price, so ${countedWithNoPrice === 1 ? "it cannot" : "they cannot"} go on the bid.`
-                : "Every priced count is on the bid."}
+                ? `${countedWithNoPrice} count${countedWithNoPrice === 1 ? "'s" : "s'"} library assembly is gone, so ${countedWithNoPrice === 1 ? "it cannot" : "they cannot"} go on the bid.`
+                : "Every count is on the bid."}
           </p>
         ) : null}
 

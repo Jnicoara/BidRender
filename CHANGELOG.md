@@ -6,6 +6,20 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **Count anything on the plans and price it on the bid — no library needed.**
+  Type a name in Count ("Type F1 fixture"), click each one on any sheet, and
+  "Send to bid" puts it on the bid as its own line with the total from every
+  sheet. Its price and labor arrive BLANK, not $0, and you type them on the
+  line; until you do, the bid says so ("1 line has no price", "1 line has no
+  labor hours") instead of quietly pricing it at nothing. Nothing is added to
+  your materials or assemblies. On the line you can optionally price it from a
+  material or assembly you already have, or save it as a new assembly for next
+  time. Counting against an assembly works exactly as before.
+
+- **Dashboard totals stay right with a half-priced line on a bid.** A line with
+  a price but no hours typed would have dropped out of the dashboard's cost
+  figure entirely; it is now counted like everywhere else.
+
 - **Search understands "inch" spelled out, and sizes said out loud.**
   "1/2 inch emt", "1/2in", "1/2-inch", "inches" and the like now mean 1/2",
   so "1/2 inch emt" finds 1/2" EMT (it found nothing) and "4 inch box" leads
@@ -73,7 +87,7 @@ This is the human-readable companion to the git history — read this to see wha
 - **AI alias suggestions confirmed working on the live site**, and they now
   say so when they can't run. Tested on bidridge.com with the test account:
   asking for suggestions on a new material returned eight trade terms in
-  under two seconds. When suggestions *can't* be fetched — AI switched off, no
+  under two seconds. When suggestions _can't_ be fetched — AI switched off, no
   key, the daily allowance used up — the add form used to say "No suggestions
   this time", exactly what it says when the AI simply had nothing to add. It
   now says "Suggestions aren't available right now" instead.
@@ -85,7 +99,7 @@ This is the human-readable companion to the git history — read this to see wha
     saved but the label still said otherwise. It now updates from the save
     itself, instantly, and goes back if the save fails.
   - Clicking "Check it" while "Measure it" was already open left the tool
-    measuring. Your two points and length then *re-set* the scale, which
+    measuring. Your two points and length then _re-set_ the scale, which
     clears any check, instead of confirming it. Each "Measure it" / "Check
     it" now starts the tool fresh in the mode you clicked.
 

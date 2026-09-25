@@ -2494,10 +2494,15 @@ export default function TakeoffPage({
         the hand-added line turns up afterwards.
       */
       toast.success(
-        quantitiesLocked
+        (quantitiesLocked
           ? `${result.count} on the bid, frozen at that number — this bid's ` +
-              `quantities are locked, so further marks will not change it.`
-          : `${result.count} on the bid. The line follows your marks from here.`
+            `quantities are locked, so further marks will not change it.`
+          : `${result.count} on the bid. The line follows your marks from here.`) +
+          // A free count arrives blank. Saying where the price goes, now,
+          // beats the estimator finding a $0 line later.
+          (result.unpriced
+            ? " It has no price or labor yet — type them on the bid."
+            : "")
       );
       if (result.warning) toast.warning(result.warning);
     },

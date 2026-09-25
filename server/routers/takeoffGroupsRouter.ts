@@ -86,8 +86,10 @@ function refusalMessage(
       return `"${label}" is already on the bid, and its line follows these marks.`;
     case "nothing-counted":
       return `Nothing is marked for "${label}" yet. Mark it on a sheet and it can go over.`;
+    // Only a count whose library assembly was deleted reaches this since
+    // 2026-09-25 — a free count crosses unpriced and is priced on the line.
     case "no-price":
-      return `"${label}" has no price behind it, so there is nothing to put on the bid. Count it against an assembly from your library.`;
+      return `"${label}" was counted against an assembly that is no longer in your library, so there is nothing to price it from. Count it again against something else, or as a free count.`;
     case "unsupported-level":
       return `"${label}" carries its own price, and typed prices cannot reach the bid yet. Counts made against an assembly can.`;
   }
@@ -396,7 +398,16 @@ export const takeoffGroupsRouter = router({
         group,
         count
       );
-      return { lineId: id, count, warning };
+      return {
+        lineId: id,
+        count,
+        warning,
+        /**
+         * A free count crossed with no price and no hours, so the screen can
+         * say where they get typed — the bid line — at the moment it matters.
+         */
+        unpriced: group.kind === "plain",
+      };
     }),
 
   /**

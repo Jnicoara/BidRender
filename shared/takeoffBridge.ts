@@ -72,12 +72,12 @@ export type BridgeLine = {
  * that explains none of them.
  *
  * ── `unsupported-level` is a real state and is expected to shrink ────────────
- * Step one of the bridge carries level 4 only — a count made against a library
- * assembly, which already holds every one of the six numbers a line freezes.
- * Levels 2 and 3 are designed and not built (there is no price field on a count
- * anywhere in the app yet), so a typed or material group is honestly reported
- * as not supported rather than silently skipped. When step two lands, this is
- * the one function that changes, and `sendable` starts returning true for them.
+ * Level 4 (a library assembly) and level 1 (a free count, priced on the bid
+ * line since 2026-09-25) cross. Levels 2 and 3 as first designed — a price or a
+ * material stored on the GROUP — have no writer anywhere in the app, so a typed
+ * or material group is honestly reported as not supported rather than silently
+ * skipped. The free count took their job by putting the price on the line
+ * instead, where "the bid owns what it costs" already said it belonged.
  *
  * See references/plan-viewer-overhaul.md § 5f.0 OVERRIDE 1.
  */
@@ -101,11 +101,18 @@ export function sendability(
   if (!(group.count > 0)) {
     return { sendable: false, reason: "nothing-counted" };
   }
-  // Level 1. A plain count never reaches the bid, and that is the feature
-  // rather than a limitation: a number on a drawing is worth having before
-  // anybody knows what the thing costs.
+  // Level 1 — a free count. It crosses as a line with NO price and NO hours,
+  // which the estimator types on the bid (shared/handPricedLines.ts).
+  //
+  // CHANGED 2026-09-25. This used to refuse with "no-price": "a plain count
+  // never reaches the bid". Asked for directly — count first, price on the
+  // bid — and safe now in a way it was not then, because a blank price is
+  // stored as NULL rather than $0 and the bid's warning strip names every such
+  // line. The refusal existed so that no count could reach money unpriced
+  // SILENTLY; that is still true, by a different route. See
+  // references/plan-viewer-overhaul.md § 5f.4.
   if (group.kind === "plain") {
-    return { sendable: false, reason: "no-price" };
+    return { sendable: true };
   }
   if (group.kind === "assembly") {
     // An assembly deleted from the library since the count was made. The group
@@ -120,13 +127,14 @@ export function sendability(
 }
 
 /**
- * How many counts are priced, marked, and not yet on the bid.
+ * How many counts are marked and not yet on the bid.
  *
  * This is the number the counted-items panel and the bid's warning strip both
- * show. It counts only what the estimator could act on RIGHT NOW: a level 1
- * count is not waiting for a decision about the bid, it is waiting for a price,
- * and a level 2 count is waiting for a feature. Folding those in would produce
- * a number that does not go down when somebody does what it asks.
+ * show. It counts only what the estimator could act on RIGHT NOW — sending —
+ * which since 2026-09-25 includes a free count: it crosses unpriced and is
+ * priced on the line. A level 2 count is waiting for a feature and is left out;
+ * folding it in would produce a number that does not go down when somebody does
+ * what it asks.
  */
 export function countsWaitingToSend(
   groups: readonly BridgeGroup[],
@@ -136,11 +144,18 @@ export function countsWaitingToSend(
 }
 
 /**
- * Counts that have marks but no price, and so will never reach the bid.
+ * Counts that have marks but nothing left to price them from, and so cannot
+ * reach the bid.
  *
- * The other half of the needs-attention pair, and § 5f is explicit that it
- * matters more: "14 exit signs counted, no price" is money missing from the bid
- * entirely, which is worse than a price nobody can re-check.
+ * Since 2026-09-25 this is ONE situation: a count made against a library
+ * assembly that has since been deleted. A free count used to be the common case
+ * here and is not any more — it crosses unpriced and the bid's strip names it
+ * there (shared/handPricedLines.ts), which is the better place, because that is
+ * where the price gets typed.
+ *
+ * § 5f is explicit that this matters: "14 exit signs counted, no price" is
+ * money missing from the bid entirely, which is worse than a price nobody can
+ * re-check.
  *
  * LIST ONLY. Never a badge on the drawing — level 1's whole promise is a quiet
  * count, and a marker nagging toward the bid breaks that promise on the screen

@@ -2252,6 +2252,9 @@ assumes an assembly behind it.
 | **3. Count = material** | The part, no labour                           | A `materialId` on the group, **plus the bridge** — § 5f           |
 | **4. Count = assembly** | What exists today                             | Nothing. Stays as the fullest option                              |
 
+> **Level 1 reaches the bid since 2026-09-25** — unpriced, with its price and
+> labor typed on the bid line. § 5f.4 overrides "Never reaches the bid" above.
+
 #### SHIPPED 2026-09-18 — the group row and level 1
 
 Four migrations, split one statement per file as 0046–0052 established:
@@ -2473,7 +2476,8 @@ and $3 is already on the bid, snapshotted, unreachable by any edit —
 `bidsRouter.updateLine` deliberately does not accept snapshot fields. An
 interruption costs a moment. A freeze at a moment nobody chose costs a job.
 
-Two smaller facts point the same way. A level 1 count creates no line at all, so
+Two smaller facts point the same way. A level 1 count creates no line at all
+(true when written; since 2026-09-25 it creates a BLANK-priced line, § 5f.4), so
 "automatic" already needs an exception carved into it. And for an assembly count
 there is no defensible automatic moment either — the first mark, or the
 fourteenth, and both are arbitrary.
@@ -3102,6 +3106,71 @@ nothing else.
   Conversion goes one way only: go and add the material properly.
 - **Level 1 and its needs-attention entry ship together.** "Never reaches the
   bid" is only safe when the count is findable somewhere.
+
+> **Two of the three bullets above are overridden by § 5f.4 (2026-09-25).** A
+> free count now reaches the bid, and a hand-priced line has a "Save as
+> assembly" action. Read § 5f.4 for what changed and why.
+
+## 5f.4 Free counts reach the bid, priced ON THE LINE — BUILT 2026-09-25
+
+**Asked for directly, and built.** Count something with no library entry — type
+a name, click each one — send it to the bid, and type its price and labor on
+the bid line. Linking the line to a material or assembly, and saving it as an
+assembly, are optional actions on the line and never required.
+
+### What this overrides, by name
+
+- **§ 3's table, level 1: "Never reaches the bid."** It does now. A plain group
+  is `sendable` in `shared/takeoffBridge.ts`.
+- **§ 5f, "A group with no price — level 1 — creates no line at all."** It
+  creates a line with a BLANK price and BLANK hours.
+- **§ 5f.2's level 2, "`unitCost` / `unitHours` on the group".** The price lives
+  on the BID LINE instead, in the four snapshot columns every line already has.
+  The group columns stay unused. This is closer to § 5f's own rule than the
+  group-price design was: _the plans own what it is and how many, the bid owns
+  what it costs_. A price on the group was the plans owning a cost.
+- **§ 5f.2, "No 'save this price to my library' button."** There is one — "Save
+  as assembly" on a hand-priced line. The objection was rows at prices nobody
+  sourced; this one is a deliberate act on a price the estimator typed, it is
+  refused while either number is blank, and it says before it runs which rows
+  it makes. The later subsection "Offering to put a typed price in the library —
+  after, never before" had already moved toward this; the placement (an action
+  on the line, not a prompt) is what it asked for.
+- **§ 5f.0 OVERRIDE 2, "no edit can reach a snapshot afterwards".** Still true of
+  every LIBRARY line. A hand-priced line (no assembly, no run type —
+  `canPriceByHand`) takes its price and hours as edits, because its snapshot
+  was never from the library; typing it is how it gets priced. OVERRIDE 2's
+  reason — the app freezing $3 on the way to $38 — does not arise: what crosses
+  is a blank, and nothing is frozen until the estimator types it.
+
+### The one rule everything else hangs on: BLANK IS NOT ZERO
+
+`bid_line_items.snapshotMaterialCost` and `snapshotLaborHours` are nullable
+(drizzle/0074, 0075 — additive, step 1, step 3 empty). NULL means "nobody has
+typed this", which a typed 0 cannot imitate:
+
+- NULL totals as $0 (the money convention, CLAUDE.md § Editing fields rule 6)
+  and the bid's warning strip names it: "1 line has no price", "1 line has no
+  labor hours". The line itself says which in amber.
+- A typed 0 is an answer (an owner-supplied fixture, a part someone else
+  installs) and is not warned about.
+- Linking to an UNPRICED material is refused, because copying its $0 would turn
+  a named blank into a silent zero.
+- The analytics SQL COALESCEs both columns. Without that, a line with a price
+  and blank hours had its whole direct cost go NULL and SUM() dropped it —
+  measured: dashboard direct cost 0 against the bid's $190.
+
+`shared/handPricedLines.ts` holds the rules; `server/freeCount.test.ts` pins
+them end to end (17 of its 22 cases fail on the code before this change).
+
+### What did NOT change
+
+Assembly counting, the send button, the double-count checks, the quantity lock
+and the supplier list all run exactly as before — a free count is one more kind
+of group through the same bridge. No catalog rows are created by counting or
+sending. Levels 2 and 3 as designed (price or material on the group) remain
+unbuilt and are reported as `unsupported-level`, which nothing can currently
+produce.
 
 ---
 

@@ -3473,20 +3473,29 @@ export const bidLineItems = mysqlTable(
     runMaterialRole: mysqlEnum("runMaterialRole", RUN_MATERIAL_ROLES),
 
     // ── The snapshot: four inputs, frozen ──
-    /** Material cost for ONE of this assembly. */
+    /**
+     * Material cost for ONE of this assembly.
+     *
+     * NULL means NOBODY HAS TYPED A PRICE YET, which is not $0. Only a free
+     * count sent to the bid is created that way (a name and some marks,
+     * nothing from the library); the estimator types the price here, on the
+     * line. It totals as 0 — the money convention — and the bid's warning strip
+     * names it. A typed 0 is a real answer and is not warned about. See
+     * shared/handPricedLines.ts and drizzle/0074.
+     */
     snapshotMaterialCost: decimal("snapshotMaterialCost", {
       precision: 12,
       scale: 4,
-    })
-      .default("0")
-      .notNull(),
-    /** Base labor hours before modifiers. */
+    }).default("0"),
+    /**
+     * Base labor hours before modifiers. NULL means not typed yet, exactly as
+     * for the cost above — and matters more here, because a material-only
+     * line typed as 0 hours is ordinary work. See drizzle/0075.
+     */
     snapshotLaborHours: decimal("snapshotLaborHours", {
       precision: 10,
       scale: 4,
-    })
-      .default("0")
-      .notNull(),
+    }).default("0"),
     /** Summed modifier fraction, e.g. 0.32 for +32%. Already added, not compounded. */
     snapshotModifierPct: decimal("snapshotModifierPct", {
       precision: 6,

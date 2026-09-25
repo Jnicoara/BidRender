@@ -519,6 +519,20 @@
       "when": 1789956300000,
       "tag": "0073_bid_quantities_lock",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "5",
+      "when": 1789956400000,
+      "tag": "0074_bid_line_material_cost_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "5",
+      "when": 1789956500000,
+      "tag": "0075_bid_line_labor_hours_nullable",
+      "breakpoints": true
     }
   ]
 }

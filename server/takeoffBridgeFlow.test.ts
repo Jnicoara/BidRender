@@ -198,7 +198,9 @@ withDb("sending a count to the bid", () => {
     expect(await lineFor(bidId)).toHaveLength(1);
   });
 
-  it("never lets a level 1 count cross, and says what to do instead", async () => {
+  it("lets a free count cross UNPRICED — blank, not $0", async () => {
+    // CHANGED 2026-09-25: this used to assert the send was refused. The full
+    // behaviour of a free count on the bid is in server/freeCount.test.ts.
     const { bidId, sheetId } = await scenario();
     const group = await caller().takeoffGroups.create({
       bidId,
@@ -211,10 +213,11 @@ withDb("sending a count to the bid", () => {
       at: [{ x: 1, y: 1 }],
     });
 
-    await expect(
-      caller().takeoffGroups.sendToBid({ id: group.id })
-    ).rejects.toThrow(/no price behind it/i);
-    expect(await lineFor(bidId)).toHaveLength(0);
+    await caller().takeoffGroups.sendToBid({ id: group.id });
+    const lines = await lineFor(bidId);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].snapshotMaterialCost).toBeNull();
+    expect(lines[0].snapshotLaborHours).toBeNull();
   });
 
   it("refuses a count with no marks, naming that rather than the price", async () => {
@@ -443,7 +446,8 @@ withDb("what the screens are told", () => {
     const { bidId, sheetId } = await scenario();
     const { assemblyId } = await ownAssembly("Exit sign LED", 38, 0.5);
     await countOf(bidId, sheetId, assemblyId, 14);
-    // A level 1 count: waiting for a price, not waiting to be sent.
+    // A free count. Since 2026-09-25 it is waiting to be SENT — it crosses
+    // unpriced and is priced on the line — so it is no longer "no price".
     const plain = await caller().takeoffGroups.create({
       bidId,
       label: "Something nobody has priced",
@@ -456,11 +460,11 @@ withDb("what the screens are told", () => {
     });
 
     const listed = await caller().takeoffGroups.list({ bidId });
-    expect(listed.waitingToSend).toBe(1);
+    expect(listed.waitingToSend).toBe(2);
 
     const bid = await caller().bids.get({ id: bidId });
-    expect(bid.fromPlans.waitingToSend).toBe(1);
-    expect(bid.fromPlans.countedWithNoPrice).toBe(1);
+    expect(bid.fromPlans.waitingToSend).toBe(2);
+    expect(bid.fromPlans.countedWithNoPrice).toBe(0);
   });
 
   it("says nothing at all about a bid with no takeoff on it", async () => {

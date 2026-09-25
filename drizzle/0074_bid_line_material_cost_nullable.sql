@@ -1,0 +1,31 @@
+-- A bid line's material cost may now be NOT TYPED YET, which is not $0.
+--
+-- ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE. No UPDATE, and no existing value
+-- changes: every row keeps the number it holds, and the default stays '0' so any
+-- insert that omits the column behaves exactly as it did. What changes is that
+-- NULL becomes storable. CLAUDE.md § "Deploying a migration: THREE STEPS, NOT
+-- TWO". **Step 3 is empty** — no backfill, no existing meaning rewritten.
+--
+-- Old code never writes NULL, so it runs unchanged against this. New code
+-- against a database WITHOUT this would fail the insert the moment a free count
+-- is sent to a bid, and nothing else.
+--
+-- ── Why NULL and not a flag beside the zero ─────────────────────────────────
+-- A free count (a name and some marks, nothing from the library) arrives on the
+-- bid with no price, and the estimator types one there. Until they do, the
+-- line must say "no price" on the warning strip — and a line where somebody
+-- DELIBERATELY typed 0 must not. Those are two states, and a zero cannot hold
+-- both; a boolean beside it is a second thing that can disagree with the first.
+-- NULL is "nobody has said", which is exactly the state. See
+-- shared/handPricedLines.ts.
+--
+-- ── What reads it as zero, and why that is allowed ──────────────────────────
+-- The money convention (CLAUDE.md § Editing fields, rule 6): unset MONEY
+-- renders and totals as 0, and SHOUTS. The pricing engine and the analytics SQL
+-- (COALESCE, server/db.ts `costSums`) count it as 0; the bid's warning strip
+-- is where it shouts.
+--
+-- One statement per file, as 0046 onward established. Hand-written, not
+-- generated — drizzle/meta has no snapshots for the hand-written files from
+-- 0053 on, so `drizzle-kit generate` would re-emit everything since.
+ALTER TABLE `bid_line_items` MODIFY COLUMN `snapshotMaterialCost` decimal(12,4) NULL DEFAULT '0';

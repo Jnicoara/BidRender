@@ -71,11 +71,20 @@ describe("whether a count can cross to the bid", () => {
     });
   });
 
-  it("never lets a level 1 count cross — that is the feature, not a limit", () => {
+  it("lets a free count cross with no price — it is priced on the bid line", () => {
+    // CHANGED 2026-09-25. This test used to read "never lets a level 1 count
+    // cross". A free count now crosses UNPRICED — NULL price, NULL hours — and
+    // the bid's strip names it until somebody types them. See
+    // shared/handPricedLines.ts and plan-viewer-overhaul.md § 5f.4.
     const plain = group({ kind: "plain", assemblyId: null });
+    expect(sendability(plain, [])).toEqual({ sendable: true });
+  });
+
+  it("still refuses a free count that has no marks", () => {
+    const plain = group({ kind: "plain", assemblyId: null, count: 0 });
     expect(sendability(plain, [])).toEqual({
       sendable: false,
-      reason: "no-price",
+      reason: "nothing-counted",
     });
   });
 
@@ -106,11 +115,13 @@ describe("the number the screen shows for work waiting to go over", () => {
   it("counts only what the estimator can act on right now", () => {
     const groups = [
       group({ id: 1 }), // sendable
-      group({ id: 2, kind: "plain", assemblyId: null }), // needs a price
+      group({ id: 2, kind: "plain", assemblyId: null }), // sendable, unpriced
       group({ id: 3, count: 0 }), // nothing marked
       group({ id: 4 }), // sendable
+      group({ id: 5, assemblyId: null }), // assembly deleted: nothing to price
+      group({ id: 6, kind: "typed", assemblyId: null }), // not built
     ];
-    expect(countsWaitingToSend(groups, [])).toBe(2);
+    expect(countsWaitingToSend(groups, [])).toBe(3);
   });
 
   it("goes down when a count is sent, which is what makes it worth showing", () => {
@@ -122,15 +133,21 @@ describe("the number the screen shows for work waiting to go over", () => {
 });
 
 describe("counts that will never reach the bid", () => {
-  it("names a level 1 count as money missing from the bid", () => {
-    const groups = [group({ id: 1, kind: "plain", assemblyId: null })];
+  it("names a count whose library assembly was deleted as money missing", () => {
+    const groups = [group({ id: 1, assemblyId: null })];
     expect(countsWithNoPrice(groups, [])).toBe(1);
   });
 
+  it("does not name a free count — it can go over, and is priced there", () => {
+    // It used to. Since 2026-09-25 a free count waits to be SENT, and once on
+    // the bid its blank price is named by the bid's own strip.
+    const groups = [group({ id: 1, kind: "plain", assemblyId: null })];
+    expect(countsWithNoPrice(groups, [])).toBe(0);
+    expect(countsWaitingToSend(groups, [])).toBe(1);
+  });
+
   it("does not count an unmarked group — there is no money missing yet", () => {
-    const groups = [
-      group({ id: 1, kind: "plain", assemblyId: null, count: 0 }),
-    ];
+    const groups = [group({ id: 1, assemblyId: null, count: 0 })];
     expect(countsWithNoPrice(groups, [])).toBe(0);
   });
 
@@ -145,7 +162,7 @@ describe("counts that will never reach the bid", () => {
       So the two numbers have to disagree in this case, and that is the whole
       point of reporting both.
     */
-    const onlyUnpriced = [group({ id: 1, kind: "plain", assemblyId: null })];
+    const onlyUnpriced = [group({ id: 1, assemblyId: null })];
     expect(countsWaitingToSend(onlyUnpriced, [])).toBe(0);
     expect(countsWithNoPrice(onlyUnpriced, [])).toBe(1);
   });

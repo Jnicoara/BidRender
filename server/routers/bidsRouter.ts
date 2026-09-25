@@ -17,7 +17,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { requireCapability, router, scoped } from "../_core/trpc";
-import { BID_STATUSES } from "../../drizzle/schema";
+import { ASSEMBLY_CATEGORIES, BID_STATUSES } from "../../drizzle/schema";
 import {
   bidRollup,
   companyDefaultsFor,
@@ -56,6 +56,13 @@ import {
   typedQuantityRefusal,
   unlockChanges,
 } from "../../shared/quantityLock";
+import {
+  canPriceByHand,
+  saveAsAssemblyRefusal,
+} from "../../shared/handPricedLines";
+import { hourlyCostOf, resolveLaborRate } from "../../shared/laborRateLookup";
+import { resolveForkedRow } from "../../shared/forkedRows";
+import { needsPricing } from "../../shared/materialPricing";
 import * as db from "../db";
 
 /**
@@ -126,6 +133,10 @@ const procedure = scoped("bids.view", "bids.edit");
 
 const nameSchema = z.string().trim().min(1).max(255);
 const qtySchema = z.number().min(0).max(999999);
+/** A typed price for ONE. Inside decimal(12,4); zero allowed and meaningful. */
+const moneySchema = z.number().min(0).max(99999999);
+/** Typed hours for ONE. Inside decimal(10,4); zero allowed and meaningful. */
+const hoursPerUnitSchema = z.number().min(0).max(99999);
 const labelSchema = z.string().trim().min(1).max(128);
 
 const overheadModeSchema = z.enum(["percentage", "flat"]);
@@ -789,10 +800,72 @@ export const bidsRouter = router({
         qty: qtySchema.optional(),
         name: nameSchema.optional(),
         unitLabel: labelSchema.nullable().optional(),
+        /**
+         * The price and hours for ONE, typed on a hand-priced line — a free
+         * count sent from the plans, or a line added with no assembly. NULL
+         * puts the field back to "not typed yet", which is not the same as 0
+         * and is what the warning strip reads (shared/handPricedLines.ts).
+         * Refused on a line priced from the library.
+         */
+        materialCost: moneySchema.nullable().optional(),
+        laborHours: hoursPerUnitSchema.nullable().optional(),
+        /**
+         * The role doing those hours. Its hourly cost is FROZEN onto the line
+         * now, like every other line's rate, so a later raise does not re-price
+         * this bid. Without one, typed hours price at $0 — the existing "hours
+         * but no labor rate" warning names that.
+         */
+        laborRateId: z.number().int().positive().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+
+      const typingPrice =
+        input.materialCost !== undefined ||
+        input.laborHours !== undefined ||
+        input.laborRateId !== undefined;
+      const handPatch: Record<string, unknown> = {};
+      if (typingPrice) {
+        const line = await db.getBidLineItem(input.id, input.bidId);
+        if (!line)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Line not found.",
+          });
+        /*
+          Only where the price did not come from the library. A library line
+          re-snapshots from its assembly or run type on purpose, and a number
+          typed over it would be a price the next reader cannot trace to
+          anything. That is R4 guarding the other direction.
+        */
+        if (!canPriceByHand(line)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "This line's price comes from your library, so it is not typed here. Change the assembly in the Library and add it again to take the new price.",
+          });
+        }
+        if (input.materialCost !== undefined) {
+          handPatch.snapshotMaterialCost =
+            input.materialCost === null ? null : toDecimal4(input.materialCost);
+        }
+        if (input.laborHours !== undefined) {
+          handPatch.snapshotLaborHours =
+            input.laborHours === null ? null : toDecimal4(input.laborHours);
+        }
+        if (input.laborRateId !== undefined) {
+          const rates = await db.getLibraryLaborRates(ctx.scope.dataUserId);
+          const rate = resolveLaborRate(rates, input.laborRateId);
+          if (!rate) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "That labor role is not in your library.",
+            });
+          }
+          handPatch.snapshotLaborRate = toDecimal4(hourlyCostOf(rate));
+        }
+      }
 
       /*
         What a from-plans line IS and HOW MANY of it there are both belong to
@@ -853,14 +926,184 @@ export const bidsRouter = router({
       if (input.qty !== undefined) patch.qty = toDecimal4(input.qty);
       if (input.name !== undefined) patch.name = input.name;
       if (input.unitLabel !== undefined) patch.unitLabel = input.unitLabel;
+      Object.assign(patch, handPatch);
 
-      // Snapshot fields are deliberately absent from this input. A line's frozen
-      // costs are not editable — re-adding the assembly is how you take a fresh
-      // snapshot, and that stays an explicit act.
+      // A LIBRARY line's frozen costs are not editable — re-adding the assembly
+      // is how you take a fresh snapshot, and that stays an explicit act. The
+      // one exception is a hand-priced line above, whose snapshot was never
+      // from the library: typing it IS how it gets priced.
       if (Object.keys(patch).length > 0) {
         await db.updateBidLineItem(input.id, input.bidId, patch);
       }
       return db.getBidLineItem(input.id, input.bidId);
+    }),
+
+  /**
+   * Price a hand-priced line from the library — optional, never required.
+   *
+   * ── An ASSEMBLY re-snapshots all four inputs and makes it a library line ──
+   * See db.priceLineFromAssembly. After this it prices exactly like the same
+   * assembly added any other way, and is no longer typed over.
+   *
+   * ── A MATERIAL copies its price, and hours only if the material has them ──
+   * A line has no material column, so the number now lives on this job and the
+   * line stays hand-priced — the estimator can still type over it. Materials
+   * carry an optional labor unit; where one is set it comes too, and where it
+   * is not the hours are left exactly as they were rather than zeroed, so a
+   * blank stays a blank the strip can name.
+   *
+   * ── An UNPRICED material is refused ─────────────────────────────────────
+   * Every shipped material costs $0 until somebody prices it (CLAUDE.md
+   * § Materials). Copying that zero would turn a named "no price" into a
+   * silent one — the exact failure blank-not-zero exists to stop.
+   */
+  linkLine: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        id: z.number().int().positive(),
+        source: z.discriminatedUnion("kind", [
+          z.object({
+            kind: z.literal("assembly"),
+            assemblyId: z.number().int().positive(),
+          }),
+          z.object({
+            kind: z.literal("material"),
+            materialId: z.number().int().positive(),
+          }),
+        ]),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const line = await db.getBidLineItem(input.id, input.bidId);
+      if (!line)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Line not found." });
+      if (!canPriceByHand(line)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This line is already priced from your library.",
+        });
+      }
+
+      if (input.source.kind === "assembly") {
+        const linked = await db.priceLineFromAssembly(
+          line.id,
+          input.bidId,
+          ctx.scope.dataUserId,
+          input.source.assemblyId
+        );
+        if (!linked)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Assembly not found.",
+          });
+        return { from: linked.name };
+      }
+
+      const material = resolveForkedRow(
+        await db.getLibraryMaterials(ctx.scope.dataUserId),
+        input.source.materialId
+      );
+      if (!material)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Material not found.",
+        });
+      if (needsPricing(material.costPerUnit)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `${material.name} has no price in your library yet — it shows $0. Price it on the Materials screen first, or type a price on this line.`,
+        });
+      }
+      const patch: Record<string, unknown> = {
+        snapshotMaterialCost: toDecimal4(Number(material.costPerUnit)),
+        snapshotAt: new Date(),
+      };
+      if (material.laborHours !== null) {
+        patch.snapshotLaborHours = toDecimal4(Number(material.laborHours));
+      }
+      await db.updateBidLineItem(line.id, input.bidId, patch);
+      return { from: material.name };
+    }),
+
+  /**
+   * Save a hand-priced line to the library as an assembly — optional, never
+   * required, and offered on the line rather than as a prompt.
+   *
+   * Refused until both numbers have been SAID (0 counts, blank does not): an
+   * assembly saved from a blank would carry a price nobody chose onto every
+   * job after this one. See shared/handPricedLines.ts § saveAsAssemblyRefusal.
+   *
+   * The name must not already be an assembly. "Link to material or assembly"
+   * is the answer when it is, and the refusal says so rather than quietly
+   * making a second row with the same name.
+   */
+  saveLineAsAssembly: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        id: z.number().int().positive(),
+        category: z.enum(ASSEMBLY_CATEGORIES),
+        /** Who does the hours. Required when the line has any. */
+        laborRateId: z.number().int().positive().nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const line = await db.getBidLineItem(input.id, input.bidId);
+      if (!line)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Line not found." });
+      const refusal = saveAsAssemblyRefusal(line);
+      if (refusal)
+        throw new TRPCError({ code: "BAD_REQUEST", message: refusal });
+
+      const hours = Number(line.snapshotLaborHours);
+      let laborRate = 0;
+      if (input.laborRateId !== null) {
+        const rate = resolveLaborRate(
+          await db.getLibraryLaborRates(ctx.scope.dataUserId),
+          input.laborRateId
+        );
+        if (!rate)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "That labor role is not in your library.",
+          });
+        laborRate = hourlyCostOf(rate);
+      } else if (hours > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Pick who does the hours. An assembly with hours and no role prices its labor at $0.",
+        });
+      }
+
+      const name = line.name.trim().toLowerCase();
+      const [assemblies, materials] = await Promise.all([
+        db.getLibraryAssemblies(ctx.scope.dataUserId),
+        db.getLibraryMaterials(ctx.scope.dataUserId),
+      ]);
+      const clash =
+        assemblies.find(a => a.name.trim().toLowerCase() === name)?.name ??
+        (Number(line.snapshotMaterialCost) > 0
+          ? materials.find(m => m.name.trim().toLowerCase() === name)?.name
+          : undefined);
+      if (clash) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `Your library already has "${clash}". Use "Link to material or assembly" to price this line from it instead.`,
+        });
+      }
+
+      return db.saveLineAsAssembly({
+        userId: ctx.scope.dataUserId,
+        bidId: input.bidId,
+        line,
+        category: input.category,
+        laborRateId: input.laborRateId,
+        laborRate,
+      });
     }),
 
   removeLine: procedure

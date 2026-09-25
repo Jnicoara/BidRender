@@ -24,9 +24,10 @@
  * "no, not that, the other one" — hiding the escape at that moment would make
  * the feature findable only by typing a word with no neighbours in the library.
  *
- * What lands is a `takeoff_groups` row of kind `plain`. It never reaches the
- * bid's price, and a price can be attached to it later with every click intact
- * — which is the whole reason the group is a row (drizzle/schema.ts).
+ * What lands is a `takeoff_groups` row of kind `plain` — a free count. Since
+ * 2026-09-25 it can be sent to the bid like any count, arriving with NO price
+ * and NO hours, which are typed on the bid line (shared/handPricedLines.ts).
+ * Until it is sent it is a tally, and nothing about the bid moves.
  *
  * Ranking is `smartSearch`, the same as the Assembly Builder and the legend, so
  * the same query finds the same assembly wherever it is typed.
@@ -174,9 +175,11 @@ export function StampPicker({
 
         {/*
           The escape hatch, below a divider and worded as what it does rather
-          than as what it lacks. "No price" is the honest half of that and is
-          said plainly: a count that never reaches the bid must not look like
-          one that does, and the moment to say so is while it is being made.
+          than as what it lacks. Where the price comes from is said while the
+          count is being made, because it is different from every row above:
+          those bring a price with them, and this one gets it typed on the bid.
+          (Until 2026-09-25 this read "not on the bid", which stopped being
+          true when free counts became sendable.)
         */}
         {query.trim() && (
           <>
@@ -195,7 +198,7 @@ export function StampPicker({
                 </span>
               </span>
               <span className="block text-[0.7rem] text-muted-foreground mt-0.5 pl-[1.125rem]">
-                Just a tally — no price, not on the bid
+                No library item needed — price it on the bid
               </span>
             </button>
           </>

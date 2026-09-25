@@ -543,6 +543,13 @@ Everything else below is still open until you say so.
 2026-09-19 and again 2026-09-24 — read both overrides below before building
 against this.**
 
+> **A count with no library entry reaches the bid too, since 2026-09-25.**
+> `references/plan-viewer-overhaul.md` § 5f.4: a free count crosses with a BLANK
+> price and BLANK hours (NULL, not zero), typed on the bid line and named on
+> the bid's warning strip until they are. Everything (a) says about the
+> quantity following the marks applies to it unchanged. Recorded in both files
+> per `CLAUDE.md` § "Where decisions live".
+
 > **"Follows the marks for ever" now has ONE end: the estimator locking the
 > bid.** `references/plan-viewer-overhaul.md` § 5f.0 OVERRIDE 3 (2026-09-24)
 > amends (a) a second time: a bid carries `quantitiesLockedAt`, and while it is

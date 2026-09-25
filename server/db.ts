@@ -32,6 +32,7 @@ import {
   InsertMaterial,
   Material,
   materials,
+  type ASSEMBLY_CATEGORIES,
   InsertLaborRate,
   LaborRate,
   laborRates,
@@ -5028,6 +5029,37 @@ export async function addCountToBid(
 ): Promise<{ id: number }> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+
+  /*
+    A FREE COUNT — a name and some marks, nothing from the library.
+
+    It crosses with its price and hours BLANK, not zero: NULL in both snapshot
+    columns, which the estimator fills in on the bid line and the warning strip
+    names until they do (shared/handPricedLines.ts). Rate and modifier are 0
+    rather than NULL because neither is a thing anybody types for this line —
+    the rate arrives with the role picked beside the hours, and a free count
+    carries no modifiers (§ 5f.2, "one escape hatch, not a second pricing
+    system").
+
+    No catalog row is made. The line is the whole record, which is the point.
+  */
+  if (group.kind === "plain") {
+    const [result] = await db.insert(bidLineItems).values({
+      bidId,
+      assemblyId: null,
+      takeoffGroupId: group.id,
+      name: group.label,
+      qty: count.toFixed(4),
+      snapshotMaterialCost: null,
+      snapshotLaborHours: null,
+      snapshotModifierPct: "0",
+      snapshotLaborRate: "0",
+      snapshotModifierNames: [],
+      sortOrder: await nextBidSortOrder(bidId),
+    });
+    return { id: result.insertId };
+  }
+
   if (group.assemblyId === null)
     throw new Error("This count has no assembly to price from");
 
@@ -5054,6 +5086,97 @@ export async function addCountToBid(
     sortOrder: await nextBidSortOrder(bidId),
   });
   return { id: result.insertId };
+}
+
+/**
+ * Price a hand-priced line from a library ASSEMBLY — "Link to material or
+ * assembly" on the bid.
+ *
+ * ── Re-snapshotted, deliberately, and it is not a breach of R4 ──────────────
+ * R4 stops the LIBRARY moving a bid behind the estimator's back. This is the
+ * estimator choosing where the price comes from, on one line, now. It freezes
+ * all four inputs through `snapshotForAssembly` — the same arithmetic a counted
+ * assembly and a hand-added one use, so the three cannot price one assembly
+ * three ways. From here on the line is a library line and is not typed over.
+ *
+ * The line keeps its name and its link to the count. Linking says what it
+ * costs, not what it is called or how many — the plans still own those.
+ */
+export async function priceLineFromAssembly(
+  lineId: number,
+  bidId: number,
+  userId: number,
+  assemblyId: number
+): Promise<{ name: string } | undefined> {
+  const detail = await getAssemblyForStoredReference(assemblyId, userId);
+  if (!detail) return undefined;
+  const snapshot = await snapshotForAssembly(userId, detail);
+  await updateBidLineItem(lineId, bidId, {
+    assemblyId: detail.id,
+    ...snapshot,
+    snapshotAt: new Date(),
+  });
+  return { name: detail.name };
+}
+
+/**
+ * Save a hand-priced line to the library as an assembly, and link the line to
+ * it — "Save as assembly" on the bid.
+ *
+ * ── Two rows, and the reason is arithmetic ──────────────────────────────────
+ * An assembly has no price of its own: its material cost is the sum of its
+ * materials. So a typed $38 needs a material at $38 inside the assembly, or
+ * the saved assembly would price at $0 on the next job — the silent zero this
+ * feature exists to prevent, moved into the library where it spreads. A typed
+ * $0 makes no material at all (a labor-only assembly is legitimate, and a $0
+ * material would sit on the Materials screen flagged as unpriced forever).
+ * The screen says both rows will be made BEFORE this runs.
+ *
+ * The line's snapshot is not re-taken: the assembly was built from exactly
+ * these numbers, so it would come out the same. The rate is the exception —
+ * the role picked here is the role the assembly will carry, and the line is
+ * re-frozen at it so the two cannot disagree about who does the work.
+ */
+export async function saveLineAsAssembly(input: {
+  userId: number;
+  bidId: number;
+  line: BidLineItem;
+  category: (typeof ASSEMBLY_CATEGORIES)[number];
+  laborRateId: number | null;
+  laborRate: number;
+}): Promise<{ assemblyId: number; materialId: number | null }> {
+  const { userId, bidId, line } = input;
+  const cost = Number(line.snapshotMaterialCost);
+  const hours = Number(line.snapshotLaborHours);
+
+  const materialId =
+    cost > 0
+      ? await createMaterial({
+          userId,
+          name: line.name,
+          unitOfSale: "each",
+          costPerUnit: cost.toFixed(4),
+        })
+      : null;
+
+  const assemblyId = await createAssembly({
+    userId,
+    name: line.name,
+    category: input.category,
+    baseLaborHours: hours.toFixed(4),
+    overheadLaborHours: "0",
+    laborRateId: input.laborRateId,
+  });
+  await setAssemblyMaterials(
+    assemblyId,
+    materialId === null ? [] : [{ materialId, qty: "1.0000" }]
+  );
+
+  await updateBidLineItem(line.id, bidId, {
+    assemblyId,
+    snapshotLaborRate: input.laborRate.toFixed(4),
+  });
+  return { assemblyId, materialId };
 }
 
 /** The live bid line for a counted group, if it has one. */
@@ -8204,9 +8327,16 @@ export const ANALYTICS_MAX_BIDS = 20000;
  * Mirrors applyModifiersToHours followed by applyProductivityToHours, including
  * both zero clamps — a modifier summing below −100% must not produce negative
  * hours here while producing zero on the bid screen.
+ *
+ * ── COALESCE, because NULL here means "not typed yet" (drizzle/0075) ────────
+ * A free count sent to a bid has no hours until the estimator types some. The
+ * engine reads that as 0 (`Number(null)`). SQL does not: GREATEST() and `+`
+ * both return NULL on a NULL argument, so without the COALESCE the line's whole
+ * direct cost goes NULL, SUM() skips the row, and its MATERIAL disappears from
+ * the dashboard too. server/handPricedLines.test.ts asserts the two agree.
  */
 function lineHoursSql(productivityPct: number) {
-  return sql`GREATEST(0, GREATEST(0, ${bidLineItems.snapshotLaborHours} * (1 + ${bidLineItems.snapshotModifierPct})) * (1 + COALESCE(${bids.productivityPct}, ${productivityPct})))`;
+  return sql`GREATEST(0, GREATEST(0, COALESCE(${bidLineItems.snapshotLaborHours}, 0) * (1 + ${bidLineItems.snapshotModifierPct})) * (1 + COALESCE(${bids.productivityPct}, ${productivityPct})))`;
 }
 
 /**
@@ -8221,7 +8351,9 @@ function lineHoursSql(productivityPct: number) {
  */
 function costSums(productivityPct: number) {
   const hours = lineHoursSql(productivityPct);
-  const materialCents = sql`ROUND(${bidLineItems.snapshotMaterialCost} * 100) * ${bidLineItems.qty}`;
+  // COALESCE for the reason lineHoursSql gives: an untyped price (drizzle/0074)
+  // must total as 0, not turn the whole line NULL and drop it from the sum.
+  const materialCents = sql`ROUND(COALESCE(${bidLineItems.snapshotMaterialCost}, 0) * 100) * ${bidLineItems.qty}`;
   const laborCents = sql`ROUND(${hours} * ${bidLineItems.qty} * ${bidLineItems.snapshotLaborRate} * 100)`;
   return {
     materialCents: sql<string>`COALESCE(SUM(${materialCents}), 0)`,

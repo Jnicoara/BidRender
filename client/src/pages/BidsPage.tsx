@@ -73,6 +73,11 @@ import { CollapsiblePanel } from "@/components/CollapsiblePanel";
 import { SampleBidNotice } from "@/components/SampleBidNotice";
 import { QuantityLockPanel } from "@/components/QuantityLockPanel";
 import { countUnpricedLaborLines } from "@shared/laborRatePricing";
+import { canPriceByHand, missingEntryCounts } from "@shared/handPricedLines";
+import {
+  HandPricedLineFields,
+  handPricedGap,
+} from "@/components/HandPricedLineFields";
 import { quantitySource } from "@shared/quantityLock";
 import { money } from "@/lib/money";
 
@@ -420,6 +425,14 @@ export default function BidsPage({
    * came from had no labor rate attached. See shared/laborRatePricing.ts.
    */
   const unpricedLaborLines = countUnpricedLaborLines(lines);
+
+  /**
+   * Hand-priced lines with a price or hours nobody has typed yet — a free count
+   * sent from the plans arrives this way. Blank, not zero: see
+   * shared/handPricedLines.ts. Read from the lines themselves so a typed price
+   * clears its entry the moment the optimistic update lands.
+   */
+  const missingEntry = missingEntryCounts(lines);
 
   /**
    * Which pricing settings this bid has taken off the company default.
@@ -808,6 +821,28 @@ export default function BidsPage({
                                 )}
                               </div>
                             ) : null}
+                            {/*
+                              A line priced BY HAND carries its own price and
+                              hours fields — a free count sent from the plans,
+                              or any line with no library source. What is blank
+                              is said in amber on the line itself as well as on
+                              the strip, because the strip says HOW MANY and
+                              only the line can say WHICH.
+                            */}
+                            {canPriceByHand(line) ? (
+                              <>
+                                {handPricedGap(line) ? (
+                                  <div className="text-xs text-[#F5C518]">
+                                    {handPricedGap(line)}
+                                  </div>
+                                ) : null}
+                                <HandPricedLineFields
+                                  bidId={bidId}
+                                  line={line}
+                                  onChanged={refresh}
+                                />
+                              </>
+                            ) : null}
                           </div>
                           {/*
                           A from-plans line's quantity is not typeable, because
@@ -917,6 +952,50 @@ export default function BidsPage({
               </div>
 
               {/*
+                Lines with a price or hours NOBODY HAS TYPED — a free count sent
+                from the plans arrives this way.
+
+                Blank, not zero (shared/handPricedLines.ts). Each blank totals
+                as $0 above, which is the money convention, and this is where it
+                shouts: fourteen fixtures at nothing would otherwise total, tax
+                and print with nothing on the screen looking unfinished. A typed
+                0 is an answer and is never listed here.
+
+                Two entries rather than one, because they are missing from two
+                different numbers above and want two different things typed.
+              */}
+              {missingEntry.noPrice > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {missingEntry.noPrice} line
+                      {missingEntry.noPrice === 1 ? " has" : "s have"} no price
+                    </span>{" "}
+                    — {missingEntry.noPrice === 1 ? "it is" : "they are"} in the
+                    Materials total above at $0. Type a price on the line (0 is
+                    fine if it really costs nothing).
+                  </p>
+                </div>
+              )}
+
+              {missingEntry.noHours > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {missingEntry.noHours} line
+                      {missingEntry.noHours === 1 ? " has" : "s have"} no labor
+                      hours
+                    </span>{" "}
+                    — no labor for {missingEntry.noHours === 1 ? "it" : "them"}{" "}
+                    is in the total above. Type hours on the line (0 if someone
+                    else installs it).
+                  </p>
+                </div>
+              )}
+
+              {/*
                 Hours that are being priced at nothing.
 
                 Sits directly under the labor line because that is the number it
@@ -937,8 +1016,10 @@ export default function BidsPage({
                       labor rate
                     </span>{" "}
                     — their hours are in the total above and their labor is
-                    priced at $0. Open the assembly in the Library and give it a
-                    role, then re-add the line to pick the rate up.
+                    priced at $0. On a line priced by hand, pick who does the
+                    hours beside them. On an assembly line, give the assembly a
+                    role in the Library, then re-add the line to pick the rate
+                    up.
                   </p>
                 </div>
               )}
@@ -961,9 +1042,8 @@ export default function BidsPage({
                       {fromPlans.waitingToSend === 1 ? " is" : "s are"} not on
                       this bid yet
                     </span>{" "}
-                    — they are marked and priced on your plans, and none of that
-                    money is in the total above. Send them from the Plans
-                    screen.
+                    — they are marked on your plans, and none of them is in the
+                    total above. Send them from the Plans screen.
                   </p>
                 </div>
               )}
@@ -979,9 +1059,10 @@ export default function BidsPage({
                         : "s have"}{" "}
                       no price
                     </span>{" "}
-                    — they are marked on your plans and can never reach this
-                    bid. Count them against something from your library to give
-                    them a price.
+                    — they were counted against an assembly that is no longer in
+                    your library, so there is nothing to price them from. Count
+                    them again on the Plans screen, from the library or as a
+                    free count.
                   </p>
                 </div>
               )}
