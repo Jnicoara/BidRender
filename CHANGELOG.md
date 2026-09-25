@@ -6,6 +6,22 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **A finished scale check now shows as checked the moment you press Enter.**
+  Two faults caused "not checked" to stick around after a check:
+  - The label only changed once the page re-downloaded the sheet list, a
+    second round trip after the save. On a slow connection the check had
+    saved but the label still said otherwise. It now updates from the save
+    itself, instantly, and goes back if the save fails.
+  - Clicking "Check it" while "Measure it" was already open left the tool
+    measuring. Your two points and length then *re-set* the scale, which
+    clears any check, instead of confirming it. Each "Measure it" / "Check
+    it" now starts the tool fresh in the mode you clicked.
+
+- **Traced footage follows a scale change straight away.** After changing a
+  sheet's scale, the footage panel kept showing lengths worked out at the old
+  scale until the page was reloaded (it read 115.74 ft of conduit where the
+  true figure was 111.12 ft). It now updates as soon as the scale does.
+
 - **Enter now confirms a scale measurement every time.** It only worked
   when the cursor was still in the distance box and what you typed could be
   read. Click anywhere else first — the card, the "?" — and Enter did

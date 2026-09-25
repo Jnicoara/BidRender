@@ -187,6 +187,7 @@ import {
 import { LegendPanel } from "@/components/takeoff/LegendPanel";
 import { CoPilotPanel } from "@/components/takeoff/CoPilotPanel";
 import { snapshotPage } from "@/lib/planSnapshot";
+import { withSavedSheet, withSheetChecked } from "@/lib/sheetScaleCache";
 import { canRetryWithFreshUrl, isExpiredPlanUrl } from "@/lib/planUrlRefresh";
 import { groupStamps } from "@shared/takeoffCounts";
 import { LayersPanel } from "@/components/takeoff/LayersPanel";
@@ -1839,6 +1840,26 @@ export default function TakeoffPage({
    * belongs to the click that opened it.
    */
   const [calibrateMode, setCalibrateMode] = useState<"set" | "check">("set");
+  /**
+   * Bumped on EVERY "Measure it" / "Check it", and used as CalibrateLayer's
+   * key, so each request starts a fresh layer in the mode asked for.
+   *
+   * ── The fault, 2026-09-25 ─────────────────────────────────────────────
+   * The layer reads the mode once, when it mounts. Clicking the toolbar's
+   * "Check it" while "Measure it" was already open changed the mode here and
+   * nothing there: the bar still said "Measure the scale", so the estimator's
+   * two points and length were a MEASUREMENT, and Enter re-set the scale —
+   * which clears any check — and then asked for a check. What they did as a
+   * check ended as "not checked". Reproduced locally before the fix.
+   */
+  const [calibrateSession, setCalibrateSession] = useState(0);
+  const startCalibrating = (mode: "set" | "check") => {
+    setCalibratePoints([]);
+    setCalibrateMode(mode);
+    setCalibrateSession(n => n + 1);
+    setCalibrating(true);
+    setArmedGroup(null);
+  };
   const [calibratePoints, setCalibratePoints] = useState<PagePoint[]>([]);
 
   /**
@@ -2014,6 +2035,16 @@ export default function TakeoffPage({
   const refreshSheets = () => {
     if (doc) void utils.bidPdfs.sheets.invalidate({ bidPdfId: doc.id });
     void utils.takeoffRuns.measurability.invalidate();
+    /*
+      A sheet's SCALE is what every traced length on it is worked out from,
+      so a sheet refresh is also a runs refresh. Found 2026-09-25: after a
+      scale changed and changed back, the traced-footage panel kept showing
+      lengths at the in-between scale — 115.74 ft of 1/2" EMT against the
+      true 111.12 ft — until the page was reloaded. Same class as the
+      counted-items panel in CLAUDE.md: a derived number in a query the
+      mutation never told to let go.
+    */
+    refreshRuns();
   };
 
   const createTicket = trpc.bidPdfs.createUploadTicket.useMutation();
@@ -2097,28 +2128,69 @@ export default function TakeoffPage({
     onSettled: refreshSheets,
   });
 
+  /**
+   * Put a scale mutation's saved row into the sheet list NOW.
+   *
+   * The scale chip reads this list, and used to change only when the refetch
+   * behind `refreshSheets` landed — a whole round trip after the save, in
+   * which a confirmed check still read "not checked" (2026-09-25; see
+   * @/lib/sheetScaleCache). Cancelling first matters: a fetch already in
+   * flight read the row BEFORE this save, and would otherwise land after this
+   * write and put the old value back. The refetch still runs afterwards, so
+   * anything else on the row catches up as before.
+   */
+  type SheetView = (typeof sheets)[number];
+  const writeSavedSheet = async (saved: SheetView) => {
+    if (!doc) return;
+    await utils.bidPdfs.sheets.cancel({ bidPdfId: doc.id });
+    utils.bidPdfs.sheets.setData({ bidPdfId: doc.id }, old =>
+      withSavedSheet(old, saved)
+    );
+  };
+
   const setSheetScale = trpc.bidPdfs.setSheetScale.useMutation({
-    onSuccess: sheet => {
+    onSuccess: async sheet => {
       // Plain words, matching the chip — "Scale set to 1:64.015002" is a
       // confirmation nobody can read back to check.
       toast.success(
         `Scale set to ${sheet.scaleRatio === null ? "none" : describeScale(sheet.scaleRatio)}.`
       );
+      await writeSavedSheet(sheet);
       refreshSheets();
     },
     onError: error => toast.error(error.message),
   });
 
   const confirmSheetScale = trpc.bidPdfs.confirmSheetScale.useMutation({
-    onSuccess: () => {
-      toast.success("Scale checked.");
-      refreshSheets();
+    // Optimistic: "checked" shows the instant Enter is pressed, and is put
+    // back if the save fails — a failed confirm must never read as checked.
+    onMutate: async ({ id }) => {
+      if (!doc) return {};
+      await utils.bidPdfs.sheets.cancel({ bidPdfId: doc.id });
+      const snapshot = utils.bidPdfs.sheets.getData({ bidPdfId: doc.id });
+      utils.bidPdfs.sheets.setData({ bidPdfId: doc.id }, old =>
+        withSheetChecked(old, id, new Date())
+      );
+      return { snapshot };
     },
-    onError: error => toast.error(error.message),
+    onSuccess: async sheet => {
+      toast.success("Scale checked.");
+      await writeSavedSheet(sheet);
+    },
+    onError: (error, _vars, context) => {
+      if (context?.snapshot && doc) {
+        utils.bidPdfs.sheets.setData({ bidPdfId: doc.id }, context.snapshot);
+      }
+      toast.error(error.message);
+    },
+    onSettled: refreshSheets,
   });
 
   const clearSheetScale = trpc.bidPdfs.clearSheetScale.useMutation({
-    onSuccess: refreshSheets,
+    onSuccess: async sheet => {
+      await writeSavedSheet(sheet);
+      refreshSheets();
+    },
     onError: error => toast.error(error.message),
   });
 
@@ -4187,18 +4259,8 @@ export default function TakeoffPage({
                   setSheetScale.mutateAsync({ id: activeSheet.id, scaleText })
                 }
                 onClear={() => clearSheetScale.mutate({ id: activeSheet.id })}
-                onMeasure={() => {
-                  setCalibratePoints([]);
-                  setCalibrateMode("set");
-                  setCalibrating(true);
-                  setArmedGroup(null);
-                }}
-                onCheck={() => {
-                  setCalibratePoints([]);
-                  setCalibrateMode("check");
-                  setCalibrating(true);
-                  setArmedGroup(null);
-                }}
+                onMeasure={() => startCalibrating("set")}
+                onCheck={() => startCalibrating("check")}
               />
             )}
 
@@ -4436,6 +4498,8 @@ export default function TakeoffPage({
                               other click on this screen. */}
                     {calibrating && activeSheet && (
                       <CalibrateLayer
+                        // A fresh layer per request — see calibrateSession.
+                        key={calibrateSession}
                         width={size.width}
                         height={size.height}
                         renderScale={size.renderScale}
