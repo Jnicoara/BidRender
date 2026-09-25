@@ -292,7 +292,9 @@ const bareCopper: BaselineMaterial[] = [
     category: "Wire & Cable" as const,
     searchAliases: aliases(
       gaugeAliases(gauge),
-      "ground grounding earth bond bonding gec egc green"
+      "ground grounding earth bond bonding gec egc green",
+      // #8 solid is what a pool or spa's equipotential bonding grid is run in.
+      gauge === "#8" ? "pool spa equipotential wire" : ""
     ),
   })),
   ...["#10", "#8", "#6", "#4", "#2", "#1/0", "#2/0"].map(gauge => ({

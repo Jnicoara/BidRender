@@ -338,7 +338,9 @@ export const EQUIPMENT: BaselineMaterial[] = [
     ...item("Equipment & Appliances"),
     name: "EV charger",
     searchAliases: aliases(
-      "evse electric vehicle car level 2 charging station tesla j1772 40 amp"
+      // "40 amp" came off on 2026-09-25, when the 32A, 40A and 48A chargers
+      // joined as their own rows.
+      "evse electric vehicle car level 2 charging station tesla j1772"
     ),
   },
   {
@@ -365,6 +367,115 @@ export const EQUIPMENT: BaselineMaterial[] = [
   {
     ...item("Equipment & Appliances"),
     name: "Doorbell transformer",
-    searchAliases: aliases("chime 16v 24v low voltage bell xfmr ring nest"),
+    searchAliases: aliases(
+      "chime 16v 24v 30va video low voltage bell xfmr ring nest"
+    ),
   },
+  /*
+    ── Moved from the pricing sheet, 2026-09-25 ─────────────────────────────
+    What a residential job connects, by the job the sheet walked: bath fan,
+    ceiling fan, EV charger, generator, spa, well pump. Aliases avoid the
+    full names of the shipped fans and switches so none of these competes
+    with the equipment it serves.
+  */
+  ...[
+    ...["50", "80", "110", "150"].map(cfm => ({
+      name: `Bath exhaust fan, ${cfm} CFM`,
+      slang: `${cfm}cfm vent bathroom ceiling`,
+    })),
+    {
+      name: "Bath exhaust fan, light combo",
+      slang: "vent bathroom ceiling light",
+    },
+    {
+      name: "Bath exhaust fan, heater combo",
+      slang: "vent bathroom ceiling heat",
+    },
+    // Not the sheet's "Bath fan grille", nor "Exhaust fan replacement
+    // grille": a name that starts with the words searched led that search.
+    { name: "Replacement fan grille", slang: "bath exhaust vent cover" },
+    { name: "Humidity sensor switch", slang: "bath vent auto control" },
+    { name: "Inline duct fan", slang: "booster remote mount exhaust" },
+    ...['4"', '6"'].map(size => ({
+      name: `${size} backdraft damper`,
+      slang: `${size.replace('"', "")} duct vent flap`,
+    })),
+    ...['4"', '6"'].map(size => ({
+      name: `${size} insulated flex duct`,
+      slang: `${size.replace('"', "")} vent exhaust flexible`,
+    })),
+    { name: '4" roof vent cap', slang: "4 exhaust jack termination" },
+    { name: '4" wall vent cap', slang: "4 exhaust hood termination" },
+    { name: "Duct clamp", slang: "hose clamp vent band" },
+    { name: "Foil duct tape", slang: "aluminum hvac vent" },
+    {
+      name: "Fan balancing kit",
+      slang: "wobble weights paddle blade",
+    },
+    ...['12"', '24"', '36"'].map(size => ({
+      name: `${size} fan downrod`,
+      slang: `${size.replace('"', "")} paddle extension pipe`,
+    })),
+    { name: "Sloped ceiling fan adapter", slang: "vaulted angled canopy" },
+    { name: "Ceiling fan remote kit", slang: "paddle receiver handheld" },
+    { name: "Attic fan thermostat", slang: "gable ventilator control" },
+    { name: "Baseboard heater", slang: "electric heat 240v wall" },
+    { name: "Baseboard heater thermostat", slang: "line voltage wall" },
+    { name: "Unit heater", slang: "garage shop hanging electric heat" },
+    { name: "Snow melt controller", slang: "heat trace de-icing sensor" },
+    ...["32", "40", "48"].map(amps => ({
+      name: `${amps}A EV charger`,
+      slang: `${amps} amp evse electric vehicle car level 2 j1772`,
+    })),
+    // Not "EV charger pedestal": it led "ev charger" above the chargers.
+    { name: "EVSE pedestal", slang: "ev charging mount post stand" },
+    { name: "AC condenser whip", slang: "a/c liquidtight disconnect hvac" },
+    { name: "Dishwasher whip", slang: "cord appliance hardwire flex" },
+    { name: "Garbage disposal cord", slang: "disposer cord appliance plug" },
+    ...["3", "4"].map(wires => ({
+      name: `Dryer cord, ${wires}-wire`,
+      slang: `${wires} prong pigtail appliance 30 amp`,
+    })),
+    ...["3", "4"].map(wires => ({
+      name: `Range cord, ${wires}-wire`,
+      slang: `${wires} prong pigtail stove oven 50 amp`,
+    })),
+    ...["30", "50"].map(amps => ({
+      name: `${amps}A power inlet box`,
+      slang: `${amps} amp generator inlet portable backfeed`,
+    })),
+    ...["30", "50"].map(amps => ({
+      name: `${amps}A generator cord`,
+      slang: `${amps} amp portable extension twist lock`,
+    })),
+    /*
+      "Cord cap", the trade's word for the male end, rather than the sheet's
+      "Generator plug": a name whose head noun is "plug" led every search for
+      "plug", which on a job means a receptacle.
+    */
+    {
+      name: "Generator cord cap, L14-30",
+      slang: "plug l14-30p twist lock 30 amp male",
+    },
+    {
+      name: "Generator cord cap, CS6365",
+      slang: "plug cs6364 50 amp twist lock male",
+    },
+    { name: "Generator battery charger", slang: "standby trickle maintainer" },
+    { name: "Generator pad", slang: "standby composite base mount" },
+    { name: "Spa bonding lug", slang: "pool hot tub equipotential bond" },
+    { name: "Pump control relay", slang: "well sump contactor" },
+    { name: "Well pump control box", slang: "submersible 3 wire capacitor" },
+    { name: "Well pump pressure switch", slang: "30/50 40/60 square d" },
+    { name: "Well pump pitless adapter", slang: "casing submersible" },
+    {
+      name: "Submersible pump splice kit",
+      slang: "well heat shrink waterproof",
+    },
+    { name: "Sump pump alarm", slang: "high water basement flood" },
+  ].map(({ name, slang }) => ({
+    ...item("Equipment & Appliances"),
+    name,
+    searchAliases: aliases(slang),
+  })),
 ];

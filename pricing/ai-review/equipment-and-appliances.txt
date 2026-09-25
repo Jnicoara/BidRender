@@ -1,22 +1,21 @@
 Category: Equipment & Appliances
-Items: 73
+Items: 68
 
 Category | Name | Size
 Equipment & Appliances | AC condenser whip | -
 Equipment & Appliances | Attic fan | -
 Equipment & Appliances | Attic fan thermostat | -
-Equipment & Appliances | Backdraft damper, 4 in | 4 in
-Equipment & Appliances | Backdraft damper, 6 in | 6 in
+Equipment & Appliances | 4" backdraft damper | 4"
+Equipment & Appliances | 6" backdraft damper | 6"
 Equipment & Appliances | Baseboard heater | -
 Equipment & Appliances | Baseboard heater thermostat | -
 Equipment & Appliances | Bath exhaust fan | -
-Equipment & Appliances | Bath fan grille | -
-Equipment & Appliances | Bath fan with heater | -
-Equipment & Appliances | Bath fan with light | -
-Equipment & Appliances | Bath fan, 110 CFM | 110 CFM
-Equipment & Appliances | Bath fan, 150 CFM | 150 CFM
-Equipment & Appliances | Bath fan, 50 CFM | 50 CFM
-Equipment & Appliances | Bath fan, 80 CFM | 80 CFM
+Equipment & Appliances | Bath exhaust fan, 110 CFM | 110 CFM
+Equipment & Appliances | Bath exhaust fan, 150 CFM | 150 CFM
+Equipment & Appliances | Bath exhaust fan, 50 CFM | 50 CFM
+Equipment & Appliances | Bath exhaust fan, 80 CFM | 80 CFM
+Equipment & Appliances | Bath exhaust fan, heater combo | -
+Equipment & Appliances | Bath exhaust fan, light combo | -
 Equipment & Appliances | Ceiling fan remote kit | -
 Equipment & Appliances | Dishwasher whip | -
 Equipment & Appliances | Doorbell transformer | -
@@ -27,49 +26,45 @@ Equipment & Appliances | 32A EV charger | 32A
 Equipment & Appliances | 40A EV charger | 40A
 Equipment & Appliances | 48A EV charger | 48A
 Equipment & Appliances | EV charger | -
-Equipment & Appliances | EV charger pedestal | -
+Equipment & Appliances | EVSE pedestal | -
 Equipment & Appliances | Fan balancing kit | -
-Equipment & Appliances | Fan downrod, 12 in | 12 in
-Equipment & Appliances | Fan downrod, 24 in | 24 in
-Equipment & Appliances | Fan downrod, 36 in | 36 in
-Equipment & Appliances | Fan mounting brace, adjustable | -
-Equipment & Appliances | Fan wall control | -
+Equipment & Appliances | 12" fan downrod | 12"
+Equipment & Appliances | 24" fan downrod | 24"
+Equipment & Appliances | 36" fan downrod | 36"
 Equipment & Appliances | Foil duct tape | -
 Equipment & Appliances | Garbage disposal cord | -
 Equipment & Appliances | Generator battery charger | -
-Equipment & Appliances | Generator cord, 30A | 30A
-Equipment & Appliances | Generator cord, 50A | 50A
+Equipment & Appliances | 30A generator cord | 30A
+Equipment & Appliances | 50A generator cord | 50A
+Equipment & Appliances | Generator cord cap, CS6365 | -
+Equipment & Appliances | Generator cord cap, L14-30 | -
 Equipment & Appliances | Generator inlet box | -
 Equipment & Appliances | Generator interlock kit | -
 Equipment & Appliances | Generator pad | -
-Equipment & Appliances | Generator plug, CS6365 | -
-Equipment & Appliances | Generator plug, L14-30 | -
 Equipment & Appliances | Heat pump disconnect | -
 Equipment & Appliances | Hot tub GFCI panel | -
 Equipment & Appliances | Humidity sensor switch | -
 Equipment & Appliances | Inline duct fan | -
-Equipment & Appliances | Insulated flex duct, 4 in | 4 in
-Equipment & Appliances | Insulated flex duct, 6 in | 6 in
+Equipment & Appliances | 4" insulated flex duct | 4"
+Equipment & Appliances | 6" insulated flex duct | 6"
 Equipment & Appliances | Manual transfer switch | -
 Equipment & Appliances | Mini-split disconnect | -
-Equipment & Appliances | Power inlet box, 30A | 30A
-Equipment & Appliances | Power inlet box, 50A | 50A
+Equipment & Appliances | 30A power inlet box | 30A
+Equipment & Appliances | 50A power inlet box | 50A
 Equipment & Appliances | Pump control relay | -
 Equipment & Appliances | Range cord, 3-wire | -
 Equipment & Appliances | Range cord, 4-wire | -
 Equipment & Appliances | Range hood fan | -
-Equipment & Appliances | Roof vent cap, 4 in | 4 in
+Equipment & Appliances | Replacement fan grille | -
+Equipment & Appliances | 4" roof vent cap | 4"
 Equipment & Appliances | Sloped ceiling fan adapter | -
 Equipment & Appliances | Snow melt controller | -
 Equipment & Appliances | Spa bonding lug | -
-Equipment & Appliances | Spa bonding wire, #8 solid | #8
 Equipment & Appliances | Spa manual disconnect | -
 Equipment & Appliances | Submersible pump splice kit | -
 Equipment & Appliances | Sump pump alarm | -
-Equipment & Appliances | Transfer switch, 10-circuit | -
-Equipment & Appliances | Transfer switch, 6-circuit | -
 Equipment & Appliances | Unit heater | -
-Equipment & Appliances | Wall vent cap, 4 in | 4 in
+Equipment & Appliances | 4" wall vent cap | 4"
 Equipment & Appliances | Water heater disconnect | -
 Equipment & Appliances | Well pump control box | -
 Equipment & Appliances | Well pump pitless adapter | -

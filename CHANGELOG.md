@@ -6,6 +6,19 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **103 more low-voltage and equipment items in the starter catalog, from the
+  pricing sheet — the last batch of the ones nothing was holding back.**
+  Cat5e, Cat6A, shielded and fiber cable, thermostat and security wire,
+  keystone and media plates, racks and cable managers, cameras, doorbells and
+  chimes; bath fans by CFM, fan downrods and controls, dampers and ducting,
+  baseboard and unit heaters, 32/40/48A EV chargers, dryer and range cords,
+  generator cords, inlets and cord caps, well-pump and spa parts. Cable rows
+  are sold by the foot (the sheet had them as "each"). Across the five
+  batches the catalog grew from 708 to 1,106 starter items, and the pricing
+  sheet's list of items not yet in the app went from 681 to 170. Every one
+  of those 170 is held back on purpose, by a recorded decision or a question
+  for the owner.
+
 - **67 more lighting and life-safety items in the starter catalog, from the
   pricing sheet.** 4" and 6" can trims in seven styles, chandeliers, pendants,
   sconces, wraparounds, area and canopy lights, step lights, a 2 ft strip,

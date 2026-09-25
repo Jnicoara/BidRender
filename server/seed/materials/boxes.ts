@@ -181,7 +181,7 @@ const ceilingBoxes: BaselineMaterial[] = [
     ...each,
     name: "Ceiling fan brace box",
     searchAliases: aliases(
-      "retrofit saf-t-brace expandable bar joist old work remodel paddle rated"
+      "retrofit saf-t-brace expandable adjustable mounting bar joist old work remodel paddle rated"
     ),
   },
   {

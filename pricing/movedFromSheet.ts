@@ -157,6 +157,18 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   "Photocell for wall pack": "Photocell",
   "Photocell, stem mount": "Photocell",
   "Dual-action pull station": "Fire alarm pull station",
+
+  // ── Batch 5: low voltage, equipment and appliances
+  "18/2 thermostat wire": "18/2 control wire",
+  "Doorbell wire": "18/2 control wire",
+  "Low-voltage mounting bracket": "Low-voltage mud ring",
+  "Video doorbell transformer": "Doorbell transformer",
+  "Fan mounting brace, adjustable": "Ceiling fan brace box",
+  "Fan wall control": "Fan speed control",
+  "Spa bonding wire, #8 solid": "#8 bare copper, solid",
+  // The shipped manual transfer switch already stands for both sizes.
+  "Transfer switch, 6-circuit": "Manual transfer switch",
+  "Transfer switch, 10-circuit": "Manual transfer switch",
 };
 
 export const RENAMED_FROM_SHEET: Record<string, string> = {
@@ -254,6 +266,37 @@ export const RENAMED_FROM_SHEET: Record<string, string> = {
   // A name starting "Smoke detector" led a search for "smoke detector".
   "Smoke detector base": "Detector base",
   "Smoke detector interconnect harness": "Detector wiring harness",
+
+  // ── Batch 5
+  "18/5 thermostat wire": "18/5 control wire",
+  "18/8 thermostat wire": "18/8 control wire",
+  // Velcro is a brand.
+  "Velcro cable strap": "Hook-and-loop cable strap",
+  "Bath fan, 50 CFM": "Bath exhaust fan, 50 CFM",
+  "Bath fan, 80 CFM": "Bath exhaust fan, 80 CFM",
+  "Bath fan, 110 CFM": "Bath exhaust fan, 110 CFM",
+  "Bath fan, 150 CFM": "Bath exhaust fan, 150 CFM",
+  "Bath fan with light": "Bath exhaust fan, light combo",
+  "Bath fan with heater": "Bath exhaust fan, heater combo",
+  // Names that led a search they should not have: "bath fan", "plug",
+  // "ev charger".
+  "Bath fan grille": "Replacement fan grille",
+  "Generator plug, L14-30": "Generator cord cap, L14-30",
+  "Generator plug, CS6365": "Generator cord cap, CS6365",
+  "EV charger pedestal": "EVSE pedestal",
+  "Backdraft damper, 4 in": '4" backdraft damper',
+  "Backdraft damper, 6 in": '6" backdraft damper',
+  "Insulated flex duct, 4 in": '4" insulated flex duct',
+  "Insulated flex duct, 6 in": '6" insulated flex duct',
+  "Roof vent cap, 4 in": '4" roof vent cap',
+  "Wall vent cap, 4 in": '4" wall vent cap',
+  "Fan downrod, 12 in": '12" fan downrod',
+  "Fan downrod, 24 in": '24" fan downrod',
+  "Fan downrod, 36 in": '36" fan downrod',
+  "Generator cord, 30A": "30A generator cord",
+  "Generator cord, 50A": "50A generator cord",
+  "Power inlet box, 30A": "30A power inlet box",
+  "Power inlet box, 50A": "50A power inlet box",
   "200A outdoor main breaker panel": "200A outdoor main panel",
 };
 

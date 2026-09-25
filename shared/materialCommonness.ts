@@ -170,6 +170,11 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   "Fire alarm horn/strobe": "common",
   "Fire alarm pull station": "common",
 
+  // ── Generator: the part most residential generator jobs buy ──
+  // Added 2026-09-25, when the generator-ready panel, cords and pad arrived
+  // and "Generator-ready main panel" led "generator" on the alphabet.
+  "Generator interlock kit": "common",
+
   // ── Grounding: on every service ──
   "Ground rod, 8 ft": "common",
 };

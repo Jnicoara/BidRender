@@ -1,15 +1,14 @@
 Category: Low Voltage
-Items: 69
+Items: 65
 
 Category | Name | Size
 Low Voltage | 14/2 speaker wire | -
 Low Voltage | 150W landscape transformer | -
 Low Voltage | 16/2 speaker wire | -
 Low Voltage | 18/2 control wire | -
-Low Voltage | 18/2 thermostat wire | -
 Low Voltage | 18/4 control wire | -
-Low Voltage | 18/5 thermostat wire | -
-Low Voltage | 18/8 thermostat wire | -
+Low Voltage | 18/5 control wire | -
+Low Voltage | 18/8 control wire | -
 Low Voltage | 22/2 security cable | -
 Low Voltage | 22/4 security cable | -
 Low Voltage | 300W landscape transformer | -
@@ -37,10 +36,10 @@ Low Voltage | Doorbell button | -
 Low Voltage | Doorbell chime, wired | -
 Low Voltage | Doorbell chime, wireless | -
 Low Voltage | Doorbell diode | -
-Low Voltage | Doorbell wire | -
 Low Voltage | Fiber optic cable | -
 Low Voltage | Fiber patch panel | -
 Low Voltage | HDMI wall plate | -
+Low Voltage | Hook-and-loop cable strap | -
 Low Voltage | Horizontal cable manager | -
 Low Voltage | In-ceiling speaker | -
 Low Voltage | Keypad mounting plate | -
@@ -51,7 +50,6 @@ Low Voltage | Keystone wall plate, 6-port | -
 Low Voltage | Landscape light fixture | -
 Low Voltage | Landscape lighting cable | -
 Low Voltage | Lighted doorbell button | -
-Low Voltage | Low-voltage mounting bracket | -
 Low Voltage | Network rack, wall mount | -
 Low Voltage | NVR enclosure | -
 Low Voltage | Patch panel blank | -
@@ -64,10 +62,8 @@ Low Voltage | Security camera, dome | -
 Low Voltage | Speaker wall plate | -
 Low Voltage | Structured media enclosure | -
 Low Voltage | Thermostat wall plate | -
-Low Voltage | Velcro cable strap | -
 Low Voltage | Vertical cable manager | -
 Low Voltage | Video doorbell | -
 Low Voltage | Video doorbell chime kit | -
-Low Voltage | Video doorbell transformer | -
 Low Voltage | Volume control | -
 Low Voltage | Wire mold for low voltage | -
