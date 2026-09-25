@@ -41,11 +41,14 @@ import { BrandingSection } from "@/components/BrandingSection";
 import { SalesTaxSection } from "@/components/SalesTaxSection";
 import { ProposalDesignControls } from "@/components/proposal/ProposalDesignControls";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useCrosshairColor } from "@/hooks/useCrosshairColor";
+import { useCrosshairColor, useCrosshairSize } from "@/hooks/useCrosshairColor";
 import {
   CROSSHAIR_COLORS,
+  CROSSHAIR_SIZES,
+  DEFAULT_CROSSHAIR_SIZE,
   crosshairSvg,
   type CrosshairColor,
+  type CrosshairSize,
 } from "@/lib/crosshairCursor";
 import {
   SETTINGS_SECTIONS,
@@ -170,8 +173,9 @@ function CrosshairColorSetting() {
             >
               <span className="flex-1 bg-white" />
               <span className="flex-1 bg-[#0f1117]" />
+              {/* Small, so every colour fits its chip; size is chosen below. */}
               <img
-                src={`data:image/svg+xml,${encodeURIComponent(crosshairSvg(key))}`}
+                src={`data:image/svg+xml,${encodeURIComponent(crosshairSvg(key, "small"))}`}
                 alt=""
                 width={24}
                 height={24}
@@ -184,7 +188,65 @@ function CrosshairColorSetting() {
           </button>
         ))}
       </div>
+      <CrosshairSizeSetting color={color} />
     </section>
+  );
+}
+
+/**
+ * The crosshair's size, beside its colour and saved the same way.
+ *
+ * Each option is the real cursor at its REAL size, in the chosen colour, over
+ * the same paper/dark strip — the thing being chosen is how long the arms are
+ * on screen, and a scaled-down preview would misreport exactly that.
+ */
+function CrosshairSizeSetting({ color }: { color: CrosshairColor }) {
+  const [size, setSize] = useCrosshairSize();
+  return (
+    <div className="space-y-2 pt-1">
+      <h4 className="text-xs font-medium text-foreground">Crosshair size</h4>
+      <div className="flex flex-wrap gap-2" role="radiogroup">
+        {(Object.keys(CROSSHAIR_SIZES) as CrosshairSize[]).map(key => {
+          const px = CROSSHAIR_SIZES[key].px;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={size === key}
+              onClick={() => setSize(key)}
+              className={cn(
+                "flex flex-col items-center gap-1.5 rounded-lg border-2 p-1.5 transition-colors",
+                size === key
+                  ? "border-[#F5C518] bg-[var(--bp-yellow-dim)]"
+                  : "border-border hover:border-border/80 hover:bg-muted/30"
+              )}
+            >
+              <span
+                className="relative flex h-14 w-20 overflow-hidden rounded border border-border/60"
+                aria-hidden="true"
+              >
+                <span className="flex-1 bg-white" />
+                <span className="flex-1 bg-[#0f1117]" />
+                <img
+                  src={`data:image/svg+xml,${encodeURIComponent(crosshairSvg(color, key))}`}
+                  alt=""
+                  width={px}
+                  height={px}
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                />
+              </span>
+              <span className="text-[0.7rem] text-foreground">
+                {CROSSHAIR_SIZES[key].label}
+                {key === DEFAULT_CROSSHAIR_SIZE && (
+                  <span className="text-muted-foreground"> · default</span>
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

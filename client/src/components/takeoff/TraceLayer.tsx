@@ -42,7 +42,7 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { CrosshairGuides, type CrosshairHandle } from "./CrosshairGuides";
 import { CROSSHAIR_COLORS, crosshairCursorStyle } from "@/lib/crosshairCursor";
-import { useCrosshairColor } from "@/hooks/useCrosshairColor";
+import { useCrosshairColor, useCrosshairSize } from "@/hooks/useCrosshairColor";
 import { Check, Ruler, TriangleAlert, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -213,6 +213,7 @@ export function TraceLayer({
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [crosshairColor] = useCrosshairColor();
+  const [crosshairSize] = useCrosshairSize();
   /** Moved directly, never through a render. See CrosshairGuides. */
   const guidesRef = useRef<CrosshairHandle | null>(null);
   /** Where the pointer is, for the rubber-band segment from the last vertex. */
@@ -340,7 +341,9 @@ export function TraceLayer({
           so it cannot trail behind the way the old drawn one did.
         */
         style={
-          tracing || stamping ? crosshairCursorStyle(crosshairColor) : undefined
+          tracing || stamping
+            ? crosshairCursorStyle(crosshairColor, crosshairSize)
+            : undefined
         }
         onPointerMove={e => {
           if (!tracing) return;

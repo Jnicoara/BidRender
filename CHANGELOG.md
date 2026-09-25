@@ -4,6 +4,30 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-25]
+
+- **Enter now confirms a scale measurement every time.** It only worked
+  when the cursor was still in the distance box and what you typed could be
+  read. Click anywhere else first — the card, the "?" — and Enter did
+  nothing; with focus left on the scale button it even reopened the scale
+  menu. Enter is now answered wherever focus is. If the distance can't be
+  read, it says so under the box instead of doing nothing, and "1,000" is now
+  read as a thousand feet.
+
+- **The measuring line is your crosshair colour.** The line between the two
+  clicks (and the small crosses at each end) used to be a fixed blue. It now
+  matches the crosshair — yellow by default — with the same faint shadow so
+  it stays visible on white paper.
+
+- **"Measure it" is back near the top of the scale menu**, as a full-width
+  button right under "Type a scale" and above the list of standard scales.
+  Yesterday's change had left it at the very bottom.
+
+- **Longer crosshair, with a size setting.** The crosshair's arms are 1.5×
+  longer by default. Settings → Display now has Small / Medium / Large next to
+  the colour (Small is the old size), saved on your device the same way the
+  colour is. The lines stay thin and the exact centre point is unchanged.
+
 ## [2026-09-24]
 
 - **Searching "90a breaker" now finds the 2-pole first.** The starter catalog's

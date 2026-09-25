@@ -282,9 +282,11 @@ export function ScaleControl({
           standard list is right under it, and picking or typing saves and
           closes. Nothing else opens.
 
-          Measuring is still here, smaller and lower, and so is the check. The
-          reason measuring once led — it does not depend on the print being at
-          true size — is what the "not checked" nudge is for.
+          Measuring is still here, and so is the check. It sat at the bottom
+          for a day and was moved back up to just under the box (2026-09-25):
+          below the list it was buried. The reason measuring once led — it
+          does not depend on the print being at true size — is what the "not
+          checked" nudge is for.
         */}
         <PopoverContent
           align="start"
@@ -333,6 +335,30 @@ export function ScaleControl({
               <span className="font-mono">1:100</span>
             </p>
           </div>
+
+          {/*
+            ── Measure it: right under the box, above the list ───────────────
+            Moved 2026-09-25. The reorder the day before put it at the very
+            bottom, as a small ghost button below all seventeen presets —
+            findable only by scrolling past everything else, for the one way
+            of setting a scale that works on any print. It is the other answer
+            to the same question the box asks, so it sits beside the box.
+            The fast path is unchanged: the box still takes focus, and a click
+            on the list still saves and closes.
+          */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 w-full gap-1.5 text-xs"
+            onClick={() => {
+              setOpen(false);
+              onMeasure();
+            }}
+            title="Click the two ends of a distance you know. Works on a sheet that states no scale, or one printed at the wrong size."
+          >
+            <Ruler className="w-3.5 h-3.5" /> Measure it — click two points you
+            know
+          </Button>
 
           {/* A reading found but not trusted enough to apply. One click to
               accept, and plainly labelled as something read off the sheet. */}
@@ -429,18 +455,6 @@ export function ScaleControl({
             )}
 
             <div className="flex items-center gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 px-2 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => {
-                  setOpen(false);
-                  onMeasure();
-                }}
-                title="Click the two ends of a distance you know. Works on a sheet that states no scale, or one printed at the wrong size."
-              >
-                <Ruler className="w-3 h-3" /> Measure it
-              </Button>
               {unchecked && (
                 <Button
                   size="sm"

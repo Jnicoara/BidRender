@@ -96,7 +96,17 @@ const TOTAL_SLIP_INCHES = ASSUMED_SLIP_INCHES * 2;
  * Returns inches, or null for anything it cannot read. Never guesses.
  */
 export function parseLengthText(input: string): number | null {
-  const text = input.trim().toLowerCase();
+  /*
+    Thousands separators are dropped — "1,000" is how an overall building
+    length is printed and typed. Added 2026-09-25: it used to return null, and
+    the calibrate card read that as "nothing to apply yet", so Enter did
+    nothing at all and nothing said why. Only a comma followed by exactly
+    three digits counts, so "1,5" is still refused rather than read as 15.
+  */
+  const text = input
+    .trim()
+    .toLowerCase()
+    .replace(/(\d),(?=\d{3}(?!\d))/g, "$1");
   if (!text) return null;
 
   // Feet and inches together: 20'-6", 20' 6", 24'-6 1/2", 20 ft 6 in

@@ -27,8 +27,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { CrosshairGuides, type CrosshairHandle } from "./CrosshairGuides";
-import { CROSSHAIR_COLORS, crosshairCursorStyle } from "@/lib/crosshairCursor";
-import { useCrosshairColor } from "@/hooks/useCrosshairColor";
+import {
+  CROSSHAIR_COLORS,
+  MEASURE_SHADOW_PASSES,
+  crosshairCursorStyle,
+} from "@/lib/crosshairCursor";
+import { useCrosshairColor, useCrosshairSize } from "@/hooks/useCrosshairColor";
+import { calibrateEnter } from "@/lib/calibrateEnter";
 import { Check, RotateCcw, Ruler, TriangleAlert, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,16 +56,19 @@ import {
 } from "@shared/planCalibration";
 import { COMMON_SCALES, describeScale } from "@shared/planScale";
 
-/**
- * The colour of the measured span ON THE DRAWING.
- *
- * Kept when the blue was taken out of this panel's chrome, because this is not
- * chrome: it is the measurement, drawn over a black-and-white sheet, and it has
- * to be unmistakable against both the drawing and the app's yellow — which
- * means marks and stamps. A line here that looked like a mark would be worse
- * than a line that stands out.
- */
-const SPAN_COLOR = "#38BDF8";
+/*
+  The colour of the measured span ON THE DRAWING — now the crosshair's (`ink`
+  in the component), with the crosshair's shadow (MEASURE_SHADOW_PASSES).
+
+  ── Reversed 2026-09-25, and why the old reason no longer holds ─────────────
+  This was a fixed sky blue, SPAN_COLOR, kept "unmistakable against the app's
+  yellow — which means marks and stamps". That reasoning was written for a
+  dark cursor. Once the cursor and its guides became the person's one chosen
+  colour, a blue line between the two clicks was a second colour on the same
+  tool, and the owner asked for it to match. The worry about looking like a
+  mark is answered the same way it is for the cursor: anyone whose sheets are
+  thick with yellow marks picks another colour in Settings, and this follows.
+*/
 
 const QUALITY_STYLE = {
   good: "text-emerald-400",
@@ -118,6 +126,17 @@ export function CalibrateLayer({
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [crosshairColor] = useCrosshairColor();
+  const [crosshairSize] = useCrosshairSize();
+  /**
+   * The measured span is drawn in the CROSSHAIR's colour, with its shadow.
+   *
+   * Fixed 2026-09-25. It was a fixed sky blue (SPAN_COLOR), chosen when the
+   * cursor was dark and needed something to stand apart from it. Once the
+   * cursor and its guides became one colour, the line between the two clicks
+   * was the only other colour on the tool — the same two-tone the guides had
+   * just been taken out of.
+   */
+  const ink = CROSSHAIR_COLORS[crosshairColor].hex;
   /** Moved directly, never through a render. See CrosshairGuides. */
   const guidesRef = useRef<CrosshairHandle | null>(null);
   const [hover, setHover] = useState<PagePoint | null>(null);
@@ -188,6 +207,32 @@ export function CalibrateLayer({
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [points, onPointsChange, onCancel, tipsOpen]);
+
+  /**
+   * Enter confirms from ANYWHERE, not only from the distance box.
+   *
+   * It used to be the box's own onKeyDown, so it did nothing whenever focus
+   * was elsewhere — and on the scale chip, where focus goes back when the
+   * menu closes, it reopened the menu instead. The decision is
+   * `calibrateEnter` (@/lib/calibrateEnter, tested there); this only feeds it
+   * the current state. Through a ref, so the listener is registered once and
+   * always reads this render's values rather than the ones it closed over.
+   */
+  const enterRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter") enterRef.current(e);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, []);
+  /** Said under the box when Enter could not act — see `calibrateEnter`. */
+  const [enterHint, setEnterHint] = useState<string | null>(null);
+  // It belongs to one card; Redo, Set it again and a saved scale all drop the
+  // points, and so drop it.
+  useEffect(() => {
+    if (points.length < 2) setEnterHint(null);
+  }, [points.length]);
 
   const toScreen = useCallback(
     (p: PagePoint) => ({ x: p.x * renderScale, y: p.y * renderScale }),
@@ -327,6 +372,7 @@ export function CalibrateLayer({
   */
   const bar = (title: string, instruction: string, extra: React.ReactNode) => (
     <div
+      data-calibrate-chrome
       className={cn(
         "absolute left-1/2 -translate-x-1/2 max-w-[calc(100%-1rem)] pointer-events-auto",
         barLow ? "bottom-2" : "top-2"
@@ -360,6 +406,7 @@ export function CalibrateLayer({
   */
   const tips = tipsOpen ? (
     <div
+      data-calibrate-chrome
       className={cn(
         "absolute left-1/2 -translate-x-1/2 w-[20rem] max-w-[calc(100%-1rem)] pointer-events-auto rounded-lg border border-border bg-card/95 shadow-xl p-2.5",
         barLow ? "bottom-12" : "top-12"
@@ -446,6 +493,37 @@ export function CalibrateLayer({
     */
     if (check) await onChecked();
     onCancel();
+  };
+
+  // This render's answer to Enter — read by the listener registered above.
+  enterRef.current = (e: KeyboardEvent) => {
+    const focused = document.activeElement;
+    const action = calibrateEnter({
+      phase,
+      pointCount: points.length,
+      text: phase === "set" ? distanceText : checkText,
+      ready: phase === "set" ? ratio !== null : check !== null,
+      busy: Boolean(busy),
+      focusOnOwnButton:
+        focused instanceof HTMLButtonElement &&
+        focused.closest("[data-calibrate-chrome]") !== null,
+      composing: e.isComposing,
+    });
+    if (action.kind === "pass") return;
+    // Taken here, in the capture phase, so the key never also reaches the
+    // focused element — which is how it used to reopen the scale menu.
+    e.preventDefault();
+    e.stopPropagation();
+    if (action.kind === "apply") void apply();
+    else if (action.kind === "keep") void keep();
+    else if (action.kind === "needText") {
+      setEnterHint(action.message);
+      document
+        .getElementById(
+          phase === "set" ? "calibrate-distance" : "calibrate-check"
+        )
+        ?.focus();
+    }
   };
 
   /*
@@ -562,17 +640,27 @@ export function CalibrateLayer({
         <Input
           id="calibrate-check"
           value={checkText}
-          onChange={e => setCheckText(e.target.value)}
-          onFocus={selectOnFocus}
-          onKeyDown={e => {
-            if (e.key === "Enter" && check) void keep();
-            if (e.key === "Escape") onCancel();
+          onChange={e => {
+            setCheckText(e.target.value);
+            setEnterHint(null);
           }}
+          onFocus={selectOnFocus}
+          /*
+            No onKeyDown. Enter and Escape are both answered by the layer's
+            window listeners, which run first (capture phase) and stop the
+            key — so a handler here never ran for Escape, and for Enter it was
+            the ONLY path, which is the fault `calibrateEnter` describes.
+          */
           placeholder="e.g. 100, 24'-6&quot;"
           className="h-7 text-xs font-mono"
           autoFocus
         />
       </div>
+      {enterHint && (
+        <p className="text-[0.7rem] text-orange-400" role="alert">
+          {enterHint}
+        </p>
+      )}
       {checkMeasuredInches !== null && (
         <p className="text-[0.7rem] text-muted-foreground">
           This sheet makes it{" "}
@@ -642,17 +730,22 @@ export function CalibrateLayer({
         <Input
           id="calibrate-distance"
           value={distanceText}
-          onChange={e => setDistanceText(e.target.value)}
-          onFocus={selectOnFocus}
-          onKeyDown={e => {
-            if (e.key === "Enter" && ratio !== null) void apply();
-            if (e.key === "Escape") onCancel();
+          onChange={e => {
+            setDistanceText(e.target.value);
+            setEnterHint(null);
           }}
+          onFocus={selectOnFocus}
+          // No onKeyDown — see the "Should be" box above.
           placeholder="e.g. 100, 24'-6&quot;"
           className="h-7 text-xs font-mono"
           autoFocus
         />
       </div>
+      {enterHint && (
+        <p className="text-[0.7rem] text-orange-400" role="alert">
+          {enterHint}
+        </p>
+      )}
       <p className="text-[0.7rem] text-muted-foreground">
         A plain number means <strong>feet</strong>. Inches need a mark —{" "}
         <span className="font-mono">246&quot;</span>.
@@ -772,6 +865,7 @@ export function CalibrateLayer({
   const resultCard = showCard ? (
     <div
       ref={cardRef}
+      data-calibrate-chrome
       className="absolute pointer-events-auto rounded-lg border border-border bg-card/95 shadow-xl p-2.5 space-y-2"
       style={cardStyle}
     >
@@ -801,7 +895,7 @@ export function CalibrateLayer({
           the ends of a dimension, and an error there multiplies into every
           measurement on the sheet rather than into one run.
         */
-        style={crosshairCursorStyle(crosshairColor)}
+        style={crosshairCursorStyle(crosshairColor, crosshairSize)}
         onPointerMove={e => {
           // Tracked from the first move, not just between the two clicks: the
           // guides have to be there while the FIRST end is being lined up,
@@ -854,31 +948,29 @@ export function CalibrateLayer({
             ref={guidesRef}
             width={width}
             height={height}
-            color={CROSSHAIR_COLORS[crosshairColor].hex}
+            color={ink}
           />
         )}
 
         {first && live && (
-          <line
+          <ShadowedLine
+            ink={ink}
             x1={first.x}
             y1={first.y}
             x2={live.x}
             y2={live.y}
-            stroke={SPAN_COLOR}
-            strokeWidth={2}
-            strokeDasharray="6 4"
-            vectorEffect="non-scaling-stroke"
+            width={2}
+            dash="6 4"
           />
         )}
         {first && second && (
-          <line
+          <ShadowedLine
+            ink={ink}
             x1={first.x}
             y1={first.y}
             x2={second.x}
             y2={second.y}
-            stroke={SPAN_COLOR}
-            strokeWidth={2}
-            vectorEffect="non-scaling-stroke"
+            width={2}
           />
         )}
         {[first, second].map((p, i) =>
@@ -886,23 +978,21 @@ export function CalibrateLayer({
             <g key={i}>
               {/* A cross rather than a dot: a dot hides the thing you aimed at,
                   and the pixel under it is the one that matters here. */}
-              <line
+              <ShadowedLine
+                ink={ink}
                 x1={p.x - 9}
                 y1={p.y}
                 x2={p.x + 9}
                 y2={p.y}
-                stroke={SPAN_COLOR}
-                strokeWidth={1.5}
-                vectorEffect="non-scaling-stroke"
+                width={1.5}
               />
-              <line
+              <ShadowedLine
+                ink={ink}
                 x1={p.x}
                 y1={p.y - 9}
                 x2={p.x}
                 y2={p.y + 9}
-                stroke={SPAN_COLOR}
-                strokeWidth={1.5}
-                vectorEffect="non-scaling-stroke"
+                width={1.5}
               />
             </g>
           ) : null
@@ -911,5 +1001,57 @@ export function CalibrateLayer({
 
       {chromeTarget ? createPortal(chrome, chromeTarget) : chrome}
     </>
+  );
+}
+
+/**
+ * One stroke of the measurement, in the crosshair's colour over its shadow.
+ *
+ * The shadow is MEASURE_SHADOW_PASSES — faint, wider black strokes under the
+ * coloured one — rather than an SVG blur, because this line sits inside the
+ * viewer's zoom transform and a blur radius would zoom with it. Every pass is
+ * non-scaling, so the line and its shadow are the same screen width at 19%
+ * and at 400%. The passes are WIDER than the line by a fixed amount, so the
+ * thin cross marks at each end get the same soft edge as the span itself.
+ */
+function ShadowedLine({
+  ink,
+  x1,
+  y1,
+  x2,
+  y2,
+  width,
+  dash,
+}: {
+  ink: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  width: number;
+  dash?: string;
+}) {
+  const at = { x1, y1, x2, y2 };
+  return (
+    <g pointerEvents="none">
+      {MEASURE_SHADOW_PASSES.map(pass => (
+        <line
+          key={pass.width}
+          {...at}
+          stroke="#000"
+          strokeOpacity={pass.opacity}
+          strokeWidth={width - 2 + pass.width}
+          strokeDasharray={dash}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+      <line
+        {...at}
+        stroke={ink}
+        strokeWidth={width}
+        strokeDasharray={dash}
+        vectorEffect="non-scaling-stroke"
+      />
+    </g>
   );
 }

@@ -77,7 +77,43 @@ export function asCrosshairColor(value: unknown): CrosshairColor {
 }
 
 /**
- * EVEN, so the image's geometric centre lands on a whole number.
+ * How big the crosshair is — a per-person setting beside the colour.
+ *
+ * ── Added 2026-09-25: arms 1.5x longer by default ────────────────────────────
+ * The 24px cursor's arms were short enough to lose on a dense sheet. MEDIUM is
+ * the new default and reaches 1.5x as far (36px image, 18px each way); SMALL
+ * is the old cursor exactly, for anyone who preferred it; LARGE is 48px.
+ *
+ * Only the REACH changes. The stroke stays 2px, the gap and the centre dot
+ * stay the same size in pixels, and every size is EVEN — see below — so the
+ * hotspot is the exact geometric centre at all three. The tests loop over
+ * every size rather than trusting that one passing implies the others.
+ *
+ * 48 is well under the 128px ceiling browsers put on cursor images. Chrome
+ * hides a cursor over 32px while it overlaps the browser's own UI — at the
+ * edge of the window — and falls back to the plain `crosshair` given in
+ * `crosshairCursorValue`, which is the fallback working as intended.
+ */
+export const CROSSHAIR_SIZES = {
+  small: { label: "Small", px: 24 },
+  medium: { label: "Medium", px: 36 },
+  large: { label: "Large", px: 48 },
+} as const;
+
+export type CrosshairSize = keyof typeof CROSSHAIR_SIZES;
+
+export const DEFAULT_CROSSHAIR_SIZE: CrosshairSize = "medium";
+
+/** A stored value from an older build or a hand-edit falls back to default. */
+export function asCrosshairSize(value: unknown): CrosshairSize {
+  return typeof value === "string" && value in CROSSHAIR_SIZES
+    ? (value as CrosshairSize)
+    : DEFAULT_CROSSHAIR_SIZE;
+}
+
+/**
+ * The image's side, in CSS pixels. EVEN, so its geometric centre lands on a
+ * whole number.
  *
  * ── This was 25, and that was half a pixel wrong ─────────────────────────────
  * Corrected 2026-09-24. An odd size gives a single centre PIXEL, index 12 of
@@ -92,24 +128,31 @@ export function asCrosshairColor(value: unknown): CrosshairColor {
  * space, where the answer comes out as a clean 12 and looks like a pass. A
  * measurement in the wrong units is not a measurement.
  *
- * With an even size, the geometric centre of a 24px image is exactly 12.0, an
- * integer, so the hotspot can name it precisely. The arms are then 2px wide and
- * centred on that line, which keeps them crisp — spanning 11.0 to 13.0, whole
- * pixel columns, symmetric about 12.0.
+ * With an even size, the geometric centre is exactly size/2, an integer, so
+ * the hotspot can name it precisely. The arms are then 2px wide and centred on
+ * that line, which keeps them crisp — whole pixel columns, symmetric about it.
  */
-export const CROSSHAIR_SIZE = 24;
+export function crosshairPx(size: CrosshairSize = DEFAULT_CROSSHAIR_SIZE) {
+  return CROSSHAIR_SIZES[size].px;
+}
 
 /** The image's exact geometric centre, and the hotspot. */
-export const CROSSHAIR_CENTRE = 12;
+export function crosshairCentre(
+  size: CrosshairSize = DEFAULT_CROSSHAIR_SIZE
+): number {
+  return crosshairPx(size) / 2;
+}
+
+/** The default image's side and centre, for callers that want a constant. */
+export const CROSSHAIR_SIZE = crosshairPx();
+export const CROSSHAIR_CENTRE = crosshairCentre();
 
 /** Arms straddle the centre line, so 2 rather than 1. */
 const CORE_WIDTH = 2;
 
 /**
- * Half the gap at the middle, in pixels.
- *
- * The arms stop short of the centre so the drawing under the exact point stays
- * visible. They no longer stop short of a HOLE, though — see CENTRE_DOT.
+ * Half the gap at the middle, in pixels. The same at every size: it is there
+ * to keep the target visible, and the target does not grow with the cursor.
  */
 const GAP = 3;
 
@@ -126,14 +169,11 @@ const GAP = 3;
  * same contrast trick the arms use and for the same reason: it has to survive
  * both white paper and black line.
  *
- * Kept to r=1.6 for the ring and r=0.6 for the core. Bigger reads as a blob and
- * covers the thing it is pointing at, which is what the gap exists to avoid.
+ * Kept to r=1.6 for the ring and r=0.6 for the core, at every size. Bigger
+ * reads as a blob and covers the thing it is pointing at.
  */
 const DOT_CORE_R = 0.6;
 const DOT_RING_R = 1.6;
-
-/** How far the arms reach. Slightly smaller than the drawn one it replaces. */
-const ARM = CROSSHAIR_CENTRE;
 
 /**
  * The centre dot's two colours. UNCHANGED by the 2026-09-24 recolour on
@@ -151,34 +191,49 @@ const HALO = "#FFFFFF";
  * person's chosen one. What the outline did for white paper is done, barely,
  * by this: a blur with no edge, so it lifts a yellow line off white without
  * drawing a second line round it.
+ *
+ * Exported because the calibration span line wears the same shadow — see
+ * MEASURE_SHADOW_PASSES below for how it is reproduced there.
  */
-const SHADOW_BLUR = 0.8;
-const SHADOW_OPACITY = 0.45;
+export const CROSSHAIR_SHADOW = { blur: 0.8, opacity: 0.45 } as const;
 
 /**
- * The centre line. THE HOTSPOT ITSELF, not half a pixel beside it.
+ * The crosshair's shadow, rebuilt for a line drawn ON the drawing.
  *
- * A 2px stroke centred here spans whole pixel columns either side, so the mark
- * is crisp AND its centre of area is the coordinate the hotspot names.
+ * The cursor can use a real blur because it is a fixed-size image. The span
+ * line lives inside the viewer's zoom transform, where a filter's blur radius
+ * would scale with the zoom — a hairline shadow at fit, a smear at 400%. So it
+ * is drawn as two faint black strokes UNDER the coloured one, each with
+ * non-scaling stroke so they are the same screen width at every zoom: 1px and
+ * 2px of soft darkening either side of a 2px line, fading outward. That is the
+ * same falloff the 0.8px blur gives the cursor's arms (measured in the
+ * rendered cursor: about 11% against the arm, about 1% a pixel beyond).
  */
-const LINE = CROSSHAIR_CENTRE;
+export const MEASURE_SHADOW_PASSES = [
+  { width: 6, opacity: 0.05 },
+  { width: 4, opacity: 0.12 },
+] as const;
 
-/** The four arm segments, as [x1, y1, x2, y2]. Symmetric about LINE. */
-export function crosshairArms(): Array<[number, number, number, number]> {
-  const near = CROSSHAIR_CENTRE - GAP;
-  const far = CROSSHAIR_CENTRE + GAP;
-  const start = CROSSHAIR_CENTRE - ARM;
-  const end = CROSSHAIR_CENTRE + ARM;
+/** The four arm segments, as [x1, y1, x2, y2]. Symmetric about the centre. */
+export function crosshairArms(
+  size: CrosshairSize = DEFAULT_CROSSHAIR_SIZE
+): Array<[number, number, number, number]> {
+  const c = crosshairCentre(size);
+  // The arms reach the edge of the image — the size IS the reach.
+  const near = c - GAP;
+  const far = c + GAP;
+  const start = 0;
+  const end = crosshairPx(size);
   return [
-    [start, LINE, near, LINE], // left
-    [far, LINE, end, LINE], // right
-    [LINE, start, LINE, near], // up
-    [LINE, far, LINE, end], // down
+    [start, c, near, c], // left
+    [far, c, end, c], // right
+    [c, start, c, near], // up
+    [c, far, c, end], // down
   ];
 }
 
-function armPath(): string {
-  return crosshairArms()
+function armPath(size: CrosshairSize): string {
+  return crosshairArms(size)
     .map(([x1, y1, x2, y2]) => `M${x1} ${y1}H${x2}V${y2}`)
     .join("");
 }
@@ -190,23 +245,26 @@ function armPath(): string {
  * filter on that same pass — so there is no second geometry to drift.
  */
 export function crosshairSvg(
-  color: CrosshairColor = DEFAULT_CROSSHAIR_COLOR
+  color: CrosshairColor = DEFAULT_CROSSHAIR_COLOR,
+  size: CrosshairSize = DEFAULT_CROSSHAIR_SIZE
 ): string {
   const ink = CROSSHAIR_COLORS[color].hex;
-  const arms = crosshairArms()
+  const px = crosshairPx(size);
+  const c = crosshairCentre(size);
+  const arms = crosshairArms(size)
     .map(
       ([x1, y1, x2, y2]) =>
         `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`
     )
     .join("");
   return [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${CROSSHAIR_SIZE}" height="${CROSSHAIR_SIZE}" viewBox="0 0 ${CROSSHAIR_SIZE} ${CROSSHAIR_SIZE}">`,
-    `<defs><filter id="s" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="0" stdDeviation="${SHADOW_BLUR}" flood-color="#000" flood-opacity="${SHADOW_OPACITY}"/></filter></defs>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 ${px} ${px}">`,
+    `<defs><filter id="s" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="0" stdDeviation="${CROSSHAIR_SHADOW.blur}" flood-color="#000" flood-opacity="${CROSSHAIR_SHADOW.opacity}"/></filter></defs>`,
     `<g stroke="${ink}" stroke-width="${CORE_WIDTH}" stroke-linecap="butt" filter="url(#s)">${arms}</g>`,
     // The centre dot, on the hotspot itself: light ring first, dark core over
     // it, so it reads on paper and on linework exactly as the arms do.
-    `<circle cx="${LINE}" cy="${LINE}" r="${DOT_RING_R}" fill="${HALO}"/>`,
-    `<circle cx="${LINE}" cy="${LINE}" r="${DOT_CORE_R}" fill="${CORE}"/>`,
+    `<circle cx="${c}" cy="${c}" r="${DOT_RING_R}" fill="${HALO}"/>`,
+    `<circle cx="${c}" cy="${c}" r="${DOT_CORE_R}" fill="${CORE}"/>`,
     `</svg>`,
   ].join("");
 }
@@ -220,28 +278,29 @@ export function crosshairSvg(
  * a drawing, so the fallback is never omitted.
  */
 export function crosshairCursorValue(
-  color: CrosshairColor = DEFAULT_CROSSHAIR_COLOR
+  color: CrosshairColor = DEFAULT_CROSSHAIR_COLOR,
+  size: CrosshairSize = DEFAULT_CROSSHAIR_SIZE
 ): string {
-  const encoded = encodeURIComponent(crosshairSvg(color));
-  return `url("data:image/svg+xml,${encoded}") ${CROSSHAIR_CENTRE} ${CROSSHAIR_CENTRE}, crosshair`;
+  const encoded = encodeURIComponent(crosshairSvg(color, size));
+  const c = crosshairCentre(size);
+  return `url("data:image/svg+xml,${encoded}") ${c} ${c}, crosshair`;
 }
 
 /**
- * Ready to spread onto a style prop, one per colour, built once — so a
- * component re-rendering on every pointer move hands React the same object
+ * Ready to spread onto a style prop, one per colour and size, built once — so
+ * a component re-rendering on every pointer move hands React the same object
  * and the browser never re-parses the cursor image.
  */
-const STYLES = Object.fromEntries(
-  (Object.keys(CROSSHAIR_COLORS) as CrosshairColor[]).map(c => [
-    c,
-    { cursor: crosshairCursorValue(c) },
-  ])
-) as Record<CrosshairColor, { cursor: string }>;
+const STYLES = new Map<string, { cursor: string }>();
+for (const c of Object.keys(CROSSHAIR_COLORS) as CrosshairColor[])
+  for (const s of Object.keys(CROSSHAIR_SIZES) as CrosshairSize[])
+    STYLES.set(`${c}:${s}`, { cursor: crosshairCursorValue(c, s) });
 
-export function crosshairCursorStyle(color: CrosshairColor): {
-  cursor: string;
-} {
-  return STYLES[color];
+export function crosshairCursorStyle(
+  color: CrosshairColor,
+  size: CrosshairSize = DEFAULT_CROSSHAIR_SIZE
+): { cursor: string } {
+  return STYLES.get(`${color}:${size}`)!;
 }
 
 /**
@@ -261,13 +320,16 @@ export function crosshairCursorStyle(color: CrosshairColor): {
  * `armPath` is unused by the SVG itself and exists only to keep this honest if
  * the drawing ever moves to a path.
  */
-export function crosshairInk(): boolean[][] {
+export function crosshairInk(
+  size: CrosshairSize = DEFAULT_CROSSHAIR_SIZE
+): boolean[][] {
   void armPath;
-  const grid: boolean[][] = Array.from({ length: CROSSHAIR_SIZE }, () =>
-    Array.from({ length: CROSSHAIR_SIZE }, () => false)
+  const px = crosshairPx(size);
+  const grid: boolean[][] = Array.from({ length: px }, () =>
+    Array.from({ length: px }, () => false)
   );
   const half = CORE_WIDTH / 2;
-  for (const [x1, y1, x2, y2] of crosshairArms()) {
+  for (const [x1, y1, x2, y2] of crosshairArms(size)) {
     /*
       Every arm is axis-aligned. Along its length it covers the span between
       its ends; across its width it covers the stroke, which straddles the
@@ -279,9 +341,7 @@ export function crosshairInk(): boolean[][] {
     const ys = y1 === y2 ? range(y1 - half, y1 + half) : range(y1, y2);
     for (const x of xs) {
       for (const y of ys) {
-        if (x < 0 || y < 0 || x >= CROSSHAIR_SIZE || y >= CROSSHAIR_SIZE) {
-          continue;
-        }
+        if (x < 0 || y < 0 || x >= px || y >= px) continue;
         grid[y][x] = true;
       }
     }
