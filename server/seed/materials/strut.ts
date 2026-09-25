@@ -86,6 +86,29 @@ const strutAccessories: BaselineMaterial[] = [
     searchAliases: aliases(STRUT_SLANG, "plastic closure cover finish"),
     defaultQty: 2,
   },
+  // Moved from the pricing sheet, 2026-09-25.
+  {
+    name: "Strut flat plate",
+    searchAliases: aliases(STRUT_SLANG, "splice straight fitting joiner"),
+  },
+  {
+    name: "Strut wing connector",
+    searchAliases: aliases(
+      STRUT_SLANG,
+      "fitting corner post bracket three way"
+    ),
+  },
+  {
+    name: "Trapeze hanger kit",
+    searchAliases: aliases(
+      STRUT_SLANG,
+      "rack all-thread suspended support channel"
+    ),
+  },
+  {
+    name: "Threaded rod stiffener",
+    searchAliases: aliases("seismic brace allthread clamp strut rod stiffner"),
+  },
 ].map(item => ({
   ...item,
   unitOfSale: "each" as const,
@@ -141,9 +164,50 @@ const allThread: BaselineMaterial[] = [
   ),
 ];
 
+/*
+  ── Clips and ceiling-grid supports ──────────────────────────────────────────
+  Moved from the pricing sheet, 2026-09-25. The spring-steel clips a
+  commercial ceiling is hung on. Generic names; "caddy" is the slang, after
+  the brand most counters stock.
+*/
+const clips: BaselineMaterial[] = [
+  ...(['1/2"', '3/4"'] as const).map(size => ({
+    name: `${size} conduit clip`,
+    searchAliases: aliases(
+      size === '1/2"' ? "half 0.5 .5" : "three quarter 0.75 .75",
+      "caddy emt spring steel rod wire stud snap on support"
+    ),
+    defaultQty: 4,
+  })),
+  {
+    name: "T-bar grid clip",
+    searchAliases: aliases(
+      "tbar ceiling grid support caddy drop acoustical lay in"
+    ),
+    defaultQty: 4,
+  },
+  {
+    name: "Grid box bracket",
+    searchAliases: aliases(
+      "t-bar ceiling box hanger caddy lay in acoustical support"
+    ),
+  },
+  {
+    name: "Independent support wire clip",
+    searchAliases: aliases("caddy ceiling tie attach grid hanger"),
+    defaultQty: 4,
+  },
+].map(item => ({
+  ...item,
+  unitOfSale: "each" as const,
+  costPerUnit: UNPRICED,
+  category: "Strut & Supports" as const,
+}));
+
 export const STRUT: BaselineMaterial[] = [
   ...channel,
   ...strutStraps,
   ...strutAccessories,
   ...allThread,
+  ...clips,
 ];

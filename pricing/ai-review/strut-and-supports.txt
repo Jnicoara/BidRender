@@ -1,16 +1,13 @@
 Category: Strut & Supports
-Items: 56
+Items: 47
 
 Category | Name | Size
 Strut & Supports | 3/8" all-thread rod, 10 ft | 3/8"
 Strut & Supports | 1/2" all-thread rod, 10 ft | 1/2"
 Strut & Supports | 1/4" all-thread rod, 10 ft | 1/4"
 Strut & Supports | 5/8" all-thread rod, 10 ft | 5/8"
-Strut & Supports | Batwing hanger | -
-Strut & Supports | Caddy clip, 1/2 in | 1/2 in
-Strut & Supports | Caddy clip, 3/4 in | 3/4 in
-Strut & Supports | Ceiling grid support clip | -
-Strut & Supports | Fixture hanger bar | -
+Strut & Supports | 1/2" conduit clip | 1/2"
+Strut & Supports | 3/4" conduit clip | 3/4"
 Strut & Supports | 3/8" flat washer | 3/8"
 Strut & Supports | 1/2" flat washer | 1/2"
 Strut & Supports | 1/4" flat washer | 1/4"
@@ -25,13 +22,10 @@ Strut & Supports | 3/8" lock washer | 3/8"
 Strut & Supports | 1/2" lock washer | 1/2"
 Strut & Supports | 1/4" lock washer | 1/4"
 Strut & Supports | 5/8" lock washer | 5/8"
-Strut & Supports | Pipe strap, 4 in | 4 in
 Strut & Supports | 3/8" rod coupler | 3/8"
 Strut & Supports | 1/2" rod coupler | 1/2"
 Strut & Supports | 1/4" rod coupler | 1/4"
 Strut & Supports | 5/8" rod coupler | 5/8"
-Strut & Supports | Rod hanger, 1/4-20 | -
-Strut & Supports | Strut 90-degree fitting | -
 Strut & Supports | Strut angle bracket | -
 Strut & Supports | Strut channel nut | -
 Strut & Supports | 1/2" strut conduit strap | 1/2"
@@ -47,12 +41,9 @@ Strut & Supports | Strut end cap | -
 Strut & Supports | Strut flat plate | -
 Strut & Supports | Strut post base | -
 Strut & Supports | Strut wing connector | -
-Strut & Supports | Strut, 1-5/8 in x 1-5/8 in | 1-5/8 in
-Strut & Supports | Strut, 1-5/8 in x 13/16 in | 1-5/8 in
 Strut & Supports | T-bar grid clip | -
 Strut & Supports | Threaded rod stiffener | -
 Strut & Supports | Trapeze hanger kit | -
-Strut & Supports | Unistrut end cap | -
 Strut & Supports | 1-1/4" x 1-1/4" strut channel, 10 ft | 1-1/4"
 Strut & Supports | 1-5/8" x 1-1/4" strut channel, 10 ft | 1-5/8"
 Strut & Supports | 1-5/8" x 1-5/8" strut channel, 10 ft | 1-5/8"

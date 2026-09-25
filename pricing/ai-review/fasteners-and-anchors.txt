@@ -1,29 +1,18 @@
 Category: Fasteners & Anchors
-Items: 25
+Items: 14
 
 Category | Name | Size
-Fasteners & Anchors | All-thread rod, 1/2 in | 1/2 in
-Fasteners & Anchors | All-thread rod, 3/8 in | 3/8 in
 Fasteners & Anchors | Beam clamp | -
 Fasteners & Anchors | Ceiling support wire | -
 Fasteners & Anchors | Concrete wedge anchor | -
 Fasteners & Anchors | Conduit hanger with bolt | -
 Fasteners & Anchors | Drop-in anchor | -
 Fasteners & Anchors | Drywall anchor | -
-Fasteners & Anchors | Hex nut | -
-Fasteners & Anchors | Insulated staple | -
 Fasteners & Anchors | J-hook | -
-Fasteners & Anchors | Lock washer | -
 Fasteners & Anchors | Masonry screw | -
-Fasteners & Anchors | Nail-on cable staple | -
 Fasteners & Anchors | Plastic conduit clip | -
 Fasteners & Anchors | Powder-actuated pin | -
-Fasteners & Anchors | Rod coupling nut | -
 Fasteners & Anchors | Rod hanger clip | -
 Fasteners & Anchors | Self-drilling screw | -
 Fasteners & Anchors | Sleeve anchor | -
-Fasteners & Anchors | Strut nut | -
-Fasteners & Anchors | Strut spring nut | -
-Fasteners & Anchors | Tapcon screw | -
 Fasteners & Anchors | Toggle bolt | -
-Fasteners & Anchors | Washer, flat | -

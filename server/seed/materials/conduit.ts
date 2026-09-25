@@ -190,4 +190,13 @@ export const CONDUIT: BaselineMaterial[] = [
     ),
     defaultQty: 3,
   },
+  {
+    // Moved from the pricing sheet, 2026-09-25. Steps a knockout down to a
+    // smaller fitting; sold as a pair in a set.
+    name: "Reducing washer set",
+    unitOfSale: "each",
+    costPerUnit: UNPRICED,
+    category: "Conduit Fittings",
+    searchAliases: aliases("reducer knockout ko step down enclosure hole pair"),
+  },
 ];

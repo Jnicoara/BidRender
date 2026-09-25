@@ -1,10 +1,9 @@
 Category: Consumables
-Items: 20
+Items: 15
 
 Category | Name | Size
 Consumables | Anti-oxidant compound | -
 Consumables | Arc flash label | -
-Consumables | Cable lubricant gel | -
 Consumables | Duct seal | -
 Consumables | Electrical putty pad | -
 Consumables | Electrical tape | -
@@ -13,12 +12,8 @@ Consumables | Firestop caulk | -
 Consumables | Heat shrink tubing | -
 Consumables | Panel directory label | -
 Consumables | Pulling lube | -
-Consumables | Push-in connectors | -
 Consumables | PVC cement | -
 Consumables | Silicone sealant | -
-Consumables | Split bolt connector | -
 Consumables | Thread sealant | -
 Consumables | Underground splice kit | -
-Consumables | Wire nuts, assorted | -
-Consumables | Wire pulling soap | -
 Consumables | Zip ties | -

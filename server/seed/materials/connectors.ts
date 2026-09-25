@@ -126,8 +126,41 @@ const terminations: BaselineMaterial[] = [
   {
     ...CONN,
     name: "Terminal block",
-    searchAliases: aliases("din rail strip barrier feed through control panel"),
+    // "din", not "din rail": DIN rail is its own item since 2026-09-25, and
+    // the block must not answer to the rail's full name.
+    searchAliases: aliases("din strip barrier feed through control panel"),
   },
+  {
+    ...CONN,
+    name: "DIN rail",
+    searchAliases: aliases("35mm top hat mounting channel control panel"),
+  },
+  {
+    ...CONN,
+    name: "Ferrule kit",
+    searchAliases: aliases(
+      "wire end sleeve crimp stranded bootlace assortment"
+    ),
+  },
+  {
+    ...CONN,
+    name: "Insulated multi-tap block",
+    searchAliases: aliases(
+      "polaris multitap connector insulated tap splice service lug"
+    ),
+  },
+  /*
+    Compression splice sleeves, by the conductor they join. Moved from the
+    pricing sheet, 2026-09-25; the two sizes a service job uses.
+  */
+  ...["#2", "#4/0"].map(gauge => ({
+    ...CONN,
+    name: `${gauge} crimp sleeve`,
+    searchAliases: aliases(
+      gauge.includes("/0") ? "aught ought" : "",
+      "compression splice butt barrel inline service copper"
+    ),
+  })),
   {
     ...CONN,
     name: "Ring terminal",
@@ -218,7 +251,9 @@ export const CONSUMABLES: BaselineMaterial[] = [
     ...CONS,
     name: "Firestop caulk",
     searchAliases: aliases(
-      "fire stop penetration red sealant rated wall putty pad"
+      // "putty" stays, "pad" went on 2026-09-25: the putty pad is its own
+      // item now, and a caulk answering to it would compete with it.
+      "fire stop penetration red sealant rated wall putty"
     ),
   },
   {
@@ -258,6 +293,39 @@ export const CONSUMABLES: BaselineMaterial[] = [
     searchAliases: aliases(
       "antiox noalox penetrox alumin aluminum joint paste grease"
     ),
+  },
+  // Moved from the pricing sheet, 2026-09-25.
+  {
+    ...CONS,
+    name: "Electrical putty pad",
+    searchAliases: aliases(
+      "fire rated box pad firestop moldable wrap back of box"
+    ),
+  },
+  {
+    ...CONS,
+    name: "Expanding foam",
+    searchAliases: aliases("spray foam can seal gap penetration great stuff"),
+  },
+  {
+    ...CONS,
+    name: "Silicone sealant",
+    searchAliases: aliases("caulk clear weatherproof tube exterior rtv"),
+  },
+  {
+    ...CONS,
+    name: "Thread sealant",
+    searchAliases: aliases("pipe dope tape teflon ptfe threaded conduit"),
+  },
+  {
+    ...CONS,
+    name: "Arc flash label",
+    searchAliases: aliases("warning sticker nfpa 70e hazard equipment"),
+  },
+  {
+    ...CONS,
+    name: "Panel directory label",
+    searchAliases: aliases("circuit schedule card index sticker load center"),
   },
 ];
 

@@ -227,7 +227,7 @@ const mcCable: BaselineMaterial[] = MC_SIZES.map(size => ({
 
 // ─── UF-B and fixture wire ────────────────────────────────────────────────────
 
-const ufb: BaselineMaterial[] = ["12-2", "10-2", "8-2"].map(size => ({
+const ufb: BaselineMaterial[] = ["14-2", "12-2", "10-2", "8-2"].map(size => ({
   name: `${size} UF-B`,
   unitOfSale: "foot",
   costPerUnit: UNPRICED,
@@ -248,6 +248,39 @@ const fixtureWire: BaselineMaterial[] = ["#16", "#18"].map(gauge => ({
     "tffn tfn luminaire pigtail lead"
   ),
 }));
+
+// ─── Fire alarm cable, portable cord and tray cable ───────────────────────────
+// Moved from the pricing sheet, 2026-09-25. Named the way the rest of this file
+// names a multi-conductor cable — "14-2 …" — with the slash form as an alias.
+
+const cable = (name: string, slang: string): BaselineMaterial => ({
+  name,
+  unitOfSale: "foot",
+  costPerUnit: UNPRICED,
+  category: "Wire & Cable",
+  searchAliases: aliases(name.match(/^\d+-\d+/)![0].replace("-", "/"), slang),
+});
+
+const fireAlarmCable: BaselineMaterial[] = ["14-2", "16-2"].map(size =>
+  cable(
+    `${size} fire alarm cable`,
+    "fplp fplr fpl red plenum riser shielded fa power limited"
+  )
+);
+
+/**
+ * Portable cord by the foot, for equipment whips and temporary power. SOOW and
+ * SJOOW differ in jacket rating (600V against 300V), which is why both exist.
+ */
+const portableCord: BaselineMaterial[] = [
+  cable("14-3 SJOOW cord", "sj 300v junior hard service portable flexible"),
+  cable("12-3 SOOW cord", "so 600v hard service portable flexible rubber"),
+  cable("10-3 SOOW cord", "so 600v hard service portable flexible rubber"),
+];
+
+const trayCable: BaselineMaterial[] = [
+  cable("12-3 tray cable", "tc tc-er power control cable tray industrial"),
+];
 
 // ─── Bare copper ground ───────────────────────────────────────────────────────
 
@@ -332,6 +365,9 @@ export const WIRE_AND_CABLE: BaselineMaterial[] = [
   ...mcCable,
   ...ufb,
   ...fixtureWire,
+  ...fireAlarmCable,
+  ...portableCord,
+  ...trayCable,
   ...bareCopper,
   ...serCopper,
   ...serAluminum,

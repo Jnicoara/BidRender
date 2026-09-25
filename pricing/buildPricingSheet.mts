@@ -25,6 +25,7 @@ import { fileURLToPath } from "node:url";
 import { BASELINE_MATERIALS } from "../server/seed/materials/index";
 import { compareBySize, materialTypeName } from "../shared/materialSizeOrder";
 import { compareMaterials } from "../shared/materialOrder";
+import { MOVED_FROM_SHEET } from "./movedFromSheet";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -70,6 +71,12 @@ const SAME_AS: Record<string, string> = {
   "20A Single-Pole dual-function breaker":
     "20A Single-Pole AFCI/GFCI combo breaker",
 };
+/*
+  Rows that have since moved into the catalog under another name, or were
+  folded into a row it already had. Same treatment as SAME_AS: the shipped name
+  wins, and a brand variant naming the old one as its parent follows it.
+*/
+Object.assign(SAME_AS, MOVED_FROM_SHEET);
 const canonical = (name: string) => SAME_AS[name] ?? name;
 
 const add = (

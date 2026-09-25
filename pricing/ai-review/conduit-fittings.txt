@@ -1,5 +1,5 @@
 Category: Conduit Fittings
-Items: 244
+Items: 235
 
 Category | Name | Size
 Conduit Fittings | 1/2" EMT 90-degree elbow | 1/2"
@@ -201,7 +201,6 @@ Conduit Fittings | 1/2" flexible metal conduit coupling | 1/2"
 Conduit Fittings | 3/4" flexible metal conduit coupling | 3/4"
 Conduit Fittings | 1" flexible metal conduit coupling | 1"
 Conduit Fittings | 1-1/4" flexible metal conduit coupling | 1-1/4"
-Conduit Fittings | AC/MC snap connector | -
 Conduit Fittings | Chase nipple, 4" | 4"
 Conduit Fittings | Conduit body, 3-1/2" LB | 3-1/2"
 Conduit Fittings | Conduit body, 4" LB | 4"
@@ -223,9 +222,6 @@ Conduit Fittings | 2" conduit locknut | 2"
 Conduit Fittings | 2-1/2" conduit locknut | 2-1/2"
 Conduit Fittings | 3" conduit locknut | 3"
 Conduit Fittings | 4" conduit locknut | 4"
-Conduit Fittings | Duplex NM connector | -
-Conduit Fittings | MC cable connector, 1/2 in | 1/2 in
-Conduit Fittings | MC cable connector, 3/8 in | 3/8 in
 Conduit Fittings | 1" metal weatherhead | 1"
 Conduit Fittings | 1-1/4" metal weatherhead | 1-1/4"
 Conduit Fittings | 1-1/2" metal weatherhead | 1-1/2"
@@ -241,8 +237,3 @@ Conduit Fittings | 2-1/2" PVC weatherhead | 2-1/2"
 Conduit Fittings | 3" PVC weatherhead | 3"
 Conduit Fittings | 4" PVC weatherhead | 4"
 Conduit Fittings | Reducing washer set | -
-Conduit Fittings | 4" rigid coupling | 4"
-Conduit Fittings | Romex connector, 1/2 in | 1/2 in
-Conduit Fittings | Romex connector, 3/4 in | 3/4 in
-Conduit Fittings | Snap-in NM connector | -
-Conduit Fittings | Two-screw NM connector | -

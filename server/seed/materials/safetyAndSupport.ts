@@ -116,7 +116,38 @@ export const FASTENERS: BaselineMaterial[] = [
   {
     ...item("Fasteners & Anchors"),
     name: "Concrete wedge anchor",
-    searchAliases: aliases("stud red head expansion masonry drop in bolt kwik"),
+    // "drop in" came out 2026-09-25, when the drop-in anchor became its own
+    // item: a wedge anchor is not one.
+    searchAliases: aliases("stud red head expansion masonry bolt kwik"),
+    defaultQty: 4,
+  },
+  // Moved from the pricing sheet, 2026-09-25.
+  {
+    ...item("Fasteners & Anchors"),
+    name: "Drop-in anchor",
+    searchAliases: aliases(
+      "dropin concrete flush female internal thread set tool rod hanger"
+    ),
+    defaultQty: 4,
+  },
+  {
+    ...item("Fasteners & Anchors"),
+    name: "Sleeve anchor",
+    searchAliases: aliases("concrete masonry block brick expansion hex nut"),
+    defaultQty: 4,
+  },
+  {
+    ...item("Fasteners & Anchors"),
+    name: "Powder-actuated pin",
+    searchAliases: aliases(
+      "shot pin ramset hilti pa fastener nail load concrete steel"
+    ),
+    defaultQty: 10,
+  },
+  {
+    ...item("Fasteners & Anchors"),
+    name: "Plastic conduit clip",
+    searchAliases: aliases("snap emt nm cable holder nail on surface"),
     defaultQty: 4,
   },
   {

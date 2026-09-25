@@ -88,6 +88,9 @@ const FITTING_NOUNS = [
   "locknut",
   "reducer",
   "reducing washer",
+  // A crimp sleeve splices two conductors. Added 2026-09-25 with the sleeves
+  // themselves, when "#4/0 crimp sleeve" ranked above 4/0 SER for "4/0".
+  "sleeve",
   "expansion fitting",
   "service entrance cap",
   "weatherhead",

@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **32 more rough-in materials in the starter catalog, moved over from the
+  pricing sheet.** 14-2 UF-B, fire alarm cable, SOOW and SJOOW cord, tray
+  cable, crimp sleeves, DIN rail, drop-in and sleeve anchors, shot pins,
+  conduit clips, ceiling-grid clips, strut fittings, putty pads, labels and
+  sealants. Like every starter item they arrive with no price. 54 more sheet
+  rows turned out to be items the catalog already had under another name
+  ("10/2 MC cable" is "10-2 MC cable"), so they were folded into those rather
+  than listed twice, and the pricing sheet no longer lists them separately.
+
 - **You can now set a material markup.** Settings → Pricing has a company
   default, and any material can carry its own markup (edit it on the
   Materials screen) that wins over the default. Each line on a bid says how
