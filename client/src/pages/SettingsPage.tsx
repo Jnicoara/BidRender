@@ -142,7 +142,7 @@ function CrosshairColorSetting() {
     <section className="space-y-3">
       <div>
         <h3 className="text-sm font-semibold text-foreground mb-0.5">
-          Crosshair colour
+          Crosshair color
         </h3>
         <p className="text-xs text-muted-foreground">
           The cursor on a plan while you count, trace or measure. Pick one that

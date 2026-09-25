@@ -21,7 +21,7 @@ This is the human-readable companion to the git history — read this to see wha
 
 - **The plan crosshair is brand yellow with a thin dark outline**, instead of
   a white outline that read as a glowing box on dark areas. Settings → Display
-  has a new "Crosshair colour" choice (yellow, cyan, magenta, red, green) for
+  has a new "Crosshair color" choice (yellow, cyan, magenta, red, green) for
   anyone whose sheets are thick with yellow marks. Saved per person on the
   device. The aiming dot and the exact click point are unchanged.
 
