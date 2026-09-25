@@ -28,9 +28,6 @@ export const PANEL_RAIL_WIDTH = 18;
 /** Folded, the whole strip reopens the panel — wide enough to hit easily. */
 const FOLDED_STRIP_WIDTH = 28;
 
-/** Inert space between a folded LEFT panel and the app's own navigation. */
-const FOLDED_GUTTER = 10;
-
 export function SidePanel({
   side,
   open,
@@ -109,24 +106,23 @@ export function SidePanel({
     wider strip reopens the panel; the chevron stays small and quiet, and the
     strip only shows itself as a faint tint on hover.
 
-    ── And on the LEFT, a gutter between it and the app's navigation ─────────
-    The app sidebar widens from 64 to 224px on hover and reflows the page, so
-    overshooting the arrow by a pixel opened the NAV — which then pushed the
-    arrow 160px away from the pointer. The gutter is inert on purpose: a
-    near-miss lands on nothing, or on the strip, never on the nav. The chevron
-    sits at the strip's inner side for the same reason — the visible target is
-    well clear of the nav's edge.
+    ── Flush against the app's navigation, with ONE divider ──────────────────
+    The app sidebar widens from 64 to 224px and reflows the page, so
+    overshooting the strip by a pixel used to open the NAV — which then pushed
+    the strip 160px away from the pointer. The first fix (same day) put a 10px
+    inert gutter between the two, and on screen it read as a gap with a second
+    divider: broken, not deliberate.
+
+    The near-miss is solved on the NAV's side instead: it now opens only when
+    the pointer reaches one of its own buttons, never from its edge or the
+    padding around them (BidRenderShell, `navOpen`). So the strip sits flush,
+    and it draws no border on the side that meets the nav — the nav's own
+    border-r is the one divider. The chevron sits at the strip's inner side,
+    away from that edge.
   */
   if (!open) {
     return (
       <div className="flex shrink-0 min-h-0">
-        {side === "left" && (
-          <div
-            className="shrink-0 bg-background"
-            style={{ width: FOLDED_GUTTER }}
-            aria-hidden="true"
-          />
-        )}
         <button
           type="button"
           onClick={onToggle}
@@ -137,8 +133,8 @@ export function SidePanel({
             "shrink-0 flex flex-col pt-2.5 bg-card text-muted-foreground",
             "hover:bg-muted/60 hover:text-foreground transition-colors cursor-pointer",
             side === "left"
-              ? "border-l border-r border-border items-end pr-1.5"
-              : "border-l border-r border-border items-start pl-1.5"
+              ? "border-r border-border items-end pr-1.5"
+              : "border-l border-border items-start pl-1.5"
           )}
           style={{ width: FOLDED_STRIP_WIDTH }}
         >

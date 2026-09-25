@@ -151,6 +151,47 @@ describe("a specific query still finds the rare part first", () => {
   });
 });
 
+describe("a bare amp size leads with the two-pole, not the 3-pole", () => {
+  /*
+    The live fault, 2026-09-24: "90a breaker" returned the 90A 3-Pole first,
+    because the shipped two-pole run stopped at 70A (plus 100A) and there was
+    no 90A two-pole for it to find. The seed now carries 15–125A two-pole, and
+    70–125A is "common", so a size typed without a pole count means the
+    two-pole — while naming the pole count still wins (the block above).
+  */
+  const search = searcher(byName);
+
+  it("finds the two-pole first at every size where both exist", () => {
+    for (const amps of ["15", "20", "25", "30", "35", "40", "45", "50", "60"]) {
+      const hits = search(`${amps}a breaker`, 30);
+      const two = hits.indexOf(`${amps}A 2-Pole breaker`);
+      const three = hits.indexOf(`${amps}A 3-Pole breaker`);
+      expect(two, `${amps}A 2-Pole found`).toBeGreaterThanOrEqual(0);
+      expect(three, `${amps}A 3-Pole found`).toBeGreaterThanOrEqual(0);
+      expect(two, amps).toBeLessThan(three);
+    }
+    for (const amps of ["70", "80", "90", "100", "125"]) {
+      expect(search(`${amps}a breaker`)[0], amps).toBe(
+        `${amps}A 2-Pole breaker`
+      );
+      expect(search(`${amps} amp breaker`)[0], amps).toBe(
+        `${amps}A 2-Pole breaker`
+      );
+    }
+  });
+
+  it("still returns the 3-pole when it is named", () => {
+    expect(search("90a 3 pole")[0]).toBe("90A 3-Pole breaker");
+    expect(search("125a 3 pole")[0]).toBe("125A 3-Pole breaker");
+  });
+
+  it("finds the new large two-poles by the spoken forms", () => {
+    expect(search("125a 2 pole")[0]).toBe("125A 2-Pole breaker");
+    expect(search("110a 2-pole")[0]).toBe("110A 2-Pole breaker");
+    expect(search("90/2")[0]).toBe("90A 2-Pole breaker");
+  });
+});
+
 describe("this company's own use settles ties", () => {
   it("a part used on many bids rises above the shipped guess", () => {
     // 20A AFCI is only "common"; five bids of it outweigh the plain row's
@@ -178,7 +219,8 @@ describe("commonness points", () => {
   it("ranks core over common over unlisted", () => {
     const core = commonnessPoints("20A Single-Pole breaker", undefined, NOW);
     const common = commonnessPoints("40A 2-Pole breaker", undefined, NOW);
-    const none = commonnessPoints("70A 2-Pole breaker", undefined, NOW);
+    // Was the 70A 2-Pole until it became "common" (2026-09-24).
+    const none = commonnessPoints("150A 3-Pole breaker", undefined, NOW);
     expect(core).toBeGreaterThan(common);
     expect(common).toBeGreaterThan(none);
     expect(none).toBe(0);

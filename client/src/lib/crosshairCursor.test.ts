@@ -178,17 +178,16 @@ describe("the cursor value a browser is given", () => {
 });
 
 describe("the crosshair reads on white paper and on black linework", () => {
-  it("draws a thin dark outline under a coloured core, from one geometry", () => {
-    // Widths are 4 and 2, not 3 and 1: an even-sized image puts the centre on
-    // a pixel BOUNDARY, so a stroke has to straddle it to stay symmetric. That
-    // also makes the outline exactly 1px each side.
+  it("draws the arms in ONE colour, with no outline", () => {
+    // Reversed 2026-09-24: the dark 1px outline made the pointer two-tone.
+    // One stroke pass in the chosen colour, 2px wide (an even-sized image puts
+    // the centre on a pixel BOUNDARY, so the stroke straddles it), lifted off
+    // white paper by a faint soft shadow rather than a drawn edge.
     const svg = crosshairSvg();
-    expect(svg).toContain('stroke="#111827" stroke-width="4"');
     expect(svg).toContain('stroke="#F5C518" stroke-width="2"');
-    // The outline has to come first, or it paints over the core.
-    expect(svg.indexOf('stroke="#111827"')).toBeLessThan(
-      svg.indexOf('stroke="#F5C518"')
-    );
+    expect(svg.match(/stroke="/g)).toHaveLength(1);
+    expect(svg).not.toContain('#111827" stroke-width');
+    expect(svg).toContain("feDropShadow");
   });
 
   /*

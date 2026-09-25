@@ -27,7 +27,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { CrosshairGuides, type CrosshairHandle } from "./CrosshairGuides";
-import { crosshairCursorStyle } from "@/lib/crosshairCursor";
+import { CROSSHAIR_COLORS, crosshairCursorStyle } from "@/lib/crosshairCursor";
 import { useCrosshairColor } from "@/hooks/useCrosshairColor";
 import { Check, RotateCcw, Ruler, TriangleAlert, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -151,6 +151,17 @@ export function CalibrateLayer({
   );
   const [checkText, setCheckText] = useState("");
   const [applyError, setApplyError] = useState<string | null>(null);
+  /** The measuring tips, folded behind the "?" in the bar. */
+  const [tipsOpen, setTipsOpen] = useState(false);
+  /**
+   * The bar moves to the BOTTOM edge while the pointer is near the top one.
+   *
+   * It is one line, but it still sits on the drawing, and "the box must never
+   * cover where the user clicks" includes a dimension that happens to run
+   * along the top of the view. Hysteresis — it only goes back up once the
+   * pointer is near the bottom — so it cannot flicker between the two.
+   */
+  const [barLow, setBarLow] = useState(false);
 
   /**
    * Escape backs out one point at a time, then leaves.
@@ -164,7 +175,10 @@ export function CalibrateLayer({
       if (e.key !== "Escape") return;
       e.preventDefault();
       e.stopPropagation();
-      if (points.length > 0) {
+      // The smallest thing open is the tips, when they are.
+      if (tipsOpen) {
+        setTipsOpen(false);
+      } else if (points.length > 0) {
         onPointsChange(points.slice(0, -1));
         setHover(null);
       } else {
@@ -173,7 +187,7 @@ export function CalibrateLayer({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [points, onPointsChange, onCancel]);
+  }, [points, onPointsChange, onCancel, tipsOpen]);
 
   const toScreen = useCallback(
     (p: PagePoint) => ({ x: p.x * renderScale, y: p.y * renderScale }),
@@ -292,237 +306,132 @@ export function CalibrateLayer({
   const second = points[1] ? toScreen(points[1]) : null;
   const live = hover && points.length === 1 ? toScreen(hover) : null;
 
-  const setPanel = (
-    /*
-      ── DOCKED BOTTOM-LEFT, off the drawing ──────────────────────────────────
-      This sat `top-3 left-1/2`, centred over the sheet, which put it exactly
-      where the first point of a measurement usually goes. Reported 2026-09-24:
-      the panel covered the thing it was asking to be clicked.
+  /*
+    ── BOTH PHASES: a one-line bar, and a small card by the line ──────────────
+    Changed 2026-09-24, twice. Checking went to this shape first; setting kept
+    a 21rem panel docked bottom-left, with three bullets of advice, a span
+    readout and two buttons stacked in it — and on a real sheet it covered the
+    drawing it was asking to be clicked. Now setting looks like checking:
 
-      Bottom-left is the corner with least competition — the toolbar owns the
-      top, the counts panel owns the right, and a title block occupying the
-      bottom-left of a drawing is not something you calibrate against. Narrower
-      too, so it takes less of whatever it does cover.
-    */
-    <div className="absolute bottom-3 left-3 w-[21rem] max-w-[calc(100%-1.5rem)] pointer-events-auto">
-      <div className="rounded-xl border border-border bg-card/95 shadow-xl p-3 space-y-2">
-        <div className="flex items-center gap-2">
-          {/*
-            `Ruler`, matching the one control this now opens from.
+      - the BAR says only what to click next, and sits on the edge of the view
+        (the bottom edge while the pointer is near the top — see `barLow`);
+      - the tips — longest span, the scale-bar trap — sit behind a "?" in it;
+      - after the second click, a small CARD beside the measured line takes the
+        distance and shows the span, its accuracy and the result.
 
-            It used to be MoveHorizontal in blue, to match a separate Calibrate
-            button — and that pairing is gone: there is one scale control now,
-            and the blue double-arrow was the only blue on the screen, which
-            made the least-used thing in the toolbar the most eye-catching.
-          */}
-          <Ruler className="w-4 h-4 shrink-0 text-muted-foreground" />
-          <p className="text-sm font-medium flex-1">Set scale by measuring</p>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 w-6 p-0 text-muted-foreground"
-            onClick={onCancel}
-            title="Cancel (Escape)"
-            aria-label="Cancel calibration"
-          >
-            <X className="w-3.5 h-3.5" />
-          </Button>
-        </div>
-
-        <>
-          {points.length < 2 ? (
-            <div className="space-y-1.5">
-              <p className="text-xs text-muted-foreground">
-                {points.length === 0
-                  ? "Click one end of a distance you know."
-                  : "Now click the other end."}{" "}
-                <span className="text-foreground">
-                  Zoom in before each click.
-                </span>
-              </p>
-              {/*
-              ── The order of this advice is the advice ─────────────────────
-              A printed dimension is a number the drawing states. A scale bar
-              is a picture you have to read, and reading it wrong is silent —
-              see the warning below. So the dimension comes first, and the bar
-              is named as the fallback it is.
-            */}
-              <ul className="text-[0.7rem] text-muted-foreground space-y-1 pl-3.5 list-disc marker:text-muted-foreground/60">
-                <li>
-                  <span className="text-foreground">
-                    Best: a dimension printed on the drawing
-                  </span>{" "}
-                  — a dimension line, a column grid, an overall building width.
-                </li>
-                <li>
-                  <span className="text-foreground">Use the longest one</span>{" "}
-                  you can find. A short span multiplies its own error into every
-                  measurement on the sheet.
-                </li>
-                <li className="text-orange-300">
-                  <span className="font-medium">
-                    A scale bar often starts LEFT of zero.
-                  </span>{" "}
-                  One reading 10-5-0-10-20 is thirty feet end to end, not
-                  twenty. Click the numbers you are typing, never the bar&apos;s
-                  ends.
-                </li>
-              </ul>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <label
-                  htmlFor="calibrate-distance"
-                  className="text-xs text-muted-foreground shrink-0"
-                >
-                  That distance is
-                </label>
-                <Input
-                  id="calibrate-distance"
-                  value={distanceText}
-                  onChange={e => setDistanceText(e.target.value)}
-                  onFocus={selectOnFocus}
-                  onKeyDown={e => {
-                    if (e.key === "Enter" && ratio !== null) apply();
-                    if (e.key === "Escape") onCancel();
-                  }}
-                  placeholder="e.g. 100, 24'-6&quot;"
-                  className="h-7 text-xs font-mono"
-                  autoFocus
-                />
-              </div>
-              <p className="text-[0.7rem] text-muted-foreground">
-                A plain number means <strong>feet</strong>. Inches need a mark —{" "}
-                <span className="font-mono">246&quot;</span>.
-              </p>
-            </div>
-          )}
-
-          {/* The span rating, live while the second point is being chosen. */}
-          {span && (
-            <div className="rounded-lg border border-border/60 bg-muted/20 px-2.5 py-2 space-y-1">
-              <div className="flex items-baseline gap-2">
-                <span className="text-[0.7rem] text-muted-foreground">
-                  Span
-                </span>
-                <span className="font-mono text-xs tabular-nums">
-                  {span.paperInches.toFixed(2)}&quot; of paper
-                </span>
-                <span
-                  className={cn(
-                    "ml-auto text-[0.7rem] font-medium",
-                    QUALITY_STYLE[span.quality]
-                  )}
-                >
-                  ±{span.errorPercent.toFixed(1)}%
-                </span>
-              </div>
-              <p
-                className={cn("text-[0.7rem] leading-snug", {
-                  "text-muted-foreground": span.quality === "good",
-                  "text-orange-400": span.quality === "short",
-                })}
-              >
-                {span.message}
-              </p>
-              {/*
-              The percentage turned into feet.
-
-              "±4.6%" needs arithmetic before it means anything; "a 1,000 ft run
-              could be off by about 46 ft" is the same fact already in the units
-              of the decision being made.
-            */}
-              {span.quality !== "good" && (
-                <p className="text-[0.7rem] text-muted-foreground">
-                  {describeErrorImpact(span.errorPercent)}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* The result, in plain terms. */}
-          {ratio !== null && (
-            <div className="rounded-lg border border-border bg-muted/20 px-2.5 py-2 space-y-1">
-              <div className="flex items-baseline gap-2">
-                <span className="text-[0.7rem] text-muted-foreground">
-                  This sheet is
-                </span>
-                <span className="font-mono text-sm">
-                  {describeScale(ratio)}
-                </span>
-              </div>
-              <p className="text-[0.7rem] text-muted-foreground">
-                One inch of paper is{" "}
-                <span className="font-mono">{(ratio / 12).toFixed(1)} ft</span>{" "}
-                of building.
-              </p>
-              {standard?.worthMentioning && (
-                <p className="text-[0.7rem] text-orange-400 flex items-start gap-1.5 pt-0.5">
-                  <TriangleAlert className="w-3 h-3 shrink-0 mt-0.5" />
-                  <span>
-                    That is {Math.abs(standard.percentOff).toFixed(0)}%{" "}
-                    {standard.percentOff > 0 ? "above" : "below"} the nearest
-                    standard scale ({standard.nearestText}). It may be right — a
-                    printed set often is. Worth checking you clicked the ends of
-                    the dimension you meant.
-                  </span>
-                </p>
-              )}
-            </div>
-          )}
-
-          {/*
-          A short span NEVER blocks applying, and this button is never dimmed
-          for it — only for "there is no number yet".
-
-          Sometimes a graphic scale bar is the only known distance printed on a
-          sheet. Refusing a short span would leave the estimator with no scale
-          at all, which is strictly worse than a scale they have been told is
-          soft. The warning sits BESIDE this button, not in place of it.
-        */}
-          <div className="flex items-center gap-2 pt-0.5">
-            <Button
-              size="sm"
-              className="h-7 gap-1.5 text-xs flex-1"
-              onClick={apply}
-              disabled={ratio === null || busy}
-              title={
-                span?.quality === "short"
-                  ? "Applies the scale. It is on the soft side — the sheet will be marked so you remember."
-                  : "Applies this scale to the sheet"
-              }
-            >
-              <Check className="w-3.5 h-3.5" />
-              {busy ? "Saving…" : "Use this scale"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => {
-                // Points only. The typed distance survives, because redoing is
-                // almost always "I clicked that badly", not "I meant a different
-                // dimension" — and retyping it would punish the correction.
-                onPointsChange([]);
-                setHover(null);
-              }}
-              disabled={points.length === 0}
-              title="Click the two points again, keeping the distance"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> Redo points
-            </Button>
-          </div>
-
-          {applyError && (
-            <p className="text-[0.7rem] text-orange-400 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 shrink-0 mt-0.5" />
-              <span>{applyError}</span>
-            </p>
-          )}
-        </>
+    ── This overrides one line of the header above, and says so ─────────────
+    "The span rating appears live, WHILE the user is choosing" is kept, in a
+    smaller form: the bar carries the ±% while the second point is being
+    chosen, in the rating's colour. The full readout — paper span, what the
+    error means in feet — moved into the card, where there is room for it.
+  */
+  const bar = (title: string, instruction: string, extra: React.ReactNode) => (
+    <div
+      className={cn(
+        "absolute left-1/2 -translate-x-1/2 max-w-[calc(100%-1rem)] pointer-events-auto",
+        barLow ? "bottom-2" : "top-2"
+      )}
+    >
+      <div
+        className="flex items-center gap-2 h-8 pl-2.5 pr-1 rounded-full border border-border bg-card/95 shadow-lg text-xs whitespace-nowrap"
+        role="status"
+        aria-live="polite"
+      >
+        <Ruler className="w-3.5 h-3.5 shrink-0 text-[#F5C518]" />
+        <span className="font-medium">{title}</span>
+        <span className="text-muted-foreground">·</span>
+        <span className="truncate">{instruction}</span>
+        {extra}
+        <span className="text-[0.65rem] text-muted-foreground pr-2">
+          {/* Escape backs out a click before it leaves — say which it does. */}
+          {points.length === 0 ? "Esc to cancel" : "Esc undoes the click"}
+        </span>
       </div>
     </div>
+  );
+
+  /*
+    The tips, word for word what the old panel said, one click away.
+
+    ── The order of this advice is the advice ─────────────────────────────────
+    A printed dimension is a number the drawing states. A scale bar is a
+    picture you have to read, and reading it wrong is silent. So the dimension
+    comes first, and the bar is named as the fallback it is.
+  */
+  const tips = tipsOpen ? (
+    <div
+      className={cn(
+        "absolute left-1/2 -translate-x-1/2 w-[20rem] max-w-[calc(100%-1rem)] pointer-events-auto rounded-lg border border-border bg-card/95 shadow-xl p-2.5",
+        barLow ? "bottom-12" : "top-12"
+      )}
+    >
+      <ul className="text-[0.7rem] text-muted-foreground space-y-1 pl-3.5 list-disc marker:text-muted-foreground/60">
+        <li>
+          <span className="text-foreground">Zoom in before each click.</span>
+        </li>
+        <li>
+          <span className="text-foreground">
+            Best: a dimension printed on the drawing
+          </span>{" "}
+          — a dimension line, a column grid, an overall building width.
+        </li>
+        <li>
+          <span className="text-foreground">Use the longest one</span> you can
+          find. A short span multiplies its own error into every measurement on
+          the sheet.
+        </li>
+        <li className="text-orange-300">
+          <span className="font-medium">
+            A scale bar often starts LEFT of zero.
+          </span>{" "}
+          One reading 10-5-0-10-20 is thirty feet end to end, not twenty. Click
+          the numbers you are typing, never the bar&apos;s ends.
+        </li>
+      </ul>
+    </div>
+  ) : null;
+
+  const setBar = bar(
+    "Measure the scale",
+    points.length === 0
+      ? "Click one end of a distance you know"
+      : points.length === 1
+        ? "Click the other end"
+        : "Type the real distance",
+    <>
+      {/* Live while the second point is chosen — see the note above `bar`. */}
+      {points.length === 1 && span && (
+        <span
+          className={cn(
+            "font-mono tabular-nums text-[0.7rem]",
+            QUALITY_STYLE[span.quality]
+          )}
+          title={span.message}
+        >
+          ±{span.errorPercent.toFixed(1)}%
+        </span>
+      )}
+      <button
+        type="button"
+        className={cn(
+          "ml-1 h-6 w-6 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted font-medium",
+          tipsOpen && "bg-muted text-foreground"
+        )}
+        onClick={() => setTipsOpen(o => !o)}
+        aria-expanded={tipsOpen}
+        aria-label="Tips for measuring a scale"
+        title="Tips: which distance to use"
+      >
+        ?
+      </button>
+      <button
+        type="button"
+        className="px-2 h-6 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
+        onClick={onCancel}
+      >
+        Cancel
+      </button>
+    </>
   );
 
   const keep = async () => {
@@ -540,51 +449,27 @@ export function CalibrateLayer({
   };
 
   /*
-    ── CHECKING: a one-line bar, and a small card by the line ─────────────────
-    Changed 2026-09-24. This used to be the same 21rem panel as setting, docked
-    bottom-left, with two sentences of reassurance and three buttons — for a
-    job that is two clicks and one number. The scale being checked is already
-    named on the toolbar chip, so all the bar has to say is what to click next.
+    The scale being checked is already named on the toolbar chip, so all the
+    bar has to say is what to click next.
 
-    The verdict goes BESIDE the measured line rather than in the corner,
-    because the line is where the estimator is looking when it appears, and
-    "reads half" means most next to the dimension that reads half.
+    Skipping is allowed, and quietly. A sheet with exactly one known dimension
+    on it is a real sheet, and refusing to leave until a second one is found
+    would make calibration impossible there.
   */
-  const checkBar = (
-    <div className="absolute top-2 left-1/2 -translate-x-1/2 max-w-[calc(100%-1rem)] pointer-events-auto">
-      <div
-        className="flex items-center gap-2 h-8 pl-2.5 pr-1 rounded-full border border-border bg-card/95 shadow-lg text-xs whitespace-nowrap"
-        role="status"
-        aria-live="polite"
-      >
-        <Ruler className="w-3.5 h-3.5 shrink-0 text-[#F5C518]" />
-        <span className="font-medium">Check the scale</span>
-        <span className="text-muted-foreground">·</span>
-        <span className="truncate">
-          {points.length === 0
-            ? "Click one end of a dimension you know"
-            : points.length === 1
-              ? "Click the other end."
-              : "Type what it should be."}
-        </span>
-        {/*
-          Skipping is allowed, and quietly. A sheet with exactly one known
-          dimension on it is a real sheet, and refusing to leave until a second
-          one is found would make calibration impossible there.
-        */}
-        <button
-          type="button"
-          className="ml-1 px-2 h-6 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
-          onClick={onCancel}
-        >
-          Skip the check
-        </button>
-        <span className="text-[0.65rem] text-muted-foreground pr-2">
-          {/* Escape backs out a click before it leaves — say which it does. */}
-          {points.length === 0 ? "Esc to cancel" : "Esc undoes the click"}
-        </span>
-      </div>
-    </div>
+  const checkBar = bar(
+    "Check the scale",
+    points.length === 0
+      ? "Click one end of a dimension you know"
+      : points.length === 1
+        ? "Click the other end."
+        : "Type what it should be.",
+    <button
+      type="button"
+      className="ml-1 px-2 h-6 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
+      onClick={onCancel}
+    >
+      Skip the check
+    </button>
   );
 
   /*
@@ -592,15 +477,22 @@ export function CalibrateLayer({
     overlay's real rectangle each frame while it is up, because the overlay is
     INSIDE the zoom transform and the card is not — a pan or zoom with the card
     open must carry it along with the line.
+
+    The card's HEIGHT is measured too, not assumed: the setting card grows a
+    line when the span is soft or the result is off-standard, and a card
+    placed with a guessed height is a card that lands on the line it is
+    describing.
   */
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const [cardAnchor, setCardAnchor] = useState<{
     x: number;
     top: number;
     bottom: number;
     w: number;
     h: number;
+    cardH: number;
   } | null>(null);
-  const showCard = phase === "check" && points.length >= 2;
+  const showCard = points.length >= 2;
   useEffect(() => {
     if (!showCard || !chromeTarget) {
       setCardAnchor(null);
@@ -622,6 +514,7 @@ export function CalibrateLayer({
           bottom: Math.max(a.y, b.y) * sy + r.top - c.top,
           w: c.width,
           h: c.height,
+          cardH: cardRef.current?.offsetHeight ?? 150,
         };
         setCardAnchor(prev =>
           prev &&
@@ -629,7 +522,8 @@ export function CalibrateLayer({
           Math.abs(prev.top - next.top) < 0.5 &&
           Math.abs(prev.bottom - next.bottom) < 0.5 &&
           prev.w === next.w &&
-          prev.h === next.h
+          prev.h === next.h &&
+          prev.cardH === next.cardH
             ? prev
             : next
         );
@@ -641,7 +535,6 @@ export function CalibrateLayer({
   }, [showCard, chromeTarget, points, width, height, toScreen]);
 
   const CARD_W = 272;
-  const CARD_H = 150;
   const cardStyle: React.CSSProperties = cardAnchor
     ? {
         left: Math.max(
@@ -650,18 +543,15 @@ export function CalibrateLayer({
         ),
         // Below the line when there is room, above it when there is not.
         top:
-          cardAnchor.bottom + 14 + CARD_H <= cardAnchor.h
+          cardAnchor.bottom + 14 + cardAnchor.cardH <= cardAnchor.h - 8
             ? cardAnchor.bottom + 14
-            : Math.max(48, cardAnchor.top - 14 - CARD_H),
+            : Math.max(48, cardAnchor.top - 14 - cardAnchor.cardH),
         width: CARD_W,
       }
     : { left: 12, bottom: 12, width: CARD_W };
 
-  const resultCard = showCard ? (
-    <div
-      className="absolute pointer-events-auto rounded-lg border border-border bg-card/95 shadow-xl p-2.5 space-y-2"
-      style={cardStyle}
-    >
+  const checkCard = (
+    <>
       <div className="flex items-center gap-2">
         <label
           htmlFor="calibrate-check"
@@ -737,18 +627,165 @@ export function CalibrateLayer({
           <RotateCcw className="w-3.5 h-3.5" /> Set it again
         </Button>
       </div>
+    </>
+  );
+
+  const setCard = (
+    <>
+      <div className="flex items-center gap-2">
+        <label
+          htmlFor="calibrate-distance"
+          className="text-xs text-muted-foreground shrink-0"
+        >
+          That distance is
+        </label>
+        <Input
+          id="calibrate-distance"
+          value={distanceText}
+          onChange={e => setDistanceText(e.target.value)}
+          onFocus={selectOnFocus}
+          onKeyDown={e => {
+            if (e.key === "Enter" && ratio !== null) void apply();
+            if (e.key === "Escape") onCancel();
+          }}
+          placeholder="e.g. 100, 24'-6&quot;"
+          className="h-7 text-xs font-mono"
+          autoFocus
+        />
+      </div>
+      <p className="text-[0.7rem] text-muted-foreground">
+        A plain number means <strong>feet</strong>. Inches need a mark —{" "}
+        <span className="font-mono">246&quot;</span>.
+      </p>
+
+      {/* The span and its accuracy, now that both ends are down. */}
+      {span && (
+        <div className="space-y-0.5">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[0.7rem] text-muted-foreground">Span</span>
+            <span className="font-mono text-xs tabular-nums">
+              {span.paperInches.toFixed(2)}&quot; of paper
+            </span>
+            <span
+              className={cn(
+                "ml-auto text-[0.7rem] font-medium",
+                QUALITY_STYLE[span.quality]
+              )}
+              title={span.message}
+            >
+              ±{span.errorPercent.toFixed(1)}%
+            </span>
+          </div>
+          {/*
+            The percentage turned into feet — only when it is worth saying.
+            "±4.6%" needs arithmetic before it means anything; "a 1,000 ft run
+            could be off by about 46 ft" is the same fact in the units of the
+            decision being made.
+          */}
+          {span.quality !== "good" && (
+            <p
+              className={cn(
+                "text-[0.7rem] leading-snug",
+                span.quality === "short"
+                  ? "text-orange-400"
+                  : "text-muted-foreground"
+              )}
+            >
+              {describeErrorImpact(span.errorPercent)}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* The result, in plain terms. */}
+      {ratio !== null && (
+        <div className="space-y-0.5">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[0.7rem] text-muted-foreground">
+              This sheet is
+            </span>
+            <span className="font-mono text-sm">{describeScale(ratio)}</span>
+            <span className="ml-auto text-[0.7rem] text-muted-foreground">
+              1&quot; = {(ratio / 12).toFixed(1)} ft
+            </span>
+          </div>
+          {standard?.worthMentioning && (
+            <p className="text-[0.7rem] text-orange-400 flex items-start gap-1.5">
+              <TriangleAlert className="w-3 h-3 shrink-0 mt-0.5" />
+              <span>
+                {Math.abs(standard.percentOff).toFixed(0)}%{" "}
+                {standard.percentOff > 0 ? "above" : "below"}{" "}
+                {standard.nearestText}. Check you clicked the ends you meant.
+              </span>
+            </p>
+          )}
+        </div>
+      )}
+
+      {/*
+        A short span NEVER blocks applying, and this button is never dimmed for
+        it — only for "there is no number yet". Sometimes a graphic scale bar is
+        the only known distance printed on a sheet, and refusing it would leave
+        the estimator with no scale at all.
+      */}
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          className="h-7 gap-1.5 text-xs flex-1"
+          onClick={() => void apply()}
+          disabled={ratio === null || busy}
+          title={
+            span?.quality === "short"
+              ? "Applies the scale. It is on the soft side — the sheet will be marked so you remember."
+              : "Applies this scale to the sheet"
+          }
+        >
+          <Check className="w-3.5 h-3.5" />
+          {busy ? "Saving…" : "Use this scale"}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 gap-1.5 text-xs"
+          onClick={() => {
+            // Points only. The typed distance survives, because redoing is
+            // almost always "I clicked that badly", not "I meant a different
+            // dimension" — and retyping it would punish the correction.
+            onPointsChange([]);
+            setHover(null);
+          }}
+          title="Click the two points again, keeping the distance"
+        >
+          <RotateCcw className="w-3.5 h-3.5" /> Redo
+        </Button>
+      </div>
+
+      {applyError && (
+        <p className="text-[0.7rem] text-orange-400 flex items-start gap-1.5">
+          <TriangleAlert className="w-3 h-3 shrink-0 mt-0.5" />
+          <span>{applyError}</span>
+        </p>
+      )}
+    </>
+  );
+
+  const resultCard = showCard ? (
+    <div
+      ref={cardRef}
+      className="absolute pointer-events-auto rounded-lg border border-border bg-card/95 shadow-xl p-2.5 space-y-2"
+      style={cardStyle}
+    >
+      {phase === "check" ? checkCard : setCard}
     </div>
   ) : null;
 
-  const chrome =
-    phase === "check" ? (
-      <>
-        {checkBar}
-        {resultCard}
-      </>
-    ) : (
-      setPanel
-    );
+  const chrome = (
+    <>
+      {phase === "check" ? checkBar : setBar}
+      {phase === "set" && tips}
+      {resultCard}
+    </>
+  );
 
   return (
     <>
@@ -779,6 +816,13 @@ export function CalibrateLayer({
             );
           }
           setHover(page);
+          // Keep the bar off the pointer — see `barLow`.
+          if (chromeTarget) {
+            const c = chromeTarget.getBoundingClientRect();
+            const y = e.clientY - c.top;
+            if (!barLow && y < 72) setBarLow(true);
+            else if (barLow && y > c.height - 72) setBarLow(false);
+          }
         }}
         /*
           The second click mounts a box that autofocuses — and then this
@@ -795,6 +839,8 @@ export function CalibrateLayer({
           // dropped a calibration point would be maddening — you would move the
           // sheet and silently set one end of the measurement at the same time.
           if (e.button !== 0) return;
+          // The tips are read, then the drawing is clicked; they go on that click.
+          setTipsOpen(false);
           if (points.length >= 2) return;
           const p = pointerToPage(e);
           if (!p) return;
@@ -808,7 +854,7 @@ export function CalibrateLayer({
             ref={guidesRef}
             width={width}
             height={height}
-            color={SPAN_COLOR}
+            color={CROSSHAIR_COLORS[crosshairColor].hex}
           />
         )}
 

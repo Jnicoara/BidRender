@@ -6,6 +6,35 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-24]
 
+- **Searching "90a breaker" now finds the 2-pole first.** The starter catalog's
+  2-pole breakers stopped at 70A (plus 100A), so the only 90A breaker it could
+  find was the rarer 3-pole. It now carries every 2-pole from 15A to 125A,
+  single-pole from 15A to 50A, and a 40A 2-pole GFCI. The 70–125A 2-poles
+  count as common, so a bare amp size leads with the 2-pole, while typing
+  "90a 3 pole" still puts the 3-pole first. Above 125A a 2-pole is a main
+  breaker, not a branch breaker, so those are deliberately left off the
+  starter list. On the pricing sheet, QO, BR, CH and Siemens gain a 110A 2-pole.
+
+- **Setting a scale is quick again.** The scale menu opens on "Type a scale"
+  and the list of standard scales; picking or typing one saves and closes.
+  "Measure it" is a smaller option lower down, and it now works like "Check
+  it": a thin one-line bar at the edge of the sheet, with the tips (longest
+  span, the scale-bar trap) behind a "?". After the second click a small card
+  beside the line takes the distance and shows the span, its accuracy and the
+  resulting scale. The bar moves to the bottom edge when the pointer goes near
+  the top, so it never sits where you are clicking.
+
+- **The crosshair is one colour.** The cross and its long guide lines are now
+  both your chosen crosshair colour (yellow by default). The dark outline is
+  gone, replaced by a very faint soft shadow. The centre dot and the exact
+  aiming point are unchanged.
+
+- **The folded sheet list sits flush against the main menu again.** The gap and
+  second divider added earlier today are gone. The problem the gap was meant to
+  solve is now fixed on the menu's side: the main menu only widens when the
+  pointer reaches one of its own buttons, never from its edge, so overshooting
+  the sheet-list strip no longer throws it open.
+
 - **Checking a sheet's scale no longer covers the drawing.** "Check it" now
   closes the scale menu at once and puts a thin one-line bar at the top of the
   sheet — click one end, click the other, with "Skip the check" and Esc right

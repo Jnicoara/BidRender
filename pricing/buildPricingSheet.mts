@@ -1412,6 +1412,22 @@ for (const [brand, line] of PLUG_ON) {
     brand
   );
 }
+// 110A two-pole, the one size in the shipped 15–125A two-pole run (added to
+// the seed 2026-09-24) that no brand carried. Only the lines known to make it
+// (QO2110, BR2110, CH2110, Siemens Q2110); Homeline, ABB, Leviton and the
+// bolt-on lines were not confirmed, so they are left without one on purpose.
+for (const [brand, line] of [
+  ["Square D", "QO"],
+  ["Eaton", "BR"],
+  ["Eaton", "CH"],
+  ["Siemens", "Siemens"],
+] as [string, string][])
+  addBrand(
+    `${tagOf(brand, line)} 110A 2-Pole breaker`,
+    "Breakers",
+    "110A 2-Pole breaker",
+    brand
+  );
 // Three-pole: the commercial lines, plug-on and bolt-on. Homeline, BR, the
 // ABB plug-on line and Leviton are residential single-phase in practice.
 const THREE_POLE: [string, string][] = [

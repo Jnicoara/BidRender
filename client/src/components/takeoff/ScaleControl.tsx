@@ -273,178 +273,33 @@ export function ScaleControl({
           No exit animation. Both measure buttons close this and hand the
           drawing straight to a two-click tool — a dropdown fading out over the
           spot the first click is aimed at is a dropdown still in the way.
+
+          ── Quick first: TYPE or PICK, at the top ─────────────────────────────
+          Reordered 2026-09-24. Measuring used to lead, with a paragraph under
+          it, then "or", then the field, then the list — so the fast path was
+          at the bottom of a tall box. Setting a scale should take one click
+          when the sheet states it: the field is first (and takes focus), the
+          standard list is right under it, and picking or typing saves and
+          closes. Nothing else opens.
+
+          Measuring is still here, smaller and lower, and so is the check. The
+          reason measuring once led — it does not depend on the print being at
+          true size — is what the "not checked" nudge is for.
         */}
         <PopoverContent
           align="start"
-          className="w-72 space-y-3 data-[state=closed]:animate-none!"
+          className="w-72 p-3 space-y-2.5 data-[state=closed]:animate-none!"
         >
-          <div>
-            <div className="text-sm font-medium">Scale for {sheet.name}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Stored for this sheet alone — other sheets in the same PDF keep
-              their own.
-            </p>
-          </div>
-
-          {/*
-            ── The check, offered first when it is outstanding ────────────────
-            Above the ways to CHANGE the scale, because on a sheet that already
-            has one the likeliest next action is confirming it, not replacing
-            it. A typed scale is as exposed here as a measured one: a half-size
-            print reads half length with a perfectly standard ratio.
-          */}
-          {unchecked && (
-            <div className="rounded-lg border border-[#F5C518]/40 bg-[#F5C518]/5 p-2.5 space-y-2">
-              <p className="text-xs text-muted-foreground">
-                <span className="text-foreground">
-                  This scale has not been checked.
-                </span>{" "}
-                A drawing printed at half size reads half length with nothing
-                looking wrong. Trace one dimension you know and this will say
-                whether the two agree.
-              </p>
-              {/*
-                Two lines of label in a one-line button wrapped and overflowed
-                it. The instruction moved into the paragraph above, where there
-                is room for it, and the button says the action only.
-              */}
-              <Button
-                size="sm"
-                className="h-7 w-full gap-1.5 text-xs"
-                onClick={() => {
-                  setOpen(false);
-                  onCheck();
-                }}
-              >
-                <Ruler className="w-3 h-3 shrink-0" /> Check it
-              </Button>
-            </div>
-          )}
-
-          {isSet && sheet.scaleCheckedAt && (
-            <p className="text-[0.7rem] text-emerald-400 flex items-center gap-1.5">
-              <Check className="w-3 h-3 shrink-0" />
-              Checked against a second dimension.
-            </p>
-          )}
-
-          {/*
-            Off-standard, explained where there is room to explain it.
-
-            Deliberately NOT phrased as an error. Three things produce it and
-            only one is a mistake: a set scaled in printing (the calibration is
-            right and the printed ratio is wrong), a misread dimension, and a
-            drawing genuinely at an odd scale. The estimator can tell these
-            apart in a second and the app cannot tell them apart at all.
-          */}
-          {offStandard && standard && (
-            <div className="rounded-lg border border-orange-400/40 bg-orange-400/5 p-2.5 space-y-1">
-              <p className="text-xs text-orange-300 flex items-start gap-1.5">
-                <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                <span>
-                  This is {Math.abs(standard.percentOff).toFixed(0)}%{" "}
-                  {standard.percentOff > 0 ? "above" : "below"}{" "}
-                  <span className="font-mono">{standard.nearestText}</span>, the
-                  nearest standard scale.
-                </span>
-              </p>
-              <p className="text-[0.7rem] text-muted-foreground">
-                It may well be right — a printed set often is a few percent off.
-                Worth a look if you set this by measuring.
-              </p>
-            </div>
-          )}
-
-          {/*
-            The exact ratio, kept reachable.
-
-            The button above says "3/16" = 1'-0"" because that is what anybody
-            needs to read. The number underneath is what every measurement
-            actually uses, and hiding it entirely would make a 0.5% snap
-            impossible to notice or check.
-          */}
-          {isSet && (
-            <p className="text-[0.7rem] text-muted-foreground">
-              One inch of paper is{" "}
-              <span className="font-mono text-foreground">
-                {(Number(sheet.scaleRatio) / 12).toFixed(2)} ft
-              </span>{" "}
-              of building.
-              {sheet.scaleText && sheet.scaleText !== label && (
-                <>
-                  {" "}
-                  Stored as <span className="font-mono">{sheet.scaleText}</span>
-                  .
-                </>
-              )}
-            </p>
-          )}
-
-          {/* A reading found but not trusted enough to apply. One click to
-              accept, and plainly labelled as something read off the sheet. */}
-          {!isSet && sheet.detectedScaleText && (
-            <div className="rounded-lg border border-[#F5C518]/40 bg-[#F5C518]/5 p-2.5">
-              <p className="text-xs text-muted-foreground">
-                This sheet mentions{" "}
-                <span className="font-mono text-foreground">
-                  {sheet.detectedScaleText}
-                </span>
-                , but not clearly enough to use it without asking.
-              </p>
-              <Button
-                size="sm"
-                className="h-7 mt-2 w-full gap-1.5 text-xs"
-                onClick={() => pick(sheet.detectedScaleText!)}
-              >
-                <Check className="w-3 h-3" /> Use {sheet.detectedScaleText}
-              </Button>
-            </div>
-          )}
-
-          {notToScale && !isSet && (
-            <p className="text-xs text-muted-foreground">
-              This sheet is marked{" "}
-              <span className="text-foreground">not to scale</span>. Set one
-              only if you intend to measure against it anyway.
-            </p>
-          )}
-
-          {/*
-            ── MEASURE IT, first of the two ways ─────────────────────────────
-            Ahead of the list because it is the answer that does not depend on
-            the PDF being at its true print size. Typing is faster when the
-            sheet says its scale and the print is honest; measuring is right
-            either way, which is why it leads.
-          */}
-          <div className="space-y-1.5">
-            <Button
-              size="sm"
-              variant={isSet ? "outline" : "default"}
-              className="h-8 w-full gap-1.5 text-xs"
-              onClick={() => {
-                setOpen(false);
-                onMeasure();
-              }}
+          <div className="flex items-baseline gap-2">
+            <span
+              className="text-sm font-medium truncate"
+              title="Stored for this sheet alone — other sheets in the same PDF keep their own."
             >
-              <Ruler className="w-3.5 h-3.5" />
-              Measure it — click two points you know
-            </Button>
-            <p className="text-[0.7rem] text-muted-foreground">
-              Works even on a sheet that states no scale, or one printed at the
-              wrong size.
-            </p>
+              Scale for {sheet.name}
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-[0.65rem] text-muted-foreground">or</span>
-            <div className="h-px flex-1 bg-border" />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs text-muted-foreground">
-              Type a scale
-            </label>
+          <div className="space-y-1">
             <Input
               value={draft}
               onChange={e => setDraft(e.target.value)}
@@ -462,61 +317,159 @@ export function ScaleControl({
                   setOpen(false);
                 }
               }}
-              placeholder={`1/4" = 1'-0"`}
+              placeholder={`Type a scale — 1/4" = 1'-0"`}
               className="h-8 text-sm font-mono"
-              aria-label={`Scale for ${sheet.name}`}
+              aria-label={`Type a scale for ${sheet.name}`}
             />
             {/*
-              These are FORMATS, not alternative scales.
-
-              It read "Also reads 1" = 20' and 1:100" under a field showing
-              1/4" = 1'-0", which lands as three different scales being offered
-              — reported 2026-09-24. Saying "any of these forms" makes it a
-              statement about notation rather than about this sheet.
+              These are FORMATS, not alternative scales. It once read "Also
+              reads 1" = 20' and 1:100" under a field showing 1/4" = 1'-0",
+              which landed as three different scales being offered.
             */}
-            <p className="text-[0.7rem] text-muted-foreground">
-              Any of these forms works:{" "}
+            <p className="text-[0.65rem] text-muted-foreground">
+              Any form works:{" "}
               <span className="font-mono">1/4&quot; = 1&apos;-0&quot;</span>,{" "}
               <span className="font-mono">1&quot; = 20&apos;</span>,{" "}
-              <span className="font-mono">1:100</span>.
+              <span className="font-mono">1:100</span>
             </p>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">
-              Or pick a common one
-            </label>
-            <div className="max-h-44 overflow-y-auto grid grid-cols-2 gap-1">
-              {COMMON_SCALES.map(scale => (
-                <button
-                  key={scale.text}
-                  onClick={() => pick(scale.text)}
-                  className={cn(
-                    "text-left px-2 py-1 rounded text-xs font-mono transition-colors",
-                    sheet.scaleRatio === scale.ratio
-                      ? "bg-[#F5C518]/15 text-[#F5C518]"
-                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {scale.text}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {isSet && (
+          {/* A reading found but not trusted enough to apply. One click to
+              accept, and plainly labelled as something read off the sheet. */}
+          {!isSet && sheet.detectedScaleText && (
             <Button
               size="sm"
-              variant="ghost"
-              className="h-7 w-full gap-1.5 text-xs text-muted-foreground"
-              onClick={() => {
-                onClear();
-                setOpen(false);
-              }}
+              variant="outline"
+              className="h-7 w-full gap-1.5 text-xs border-[#F5C518]/40"
+              onClick={() => pick(sheet.detectedScaleText!)}
+              title="This sheet mentions it, but not clearly enough to use it without asking"
             >
-              <X className="w-3 h-3" /> Clear the scale
+              <Check className="w-3 h-3" /> Use{" "}
+              <span className="font-mono">{sheet.detectedScaleText}</span>
+              <span className="text-muted-foreground">— on the sheet</span>
             </Button>
           )}
+
+          <div className="max-h-44 overflow-y-auto grid grid-cols-2 gap-1">
+            {COMMON_SCALES.map(scale => (
+              <button
+                key={scale.text}
+                onClick={() => pick(scale.text)}
+                className={cn(
+                  "text-left px-2 py-1 rounded text-xs font-mono transition-colors",
+                  sheet.scaleRatio === scale.ratio
+                    ? "bg-[#F5C518]/15 text-[#F5C518]"
+                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {scale.text}
+              </button>
+            ))}
+          </div>
+
+          {notToScale && !isSet && (
+            <p className="text-[0.7rem] text-muted-foreground">
+              This sheet is marked{" "}
+              <span className="text-foreground">not to scale</span>. Set one
+              only if you intend to measure against it anyway.
+            </p>
+          )}
+
+          <div className="border-t border-border pt-2 space-y-1.5">
+            {/*
+              What the scale in force IS, in one or two quiet lines. The exact
+              ratio stays reachable because it is what every measurement uses,
+              and hiding it would make a 0.5% snap impossible to notice.
+            */}
+            {isSet && (
+              <p className="text-[0.7rem] text-muted-foreground">
+                1&quot; of paper ={" "}
+                <span className="font-mono text-foreground">
+                  {(Number(sheet.scaleRatio) / 12).toFixed(2)} ft
+                </span>
+                {sheet.scaleText && sheet.scaleText !== label && (
+                  <>
+                    {" "}
+                    · stored as{" "}
+                    <span className="font-mono">{sheet.scaleText}</span>
+                  </>
+                )}
+                {sheet.scaleCheckedAt && (
+                  <span className="text-emerald-400"> · checked</span>
+                )}
+              </p>
+            )}
+
+            {/*
+              Off-standard, NOT phrased as an error: a set scaled in printing,
+              a misread dimension and a drawing genuinely at an odd scale all
+              produce it, and only one is a mistake.
+            */}
+            {offStandard && standard && (
+              <p className="text-[0.7rem] text-orange-300 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 shrink-0 mt-0.5" />
+                <span>
+                  {Math.abs(standard.percentOff).toFixed(0)}%{" "}
+                  {standard.percentOff > 0 ? "above" : "below"}{" "}
+                  <span className="font-mono">{standard.nearestText}</span>. A
+                  printed set often is — worth a look if you measured it.
+                </span>
+              </p>
+            )}
+
+            {/*
+              A typed scale is only true if the PDF is at its true print size;
+              a half-size set reads half length with nothing looking wrong. One
+              line saying so, and the check beside it.
+            */}
+            {unchecked && (
+              <p className="text-[0.7rem] text-muted-foreground">
+                Not checked — a half-size print reads half length.
+              </p>
+            )}
+
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setOpen(false);
+                  onMeasure();
+                }}
+                title="Click the two ends of a distance you know. Works on a sheet that states no scale, or one printed at the wrong size."
+              >
+                <Ruler className="w-3 h-3" /> Measure it
+              </Button>
+              {unchecked && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 gap-1.5 text-xs text-[#F5C518] hover:text-[#F5C518]"
+                  onClick={() => {
+                    setOpen(false);
+                    onCheck();
+                  }}
+                  title="Measure one known dimension to confirm this scale"
+                >
+                  <Check className="w-3 h-3" /> Check it
+                </Button>
+              )}
+              {isSet && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 gap-1.5 text-xs text-muted-foreground ml-auto"
+                  onClick={() => {
+                    onClear();
+                    setOpen(false);
+                  }}
+                >
+                  <X className="w-3 h-3" /> Clear
+                </Button>
+              )}
+            </div>
+          </div>
         </PopoverContent>
       </Popover>
 

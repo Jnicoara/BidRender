@@ -40,7 +40,22 @@ const BREAKER_SLANG = "circuit cb ocpd bolt on plug in load center";
 /** Said out loud and written on takeoff sheets; kept findable after the rename. */
 const TWO_POLE_SLANG = "2 pole double pole two pole dp 240 volt 240v";
 
-const singlePole: BaselineMaterial[] = ["15", "20", "30"].map(amps => ({
+/*
+  Sizes: 15–50A, the run every plug-on and bolt-on line makes. 60A and 70A
+  single-pole exist in QO only, so they stay on the pricing sheet rather than
+  in the shipped list. 25–50A added 2026-09-24 from the pricing sheet, where
+  they had sat as "new" rows while live search could not find them.
+*/
+const singlePole: BaselineMaterial[] = [
+  "15",
+  "20",
+  "25",
+  "30",
+  "35",
+  "40",
+  "45",
+  "50",
+].map(amps => ({
   ...gear("Breakers"),
   name: `${amps}A Single-Pole breaker`,
   searchAliases: aliases(
@@ -50,14 +65,35 @@ const singlePole: BaselineMaterial[] = ["15", "20", "30"].map(amps => ({
   ),
 }));
 
+/*
+  Sizes: every plug-on two-pole from 15A to 125A.
+
+  Until 2026-09-24 this list stopped at 70A with 100A on its own, so a search
+  for "90a breaker" on the live site could only return the 90A 3-POLE — the
+  rarer part — because the two-pole it meant did not exist. The pricing sheet
+  had carried 80/90/110/125A as new rows for days; nothing had moved them here,
+  which is the only place search reads.
+
+  Above 125A a two-pole is a main breaker (a different frame, and usually part
+  of the panel), so 150A and up are deliberately NOT shipped as branch
+  breakers. The pricing sheet lists them; see the audit in CHANGELOG.md.
+*/
 const doublePole: BaselineMaterial[] = [
+  "15",
   "20",
+  "25",
   "30",
+  "35",
   "40",
+  "45",
   "50",
   "60",
   "70",
+  "80",
+  "90",
   "100",
+  "110",
+  "125",
 ].map(amps => ({
   ...gear("Breakers"),
   name: `${amps}A 2-Pole breaker`,
@@ -154,7 +190,7 @@ const protectedSingle: BaselineMaterial[] = PROTECTED_TYPES.flatMap(type =>
  * the smaller end where a 240V branch circuit still needs arc protection.
  */
 const protectedDouble: BaselineMaterial[] = [
-  { type: PROTECTED_TYPES[1], amps: ["20", "30", "50", "60"] }, // GFCI
+  { type: PROTECTED_TYPES[1], amps: ["20", "30", "40", "50", "60"] }, // GFCI
   { type: PROTECTED_TYPES[0], amps: ["20", "30"] }, // AFCI
   { type: PROTECTED_TYPES[2], amps: ["20", "30"] }, // combo
 ].flatMap(({ type, amps }) =>

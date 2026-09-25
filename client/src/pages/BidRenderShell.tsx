@@ -1,6 +1,7 @@
 /**
  * BidRenderShell — Main layout shell
- * Desktop: fixed left sidebar (icon-only 64px, expands to 224px on hover)
+ * Desktop: fixed left sidebar (icon-only 64px, expands to 224px when the
+ *          pointer reaches one of its buttons — not its edge; see the aside)
  * Mobile:  fixed bottom navigation bar
  * Design: Tactical Dark Mode SaaS, Safety Yellow accent (#F5C518)
  *
@@ -104,6 +105,8 @@ export default function BidRenderShell() {
     getCurrentRouteState()
   );
   const [previousRoute, setPreviousRoute] = useState<Route>("dashboard");
+  /** Whether the desktop nav is widened — see the aside for what opens it. */
+  const [navOpen, setNavOpen] = useState(false);
 
   const { route, projectId: activeProjectId, view: activeView } = routeState;
 
@@ -329,6 +332,7 @@ export default function BidRenderShell() {
     title?: string;
   }) => (
     <button
+      data-nav-trigger
       onClick={onClick}
       title={title ?? label}
       className={cn(
@@ -342,7 +346,7 @@ export default function BidRenderShell() {
         className={cn("shrink-0", isActive ? "text-[#F5C518]" : "")}
       />
       <span
-        className="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 truncate text-xs"
+        className="whitespace-nowrap opacity-0 group-data-[open=true]:opacity-100 transition-opacity duration-150 truncate text-xs"
         style={{ fontFamily: "'Space Grotesk', sans-serif" }}
       >
         {label}
@@ -374,7 +378,7 @@ export default function BidRenderShell() {
     <div className="flex flex-col gap-1">
       <div className="px-2.5 pt-3 pb-1 first:pt-1">
         <span
-          className="hidden group-hover:block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 whitespace-nowrap"
+          className="hidden group-data-[open=true]:block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 whitespace-nowrap"
           style={{ fontFamily: "'Space Grotesk', sans-serif" }}
         >
           {label}
@@ -382,7 +386,7 @@ export default function BidRenderShell() {
         {/* Collapsed stand-in for the heading. aria-hidden because the group is
             already named for assistive tech by the <nav> aria-label below. */}
         <span
-          className="block group-hover:hidden h-px bg-sidebar-border mx-1"
+          className="block group-data-[open=true]:hidden h-px bg-sidebar-border mx-1"
           aria-hidden
         />
       </div>
@@ -414,24 +418,50 @@ export default function BidRenderShell() {
       style={{ zoom: uiFontScale }}
     >
       {/* ── Desktop Sidebar ─────────────────────────────────────── */}
+      {/*
+        ── It opens from its BUTTONS, not from anywhere over it ────────────────
+        Changed 2026-09-24. This was a CSS :hover on the whole aside, so the
+        8px of padding at its right edge opened it too — and on the plans page
+        a folded sheet strip sits right against that edge. Overshooting the
+        strip by a pixel widened the nav by 160px and threw the strip out from
+        under the pointer. Now the pointer has to reach a button or the logo
+        (anything marked data-nav-trigger); the padding, the gaps between
+        buttons and the border are inert, and it closes when the pointer
+        leaves the aside. Keyboard focus opens it the same way.
+      */}
       <aside
-        className="hidden md:flex flex-col shrink-0 w-16 hover:w-56 transition-[width] duration-200 ease-out
+        data-open={navOpen}
+        onPointerOver={e => {
+          if ((e.target as Element).closest("[data-nav-trigger]"))
+            setNavOpen(true);
+        }}
+        onPointerLeave={() => setNavOpen(false)}
+        onFocus={e => {
+          if ((e.target as Element).closest("[data-nav-trigger]"))
+            setNavOpen(true);
+        }}
+        onBlur={e => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+            setNavOpen(false);
+        }}
+        className="hidden md:flex flex-col shrink-0 w-16 data-[open=true]:w-56 transition-[width] duration-200 ease-out
                    bg-sidebar border-r border-sidebar-border overflow-hidden group z-20"
       >
         {/* Logo — click returns to the Dashboard */}
         <div
+          data-nav-trigger
           onClick={() => navigate("dashboard")}
           className="flex items-center justify-center gap-2 px-3 py-4 h-16 border-b border-sidebar-border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
           title="BidRidge — Dashboard"
         >
           <span
-            className="font-bold text-[#F5C518] text-sm shrink-0 group-hover:hidden"
+            className="font-bold text-[#F5C518] text-sm shrink-0 group-data-[open=true]:hidden"
             style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           >
             BR
           </span>
           <span
-            className="font-bold text-base whitespace-nowrap hidden group-hover:block transition-opacity duration-150"
+            className="font-bold text-base whitespace-nowrap hidden group-data-[open=true]:block transition-opacity duration-150"
             style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           >
             <span className="text-foreground">Bid</span>
@@ -582,7 +612,7 @@ export default function BidRenderShell() {
           is reference information, not something to read every day.
         */}
         <div className="px-3 py-2 border-t border-sidebar-border shrink-0">
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+          <div className="opacity-0 group-data-[open=true]:opacity-100 transition-opacity duration-150">
             <span className="block text-[10px] text-muted-foreground whitespace-nowrap font-mono">
               {APP_VERSION_LABEL}
             </span>

@@ -48,6 +48,12 @@
  * objection to yellow above is real for some sets: a sheet dense with yellow
  * marks is exactly where someone wants cyan or magenta instead. The centre dot
  * and every coordinate are unchanged — only the arm colours moved.
+ *
+ * ── And later the same day: the outline went too ─────────────────────────────
+ * Yellow arms, a dark outline and blue alignment guides were three colours on
+ * one pointer. The arms and the guides (CrosshairGuides, in TraceLayer and
+ * CalibrateLayer) now both take the chosen colour, and the outline is replaced
+ * by a very faint soft shadow — see SHADOW_BLUR. The centre dot is untouched.
  */
 
 /** The choices offered in Settings. All saturated, all readable on white. */
@@ -96,9 +102,8 @@ export const CROSSHAIR_SIZE = 24;
 /** The image's exact geometric centre, and the hotspot. */
 export const CROSSHAIR_CENTRE = 12;
 
-/** Arms straddle the centre line, so 2 and 4 rather than 1 and 3. */
+/** Arms straddle the centre line, so 2 rather than 1. */
 const CORE_WIDTH = 2;
-const HALO_WIDTH = 4;
 
 /**
  * Half the gap at the middle, in pixels.
@@ -137,8 +142,18 @@ const ARM = CROSSHAIR_CENTRE;
 const CORE = "#111827";
 const HALO = "#FFFFFF";
 
-/** The thin dark outline round the coloured arms. */
-const OUTLINE = "#111827";
+/**
+ * A very faint soft shadow under the arms — NOT an outline.
+ *
+ * Changed 2026-09-24, the same day the outline went in. A yellow core with a
+ * dark 1px outline, beside blue alignment guides, put three colours on the
+ * pointer and read as messy. The arms and the guides are now ONE colour, the
+ * person's chosen one. What the outline did for white paper is done, barely,
+ * by this: a blur with no edge, so it lifts a yellow line off white without
+ * drawing a second line round it.
+ */
+const SHADOW_BLUR = 0.8;
+const SHADOW_OPACITY = 0.45;
 
 /**
  * The centre line. THE HOTSPOT ITSELF, not half a pixel beside it.
@@ -171,9 +186,8 @@ function armPath(): string {
 /**
  * The cursor as an SVG document.
  *
- * Two passes of the SAME path: a wide dark one, then a narrow coloured one
- * over it — 1px of outline showing each side. One geometry, so the outline
- * cannot drift away from the core.
+ * One pass of the arms in the chosen colour, with the soft shadow above as a
+ * filter on that same pass — so there is no second geometry to drift.
  */
 export function crosshairSvg(
   color: CrosshairColor = DEFAULT_CROSSHAIR_COLOR
@@ -187,8 +201,8 @@ export function crosshairSvg(
     .join("");
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${CROSSHAIR_SIZE}" height="${CROSSHAIR_SIZE}" viewBox="0 0 ${CROSSHAIR_SIZE} ${CROSSHAIR_SIZE}">`,
-    `<g stroke="${OUTLINE}" stroke-width="${HALO_WIDTH}" stroke-linecap="butt">${arms}</g>`,
-    `<g stroke="${ink}" stroke-width="${CORE_WIDTH}" stroke-linecap="butt">${arms}</g>`,
+    `<defs><filter id="s" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="0" stdDeviation="${SHADOW_BLUR}" flood-color="#000" flood-opacity="${SHADOW_OPACITY}"/></filter></defs>`,
+    `<g stroke="${ink}" stroke-width="${CORE_WIDTH}" stroke-linecap="butt" filter="url(#s)">${arms}</g>`,
     // The centre dot, on the hotspot itself: light ring first, dark core over
     // it, so it reads on paper and on linework exactly as the arms do.
     `<circle cx="${LINE}" cy="${LINE}" r="${DOT_RING_R}" fill="${HALO}"/>`,

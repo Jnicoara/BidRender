@@ -41,7 +41,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { CrosshairGuides, type CrosshairHandle } from "./CrosshairGuides";
-import { crosshairCursorStyle } from "@/lib/crosshairCursor";
+import { CROSSHAIR_COLORS, crosshairCursorStyle } from "@/lib/crosshairCursor";
 import { useCrosshairColor } from "@/hooks/useCrosshairColor";
 import { Check, Ruler, TriangleAlert, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -406,7 +406,7 @@ export function TraceLayer({
             ref={guidesRef}
             width={width}
             height={height}
-            color={RUN_COLOR[pathType]}
+            color={CROSSHAIR_COLORS[crosshairColor].hex}
           />
         )}
 

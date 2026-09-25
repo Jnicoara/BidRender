@@ -48,6 +48,15 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   "40A 2-Pole breaker": "common",
   "50A 2-Pole breaker": "common",
   "60A 2-Pole breaker": "common",
+  // 70–125A two-pole: subpanel feeds, heat strips, large A/C. Common, so a
+  // "90a breaker" leads with the two-pole rather than the rarer 3-pole that
+  // matches it equally well.
+  "70A 2-Pole breaker": "common",
+  "80A 2-Pole breaker": "common",
+  "90A 2-Pole breaker": "common",
+  "100A 2-Pole breaker": "common",
+  "110A 2-Pole breaker": "common",
+  "125A 2-Pole breaker": "common",
   "15A Single-Pole AFCI breaker": "common",
   "20A Single-Pole AFCI breaker": "common",
   "20A Single-Pole GFCI breaker": "common",

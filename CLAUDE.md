@@ -1721,7 +1721,8 @@ So: a data query filters on **`ctx.scope.dataUserId`**, which `server/_core/comp
 
 **THE LIVE MODEL:**
 
-- `materials` — the catalog. 629 shipped rows plus the user's own; `costPerUnit`,
+- `materials` — the catalog. 659 shipped rows (2026-09-24 — count
+  `BASELINE_MATERIALS` rather than trusting this) plus the user's own; `costPerUnit`,
   `unitOfSale` (each/foot/box), category, search aliases. Seeded from
   `server/seed/materials/*`.
 - `assemblies` / `assembly_materials` / `assembly_modifiers` — a reusable recipe:

@@ -35,6 +35,13 @@
  * enough to obscure. They sit just above the background and below every mark:
  * visible when looked for, invisible when not.
  *
+ * ── The SAME colour as the pointer ───────────────────────────────────────────
+ * Changed 2026-09-24. Callers passed their own colour — the run's type colour
+ * in TraceLayer, the span blue in CalibrateLayer — so a yellow pointer sat on
+ * blue guides and read as two tools. Both now pass the person's crosshair
+ * colour, so pointer and guides are one thing. Opacity raised from 0.35 to
+ * 0.6 for it: a yellow hairline at 0.35 all but vanishes on white paper.
+ *
  * ── Why the stroke does not scale ────────────────────────────────────────────
  * `vectorEffect="non-scaling-stroke"` keeps them one screen pixel at every
  * zoom. Without it a guide drawn at fit zoom becomes a band several feet wide
@@ -97,7 +104,7 @@ export const CrosshairGuides = forwardRef<
         y2={0}
         stroke={color}
         strokeWidth={1}
-        strokeOpacity={0.35}
+        strokeOpacity={0.6}
         vectorEffect="non-scaling-stroke"
       />
       <line
@@ -108,7 +115,7 @@ export const CrosshairGuides = forwardRef<
         y2={height}
         stroke={color}
         strokeWidth={1}
-        strokeOpacity={0.35}
+        strokeOpacity={0.6}
         vectorEffect="non-scaling-stroke"
       />
     </g>
