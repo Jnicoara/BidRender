@@ -151,7 +151,11 @@ self.onmessage = async (e: MessageEvent) => {
       const loadingTask =
         msg.type === "loadUrl"
           ? pdfjs.getDocument({
-              ...pdfRangeLoadOptions(msg.url, msg.byteSize ?? null),
+              ...pdfRangeLoadOptions(
+                msg.url,
+                msg.byteSize ?? null,
+                self.location.href
+              ),
               ...WORKER_SAFE_OPTIONS,
             })
           : pdfjs.getDocument({

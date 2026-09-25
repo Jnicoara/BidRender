@@ -6,6 +6,26 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **Large plan sets now actually open a page at a time, instead of
+  downloading the whole file first.** Since mid-August every plan was being
+  downloaded in full before the first sheet appeared, even though the
+  changelog said otherwise: a 500-sheet, 270 MB set meant 270 MB before
+  anything drew, which is minutes on a site connection. It now opens in about
+  a quarter of a second and draws the first sheet in under a second. If a plan
+  ever can't be read a piece at a time, the viewer no longer silently pulls
+  down a huge file. Above 50 MB it stops and says so.
+- **The sheet list and the sheet picker stay quick on huge sets, and the
+  pictures you scroll to are drawn first.** Only the sheets on screen are
+  built, so a 500-sheet set no longer puts thousands of rows on the page at
+  once. Thumbnails used to be drawn strictly from sheet 1 onward, so scrolling
+  to sheet 400 meant roughly four minutes of grey boxes. Now whatever you are
+  looking at is drawn next.
+- **The sheet list can show pictures.** A new names/pictures switch at the top
+  of the sheet list shows each sheet as a full-width picture with its name
+  underneath, big enough to tell a panel schedule from a floor plan at a
+  glance. Switching keeps you on the sheet you were looking at, and your choice
+  is remembered.
+
 - **The pre-deploy database check now also catches wrong default values and
   mismatched text collation.** A column whose default changed, disappeared or
   appeared (for example a quantity defaulting to 2 instead of 1, or a status

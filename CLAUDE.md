@@ -1659,13 +1659,17 @@ piece number map to a byte range by arithmetic.
 
 **Coming down: one long-lived link, and it must be byte-identical.**
 
-> **NOT WORKING — measured 2026-09-25.** Every plan downloads WHOLE before it
-> draws: 270.4MB in one request for a 500-sheet set. The worker passes pdf.js a
-> string url, pdf.js resolves it against `window.location`, a Web Worker has no
-> `window`, and `TakeoffPage` silently falls back to `fetch()` of the entire
-> file. The byte-range design below is right; it has most likely never run
-> since it was added on 2026-08-15. Fix and measurements:
-> `references/plan-viewer-overhaul.md` § 17.2. Remove this note when it ships.
+> **It did not work from 2026-08-15 to 2026-09-25, and nothing said so.** The
+> worker passed pdf.js a STRING url, pdf.js resolves a string against
+> `window.location`, a Web Worker has no `window`, and `TakeoffPage` silently
+> fell back to `fetch()` of the whole file — 270.4MB before sheet 1 of a
+> 500-sheet set. Fixed by handing pdf.js a `URL` object, built in
+> `pdfRangeLoadOptions` where `client/src/lib/pdfRangeLoading.test.ts` pins it
+> (the test that stood there before asserted the url passed through "untouched"
+> — it pinned the bug). The fallback now warns in the console and refuses
+> anything over `PDF_WHOLE_DOWNLOAD_LIMIT_BYTES`. **Keep both**: a fallback
+> nobody can see being taken is how six weeks of whole downloads looked like a
+> working feature. `references/plan-viewer-overhaul.md` § 17.2 / 17.3.
 
 `planViewerUrl` hands pdf.js a 12-hour signed R2 link so page loads skip this
 server entirely. `viewerUrlWindow` pins the signing time AND the expiry to a

@@ -97,6 +97,21 @@ import {
   type ViewBounds,
 } from "@/lib/planView";
 import { SheetIndex } from "@/components/takeoff/SheetIndex";
+import {
+  PDF_WHOLE_DOWNLOAD_LIMIT_BYTES,
+  wholeDownloadAllowed,
+  wholeDownloadRefusal,
+} from "@shared/pdfRangeLoading";
+import {
+  DownloadTooLarge,
+  contentLength,
+  readCapped,
+} from "@/lib/cappedDownload";
+import {
+  nextThumbnail,
+  thumbnailWants,
+  type VisibleRange,
+} from "@/lib/thumbnailQueue";
 // The tool button and the row it produces draw the same icon, from one place.
 import { CableIcon, ConduitIcon } from "@/components/takeoff/runIcons";
 import { SheetChip } from "@/components/takeoff/SheetChip";
@@ -538,7 +553,7 @@ function PlanPane({
   overlay,
   onUrlExpired,
   controlsTarget,
-  drawThumbnails,
+  thumbnailWants,
   onThumbnail,
 }: {
   doc: Document;
@@ -551,13 +566,15 @@ function PlanPane({
    */
   controlsTarget?: HTMLElement | null;
   /**
-   * Draw a thumbnail of every sheet, one at a time, while this is true.
+   * The pages worth a thumbnail right now, most wanted first — what the grid
+   * and the pictures list have on screen (lib/thumbnailQueue.ts). Drawn one at
+   * a time; empty draws nothing.
    *
    * Gated rather than eager because the worker draws one thing at a time: a
    * grid rendered in the background would queue itself in front of the sharp
    * patch for the sheet somebody is reading. See SheetChip.
    */
-  drawThumbnails?: boolean;
+  thumbnailWants?: readonly number[];
   onThumbnail?: (pageNumber: number, dataUrl: string) => void;
   onPageCount: (pageCount: number) => void;
   onPage: (page: number) => void;
@@ -1033,9 +1050,23 @@ function PlanPane({
         // This keeps very large plan sets out of the main tab's memory. Some
         // storage gateways cannot answer range requests; only in that case do
         // we retain the previous complete-download path as a compatibility
-        // fallback for ordinary-sized files.
+        // fallback — and only for ordinary-sized files, which is now ENFORCED
+        // rather than hoped. Until 2026-09-25 this fallback had no ceiling and
+        // no log line, and it silently served every plan whole for six weeks
+        // because range loading was failing on every open (see
+        // shared/pdfRangeLoading.ts). A fallback that nobody can see being
+        // taken is how that stayed hidden, so it warns now.
         const pages = await loadUrl(doc.url, hash, doc.byteSize ?? null).catch(
           async rangeError => {
+            console.warn(
+              "[plan] byte-range loading failed; trying a whole download:",
+              rangeError
+            );
+            // Refuse before a byte is fetched when the size is already known.
+            const known = doc.byteSize ?? null;
+            if (!wholeDownloadAllowed(known))
+              throw new Error(wholeDownloadRefusal(known));
+
             const resp = await fetch(doc.url);
             // A refused URL is usually just an old one — plan URLs are signed and
             // expire. Distinguished here so the outer catch can ask for a fresh
@@ -1043,7 +1074,20 @@ function PlanPane({
             if (isExpiredPlanUrl(resp.status)) throw new PlanUrlExpired();
             if (!resp.ok)
               throw new Error(`Could not fetch the plan (${resp.status})`);
-            const buffer = await resp.arrayBuffer();
+            const declared = contentLength(resp);
+            if (!wholeDownloadAllowed(declared)) {
+              await resp.body?.cancel().catch(() => {});
+              throw new Error(wholeDownloadRefusal(declared));
+            }
+            // Neither size known: read it against the limit as it arrives.
+            const buffer = await readCapped(
+              resp,
+              PDF_WHOLE_DOWNLOAD_LIMIT_BYTES
+            ).catch(err => {
+              if (err instanceof DownloadTooLarge)
+                throw new Error(wholeDownloadRefusal(null));
+              throw err;
+            });
             try {
               return await load(buffer, hash);
             } catch {
@@ -1273,82 +1317,107 @@ function PlanPane({
   /**
    * ── Thumbnails ────────────────────────────────────────────────────────────
    *
-   * One small render per sheet, in page order, and ONLY while somebody has the
-   * grid open. The worker is a single queue, so a background pass over a
-   * 40-sheet set would sit in front of the sharp patch for the sheet being
-   * read — the user would see the drawing go soft every time they opened the
-   * sheet picker, which is a strange thing for a picker to do.
+   * One small render per sheet, most wanted first, and ONLY for pages some
+   * surface has on screen (see lib/thumbnailQueue.ts). The worker is a single
+   * queue, so a background pass over a 40-sheet set would sit in front of the
+   * sharp patch for the sheet being read — the user would see the drawing go
+   * soft every time they opened the sheet picker, which is a strange thing for
+   * a picker to do.
    *
-   * Sequential rather than parallel for the same reason, and because the
-   * pictures are worth more early than all at once: the grid fills in from the
-   * top while it is being looked at.
+   * ONE loop, and it re-reads the wants before every render instead of being
+   * restarted when they change. A scroll changes them many times a second.
+   * Restarting on each change would stack a render per scroll event into the
+   * worker, all for pages already scrolled past.
    *
    * `done` is a ref, not state — it is a record of what has been paid for, and
    * putting it in state would restart this effect on every arrival.
    */
   const thumbnailsDone = useRef<Set<number>>(new Set());
+  const thumbnailGeneration = useRef(0);
+  const thumbnailLoopRunning = useRef(false);
+  const wantsRef = useRef<readonly number[]>([]);
+  wantsRef.current = thumbnailWants ?? [];
+  const onThumbnailRef = useRef(onThumbnail);
+  onThumbnailRef.current = onThumbnail;
+  /*
+    Sized from the sheet rather than from a fixed scale. Drawings come in
+    wildly different sizes — a 36x24 E-sheet beside an 8.5x11 detail — and one
+    scale for both gives a grid of one enormous picture and one stamp. Falls
+    back to the whole-sheet render scale divided down when the page size is not
+    known yet.
+  */
+  const thumbnailScaleRef = useRef(0.12);
+  {
+    const pageWidthPoints =
+      canvasSize.width > 0 && drawnScale > 0
+        ? canvasSize.width / drawnScale
+        : 0;
+    thumbnailScaleRef.current =
+      pageWidthPoints > 0 ? THUMBNAIL_PIXELS / pageWidthPoints : 0.12;
+  }
+
+  // A new document ends the old loop: it checks its generation every turn.
   useEffect(() => {
     thumbnailsDone.current = new Set();
+    thumbnailLoopRunning.current = false;
+    thumbnailGeneration.current++;
+    return () => {
+      thumbnailGeneration.current++;
+    };
   }, [hash]);
 
+  const wantsKey = (thumbnailWants ?? []).join(",");
   useEffect(() => {
-    if (!drawThumbnails || !onThumbnail) return;
     if (loading || error || pageCount === 0) return;
-    let cancelled = false;
+    // Already running: it will see the new wants before its next render.
+    if (thumbnailLoopRunning.current) return;
+    if (nextThumbnail(wantsRef.current, thumbnailsDone.current) === null)
+      return;
 
+    const generation = thumbnailGeneration.current;
+    thumbnailLoopRunning.current = true;
     (async () => {
-      for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
-        if (cancelled) return;
-        if (thumbnailsDone.current.has(pageNumber)) continue;
-        try {
-          /*
-            Sized from the sheet rather than from a fixed scale. Drawings come
-            in wildly different sizes — a 36x24 E-sheet beside an 8.5x11 detail
-            — and one scale for both gives a grid of one enormous picture and
-            one stamp. Falls back to the whole-sheet render scale divided down
-            when the page size is not known yet.
-          */
-          const pageWidthPoints =
-            canvasSize.width > 0 && drawnScale > 0
-              ? canvasSize.width / drawnScale
-              : 0;
-          const scale =
-            pageWidthPoints > 0 ? THUMBNAIL_PIXELS / pageWidthPoints : 0.12;
-          const { bitmap } = await render(pageNumber, scale, hash);
-          if (cancelled) {
+      try {
+        for (;;) {
+          if (generation !== thumbnailGeneration.current) return;
+          const pageNumber = nextThumbnail(
+            wantsRef.current,
+            thumbnailsDone.current
+          );
+          if (pageNumber === null) return;
+          // Marked before the render, so a sheet that will not draw small is
+          // not retried for ever. Its cell keeps its placeholder and its
+          // name, which is still enough to click.
+          thumbnailsDone.current.add(pageNumber);
+          try {
+            const { bitmap } = await render(
+              pageNumber,
+              thumbnailScaleRef.current,
+              hash
+            );
+            if (generation !== thumbnailGeneration.current) {
+              bitmap.close();
+              return;
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
             bitmap.close();
-            return;
+            onThumbnailRef.current?.(
+              pageNumber,
+              canvas.toDataURL("image/jpeg", 0.75)
+            );
+          } catch {
+            // Not worth an error anywhere — see the note above.
           }
-          const canvas = document.createElement("canvas");
-          canvas.width = bitmap.width;
-          canvas.height = bitmap.height;
-          canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
-          bitmap.close();
-          thumbnailsDone.current.add(pageNumber);
-          onThumbnail(pageNumber, canvas.toDataURL("image/jpeg", 0.75));
-        } catch {
-          // A sheet that will not draw small is not worth an error anywhere.
-          // Its cell keeps its placeholder and its name, which is still enough
-          // to click. Marked done so the grid does not retry it for ever.
-          thumbnailsDone.current.add(pageNumber);
         }
+      } finally {
+        if (generation === thumbnailGeneration.current)
+          thumbnailLoopRunning.current = false;
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    drawThumbnails,
-    onThumbnail,
-    loading,
-    error,
-    pageCount,
-    hash,
-    render,
-    canvasSize.width,
-    drawnScale,
-  ]);
+  }, [wantsKey, loading, error, pageCount, hash, render]);
 
   // Pull the page's text once, for scale detection.
   useEffect(() => {
@@ -1807,10 +1876,13 @@ export default function TakeoffPage({
   /**
    * Sheet thumbnails, and the switch that pays for them.
    *
-   * Drawn only while the picker is open (see SheetChip), because every one is
-   * a real page render and the worker draws one thing at a time.
+   * Drawn only for the sheets the grid (SheetChip) or the list in pictures
+   * mode (SheetIndex) has on screen, because every one is a real page render
+   * and the worker draws one thing at a time. The grid comes first: it is a
+   * popover somebody opened in order to look at pictures.
    */
-  const [browsingSheets, setBrowsingSheets] = useState(false);
+  const [gridRange, setGridRange] = useState<VisibleRange | null>(null);
+  const [listRange, setListRange] = useState<VisibleRange | null>(null);
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
   const rememberThumbnail = useCallback(
     (pageNumber: number, dataUrl: string) => {
@@ -2019,6 +2091,12 @@ export default function TakeoffPage({
       { bidPdfId: doc?.id ?? 0 },
       { enabled: Boolean(doc) }
     );
+
+  const thumbnailPageCount = doc?.pageCount ?? sheets.length;
+  const wantedThumbnails = useMemo(
+    () => thumbnailWants([gridRange, listRange], thumbnailPageCount),
+    [gridRange, listRange, thumbnailPageCount]
+  );
   const activeSheet = sheets.find(s => s.pageNumber === page) ?? null;
 
   /**
@@ -3969,7 +4047,7 @@ export default function TakeoffPage({
               if (next < 1 || (last > 0 && next > last)) return;
               setPage(next);
             }}
-            onBrowsing={setBrowsingSheets}
+            onVisibleRange={setGridRange}
             disabled={!doc}
           />
 
@@ -4460,6 +4538,8 @@ export default function TakeoffPage({
                 sheets={sheets}
                 activePage={page}
                 loading={sheetsLoading}
+                thumbnails={thumbnails}
+                onVisibleRange={setListRange}
                 onOpenPage={setPage}
                 onRename={(sheetId, name) =>
                   renameSheet.mutate({ id: sheetId, name })
@@ -4475,7 +4555,7 @@ export default function TakeoffPage({
               page={page}
               onPage={setPage}
               controlsTarget={zoomSlot}
-              drawThumbnails={browsingSheets}
+              thumbnailWants={wantedThumbnails}
               onThumbnail={rememberThumbnail}
               onPageCount={pageCount =>
                 setPageCount.mutate({ id: doc.id, pageCount })

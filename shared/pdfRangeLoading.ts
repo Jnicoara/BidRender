@@ -52,15 +52,72 @@ export function shouldDisableAutoFetch(byteSize: number | null): boolean {
   return byteSize > PDF_AUTOFETCH_LIMIT_BYTES;
 }
 
+/**
+ * The options handed to pdf.js's `getDocument`.
+ *
+ * ── `url` is a URL OBJECT, resolved here, and that is the whole fix ──────────
+ * pdf.js 5 turns a STRING url into an absolute one with
+ * `URL.parse(val, window.location)`. This runs inside a Web Worker, which has
+ * no `window`, so every string threw `ReferenceError: window is not defined`.
+ * The viewer caught that and fell back to downloading the whole file. So from
+ * the day range loading was added (2026-08-15) until 2026-09-25, every plan
+ * was downloaded whole before it drew: 270MB for a 500-sheet set, with nothing
+ * on screen or in the console to say so. A `URL` object skips that branch
+ * entirely (`getUrlProp` returns `val.href`).
+ *
+ * `base` is where a relative url resolves from: `self.location.href` in the
+ * worker. The disk-storage url is `/manus-storage/...`, which is relative,
+ * and an R2 url is absolute and ignores the base.
+ * references/plan-viewer-overhaul.md § 17.2 has the measurements.
+ */
 export function pdfRangeLoadOptions(
   url: string,
-  byteSize: number | null = null
+  byteSize: number | null,
+  base: string
 ) {
   return {
-    url,
+    url: new URL(url, base),
     rangeChunkSize: PDF_RANGE_CHUNK_BYTES,
     disableRange: false,
     disableStream: false,
     disableAutoFetch: shouldDisableAutoFetch(byteSize),
   } as const;
+}
+
+/**
+ * The most the viewer will download WHOLE when byte ranges fail.
+ *
+ * The whole-file path is a fallback for storage that cannot serve ranges. It
+ * had no ceiling at all, which is how a broken range loader went unnoticed:
+ * every plan quietly came down whole, whatever its size. Above this, the
+ * fallback refuses and says why instead of pulling a gigabyte over somebody's
+ * tethered phone.
+ *
+ * The same number as the background-download threshold, for the same reason.
+ * Below it pdf.js fetches the whole file anyway, so a whole download costs
+ * nothing extra. Above it, a whole download is the thing range loading exists
+ * to avoid.
+ */
+export const PDF_WHOLE_DOWNLOAD_LIMIT_BYTES = PDF_AUTOFETCH_LIMIT_BYTES;
+
+/**
+ * May the fallback download this file whole?
+ *
+ * `size` is the best size known: the one recorded at upload, or else the
+ * response's Content-Length. Unknown is allowed, because the download is then
+ * read against the limit as it arrives (`readCapped` in the client) and stops
+ * the moment it passes it.
+ */
+export function wholeDownloadAllowed(size: number | null): boolean {
+  if (size === null) return true;
+  return size <= PDF_WHOLE_DOWNLOAD_LIMIT_BYTES;
+}
+
+/** What the viewer says when it refuses. */
+export function wholeDownloadRefusal(size: number | null): string {
+  const mb = size === null ? null : Math.round(size / (1024 * 1024));
+  return (
+    `This plan${mb === null ? "" : ` is ${mb} MB and`} could not be read a piece at a time, ` +
+    `so it was not downloaded whole. Your takeoff is saved — try opening it again.`
+  );
 }

@@ -5588,7 +5588,34 @@ quietly pulling a gigabyte. And the url becomes a `URL` inside
 `pdfRangeLoadOptions`, in `shared/`, where vitest can reach it. A test there is
 the forcing function; a comment in the worker would only be a reminder.
 
-### 17.3 Piece 1 — big sets open fast. NO MIGRATION.
+### 17.3 Piece 1 — big sets open fast. NO MIGRATION. BUILT 2026-09-25
+
+> **Built as specified below, with two changes and these measurements** (500-
+> sheet test set, localhost, through the app's own worker):
+>
+> - **Open 0.25s, sheet 1 drawn in 0.76s after that.** In the app, from
+>   changing the address to sheet 1 drawn was 1.37s, which includes mounting
+>   the screen and its queries. No main-thread download of the file, and no
+>   fallback warning. The extension cannot see requests made inside the
+>   worker, so "ranges, not whole" is shown by the fallback not being taken
+>   rather than by counting bytes. Node counted ~2.8MB for open plus page 1
+>   (§ 17.2).
+> - **Grid scrolled to sheet 400:** sheets 400–405 were drawn within 6s, then
+>   406 and 407, with 131 DOM elements in the grid (was ~4,000). **Names list:**
+>   311 elements (was ~4,500).
+> - **Change 1: the fallback limit is 50MB** (`PDF_WHOLE_DOWNLOAD_LIMIT_BYTES`,
+>   equal to the autofetch limit). It is checked against the recorded size,
+>   then Content-Length, then while reading (`lib/cappedDownload.ts`), so an
+>   unknown size cannot slip through.
+> - **Change 2, found by checking on screen:** each list mode is a FRESH
+>   virtualiser, keyed by mode, that opens at the row you were on. Reusing one
+>   across the switch carried picture-row heights into names mode, which then
+>   landed on sheet 490 whatever you had been looking at, and switching back
+>   could show an empty list. Verified at sheets 120, 300 and 461, in both
+>   directions.
+> - **Still unmeasured:** scroll smoothness in a VISIBLE window. The Chrome
+>   window was hidden for the whole check again (§ 17.8), which throttles
+>   main-thread timers, so no frame-rate claim is made.
 
 **Why first:** every later piece loads pages, and it fixes a measured fault
 that costs users minutes on every large set today. It is also the smallest
