@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **AI alias suggestions confirmed working on the live site**, and they now
+  say so when they can't run. Tested on bidridge.com with the test account:
+  asking for suggestions on a new material returned eight trade terms in
+  under two seconds. When suggestions *can't* be fetched — AI switched off, no
+  key, the daily allowance used up — the add form used to say "No suggestions
+  this time", exactly what it says when the AI simply had nothing to add. It
+  now says "Suggestions aren't available right now" instead.
+
 - **A finished scale check now shows as checked the moment you press Enter.**
   Two faults caused "not checked" to stick around after a check:
   - The label only changed once the page re-downloaded the sheet list, a

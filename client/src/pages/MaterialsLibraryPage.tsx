@@ -56,7 +56,10 @@ import {
   scopeCounts,
   type LibraryScope,
 } from "@/lib/libraryScope";
-import { AliasSuggestions } from "@/components/AliasSuggestions";
+import {
+  AliasSuggestions,
+  type AliasSuggestionResult,
+} from "@/components/AliasSuggestions";
 import { countNeedingPricing, needsPricing } from "@shared/materialPricing";
 import {
   countNeedingLaborUnit,
@@ -115,7 +118,7 @@ type SuggestAliases = (
   name: string,
   category: Category | null,
   existing: string | null
-) => Promise<string[]>;
+) => Promise<AliasSuggestionResult>;
 
 const UNITS: Material["unitOfSale"][] = ["each", "foot", "box"];
 
@@ -928,20 +931,26 @@ export default function MaterialsLibraryPage() {
         toast.error(
           "Give the material a name first — suggestions come from it."
         );
-        return [];
+        return { suggestions: [], available: true };
       }
+      /*
+        "Unavailable" is passed through, not folded into "no suggestions".
+        The server answers `available: false` for AI switched off, no key, a
+        refusal or a used-up allowance — and until 2026-09-25 this dropped it,
+        so the panel read "No suggestions this time", word for word what a
+        working model with nothing to add produces. That silence is why the
+        feature went unverified for as long as it did. The panel now says
+        which of the two it is (AliasSuggestions).
+      */
       try {
         const result = await suggestAliases.mutateAsync({
           name: name.trim(),
           category,
           existing,
         });
-        return result.suggestions;
+        return { suggestions: result.suggestions, available: result.available };
       } catch {
-        toast.error(
-          "Could not fetch suggestions — type the terms people use for it yourself."
-        );
-        return [];
+        return { suggestions: [], available: false };
       }
     },
     [suggestAliases]

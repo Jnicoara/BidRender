@@ -23,6 +23,18 @@ import { Input } from "@/components/ui/input";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { mergeAliases } from "@shared/aliasSuggestions";
 
+/**
+ * What asking for suggestions came back with.
+ *
+ * `available: false` means the AI could not be asked — switched off, no key,
+ * the daily allowance used, or a failed call — which is a different thing to
+ * say from "it was asked and had nothing to add" (2026-09-25).
+ */
+export type AliasSuggestionResult = {
+  suggestions: string[];
+  available: boolean;
+};
+
 export function AliasSuggestions({
   value,
   onChange,
@@ -32,11 +44,12 @@ export function AliasSuggestions({
   /** The alias text as it will be saved. */
   value: string;
   onChange: (next: string) => void;
-  /** Ask for suggestions. Resolves to [] when unavailable — never throws. */
-  onRequest: () => Promise<string[]>;
+  /** Ask for suggestions. Never throws — failure is `available: false`. */
+  onRequest: () => Promise<AliasSuggestionResult>;
   disabled?: boolean;
 }) {
   const [suggestions, setSuggestions] = useState<string[] | null>(null);
+  const [available, setAvailable] = useState(true);
   const [accepted, setAccepted] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
 
@@ -44,7 +57,8 @@ export function AliasSuggestions({
     setLoading(true);
     try {
       const found = await onRequest();
-      setSuggestions(found);
+      setSuggestions(found.suggestions);
+      setAvailable(found.available);
       setAccepted(new Set());
     } finally {
       setLoading(false);
@@ -100,9 +114,11 @@ export function AliasSuggestions({
 
       {suggestions !== null && suggestions.length === 0 && (
         <p className="text-[0.7rem] text-muted-foreground">
-          No suggestions this time — type the terms people use for it yourself.
-          Search still works either way; the shared abbreviation list covers the
-          common trade words.
+          {available
+            ? "No suggestions this time"
+            : "Suggestions aren't available right now"}{" "}
+          — type the terms people use for it yourself. Search still works either
+          way; the shared abbreviation list covers the common trade words.
         </p>
       )}
 
