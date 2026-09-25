@@ -38,6 +38,9 @@ export default defineConfig({
     ],
     // dotenv first, so vitest.setup.ts fills only what .env did not supply.
     setupFiles: ["dotenv/config", "./vitest.setup.ts"],
+    // Refuses the whole run unless DATABASE_URL is a scratch database on this
+    // machine — .env points at the real-data copy. See the file.
+    globalSetup: ["./vitest.globalSetup.ts"],
     /**
      * One file at a time, because every DB-backed file shares one MySQL.
      *

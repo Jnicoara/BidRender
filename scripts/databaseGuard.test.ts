@@ -10,6 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
+  checkTestDatabase,
   checkWritableDatabase,
   OVERRIDE_VAR,
   OVERRIDE_VALUE,
@@ -135,5 +136,57 @@ describe("the exact near-miss that caused this", () => {
       expect(result.message).toContain(OVERRIDE_VAR);
       expect(result.message).toContain("drop and recreate a rehearsal schema");
     }
+  });
+});
+
+describe("the test suite only ever touches a scratch database", () => {
+  it("REFUSES the real-data copy that .env points at", () => {
+    const result = checkTestDatabase(
+      "mysql://root:pw@127.0.0.1:3307/bidrender_local"
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("refuses production, even with a test-looking name", () => {
+    // The host check is not skipped just because the name looks right.
+    const result = checkTestDatabase(
+      "mysql://u:p@db.ondigitalocean.com:25060/bidrender_test"
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("has no override: ALLOW_REMOTE_DATABASE does not reach it", () => {
+    // It takes no env at all, which is the point. Asserted so a later
+    // signature change that adds one has to delete this test to do it.
+    expect(checkTestDatabase.length).toBe(1);
+  });
+
+  it("refuses a name that only CONTAINS the letters", () => {
+    for (const name of [
+      "contest",
+      "bidrender_latest",
+      "testimony",
+      "bidrender",
+    ]) {
+      expect(checkTestDatabase(`mysql://u:p@127.0.0.1:3307/${name}`).ok).toBe(
+        false
+      );
+    }
+  });
+
+  it("refuses a url it cannot read", () => {
+    expect(checkTestDatabase("not a url").ok).toBe(false);
+  });
+
+  it("accepts the scratch databases on this machine", () => {
+    for (const name of ["bidrender_test", "bidrender_test_clean", "test"]) {
+      const result = checkTestDatabase(`mysql://u:p@localhost:3307/${name}`);
+      expect(result).toEqual({ ok: true, database: name });
+    }
+  });
+
+  it("allows no url at all — every database suite skips itself then", () => {
+    expect(checkTestDatabase(undefined)).toEqual({ ok: true, database: null });
+    expect(checkTestDatabase("  ")).toEqual({ ok: true, database: null });
   });
 });

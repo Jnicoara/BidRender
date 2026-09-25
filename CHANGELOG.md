@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **The test suite now refuses to run against real data.** Tests write
+  throwaway accounts and bids into whatever database they are pointed at, and
+  the default local settings point at the copy of real data, which is what
+  happened on 2026-09-14. A run now stops before its first test unless it is
+  aimed at a scratch database on this machine whose name says "test". Leaving
+  the database blank is still allowed, and then every database test skips.
+
 - **103 more low-voltage and equipment items in the starter catalog, from the
   pricing sheet — the last batch of the ones nothing was holding back.**
   Cat5e, Cat6A, shielded and fiber cable, thermostat and security wire,

@@ -1,3 +1,5 @@
+import { checkTestDatabase } from "./scripts/databaseGuard";
+
 /**
  * Environment every test run needs, beyond what `.env` carries.
  *
@@ -62,3 +64,17 @@ process.env.DISABLE_AI_FEATURES = "false";
  * expects one, and `undefined` finds a different branch than "".
  */
 process.env.ANTHROPIC_API_KEY = "";
+
+/**
+ * ── Which database, checked again in the process that connects ───────────────
+ *
+ * vitest.globalSetup.ts already refused the run if `DATABASE_URL` is not a
+ * scratch database on this machine. This is the same check in the WORKER,
+ * because that is where the pool is opened and the two processes are not
+ * guaranteed to see the same environment. A throw here fails every file,
+ * which is the right amount of noise for "about to write into real data".
+ */
+{
+  const result = checkTestDatabase(process.env.DATABASE_URL);
+  if (!result.ok) throw new Error(result.message);
+}

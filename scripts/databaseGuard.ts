@@ -134,3 +134,71 @@ export function assertWritableDatabase(
   }
   return result.host;
 }
+
+/**
+ * ── The test suite's door: a SCRATCH database on this machine, or nothing ────
+ *
+ * The suite writes fixture rows — users, bids, clients, kits — into whatever
+ * `DATABASE_URL` names, and `.env` names `bidrender_local`, the restored copy
+ * of real data. On 2026-09-14 two full runs did exactly that and left test
+ * accounts in it. The fix then was a comment in `.env` and a line in a memory
+ * file — a rule somebody has to remember at the one moment they are not
+ * thinking about it. This is the version that can fail.
+ *
+ * Stricter than `checkWritableDatabase` on purpose, and there is no override:
+ *
+ *   - the host must be this machine, AND
+ *   - the database NAME must say it is a test one — `test` as its own
+ *     underscore-separated word (`bidrender_test`, `bidrender_test_clean`,
+ *     `test_scratch`). A real-data copy never carries the word, and
+ *     `bidrender_local` does not.
+ *
+ * UNSET is allowed. Every DB-backed suite skips itself without a url, so a
+ * run with `DATABASE_URL=` can write nowhere; that is the pure-function run,
+ * and refusing it would only teach people to point at something to get past
+ * the guard.
+ */
+export const TEST_DATABASE_NAME = /(^|_)test(_|$)/i;
+
+export type TestDatabaseResult =
+  | { ok: true; database: string | null }
+  | { ok: false; message: string };
+
+export function checkTestDatabase(url: string | undefined): TestDatabaseResult {
+  if (!url || !url.trim()) return { ok: true, database: null };
+
+  const howTo =
+    `Point the run at a scratch database, e.g.\n` +
+    `  DATABASE_URL=mysql://root:<pw>@127.0.0.1:3307/bidrender_test_clean pnpm test\n` +
+    `or run with DATABASE_URL= (empty) to skip every database-backed suite.`;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return {
+      ok: false,
+      message: `Refusing to run tests: could not read the database URL, so there is no way to tell what they would write into.\n${howTo}`,
+    };
+  }
+  const host = parsed.hostname;
+  const database = decodeURIComponent(parsed.pathname.replace(/^\//, ""));
+
+  if (!(LOCAL_HOSTS as readonly string[]).includes(host)) {
+    return {
+      ok: false,
+      message: `Refusing to run tests: the database is at ${host}, which is not this machine. Tests write fixture rows.\n${howTo}`,
+    };
+  }
+  if (!TEST_DATABASE_NAME.test(database)) {
+    return {
+      ok: false,
+      message:
+        `Refusing to run tests against "${database || "(no database named)"}": ` +
+        `the name does not say it is a test database, and the suite writes ` +
+        `fixture rows into whatever it is given. .env points at the real-data ` +
+        `copy on purpose, for the dev server.\n${howTo}`,
+    };
+  }
+  return { ok: true, database };
+}
