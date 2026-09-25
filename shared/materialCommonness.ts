@@ -124,10 +124,17 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   // Core, not common: every kitchen, bath, laundry and garage circuit is 20A.
   // Listed after the plain duplex so a bare "receptacle" still leads with it.
   "20A duplex receptacle": "core",
+  // Added 2026-09-25 with the rows themselves: the 20A GFCI is on every
+  // kitchen and bath counter, and the weather-resistant one outside every
+  // door. Without these "gfci" led with breakers ahead of the 20A device.
+  "20A GFCI receptacle": "common",
+  "GFCI receptacle, weather-resistant": "common",
   "USB combo receptacle": "common",
   "30A dryer receptacle": "common",
   "50A range receptacle": "common",
   "4-way switch": "common",
+  // So "20a switch" leads with the single-pole, as "switch" does (2026-09-25).
+  "20A single-pole switch": "common",
   Dimmer: "common",
   "Occupancy sensor switch": "common",
 

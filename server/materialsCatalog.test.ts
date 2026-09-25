@@ -45,9 +45,11 @@ describe("shipped catalog shape", () => {
     expect(BASELINE_MATERIALS.length).toBeGreaterThan(500);
     // Raised from 700 to 800 on 2026-09-25, when the lighting audit added 49
     // rows on purpose (tubes, lamps, promoted troffers/cans) and took the
-    // catalog to ~708. Still a ceiling: a generator that runs away blows
-    // through it, and so does anything that doubles a family.
-    expect(BASELINE_MATERIALS.length).toBeLessThan(800);
+    // catalog to ~708. Raised again to 1,250 the same day, when the unblocked
+    // pricing-sheet rows moved in (~410 rows, taking it to ~1,120). Still a
+    // ceiling: a generator that runs away blows through it, and so does
+    // anything that doubles a family.
+    expect(BASELINE_MATERIALS.length).toBeLessThan(1250);
   });
 
   it("has no duplicate names", () => {

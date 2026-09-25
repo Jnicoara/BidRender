@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **88 more boxes, devices and plates in the starter catalog, from the
+  pricing sheet.** Old-work and masonry boxes, 4- and 5-gang boxes, nail
+  plates, box extenders and blank covers; 20A GFCI and weather-resistant
+  receptacles, hospital-grade, isolated-ground, twist-lock (L5-20, L6-30,
+  L14-30) and RV receptacles; 20A switches, dimmers by type, fan controls and
+  ceiling occupancy sensors; 4- to 6-gang, screwless and stainless plates. 29
+  sheet rows were items the catalog already had and were folded in instead.
+  Searching "gfci" or "20a switch" still puts the everyday part first.
+
 - **32 more rough-in materials in the starter catalog, moved over from the
   pricing sheet.** 14-2 UF-B, fire alarm cable, SOOW and SJOOW cord, tray
   cable, crimp sleeves, DIN rail, drop-in and sleeve anchors, shot pins,

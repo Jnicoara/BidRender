@@ -93,6 +93,42 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   "Strut, 1-5/8 in x 1-5/8 in": '1-5/8" x 1-5/8" strut channel, 10 ft',
   "Strut, 1-5/8 in x 13/16 in": '1-5/8" x 13/16" strut channel, 10 ft',
   "Unistrut end cap": "Strut end cap",
+
+  // ── Batch 2: boxes, wall plates, receptacles, switches
+  "Anti-short bushing": "MC anti-short bushing",
+  "Box extender": "Single-gang box extender",
+  "Old-work fan box": "Ceiling fan brace box",
+  // Mud ring depths; the shipped ring already answers to "plaster ring".
+  "Plaster ring, 1/2 in": '4" square mud ring',
+  "Plaster ring, 5/8 in": '4" square mud ring',
+  "Romex staple, 1/2 in": "Cable staple",
+  "Romex staple, 3/4 in": "Cable staple",
+  "Stacker staple": "Cable staple",
+  "Stud guard plate": '1-1/2" nail plate',
+  "1-gang decorator plate": "Wall plate",
+  "2-gang decorator plate": "2-gang wall plate",
+  "3-gang decorator plate": "3-gang wall plate",
+  // A decorator plate is what goes on a GFCI; the plate is not aliased to
+  // the device (devices.ts header).
+  "GFCI wall plate": "Wall plate",
+  "Outlet box spacer": "Device shim",
+  "15A AFCI receptacle": "AFCI receptacle",
+  "15A duplex receptacle": "Duplex receptacle",
+  "15A GFCI receptacle": "GFCI receptacle",
+  "Self-test GFCI receptacle": "GFCI receptacle",
+  // Every shipped duplex is already tamper-resistant (its aliases say so).
+  "15A tamper-resistant receptacle": "Duplex receptacle",
+  "20A tamper-resistant receptacle": "20A duplex receptacle",
+  "15A weather-resistant receptacle": "Duplex receptacle, weather-resistant",
+  "20A weather-resistant receptacle":
+    "20A duplex receptacle, weather-resistant",
+  "USB-C combo receptacle": "USB combo receptacle",
+  "Astronomic time switch": "Time clock",
+  "Digital in-wall timer": "Timer switch",
+  "Spring-wound timer switch": "Timer switch",
+  "Rotary dimmer": "Dimmer",
+  "Slide dimmer": "Dimmer",
+  "Wall-mount vacancy sensor": "Vacancy sensor switch",
 };
 
 export const RENAMED_FROM_SHEET: Record<string, string> = {
@@ -109,6 +145,32 @@ export const RENAMED_FROM_SHEET: Record<string, string> = {
   "Din rail": "DIN rail",
   "Caddy clip, 1/2 in": '1/2" conduit clip',
   "Caddy clip, 3/4 in": '3/4" conduit clip',
+
+  // ── Batch 2
+  "Extension ring, single-gang": "Single-gang box extender",
+  "Extension ring, 4 in": '4" square extension ring',
+  "Junction box cover, 4 in": '4" square blank cover',
+  "Junction box cover, 4-11/16 in": '4-11/16" square blank cover',
+  "Nail plate, 1-1/2 in": '1-1/2" nail plate',
+  "Nail plate, 3 in": '3" nail plate',
+  "Cable protection plate, 5 in": '5" nail plate',
+  "Old-work single-gang box": "Single-gang old-work box",
+  "Old-work double-gang box": "Double-gang old-work box",
+  "Old-work triple-gang box": "Triple-gang old-work box",
+  "Blank plate, 4-gang": "4-gang blank plate",
+  // The plain name is the 15A one, as with every shipped receptacle.
+  "15A GFCI receptacle, weather-resistant":
+    "GFCI receptacle, weather-resistant",
+  "15A TR/WR receptacle": "Duplex receptacle, weather-resistant",
+  "20A TR/WR receptacle": "20A duplex receptacle, weather-resistant",
+  "15A single receptacle": "Single receptacle",
+  "15A quad receptacle": "Quad receptacle",
+  "15A surge-protective receptacle": "Surge-protective receptacle",
+  // "Receptacle …" as a name outranked the Duplex receptacle for "recep".
+  "Receptacle shim": "Device shim",
+  // It has no receptacle: a GFCI with a blank face, protecting downstream.
+  // Ends in "device" so it is not read as THE GFCI for a search of "gfci".
+  "Dead-front GFCI receptacle": "Dead-front GFCI device",
 };
 
 /** Every sheet name that moved under a different name, whichever kind. */

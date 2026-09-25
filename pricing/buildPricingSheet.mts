@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 import { BASELINE_MATERIALS } from "../server/seed/materials/index";
 import { compareBySize, materialTypeName } from "../shared/materialSizeOrder";
 import { compareMaterials } from "../shared/materialOrder";
-import { MOVED_FROM_SHEET } from "./movedFromSheet";
+import { MOVED_FROM_SHEET, RENAMED_FROM_SHEET } from "./movedFromSheet";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -39,6 +39,8 @@ type Row = {
   isNew: boolean;
   brand: string;
   job: string;
+  /** The sheet's old name, for a row that moved into the catalog renamed. */
+  packAs?: string;
 };
 
 const rows: Row[] = [];
@@ -1511,6 +1513,21 @@ const sortRows = (list: Row[]) =>
       return catRank(a.category) - catRank(b.category);
     return compareMaterials(a, b);
   });
+
+/*
+  A row that moved into the catalog under a new name keeps the PACK the sheet
+  gave it under the old one. The pack is derived from the name
+  (writeWorkbook.cjs, packFor), so "15A single receptacle" was a box of 10 and
+  "Single receptacle" would silently become "each". `packAs` carries the old
+  name across for that one purpose; the Name column shows the shipped one.
+*/
+const PACK_AS = new Map(
+  Object.entries(RENAMED_FROM_SHEET).map(([sheet, shipped]) => [shipped, sheet])
+);
+for (const r of rows) {
+  const sheetName = PACK_AS.get(r.name);
+  if (sheetName) r.packAs = sheetName;
+}
 
 const generic = sortRows(rows);
 const branded = sortRows(brandRows);

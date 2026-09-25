@@ -1,5 +1,5 @@
 Category: Boxes
-Items: 65
+Items: 55
 
 Category | Name | Size
 Boxes | 12x12 pull box | 12x12
@@ -10,17 +10,13 @@ Boxes | 4x4 pull box | 4x4
 Boxes | 5-gang box | -
 Boxes | 6x6 pull box | 6x6
 Boxes | 8x8 pull box | 8x8
-Boxes | Anti-short bushing | -
-Boxes | Box extender | -
 Boxes | Box relocation kit | -
-Boxes | Cable protection plate, 5 in | 5 in
 Boxes | Cable support bushing | -
 Boxes | Ceiling fan brace box | -
 Boxes | Double-gang box | -
 Boxes | Double-gang metal box | -
+Boxes | Double-gang old-work box | -
 Boxes | Drywall repair ring | -
-Boxes | Extension ring, 4 in | 4 in
-Boxes | Extension ring, single-gang | -
 Boxes | Fan-rated ceiling box | -
 Boxes | 1/2" FD cast box | 1/2"
 Boxes | 3/4" FD cast box | 3/4"
@@ -30,40 +26,34 @@ Boxes | 1/2" FS cast box | 1/2"
 Boxes | 3/4" FS cast box | 3/4"
 Boxes | 1" FS cast box | 1"
 Boxes | Handy box | -
-Boxes | Junction box cover, 4 in | 4 in
-Boxes | Junction box cover, 4-11/16 in | 4-11/16 in
 Boxes | Low-voltage mud ring | -
 Boxes | Masonry box, double-gang | -
 Boxes | Masonry box, single-gang | -
-Boxes | Nail plate, 1-1/2 in | 1-1/2 in
-Boxes | Nail plate, 3 in | 3 in
+Boxes | 1-1/2" nail plate | 1-1/2"
+Boxes | 3" nail plate | 3"
+Boxes | 5" nail plate | 5"
 Boxes | Octagon box, metal | -
 Boxes | Octagon box, plastic | -
 Boxes | Old-work ceiling box | -
-Boxes | Old-work double-gang box | -
-Boxes | Old-work fan box | -
-Boxes | Old-work single-gang box | -
-Boxes | Old-work triple-gang box | -
 Boxes | Panel knockout seal | -
-Boxes | Plaster ring, 1/2 in | 1/2 in
-Boxes | Plaster ring, 5/8 in | 5/8 in
 Boxes | Retrofit bar hanger | -
-Boxes | Romex staple, 1/2 in | 1/2 in
-Boxes | Romex staple, 3/4 in | 3/4 in
 Boxes | Shallow round box | -
 Boxes | Single-gang box | -
+Boxes | Single-gang box extender | -
 Boxes | Single-gang metal box | -
+Boxes | Single-gang old-work box | -
+Boxes | 4" square blank cover | 4"
+Boxes | 4-11/16" square blank cover | 4-11/16"
 Boxes | 4" square box | 4"
 Boxes | 4-11/16" square box | 4-11/16"
+Boxes | 4" square extension ring | 4"
 Boxes | 4" square mud ring | 4"
 Boxes | 4-11/16" square mud ring | 4-11/16"
-Boxes | Stacker staple | -
 Boxes | Steel stud grommet | -
-Boxes | Stud guard plate | -
 Boxes | Triple-gang box | -
 Boxes | Triple-gang metal box | -
+Boxes | Triple-gang old-work box | -
 Boxes | Wall plate extender | -
 Boxes | Weatherproof box, double-gang | -
 Boxes | Weatherproof box, single-gang | -
 Boxes | Weatherproof box, triple-gang | -
-Boxes | Wire pulling grip | -

@@ -60,7 +60,44 @@ const deviceBoxes: BaselineMaterial[] = [
     searchAliases: aliases("3g three gang", DEVICE_BOX, "steel"),
     description: METAL_NOTE,
   },
+  // Moved from the pricing sheet, 2026-09-25. Plastic, like every unsuffixed
+  // device box in this file.
+  {
+    ...each,
+    name: "4-gang box",
+    searchAliases: aliases("4g four gang quad", DEVICE_BOX, "plastic pvc"),
+  },
+  {
+    ...each,
+    name: "5-gang box",
+    searchAliases: aliases("5g five gang", DEVICE_BOX, "plastic pvc"),
+  },
 ];
+
+/**
+ * Old-work boxes clamp to the drywall with wings or ears instead of nailing
+ * to a stud — a different part from the new-work box, bought for remodels.
+ * Moved from the pricing sheet, 2026-09-25.
+ */
+const OLD_WORK = "remodel cut in retrofit wings ears swing clamp drywall";
+const oldWorkBoxes: BaselineMaterial[] = [
+  { gang: "Single-gang", slang: "1g one gang" },
+  { gang: "Double-gang", slang: "2g two gang" },
+  { gang: "Triple-gang", slang: "3g three gang" },
+].map(({ gang, slang }) => ({
+  ...each,
+  name: `${gang} old-work box`,
+  searchAliases: aliases(slang, OLD_WORK, "oldwork device plastic"),
+}));
+
+const masonryBoxes: BaselineMaterial[] = [
+  { gang: "single-gang", slang: "1g one gang" },
+  { gang: "double-gang", slang: "2g two gang" },
+].map(({ gang, slang }) => ({
+  ...each,
+  name: `Masonry box, ${gang}`,
+  searchAliases: aliases(slang, "block brick cmu concrete steel device deep"),
+}));
 
 const squareBoxes: BaselineMaterial[] = [
   {
@@ -92,22 +129,67 @@ const squareBoxes: BaselineMaterial[] = [
       "4 11/16 plaster ring cover raised device gang five square"
     ),
   },
+  // Moved from the pricing sheet, 2026-09-25.
+  {
+    ...each,
+    name: '4" square extension ring',
+    searchAliases: aliases("1900 4in deepen add depth steel box extension"),
+  },
+  {
+    ...each,
+    name: '4" square blank cover',
+    searchAliases: aliases("1900 4in flat plate junction jbox j box steel lid"),
+  },
+  {
+    ...each,
+    name: '4-11/16" square blank cover',
+    searchAliases: aliases(
+      "4 11/16 five square flat plate junction jbox j box steel lid"
+    ),
+  },
 ];
 
 const ceilingBoxes: BaselineMaterial[] = [
   {
     ...each,
     name: "Octagon box, plastic",
-    searchAliases: aliases(
-      "oct round ceiling light fixture pancake new work pvc"
-    ),
+    // "pancake" moved to the shallow round box on 2026-09-25, which is the
+    // part the word actually names.
+    searchAliases: aliases("oct round ceiling light fixture new work pvc"),
     description: PLASTIC_NOTE,
   },
   {
     ...each,
     name: "Octagon box, metal",
-    searchAliases: aliases("oct round ceiling light fixture pancake steel"),
+    searchAliases: aliases("oct round ceiling light fixture steel"),
     description: METAL_NOTE,
+  },
+  // Moved from the pricing sheet, 2026-09-25.
+  {
+    ...each,
+    name: "Shallow round box",
+    searchAliases: aliases("pancake 1/2 inch half deep ceiling light steel"),
+  },
+  {
+    ...each,
+    name: "Old-work ceiling box",
+    searchAliases: aliases(
+      "round light fixture remodel cut in retrofit oldwork plastic"
+    ),
+  },
+  {
+    ...each,
+    name: "Ceiling fan brace box",
+    searchAliases: aliases(
+      "retrofit saf-t-brace expandable bar joist old work remodel paddle rated"
+    ),
+  },
+  {
+    ...each,
+    name: "Retrofit bar hanger",
+    searchAliases: aliases(
+      "remodel old work joist expandable can recessed support"
+    ),
   },
   {
     ...each,
@@ -131,6 +213,13 @@ const enclosures: BaselineMaterial[] = [
     name: "Weatherproof box, double-gang",
     searchAliases: aliases(
       "wp outdoor exterior bell cast 2g two gang rain tight"
+    ),
+  },
+  {
+    ...each,
+    name: "Weatherproof box, triple-gang",
+    searchAliases: aliases(
+      "wp outdoor exterior bell cast 3g three gang rain tight"
     ),
   },
   {
@@ -182,22 +271,73 @@ const castBoxes: BaselineMaterial[] = ['1/2"', '3/4"', '1"'].flatMap(size => {
   ];
 });
 
-const pullBoxes: BaselineMaterial[] = ["4x4", "6x6", "8x8", "12x12"].map(
-  size => ({
+const pullBoxes: BaselineMaterial[] = [
+  "4x4",
+  "6x6",
+  "8x8",
+  "12x12",
+  "16x16",
+  "24x24",
+].map(size => ({
+  ...each,
+  name: `${size} pull box`,
+  searchAliases: aliases(
+    size.replace("x", " x "),
+    "junction jbox j box nema screw cover trough wireway"
+  ),
+}));
+
+/*
+  ── Rough-in accessories ──────────────────────────────────────────────────────
+  Moved from the pricing sheet, 2026-09-25. What goes on or around a box while
+  it is roughed in and trimmed out.
+*/
+const NAIL_PLATE = "stud guard protector shield steel cable protection";
+const roughIn: BaselineMaterial[] = [
+  ...['1-1/2"', '3"', '5"'].map(size => ({
     ...each,
-    name: `${size} pull box`,
+    name: `${size} nail plate`,
+    searchAliases: aliases(size.replace('"', ""), NAIL_PLATE),
+  })),
+  {
+    ...each,
+    name: "Single-gang box extender",
     searchAliases: aliases(
-      size.replace("x", " x "),
-      "junction jbox j box nema screw cover trough wireway"
+      "extension ring goof ring tile backsplash recessed deep device"
     ),
-  })
-);
+  },
+  {
+    ...each,
+    name: "Drywall repair ring",
+    searchAliases: aliases("oversize cut out fix bad hole sheetrock"),
+  },
+  {
+    ...each,
+    name: "Low-voltage mud ring",
+    searchAliases: aliases(
+      "lv bracket old work data cat6 tv low voltage mounting open back"
+    ),
+  },
+  {
+    ...each,
+    name: "Panel knockout seal",
+    searchAliases: aliases("ko plug closure cap hole snap in"),
+  },
+  {
+    ...each,
+    name: "Steel stud grommet",
+    searchAliases: aliases("bushing insert metal stud hole cable protect"),
+  },
+];
 
 export const BOXES: BaselineMaterial[] = [
   ...deviceBoxes,
+  ...oldWorkBoxes,
+  ...masonryBoxes,
   ...squareBoxes,
   ...ceilingBoxes,
   ...enclosures,
   ...castBoxes,
   ...pullBoxes,
+  ...roughIn,
 ];

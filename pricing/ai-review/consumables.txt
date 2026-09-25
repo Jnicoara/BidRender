@@ -1,5 +1,5 @@
 Category: Consumables
-Items: 15
+Items: 16
 
 Category | Name | Size
 Consumables | Anti-oxidant compound | -
@@ -16,4 +16,5 @@ Consumables | PVC cement | -
 Consumables | Silicone sealant | -
 Consumables | Thread sealant | -
 Consumables | Underground splice kit | -
+Consumables | Wire pulling grip | -
 Consumables | Zip ties | -

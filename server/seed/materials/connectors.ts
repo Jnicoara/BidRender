@@ -327,6 +327,12 @@ export const CONSUMABLES: BaselineMaterial[] = [
     name: "Panel directory label",
     searchAliases: aliases("circuit schedule card index sticker load center"),
   },
+  {
+    // On the sheet's Boxes list; it is a pulling aid, so it lives here.
+    ...CONS,
+    name: "Wire pulling grip",
+    searchAliases: aliases("kellems basket sock cable mesh eye pull"),
+  },
 ];
 
 export const CONNECTORS: BaselineMaterial[] = [

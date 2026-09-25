@@ -1,48 +1,39 @@
 Category: Receptacles
-Items: 44
+Items: 35
 
 Category | Name | Size
-Receptacles | 15A AFCI receptacle | 15A
 Receptacles | AFCI receptacle | -
 Receptacles | Controlled duplex receptacle | -
-Receptacles | Dead-front GFCI receptacle | -
+Receptacles | Dead-front GFCI device | -
 Receptacles | 30A dryer receptacle | 30A
-Receptacles | 15A duplex receptacle | 15A
 Receptacles | 20A duplex receptacle | 20A
 Receptacles | Duplex receptacle | -
+Receptacles | 20A duplex receptacle, weather-resistant | 20A
+Receptacles | Duplex receptacle, weather-resistant | -
 Receptacles | Floor receptacle assembly | -
-Receptacles | 15A GFCI receptacle | 15A
 Receptacles | 20A GFCI receptacle | 20A
 Receptacles | GFCI receptacle | -
-Receptacles | 15A GFCI receptacle, weather-resistant | 15A
 Receptacles | 20A GFCI receptacle, weather-resistant | 20A
+Receptacles | GFCI receptacle, weather-resistant | -
 Receptacles | Hospital-grade receptacle | -
 Receptacles | Isolated-ground receptacle | -
 Receptacles | L14-30 receptacle | -
 Receptacles | L5-20 receptacle | -
 Receptacles | L6-30 receptacle | -
 Receptacles | Pop-up floor receptacle | -
-Receptacles | 15A quad receptacle | 15A
 Receptacles | 20A quad receptacle | 20A
+Receptacles | Quad receptacle | -
 Receptacles | 50A range receptacle | 50A
 Receptacles | Recessed clock receptacle | -
 Receptacles | Recessed TV receptacle box | -
 Receptacles | 30A RV receptacle | 30A
 Receptacles | 50A RV receptacle | 50A
-Receptacles | Self-test GFCI receptacle | -
-Receptacles | 15A single receptacle | 15A
 Receptacles | 20A single receptacle | 20A
-Receptacles | 15A surge-protective receptacle | 15A
+Receptacles | Single receptacle | -
+Receptacles | Surge-protective receptacle | -
 Receptacles | Switch/receptacle combo device | -
-Receptacles | 15A tamper-resistant receptacle | 15A
-Receptacles | 20A tamper-resistant receptacle | 20A
-Receptacles | 15A TR/WR receptacle | 15A
-Receptacles | 20A TR/WR receptacle | 20A
 Receptacles | 20A twist-lock receptacle | 20A
 Receptacles | 30A twist-lock receptacle | 30A
 Receptacles | 50A twist-lock receptacle | 50A
 Receptacles | Twist-lock receptacle | -
 Receptacles | USB combo receptacle | -
-Receptacles | USB-C combo receptacle | -
-Receptacles | 15A weather-resistant receptacle | 15A
-Receptacles | 20A weather-resistant receptacle | 20A

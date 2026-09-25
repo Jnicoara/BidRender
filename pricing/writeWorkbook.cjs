@@ -207,7 +207,12 @@ function buildSheet(name, rows, note) {
 
   rows.forEach((row, i) => {
     const r = i + 3;
-    const [packText, packQty] = packFor(row);
+    // A row moved into the catalog under a new name keeps the pack its old
+    // sheet name gave it (buildPricingSheet.mts, packAs).
+    const [packText, packQty] = packFor({
+      ...row,
+      name: row.packAs ?? row.name,
+    });
     ws.getCell(r, 1).value = row.parent;
     ws.getCell(r, 2).value = row.category;
     ws.getCell(r, 3).value = row.type;
