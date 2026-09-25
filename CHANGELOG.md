@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **67 more lighting and life-safety items in the starter catalog, from the
+  pricing sheet.** 4" and 6" can trims in seven styles, chandeliers, pendants,
+  sconces, wraparounds, area and canopy lights, step lights, a 2 ft strip,
+  4 ft and 8 ft MC whips, tape-light drivers and channel, track connectors,
+  light-pole parts and landscape stakes; heat, duct and beam detectors, CO
+  detectors, fire alarm strobes, speakers, modules, batteries and a
+  rapid-entry key box. 3" and 5" cans and trims and the extra wafer and
+  canless sizes stay on the sheet, as the catalog already decided.
+
 - **108 more panels, breakers, commercial gear and grounding parts in the
   starter catalog, from the pricing sheet.** Main panels and sub-panels by
   space count ("200A main panel, 40-space"), outdoor and generator-ready

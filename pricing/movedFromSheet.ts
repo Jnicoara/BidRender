@@ -140,6 +140,23 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   "Gas line bonding clamp": "Water pipe bonding clamp",
   // The shipped 8 ft rod is the 5/8" one.
   "Ground rod, 5/8 in x 8 ft": "Ground rod, 8 ft",
+
+  // ── Batch 4: lighting and life safety
+  "Direct burial splice kit": "Underground splice kit",
+  "Drum ceiling fixture": "Surface-mount ceiling fixture",
+  "Flush mount ceiling fixture": "Surface-mount ceiling fixture",
+  "Flood light, adjustable knuckle": "Flood light",
+  // The shipped landscape fixture already stands for path, well and up
+  // lights (its aliases say so), and the high bay for linear and UFO.
+  "Path light fixture": "Landscape light fixture",
+  "Well light fixture": "Landscape light fixture",
+  "In-grade uplight": "Landscape light fixture",
+  "LED linear high bay": "High bay",
+  "LED round high bay": "High bay",
+  "Occupancy sensor, ceiling mount": "Ceiling occupancy sensor, PIR",
+  "Photocell for wall pack": "Photocell",
+  "Photocell, stem mount": "Photocell",
+  "Dual-action pull station": "Fire alarm pull station",
 };
 
 export const RENAMED_FROM_SHEET: Record<string, string> = {
@@ -223,6 +240,20 @@ export const RENAMED_FROM_SHEET: Record<string, string> = {
     )
   ),
   "100A outdoor main breaker panel": "100A outdoor main panel",
+
+  // ── Batch 4
+  // Led a search for "j box", above every pull box.
+  "In-ground junction box": "In-ground splice box",
+  "Fixture whip, 4 ft": "4 ft MC whip",
+  "Fixture whip, 8 ft": "8 ft MC whip",
+  "LED retrofit kit": "LED troffer retrofit kit",
+  // A remote head is an emergency-light part, not an exit sign.
+  "Exit sign, remote head": "Emergency light remote head",
+  // Knox is a brand; the catalog is generic.
+  "Fire alarm knox box": "Rapid-entry key box",
+  // A name starting "Smoke detector" led a search for "smoke detector".
+  "Smoke detector base": "Detector base",
+  "Smoke detector interconnect harness": "Detector wiring harness",
   "200A outdoor main breaker panel": "200A outdoor main panel",
 };
 

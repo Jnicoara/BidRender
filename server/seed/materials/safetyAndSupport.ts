@@ -135,6 +135,75 @@ export const LIFE_SAFETY: BaselineMaterial[] = [
       "facp addressable conventional zone annunciator fa head end"
     ),
   },
+  /*
+    ── Moved from the pricing sheet, 2026-09-25 ─────────────────────────────
+    No name here starts with "Smoke": a name that begins with the words
+    typed scores above one that does not, and "smoke detector" must still
+    land on the hardwired detector rather than on a base or a harness.
+  */
+  ...[
+    {
+      name: "Hardwired smoke detector, 10-year",
+      slang: "smoke alarm sealed lithium battery backup interconnect 120v",
+    },
+    {
+      name: "Hardwired CO detector",
+      slang: "carbon monoxide alarm interconnect 120v battery backup",
+    },
+    { name: "Heat detector", slang: "fixed temperature rate of rise garage" },
+    {
+      name: "Duct smoke detector",
+      slang: "hvac air handler rtu shutdown housing sampling tube",
+    },
+    { name: "Beam detector", slang: "projected beam reflector atrium smoke" },
+    { name: "Detector base", slang: "smoke head plug in twist addressable" },
+    {
+      name: "Detector mounting bracket",
+      slang: "smoke alarm adapter plate ring",
+    },
+    {
+      name: "Detector wiring harness",
+      slang: "smoke alarm interconnect pigtail adapter plug",
+    },
+    {
+      name: "Detector relay module",
+      slang: "smoke alarm interconnect auxiliary contact hvac shutdown",
+    },
+    {
+      name: "Addressable module",
+      slang: "monitor input control output interface fa slc",
+    },
+    { name: "Fire alarm relay module", slang: "control output fa slc" },
+    {
+      name: "Fire alarm strobe",
+      slang: "notification appliance nac visual candela fa",
+    },
+    {
+      name: "Fire alarm speaker/strobe",
+      slang: "notification appliance voice evac audible visual fa",
+    },
+    {
+      name: "Fire alarm remote annunciator",
+      slang: "facp display lcd fa lobby",
+    },
+    {
+      name: "Fire alarm battery",
+      slang: "sla sealed lead acid 12v 7ah 18ah facp standby",
+    },
+    { name: "End-of-line resistor", slang: "eol supervision zone fa" },
+    {
+      name: "Rapid-entry key box",
+      slang: "knox box fire department lock vault",
+    },
+    {
+      name: "Emergency exit light combo",
+      slang: "egress battery backup running man twin head led",
+    },
+  ].map(({ name, slang }) => ({
+    ...item("Life Safety"),
+    name,
+    searchAliases: aliases(slang),
+  })),
 ];
 
 export const FASTENERS: BaselineMaterial[] = [

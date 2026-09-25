@@ -155,6 +155,21 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   "4 ft LED T8 tube, ballast bypass": "common",
   "4 ft LED T8 tube, ballast compatible": "common",
 
+  // ── Lighting: the residential downlight ──
+  // Added 2026-09-25, when "LED cylinder downlight" arrived from the pricing
+  // sheet and led "downlight" on the alphabet.
+  '5"/6" wafer LED downlight': "common",
+  '4" wafer LED downlight': "common",
+
+  // ── Life safety: what a residential and a small commercial job count ──
+  // Added 2026-09-25 with the duct smoke detector, beam detector and FA
+  // modules, which tied these on "smoke" and "fire alarm" and led on the
+  // alphabet ("Duct …", "Fire alarm battery").
+  "Hardwired smoke detector": "common",
+  "Hardwired smoke/CO detector": "common",
+  "Fire alarm horn/strobe": "common",
+  "Fire alarm pull station": "common",
+
   // ── Grounding: on every service ──
   "Ground rod, 8 ft": "common",
 };

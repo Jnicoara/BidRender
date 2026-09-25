@@ -36,12 +36,19 @@ const recessed: BaselineMaterial[] = [
   ),
 }));
 
-const linear: BaselineMaterial[] = ["4 ft", "8 ft"].map(length => ({
+/** 2 ft moved from the pricing sheet, 2026-09-25. */
+const LINEAR_LENGTH_SLANG: Record<string, string> = {
+  "2 ft": "two foot 24",
+  "4 ft": "four foot 48",
+  "8 ft": "eight foot 96",
+};
+
+const linear: BaselineMaterial[] = ["2 ft", "4 ft", "8 ft"].map(length => ({
   ...fixture,
   name: `${length} LED strip fixture`,
   searchAliases: aliases(
     length.replace(" ", ""),
-    length.startsWith("4") ? "four foot 48" : "eight foot 96",
+    LINEAR_LENGTH_SLANG[length],
     "shop light linear wrap industrial surface tube",
     /*
       "fluorescent": added 2026-09-25. A plan still says "4' fluorescent
@@ -285,6 +292,32 @@ const retrofitTrims: BaselineMaterial[] = [
   ),
 }));
 
+/**
+ * Trims for the shipped can sizes, 4" and 6". Moved from the pricing sheet,
+ * 2026-09-25. The sheet also lists 3" and 5" trims; they stay there with the
+ * 3" and 5" cans they fit (see CAN_TYPES).
+ */
+const TRIM_TYPES: { type: string; slang: string }[] = [
+  { type: "baffle trim", slang: "ribbed black white glare" },
+  { type: "reflector trim", slang: "smooth specular cone clear alzak" },
+  { type: "open trim", slang: "ring lip white" },
+  { type: "gimbal trim", slang: "adjustable aim tilt" },
+  { type: "eyeball trim", slang: "adjustable aim swivel accent" },
+  { type: "adjustable trim", slang: "aim tilt directional accent" },
+  { type: "shower wet-rated trim", slang: "lensed wet location bathroom tub" },
+];
+const cannedTrims: BaselineMaterial[] = ['4"', '6"'].flatMap(size =>
+  TRIM_TYPES.map(({ type, slang }) => ({
+    ...fixture,
+    name: `${size} ${type}`,
+    searchAliases: aliases(
+      size === '4"' ? "4 four" : "6 six",
+      slang,
+      "recessed can pot light housing"
+    ),
+  }))
+);
+
 /*
   The shipped "Wall pack" stays the standard one — renaming a shipped row is
   a RENAMED_BASELINE_MATERIALS job, and it is already the size most jobs buy.
@@ -368,7 +401,8 @@ const lamps: BaselineMaterial[] = [
   // a lamp answering to them would compete with the fixture the word names.
   {
     name: "LED candelabra bulb, E12",
-    slang: "lamp chandelier torpedo flame tip b10 b11 small base",
+    // No "chandelier" since 2026-09-25: the fixture is its own item now.
+    slang: "lamp torpedo flame tip b10 b11 small base",
   },
   { name: "LED G25 globe bulb", slang: "lamp round vanity e26" },
   {
@@ -389,6 +423,101 @@ const lamps: BaselineMaterial[] = [
   searchAliases: aliases(slang, "philips cree feit"),
 }));
 
+/*
+  ── Moved from the pricing sheet, 2026-09-25 ───────────────────────────────
+  Fixtures, controls and site-lighting parts the sheet found by walking
+  tenant-improvement, residential and site jobs. Aliases avoid the full name
+  of any other shipped item — "flood light", "high bay", "wall pack" — so none
+  of these competes with the fixture that word names.
+*/
+const moreFixtures: BaselineMaterial[] = [
+  { name: "Chandelier", slang: "hanging decorative dining foyer crystal" },
+  {
+    name: "Semi-flush ceiling fixture",
+    slang: "semi flush dome close to ceiling bowl",
+  },
+  { name: "LED pendant fixture", slang: "hanging drop island kitchen cord" },
+  { name: "LED wall sconce", slang: "wall mount decorative up down" },
+  {
+    name: "LED cylinder downlight",
+    slang: "surface pendant can round commercial",
+  },
+  {
+    name: "LED mirror light",
+    slang: "lighted mirror bathroom vanity backlit",
+  },
+  { name: "LED step light", slang: "stair recessed wall brick marker" },
+  {
+    name: "LED area light",
+    slang: "shoebox parking lot site pole head",
+  },
+  {
+    name: "LED canopy light",
+    slang: "gas station garage soffit drive through",
+  },
+  ...["4 ft", "8 ft"].map(length => ({
+    name: `${length} LED wraparound`,
+    slang: `${length.replace(" ", "")} wrap linear surface garage basement`,
+  })),
+  {
+    name: "LED troffer retrofit kit",
+    slang: "conversion lay in 2x4 2x2 panel upgrade",
+  },
+  {
+    name: "Recessed can conversion kit",
+    slang: "pendant adapter screw in retrofit",
+  },
+  {
+    name: "Emergency battery backup pack",
+    slang: "driver ballast emergency inverter bodine integral",
+  },
+  {
+    name: "Emergency light remote head",
+    slang: "remote lamp twin head exterior egress",
+  },
+  {
+    name: "Exit sign, double face",
+    slang: "egress two sided double sided running man",
+  },
+  {
+    name: "Daylight sensor",
+    slang: "harvesting photosensor dimming 0-10v commercial",
+  },
+  {
+    name: "Occupancy sensor, high bay",
+    slang: "motion pir warehouse fixture mount",
+  },
+  {
+    name: "LED tape light power supply",
+    slang: "driver transformer 12v 24v dc strip",
+  },
+  {
+    name: "Tape light channel",
+    slang: "aluminum extrusion diffuser led strip",
+  },
+  { name: "Track light connector", slang: "rail joiner coupler l t" },
+  { name: "Track light end feed", slang: "rail power feed live end" },
+  { name: "Pole anchor bolt kit", slang: "light pole base template" },
+  { name: "Pole base cover", slang: "light pole shroud skirt" },
+  { name: "Pole base grout", slang: "light pole non shrink" },
+  { name: "Pole handhole cover", slang: "light pole access plate" },
+  { name: "Pole mounting arm", slang: "light pole bracket straight" },
+  { name: "Pole wire harness", slang: "light pole fuse holder in-line" },
+  { name: "Tenon adapter", slang: "light pole slip fitter top" },
+  {
+    // The sheet's "In-ground junction box" led a search for "j box", above
+    // every pull box and square box.
+    name: "In-ground splice box",
+    slang: "landscape buried junction direct burial",
+  },
+  { name: "Landscape hub connector", slang: "low voltage splice hub" },
+  { name: "Landscape light stake", slang: "ground spike mount path spot" },
+].map(({ name, slang }) => ({
+  ...fixture,
+  name,
+  searchAliases: aliases(slang),
+}));
+
 export const LIGHTING: BaselineMaterial[] = [
   ...recessed,
   ...linear,
@@ -399,6 +528,7 @@ export const LIGHTING: BaselineMaterial[] = [
   ...troffers,
   ...vaporTight,
   ...cans,
+  ...cannedTrims,
   ...retrofitTrims,
   ...wallPacks,
   ...vanities,
@@ -427,7 +557,7 @@ export const LIGHTING: BaselineMaterial[] = [
     ...fixture,
     name: "High bay",
     searchAliases: aliases(
-      "highbay ufo warehouse shop ceiling industrial led linear"
+      "highbay ufo round warehouse shop ceiling industrial led linear"
     ),
   },
   {
@@ -472,4 +602,15 @@ export const LIGHTING: BaselineMaterial[] = [
       "fixture light 6 foot flex armored metal clad pigtail greenfield"
     ),
   },
+  // Moved from the pricing sheet, 2026-09-25. "4 ft", not "4ft": the catalog
+  // writes a length with a space everywhere but the one shipped row above.
+  ...["4 ft", "8 ft"].map(length => ({
+    ...fixture,
+    name: `${length} MC whip`,
+    searchAliases: aliases(
+      length.replace(" ", ""),
+      "fixture light foot flex armored metal clad pigtail greenfield"
+    ),
+  })),
+  ...moreFixtures,
 ];

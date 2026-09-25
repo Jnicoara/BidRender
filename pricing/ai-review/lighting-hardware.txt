@@ -1,5 +1,5 @@
 Category: Lighting Hardware
-Items: 200
+Items: 188
 
 Category | Name | Size
 Lighting Hardware | 1x4 LED troffer | 1x4
@@ -23,30 +23,23 @@ Lighting Hardware | 8" canless LED downlight | 8"
 Lighting Hardware | Ceiling fan | -
 Lighting Hardware | Chandelier | -
 Lighting Hardware | Daylight sensor | -
-Lighting Hardware | Direct burial splice kit | -
-Lighting Hardware | Drum ceiling fixture | -
 Lighting Hardware | Emergency battery backup pack | -
 Lighting Hardware | Emergency light | -
+Lighting Hardware | Emergency light remote head | -
 Lighting Hardware | Exit sign | -
 Lighting Hardware | Exit sign, double face | -
-Lighting Hardware | Exit sign, remote head | -
 Lighting Hardware | 3" eyeball trim | 3"
 Lighting Hardware | 4" eyeball trim | 4"
 Lighting Hardware | 5" eyeball trim | 5"
 Lighting Hardware | 6" eyeball trim | 6"
 Lighting Hardware | Fixture mounting bracket | -
-Lighting Hardware | Fixture whip, 4 ft | 4 ft
-Lighting Hardware | Fixture whip, 8 ft | 8 ft
 Lighting Hardware | Flood light | -
-Lighting Hardware | Flood light, adjustable knuckle | -
-Lighting Hardware | Flush mount ceiling fixture | -
 Lighting Hardware | 3" gimbal trim | 3"
 Lighting Hardware | 4" gimbal trim | 4"
 Lighting Hardware | 5" gimbal trim | 5"
 Lighting Hardware | 6" gimbal trim | 6"
 Lighting Hardware | High bay | -
-Lighting Hardware | In-grade uplight | -
-Lighting Hardware | In-ground junction box | -
+Lighting Hardware | In-ground splice box | -
 Lighting Hardware | Landscape hub connector | -
 Lighting Hardware | Landscape light stake | -
 Lighting Hardware | LED A19 bulb, 60W equivalent | -
@@ -68,17 +61,14 @@ Lighting Hardware | 5" LED disc light, CCT selectable | 5"
 Lighting Hardware | 6" LED disc light, CCT selectable | 6"
 Lighting Hardware | 7" LED disc light, CCT selectable | 7"
 Lighting Hardware | LED G25 globe bulb | -
-Lighting Hardware | LED linear high bay | -
 Lighting Hardware | LED mirror light | -
 Lighting Hardware | LED PAR20 bulb | -
 Lighting Hardware | LED PAR30 bulb | -
 Lighting Hardware | LED PAR38 bulb | -
 Lighting Hardware | LED pendant fixture | -
 Lighting Hardware | LED PL-pin lamp, G24 | -
-Lighting Hardware | LED retrofit kit | -
 Lighting Hardware | 4" LED retrofit trim | 4"
 Lighting Hardware | 5"/6" LED retrofit trim | 5"
-Lighting Hardware | LED round high bay | -
 Lighting Hardware | LED security light, dusk-to-dawn | -
 Lighting Hardware | LED security light, motion-activated, 2-head | -
 Lighting Hardware | LED security light, motion-activated, 3-head | -
@@ -94,6 +84,7 @@ Lighting Hardware | 2 ft LED T8 tube, ballast compatible | 2 ft
 Lighting Hardware | 4 ft LED T8 tube, ballast compatible | 4 ft
 Lighting Hardware | LED tape light | -
 Lighting Hardware | LED tape light power supply | -
+Lighting Hardware | LED troffer retrofit kit | -
 Lighting Hardware | LED wall sconce | -
 Lighting Hardware | 4 ft LED wraparound | 4 ft
 Lighting Hardware | 8 ft LED wraparound | 8 ft
@@ -103,17 +94,15 @@ Lighting Hardware | 30 ft light pole | 30 ft
 Lighting Hardware | 4 ft lighting track | 4 ft
 Lighting Hardware | 6 ft lighting track | 6 ft
 Lighting Hardware | 8 ft lighting track | 8 ft
+Lighting Hardware | 4 ft MC whip | 4 ft
 Lighting Hardware | 6ft MC whip | 6ft
+Lighting Hardware | 8 ft MC whip | 8 ft
 Lighting Hardware | Non-shunted lampholder | -
-Lighting Hardware | Occupancy sensor, ceiling mount | -
 Lighting Hardware | Occupancy sensor, high bay | -
 Lighting Hardware | 3" open trim | 3"
 Lighting Hardware | 4" open trim | 4"
 Lighting Hardware | 5" open trim | 5"
 Lighting Hardware | 6" open trim | 6"
-Lighting Hardware | Path light fixture | -
-Lighting Hardware | Photocell for wall pack | -
-Lighting Hardware | Photocell, stem mount | -
 Lighting Hardware | Pole anchor bolt kit | -
 Lighting Hardware | Pole base cover | -
 Lighting Hardware | Pole base grout | -
@@ -201,4 +190,3 @@ Lighting Hardware | Wall pack | -
 Lighting Hardware | Wall pack, full cutoff | -
 Lighting Hardware | Wall pack, large | -
 Lighting Hardware | Wall pack, mini | -
-Lighting Hardware | Well light fixture | -

@@ -311,7 +311,9 @@ export const SWITCHES: BaselineMaterial[] = [
     ...device("Switches"),
     name: "Photocell",
     searchAliases: aliases(
-      "photo eye cell dusk dawn daylight sensor outdoor lighting control"
+      // Not "daylight sensor": that is its own item since 2026-09-25, and an
+      // alias spelling it out would compete with it.
+      "photo eye cell dusk dawn daylight outdoor lighting control stem button twistlock"
     ),
   },
   {

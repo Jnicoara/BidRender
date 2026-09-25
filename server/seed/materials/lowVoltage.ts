@@ -95,7 +95,7 @@ export const LOW_VOLTAGE: BaselineMaterial[] = [
     ...lv("each"),
     name: "Landscape light fixture",
     searchAliases: aliases(
-      "path spot well up light garden yard exterior 12v mr16"
+      "path spot well up light uplight in-grade ingrade garden yard exterior 12v mr16"
     ),
   },
   ...["150W", "300W", "600W"].map(watts => ({
