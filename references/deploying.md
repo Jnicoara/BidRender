@@ -558,6 +558,15 @@ Expect `Database matches the schema.` **If it still names something, stop here
 and do not deploy.** The site is fine — it is running the old code, which does
 not know about any of this.
 
+> **`schemaDrift.mts` cannot see a change to NULLability — found 2026-09-25.**
+> Before 0074/0075 ran, production reported `Database matches the schema.`
+> with both `bid_line_items` snapshot columns still `NOT NULL`: the check
+> compares which columns EXIST, not their definitions. For a migration that
+> only changes a column (`MODIFY COLUMN`), it will say "matches" both before
+> and after, so it proves nothing. Ask `information_schema.COLUMNS` for
+> `IS_NULLABLE` before and after instead, and compare the two readings — the
+> 0074/0075 deploy did (`NO -> YES`, recorded migrations `74 -> 76`).
+
 #### 7. Open the live site, still on the OLD code
 
 Check a bid's takeoff totals read the numbers they read yesterday. **This step
