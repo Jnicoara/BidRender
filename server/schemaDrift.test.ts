@@ -26,10 +26,14 @@
  */
 import { describe, it, expect } from "vitest";
 import {
+  EXPECTED_COLLATION,
+  NO_DEFAULT,
+  canonicalDefault,
   compareTable,
   declaredTables,
   describeDrift,
   findSchemaDrift,
+  liveDefault,
   normalizeColumnType,
   type LiveColumn,
 } from "./schemaCheck";
@@ -53,18 +57,70 @@ function asMysqlReports(type: string): string {
 }
 
 /**
+ * COLUMN_DEFAULT and EXTRA as MySQL 8 reports a declared default — in
+ * MySQL's spelling, NOT the check's canonical one, for the same reason as
+ * above. Measured 2026-09-25 on production: a decimal default comes back at
+ * the column's scale (`0.0000`), the current time as `now()` flagged
+ * DEFAULT_GENERATED, and "no default" as NULL.
+ */
+function defaultAsMysqlReports(
+  type: string,
+  canonical: string
+): { COLUMN_DEFAULT: string | null; EXTRA: string } {
+  const onUpdate = canonical.endsWith(", on update current_timestamp");
+  const value = canonical.replace(", on update current_timestamp", "");
+  const extraOnUpdate = onUpdate ? "on update CURRENT_TIMESTAMP" : "";
+  if (value === NO_DEFAULT)
+    return { COLUMN_DEFAULT: null, EXTRA: extraOnUpdate };
+  if (value === "current_timestamp") {
+    return {
+      COLUMN_DEFAULT: "now()",
+      EXTRA: ("DEFAULT_GENERATED " + extraOnUpdate).trim(),
+    };
+  }
+  const scale = /^decimal\(\d+,(\d+)\)/.exec(type);
+  return {
+    COLUMN_DEFAULT: scale ? Number(value).toFixed(Number(scale[1])) : value,
+    EXTRA: extraOnUpdate,
+  };
+}
+
+/** A string type carries a collation; numbers, dates and json do not. */
+function collationFor(type: string): string | null {
+  return /^(varchar|char|text|tinytext|mediumtext|longtext|enum|set)\b/.test(
+    type
+  )
+    ? EXPECTED_COLLATION
+    : null;
+}
+
+type Override =
+  | "YES"
+  | "NO"
+  | {
+      type?: string;
+      default?: string | null;
+      extra?: string;
+      collation?: string;
+    }
+  | null;
+
+/**
  * What information_schema would return for a database that agrees with the
  * schema on everything — except the columns named in `overrides`, which set
- * nullability ("YES"/"NO"), a type ({ type }), or absence (null).
+ * nullability ("YES"/"NO"), any of type / default / extra / collation, or
+ * absence (null).
  */
 function liveColumnsFor(
   name: string,
-  overrides: Record<string, "YES" | "NO" | { type: string } | null> = {}
+  overrides: Record<string, Override> = {}
 ): LiveColumn[] {
   const rows: LiveColumn[] = [];
   for (const column of declared(name).columns) {
     const override = overrides[column.name];
     if (override === null) continue; // absent from the database
+    const set = typeof override === "object" ? override : {};
+    const reported = defaultAsMysqlReports(column.type, column.default);
     rows.push({
       COLUMN_NAME: column.name,
       IS_NULLABLE:
@@ -73,10 +129,11 @@ function liveColumnsFor(
           : column.nullable
             ? "YES"
             : "NO",
-      COLUMN_TYPE:
-        typeof override === "object" && override !== null
-          ? override.type
-          : asMysqlReports(column.type),
+      COLUMN_TYPE: set.type ?? asMysqlReports(column.type),
+      COLUMN_DEFAULT:
+        set.default !== undefined ? set.default : reported.COLUMN_DEFAULT,
+      EXTRA: set.extra ?? reported.EXTRA,
+      COLLATION_NAME: set.collation ?? collationFor(column.type),
     });
   }
   return rows;
@@ -290,6 +347,170 @@ describe("the equivalent spellings MySQL uses for one type", () => {
   });
 });
 
+describe("default drift — the column is right and its default is not", () => {
+  it("catches a default whose VALUE changed", () => {
+    // bid_line_items.qty defaults to 1: a line added without a quantity is
+    // one of the thing. A database defaulting to 2 doubles it, silently.
+    const drift = compareTable(
+      declared("bid_line_items"),
+      liveColumnsFor("bid_line_items", { qty: { default: "2.0000" } })
+    );
+    expect(drift!.defaults).toEqual([
+      { column: "qty", schemaDefault: "1", databaseDefault: "2" },
+    ]);
+    expect(drift!.types).toEqual([]);
+    expect(describeDrift([drift!])).toContain(
+      "bid_line_items.qty — schema default 1, database default 2"
+    );
+  });
+
+  it("catches a default that is MISSING from the database", () => {
+    // An insert that leaves `kind` out relies on 'plain'. With no default on a
+    // NOT NULL column, MySQL refuses the row.
+    const drift = compareTable(
+      declared("takeoff_groups"),
+      liveColumnsFor("takeoff_groups", { kind: { default: null } })
+    );
+    expect(drift!.defaults).toEqual([
+      { column: "kind", schemaDefault: "plain", databaseDefault: NO_DEFAULT },
+    ]);
+  });
+
+  it("catches a default the database has and the schema does not", () => {
+    const drift = compareTable(
+      declared("takeoff_groups"),
+      liveColumnsFor("takeoff_groups", { label: { default: "Untitled" } })
+    );
+    expect(drift!.defaults).toEqual([
+      {
+        column: "label",
+        schemaDefault: NO_DEFAULT,
+        databaseDefault: "Untitled",
+      },
+    ]);
+  });
+
+  it("catches a lost ON UPDATE — updatedAt stops moving", () => {
+    const drift = compareTable(
+      declared("bids"),
+      liveColumnsFor("bids", {
+        updatedAt: { default: "now()", extra: "DEFAULT_GENERATED" },
+      })
+    );
+    expect(drift!.defaults.map(d => d.column)).toEqual(["updatedAt"]);
+  });
+
+  it("compares a string default exactly — 'draft' is not 'Draft'", () => {
+    const drift = compareTable(
+      declared("bids"),
+      liveColumnsFor("bids", { status: { default: "draft" } })
+    );
+    expect(drift!.defaults).toEqual([
+      { column: "status", schemaDefault: "Draft", databaseDefault: "draft" },
+    ]);
+  });
+});
+
+describe("the equivalent spellings of one default", () => {
+  const decimal = { type: "decimal(10,4)", expression: false };
+
+  it("reads a decimal default at the column's scale as the same number", () => {
+    // 31 columns on production report `.default("0")` as 0.0000.
+    expect(canonicalDefault("0.0000", decimal)).toBe(
+      canonicalDefault("0", decimal)
+    );
+    expect(canonicalDefault("1.0000", decimal)).toBe("1");
+    expect(canonicalDefault("1.5000", decimal)).not.toBe(
+      canonicalDefault("1", decimal)
+    );
+  });
+
+  it("reads drizzle's boolean as MySQL's 0/1", () => {
+    const bool = { type: "boolean", expression: false };
+    expect(canonicalDefault(false, bool)).toBe(canonicalDefault("0", bool));
+    expect(canonicalDefault(true, bool)).toBe(canonicalDefault("1", bool));
+  });
+
+  it("reads every name MySQL keeps for the current time as one", () => {
+    const row = (d: string, extra = "DEFAULT_GENERATED"): LiveColumn => ({
+      COLUMN_NAME: "createdAt",
+      IS_NULLABLE: "NO",
+      COLUMN_TYPE: "timestamp",
+      COLUMN_DEFAULT: d,
+      EXTRA: extra,
+      COLLATION_NAME: null,
+    });
+    const drizzle = canonicalDefault("(now())", {
+      type: "timestamp",
+      expression: true,
+    });
+    for (const spelling of [
+      "now()",
+      "CURRENT_TIMESTAMP",
+      "current_timestamp()",
+    ]) {
+      expect(liveDefault(row(spelling))).toBe(drizzle);
+    }
+    // MySQL 5.7 reports it with no DEFAULT_GENERATED marker.
+    expect(liveDefault(row("CURRENT_TIMESTAMP", ""))).toBe(drizzle);
+  });
+
+  it("does not read the WORD 'now' on a text column as a time", () => {
+    expect(
+      canonicalDefault("now", { type: "varchar(32)", expression: false })
+    ).toBe("now");
+  });
+
+  it("strips one layer of the quotes MariaDB and older MySQL put round a literal", () => {
+    const v = { type: "varchar(32)", expression: false };
+    expect(canonicalDefault("'Draft'", v)).toBe(canonicalDefault("Draft", v));
+  });
+
+  it("treats no default and DEFAULT NULL as the same, as MySQL does", () => {
+    const v = { type: "varchar(32)", expression: false };
+    expect(canonicalDefault(null, v)).toBe(NO_DEFAULT);
+    expect(canonicalDefault(undefined, v)).toBe(NO_DEFAULT);
+  });
+});
+
+describe("collation drift — against the project's rule, since the schema cannot state one", () => {
+  it("catches a string column on the database's other collation", () => {
+    // The ER_CANT_AGGREGATE_2COLLATIONS failure of 2026-09-18 in one column:
+    // joining this label to an older table's strings is refused outright.
+    const drift = compareTable(
+      declared("takeoff_groups"),
+      liveColumnsFor("takeoff_groups", {
+        label: { collation: "utf8mb4_0900_ai_ci" },
+      })
+    );
+    expect(drift!.collations).toEqual([
+      {
+        column: "label",
+        expected: EXPECTED_COLLATION,
+        database: "utf8mb4_0900_ai_ci",
+      },
+    ]);
+    const message = describeDrift([drift!]);
+    expect(message).toContain(
+      "takeoff_groups.label — collation utf8mb4_0900_ai_ci, expected utf8mb4_unicode_ci"
+    );
+    // db:push cannot fix a collation, so the advice must not stop there.
+    expect(message).toContain(
+      "ALTER TABLE `takeoff_groups` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    );
+    expect(message).not.toContain("pnpm db:push");
+  });
+
+  it("ignores columns that have no collation at all", () => {
+    // Numbers, dates and json report NULL; there is nothing to compare.
+    const drift = compareTable(
+      declared("bid_line_items"),
+      liveColumnsFor("bid_line_items")
+    );
+    expect(drift).toBeNull();
+  });
+});
+
 describe.skipIf(!hasDb)("the database matches the schema", () => {
   it("has every column the code declares", async () => {
     const drift = await findSchemaDrift();
@@ -308,6 +529,8 @@ describe.skipIf(!hasDb)("the database matches the schema", () => {
         missingColumns: ["isSample"],
         nullability: [],
         types: [],
+        defaults: [],
+        collations: [],
       },
     ]);
     expect(message).toContain("bids — missing isSample");

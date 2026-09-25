@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **The pre-deploy database check now also catches wrong default values and
+  mismatched text collation.** A column whose default changed, disappeared or
+  appeared (for example a quantity defaulting to 2 instead of 1, or a status
+  with no default so new rows are refused) is now flagged, as is a text column
+  on a different collation, which makes some searches and joins fail. It
+  ignores harmless differences in how MySQL writes the same default. Production
+  and the test database are clean; the local copy correctly shows three tables
+  on the old collation, and the check prints the command to convert them. The
+  only thing it still doesn't compare is auto-numbering (auto-increment).
+
 - **The pre-deploy database check now also catches a column of the wrong type
   or size.** For example text where the app expects a short text field, a
   whole-number column too small for a large plan file's size, a price column

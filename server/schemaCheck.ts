@@ -25,7 +25,7 @@
  * It checks that every declared column EXISTS, that it agrees with the schema
  * about whether it may be NULL, and that its type is the declared one —
  * including the width, the decimal precision and scale, and an enum's value
- * list. Both of the last two were added on 2026-09-25.
+ * list — its DEFAULT, and its COLLATION. All four were added on 2026-09-25.
  *
  * Nullability was added because presence alone passed a real gap. Before
  * migrations 0074/0075 ran, production reported "Database matches the schema."
@@ -66,9 +66,45 @@
  * Nothing here is Postgres-shaped: this app runs MySQL only, so Postgres
  * aliases (`int4`, `character varying`) cannot appear and are not listed.
  *
- * Still not compared: defaults, character set and collation, and auto-
- * increment. Round-tripping real values covers what the type cannot say, and
- * that belongs in the feature's own test (see server/bidArchive.test.ts).
+ * ── Defaults: compared as VALUES, through a second short list ───────────────
+ * Drizzle's declared default (`.default(x)`, `.defaultNow()`, and
+ * `.onUpdateNow()`) against `COLUMN_DEFAULT` and `EXTRA`. Includes "no
+ * default" against "has one" in both directions. A client-side `$defaultFn`
+ * is not a database default and reads as none, which is what MySQL has.
+ *
+ * Measured the same way on 2026-09-25, and the spellings that differ while
+ * meaning the same thing are few (`canonicalDefault`):
+ *   • numbers are compared as numbers. MySQL reports a decimal default at the
+ *     column's scale, so `.default("0")` comes back as `0.0000` (31 columns)
+ *     or `0.00` (3). A string comparison would false-alarm on every one.
+ *   • booleans: drizzle's `false`/`true` are MySQL's `0`/`1` (27 columns).
+ *   • the current time has four names — `now()`, `CURRENT_TIMESTAMP`,
+ *     `current_timestamp()`, `localtimestamp` — and MySQL keeps whichever one
+ *     created the column. Production and test say `now()` on every timestamp;
+ *     the local copy says `CURRENT_TIMESTAMP` on 92 of 104. Same default.
+ *   • MariaDB and pre-8.0 servers wrap a literal default in single quotes;
+ *     one layer of those is removed so the same default reads the same.
+ *   • "no default" and `DEFAULT NULL` are the same thing — MySQL reports NULL
+ *     for both, and so does this.
+ * A string default is otherwise compared exactly, case included: `'Draft'`
+ * and `'draft'` are different values.
+ *
+ * ── Collation: against the PROJECT's rule, because the schema cannot say ────
+ * drizzle 0.44 has no way to declare a MySQL collation, so there is nothing in
+ * drizzle/schema.ts to compare against. The rule lives in
+ * references/deploying.md § "A new table lands on the WRONG collation": every
+ * string column is `utf8mb4_unicode_ci` (EXPECTED_COLLATION). A column whose
+ * type has no collation (numbers, dates, json) is skipped.
+ *
+ * There is deliberately NO allowlist. Measured 2026-09-25: production and test
+ * have no string column on any other collation. The local copy has three
+ * tables on `utf8mb4_0900_ai_ci` (its database default), so the check reports
+ * them there — true, since local differs from production. An allowlist would
+ * also have stopped the check seeing those tables drift on production.
+ *
+ * Still not compared: auto-increment. Round-tripping real values covers what
+ * none of this can say, and that belongs in the feature's own test (see
+ * server/bidArchive.test.ts).
  */
 import { sql } from "drizzle-orm";
 import { getTableConfig } from "drizzle-orm/mysql-core";
@@ -107,6 +143,24 @@ export type TypeDrift = {
   databaseType: string;
 };
 
+/**
+ * A column whose default differs, shown in canonical form on both sides so the
+ * message names the difference rather than a spelling (`0` not `0.0000`).
+ * `no default` is a value here: gaining or losing a default is drift.
+ */
+export type DefaultDrift = {
+  column: string;
+  schemaDefault: string;
+  databaseDefault: string;
+};
+
+/** A string column on a collation other than the project's. */
+export type CollationDrift = {
+  column: string;
+  expected: string;
+  database: string;
+};
+
 export type TableDrift = {
   table: string;
   /** True when the table itself is absent, not merely some of its columns. */
@@ -116,12 +170,32 @@ export type TableDrift = {
   nullability: NullabilityDrift[];
   /** Columns present on both sides with a different type (width included). */
   types: TypeDrift[];
+  /** Columns whose default (or on-update) differs. */
+  defaults: DefaultDrift[];
+  /** String columns on a collation other than EXPECTED_COLLATION. */
+  collations: CollationDrift[];
 };
 
-/** A declared table: its name, and each column's nullability and type. */
+/**
+ * The collation every string column in this schema is on. The rule lives in
+ * references/deploying.md § "A new table lands on the WRONG collation" — the
+ * schema cannot state it, because drizzle 0.44 has no collation option.
+ */
+export const EXPECTED_COLLATION = "utf8mb4_unicode_ci";
+
+/** What "no default" reads as, on both sides. */
+export const NO_DEFAULT = "no default";
+
+/** A declared table: its name, and each column's nullability, type, default. */
 export type DeclaredTable = {
   name: string;
-  columns: Array<{ name: string; nullable: boolean; type: string }>;
+  columns: Array<{
+    name: string;
+    nullable: boolean;
+    type: string;
+    /** Canonical — see `canonicalDefault`. `NO_DEFAULT` when there is none. */
+    default: string;
+  }>;
 };
 
 /** One row of information_schema.COLUMNS — as much of it as this reads. */
@@ -129,7 +203,115 @@ export type LiveColumn = {
   COLUMN_NAME: string;
   IS_NULLABLE: string;
   COLUMN_TYPE: string;
+  COLUMN_DEFAULT: string | null;
+  /** e.g. `DEFAULT_GENERATED on update CURRENT_TIMESTAMP`, `auto_increment`. */
+  EXTRA: string;
+  /** NULL for a type with no collation — numbers, dates, json. */
+  COLLATION_NAME: string | null;
 };
+
+/** The four names MySQL accepts for "the current time". */
+const CURRENT_TIME =
+  /^(now|current_timestamp|localtimestamp|localtime)(\(\d*\))?$/i;
+
+/** Whether a declared type holds a number, so its default compares as one. */
+function isNumericType(type: string): boolean {
+  return /^(tinyint|smallint|mediumint|int|integer|bigint|decimal|numeric|float|double|real|boolean|bool)\b/i.test(
+    type.trim()
+  );
+}
+
+/**
+ * One spelling for two ways of writing the same default. See the header for
+ * the measurement behind this list.
+ *
+ * `value` is what either side says the default is — drizzle's value, or
+ * MySQL's COLUMN_DEFAULT — and `expression` says whether it is an expression
+ * (drizzle `sql\`...\``, MySQL EXTRA `DEFAULT_GENERATED`) rather than a literal.
+ */
+export function canonicalDefault(
+  value: string | number | boolean | null | undefined,
+  options: { type: string; expression: boolean; onUpdateNow?: boolean }
+): string {
+  const onUpdate = options.onUpdateNow ? ", on update current_timestamp" : "";
+  if (value === null || value === undefined) return NO_DEFAULT + onUpdate;
+  if (typeof value === "boolean") return (value ? "1" : "0") + onUpdate;
+
+  let text = String(value).trim();
+  if (options.expression) {
+    // drizzle writes `(now())`; MySQL may report `now()` or CURRENT_TIMESTAMP.
+    while (text.startsWith("(") && text.endsWith(")")) {
+      text = text.slice(1, -1).trim();
+    }
+    if (CURRENT_TIME.test(text)) return "current_timestamp" + onUpdate;
+    return text.toLowerCase() + onUpdate;
+  }
+  // One layer of single quotes, as MariaDB and pre-8.0 servers report a literal.
+  if (text.length >= 2 && text.startsWith("'") && text.endsWith("'")) {
+    text = text.slice(1, -1);
+  }
+  // MySQL 5.7 reports a CURRENT_TIMESTAMP default without DEFAULT_GENERATED.
+  // Only on a date/time column: on a varchar, "now" is just a word.
+  if (
+    /^(timestamp|datetime)/i.test(options.type.trim()) &&
+    CURRENT_TIME.test(text)
+  ) {
+    return "current_timestamp" + onUpdate;
+  }
+  if (
+    isNumericType(options.type) &&
+    text !== "" &&
+    Number.isFinite(Number(text))
+  ) {
+    return String(Number(text)) + onUpdate;
+  }
+  return text + onUpdate;
+}
+
+/** A declared drizzle column's default, canonical. */
+function declaredDefault(column: {
+  default?: unknown;
+  hasDefault?: boolean;
+  getSQLType(): string;
+  hasOnUpdateNow?: boolean;
+}): string {
+  const type = column.getSQLType();
+  const onUpdateNow = Boolean(column.hasOnUpdateNow);
+  const value = column.default;
+  // `$defaultFn` runs in the client, never in the database: no default here.
+  if (value === undefined)
+    return canonicalDefault(null, { type, expression: false, onUpdateNow });
+  if (value !== null && typeof value === "object" && "queryChunks" in value) {
+    const chunks = (value as { queryChunks: Array<{ value?: unknown }> })
+      .queryChunks;
+    const text = chunks
+      .map(chunk => (Array.isArray(chunk.value) ? chunk.value.join("") : ""))
+      .join("");
+    return canonicalDefault(text, { type, expression: true, onUpdateNow });
+  }
+  if (value instanceof Date) {
+    return canonicalDefault(value.toISOString(), {
+      type,
+      expression: false,
+      onUpdateNow,
+    });
+  }
+  return canonicalDefault(value as string | number | boolean | null, {
+    type,
+    expression: false,
+    onUpdateNow,
+  });
+}
+
+/** What MySQL says a column's default is, canonical. */
+export function liveDefault(row: LiveColumn): string {
+  const extra = String(row.EXTRA ?? "").toLowerCase();
+  return canonicalDefault(row.COLUMN_DEFAULT, {
+    type: row.COLUMN_TYPE,
+    expression: extra.includes("default_generated"),
+    onUpdateNow: /on update (current_timestamp|now)/.test(extra),
+  });
+}
 
 /**
  * One spelling for two names of the same MySQL type. See the header for the
@@ -175,6 +357,8 @@ export function compareTable(
       missingColumns: declared.columns.map(column => column.name),
       nullability: [],
       types: [],
+      defaults: [],
+      collations: [],
     };
   }
 
@@ -182,6 +366,8 @@ export function compareTable(
   const missingColumns: string[] = [];
   const nullability: NullabilityDrift[] = [];
   const types: TypeDrift[] = [];
+  const defaults: DefaultDrift[] = [];
+  const collations: CollationDrift[] = [];
   for (const column of declared.columns) {
     const row = liveByName.get(column.name);
     if (!row) {
@@ -207,12 +393,30 @@ export function compareTable(
         databaseType: String(row.COLUMN_TYPE),
       });
     }
+    const databaseDefault = liveDefault(row);
+    if (databaseDefault !== column.default) {
+      defaults.push({
+        column: column.name,
+        schemaDefault: column.default,
+        databaseDefault,
+      });
+    }
+    // A type with no collation (numbers, dates, json) reports NULL: skipped.
+    if (row.COLLATION_NAME && row.COLLATION_NAME !== EXPECTED_COLLATION) {
+      collations.push({
+        column: column.name,
+        expected: EXPECTED_COLLATION,
+        database: row.COLLATION_NAME,
+      });
+    }
   }
 
   if (
     missingColumns.length === 0 &&
     nullability.length === 0 &&
-    types.length === 0
+    types.length === 0 &&
+    defaults.length === 0 &&
+    collations.length === 0
   )
     return null;
   return {
@@ -221,6 +425,8 @@ export function compareTable(
     missingColumns,
     nullability,
     types,
+    defaults,
+    collations,
   };
 }
 
@@ -244,6 +450,7 @@ export function declaredTables(): DeclaredTable[] {
         nullable: !column.notNull,
         // The DDL drizzle would write for it, e.g. `decimal(12,4)`.
         type: column.getSQLType(),
+        default: declaredDefault(column as never),
       })),
     });
   }
@@ -264,7 +471,8 @@ export async function findSchemaDrift(): Promise<TableDrift[]> {
   const drift: TableDrift[] = [];
   for (const table of declaredTables()) {
     const [rows] = (await db.execute(
-      sql`SELECT COLUMN_NAME, IS_NULLABLE, COLUMN_TYPE FROM information_schema.COLUMNS
+      sql`SELECT COLUMN_NAME, IS_NULLABLE, COLUMN_TYPE, COLUMN_DEFAULT, EXTRA, COLLATION_NAME
+          FROM information_schema.COLUMNS
           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ${table.name}`
     )) as unknown as [LiveColumn[]];
 
@@ -318,14 +526,65 @@ export function describeDrift(drift: readonly TableDrift[]): string {
           `database ${column.databaseType}`
       );
     }
+    for (const column of entry.defaults) {
+      lines.push(
+        `  ${entry.table}.${column.column} — schema default ${column.schemaDefault}, ` +
+          `database default ${column.databaseDefault}`
+      );
+    }
+    for (const column of entry.collations) {
+      lines.push(
+        `  ${entry.table}.${column.column} — collation ${column.database}, ` +
+          `expected ${column.expected}`
+      );
+    }
+  }
+  /*
+    The advice depends on the kind of drift. Migrations set shape — columns,
+    NULL, type, default — so `pnpm db:push` is the fix for those. They do NOT
+    set collation: a table takes the database's default unless its CREATE TABLE
+    names one, so re-running migrations changes nothing and saying "run
+    db:push" for it would send somebody round in a circle.
+  */
+  const shape = drift.some(
+    entry =>
+      entry.missingTable ||
+      entry.missingColumns.length > 0 ||
+      entry.nullability.length > 0 ||
+      entry.types.length > 0 ||
+      entry.defaults.length > 0
+  );
+  // One entry per table already — findSchemaDrift makes one TableDrift each.
+  const collated = drift
+    .filter(entry => entry.collations.length > 0)
+    .map(entry => entry.table);
+  const advice: string[] = [];
+  if (shape) {
+    advice.push(
+      "",
+      "Run `pnpm db:push` against it. Until then, any screen whose query",
+      "touches a missing column fails outright, a column the database holds",
+      "NOT NULL refuses a NULL the code writes, a narrower type truncates or",
+      "refuses what the code sends, and a missing default fails an insert that",
+      "relied on it — see server/schemaCheck.ts."
+    );
+  }
+  if (collated.length > 0) {
+    advice.push(
+      "",
+      "Collation is not something a migration sets, so db:push will not fix",
+      "it. Comparing these strings with another table's fails with",
+      "ER_CANT_AGGREGATE_2COLLATIONS. To convert (references/deploying.md",
+      '§ "A new table lands on the WRONG collation"):',
+      ...collated.map(
+        table =>
+          `  ALTER TABLE \`${table}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE ${EXPECTED_COLLATION};`
+      )
+    );
   }
   return [
     `This database disagrees with the code in ${drift.length} table(s):`,
     ...lines,
-    "",
-    "Run `pnpm db:push` against it. Until then, any screen whose query",
-    "touches a missing column fails outright, a column the database holds",
-    "NOT NULL refuses a NULL the code writes, and a narrower type truncates",
-    "or refuses what the code sends — see server/schemaCheck.ts.",
+    ...advice,
   ].join("\n");
 }

@@ -3,17 +3,26 @@
  *
  *   pnpm tsx scripts/schemaDrift.mts
  *
- * ── Run this in a Manus sandbox before and after `pnpm db:push` ──────────────
+ * ── Run this before and after applying migrations ────────────────────────────
+ * (This heading said "in a Manus sandbox" until 2026-09-25; that platform is
+ * gone. Point DATABASE_URL — or DOTENV_CONFIG_PATH — at the database to ask.)
+ *
  * references/deploying.md § 5 says to compare the migrations in the repo
  * against what the database has actually run, and until now there was no way
  * to do it — `ls drizzle/*.sql | wc -l` counts files, which tells you nothing
  * about the other end. This answers the real question: which columns does the
  * code expect that this database does not have — and, since 2026-09-25, which
- * columns does it disagree with about NULL or about TYPE, width included
- * (varchar(255) vs text, int vs bigint, varchar(128) vs varchar(64)). Widths
- * are covered; defaults, collation and auto-increment are not. See
- * server/schemaCheck.ts for why each was added and how MySQL's equivalent
- * spellings of one type (boolean = tinyint(1)) are kept from false-alarming.
+ * columns does it disagree with about NULL, about TYPE (width included:
+ * varchar(255) vs text, int vs bigint, varchar(128) vs varchar(64)), about the
+ * DEFAULT (a different value, one gained or lost, a lost ON UPDATE), or about
+ * COLLATION (any string column not on utf8mb4_unicode_ci — the project rule,
+ * since drizzle cannot declare one). **Auto-increment is the only thing not
+ * compared.** See server/schemaCheck.ts for why each was added and the two
+ * short, measured lists that stop equivalent spellings from false-alarming
+ * (boolean = tinyint(1); 0 = 0.0000; now() = CURRENT_TIMESTAMP).
+ *
+ * For collation drift the fix is not db:push — a migration does not set a
+ * collation — so the report prints the ALTER TABLE … CONVERT statement.
  *
  * Exits 1 on drift so it can gate a deploy step; 0 when they agree.
  *

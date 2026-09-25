@@ -186,8 +186,16 @@ columns the code expects that it does not have, and — since 2026-09-25 — eve
 column where the database and the schema disagree about NULL (either
 direction) or about its TYPE, width included: `varchar(255)` against `text`,
 `int` against `bigint`, `varchar(128)` against `varchar(64)`, a decimal's
-precision or scale, an enum's value list. It exits non-zero on any of them.
-It does not compare defaults, collation or auto-increment.
+precision or scale, an enum's value list — or about its DEFAULT (a different
+value, a default gained or lost, a lost `ON UPDATE`), or where a string column
+is on a collation other than `utf8mb4_unicode_ci`. It exits non-zero on any of
+them. **Auto-increment is the only thing it does not compare.**
+
+Collation is judged against the project rule rather than the schema, because
+drizzle has no way to declare one (§ "A new table lands on the WRONG
+collation"). And for collation drift the fix is NOT `pnpm db:push` — a
+migration does not set it — so the script prints the `ALTER TABLE … CONVERT`
+statement instead.
 Run it **before** `pnpm db:push` to see what is pending and **after** to confirm
 it took. When in doubt, run `pnpm db:push` anyway — it is idempotent.
 
@@ -345,12 +353,23 @@ That makes the table match its neighbours on any server, whatever that
 server's default happens to be — which also means local and production cannot
 diverge on it.
 
-**Four tables are already on the wrong side of the line** — `ai_usage_daily`,
+**Four tables were on the wrong side of the line** — `ai_usage_daily`,
 `bid_mounting_heights`, `takeoff_height_defaults` and
-`takeoff_mounting_heights`. Nothing joins their strings to anything, so nothing
-has broken. **Leave them**: converting a live table's collation is real risk for
-no current benefit. Check this list before writing a query that joins one of
-their text columns to an older table's.
+`takeoff_mounting_heights` — **on the database this was written against.**
+
+> **Corrected 2026-09-25, by measuring.** Production and the test database
+> both have a database default of `utf8mb4_unicode_ci`, so every table on them
+> — those four included — is already `utf8mb4_unicode_ci`, and not one string
+> column is on anything else. The four exist on `utf8mb4_0900_ai_ci` only on
+> the LOCAL copy (`bidrender_local`, whose database default is
+> `utf8mb4_0900_ai_ci`). `takeoff_height_defaults` is no longer declared in
+> `drizzle/schema.ts`, so three of them are in the schema.
+>
+> So "leave them because converting a live table is risky" no longer applies
+> to production — there is nothing to convert there. On the local copy it is a
+> free choice; converting makes local match production:
+> `ALTER TABLE <table> CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
+> `scripts/schemaDrift.mts` now reports these, and prints those statements.
 
 **The general lesson is about rehearsal, not collations.** The failure was
 invisible to `pnpm check`, to the test suite and to reading the file, and it
@@ -582,10 +601,22 @@ not know about any of this.
 > treated as the same; the list is in `normalizeColumnType`
 > (`server/schemaCheck.ts`) and is short because it was measured, not guessed.
 >
-> **What it still cannot see: defaults, collation and auto-increment.** A
-> migration that only changes one of those reads as "matches" before and after.
-> For one of those, ask `information_schema.COLUMNS` for `COLUMN_DEFAULT` /
-> `COLLATION_NAME` / `EXTRA` before and after and compare the two readings.
+> **Defaults and collation are covered too — added later again the same day.**
+> Defaults are compared as values, through a second short, measured list of
+> equivalent spellings (`canonicalDefault`): a decimal reported at its scale
+> (`0.0000` for `.default("0")`), `false`/`true` as `0`/`1`, the four names
+> of the current time (`now()` on production, `CURRENT_TIMESTAMP` on most of
+> the local copy), and MariaDB's quotes round a literal. Collation is checked
+> against `utf8mb4_unicode_ci`, with no allowlist.
+>
+> **What it still cannot see: auto-increment.** A migration that only adds or
+> removes `AUTO_INCREMENT` reads as "matches" before and after. For one of
+> those, ask `information_schema.COLUMNS` for `EXTRA` before and after and
+> compare the two readings.
+>
+> **Run against the local copy, it reports six string columns in three tables
+> on `utf8mb4_0900_ai_ci`.** That is real — local differs from production —
+> not a false alarm; see § "A new table lands on the WRONG collation".
 
 #### 7. Open the live site, still on the OLD code
 
