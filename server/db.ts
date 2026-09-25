@@ -4435,6 +4435,72 @@ export async function getSheetJumpRows(bidId: number, userId: number) {
   return { plans, sheets, reads };
 }
 
+/** The most pages one search reads back — see `searchSheetText`. */
+export const SEARCH_PAGE_LIMIT = 300;
+
+/**
+ * Pages on these plans whose stored text passes the loose LIKE pattern
+ * (shared/planTextSearch.ts `likePattern`), plus what could NOT be searched.
+ *
+ * Only the pages that pass come back with their text, capped at
+ * SEARCH_PAGE_LIMIT, because a common word on a 500-sheet set would otherwise
+ * move every page's text — megabytes — for one keystroke. `truncated` says the
+ * cap was hit, so the screen never implies it showed everything.
+ *
+ * `scanned` counts pages the reader reached and found no text on; `read`
+ * counts every page it reached. Pages it never reached are the caller's to
+ * work out from the plans' page counts.
+ */
+export async function searchSheetText(
+  bidPdfIds: number[],
+  userId: number,
+  pattern: string
+) {
+  const db = await getDb();
+  if (!db || bidPdfIds.length === 0)
+    return { pages: [], truncated: false, perPlan: [] };
+  const scope = and(
+    inArray(bidPdfSheetText.bidPdfId, bidPdfIds),
+    eq(bidPdfSheetText.userId, userId)
+  );
+  const [pages, perPlan] = await Promise.all([
+    db
+      .select({
+        bidPdfId: bidPdfSheetText.bidPdfId,
+        pageNumber: bidPdfSheetText.pageNumber,
+        text: bidPdfSheetText.text,
+      })
+      .from(bidPdfSheetText)
+      .where(
+        and(
+          scope,
+          eq(bidPdfSheetText.hasTextLayer, true),
+          like(bidPdfSheetText.text, pattern)
+        )
+      )
+      .orderBy(asc(bidPdfSheetText.bidPdfId), asc(bidPdfSheetText.pageNumber))
+      .limit(SEARCH_PAGE_LIMIT + 1),
+    db
+      .select({
+        bidPdfId: bidPdfSheetText.bidPdfId,
+        read: sql<number>`count(*)`,
+        scanned: sql<number>`sum(case when ${bidPdfSheetText.hasTextLayer} then 0 else 1 end)`,
+      })
+      .from(bidPdfSheetText)
+      .where(scope)
+      .groupBy(bidPdfSheetText.bidPdfId),
+  ]);
+  return {
+    pages: pages.slice(0, SEARCH_PAGE_LIMIT),
+    truncated: pages.length > SEARCH_PAGE_LIMIT,
+    perPlan: perPlan.map(p => ({
+      bidPdfId: p.bidPdfId,
+      read: Number(p.read),
+      scanned: Number(p.scanned ?? 0),
+    })),
+  };
+}
+
 /**
  * A field the reading pass found — or found nothing for, which is `value:
  * null` — for one page. Omitting a field leaves whatever is stored alone.

@@ -5898,7 +5898,40 @@ Hand-write it. `drizzle-kit generate` re-emits old hand-written migrations
 - **Across plans on one bid:** a bid can hold several PDFs, so the box searches
   every plan on the bid and says which one a hit is in.
 
-### 17.6 Piece 4 — search the set. NO MIGRATION (the table came with piece 2).
+### 17.6 Piece 4 — search the set. NO MIGRATION (the table came with piece 2). BUILT 2026-09-25
+
+> **Built as below, in the SAME box as piece 3.** Results come in two
+> sections: sheets whose number or title matches, then "On the drawings".
+> Typing is sent 300ms after it stops. The rules are
+> `shared/planTextSearch.ts`, the procedure is `bidPdfs.searchText`, and the
+> tests are `client/src/lib/planTextSearch.test.ts` and
+> `server/sheetIdentity.test.ts`.
+>
+> - **Two steps.** MySQL keeps pages whose text contains the query's
+>   letter-and-digit runs in order (`LIKE '%RP%1%'`, only over this bid's
+>   pages). Then an exact match runs on normalised text: spaces around `-`, `.`
+>   and `/` are removed, and before an inch or foot mark, since `1/2 " EMT` is
+>   how a split `1/2" EMT` arrives. That pass counts the hits and cuts the
+>   snippet. At most 300 pages come back, and the screen says so when that cap
+>   is hit.
+> - **What was NOT searched is stated every time:** "Searched the text of 42
+>   sheets. 6 sheets are scanned with no text and couldn't be searched", plus
+>   any sheets the reader never reached.
+> - **Enter follows piece 3's rule:** it jumps only when one sheet can be
+>   meant. Hover is not a choice.
+> - A sheet already listed by its number is not repeated under "On the
+>   drawings".
+>
+> **Seen on screen, 2026-09-25** (bid "Sheet numbers check", seven plans,
+> real key presses), checked against a direct `LIKE` on the stored text:
+>
+> - `fire alarm`: 6 sheets across 3 plans, the same 6 the direct `LIKE` found,
+>   each with its count (14× on UNC Charlotte E001) and a snippet.
+> - `ct12`: one sheet, and Enter jumped to it.
+> - `zebra crossing`: "Nothing matches", with the coverage line still shown.
+> - The scanned count read **6**: pine st's 5 pages plus a blank page in
+>   Weld's 18-sheet set.
+> - `e1.0` still listed Weld's two E1.0 sheets, and Enter did not pick one.
 
 - **Server-side**, per CLAUDE.md § Responsiveness rule 2:
   `bidPdfs.searchText({ bidId, q })` over `bid_pdf_sheet_text`, returning the

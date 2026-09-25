@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **Search the words on the drawings, across every plan on the bid.** The same
+  box that goes to a sheet number (press G) now also finds any word printed on
+  the sheets: "fire alarm", "CT12", "1/2" EMT". It lists each sheet with how
+  many times the word appears and a line of the text around it. Scanned
+  sheets have no text to search, so the box always says how many it couldn't
+  look at rather than letting "no results" sound like "not on the drawings".
+
 - **Go straight to a sheet by typing its number.** Press G, or click the sheet
   name at the top, and type "E-101", "e101" or even "e-1". Capital letters,
   dashes and leading zeros don't matter, and it searches every plan on the

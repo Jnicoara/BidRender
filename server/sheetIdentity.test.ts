@@ -216,6 +216,55 @@ describe.skipIf(!hasDb)("sheet numbers read at upload", () => {
     ).rejects.toThrow();
   });
 
+  it("searches the drawings' text, and says what it could not search", async () => {
+    const bidPdfId = await newPlan(); // 3 pages
+    const caller = callerFor(USER);
+    await caller.bidPdfs.recordSheetReads({ bidPdfId, pages: firstRead });
+    const db = await getDb();
+    const [pdf] = await db!
+      .select({ bidId: bidPdfs.bidId })
+      .from(bidPdfs)
+      .where(eq(bidPdfs.id, bidPdfId));
+    // A second plan on the same bid that was never read: 4 pages unsearched.
+    await db!.insert(bidPdfs).values({
+      bidId: pdf.bidId,
+      userId: USER,
+      filename: "Unread.pdf",
+      storageKey: `test/${pdf.bidId}/unread-${Math.random()}.pdf`,
+      byteSize: 1024,
+      pageCount: 4,
+      sortOrder: 1,
+    });
+
+    const plan = await caller.bidPdfs.searchText({
+      bidId: pdf.bidId,
+      q: "plan",
+    });
+    expect(plan.hits.map(h => [h.pageNumber, h.number, h.count])).toEqual([
+      [1, "E-101", 1],
+      [2, "E-102", 1],
+    ]);
+    expect(plan.coverage).toEqual({ searched: 2, scanned: 1, unread: 4 });
+
+    // A split token, typed the way a person would.
+    const one = await caller.bidPdfs.searchText({
+      bidId: pdf.bidId,
+      q: "e - 102",
+    });
+    expect(one.hits.map(h => h.pageNumber)).toEqual([2]);
+
+    const none = await caller.bidPdfs.searchText({
+      bidId: pdf.bidId,
+      q: "fire alarm",
+    });
+    expect(none.hits).toEqual([]);
+    expect(none.coverage.scanned).toBe(1);
+
+    await expect(
+      callerFor(OTHER_USER).bidPdfs.searchText({ bidId: pdf.bidId, q: "plan" })
+    ).rejects.toThrow();
+  });
+
   it("another company can neither read nor write a plan's numbers", async () => {
     const bidPdfId = await newPlan();
     await expect(

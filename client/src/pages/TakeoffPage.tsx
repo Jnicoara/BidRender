@@ -2144,8 +2144,10 @@ export default function TakeoffPage({
     // What the list SHOWS for a sheet is its row AND its read number/title.
     if (doc)
       void utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId: doc.id });
-    // …and "go to sheet" matches on both, for every plan on the bid.
+    // …and "go to sheet" matches on both, for every plan on the bid, as does
+    // the drawing-text search, whose hits carry the same numbers and titles.
     void utils.bidPdfs.sheetJumpList.invalidate({ bidId });
+    void utils.bidPdfs.searchText.invalidate();
     void utils.takeoffRuns.measurability.invalidate();
     /*
       A sheet's SCALE is what every traced length on it is worked out from,
@@ -2319,6 +2321,8 @@ export default function TakeoffPage({
         onBatchSaved: () => {
           void utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId });
           void utils.bidPdfs.sheetJumpList.invalidate();
+          // New page text, so a search can now find what it could not.
+          void utils.bidPdfs.searchText.invalidate();
         },
       });
       sheetReadJobs.current.set(bidPdfId, job);
@@ -4176,6 +4180,7 @@ export default function TakeoffPage({
             }}
             onVisibleRange={setGridRange}
             jumpList={jumpList}
+            bidId={bidId}
             onJump={(bidPdfId, pageNumber) => {
               // Another plan on the same bid: switch to it, then the page.
               if (bidPdfId !== doc?.id) setSelectedDocId(bidPdfId);

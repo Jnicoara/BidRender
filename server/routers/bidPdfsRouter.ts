@@ -53,6 +53,12 @@ import {
 } from "../../shared/planScale";
 import { checkPdfUpload } from "../../shared/uploadLimits";
 import { sheetDisplay } from "../../shared/sheetIdentity";
+import {
+  MIN_SEARCH_LENGTH,
+  findInText,
+  likePattern,
+  normaliseForSearch,
+} from "../../shared/planTextSearch";
 import * as db from "../db";
 
 /**
@@ -551,6 +557,95 @@ export const bidPdfsRouter = router({
         }
       }
       return out;
+    }),
+
+  /**
+   * Search the words ON the drawings, across every plan on the bid (viewer
+   * piece 4). Reads the page text stored at upload; stores nothing.
+   *
+   * Returns the matching sheets in plan-then-page order, each with its
+   * number, title, how many times the term appears and a snippet — and, as
+   * important, what was NOT searched: pages with no text (scans) and pages the
+   * reader never reached. A search that silently skips scans reads as "not on
+   * the drawings" when it may well be (CLAUDE.md: an audit reports what it
+   * searched for).
+   */
+  searchText: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        q: z.string().trim().max(200),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const { plans, sheets, reads } = await db.getSheetJumpRows(
+        input.bidId,
+        ctx.scope.dataUserId
+      );
+      const pattern =
+        normaliseForSearch(input.q).length >= MIN_SEARCH_LENGTH
+          ? likePattern(input.q)
+          : null;
+      const found = await db.searchSheetText(
+        plans.map(p => p.id),
+        ctx.scope.dataUserId,
+        pattern ?? "%"
+      );
+
+      // What could not be searched, whatever was typed.
+      let searched = 0;
+      let scanned = 0;
+      let unread = 0;
+      for (const plan of plans) {
+        const counts = found.perPlan.find(c => c.bidPdfId === plan.id);
+        const read = counts?.read ?? 0;
+        const pages =
+          plan.pageCount ?? sheets.filter(s => s.bidPdfId === plan.id).length;
+        searched += read - (counts?.scanned ?? 0);
+        scanned += counts?.scanned ?? 0;
+        unread += Math.max(0, pages - read);
+      }
+      const coverage = { searched, scanned, unread };
+      if (!pattern) return { hits: [], truncated: false, coverage };
+
+      const key = (pdf: number, page: number) => `${pdf}:${page}`;
+      const sheetAt = new Map(
+        sheets.map(s => [key(s.bidPdfId, s.pageNumber), s])
+      );
+      const readAt = new Map(
+        reads.map(r => [key(r.bidPdfId, r.pageNumber), r])
+      );
+      const planOrder = new Map(plans.map((p, i) => [p.id, i]));
+      const hits = found.pages
+        .map(page => {
+          const match = findInText(page.text, input.q);
+          if (!match) return null;
+          const plan = plans.find(p => p.id === page.bidPdfId)!;
+          const display = sheetDisplay(
+            sheetAt.get(key(page.bidPdfId, page.pageNumber)) ?? {
+              name: `Sheet ${page.pageNumber}`,
+              nameSource: "default",
+            },
+            readAt.get(key(page.bidPdfId, page.pageNumber))
+          );
+          return {
+            bidPdfId: page.bidPdfId,
+            filename: plan.filename,
+            pageNumber: page.pageNumber,
+            number: display.number,
+            title: display.title,
+            count: match.count,
+            snippet: match.snippet,
+          };
+        })
+        .filter((hit): hit is NonNullable<typeof hit> => hit !== null)
+        .sort(
+          (a, b) =>
+            (planOrder.get(a.bidPdfId) ?? 0) -
+              (planOrder.get(b.bidPdfId) ?? 0) || a.pageNumber - b.pageNumber
+        );
+      return { hits, truncated: found.truncated, coverage };
     }),
 
   /**

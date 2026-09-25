@@ -91,10 +91,10 @@ function keyOf(entry: Pick<JumpEntry, "bidPdfId" | "pageNumber">) {
  * — an explicit pick. Without one, Enter jumps only when a single sheet can be
  * meant: one exact match, or one match of any kind at all.
  */
-export function enterTarget(
-  matches: readonly JumpMatch[],
+export function enterTarget<T extends { kind: string }>(
+  matches: readonly T[],
   chosen: number | null
-): JumpMatch | null {
+): T | null {
   if (chosen !== null) return matches[chosen] ?? null;
   const exact = matches.filter(m => m.kind === "exact");
   if (exact.length === 1) return exact[0];

@@ -40,6 +40,9 @@ import {
 import { ChevronDown, ChevronLeft, ChevronRight, Ruler } from "lucide-react";
 import type { VisibleRange } from "@/lib/thumbnailQueue";
 import { Input } from "@/components/ui/input";
+import { trpc } from "@/lib/trpc";
+import { useDebounced } from "@/hooks/useDebounced";
+import { MIN_SEARCH_LENGTH, normaliseForSearch } from "@shared/planTextSearch";
 import {
   enterTarget,
   jumpMatches,
@@ -85,8 +88,11 @@ export function SheetChip({
   onVisibleRange,
   jumpList,
   onJump,
+  bidId,
   disabled,
 }: {
+  /** The bid whose plans the box searches. */
+  bidId: number;
   sheets: ChipSheet[];
   /** Numbers and titles read off the plan, by page. */
   identities: Map<number, StoredSheetIdentity>;
@@ -194,7 +200,7 @@ export function SheetChip({
             variant="ghost"
             className="h-7 gap-1.5 px-2 text-xs max-w-[15rem]"
             disabled={disabled}
-            title="Every sheet in this set — or press G and type a sheet number"
+            title="Every sheet in this set — or press G to find a sheet number or any word on the drawings"
           >
             <span className="truncate">{label}</span>
             <span className="font-mono tabular-nums text-muted-foreground shrink-0">
@@ -228,14 +234,14 @@ export function SheetChip({
                 {pages.length} {pages.length === 1 ? "sheet" : "sheets"}
               </p>
               <p className="text-xs text-muted-foreground">
-                Pick by shape, or type a sheet number
+                Pick by shape, or type a sheet number or any word
               </p>
             </div>
             <Input
               ref={jumpInput}
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Go to sheet — E-101, e101, lighting…"
+              placeholder="E-101, or a word on the drawings — RP-1, fire alarm…"
               className="h-8 mt-2 text-sm font-mono"
               aria-label="Go to sheet by number"
               // Enter, arrows and Escape are handled in JumpResults.
@@ -244,6 +250,7 @@ export function SheetChip({
           </div>
           {query.trim() ? (
             <JumpResults
+              bidId={bidId}
               query={query}
               entries={jumpList}
               showPlan={new Set(jumpList.map(j => j.bidPdfId)).size > 1}
@@ -284,15 +291,33 @@ export function SheetChip({
   );
 }
 
+/** One row of results: a sheet found by number, title, or text on it. */
+type ResultRow = JumpEntry & {
+  filename: string;
+  kind: JumpMatch["kind"] | "text";
+  /** Text hits only: how many times, and where. */
+  count?: number;
+  snippet?: string;
+};
+
 /**
- * What "go to sheet" found for what was typed, across every plan on the bid.
+ * What the box found for what was typed, across every plan on the bid, in two
+ * sections: SHEETS whose number or title matches (piece 3, instant, from the
+ * list already loaded), then the words ON THE DRAWINGS (piece 4, a server
+ * search over the page text read at upload, sent 300ms after typing stops).
+ *
+ * One box and one list rather than a second search, because the question is
+ * the same — "where is this?" — and the person should not have to know
+ * whether the thing they typed is a sheet number or a note on a sheet.
  *
  * Enter goes straight there when only one sheet can be meant; when two sheets
  * share a number — real sets do this — both are listed and nothing is chosen
  * until the person picks (lib/sheetJump.ts, `enterTarget`). Nothing found is a
- * sentence, not an error.
+ * sentence, not an error, and it says what could NOT be searched: a scanned
+ * sheet has no text, and silence about it would read as "not on the drawings".
  */
 function JumpResults({
+  bidId,
   query,
   entries,
   showPlan,
@@ -300,18 +325,41 @@ function JumpResults({
   onClear,
   onPick,
 }: {
+  bidId: number;
   query: string;
   entries: (JumpEntry & { filename: string })[];
   /** Say which plan a sheet is in — only when the bid has more than one. */
   showPlan: boolean;
   keys: React.MutableRefObject<((e: React.KeyboardEvent) => void) | null>;
   onClear: () => void;
-  onPick: (match: JumpMatch & { filename: string }) => void;
+  onPick: (match: JumpEntry) => void;
 }) {
-  const matches = useMemo(
+  const sheetMatches = useMemo(
     () => jumpMatches(query, entries) as (JumpMatch & { filename: string })[],
     [query, entries]
   );
+
+  // ── On the drawings ────────────────────────────────────────────────────
+  const typed = query.trim();
+  const settled = useDebounced(typed, 300);
+  const searchable = normaliseForSearch(settled).length >= MIN_SEARCH_LENGTH;
+  const search = trpc.bidPdfs.searchText.useQuery(
+    { bidId, q: settled },
+    // The previous answer stays on screen while the next one loads, rather
+    // than the list emptying on every keystroke (CLAUDE.md § Responsiveness).
+    { enabled: searchable, placeholderData: previous => previous }
+  );
+  const current = searchable && settled === typed && !search.isPlaceholderData;
+  const listed = new Set(
+    sheetMatches.map(m => `${m.bidPdfId}:${m.pageNumber}`)
+  );
+  const textRows: ResultRow[] = searchable
+    ? (search.data?.hits ?? [])
+        // Already listed above by its number or title: once is enough.
+        .filter(h => !listed.has(`${h.bidPdfId}:${h.pageNumber}`))
+        .map(h => ({ ...h, kind: "text" as const }))
+    : [];
+  const matches: ResultRow[] = [...sheetMatches, ...textRows];
   /** The row the person moved to with the arrows — null until they do. */
   const [chosen, setChosen] = useState<number | null>(null);
   const [asked, setAsked] = useState(false);
@@ -336,31 +384,112 @@ function JumpResults({
     if (e.key === "Enter") {
       e.preventDefault();
       const target = enterTarget(matches, chosen);
-      if (target) onPick(target as JumpMatch & { filename: string });
+      if (target) onPick(target);
       else setAsked(true);
     }
   };
   useEffect(() => () => void (keys.current = null), [keys]);
 
-  const exactCount = matches.filter(m => m.kind === "exact").length;
+  const exactCount = sheetMatches.filter(m => m.kind === "exact").length;
+  const coverage = searchable ? search.data?.coverage : undefined;
+  const pending = searchable && !current;
+
+  /**
+   * What could NOT be searched, stated every time there is an answer. A scan
+   * has no text layer, so a term printed on it is invisible to this search.
+   */
+  const coverageLine = coverage && (
+    <p className="px-3 py-1.5 text-[0.7rem] text-muted-foreground border-t border-border">
+      Searched the text of {coverage.searched}{" "}
+      {coverage.searched === 1 ? "sheet" : "sheets"}.
+      {coverage.scanned > 0 && (
+        <>
+          {" "}
+          <span className="text-amber-400/90">
+            {coverage.scanned}{" "}
+            {coverage.scanned === 1 ? "sheet is" : "sheets are"} scanned with no
+            text and couldn’t be searched.
+          </span>
+        </>
+      )}
+      {coverage.unread > 0 && (
+        <>
+          {" "}
+          {coverage.unread}{" "}
+          {coverage.unread === 1 ? "sheet has" : "sheets have"} not been read
+          yet — use “Read” in the sheet list.
+        </>
+      )}
+      {search.data?.truncated &&
+        " Showing the first 300 sheets that contain it."}
+    </p>
+  );
 
   if (matches.length === 0) {
     return (
-      <div className="px-3 py-6 text-sm text-muted-foreground" role="status">
-        No sheet numbered “{query.trim()}” on this bid.{" "}
-        <button
-          type="button"
-          onClick={onClear}
-          className="text-[#F5C518] hover:underline"
-        >
-          Show all sheets
-        </button>
+      <div role="status">
+        <p className="px-3 py-6 text-sm text-muted-foreground">
+          {pending ? (
+            "Searching the drawings…"
+          ) : (
+            <>
+              Nothing matches “{typed}” — no sheet number, title or text on the
+              drawings.{" "}
+              <button
+                type="button"
+                onClick={onClear}
+                className="text-[#F5C518] hover:underline"
+              >
+                Show all sheets
+              </button>
+            </>
+          )}
+        </p>
+        {!pending && coverageLine}
       </div>
     );
   }
 
+  const row = (match: ResultRow, index: number) => (
+    <button
+      key={`${match.kind === "text" ? "t" : "s"}:${match.bidPdfId}:${match.pageNumber}`}
+      type="button"
+      role="option"
+      aria-selected={chosen === index}
+      onClick={() => onPick(match)}
+      // Hover is only a look, never a choice. Found on screen 2026-09-25: a
+      // pointer resting where the list happened to appear set the choice,
+      // and Enter then jumped to one of two sheets sharing a number —
+      // exactly the guess this list exists to avoid. Arrows or a click.
+      className={cn(
+        "w-full text-left px-3 py-1.5 text-sm",
+        chosen === index ? "bg-muted" : "hover:bg-muted/60"
+      )}
+    >
+      <span className="flex items-baseline gap-2">
+        <span className="font-mono font-medium w-20 shrink-0 truncate">
+          {match.number ?? "—"}
+        </span>
+        <span className="flex-1 min-w-0 truncate">{match.title}</span>
+        {match.count !== undefined && (
+          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+            {match.count}×
+          </span>
+        )}
+        <span className="shrink-0 text-xs text-muted-foreground font-mono">
+          {showPlan ? `${match.filename} · ` : ""}p{match.pageNumber}
+        </span>
+      </span>
+      {match.snippet && (
+        <span className="block pl-[5.5rem] text-xs text-muted-foreground truncate">
+          {match.snippet}
+        </span>
+      )}
+    </button>
+  );
+
   return (
-    <div className="max-h-[60vh] overflow-y-auto py-1" role="listbox">
+    <div className="max-h-[60vh] overflow-y-auto" role="listbox">
       {exactCount > 1 && (
         <p
           className={cn(
@@ -369,34 +498,29 @@ function JumpResults({
           )}
           role="status"
         >
-          {exactCount} sheets are numbered {matches[0].number} — pick one.
+          {exactCount} sheets are numbered {sheetMatches[0].number} — pick one.
         </p>
       )}
-      {matches.map((match, index) => (
-        <button
-          key={`${match.bidPdfId}:${match.pageNumber}`}
-          type="button"
-          role="option"
-          aria-selected={chosen === index}
-          onClick={() => onPick(match)}
-          // Hover is only a look, never a choice. Found on screen 2026-09-25: a
-          // pointer resting where the list happened to appear set the choice,
-          // and Enter then jumped to one of two sheets sharing a number —
-          // exactly the guess this list exists to avoid. Arrows or a click.
-          className={cn(
-            "w-full text-left px-3 py-1.5 flex items-baseline gap-2 text-sm",
-            chosen === index ? "bg-muted" : "hover:bg-muted/60"
+      {sheetMatches.map(row)}
+      {searchable && (
+        <>
+          <p className="px-3 pt-2 pb-1 text-[0.7rem] uppercase tracking-wide text-muted-foreground">
+            On the drawings
+            {pending && (
+              <span className="normal-case tracking-normal"> — searching…</span>
+            )}
+          </p>
+          {textRows.map((r, i) => row(r, sheetMatches.length + i))}
+          {current && textRows.length === 0 && (
+            <p className="px-3 pb-1.5 text-xs text-muted-foreground">
+              {sheetMatches.length > 0
+                ? "No other sheet has it in its text."
+                : "Not in the text of any sheet."}
+            </p>
           )}
-        >
-          <span className="font-mono font-medium w-20 shrink-0 truncate">
-            {match.number ?? "—"}
-          </span>
-          <span className="flex-1 min-w-0 truncate">{match.title}</span>
-          <span className="shrink-0 text-xs text-muted-foreground font-mono">
-            {showPlan ? `${match.filename} · ` : ""}p{match.pageNumber}
-          </span>
-        </button>
-      ))}
+          {current && coverageLine}
+        </>
+      )}
     </div>
   );
 }
