@@ -981,19 +981,43 @@ safe:
 before the pricing list uploads, because the list already carries the
 relationship in a Parent column.
 
-### One convention for single-pole breakers: "1-Pole"
+### One convention for single-pole breakers: "Single-Pole" — DONE 2026-09-24
 
-The catalog says `20A 2-Pole breaker` but `20A breaker` for a single pole,
-which reads as though the pole count is optional. **The convention is
-"1-Pole" everywhere** — `20A 1-Pole breaker` — so the two rows are the same
-shape and a brand variant can be named from its parent mechanically.
+Every breaker named by its amperage states its pole count:
+`20A Single-Pole breaker`, `20A Single-Pole AFCI breaker`, `20A 2-Pole
+breaker`, `20A 3-Pole breaker`. Brand variants follow the same pattern
+(`Square D QO 20A Single-Pole breaker`). The amperage stays `20A`, as it is
+everywhere else in the catalog, and it is the only form the size parser reads.
 
-**Nothing is renamed yet, deliberately**, and the rename is part of the
-parent/variant work rather than a tidy-up on its own. When it happens it goes
-through `RENAMED_BASELINE_MATERIALS`, which renames in place — see below, and
-note the file already did exactly this for `20/2 breaker` → `20A 2-Pole
-breaker`. Add the old spoken form as a search alias in the same change, so
-anybody typing the old name still lands on the row.
+**This overrides the entry that stood here from 2026-09-21**, which chose
+"1-Pole" and said the rename would wait for the parent/variant work. Two things
+changed. "Single-Pole" replaced "1-Pole" because that is how a one-pole breaker
+is said and written. And the rename was done on its own, because the bare
+`20A breaker` beside `20A 1-Pole breaker` was already producing duplicate rows
+in the pricing sheet. `ASSEMBLIES_PLAN.md` step 6 says the same. The seed
+file's comment in `server/seed/materials/power.ts` used to argue for the bare
+form, and now says why that was reversed.
+
+It went through `RENAMED_BASELINE_MATERIALS`, so the rows kept their ids, and
+`server/materialsCatalog.test.ts` fails on any amp-rated breaker without a pole
+count. The old names still find the rows in search, because every word of them
+is still in the name. "1-pole" is also a search alias, and the shared search
+table maps "single pole" to 1P and SP.
+
+**Starter assemblies name materials by EXACT name and ignore the rename map.**
+The rename shipped with `baselineAssemblies.ts` updated in the same change. That
+also turned up "20/2 breaker" still named there, a spelling retired by the
+two-pole rename, which had been silently skipping the "200A main panel furnish
+and install" starter on every database seeded since then. A test now fails on
+any starter line that names a renamed spelling.
+
+**Edit the seed name and the rename entry in ONE edit, or stop `pnpm dev`
+first.** `tsx watch` restarts on each save. On 2026-09-24 a restart between
+the `power.ts` edit and the `index.ts` edit seeded the new names as nine fresh
+rows, and every later restart found both names and, correctly, refused to
+merge them. That was only the local database, since a deploy ships both files
+at once. The repair was deleting the nine unreferenced rows so the rename could
+run in place.
 
 **Renaming a shipped material is not a text edit.** Baseline rows are matched by
 name, so changing one inserts a second row and orphans the first, and every

@@ -151,7 +151,7 @@ export const BASELINE_ASSEMBLIES: BaselineAssembly[] = [
       { material: "Duplex receptacle", qty: 1 },
       { material: "Wall plate", qty: 1 },
       { material: "12-2 NM-B", qty: 35 },
-      { material: "20A breaker", qty: 1 },
+      { material: "20A Single-Pole breaker", qty: 1 },
       { material: "Wire nuts", qty: 3 },
     ],
   },
@@ -219,8 +219,12 @@ export const BASELINE_ASSEMBLIES: BaselineAssembly[] = [
     baseLaborHours: 8.0,
     materials: [
       { material: "200A main panel", qty: 1 },
-      { material: "20A breaker", qty: 10 },
-      { material: "20/2 breaker", qty: 2 },
+      { material: "20A Single-Pole breaker", qty: 10 },
+      // Was "20/2 breaker", a name retired by an earlier rename. Starters look
+      // materials up by EXACT name, so this assembly was silently skipped on
+      // every database seeded since then. materialsCatalog.test.ts now fails
+      // on any starter line that names a renamed spelling.
+      { material: "20A 2-Pole breaker", qty: 2 },
       { material: "#8 THHN", qty: 40 },
       { material: "Wire nuts", qty: 6 },
     ],

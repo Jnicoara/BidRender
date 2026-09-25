@@ -52,22 +52,23 @@ const jobTally = new Map<string, number>();
 
   The SHIPPED name wins, whichever reads better, because this sheet cannot
   rename a shipped row: baseline rows are matched by name, and a rename goes
-  through RENAMED_BASELINE_MATERIALS in server/seed/materials. The "1-Pole"
-  rename is already planned there as part of the parent/variant work (CLAUDE.md
-  § Brands); when it lands, these entries flip direction.
+  through RENAMED_BASELINE_MATERIALS in server/seed/materials.
+
+  "15A 1-Pole breaker" -> "15A breaker" used to be here too. The single-pole
+  rename (2026-09-24) made the shipped row "15A Single-Pole breaker", which is
+  exactly the name this sheet generates, so the two now meet by name and need
+  no entry.
 */
 const SAME_AS: Record<string, string> = {
-  // A single-pole breaker IS a 1-pole breaker.
-  "15A 1-Pole breaker": "15A breaker",
-  "20A 1-Pole breaker": "20A breaker",
-  "30A 1-Pole breaker": "30A breaker",
   // One 15A and one 20A circuit in one slot; the order is only how a maker
   // writes the part number (Square D HOMT1520, Eaton BD2015).
   "20/15 tandem breaker": "15/20 tandem breaker",
   // "Dual function" is the makers' word for AFCI + GFCI in one breaker; the
   // shipped combo row already carries it as a search alias.
-  "15A dual-function breaker": "15A AFCI/GFCI combo breaker",
-  "20A dual-function breaker": "20A AFCI/GFCI combo breaker",
+  "15A Single-Pole dual-function breaker":
+    "15A Single-Pole AFCI/GFCI combo breaker",
+  "20A Single-Pole dual-function breaker":
+    "20A Single-Pole AFCI/GFCI combo breaker",
 };
 const canonical = (name: string) => SAME_AS[name] ?? name;
 
@@ -374,7 +375,13 @@ for (const a of [
   "60A",
   "70A",
 ])
-  add(`${a} 1-Pole breaker`, "Breakers", E, true, "Residential — rough-in");
+  add(
+    `${a} Single-Pole breaker`,
+    "Breakers",
+    E,
+    true,
+    "Residential — rough-in"
+  );
 for (const a of [
   "15A",
   "25A",
@@ -416,11 +423,11 @@ for (const a of [
   );
 addAll(
   [
-    "25A AFCI breaker",
-    "30A AFCI breaker",
-    "15A dual-function breaker",
-    "20A dual-function breaker",
-    "30A GFCI breaker",
+    "25A Single-Pole AFCI breaker",
+    "30A Single-Pole AFCI breaker",
+    "15A Single-Pole dual-function breaker",
+    "20A Single-Pole dual-function breaker",
+    "30A Single-Pole GFCI breaker",
     "40A 2-Pole GFCI breaker",
     "100A 2-Pole main breaker",
     "125A 2-Pole main breaker",
@@ -1176,7 +1183,13 @@ addAll(
 const HALF_1P = ["15A", "20A", "30A"];
 const HALF_2P = ["15A", "20A", "30A", "40A", "50A"];
 for (const a of HALF_1P)
-  add(`${a} 1-Pole half-size breaker`, "Breakers", E, true, "Breaker check");
+  add(
+    `${a} Single-Pole half-size breaker`,
+    "Breakers",
+    E,
+    true,
+    "Breaker check"
+  );
 for (const a of HALF_2P)
   add(`${a} 2-Pole half-size breaker`, "Breakers", E, true, "Breaker check");
 // The 3-pole run skipped the odd sizes a rooftop unit or a 3-phase motor
@@ -1255,9 +1268,9 @@ for (const L of LINES) {
   const tag = L.line === L.brand ? L.brand : `${L.brand} ${L.line}`;
   for (const a of B1)
     addBrand(
-      `${tag} ${a} 1-Pole breaker`,
+      `${tag} ${a} Single-Pole breaker`,
       "Breakers",
-      `${a} 1-Pole breaker`,
+      `${a} Single-Pole breaker`,
       L.brand
     );
   for (const a of B2)
@@ -1270,21 +1283,21 @@ for (const L of LINES) {
   if (!L.boltOn) {
     for (const a of ["15A", "20A"]) {
       addBrand(
-        `${tag} ${a} AFCI breaker`,
+        `${tag} ${a} Single-Pole AFCI breaker`,
         "Breakers",
-        `${a} AFCI breaker`,
+        `${a} Single-Pole AFCI breaker`,
         L.brand
       );
       addBrand(
-        `${tag} ${a} GFCI breaker`,
+        `${tag} ${a} Single-Pole GFCI breaker`,
         "Breakers",
-        `${a} GFCI breaker`,
+        `${a} Single-Pole GFCI breaker`,
         L.brand
       );
       addBrand(
-        `${tag} ${a} dual-function breaker`,
+        `${tag} ${a} Single-Pole dual-function breaker`,
         "Breakers",
-        `${a} dual-function breaker`,
+        `${a} Single-Pole dual-function breaker`,
         L.brand
       );
     }
@@ -1353,9 +1366,9 @@ const tagOf = (brand: string, line: string) =>
 // Half-size: THQP only (see § 3b for why no other line gets any).
 for (const a of HALF_1P)
   addBrand(
-    `ABB THQP ${a} 1-Pole half-size breaker`,
+    `ABB THQP ${a} Single-Pole half-size breaker`,
     "Breakers",
-    `${a} 1-Pole half-size breaker`,
+    `${a} Single-Pole half-size breaker`,
     "ABB"
   );
 for (const a of HALF_2P)

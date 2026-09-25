@@ -16,6 +16,7 @@ import {
   RENAMED_BASELINE_MATERIALS,
   RETIRED_BASELINE_MATERIALS,
 } from "./seed/baselineMaterials";
+import { BASELINE_ASSEMBLIES } from "./seed/baselineAssemblies";
 import { MATERIAL_CATEGORIES } from "../drizzle/schema";
 import { materials } from "../drizzle/schema";
 import {
@@ -574,18 +575,80 @@ describe("breakers", () => {
     }
   });
 
-  it("leaves single-pole unmarked", () => {
-    // Pole count is worth saying where it is not one. "1-Pole" on the most
-    // common part in the catalog is noise.
-    expect(named("20A breaker")).toBeDefined();
-    expect(named("20A 1-Pole breaker")).toBeUndefined();
+  it("states the pole count on every amp-rated breaker", () => {
+    // Reversed 2026-09-24. This test used to be "leaves single-pole unmarked"
+    // and pinned the bare "20A breaker" form. Now every breaker named by its
+    // amperage says Single-Pole, 2-Pole or 3-Pole, and a one-pole breaker is
+    // never written "1-Pole". Loops over the shelf rather than naming rows, so
+    // a breaker added later without a pole count fails here.
+    const amped = breakers().filter(m => /^\d+A /.test(m.name));
+    expect(amped.length).toBeGreaterThan(0);
+    for (const m of amped) {
+      expect(m.name, `${m.name} has no pole count`).toMatch(
+        / (Single|2|3)-Pole /
+      );
+      expect(m.name).not.toMatch(/1-Pole/);
+    }
+  });
+
+  it("renames the single-pole rows in place", () => {
+    const old = [
+      "15A breaker",
+      "20A breaker",
+      "30A breaker",
+      "15A AFCI breaker",
+      "20A AFCI breaker",
+      "15A GFCI breaker",
+      "20A GFCI breaker",
+      "15A AFCI/GFCI combo breaker",
+      "20A AFCI/GFCI combo breaker",
+    ];
+    for (const from of old) {
+      const to = RENAMED_BASELINE_MATERIALS[from];
+      expect(to, `${from} is not in the rename map`).toBe(
+        from.replace(/^(\d+A) /, "$1 Single-Pole ")
+      );
+      expect(named(to), `${to} is not shipped`).toBeDefined();
+      expect(named(from), `${from} is still shipped`).toBeUndefined();
+    }
+  });
+
+  it("still finds single-pole breakers by the old and spoken names", () => {
+    // Through SEARCH, for the same reason as the two-pole case above: the
+    // alias string is stripped of anything the name now says.
+    const index = BASELINE_MATERIALS.map((m, i) => ({
+      id: String(i),
+      description: m.name,
+      unit: m.unitOfSale,
+      searchAliases: m.searchAliases,
+    }));
+    const find = (query: string) =>
+      smartSearch(index, query, 8).map(
+        hit => BASELINE_MATERIALS[Number(hit.id)].name
+      );
+    const cases: Array<[string, string]> = [
+      ["20A breaker", "20A Single-Pole breaker"],
+      ["20 amp breaker", "20A Single-Pole breaker"],
+      ["single pole 20", "20A Single-Pole breaker"],
+      ["1-pole 20", "20A Single-Pole breaker"],
+      ["1 pole 20a", "20A Single-Pole breaker"],
+      ["sp 20", "20A Single-Pole breaker"],
+      ["20A AFCI breaker", "20A Single-Pole AFCI breaker"],
+      ["15a gfci breaker", "15A Single-Pole GFCI breaker"],
+      ["dual function 20", "20A Single-Pole AFCI/GFCI combo breaker"],
+    ];
+    for (const [query, expected] of cases) {
+      expect(find(query), `"${query}" should find ${expected}`).toContain(
+        expected
+      );
+    }
   });
 
   it("ships all three protected types, single-pole", () => {
     for (const type of ["AFCI", "GFCI", "AFCI/GFCI combo"]) {
       for (const amps of ["15", "20"]) {
         expect(
-          named(`${amps}A ${type} breaker`),
+          named(`${amps}A Single-Pole ${type} breaker`),
           `${amps}A ${type} missing`
         ).toBeDefined();
       }
@@ -655,5 +718,48 @@ describe("the Panels / Breakers split", () => {
     // across two shelves would separate two rows that are always bought together.
     expect(inCategory("Panels")).toContain("60A cartridge fuse");
     expect(inCategory("Breakers")).not.toContain("60A cartridge fuse");
+  });
+});
+
+/**
+ * Starter assemblies find their materials by EXACT name (seedBaselineAssemblies
+ * in server/db.ts), and they do not read RENAMED_BASELINE_MATERIALS. So an
+ * assembly line still naming a renamed spelling can never resolve, and the
+ * seeder skips the whole assembly with nothing but a console warning.
+ *
+ * That is not hypothetical. "200A main panel furnish and install" named
+ * "20/2 breaker" from the day that row became "20A 2-Pole breaker" until
+ * 2026-09-24, and was missing from every database seeded in between. Nothing
+ * failed, which is why this test exists.
+ *
+ * It asks the narrow question deliberately. Some starters wait on materials
+ * that are not shipped yet and are skipped ON PURPOSE (assemblies.test.ts,
+ * "only seeds assemblies whose materials all exist"), so "every line resolves"
+ * would be the wrong rule. A line naming a spelling that was renamed away is
+ * never on purpose.
+ */
+describe("starter assemblies", () => {
+  it("never name a material by a spelling that was renamed away", () => {
+    const stale = BASELINE_ASSEMBLIES.flatMap(spec =>
+      spec.materials
+        .filter(line => line.material in RENAMED_BASELINE_MATERIALS)
+        .map(
+          line =>
+            `${spec.name}: "${line.material}" is now "${RENAMED_BASELINE_MATERIALS[line.material]}"`
+        )
+    );
+    expect(stale).toEqual([]);
+  });
+
+  it("name only shipped breakers", () => {
+    // Breakers are the rows this rename touched, and every one is shipped.
+    const shipped = new Set(BASELINE_MATERIALS.map(m => m.name));
+    const unresolved = BASELINE_ASSEMBLIES.flatMap(spec =>
+      spec.materials
+        .filter(line => /breaker/i.test(line.material))
+        .filter(line => !shipped.has(line.material))
+        .map(line => `${spec.name}: "${line.material}"`)
+    );
+    expect(unresolved).toEqual([]);
   });
 });

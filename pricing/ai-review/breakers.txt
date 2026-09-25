@@ -2,9 +2,6 @@ Category: Breakers
 Items: 85
 
 Category | Name | Size
-Breakers | 15A 1-Pole half-size breaker | 15A
-Breakers | 20A 1-Pole half-size breaker | 20A
-Breakers | 30A 1-Pole half-size breaker | 30A
 Breakers | 15/15 tandem breaker | -
 Breakers | 15/20 tandem breaker | -
 Breakers | 15A 2-Pole half-size breaker | 15A
@@ -14,25 +11,28 @@ Breakers | 40A 2-Pole half-size breaker | 40A
 Breakers | 50A 2-Pole half-size breaker | 50A
 Breakers | 20/20 tandem breaker | -
 Breakers | 30/30 tandem breaker | -
-Breakers | 25A 1-Pole breaker | 25A
-Breakers | 35A 1-Pole breaker | 35A
-Breakers | 40A 1-Pole breaker | 40A
-Breakers | 45A 1-Pole breaker | 45A
-Breakers | 50A 1-Pole breaker | 50A
-Breakers | 60A 1-Pole breaker | 60A
-Breakers | 70A 1-Pole breaker | 70A
-Breakers | 15A breaker | 15A
-Breakers | 20A breaker | 20A
-Breakers | 30A breaker | 30A
-Breakers | 15A AFCI breaker | 15A
-Breakers | 20A AFCI breaker | 20A
-Breakers | 25A AFCI breaker | 25A
-Breakers | 30A AFCI breaker | 30A
-Breakers | 15A GFCI breaker | 15A
-Breakers | 20A GFCI breaker | 20A
-Breakers | 30A GFCI breaker | 30A
-Breakers | 15A AFCI/GFCI combo breaker | 15A
-Breakers | 20A AFCI/GFCI combo breaker | 20A
+Breakers | 15A Single-Pole half-size breaker | 15A
+Breakers | 20A Single-Pole half-size breaker | 20A
+Breakers | 30A Single-Pole half-size breaker | 30A
+Breakers | 15A Single-Pole breaker | 15A
+Breakers | 20A Single-Pole breaker | 20A
+Breakers | 25A Single-Pole breaker | 25A
+Breakers | 30A Single-Pole breaker | 30A
+Breakers | 35A Single-Pole breaker | 35A
+Breakers | 40A Single-Pole breaker | 40A
+Breakers | 45A Single-Pole breaker | 45A
+Breakers | 50A Single-Pole breaker | 50A
+Breakers | 60A Single-Pole breaker | 60A
+Breakers | 70A Single-Pole breaker | 70A
+Breakers | 15A Single-Pole AFCI breaker | 15A
+Breakers | 20A Single-Pole AFCI breaker | 20A
+Breakers | 25A Single-Pole AFCI breaker | 25A
+Breakers | 30A Single-Pole AFCI breaker | 30A
+Breakers | 15A Single-Pole GFCI breaker | 15A
+Breakers | 20A Single-Pole GFCI breaker | 20A
+Breakers | 30A Single-Pole GFCI breaker | 30A
+Breakers | 15A Single-Pole AFCI/GFCI combo breaker | 15A
+Breakers | 20A Single-Pole AFCI/GFCI combo breaker | 20A
 Breakers | 15A 2-Pole breaker | 15A
 Breakers | 20A 2-Pole breaker | 20A
 Breakers | 25A 2-Pole breaker | 25A

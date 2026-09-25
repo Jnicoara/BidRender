@@ -71,6 +71,18 @@ export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
   "60/2 breaker": "60A 2-Pole breaker",
   "70/2 breaker": "70A 2-Pole breaker",
   "100/2 breaker": "100A 2-Pole breaker",
+  // Single-pole now states its pole count as well, so every breaker row reads
+  // the same way (2026-09-24, see power.ts). "Single-Pole", not "1-Pole": it is
+  // what is said and written for a one-pole breaker.
+  "15A breaker": "15A Single-Pole breaker",
+  "20A breaker": "20A Single-Pole breaker",
+  "30A breaker": "30A Single-Pole breaker",
+  "15A AFCI breaker": "15A Single-Pole AFCI breaker",
+  "20A AFCI breaker": "20A Single-Pole AFCI breaker",
+  "15A GFCI breaker": "15A Single-Pole GFCI breaker",
+  "20A GFCI breaker": "20A Single-Pole GFCI breaker",
+  "15A AFCI/GFCI combo breaker": "15A Single-Pole AFCI/GFCI combo breaker",
+  "20A AFCI/GFCI combo breaker": "20A Single-Pole AFCI/GFCI combo breaker",
 };
 
 /**

@@ -114,7 +114,7 @@ describe.skipIf(!hasDb)("baseline material seeding", () => {
     await seedBaselineMaterials();
     const rows = await getLibraryMaterials(USER);
     const duplicated = rows.filter(
-      r => r.userId === null && r.name === "20A breaker"
+      r => r.userId === null && r.name === "20A Single-Pole breaker"
     );
     expect(duplicated).toHaveLength(1);
   });

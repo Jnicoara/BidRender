@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-24]
 
+- **Every breaker now says how many poles it has.** "20A breaker" is now "20A
+  Single-Pole breaker", and the single-pole AFCI, GFCI and combo breakers read
+  the same way ("20A Single-Pole AFCI breaker"), matching the 2-Pole and 3-Pole
+  rows beside them. The rows are renamed in place, so nothing already built on
+  them changes, and typing the old name, "single pole", "1 pole" or "sp" still
+  finds them. Along the way, a starter assembly — "200A main panel furnish and
+  install" — had been quietly missing from new accounts because it asked for a
+  breaker by a name retired weeks ago; it now seeds again, and a test stops that
+  from happening a second time.
+
 - **Duplicate breakers removed from the pricing sheet, so nothing gets priced
   twice.** Three pairs were the same breaker written two ways — "15A breaker"
   and "15A 1-Pole breaker" (also 20A and 30A), "15/20" and "20/15 tandem", and

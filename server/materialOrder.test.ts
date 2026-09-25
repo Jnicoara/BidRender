@@ -442,19 +442,23 @@ describe("breakers sort by pole class, then protection, then size", () => {
       .sort(compareMaterials)
       .map(r => r.name);
 
-  it("runs tandem, 1-pole, 2-pole, 3-pole", () => {
+  // Written with the names the catalog ships since 2026-09-24 — "Single-Pole",
+  // not "1-Pole" and not the bare "20A breaker" — so these cases prove the
+  // words actually on the shelf land in the single-pole class, rather than a
+  // spelling nobody uses.
+  it("runs tandem, single-pole, 2-pole, 3-pole", () => {
     // 3-Pole had no test of its own, so it fell through to the single-pole
     // rank and the shelf read 1-Pole, 3-Pole, AFCI, GFCI, then 2-Pole.
     expect(
       shelf([
         "20A 3-Pole breaker",
         "20A 2-Pole breaker",
-        "20A 1-Pole breaker",
+        "20A Single-Pole breaker",
         "20/20 tandem breaker",
       ])
     ).toEqual([
       "20/20 tandem breaker",
-      "20A 1-Pole breaker",
+      "20A Single-Pole breaker",
       "20A 2-Pole breaker",
       "20A 3-Pole breaker",
     ]);
@@ -464,24 +468,26 @@ describe("breakers sort by pole class, then protection, then size", () => {
     // "15/15" is two circuits, not an amperage, so there is nothing for the
     // size parser to strip — which made every tandem look like an accessory
     // and sent the lot to the end of the shelf.
-    expect(shelf(["20A 1-Pole breaker", "15/15 tandem breaker"])[0]).toBe(
+    expect(shelf(["20A Single-Pole breaker", "15/15 tandem breaker"])[0]).toBe(
       "15/15 tandem breaker"
     );
   });
 
-  it("puts plain before AFCI, GFCI, then dual-function, inside a pole class", () => {
+  it("puts plain before AFCI, GFCI, then combo, inside a pole class", () => {
     expect(
       shelf([
-        "20A GFCI breaker",
-        "20A dual-function breaker",
-        "20A AFCI breaker",
-        "20A breaker",
+        "20A Single-Pole GFCI breaker",
+        "20A Single-Pole AFCI/GFCI combo breaker",
+        "20A Single-Pole AFCI breaker",
+        "20A Single-Pole breaker",
+        "15A Single-Pole AFCI breaker",
       ])
     ).toEqual([
-      "20A breaker",
-      "20A AFCI breaker",
-      "20A GFCI breaker",
-      "20A dual-function breaker",
+      "20A Single-Pole breaker",
+      "15A Single-Pole AFCI breaker",
+      "20A Single-Pole AFCI breaker",
+      "20A Single-Pole GFCI breaker",
+      "20A Single-Pole AFCI/GFCI combo breaker",
     ]);
   });
 
@@ -491,10 +497,10 @@ describe("breakers sort by pole class, then protection, then size", () => {
         "Breaker filler plate",
         "20A 3-Pole breaker",
         "Breaker handle tie",
-        "15A 1-Pole breaker",
+        "15A Single-Pole breaker",
       ])
     ).toEqual([
-      "15A 1-Pole breaker",
+      "15A Single-Pole breaker",
       "20A 3-Pole breaker",
       "Breaker filler plate",
       "Breaker handle tie",

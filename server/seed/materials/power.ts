@@ -10,9 +10,16 @@
  * rows are matched by name, so editing this string alone would have inserted a
  * second row and orphaned every assembly pointing at the first.
  *
- * Single-pole keeps the bare "20A breaker" form. Adding "1-Pole" to it would be
- * noise on the most common part in the catalog — pole count is worth saying
- * where it is not one.
+ * Single-pole says so too: "20A Single-Pole breaker", "20A Single-Pole AFCI
+ * breaker". Changed 2026-09-24. This comment used to argue the opposite — that
+ * "1-Pole" on the most common part in the catalog would be noise — and the bare
+ * "20A breaker" form it defended is why a single-pole row and its brand
+ * variants could not be named from one pattern, and why "15A breaker" sat
+ * beside "15A 1-Pole breaker" in the pricing sheet as two rows for one part.
+ * Every breaker now states its pole count, and a one-pole breaker says
+ * "Single-Pole" rather than "1-Pole" because that is how it is said and
+ * written. The old names are in RENAMED_BASELINE_MATERIALS, and "20A breaker"
+ * still finds the row, because every word of it is still in the name.
  *
  * ── Panels and Breakers are separate shelves ─────────────────────────────────
  * A panel is a box you hang once; a breaker is a part you stock by the dozen.
@@ -35,10 +42,10 @@ const TWO_POLE_SLANG = "2 pole double pole two pole dp 240 volt 240v";
 
 const singlePole: BaselineMaterial[] = ["15", "20", "30"].map(amps => ({
   ...gear("Breakers"),
-  name: `${amps}A breaker`,
+  name: `${amps}A Single-Pole breaker`,
   searchAliases: aliases(
     `${amps} amp`,
-    "single pole one pole 1p sp",
+    "single pole one pole 1p sp 1-pole",
     BREAKER_SLANG
   ),
 }));
@@ -90,10 +97,10 @@ const PROTECTED_TYPES: Protected[] = [
 const protectedSingle: BaselineMaterial[] = PROTECTED_TYPES.flatMap(type =>
   ["15", "20"].map(amps => ({
     ...gear("Breakers"),
-    name: `${amps}A ${type.suffix} breaker`,
+    name: `${amps}A Single-Pole ${type.suffix} breaker`,
     searchAliases: aliases(
       `${amps} amp`,
-      "single pole one pole 1p sp",
+      "single pole one pole 1p sp 1-pole",
       type.slang,
       BREAKER_SLANG
     ),

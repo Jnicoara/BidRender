@@ -135,7 +135,7 @@ uploads**, because `pricing/starter-catalog-pricing.xlsx` already carries the
 relationship in a Parent column and 407 branded rows are waiting on somewhere
 to put it.
 
-**The shape.** A generic parent — "20A 1-Pole breaker" — with brand variants
+**The shape.** A generic parent — "20A Single-Pole breaker" — with brand variants
 underneath it: Square D Homeline, Square D QO, Eaton BR, Eaton CH, Siemens, ABB,
 Leviton, plus the bolt-on lines QOB, BAB, BQD, THQB. Each is its own family and
 they do not interchange, which is why brand is a real property here and nowhere
@@ -186,9 +186,15 @@ variant does. So pricing resolves parent → preferred brand → variant, and:
   than silently picking the cheapest or the first. A plausible number nobody
   chose is the failure the whole $0 convention exists to prevent.
 
-**6. The "1-Pole" rename, through `RENAMED_BASELINE_MATERIALS`.** "20A breaker"
-becomes "20A 1-Pole breaker" so parents and variants can be named from each
-other mechanically. That map renames IN PLACE — the row keeps its id, so every
+**6. The single-pole rename — DONE 2026-09-24, ahead of this step and in a
+different word.** "20A breaker" became "20A Single-Pole breaker", not "20A
+1-Pole breaker", and the protected single-pole rows became "20A Single-Pole
+AFCI breaker" and so on. It shipped on its own because the bare name was
+already producing duplicate rows in the pricing sheet. CLAUDE.md § "One
+convention for single-pole breakers" records why it changed from what this step
+said. The original text follows, kept because the reasoning about renaming in
+place still holds. "20A breaker" becomes "20A 1-Pole breaker" so parents and
+variants can be named from each other mechanically. That map renames IN PLACE — the row keeps its id, so every
 assembly, kit and takeoff stamp pointing at it is unaffected — and the file
 already did this for "20/2 breaker" → "20A 2-Pole breaker". Add the old name as
 a search alias in the same change.
