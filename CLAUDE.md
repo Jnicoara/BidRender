@@ -1658,6 +1658,15 @@ Equal-sized pieces are an R2 rule, not a preference, and they are what make a
 piece number map to a byte range by arithmetic.
 
 **Coming down: one long-lived link, and it must be byte-identical.**
+
+> **NOT WORKING — measured 2026-09-25.** Every plan downloads WHOLE before it
+> draws: 270.4MB in one request for a 500-sheet set. The worker passes pdf.js a
+> string url, pdf.js resolves it against `window.location`, a Web Worker has no
+> `window`, and `TakeoffPage` silently falls back to `fetch()` of the entire
+> file. The byte-range design below is right; it has most likely never run
+> since it was added on 2026-08-15. Fix and measurements:
+> `references/plan-viewer-overhaul.md` § 17.2. Remove this note when it ships.
+
 `planViewerUrl` hands pdf.js a 12-hour signed R2 link so page loads skip this
 server entirely. `viewerUrlWindow` pins the signing time AND the expiry to a
 fixed boundary so re-minting inside the window returns the same string. Pinning

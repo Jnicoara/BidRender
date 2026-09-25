@@ -366,27 +366,28 @@ Each phase ships and gets used before the next starts.
 > **Re-ordered 2026-09-17 after testing Phase 1 on the live site.** The order
 > below is the current one; § 4.1 records what the testing changed and why.
 
-| Phase   | What                                                                           | DB change                |
-| ------- | ------------------------------------------------------------------------------ | ------------------------ |
-| **1**   | ~~Zoom, pan, and the three viewer bugs~~ **shipped**                           | No                       |
-| **1a**  | ~~Page-flip fit bug + tool discoverability~~ **shipped**                       | **No**                   |
-| **2**   | ~~Two-point scale calibration~~ **shipped**                                    | No (reuses `scaleRatio`) |
-| **3**   | ~~Sharp re-render of the visible area~~ **shipped**                            | **No**                   |
-| **4**   | ~~The layout: top bar, collapsing panels, focus mode~~ **shipped**             | **No**                   |
-| **4b**  | Measure-only tool                                                              | **No**                   |
-| **5**   | **Verticals on runs — the money phase**                                        | **Yes**                  |
-| **6**   | Group row, plain counting, and marks you can tell apart — § 5e                 | **Yes** — count groups   |
-| **6b**  | **The bridge: counts onto the bid, then levels 3 and 2** — § 5f                | **Yes** (small)          |
-| **6c**  | Takeoff-only jobs: stop nagging a finished count — § 5h                        | **Yes** (one column)     |
-| **7**   | Run settings: allowances, materials, sizes, ground                             | **Yes**                  |
-| **8**   | **Verticals on stamps**                                                        | **Yes** (small)          |
-| **9**   | Editing runs: drag a vertex, insert/remove points                              | No                       |
-| **9a**  | **AI-assisted legend capture** — see § 9, and § 9.6 for why it precedes 10     | **Yes** (small)          |
-| **10**  | AI reader tiling, and the daily-limit question with it — **gated on § 15**     | No                       |
-| **10b** | **AI-suggested known distances for calibration** — see § 13                    | No                       |
-| **11**  | Tablet and touch                                                               | No                       |
-| **12**  | **Alternates and allowances** — add/deduct priced apart from the base — § 5g   | **Yes**                  |
-| **13**  | Per-bid proposal breakdown: where the choice is STORED, then the shapes — § 5g | **Yes** (small)          |
+| Phase    | What                                                                              | DB change                |
+| -------- | --------------------------------------------------------------------------------- | ------------------------ |
+| **1**    | ~~Zoom, pan, and the three viewer bugs~~ **shipped**                              | No                       |
+| **1a**   | ~~Page-flip fit bug + tool discoverability~~ **shipped**                          | **No**                   |
+| **2**    | ~~Two-point scale calibration~~ **shipped**                                       | No (reuses `scaleRatio`) |
+| **3**    | ~~Sharp re-render of the visible area~~ **shipped**                               | **No**                   |
+| **4**    | ~~The layout: top bar, collapsing panels, focus mode~~ **shipped**                | **No**                   |
+| **4b**   | Measure-only tool                                                                 | **No**                   |
+| **5**    | **Verticals on runs — the money phase**                                           | **Yes**                  |
+| **6**    | Group row, plain counting, and marks you can tell apart — § 5e                    | **Yes** — count groups   |
+| **6b**   | **The bridge: counts onto the bid, then levels 3 and 2** — § 5f                   | **Yes** (small)          |
+| **6c**   | Takeoff-only jobs: stop nagging a finished count — § 5h                           | **Yes** (one column)     |
+| **7**    | Run settings: allowances, materials, sizes, ground                                | **Yes**                  |
+| **8**    | **Verticals on stamps**                                                           | **Yes** (small)          |
+| **9**    | Editing runs: drag a vertex, insert/remove points                                 | No                       |
+| **9a**   | **AI-assisted legend capture** — see § 9, and § 9.6 for why it precedes 10        | **Yes** (small)          |
+| **10**   | AI reader tiling, and the daily-limit question with it — **gated on § 15**        | No                       |
+| **10b**  | **AI-suggested known distances for calibration** — see § 13                       | No                       |
+| **11**   | Tablet and touch                                                                  | No                       |
+| **12**   | **Alternates and allowances** — add/deduct priced apart from the base — § 5g      | **Yes**                  |
+| **13**   | Per-bid proposal breakdown: where the choice is STORED, then the shapes — § 5g    | **Yes** (small)          |
+| **V1–4** | Viewer batch: big sets, sheet numbers, go-to, search — § 17 (independent of 5–13) | **V2 only** (additive)   |
 
 > **Phase 6 was split on 2026-09-18 and 6c inserted.** The bridge (6b) is the
 > largest piece in this document and is not a step inside an appearance phase —
@@ -5487,3 +5488,357 @@ the same select-and-assign flow and the same flag.
 That also keeps CLAUDE.md § "manual mode is the product" true by construction:
 the manual path is not a degraded version of the AI path, it is the SAME path,
 and the AI just fills it faster.
+
+---
+
+## 17. The viewer batch: big sets, sheet numbers, go-to, search — PLANNED 2026-09-25, not built
+
+**Asked for 2026-09-25:** sheet thumbnails in the sheet list; the sheet number
+and title read off each page by plain code, no AI (`E-101  Lighting Plan`); type
+a number to jump to it; search across the set; and smooth on a 500+ page set.
+**Planning only. Nothing in this section is built.**
+
+Four pieces, each deployable on its own, in this order: **(1) big sets open
+fast, (2) sheet numbers and titles, (3) go to a sheet, (4) search the set.**
+Only piece 2 changes the database, and all of it is additive. § 17.7 has the
+table.
+
+### 17.1 What already exists, and what this conflicts with
+
+Searched first, per CLAUDE.md § "Where decisions live". Grepped
+`thumbnail|sheet number|title block|search|large set` across this file,
+`takeoff-spec.md`, `CHANGELOG.md` and `todo.md`, and read the code the hits
+pointed at.
+
+| Asked for               | What exists                                                                                                                                                                                                                                                           |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Thumbnails              | **Built, in the sheet CHIP's grid, not in the sheet list** (§ 4a, `SheetChip.tsx`). 360px renders, drawn one at a time, only while the grid is open. `SheetIndex.tsx`, the left-hand list, is names only.                                                             |
+| Sheet number and title  | **Names come from PDF bookmarks only** (`ensureSheets`, `bid_pdf_sheets.name`, `nameSource` = `bookmark` / `default` / `user`). No page labels, no title block, no separate number. A set with no bookmarks is `Sheet 1` … `Sheet 500`. Renaming works and is sticky. |
+| Fix a wrong one by hand | **Exists for the name** — rename in place in `SheetIndex`, sticky against every reopen. There is no number field to fix.                                                                                                                                              |
+| Jump to a sheet         | Prev/next, the list, the grid, arrow keys and Home/End. **Nothing typed.**                                                                                                                                                                                            |
+| Search the set          | **Nothing.** The viewer extracts text for the VISIBLE page only (`pageText`, for scale detection and the plan reader) and keeps it in a ref.                                                                                                                          |
+| 500+ pages              | `ensureSheets` accepts 10,000. The list and the grid render every row with no virtualisation. Range loading is designed and documented (CLAUDE.md § "Large plan sets", `shared/pdfRangeLoading.ts`) — **and does not work; see 17.2.**                                |
+
+**Conflicts, and what this plan does about each:**
+
+- **`takeoff-spec.md` V15 says "Page thumbnails … skip — the named sheet list
+  covers it"** (§ 9 there) and lists V15 as Missing. § 4a overrode that on
+  2026-09-17 and built the grid, and nothing went back to V15. Corrected there
+  in the same commit as this section, pointing here.
+- **§ 4a: "The thumbnails must be big enough to recognise a sheet by its
+  SHAPE … a postage-stamp grid would waste the whole idea."** A thumbnail in a
+  240px list, beside a name, is a postage stamp. So thumbnails reach the list
+  as a **pictures mode** — one full-width picture per row, number and title
+  under it — not as a 48px icon beside each name. That keeps § 4a's reason
+  intact. **This is the one choice in the batch that is the owner's rather than
+  mine** — see 17.3.
+- **§ 4a: "Thumbnails are rendered ONLY while the grid is open."** Kept. What
+  changes is the ORDER (17.3).
+- **`takeoff-spec.md` V20 level 1** (revision awareness) plans to read the
+  revision "from the text the viewer already pulls off every page". The viewer
+  pulls text off the visible page only. Piece 2's reading pass is the thing
+  V20 needs, and the title-block reader is where a revision reader would go.
+  Nothing here builds V20.
+- **§ 5c ("the app suggests, the estimator confirms") does not govern this** —
+  it is written for AI and for anything with money attached, and a sheet number
+  is neither. Two of its rules are borrowed anyway, because they are right
+  here too: a read never overwrites something a person typed, and a reading the
+  app is unsure of says so on screen.
+- **CLAUDE.md § "AI features"** — nothing in this batch calls a model. The
+  reader is plain code over the PDF's text layer.
+
+### 17.2 THE FINDING: large sets download whole, and have since 2026-08-15
+
+**Measured 2026-09-25 on the running app.** Opening a 270MB, 500-page set made
+**one request for all 270.4MB** before the first sheet drew. The byte-range
+loading that CLAUDE.md § "Large plan sets" describes, and that the CHANGELOG
+entry "Opening a large plan is faster, and no longer downloads the whole drawing
+set" announces, **does not run.**
+
+**Why.** The worker hands pdf.js the url as a STRING. pdf.js 5.4.296 resolves a
+string with `URL.parse(val, window.location)` (`getUrlProp`,
+`node_modules/pdfjs-dist/build/pdf.mjs:7176`), and **a Web Worker has no
+`window`**. The worker posts `ReferenceError: window is not defined`,
+`TakeoffPage` catches it as `rangeError` and falls back to `fetch(doc.url)` of
+the whole file, and nothing logs the first failure. pdfjs-dist has been 5.4.296
+since before range loading was added (`5940988`, 2026-08-15), so it has most
+likely never worked. **Measured locally against disk storage. The R2 path goes
+through the same `getUrlProp` line, so production should behave the same way,
+but I did not measure it on the live site.**
+
+**The fix is one line**: pass `new URL(msg.url, self.location.href)`, which
+pdf.js accepts without touching `window`. It was tested by shimming
+`window.location` in a throwaway worker around `getDocument` only: the same set
+then opened over byte ranges and rendered and extracted normally.
+
+**What it is worth, measured in Chrome through the app's own worker, localhost:**
+
+|                              | Today (whole download)                                | Fixed (byte ranges)                                   |
+| ---------------------------- | ----------------------------------------------------- | ----------------------------------------------------- |
+| Bytes before the first sheet | **270.4 MB**                                          | **~2.8 MB** (open 1.0 MB + page 1; Node count, below) |
+| Open, localhost              | 0.7s to download, then parse                          | **0.28s** open, **0.9s** to page 1 drawn              |
+| At 50 Mbit/s (office)        | ~43s before anything draws (arithmetic, not measured) | ~1s plus latency                                      |
+| At 10 Mbit/s (phone tether)  | **~3.6 minutes** (arithmetic)                         | a few seconds                                         |
+| A 2GB set                    | 2GB into the tab, then into the worker                | the pages looked at                                   |
+
+**The silence is the second fault.** The fallback exists "for ordinary-sized
+files", but nothing enforces "ordinary-sized". Piece 1 caps it: above
+`PDF_AUTOFETCH_LIMIT_BYTES` the fallback refuses and says why, rather than
+quietly pulling a gigabyte. And the url becomes a `URL` inside
+`pdfRangeLoadOptions`, in `shared/`, where vitest can reach it. A test there is
+the forcing function; a comment in the worker would only be a reminder.
+
+### 17.3 Piece 1 — big sets open fast. NO MIGRATION.
+
+**Why first:** every later piece loads pages, and it fixes a measured fault
+that costs users minutes on every large set today. It is also the smallest
+piece.
+
+1. **Range loading actually works** — the `URL` object, the capped fallback, a
+   `console.warn` when range loading fails, and the test (17.2).
+2. **Virtualise the sheet list and the grid.** At 500 sheets the list is ~4,500
+   DOM nodes and the open grid ~4,000 more (measured). `@tanstack/react-virtual`
+   is already a dependency. CLAUDE.md § Responsiveness rule 2 asks for exactly
+   this. The rows are one small query per plan, so the fetch stays whole and
+   only the DOM is windowed.
+3. **Thumbnails: visible first.** Today the grid draws sheets 1, 2, 3 … in
+   order. Measured: **~0.6s median per thumbnail** (12 took 9.3s; one took
+   3.2s), so on a 500-sheet set, scrolling the grid to sheet 400 means **about
+   four minutes** of waiting for the 399 above it. Draw what is on screen, then
+   its neighbours, and drop what has scrolled away from the queue. Each render
+   still goes one at a time through the one worker (§ 4a's reason stands).
+4. **Thumbnails in the sheet list, as a pictures mode.** A names | pictures
+   toggle at the top of the list. Pictures mode shows one full-width picture
+   per row (~220px at the list's default width) with the number and title
+   under it. It draws visible-first on the same queue as the grid, and only
+   while the list is open. Remembered per user, like the fold. **Owner's call:**
+   if thumbnails-beside-names is what was meant, § 4a says why that would be a
+   step back, and it should be decided rather than defaulted.
+
+**Holding thumbnails:** as JPEG data URLs, the grid measured **~24KB each**, so
+~12MB for 500. That is fine in memory. Persisting them, so a second estimator
+or a reload does not redraw them, is **not in this batch**. CLAUDE.md records
+that the old IndexedDB layer was removed on purpose. Revisit it only if people
+actually open the grid on big sets often enough for the redraw to matter.
+
+### 17.4 Piece 2 — sheet numbers and titles. ADDITIVE MIGRATION.
+
+#### How real sets lay it out — looked at, not assumed
+
+Ten real sets. Six were public electrical bid sets found on 2026-09-25 (Weld
+County ×2, UNC Charlotte, Longview Public Schools, a Collier County airport
+job, Midland ON), four more were held out for a blind check (Colusa County, a
+Delaware school addendum, Univ. of Kentucky, a NSW school), plus the two
+fixtures already in `.local-storage`.
+
+- **The number is the biggest text in the bottom-right corner**, on every
+  CAD-published North American sheet looked at. It is 2–9× the height of the
+  next discipline-shaped token (`E101` at 88pt against 10pt callouts). The
+  title sits just above it, often under a small `SHEET TITLE` / `DRAWING TITLE`
+  label, and runs to one to three lines.
+- **Two layouts:** a box in the corner (Midland, UNCC, Dominguez), or a
+  **vertical strip down the right edge with the TITLE ROTATED 90°** (Weld,
+  Old Blueridge). The reader has to handle rotated text and `/Rotate 270` pages
+  (both Weld sets are 270).
+- **Numbers vary:** `E-101`, `E101`, `E1.01`, `E0.1`, `E1.1A`, `ED-101B`,
+  `AD-101` (drawn as three separate text items: `AD`, `-`, `101`). The NSW set
+  uses long ISO 19650 codes in a strip, which is a different world.
+- **Better than any reading, when present: the PDF's own page labels.** 4 of
+  the 10 sets carry them (`E-001 - ELECTRICAL SPECIFICATIONS`), written by the
+  CAD publisher, and 3 carry sheet-named bookmarks. One set's labels were page
+  numbers from a bigger set (`18`, `19` …), so a bare number is not a label.
+  **The app reads neither labels nor sheet-number-shaped bookmarks apart
+  today.**
+- **The cover sheet's drawing index** (number → title) was on 4 of the 6. It is
+  a free cross-check: a read number that is in the index is corroborated, and
+  the index's title is often cleaner than the title block's. **Not measured,
+  only seen.**
+- **Real sets contain mistakes.** Weld's 18-sheet set has `E1.0` on two
+  different sheets. Go-to must handle a duplicate (17.5).
+
+#### How reliable plain code is — measured, with a prototype
+
+The prototype (`references/sheet-reader-prototype.mjs`, kept as a record, not
+wired in) finds discipline-shaped tokens in the bottom-right 40%, ranks by
+height and corner distance, calls it **high confidence** when the winner is
+1.4× the height of any rival, and takes the title from lines just above it
+that do NOT repeat across most sheets. The project name repeats on every
+sheet, and the title does not. Truth was the PDF's own page labels or
+bookmarks.
+
+| Sets                                 | Sheet number                          | Title                         |
+| ------------------------------------ | ------------------------------------- | ----------------------------- |
+| 6 tuning sets, 82 sheets with labels | **82 / 82**                           | 80 / 82                       |
+| 4 held-out sets, 22 drawing sheets   | **7 / 22 right, 13 nothing, 2 wrong** | ~1 in 4                       |
+| Old Blueridge (OCR'd scan)           | 5 / 5                                 | unusable (OCR noise, rotated) |
+| pine st (scan, no text layer)        | 0 / 5 — nothing to read               | —                             |
+
+**Read that table carefully, because the first row flatters.** The prototype
+was tuned on those six sets, and a reader tuned on its test set scores well on
+it. The held-out row is the honest number. The held-out sets carry no labels,
+so "right" there was checked by rendering the corner and looking; four of the
+seven were looked at (`E-201B`, `E1.1A`, `ED-101B`, `E1.1`), all correct. The
+6 addendum letter pages in the Delaware file were left out, and the reader
+correctly found no number on any of them. The row shows **how** it fails:
+
+- **Mostly it finds NOTHING**, which is the safe failure: the sheet stays
+  `Sheet N`. NSW's codes are a format it does not know (9 sheets). On Colusa's
+  cover sheet the number is drawn as vector strokes (AutoCAD SHX fonts), so
+  there is no text to read. Scans without OCR have no text at all.
+- **The 2 wrong answers were both LOW confidence**: a room number `E100`
+  picked on a sheet whose real number, `A101D-E`, did not fit the pattern.
+  **Zero high-confidence wrong answers across all 12 sets.** That asymmetry is
+  what the design leans on.
+- **Titles are the weak half.** On the held-out sets the reader took
+  `PROJ MGR: JHA` from a label cell, and missed a title sitting 15% of the page
+  above the number. The fixes are known: skip `LABEL:` cells, and prefer text
+  under a `TITLE` label. They are unmeasured until built.
+
+**So, expected in practice:** on US CAD-published electrical sets, which is
+what a sub gets from an engineer, the number reads almost always, and page
+labels often make reading unnecessary. On scans, GC-assembled sets and foreign
+formats, expect a lot of "nothing found", and hand entry has to be quick.
+
+#### Where the reading happens — once, and from the uploader's own disk
+
+**Measured: reading the text of every page pulls 263.6MB of a 270.4MB set**
+(Node, counting range bytes). On vector sheets the content streams ARE the
+file, so "read every sheet's number" means "download the whole set". That
+decides the design:
+
+- **At upload, from the local `File`**, in a second worker, alongside the
+  transfer. Zero extra network. Measured cost: **~56s of worker time for 500
+  pages** (median 52ms/page, p95 254ms, worst 1.0s; Node: 32s). It is shorter
+  than uploading 270MB and runs in parallel with it. Results post in batches of
+  50 pages, so leaving halfway keeps what was read. This covers both upload
+  doors: the plans screen and the Dashboard's "Upload a plan" (V2).
+- **For plans attached before this ships, a "Read sheet numbers" button**,
+  which says what it costs: "reads the whole 270 MB set". Below
+  `PDF_AUTOFETCH_LIMIT_BYTES` it can simply run on open, because pdf.js is
+  already fetching the whole file there. It runs in a SEPARATE worker from the
+  one drawing sheets, or it would queue in front of the sharp patch for the
+  sheet being read (§ 4a's reason again).
+- **Not on the server.** pdf.js in Node reached 702MB RSS on this set. The
+  backup rule "nothing may buffer a whole file" exists for the same reason.
+
+The same pass stores each page's text for piece 4 (below). Running it twice
+would mean downloading a large set twice.
+
+#### Which source wins, per field, and fixing a wrong one by hand
+
+`typed by a person` > `PDF page label` > `sheet-named bookmark` > `title block,
+high confidence` > `title block, low confidence` > `Sheet N`.
+
+- **A person's value is never overwritten** by any later read. That is today's
+  `nameSource: "user"` rule, extended to the number.
+- **A low-confidence read is SHOWN with a marker** (a small "check" dot, and the
+  words in the tooltip), never silently presented as fact. It still works for
+  go-to, because a wrong number that is visibly flagged costs less than a sheet
+  you cannot reach.
+- **Fixing it is the existing rename, split into two fields**: number and
+  title, each editable in place under CLAUDE.md § Editing fields. Select on
+  focus, Enter/blur commits, Escape reverts, green flash on a real write, and
+  sticky from then on. Clearing a number returns the sheet to "no number", not
+  to the reader's guess.
+- **For a set the reader could not read at all** (a scan), typing 40 numbers is
+  the real cost. One small help, **optional and cuttable**: after you type
+  `E-104` on a sheet, offer to continue `E-105, E-106 …` down the following
+  unnumbered sheets. It is a single offer, and dismissing it once dismisses it.
+
+#### The migration — additive, so step 1: apply BEFORE the deploy
+
+Classified per file, per CLAUDE.md § "Deploying a migration: THREE STEPS".
+Every column is NULLABLE with no default, so NULL can only mean "not read yet":
+
+- `bid_pdf_sheets.sheetNumber varchar(32) NULL`, and
+  `sheetNumberSource enum('label','bookmark','titleblock','user') NULL`.
+- `bid_pdf_sheets.readConfidence enum('high','low') NULL`, which applies to a
+  title-block read only.
+- `bid_pdf_sheets.nameSource` gains `'label'` and `'titleblock'`. An ENUM
+  widening is additive, because old code never writes the new values. **It
+  must still go first**, since new code writing `'label'` to an old column
+  fails.
+- `bid_pdfs.sheetsReadAt timestamp NULL`, where NULL means the reading pass
+  never ran. That is what decides whether to offer the button.
+- **A NEW table, `bid_pdf_sheet_text`** (`sheetId` unique, `text MEDIUMTEXT`,
+  `hasTextLayer`, `extractedAt`), **not a column on `bid_pdf_sheets`.** Nearly
+  every read here is a bare `select()`, so a text column would make every sheet
+  list fetch drag the whole set's text along. Measured: **4.8M characters for
+  this 500-sheet set**, ~9.6KB a sheet.
+
+Hand-write it. `drizzle-kit generate` re-emits old hand-written migrations
+(CLAUDE.md), so read every statement it produces before trusting any of it.
+
+### 17.5 Piece 3 — go to a sheet by number. NO MIGRATION.
+
+- **Type into the sheet chip.** Click the chip, or press **G**, and it becomes
+  a box. Type `E-101`, press Enter, and you are there. Matching ignores case,
+  spaces and hyphens (`e101` finds `E-101`), and keeps the dot, because `E1.01`
+  and `E101` are different numbering schemes and folding them together would
+  pick the wrong sheet. An exact match wins, then prefix matches, then title
+  words (`lighting`), in one list, arrow keys to choose. It searches client-side
+  over the sheet rows already loaded; 500 rows is nothing.
+- **Duplicates show both** (`E1.0 — Legend and index`, `E1.0 — Single-line`)
+  rather than picking one, because Weld's set shows it happens.
+- **Works without piece 2's reader**, on whatever names exist (bookmarks, typed
+  names). That is why it can ship either side of piece 2, and why it is its own
+  piece.
+- **Across plans on one bid:** a bid can hold several PDFs, so the box searches
+  every plan on the bid and says which one a hit is in.
+
+### 17.6 Piece 4 — search the set. NO MIGRATION (the table came with piece 2).
+
+- **Server-side**, per CLAUDE.md § Responsiveness rule 2:
+  `bidPdfs.searchText({ bidId, q })` over `bid_pdf_sheet_text`, returning the
+  sheets that contain the term, a count per sheet and a short snippet. A
+  `LIKE` over ~5MB is fine at this size. A FULLTEXT index is a later additive
+  step if it is measured slow, not before.
+- **Normalise the same way as the text was joined.** pdf.js returns items in
+  drawing order and splits tokens (`AD` `-` `101`), so the stored text and the
+  query both collapse the spaces around `-`, `.` and `/`. Otherwise `RP-1` misses
+  the sheets where it is printed.
+- **On the sheet, highlight the hits** by re-extracting THAT page's text with
+  positions in the viewer's worker when it opens. The page is loaded anyway,
+  and one page measured ~50ms. Nothing positional is stored.
+- **Say what it could not see.** "Searched 488 sheets. 12 have no text (scanned)
+  and cannot be searched." This is CLAUDE.md's "an audit reports what it
+  searched for" applied to a user-facing search, and a search that silently
+  skips scans reads as "not on the drawings" when it is.
+- One box or two: the go-to box (piece 3) gets a second section, "On the
+  drawings", once piece 4 exists. Same keystrokes, one place to type.
+
+### 17.7 Order, migrations, and why this order
+
+| Piece | What                                                                                              | DB change                                      | Why here                                                                                             |
+| ----- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **1** | Range loading fixed, virtualised list + grid, visible-first thumbnails, pictures mode in the list | **No**                                         | Fixes a measured fault on every large set, and everything after it loads pages.                      |
+| **2** | Read numbers + titles (labels, bookmarks, title block), store page text, fix by hand              | **Yes — additive only, apply BEFORE the push** | The data the next two pieces are about. The text is captured in the same pass so a set is read once. |
+| **3** | Go to a sheet by number                                                                           | **No**                                         | Small, and useful on typed and bookmark names even before 2.                                         |
+| **4** | Search the set                                                                                    | **No**                                         | Needs piece 2's stored text. The largest UI of the four, and the one most easily cut.                |
+
+**Piece 3 can swap with piece 2** if go-to is wanted sooner. It works on
+bookmark and typed names alone. **Piece 4 cannot move ahead of 2.**
+
+This batch is independent of Phases 5–13 in § 4. It touches the viewer shell,
+the sheet rows and the upload path, not runs, counts or the bid bridge.
+
+### 17.8 The large test set, and how to make it again
+
+**Local fixture, like "Bar layout check": bid "Large set check (500 sheets)",
+user 1, id 1728349.** The 270.4MB file is at
+`.local-storage/bid-plans/1/1728349/big500.pdf`, which is git-ignored and so
+exists on this machine only. It is 500 pages built by concatenating ten real
+sets with `pdf-lib`, loading each source fresh every time so no two pages share
+objects and pdf.js cannot shortcut through a shared-resource cache. It has **no
+outline and no page labels**, like a GC-assembled set, which is the worst case
+for naming. Sources: the ten sets named in 17.4 (public bid documents) plus the
+Old Blueridge fixture. Page sizes range from 715×505pt to 3024×2160pt, and two
+sets are `/Rotate 270`.
+
+**Measurement caveat, so nobody re-derives it:** the Chrome window was hidden
+during these runs (`document.visibilityState === "hidden"`), which throttles
+main-thread timers to about once a second and stops `requestAnimationFrame`.
+So **no main-thread timing here is trustworthy.** The "1s freeze" first seen
+was that throttling. The numbers above are worker-side, where it does not
+apply, or from Node. Piece 1 needs the scroll smoothness of a 500-row list
+measured again in a visible window.

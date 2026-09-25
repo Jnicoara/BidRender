@@ -102,7 +102,7 @@ from now on.
 | V12 | A warning before opening a very large plan (over 150MB).                                                                                                       | **Works**   | Changelog Aug 14                | Nice-to-have |
 | V13 | Resizable side panels.                                                                                                                                         | **Works**   | Current code                    | Nice-to-have |
 | V14 | Crosshair lines across the whole sheet that follow the cursor.                                                                                                 | **Missing** | Old screen                      | Nice-to-have |
-| V15 | Page thumbnail overview to jump between pages.                                                                                                                 | **Missing** | Old screen                      | Nice-to-have |
+| V15 | Page thumbnail overview to jump between pages.                                                                                                                 | **Works**   | Old screen; built § 4a (grid)   | Nice-to-have |
 | V16 | Hide pages you do not need.                                                                                                                                    | **Missing** | Old screen                      | Nice-to-have |
 | V17 | Keyboard shortcuts for tools (the old screen had **M** measure, **C** count, **U** undo).                                                                      | **Missing** | Old screen                      | Nice-to-have |
 | V18 | Two drawings side by side.                                                                                                                                     | **Missing** | Plan item 2 (one reading of it) | Nice-to-have |
@@ -939,6 +939,12 @@ deliberately-zero must not be the same value.
 - Crosshair lines (V14): **skip** — no use on a touchscreen.
 - Page thumbnails (V15) and hiding pages (V16): **skip** — the named sheet list
   covers it.
+  > **V15 overridden 2026-09-17, recorded here 2026-09-25.** Phase 4 built a
+  > thumbnail grid behind the sheet chip (`plan-viewer-overhaul.md` § 4a),
+  > because on a real set the names blur together and a sheet's shape does
+  > not. Thumbnails in the sheet list itself, and making them usable on a
+  > 500-sheet set, are planned in `plan-viewer-overhaul.md` § 17. V16 still
+  > stands as skipped.
 - Tool keyboard shortcuts (V17): **a few**, only as extras on top of on-screen
   buttons.
 
