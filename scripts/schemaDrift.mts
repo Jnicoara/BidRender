@@ -9,8 +9,11 @@
  * to do it — `ls drizzle/*.sql | wc -l` counts files, which tells you nothing
  * about the other end. This answers the real question: which columns does the
  * code expect that this database does not have — and, since 2026-09-25, which
- * columns does it disagree with about NULL (see server/schemaCheck.ts for why
- * that was added, and what it still does not compare).
+ * columns does it disagree with about NULL or about TYPE, width included
+ * (varchar(255) vs text, int vs bigint, varchar(128) vs varchar(64)). Widths
+ * are covered; defaults, collation and auto-increment are not. See
+ * server/schemaCheck.ts for why each was added and how MySQL's equivalent
+ * spellings of one type (boolean = tinyint(1)) are kept from false-alarming.
  *
  * Exits 1 on drift so it can gate a deploy step; 0 when they agree.
  *

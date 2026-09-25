@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **The pre-deploy database check now also catches a column of the wrong type
+  or size.** For example text where the app expects a short text field, a
+  whole-number column too small for a large plan file's size, a price column
+  holding fewer decimal places, or a status list missing a value. Sizes are
+  covered too, not just the kind of column. It stays quiet on the harmless
+  differences in how MySQL names the same type, and found nothing wrong on the
+  live, local or test databases.
+
 - **The pre-deploy database check now catches a column that must accept an
   empty value but doesn't.** It used to confirm only that every column
   existed, so today it passed a production database that would have refused

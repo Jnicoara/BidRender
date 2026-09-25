@@ -183,9 +183,11 @@ pnpm tsx scripts/schemaDrift.mts
 
 It prints how many migrations that database has recorded, exactly which
 columns the code expects that it does not have, and — since 2026-09-25 — every
-column where the database and the schema disagree about NULL, in either
-direction. It exits non-zero on any of them. It still does not compare column
-TYPES or widths.
+column where the database and the schema disagree about NULL (either
+direction) or about its TYPE, width included: `varchar(255)` against `text`,
+`int` against `bigint`, `varchar(128)` against `varchar(64)`, a decimal's
+precision or scale, an enum's value list. It exits non-zero on any of them.
+It does not compare defaults, collation or auto-increment.
 Run it **before** `pnpm db:push` to see what is pending and **after** to confirm
 it took. When in doubt, run `pnpm db:push` anyway — it is idempotent.
 
@@ -571,11 +573,19 @@ not know about any of this.
 > and exited 1 (reproduced on a scratch database; pinned in
 > `server/schemaDrift.test.ts`).
 >
-> **What it still cannot see: a change to a column's TYPE or WIDTH** — a
-> `MODIFY COLUMN` from `decimal(10,4)` to `decimal(12,4)`, say, reads as
-> "matches" before and after. For one of those, ask
-> `information_schema.COLUMNS` for `COLUMN_TYPE` before and after and compare
-> the two readings.
+> **Types and widths are covered too — added later the same day.** It compares
+> each column's full `COLUMN_TYPE` against the type drizzle declares, so a
+> `MODIFY COLUMN` from `decimal(10,4)` to `decimal(12,4)`, or `varchar` to
+> `text`, now reads as drift before the migration and as matching after it.
+> MySQL's equivalent spellings of one type (`boolean` stored as `tinyint(1)`,
+> `integer` for `int`, the `int(11)` display width older servers print) are
+> treated as the same; the list is in `normalizeColumnType`
+> (`server/schemaCheck.ts`) and is short because it was measured, not guessed.
+>
+> **What it still cannot see: defaults, collation and auto-increment.** A
+> migration that only changes one of those reads as "matches" before and after.
+> For one of those, ask `information_schema.COLUMNS` for `COLUMN_DEFAULT` /
+> `COLLATION_NAME` / `EXTRA` before and after and compare the two readings.
 
 #### 7. Open the live site, still on the OLD code
 
