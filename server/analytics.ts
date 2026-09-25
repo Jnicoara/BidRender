@@ -171,14 +171,22 @@ function priceBid(
     productivityPct: row.productivityPct,
   });
   try {
+    // The same inputs rollUpBid gives the engine: the lines' direct cost plus
+    // any marked-up charge, and the lines' material markup on its own.
     const price = calculateBidPrice({
-      directCost: row.directCost,
+      directCost: roundMoney(row.directCost + row.markedUpExpenses),
+      materialMarkup: row.materialMarkup,
       overhead: settings.overhead,
       profit: settings.profit,
     });
     return { price: price.finalPrice, priced: true };
   } catch {
-    return { price: roundMoney(row.directCost), priced: false };
+    return {
+      price: roundMoney(
+        row.directCost + row.markedUpExpenses + row.materialMarkup
+      ),
+      priced: false,
+    };
   }
 }
 

@@ -1168,6 +1168,19 @@ export const pricingDefaults = mysqlTable(
       .default("0")
       .notNull(),
 
+    /**
+     * The company-default MATERIAL markup — the last level of the markup rules
+     * (references/material-markup.md). Fraction: 0.35 = 35%.
+     *
+     * NULL, not 0, when the company has not set one: "no rule" and "a rule of
+     * 0%" read differently on a bid line ("no markup rule set" against "0%
+     * markup from company default"), and only one of them is a decision.
+     */
+    materialMarkupPct: decimal("materialMarkupPct", {
+      precision: 10,
+      scale: 6,
+    }),
+
     defaultLaborRateId: int("defaultLaborRateId").references(
       () => laborRates.id,
       { onDelete: "set null" }
@@ -3446,6 +3459,78 @@ export type PlanCopilotCorrection = typeof planCopilotCorrections.$inferSelect;
 export type InsertPlanCopilotCorrection =
   typeof planCopilotCorrections.$inferInsert;
 
+// ─── Material markup rules ────────────────────────────────────────────────────
+
+/** What `bid_line_items.snapshotMarkupSource` holds. Built by shared/materialMarkup.ts. */
+export type StoredMarkupSource = {
+  level: string;
+  label: string;
+  parts: Array<{ materialId: number | null; cost: number }>;
+};
+
+export const MARKUP_RULE_KINDS = ["item", "category", "band"] as const;
+
+/**
+ * A company's material markup rules — every level of the ordered list except
+ * the company default, which lives on `pricing_defaults.materialMarkupPct`
+ * beside the company's other defaults. See references/material-markup.md.
+ *
+ * ── One table for three kinds, deliberately ─────────────────────────────────
+ * It is ONE mechanism with an order, and three tables would be three reads
+ * that could each be forgotten by the code that assembles the rule set. The
+ * kind decides which key column is filled:
+ *
+ *   item      itemKey   — `materialItemKey`: a shipped material and its forks
+ *                          share one key, so forking to fix a price does not
+ *                          lose the override
+ *   category  category  — the category name as stored on the material
+ *   band      bandMinPrice / bandMaxPrice — Piece 2, on the PACK price (D3)
+ *
+ * The quoted-line level (D4) is a line TYPE with its own %, not a rule row,
+ * and has no column here until it is built.
+ *
+ * ── Starter rows (Piece 2) ──────────────────────────────────────────────────
+ * `isStarter` rows are shipped suggestions with a `starterDate`, and apply
+ * NOTHING until `acceptedAt` is set — the amended CLAUDE.md § Starter content.
+ * The loader skips an unaccepted starter; it is shown, never priced with.
+ */
+export const markupRules = mysqlTable(
+  "markup_rules",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    /** The COMPANY OWNER's id, like every other table (ctx.scope.dataUserId). */
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: mysqlEnum("kind", MARKUP_RULE_KINDS).notNull(),
+    itemKey: int("itemKey"),
+    category: varchar("category", { length: 128 }),
+    bandMinPrice: decimal("bandMinPrice", { precision: 12, scale: 2 }),
+    bandMaxPrice: decimal("bandMaxPrice", { precision: 12, scale: 2 }),
+    /** Fraction: 0.35 = 35% markup on cost. Always markup, never margin. */
+    markupPct: decimal("markupPct", { precision: 10, scale: 6 }).notNull(),
+    isStarter: boolean("isStarter").default(false).notNull(),
+    starterDate: date("starterDate"),
+    acceptedAt: timestamp("acceptedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    index("markup_rules_userId_idx").on(t.userId),
+    // One override per item and one rule per category. MySQL lets NULLs repeat
+    // in a unique index, so each constraint only binds the kind that fills it.
+    unique("markup_rules_user_kind_item_uq").on(t.userId, t.kind, t.itemKey),
+    unique("markup_rules_user_kind_category_uq").on(
+      t.userId,
+      t.kind,
+      t.category
+    ),
+  ]
+);
+
+export type MarkupRule = typeof markupRules.$inferSelect;
+export type InsertMarkupRule = typeof markupRules.$inferInsert;
+
 // ─── Bid Line Items ───────────────────────────────────────────────────────────
 /**
  * One assembly placed into a bid, at a quantity, with its cost SNAPSHOT.
@@ -3611,6 +3696,30 @@ export const bidLineItems = mysqlTable(
       .notNull(),
     /** Modifier names at add time, for showing why the hours are what they are. */
     snapshotModifierNames: json("snapshotModifierNames").$type<string[]>(),
+    /**
+     * Material markup as a FRACTION of this line's material cost (0.35 = 35%),
+     * resolved from the ordered markup rules when the line was added and
+     * frozen like the four inputs above (references/material-markup.md).
+     *
+     * NULL means the line was added BEFORE markup rules existed, and prices as
+     * 0% — read through `storedMarkupPct`, never `Number()`. That is what made
+     * migration 0078 additive: no backfill, and every existing line priced to
+     * the cent as it did before. Six decimals because an assembly's parts can
+     * match different rules and this is their cost-weighted blend.
+     */
+    snapshotMarkupPct: decimal("snapshotMarkupPct", {
+      precision: 10,
+      scale: 6,
+    }),
+    /**
+     * Where the markup came from — the level, the sentence the line shows
+     * ("from Wire & Cable category"), and the parts it was resolved over, so
+     * "Re-apply rules" re-runs the rules on the composition the cost was
+     * frozen from. See `LineMarkupSource` in shared/materialMarkup.ts.
+     */
+    snapshotMarkupSource: json(
+      "snapshotMarkupSource"
+    ).$type<StoredMarkupSource>(),
     snapshotAt: timestamp("snapshotAt").defaultNow().notNull(),
 
     sortOrder: int("sortOrder").default(0).notNull(),

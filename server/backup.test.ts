@@ -385,6 +385,9 @@ describe("stored files", () => {
           // A mounting-height TYPE key — "receptacle", "exit-sign". An
           // identifier for a row, not a file in storage.
           "typeKey",
+          // markup_rules.itemKey — the material an item markup override is
+          // for (`materialItemKey`). An id, not a file.
+          "itemKey",
         ].includes(column)
       ) {
         continue;

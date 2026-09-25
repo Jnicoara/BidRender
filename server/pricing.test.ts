@@ -762,6 +762,12 @@ describe("Materials + Labor = Direct cost, to the cent", () => {
 
   it("is still exact when there are no lines at all", () => {
     const totals = sumLineCosts([]);
-    expect(totals).toEqual({ materialCost: 0, laborCost: 0, directCost: 0 });
+    expect(totals).toEqual({
+      materialCost: 0,
+      laborCost: 0,
+      directCost: 0,
+      materialMarkup: 0,
+      costWithMarkup: 0,
+    });
   });
 });

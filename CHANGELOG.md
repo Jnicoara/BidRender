@@ -6,6 +6,26 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **The groundwork for marking up material.** Each line on a bid can now
+  carry its own material markup, worked out when the line is added: a
+  material's own markup first, then its category, then the company default.
+  The line remembers where the number came from. Nothing changes on any
+  existing bid: every line added before today prices exactly as it did, to
+  the cent. That was checked against all 4,231 bids in the local copy of the
+  data before and after.
+
+- **Five places that shared out a bid's price now do it correctly once
+  material carries its own markup.** A marked-up permit, the per-room prices
+  on a proposal, sales tax charged on the billed price, and the Materials /
+  Labor split in the accounting export all used to assume every dollar of
+  cost was marked up the same way. That would have taxed part of what the
+  customer pays for material as labor, and billed a permit at the wire's
+  markup.
+
+- **Fixed: a dashboard card showed a lower price than the bid it opens when
+  the bid had a marked-up expense.** The card left the expense out. It now
+  counts it the same way the bid screen does.
+
 - **Search the words on the drawings, across every plan on the bid.** The same
   box that goes to a sheet number (press G) now also finds any word printed on
   the sheets: "fire alarm", "CT12", "1/2" EMT". It lists each sheet with how

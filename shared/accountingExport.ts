@@ -53,6 +53,7 @@
  * anyone treats this list as load-bearing.
  */
 import { csvDocument } from "./csvWrite";
+import { apportionWorkPrice } from "./pricing";
 
 /**
  * QuickBooks Online's invoice import columns, in its sample file's order.
@@ -193,6 +194,12 @@ export type AccountingSource = {
   isSample?: boolean;
   totals: {
     materialCost: number;
+    /**
+     * The bid's material markup. Required: the split below weights material
+     * by cost PLUS markup, and a caller that left it out would book part of
+     * what the customer pays for material as labor.
+     */
+    materialMarkup: number;
     laborCost: number;
     workPrice: number;
     salesTaxAmount: number;
@@ -217,12 +224,23 @@ export function buildAccountingExport(
   const warnings: string[] = [];
 
   const workCents = cents(source.totals.workPrice);
-  const materialCostCents = cents(source.totals.materialCost);
-  const laborCostCents = cents(source.totals.laborCost);
-  const costCents = materialCostCents + laborCostCents;
+  /*
+    The split is the one sales tax uses, from the one function both call.
+    Material is weighted by its cost PLUS its markup — what the customer is
+    charged for material — and labor takes the remainder. Weighting by bare
+    cost (as this did before material markup) would book part of the
+    material's markup as labor, so the invoice and the tax on it would
+    disagree about what "Materials" was.
+  */
+  const split = apportionWorkPrice({
+    workPrice: source.totals.workPrice,
+    materialCost: source.totals.materialCost,
+    materialMarkup: source.totals.materialMarkup,
+    laborCost: source.totals.laborCost,
+  });
 
   if (workCents !== 0) {
-    if (costCents <= 0) {
+    if (split === null) {
       // Nothing to apportion by. One line for the whole charge rather than
       // attributing it all to labor, which would be a made-up split.
       lines.push({
@@ -238,10 +256,8 @@ export function buildAccountingExport(
       // sum to the work price exactly — apportioning both independently leaves
       // a cent adrift on roughly half of all bids, and an invoice that misses
       // the bid by a penny is one somebody has to reconcile by hand.
-      const materialCharge = Math.round(
-        (workCents * materialCostCents) / costCents
-      );
-      const laborCharge = workCents - materialCharge;
+      const materialCharge = split.materialCents;
+      const laborCharge = split.laborCents;
 
       if (materialCharge !== 0) {
         lines.push({

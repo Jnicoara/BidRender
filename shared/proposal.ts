@@ -334,6 +334,12 @@ export type BuildProposalInput = {
   /** Priced from the bid's snapshot by shared/pricing.ts. Never recomputed here. */
   totals: {
     directCost: number;
+    /**
+     * Direct cost plus material markup — what overhead and profit applied to,
+     * and so the only honest denominator for spreading the price over units.
+     * Required: see `unitPricing` below.
+     */
+    costWithMarkup: number;
     overheadAmount: number;
     profitAmount: number;
     finalPrice: number;
@@ -371,8 +377,12 @@ export type BuildProposalInput = {
    * existing caller is unchanged.
    */
   mode?: ProposalMode;
-  /** Unit subtotals at DIRECT cost, as bids.get returns them. */
-  units: Array<{ label: string; directCost: number }>;
+  /**
+   * Unit subtotals as bids.get returns them. `costWithMarkup` is the unit's
+   * direct cost plus ITS lines' material markup, and is what the unit is
+   * priced from.
+   */
+  units: Array<{ label: string; directCost: number; costWithMarkup: number }>;
   lines: ProposalScopeLine[];
   branding: BrandingFields;
   design: {
@@ -668,12 +678,21 @@ export function buildProposal(input: BuildProposalInput): ProposalDocument {
    * prints per-room figures that visibly do not sum to the number underneath
    * them, which is the fastest way to lose an argument about a price.
    */
+  /*
+    ── Each unit's OWN marked-up cost, times the bottom-of-bid ratio ──────────
+    This was unit.directCost × (finalPrice ÷ directCost): one ratio for the
+    whole bid. Once material carries its own markup that is wrong in both
+    directions — a room of cheap, heavily marked-up parts would print under
+    its real share and a room of gear over it — while the total underneath
+    stayed right, so nothing on the page looked off. A unit is now priced from
+    its cost WITH its markup, and only overhead and profit are spread.
+  */
   const priceRatio =
-    totals.directCost > 0 ? totals.finalPrice / totals.directCost : 0;
+    totals.costWithMarkup > 0 ? totals.finalPrice / totals.costWithMarkup : 0;
   const unitPricing: ProposalUnitPrice[] = visible("unitPricing")
     ? input.units.map(unit => ({
         label: unit.label,
-        price: Math.round(unit.directCost * priceRatio * 100) / 100,
+        price: Math.round(unit.costWithMarkup * priceRatio * 100) / 100,
       }))
     : [];
 

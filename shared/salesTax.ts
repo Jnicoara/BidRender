@@ -31,7 +31,7 @@
  * ══════════════════════════════════════════════════════════════════════════════
  */
 
-import { fromCents, toCents } from "./pricing";
+import { apportionWorkPrice, fromCents, toCents } from "./pricing";
 
 // ─── Rates ────────────────────────────────────────────────────────────────────
 
@@ -111,6 +111,14 @@ export const DEFAULT_TAX_RULES: TaxRules = {
 export type SalesTaxInput = {
   /** Cost of materials across the bid, before overhead and profit. */
   materialCost: number;
+  /**
+   * The bid's MATERIAL markup (references/material-markup.md). Under "price"
+   * it is part of what the customer is billed for material, so it weights the
+   * material share of the price; under "cost" it is ignored, because "cost"
+   * taxes what the contractor paid. Omitted is 0 — a bid with no markup, which
+   * taxes exactly as it did before markup existed.
+   */
+  materialMarkup?: number;
   /** Cost of labor across the bid, before overhead and profit. */
   laborCost: number;
   /**
@@ -249,32 +257,37 @@ export function calculateSalesTax(input: SalesTaxInput): SalesTaxBreakdown {
 
   const materialCents = toCents(input.materialCost);
   const laborCents = toCents(input.laborCost);
-  const directCents = materialCents + laborCents;
 
   let baseMaterialCents: number;
   let baseLaborCents: number;
 
   if (input.rules.applyTo === "cost") {
+    // What the contractor paid — material markup is not a cost, so it is not
+    // here even when material is taxable.
     baseMaterialCents = input.rules.taxMaterials ? materialCents : 0;
     baseLaborCents = input.rules.taxLabor ? laborCents : 0;
   } else {
-    // Allocate the marked-up price across material and labor by cost share.
-    // A bid with no cost at all has no shares to allocate — guarding this is
-    // what keeps an empty bid from producing NaN instead of zero.
-    if (directCents <= 0) {
-      baseMaterialCents = 0;
-      baseLaborCents = 0;
-    } else {
-      const materialPriceCents = Math.round(
-        (finalPriceCents * materialCents) / directCents
-      );
-      // Labor takes the remainder rather than its own rounded share, so the
-      // two always sum to exactly the final price — no stray cent appears or
-      // vanishes between them.
-      const laborPriceCents = finalPriceCents - materialPriceCents;
-      baseMaterialCents = input.rules.taxMaterials ? materialPriceCents : 0;
-      baseLaborCents = input.rules.taxLabor ? laborPriceCents : 0;
-    }
+    /*
+      Allocate the billed price across material and labor.
+
+      By each side's cost WITH ITS MARKUP, through the one function the
+      accounting export also uses — so the material share here is the same
+      number the invoice books as Materials. It used to be bare cost share,
+      which was right only while nothing was marked up differently: with a 40%
+      markup on material it would tax labor for money the customer pays for
+      material. Labor takes the remainder, so the two sum to exactly the final
+      price. A bid with no cost has no shares to allocate, which is what keeps
+      an empty bid at zero rather than NaN.
+    */
+    const split = apportionWorkPrice({
+      workPrice: input.finalPrice,
+      materialCost: input.materialCost,
+      materialMarkup: input.materialMarkup ?? 0,
+      laborCost: input.laborCost,
+    });
+    baseMaterialCents =
+      split && input.rules.taxMaterials ? split.materialCents : 0;
+    baseLaborCents = split && input.rules.taxLabor ? split.laborCents : 0;
   }
 
   // Each taxable charge enters on the same footing as materials and labor:

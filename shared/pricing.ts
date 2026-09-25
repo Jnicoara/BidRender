@@ -5,8 +5,13 @@
  *   1. Direct Cost = Materials + (Labor hours × modifiers, SUMMED not compounded) × Labor Rate
  *      where Labor hours = the assembly's material-driven hours PLUS its own
  *      overhead hours (setup, testing, cleanup, trip), added before modifiers
+ *   1a. + Material markup — per LINE, from the ordered markup rules, on the
+ *      line's material cost only (references/material-markup.md). Direct cost
+ *      + markup is `costWithMarkup`, the subtotal both steps below apply to.
  *   2. + Overhead  — optional, percentage or flat, applied BEFORE profit
- *   3. + Profit    — Markup % or Target Margin %, always an explicit choice
+ *   3. + Profit    — Markup % or Target Margin %, always an explicit choice.
+ *      It STACKS on marked-up material by decision (D1): the route setting is
+ *      what stops the two doubling up, not this arithmetic.
  *   4. = Final Bid Price
  *
  * Deliberately pure: no database, no I/O, no framework. Everything here is
@@ -93,10 +98,28 @@ export type LineItemInput = {
    * applyProductivityToHours. Defaults to 0, meaning no adjustment.
    */
   productivityPct?: number;
+  /**
+   * This line's material markup as a fraction of its material cost (0.35 =
+   * 35%), already resolved from the markup rules and frozen on the line.
+   * Defaults to 0, which is also what a line stored before markup existed
+   * reads as (shared/materialMarkup.ts, `storedMarkupPct`).
+   */
+  materialMarkupPct?: number;
 };
 
 export type LineItemBreakdown = {
   materialCost: number;
+  /** The markup fraction applied. 0 when none. */
+  materialMarkupPct: number;
+  /** Material markup in dollars, at quantity — whole cents. */
+  materialMarkup: number;
+  /**
+   * directCost + materialMarkup. What overhead and profit apply to, and the
+   * weight every "share of the price" calculation has to use — never
+   * directCost alone, which is the mistake five places made before markup
+   * existed (references/material-markup.md § The five places).
+   */
+  costWithMarkup: number;
   /** The assembly's overhead hours as applied. 0 when unset. */
   overheadLaborHours: number;
   /**
@@ -137,14 +160,24 @@ export type LineItemBreakdown = {
 
 export type BidPriceInput = {
   directCost: number;
+  /**
+   * The bid's material markup in dollars, summed from its lines. Added to the
+   * direct cost BEFORE overhead and profit, so both apply to it (D1). 0 when
+   * omitted, which prices exactly as before markup existed.
+   */
+  materialMarkup?: number;
   overhead?: OverheadSetting;
   profit: ProfitSetting;
 };
 
 export type BidPriceBreakdown = {
   directCost: number;
+  /** Material markup, in dollars. 0 when there is none. */
+  materialMarkup: number;
+  /** directCost + materialMarkup — the subtotal overhead applies to. */
+  costWithMarkup: number;
   overheadAmount: number;
-  /** directCost + overheadAmount — the basis profit is applied to. */
+  /** costWithMarkup + overheadAmount — the basis profit is applied to. */
   costWithOverhead: number;
   profitAmount: number;
   finalPrice: number;
@@ -552,8 +585,25 @@ export function calculateLineItem(input: LineItemInput): LineItemBreakdown {
   const totalLaborHours = hours * quantity;
   const laborCents = toCents(totalLaborHours * input.laborRate);
 
+  // Material markup, on the LINE's material cents after quantity, rounded to a
+  // whole cent here for the reason the material is: it is a money amount the
+  // bid adds up, and every total downstream has to be a sum of the same
+  // integers. The dashboard's SQL makes the same two roundings in the same
+  // order (server/db.ts, costSums) so a card and its bid cannot disagree.
+  const materialMarkupPct = input.materialMarkupPct ?? 0;
+  assertFinite(materialMarkupPct, "materialMarkupPct");
+  if (materialMarkupPct < 0) {
+    throw new Error(
+      `materialMarkupPct cannot be negative, received: ${materialMarkupPct}`
+    );
+  }
+  const markupCents = roundToInt(materialCents * materialMarkupPct);
+
   return {
     materialCost: fromCents(materialCents),
+    materialMarkupPct,
+    materialMarkup: fromCents(markupCents),
+    costWithMarkup: fromCents(materialCents + laborCents + markupCents),
     overheadLaborHours,
     baseHoursWithOverhead,
     modifierPct,
@@ -593,17 +643,23 @@ export function sumLineCosts(lines: LineItemBreakdown[]): {
   materialCost: number;
   laborCost: number;
   directCost: number;
+  materialMarkup: number;
+  costWithMarkup: number;
 } {
   let materialCents = 0;
   let laborCents = 0;
+  let markupCents = 0;
   for (const line of lines) {
     materialCents += toCents(line.materialCost);
     laborCents += toCents(line.laborCost);
+    markupCents += toCents(line.materialMarkup);
   }
   return {
     materialCost: fromCents(materialCents),
     laborCost: fromCents(laborCents),
     directCost: fromCents(materialCents + laborCents),
+    materialMarkup: fromCents(markupCents),
+    costWithMarkup: fromCents(materialCents + laborCents + markupCents),
   };
 }
 
@@ -686,13 +742,25 @@ export function calculateBidPrice(input: BidPriceInput): BidPriceBreakdown {
     );
   }
 
+  const markup = input.materialMarkup ?? 0;
+  assertFinite(markup, "materialMarkup");
+  if (markup < 0) {
+    throw new Error(`materialMarkup cannot be negative, received: ${markup}`);
+  }
+
   const directCents = toCents(input.directCost);
-  const ohCents = overheadCents(directCents, input.overhead);
-  const withOverheadCents = directCents + ohCents;
+  const markupCents = toCents(markup);
+  // Overhead and profit both apply to the subtotal AS IT STANDS, marked-up
+  // material included (D1, references/material-markup.md).
+  const baseCents = directCents + markupCents;
+  const ohCents = overheadCents(baseCents, input.overhead);
+  const withOverheadCents = baseCents + ohCents;
   const pCents = profitCents(withOverheadCents, input.profit);
 
   return {
     directCost: fromCents(directCents),
+    materialMarkup: fromCents(markupCents),
+    costWithMarkup: fromCents(baseCents),
     overheadAmount: fromCents(ohCents),
     costWithOverhead: fromCents(withOverheadCents),
     profitAmount: fromCents(pCents),
@@ -708,10 +776,96 @@ export function priceLineItems(
   settings: { overhead?: OverheadSetting; profit: ProfitSetting }
 ): BidPriceBreakdown & { lines: LineItemBreakdown[] } {
   const breakdowns = lines.map(calculateLineItem);
+  const sums = sumLineCosts(breakdowns);
   const bid = calculateBidPrice({
-    directCost: sumDirectCost(breakdowns),
+    directCost: sums.directCost,
+    materialMarkup: sums.materialMarkup,
     overhead: settings.overhead,
     profit: settings.profit,
   });
   return { ...bid, lines: breakdowns };
+}
+
+// ─── Spreading the price back over its parts ─────────────────────────────────
+
+/**
+ * The factor overhead and profit multiplied the bid by: finalPrice ÷
+ * costWithMarkup.
+ *
+ * ── Why the DENOMINATOR is the point ─────────────────────────────────────────
+ * Until material markup existed there was one uplift, finalPrice ÷ directCost,
+ * and five places used it to spread the price back over a bid's parts — a
+ * marked-up expense, a unit on the proposal, the material share for tax, the
+ * accounting split. That is only right while every dollar of cost is marked up
+ * the same way. Once material carries its own markup it is not: dividing by
+ * directCost folds the material markup into the ratio and hands it to things
+ * that never had it — a permit billed at the wire's markup.
+ *
+ * This is the BOTTOM-of-bid ratio only. Multiply it by a cost-with-markup —
+ * a line's, a unit's, an expense's (which has no markup) — and the answer is
+ * that thing's billed price. With no markup anywhere it is exactly the old
+ * ratio, which is what keeps every existing bid where it was.
+ */
+export function bottomOfBidRatio(bid: {
+  finalPrice: number;
+  costWithMarkup: number;
+}): number {
+  return bid.costWithMarkup > 0 ? bid.finalPrice / bid.costWithMarkup : 1;
+}
+
+/**
+ * Split the billed price of the work into its material and labor shares.
+ *
+ * The material share is weighted by material cost PLUS ITS MARKUP — the thing
+ * the customer is actually being charged for material — and labor takes the
+ * remainder so the two always sum to `workPrice` exactly. Sales tax (on the
+ * billed price) and the accounting export both call this, so the two can
+ * never apportion one bid two ways.
+ *
+ * The rounding is a plain `Math.round`, as both callers used before they
+ * shared it: with no markup this reproduces their old answer to the cent.
+ */
+export function apportionWorkPrice(input: {
+  workPrice: number;
+  materialCost: number;
+  materialMarkup: number;
+  laborCost: number;
+}): { materialCents: number; laborCents: number } | null {
+  const workCents = toCents(input.workPrice);
+  const materialSellCents =
+    toCents(input.materialCost) + toCents(input.materialMarkup);
+  const laborCents = toCents(input.laborCost);
+  const weight = materialSellCents + laborCents;
+  // No cost at all has no shares to apportion — the caller decides what that
+  // means rather than getting NaN.
+  if (weight <= 0) return null;
+  const materialCents = Math.round((workCents * materialSellCents) / weight);
+  return { materialCents, laborCents: workCents - materialCents };
+}
+
+// ─── Markup vs margin ────────────────────────────────────────────────────────
+
+/**
+ * The margin a markup produces. 0.20 markup → 0.1667 margin.
+ *
+ * Part 4 of the bid-structure design: contractors mix these up and it costs
+ * real money, so every % field says which it is AND shows the other number
+ * beside it. These two are the arithmetic behind that line, and each is the
+ * other's inverse — `server/markupMargin.test.ts` pins both directions.
+ */
+export function markupToMargin(markup: number): number {
+  assertFinite(markup, "markup");
+  if (markup <= -1) {
+    throw new Error(`A markup of -100% or less has no margin: ${markup}`);
+  }
+  return markup / (1 + markup);
+}
+
+/** The markup needed to reach a margin. 0.20 margin → 0.25 markup. */
+export function marginToMarkup(margin: number): number {
+  assertFinite(margin, "margin");
+  if (margin >= 1) {
+    throw new Error(`A margin of 100% or more has no finite markup: ${margin}`);
+  }
+  return margin / (1 - margin);
 }

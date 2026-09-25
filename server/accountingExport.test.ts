@@ -85,6 +85,9 @@ const source = (over: Partial<AccountingSource> = {}): AccountingSource => ({
   ...over,
   totals: {
     materialCost: 0,
+    // No material markup unless a case says so: every case here predates it,
+    // and the split is weighted by cost + markup (apportionWorkPrice).
+    materialMarkup: 0,
     laborCost: 0,
     workPrice: 0,
     salesTaxAmount: 0,

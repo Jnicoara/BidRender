@@ -82,6 +82,8 @@ import {
   BidLineItem,
   bidLineItems,
   bidUnitLinks,
+  markupRules,
+  type MarkupRule,
   InsertBidPdf,
   BidPdf,
   bidPdfs,
@@ -194,6 +196,15 @@ import {
   usableTerm,
 } from "../shared/bidSearch";
 import { addAssemblyOverheadHours } from "../shared/pricing";
+import {
+  markupDiffers,
+  materialItemKey,
+  NO_MARKUP_RULES,
+  resolveLineMarkup,
+  type LineMarkupSource,
+  type MarkupPart,
+  type MarkupRuleSet,
+} from "../shared/materialMarkup";
 import { resolveLineQty } from "../shared/takeoffBridge";
 import { followsDrawing } from "../shared/quantityLock";
 import type { PlanRemovalImpact } from "../shared/planRemoval";
@@ -2549,6 +2560,13 @@ export type AssemblyMaterialLine = {
    */
   isBranchWhip: boolean;
   category: Material["category"];
+  /**
+   * The key an item markup override is stored under — the shipped row's id
+   * for a shipped material or any fork of it (`materialItemKey`). Taken from
+   * the RESOLVED material, so a recipe pointing at a baseline the company has
+   * since forked still finds the override.
+   */
+  itemKey: number;
 };
 
 export type AssemblyDetail = Assembly & {
@@ -2685,6 +2703,7 @@ export async function getAssemblyMaterialLines(
       costPerUnit: material.costPerUnit,
       laborHours: material.laborHours,
       category: material.category,
+      itemKey: materialItemKey(material),
     });
   }
   return resolved;
@@ -5245,10 +5264,13 @@ async function snapshotForAssembly(
   snapshotModifierPct: string;
   snapshotLaborRate: string;
   snapshotModifierNames: string[];
+  snapshotMarkupPct: string;
+  snapshotMarkupSource: LineMarkupSource;
 }> {
-  const [activeModifiers, rates] = await Promise.all([
+  const [activeModifiers, rates, markupRuleSet] = await Promise.all([
     getLibraryModifiers(userId, "active"),
     getLibraryLaborRates(userId),
+    getMarkupRuleSet(userId),
   ]);
 
   /*
@@ -5301,7 +5323,296 @@ async function snapshotForAssembly(
     snapshotModifierPct: modifierPct.toFixed(4),
     snapshotLaborRate: laborRate.toFixed(4),
     snapshotModifierNames: applied.map(m => m.name),
+    // Resolved per PART, over the same recipe lines the material cost above
+    // was summed from, so the blend is weighted by exactly that cost.
+    ...markupSnapshot(markupPartsForAssembly(detail), markupRuleSet),
   };
+}
+
+// ─── Material markup: the rules, and what a line freezes ─────────────────────
+
+/**
+ * A company's markup rules, assembled into the one ordered set the engine
+ * walks (shared/materialMarkup.ts, references/material-markup.md).
+ *
+ * ── An unaccepted starter is not a rule ──────────────────────────────────────
+ * Starter rows (Piece 2) are shown and dated but apply NOTHING until accepted
+ * — the amended CLAUDE.md § Starter content. Filtered HERE, the only place a
+ * rule set is built, so no caller can price with a suggestion by forgetting.
+ *
+ * Bands are not loaded yet: they need a pack price `materials` does not carry
+ * (D3), so the band level returns "no rule" until Piece 2 supplies both.
+ */
+export async function getMarkupRuleSet(userId: number): Promise<MarkupRuleSet> {
+  const db = await getDb();
+  if (!db) return NO_MARKUP_RULES;
+  const [defaults, rows] = await Promise.all([
+    getPricingDefaults(userId),
+    db.select().from(markupRules).where(eq(markupRules.userId, userId)),
+  ]);
+  const live = rows.filter(row => !row.isStarter || row.acceptedAt !== null);
+
+  const items = new Map<number, number>();
+  const categories = new Map<string, number>();
+  for (const row of live) {
+    if (row.kind === "item" && row.itemKey !== null)
+      items.set(row.itemKey, Number(row.markupPct));
+    if (row.kind === "category" && row.category !== null)
+      categories.set(row.category, Number(row.markupPct));
+  }
+
+  const companyDefault =
+    defaults?.materialMarkupPct === null ||
+    defaults?.materialMarkupPct === undefined
+      ? null
+      : Number(defaults.materialMarkupPct);
+
+  return {
+    items,
+    quotedLinePct: null,
+    categories,
+    bands: [],
+    companyDefault,
+  };
+}
+
+/** A recipe's material lines as the markup rules see them. */
+export function markupPartsForAssembly(detail: {
+  materials: AssemblyMaterialLine[];
+}): MarkupPart[] {
+  return detail.materials.map(line => ({
+    materialId: line.materialId,
+    itemKey: line.itemKey,
+    category: line.category,
+    packPrice: null,
+    cost: Number(line.costPerUnit) * Number(line.qty),
+  }));
+}
+
+/** One material standing alone as a line's only part — a traced run, a priced line. */
+export function markupPartForMaterial(
+  material: Material,
+  storedId: number
+): MarkupPart {
+  return {
+    materialId: storedId,
+    itemKey: materialItemKey(material),
+    category: material.category,
+    packPrice: null,
+    cost: Number(material.costPerUnit),
+  };
+}
+
+/** The two columns a line freezes, from its parts and the rules in force now. */
+export function markupSnapshot(
+  parts: readonly MarkupPart[],
+  rules: MarkupRuleSet
+): { snapshotMarkupPct: string; snapshotMarkupSource: LineMarkupSource } {
+  const { pct, source } = resolveLineMarkup(parts, rules);
+  return { snapshotMarkupPct: pct.toFixed(6), snapshotMarkupSource: source };
+}
+
+/**
+ * EVERY pricing snapshot column of a line, for copying it onto another line.
+ *
+ * Unit generation and template push each built this list by hand, and a
+ * hand-built list is where a new snapshot column goes missing: the copy would
+ * price at 0% markup with nothing on screen to say why. Typed as REQUIRED
+ * over every `snapshot*` key, so a column added later is a compile error here
+ * until it is copied — CLAUDE.md § "Where to be structural".
+ */
+type SnapshotKey = Extract<keyof BidLineItem, `snapshot${string}`>;
+export function pricingSnapshotOf(
+  line: BidLineItem
+): Required<Pick<BidLineItem, SnapshotKey>> {
+  return {
+    snapshotMaterialCost: line.snapshotMaterialCost,
+    snapshotLaborHours: line.snapshotLaborHours,
+    snapshotModifierPct: line.snapshotModifierPct,
+    snapshotLaborRate: line.snapshotLaborRate,
+    snapshotModifierNames: line.snapshotModifierNames,
+    snapshotMarkupPct: line.snapshotMarkupPct,
+    snapshotMarkupSource: line.snapshotMarkupSource,
+    snapshotAt: line.snapshotAt,
+  };
+}
+
+/** One line whose markup today's rules would change. */
+export type MarkupReapplyChange = {
+  lineId: number;
+  name: string;
+  /** What the line prices with now. NULL is a line from before markup rules. */
+  fromPct: number | null;
+  toPct: number;
+  toLabel: string;
+  snapshot: {
+    snapshotMarkupPct: string;
+    snapshotMarkupSource: LineMarkupSource;
+  };
+};
+
+/**
+ * What "Re-apply markup rules" would do to a bid, line by line — measured, not
+ * described, the same way the quantity lock reports what unlocking would move.
+ *
+ * ── Which composition the rules run over ─────────────────────────────────────
+ * A line stored with markup carries the parts it was resolved from — the
+ * material ids and the cost weights its frozen material cost was summed from —
+ * and the CURRENT rules run over those, with each material re-read so a new
+ * item override or category is seen. The cost weights are not refreshed: the
+ * blend has to stay weighted by the same recipe the line's price came from.
+ *
+ * A line from before markup rules has no stored parts, so they are rebuilt
+ * from its links: its assembly's recipe as it is today, the material its run
+ * type names for its role, or none at all for a price typed by hand — which
+ * then takes the company default. That is the best available reading of what
+ * the line is made of, and it is only ever used once: after re-applying, the
+ * line stores its parts like any other.
+ */
+export async function planMarkupReapply(
+  bidId: number,
+  userId: number
+): Promise<MarkupReapplyChange[]> {
+  const [lines, rules] = await Promise.all([
+    getBidLineItems(bidId),
+    getMarkupRuleSet(userId),
+  ]);
+
+  const storedIds = lines.flatMap(
+    line =>
+      line.snapshotMarkupSource?.parts
+        .map(part => part.materialId)
+        .filter((id): id is number => id !== null) ?? []
+  );
+  const library = await getMaterialsByIds(storedIds, userId);
+
+  const changes: MarkupReapplyChange[] = [];
+  for (const line of lines) {
+    let parts: MarkupPart[];
+    if (line.snapshotMarkupSource) {
+      parts = line.snapshotMarkupSource.parts.map(stored => {
+        const material =
+          stored.materialId === null
+            ? undefined
+            : resolveMaterial(library, stored.materialId);
+        return material
+          ? {
+              ...markupPartForMaterial(material, stored.materialId as number),
+              cost: stored.cost,
+            }
+          : {
+              // A material deleted since: no item or category left to match,
+              // so it falls to the company default rather than vanishing.
+              materialId: stored.materialId,
+              itemKey: null,
+              category: null,
+              packPrice: null,
+              cost: stored.cost,
+            };
+      });
+    } else {
+      parts = await legacyMarkupParts(line, userId);
+    }
+
+    const next = markupSnapshot(parts, rules);
+    const toPct = Number(next.snapshotMarkupPct);
+    const fromPct =
+      line.snapshotMarkupPct === null ? null : Number(line.snapshotMarkupPct);
+    if (!markupDiffers(line.snapshotMarkupPct, toPct)) continue;
+    changes.push({
+      lineId: line.id,
+      name: line.name,
+      fromPct,
+      toPct,
+      toLabel: next.snapshotMarkupSource.label,
+      snapshot: next,
+    });
+  }
+  return changes;
+}
+
+/** A line from before markup rules, read back into parts from its links. */
+async function legacyMarkupParts(
+  line: BidLineItem,
+  userId: number
+): Promise<MarkupPart[]> {
+  if (line.assemblyId !== null) {
+    const detail = await getAssemblyForStoredReference(line.assemblyId, userId);
+    return detail ? markupPartsForAssembly(detail) : [];
+  }
+  if (line.takeoffRunTypeId !== null && line.runMaterialRole !== null) {
+    const type = await getRunTypeById(line.takeoffRunTypeId, userId);
+    const materialId =
+      type === undefined
+        ? null
+        : line.runMaterialRole === "raceway"
+          ? type.racewayMaterialId
+          : line.runMaterialRole === "conductor"
+            ? type.conductorMaterialId
+            : type.groundMaterialId;
+    if (materialId === null) return [];
+    const material = resolveMaterial(
+      await getMaterialsByIds([materialId], userId),
+      materialId
+    );
+    return material ? [markupPartForMaterial(material, materialId)] : [];
+  }
+  return [];
+}
+
+/** Write a planned re-apply. The caller has already decided the bid may move. */
+export async function applyMarkupReapply(
+  bidId: number,
+  changes: readonly MarkupReapplyChange[]
+): Promise<void> {
+  for (const change of changes) {
+    await updateBidLineItem(change.lineId, bidId, change.snapshot);
+  }
+}
+
+// ─── Markup rules: the company's own ─────────────────────────────────────────
+
+/** Every rule row this company has, for the settings and materials screens. */
+export async function listMarkupRules(userId: number): Promise<MarkupRule[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(markupRules).where(eq(markupRules.userId, userId));
+}
+
+/**
+ * Set or clear the item override for one material. `null` removes it, and the
+ * material falls back to its category, band or the company default.
+ */
+export async function setItemMarkupOverride(
+  userId: number,
+  itemKey: number,
+  markupPct: number | null
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const where = and(
+    eq(markupRules.userId, userId),
+    eq(markupRules.kind, "item"),
+    eq(markupRules.itemKey, itemKey)
+  );
+  if (markupPct === null) {
+    await db.delete(markupRules).where(where);
+    return;
+  }
+  const [existing] = await db.select().from(markupRules).where(where).limit(1);
+  if (existing) {
+    await db
+      .update(markupRules)
+      .set({ markupPct: markupPct.toFixed(6) })
+      .where(eq(markupRules.id, existing.id));
+    return;
+  }
+  await db.insert(markupRules).values({
+    userId,
+    kind: "item",
+    itemKey,
+    markupPct: markupPct.toFixed(6),
+  });
 }
 
 /**
@@ -5360,6 +5671,13 @@ export async function addCountToBid(
       snapshotModifierPct: "0",
       snapshotLaborRate: "0",
       snapshotModifierNames: [],
+      /*
+        A typed price enters as material money (§ 5f), so it takes markup like
+        any material — frozen NOW, with no parts to resolve, which means the
+        company default if one is set. The price itself is typed later and
+        this percentage applies to whatever is typed.
+      */
+      ...markupSnapshot([], await getMarkupRuleSet(userId)),
       sortOrder: await nextBidSortOrder(bidId),
     });
     return { id: result.insertId };
@@ -5663,12 +5981,7 @@ export async function generateBidUnits(
           name: line.name,
           qty: line.qty,
           unitLabel: label,
-          snapshotMaterialCost: line.snapshotMaterialCost,
-          snapshotLaborHours: line.snapshotLaborHours,
-          snapshotModifierPct: line.snapshotModifierPct,
-          snapshotLaborRate: line.snapshotLaborRate,
-          snapshotModifierNames: line.snapshotModifierNames,
-          snapshotAt: line.snapshotAt,
+          ...pricingSnapshotOf(line),
           sortOrder: sortOrder++,
         });
       }
@@ -5876,12 +6189,7 @@ export async function pushTemplateToLinkedCopies(
         name: line.name,
         qty: line.qty,
         unitLabel: label,
-        snapshotMaterialCost: line.snapshotMaterialCost,
-        snapshotLaborHours: line.snapshotLaborHours,
-        snapshotModifierPct: line.snapshotModifierPct,
-        snapshotLaborRate: line.snapshotLaborRate,
-        snapshotModifierNames: line.snapshotModifierNames,
-        snapshotAt: line.snapshotAt,
+        ...pricingSnapshotOf(line),
         sortOrder: sortOrder++,
       });
     }
@@ -8514,6 +8822,18 @@ export async function seedSampleProject(
       snapshotModifierPct: (line.modifierPct ?? 0).toFixed(4),
       snapshotLaborRate: content.laborRate.toFixed(4),
       snapshotModifierNames: line.modifierNames ?? null,
+      /*
+        The sample is priced by its own fixture numbers and nothing else, so
+        it carries a deliberate 0% rather than whatever rules the company has:
+        a sample that re-priced itself from somebody's real markup would stop
+        matching the walkthrough written against it.
+      */
+      snapshotMarkupPct: "0.000000",
+      snapshotMarkupSource: {
+        level: "none",
+        label: "no material markup on the sample bid",
+        parts: [],
+      },
       sortOrder: sortOrder++,
     });
   }
@@ -8660,10 +8980,38 @@ function costSums(productivityPct: number) {
   // must total as 0, not turn the whole line NULL and drop it from the sum.
   const materialCents = sql`ROUND(COALESCE(${bidLineItems.snapshotMaterialCost}, 0) * 100) * ${bidLineItems.qty}`;
   const laborCents = sql`ROUND(${hours} * ${bidLineItems.qty} * ${bidLineItems.snapshotLaborRate} * 100)`;
+  /*
+    MATERIAL MARKUP, per line, rounded exactly as the engine rounds it.
+
+    `calculateLineItem` rounds the line's material to whole cents AFTER the
+    quantity and then takes the markup of that, rounded again. Both ROUNDs are
+    here in the same order, on DECIMAL columns, where MySQL rounds half away
+    from zero as the engine does. Rounding once at the end instead would put
+    a dashboard card a cent off the bid it opens on some fraction of bids,
+    which is the disagreement this function exists to prevent.
+
+    NULL `snapshotMarkupPct` — a line from before markup rules — is 0%, the
+    same reading `storedMarkupPct` gives it.
+  */
+  const markupCents = sql`ROUND(ROUND(ROUND(COALESCE(${bidLineItems.snapshotMaterialCost}, 0) * 100) * ${bidLineItems.qty}) * COALESCE(${bidLineItems.snapshotMarkupPct}, 0))`;
   return {
     materialCents: sql<string>`COALESCE(SUM(${materialCents}), 0)`,
     laborCents: sql<string>`COALESCE(SUM(${laborCents}), 0)`,
     directCents: sql<string>`COALESCE(SUM(ROUND(${materialCents} + ${laborCents})), 0)`,
+    markupCents: sql<string>`COALESCE(SUM(${markupCents}), 0)`,
+    /*
+      Marked-up charges, which join the direct cost and take overhead and
+      profit exactly as the bid screen prices them (server/bidPricing.ts,
+      rollUpBid). A scalar subquery rather than a join, because joining
+      expenses beside the line items would multiply every line by every
+      charge.
+
+      Missing until 2026-09-25: a dashboard card for a bid carrying a
+      marked-up permit read that permit's price short of the bid it opened.
+      Found by dumping every local bid's two figures side by side while
+      proving material markup moved nothing.
+    */
+    markedUpExpenseCents: sql<string>`(SELECT COALESCE(SUM(ROUND(${bidExpenses.amount} * 100)), 0) FROM ${bidExpenses} WHERE ${bidExpenses.bidId} = ${bids.id} AND ${bidExpenses.markedUp} = 1)`,
     totalHours: sql<string>`COALESCE(SUM(${hours} * ${bidLineItems.qty}), 0)`,
   };
 }
@@ -8752,7 +9100,12 @@ export type BidCostRow = {
   productivityPct: number | null;
   materialCost: number;
   laborCost: number;
+  /** The LINES' direct cost. Marked-up charges are `markedUpExpenses`, apart. */
   directCost: number;
+  /** Summed per line exactly as the engine rounds it. See costSums. */
+  materialMarkup: number;
+  /** Charges that join the direct cost before overhead and profit. */
+  markedUpExpenses: number;
   totalHours: number;
 };
 
@@ -8777,6 +9130,8 @@ function toBidCostRow(row: Record<string, unknown>): BidCostRow {
     materialCost: Number(row.materialCents) / 100,
     laborCost: Number(row.laborCents) / 100,
     directCost: Number(row.directCents) / 100,
+    materialMarkup: Number(row.markupCents) / 100,
+    markedUpExpenses: Number(row.markedUpExpenseCents) / 100,
     totalHours: Number(row.totalHours),
   };
 }
@@ -8985,6 +9340,8 @@ export type DashboardBidRow = Bid & {
   materialCost: number;
   laborCost: number;
   directCost: number;
+  materialMarkup: number;
+  markedUpExpenses: number;
   totalHours: number;
 };
 
@@ -9035,6 +9392,8 @@ export async function getDashboardBids(
     materialCost: Number(row.materialCents) / 100,
     laborCost: Number(row.laborCents) / 100,
     directCost: Number(row.directCents) / 100,
+    materialMarkup: Number(row.markupCents) / 100,
+    markedUpExpenses: Number(row.markedUpExpenseCents) / 100,
     totalHours: Number(row.totalHours),
   }));
 }
@@ -9464,10 +9823,11 @@ export async function addRunTypeRowToBid(
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
 
-  const [materialRows, rates, defaults] = await Promise.all([
+  const [materialRows, rates, defaults, markupRuleSet] = await Promise.all([
     getMaterialsByIds([input.materialId], userId),
     getLibraryLaborRates(userId),
     getPricingDefaults(userId),
+    getMarkupRuleSet(userId),
   ]);
   // Follows a fork, like every other read of a stored material id.
   const material = resolveMaterial(materialRows, input.materialId);
@@ -9490,6 +9850,12 @@ export async function addRunTypeRowToBid(
     snapshotModifierPct: "0.0000",
     snapshotLaborRate: laborRate.toFixed(4),
     snapshotModifierNames: [],
+    // One material, one part: the wire or pipe's own item override, its
+    // category, or the company default, in that order.
+    ...markupSnapshot(
+      [markupPartForMaterial(material, input.materialId)],
+      markupRuleSet
+    ),
     sortOrder: await nextBidSortOrder(bidId),
   });
   return { id: result.insertId };

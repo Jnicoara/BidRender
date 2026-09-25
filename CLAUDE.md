@@ -206,6 +206,9 @@ made, which is not always where the next plan gets written:
   takeoff behaves, and the feature inventory (C, S, T, R) with what exists.
 - `references/plan-viewer-overhaul.md` — the phase plan, § 6 "Decisions already
   made — do not re-open without saying why", and the per-phase specs.
+- `references/material-markup.md` — the markup rule order and decisions
+  D1–D6 (2026-09-25): profit stacks on marked-up material, starter bands,
+  pack-price bands, quoted is a line type.
 - `CLAUDE.md` — standing rules that apply to every screen.
 - `todo.md` § "Working on this repo — traps" — the things that bite.
 
@@ -1085,6 +1088,15 @@ salaried role unrated forever.
 
 Tests must not borrow shipped prices or rates for their arithmetic. Price a
 fixture, or the test is really asserting that the seed data has not changed.
+
+**Amended 2026-09-25 for markup: UNACCEPTED STARTERS APPLY NOTHING.** Starter
+material-markup bands ship with real percentages (75% under $1, down to 12%
+over $1,000), which this section would otherwise forbid. They are allowed
+because they are labelled "Starter — verify against your own work", dated, and
+**do not touch a single bid until the user clicks accept**. Until then the
+effect is exactly $0, which is the promise this rule exists to keep. Any future
+starter with a number follows the same shape: shown, dated, inert until
+accepted. See `references/material-markup.md` D2 and D6.
 
 ## Company defaults vs per-bid overrides — say which one you are changing
 

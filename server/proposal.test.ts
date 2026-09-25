@@ -111,6 +111,8 @@ function input(
     },
     totals: {
       directCost: 10000,
+      // No material markup in these fixtures, so the two are the same figure.
+      costWithMarkup: 10000,
       overheadAmount: 1000,
       profitAmount: 2200,
       finalPrice: 13200,
@@ -375,6 +377,7 @@ describe("what leaves the building", () => {
       input({
         totals: {
           directCost: 10000,
+          costWithMarkup: 10000,
           overheadAmount: 0,
           profitAmount: 0,
           finalPrice: 10000,
@@ -407,8 +410,8 @@ describe("what leaves the building", () => {
     const doc = buildProposal(
       input({
         units: [
-          { label: "Room 101", directCost: 5000 },
-          { label: "Room 102", directCost: 5000 },
+          { label: "Room 101", directCost: 5000, costWithMarkup: 5000 },
+          { label: "Room 102", directCost: 5000, costWithMarkup: 5000 },
         ],
       })
     );
@@ -422,12 +425,13 @@ describe("what leaves the building", () => {
       input({
         totals: {
           directCost: 0,
+          costWithMarkup: 0,
           overheadAmount: 0,
           profitAmount: 0,
           finalPrice: 0,
           totalLaborHours: 0,
         },
-        units: [{ label: "Room 101", directCost: 0 }],
+        units: [{ label: "Room 101", directCost: 0, costWithMarkup: 0 }],
       })
     );
     expect(doc.unitPricing[0].price).toBe(0);

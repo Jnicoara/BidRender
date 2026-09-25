@@ -218,7 +218,8 @@ additive and safe, but it is a MIGRATION and it belongs in the same release as
 
 Worth noting the enum is also why the shelves stay curated: a category nobody
 can add by accident is the reason "Category is NOT user-extendable" holds
-further up this document.
+further up this document. (That rule was overridden 2026-09-25 for material
+markup — `references/material-markup.md` D5.)
 
 #### A third axis, and it is independent of the other two
 
@@ -261,11 +262,21 @@ Conduit and wire labor is conventionally quoted per 100 ft or per 1000 ft rather
 - Baseline updates **never auto-overwrite** a user's personalized copy — surfaced as "update available" instead.
 - Users can create fully **custom** materials / labor rates / assemblies with no baseline link.
 - **"Revert to Original"** — discards a user's personal changes and restores the current baseline version.
+- **OVERRIDDEN 2026-09-25 — see `references/material-markup.md` D5.** Material
+  markup needs a company to add a category with its own percentage, so categories
+  become user-extendable in markup Piece 3. The clutter concern below still has
+  to be answered there, not dropped. The original entry, as it stood:
 - **Category is NOT user-extendable.** It stays a small, deliberately curated list — users pick from it when building a custom assembly but cannot add new entries to it. This keeps the category-as-layer reuse (see [LAYERS](#layers)) safe from clutter: no user action can silently add a new layer to every takeoff sheet.
 
 ## PRICING FLOW
 
 1. **Direct Cost** = Materials + (Labor hours × modifiers, summed not compounded) × Labor Rate
+   - **1a. + Material markup** — added 2026-09-25. Per bid line, from the
+     ordered markup rules (item override → quoted line → category → price
+     band → company default), frozen on the line like the other snapshot
+     inputs. Direct Cost + material markup is the subtotal the next two steps
+     apply to, so profit stacks on marked-up material by decision (D1). Full
+     design: `references/material-markup.md`.
 2. **+ Overhead** — optional, on/off, percentage or flat amount. Applied _before_ profit.
 3. **+ Profit** — explicit choice between:
    - **Markup %** → `price = cost × (1 + markup%)`

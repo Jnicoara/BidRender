@@ -380,7 +380,11 @@ export const proposalsRouter = router({
           text: row.text,
         })),
         mode: input.mode,
-        units: units.map(u => ({ label: u.label, directCost: u.directCost })),
+        units: units.map(u => ({
+          label: u.label,
+          directCost: u.directCost,
+          costWithMarkup: u.costWithMarkup,
+        })),
         lines: priced.map(({ line }) => ({
           name: line.name,
           qty: Number(line.qty),
@@ -437,6 +441,7 @@ export const proposalsRouter = router({
           materialCost: totals.materialCost,
           laborCost: totals.laborCost,
           directCost: totals.directCost,
+          materialMarkup: totals.materialMarkup,
           overheadAmount: totals.overheadAmount,
           profitAmount: totals.profitAmount,
           finalPrice: totals.finalPrice,

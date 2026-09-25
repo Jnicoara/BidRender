@@ -27,6 +27,7 @@ import {
   toTaxJurisdiction,
 } from "../bidPricing";
 import { explainTaxStatus } from "../../shared/salesTax";
+import { roundMoney } from "../../shared/pricing";
 import {
   daysRemaining,
   purgeDueAt,
@@ -62,6 +63,11 @@ import {
 } from "../../shared/handPricedLines";
 import { hourlyCostOf, resolveLaborRate } from "../../shared/laborRateLookup";
 import { resolveForkedRow } from "../../shared/forkedRows";
+import {
+  MAX_MARKUP_PCT,
+  markupReapplyRefusal,
+  materialItemKey,
+} from "../../shared/materialMarkup";
 import { needsPricing } from "../../shared/materialPricing";
 import * as db from "../db";
 
@@ -151,6 +157,8 @@ const profitMethodSchema = z.enum(["markup", "margin"]);
  * anyone means and would be a very quiet way to send a bid out wrong.
  */
 const productivitySchema = z.number().min(-0.9).max(2);
+/** A material markup fraction: 0 to MAX_MARKUP_PCT (1000%). Never negative. */
+const markupPctSchema = z.number().min(0).max(MAX_MARKUP_PCT);
 /**
  * The per-job whip dial, as a signed fraction. -0.9 to +3 is a deliberately
  * wide but finite range: past that it is a typo rather than a tight building,
@@ -291,11 +299,27 @@ export const bidsRouter = router({
         materialCost,
         laborCost,
         directCost,
+        materialMarkup,
+        markedUpExpenses,
         totalHours,
         ...bid
       } = row;
-      const { price } = priceFromDirectCost(bid, directCost, company);
-      return { ...bid, lineCount, directCost, finalPrice: price };
+      // The card's direct cost is the bid screen's: lines plus marked-up
+      // charges (rollUpBid). Leaving the charges out read a bid carrying a
+      // marked-up permit short by that permit until 2026-09-25.
+      const fullDirect = roundMoney(directCost + markedUpExpenses);
+      const { price } = priceFromDirectCost(
+        bid,
+        fullDirect,
+        materialMarkup,
+        company
+      );
+      return {
+        ...bid,
+        lineCount,
+        directCost: fullDirect,
+        finalPrice: price,
+      };
     });
   }),
 
@@ -1019,6 +1043,13 @@ export const bidsRouter = router({
       const patch: Record<string, unknown> = {
         snapshotMaterialCost: toDecimal4(Number(material.costPerUnit)),
         snapshotAt: new Date(),
+        // The price now comes from THIS material, so its markup does too —
+        // its item override or category, before the company default a typed
+        // price would have taken. Frozen with the price, like every snapshot.
+        ...db.markupSnapshot(
+          [db.markupPartForMaterial(material, input.source.materialId)],
+          await db.getMarkupRuleSet(ctx.scope.dataUserId)
+        ),
       };
       if (material.laborHours !== null) {
         patch.snapshotLaborHours = toDecimal4(Number(material.laborHours));
@@ -1318,10 +1349,22 @@ export const bidsRouter = router({
         profitMethod: profitMethodSchema.optional(),
         profitValue: z.number().min(0).max(0.99).optional(),
         productivityPct: productivitySchema.optional(),
+        /**
+         * The company-default MATERIAL markup, as a fraction. NULL clears it
+         * back to "no rule", which is not the same as a 0% rule — see
+         * pricing_defaults.materialMarkupPct. Always a markup, never a margin.
+         */
+        materialMarkupPct: markupPctSchema.nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const patch: Record<string, unknown> = {};
+      if (input.materialMarkupPct !== undefined) {
+        patch.materialMarkupPct =
+          input.materialMarkupPct === null
+            ? null
+            : input.materialMarkupPct.toFixed(6);
+      }
       if (input.overheadEnabled !== undefined)
         patch.overheadEnabled = input.overheadEnabled;
       if (input.overheadMode !== undefined)
@@ -1340,5 +1383,84 @@ export const bidsRouter = router({
         await db.updatePricingDefaults(ctx.scope.dataUserId, patch);
       }
       return db.getPricingDefaults(ctx.scope.dataUserId);
+    }),
+
+  /**
+   * What "Re-apply markup rules" would change on this bid, line by line.
+   *
+   * Empty on anything that may not move — see `markupReapplyRefusal` — so the
+   * screen cannot offer the button on a sent or locked bid even by accident.
+   */
+  markupReapplyPreview: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      const refusal = markupReapplyRefusal(bid);
+      if (refusal)
+        return { allowed: false as const, reason: refusal, changes: [] };
+      const changes = await db.planMarkupReapply(bid.id, ctx.scope.dataUserId);
+      return {
+        allowed: true as const,
+        reason: null,
+        changes: changes.map(({ snapshot: _snapshot, ...change }) => change),
+      };
+    }),
+
+  /**
+   * Re-run today's markup rules over this bid's lines.
+   *
+   * DRAFT bids only, and never a locked one — refused here, not merely hidden
+   * on the screen. A sent bid is the price somebody was quoted; letting a
+   * company-wide rule change reach it is the silent re-pricing the snapshot
+   * exists to stop (ASSEMBLIES_PLAN.md § PROJECT ESTIMATES: "Once a bid is
+   * Submitted, it is fully frozen").
+   */
+  reapplyMarkupRules: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      const refusal = markupReapplyRefusal(bid);
+      if (refusal)
+        throw new TRPCError({ code: "BAD_REQUEST", message: refusal });
+      const changes = await db.planMarkupReapply(bid.id, ctx.scope.dataUserId);
+      await db.applyMarkupReapply(bid.id, changes);
+      return { changed: changes.length };
+    }),
+
+  /** Every markup rule this company has — item overrides today (Piece 1). */
+  markupRules: procedure.query(async ({ ctx }) =>
+    db.listMarkupRules(ctx.scope.dataUserId)
+  ),
+
+  /**
+   * Set or clear one material's own markup — the first level of the rules.
+   *
+   * `pricing.edit`, like the company defaults: an item override moves every
+   * future line with that material on every bid, which is a company-wide act.
+   * It does NOT move a line already on a bid — only "Re-apply" does that.
+   */
+  setItemMarkupOverride: requireCapability("pricing.edit")
+    .input(
+      z.object({
+        materialId: z.number().int().positive(),
+        markupPct: markupPctSchema.nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const material = resolveForkedRow(
+        await db.getLibraryMaterials(ctx.scope.dataUserId),
+        input.materialId
+      );
+      if (!material)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Material not found.",
+        });
+      await db.setItemMarkupOverride(
+        ctx.scope.dataUserId,
+        materialItemKey(material),
+        input.markupPct
+      );
+      return { itemKey: materialItemKey(material) };
     }),
 });

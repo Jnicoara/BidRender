@@ -19,15 +19,16 @@
  */
 import type { Bid, BidLineItem, TaxJurisdictionRow } from "../drizzle/schema";
 import {
+  bottomOfBidRatio,
   calculateBidPrice,
   calculateLineItem,
   resolveBidPricingSettings,
   type ResolvedPricingSettings,
   roundMoney,
-  sumDirectCost,
   sumLineCosts,
   type CompanyPricingDefaults,
 } from "../shared/pricing";
+import { storedMarkupPct } from "../shared/materialMarkup";
 import {
   DEFAULT_TAX_RULES,
   calculateSalesTax,
@@ -205,6 +206,9 @@ export function priceLine(line: BidLineItem, productivityPct: number) {
     laborRate: Number(line.snapshotLaborRate),
     quantity: Number(line.qty),
     productivityPct,
+    // Frozen with the rest of the snapshot. NULL — a line from before markup
+    // rules — reads as 0%, which is what keeps every such line where it was.
+    materialMarkupPct: storedMarkupPct(line.snapshotMarkupPct),
   });
 }
 
@@ -246,6 +250,13 @@ export function priceFromDirectCost(
     | "productivityPct"
   >,
   directCost: number,
+  /**
+   * The bid's material markup, summed per line in SQL beside the direct cost.
+   * Required rather than defaulted: a caller that forgot it would price every
+   * marked-up bid at cost-plus-profit and the card would quietly undersell
+   * the bid it opens.
+   */
+  materialMarkup: number,
   company: CompanyPricingDefaults
 ): { price: number; priced: boolean; settings: ResolvedPricingSettings } {
   const settings = resolveBidPricingSettings(company, {
@@ -261,12 +272,17 @@ export function priceFromDirectCost(
   try {
     const priced = calculateBidPrice({
       directCost,
+      materialMarkup,
       overhead: settings.overhead,
       profit: settings.profit,
     });
     return { price: priced.finalPrice, priced: true, settings };
   } catch {
-    return { price: roundMoney(directCost), priced: false, settings };
+    return {
+      price: roundMoney(directCost + materialMarkup),
+      priced: false,
+      settings,
+    };
   }
 }
 
@@ -303,10 +319,17 @@ export function rollUpBid(
    *
    * Flat charges are absent by design; they are added after profit.
    */
-  const workCost = sumDirectCost(breakdowns);
+  const lineSums = sumLineCosts(breakdowns);
+  const workCost = lineSums.directCost;
   const directCost = roundMoney(workCost + sumMarkedUpExpenses(expenses));
+  /*
+    Material markup is summed from the LINES only. A marked-up expense enters
+    the direct cost above and so takes overhead and profit, but it is not
+    material and no markup rule ever reaches it.
+  */
   const bidPrice = calculateBidPrice({
     directCost,
+    materialMarkup: lineSums.materialMarkup,
     overhead: settings.overhead,
     profit: settings.profit,
   });
@@ -351,14 +374,24 @@ export function bidRollup(
   }));
 
   // Unit subtotals, so a hotel bid can answer "what does one room cost?"
-  const unitTotals = new Map<string, { directCost: number; lines: number }>();
+  //
+  // `costWithMarkup` is carried beside `directCost` because it is the one the
+  // proposal prices a unit from. A unit of cheap parts and a unit of gear carry
+  // different markups, so a unit's share of the price follows ITS
+  // cost-with-markup, not its bare cost scaled by a bid-wide ratio.
+  const unitTotals = new Map<
+    string,
+    { directCost: number; costWithMarkup: number; lines: number }
+  >();
   for (const { line, breakdown } of priced) {
     if (!line.unitLabel) continue;
     const current = unitTotals.get(line.unitLabel) ?? {
       directCost: 0,
+      costWithMarkup: 0,
       lines: 0,
     };
     current.directCost += breakdown.directCost;
+    current.costWithMarkup += breakdown.costWithMarkup;
     current.lines += 1;
     unitTotals.set(line.unitLabel, current);
   }
@@ -375,7 +408,7 @@ export function bidRollup(
     `sumLineCosts` returns all three from one pass, so the parts equal the
     whole by construction rather than by both happening to round the same way.
   */
-  const { materialCost, laborCost } = sumLineCosts(breakdowns);
+  const { materialCost, laborCost, materialMarkup } = sumLineCosts(breakdowns);
 
   /**
    * Sales tax, computed here so the bid screen and the proposal cannot differ.
@@ -408,7 +441,17 @@ export function bidRollup(
    * `workPrice` is therefore the bid price with those charges taken back out —
    * the marked-up materials and labor alone.
    */
-  const uplift = directCost > 0 ? bidPrice.finalPrice / directCost : 1;
+  /*
+    THE BOTTOM-OF-BID RATIO, not finalPrice ÷ directCost.
+
+    That was right while every dollar of cost was marked up alike. With
+    material markup it hands the wire's markup to a permit: a marked-up expense
+    takes overhead and profit — the same as the work — and no material markup,
+    because it is not material. `bottomOfBidRatio` divides by cost-with-markup
+    for exactly that reason (shared/pricing.ts). With no markup on the bid the
+    two ratios are identical, which is why existing bids did not move.
+  */
+  const uplift = bottomOfBidRatio(bidPrice);
   const pricedExpenses = priceExpenses(expenses, uplift);
   const workPrice = roundMoney(
     bidPrice.finalPrice - pricedExpenses.markedUpCharged
@@ -416,6 +459,9 @@ export function bidRollup(
 
   const salesTax = calculateSalesTax({
     materialCost,
+    // Taxed under "price" as part of the material's billed share; ignored
+    // under "cost", which taxes what the contractor paid.
+    materialMarkup,
     laborCost,
     // The work only. Charges carry their own taxability and are passed
     // separately rather than blended into a figure taxed wholesale.
@@ -466,6 +512,8 @@ export function bidRollup(
       ),
       materialCost,
       laborCost,
+      // `materialMarkup` and `costWithMarkup` arrive with the ...bidPrice
+      // spread above, from the engine that computed them.
       /**
        * Tax, and the price with it. Kept as their own fields beside
        * `finalPrice` rather than folded into it — a bid total that silently

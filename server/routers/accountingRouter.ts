@@ -99,6 +99,7 @@ export const accountingRouter = router({
           isSample: bid.isSample,
           totals: {
             materialCost: totals.materialCost,
+            materialMarkup: totals.materialMarkup,
             laborCost: totals.laborCost,
             workPrice: totals.workPrice,
             salesTaxAmount: totals.salesTaxAmount,
