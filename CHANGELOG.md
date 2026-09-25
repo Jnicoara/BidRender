@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **The pre-deploy database check now catches a column that must accept an
+  empty value but doesn't.** It used to confirm only that every column
+  existed, so today it passed a production database that would have refused
+  the first free count sent to a bid. It now also compares whether each column
+  may be empty, and says which one and in which direction.
+
 - **Count anything on the plans and price it on the bid — no library needed.**
   Type a name in Count ("Type F1 fixture"), click each one on any sheet, and
   "Send to bid" puts it on the bid as its own line with the total from every

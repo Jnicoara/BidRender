@@ -181,8 +181,11 @@ Ask the database directly, rather than counting files:
 pnpm tsx scripts/schemaDrift.mts
 ```
 
-It prints how many migrations that database has recorded and exactly which
-columns the code expects that it does not have, and exits non-zero on drift.
+It prints how many migrations that database has recorded, exactly which
+columns the code expects that it does not have, and — since 2026-09-25 — every
+column where the database and the schema disagree about NULL, in either
+direction. It exits non-zero on any of them. It still does not compare column
+TYPES or widths.
 Run it **before** `pnpm db:push` to see what is pending and **after** to confirm
 it took. When in doubt, run `pnpm db:push` anyway — it is idempotent.
 
@@ -558,14 +561,21 @@ Expect `Database matches the schema.` **If it still names something, stop here
 and do not deploy.** The site is fine — it is running the old code, which does
 not know about any of this.
 
-> **`schemaDrift.mts` cannot see a change to NULLability — found 2026-09-25.**
-> Before 0074/0075 ran, production reported `Database matches the schema.`
-> with both `bid_line_items` snapshot columns still `NOT NULL`: the check
-> compares which columns EXIST, not their definitions. For a migration that
-> only changes a column (`MODIFY COLUMN`), it will say "matches" both before
-> and after, so it proves nothing. Ask `information_schema.COLUMNS` for
-> `IS_NULLABLE` before and after instead, and compare the two readings — the
-> 0074/0075 deploy did (`NO -> YES`, recorded migrations `74 -> 76`).
+> **`schemaDrift.mts` now sees a change to NULLability — FIXED 2026-09-25,
+> the same day the gap was found.** Before 0074/0075 ran, production reported
+> `Database matches the schema.` with both `bid_line_items` snapshot columns
+> still `NOT NULL`, because the check only compared which columns EXIST. It
+> now also compares `IS_NULLABLE` against the schema, so that database would
+> have printed
+> `bid_line_items.snapshotMaterialCost — schema allows NULL, database NOT NULL`
+> and exited 1 (reproduced on a scratch database; pinned in
+> `server/schemaDrift.test.ts`).
+>
+> **What it still cannot see: a change to a column's TYPE or WIDTH** — a
+> `MODIFY COLUMN` from `decimal(10,4)` to `decimal(12,4)`, say, reads as
+> "matches" before and after. For one of those, ask
+> `information_schema.COLUMNS` for `COLUMN_TYPE` before and after and compare
+> the two readings.
 
 #### 7. Open the live site, still on the OLD code
 

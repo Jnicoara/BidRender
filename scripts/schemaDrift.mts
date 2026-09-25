@@ -8,7 +8,9 @@
  * against what the database has actually run, and until now there was no way
  * to do it — `ls drizzle/*.sql | wc -l` counts files, which tells you nothing
  * about the other end. This answers the real question: which columns does the
- * code expect that this database does not have.
+ * code expect that this database does not have — and, since 2026-09-25, which
+ * columns does it disagree with about NULL (see server/schemaCheck.ts for why
+ * that was added, and what it still does not compare).
  *
  * Exits 1 on drift so it can gate a deploy step; 0 when they agree.
  *
