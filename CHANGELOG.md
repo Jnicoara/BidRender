@@ -29,8 +29,8 @@ This is the human-readable companion to the git history — read this to see wha
   degrees of bend allowed before a pull point is proposed (360°, or 270° to
   leave room for the kicks the plans do not show), and the size from which a
   pull box is offered instead of an LB (2"). Each can go back to the default.
-  The Materials editor for a pipe now also has "Field bend ___ h each", the
-  labor for one bend made with a bender.
+  The Materials editor for a pipe now also has a "Field bend … h each" box:
+  the labor for one bend made with a bender.
 - **Elbows, field bends, LBs and pull boxes now reach the bid from traced
   conduit**, through Send like couplings do. Elbows are counted from each
   corner's angle and each drop, and always read "at least", because plans
