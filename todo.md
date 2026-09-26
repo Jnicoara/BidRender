@@ -958,6 +958,33 @@ now runs 32 passed / 0 failed. See below for what the grant was.
 
 ## Working on this repo — traps
 
+**Running an OLDER build's tests against the shared test database puts the
+old catalog names back.** Found 2026-09-26.
+
+The suite starts the seeders, and a seeder only knows the names in its own
+checkout. Point a worktree at an earlier commit — which a deploy of part of
+`local-dev` does, to test exactly what is shipping — and it sees
+`#8 XHHW aluminum` missing (the newer build renamed it) and inserts it as a
+fresh row. Every later run of the current code then finds BOTH spellings, and
+`renameBaselineMaterials` correctly refuses to merge them. On
+`bidrender_test_clean` that left 46 stray rows, and
+`materialsCatalog.test.ts > renames the reshaped rows in place` failed on a
+catalog that was fine.
+
+**It is a test-database fault, not a catalog one.** Production cannot get into
+this state, because only one build seeds it at a time and never an older one
+after a newer. To confirm rather than assume: restore a production backup,
+start the build that is shipping against it, and check that no baseline row is
+left on an old spelling.
+
+**Repair:** list the baseline rows whose name is a key of
+`RENAMED_BASELINE_MATERIALS` while the new name also exists, check nothing
+references them (`assembly_materials`, forks via `baselineId`, run types,
+`takeoff_groups`), and delete them. **Avoid it:** give an old-commit test run a
+database of its own — `CREATE DATABASE … CHARACTER SET utf8mb4 COLLATE
+utf8mb4_unicode_ci`, then `scripts/migrate.mts` against it, since a server
+default collation fails at 0055.
+
 **`users.lastSignedIn` reads back SEVEN HOURS in the future. Do not compare it
 to the clock by eye.**
 

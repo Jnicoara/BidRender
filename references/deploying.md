@@ -672,6 +672,43 @@ database is **already missing five foreign keys** from the 0004 incident in July
 — so it is the statement type with history here. Both are in their own file for
 exactly that reason.
 
+### 5b. A catalog release IS a migration — it just runs at startup
+
+**Added 2026-09-26.** A release that only touches `server/seed/materials/`
+has nothing in `drizzle/`, so § 5a looks as if it does not apply. It does. The
+first boot of the new build runs `seedBaselineMaterials`, which renames rows in
+place (`RENAMED_BASELINE_MATERIALS`), retires others, inserts every new name
+and re-stamps category, aliases and price — against production, on its own,
+with nobody watching. Nothing in `schemaDrift.mts` can see any of it, because
+the schema does not change.
+
+**Rehearse it the same way as a migration, with the build that ships:**
+
+1. § 5a steps 1–2: back up, and prove the backup restores.
+2. Restore that dump into a local scratch database that persists.
+3. Before starting anything, ask the copy the questions a rename can get
+   wrong: does any rename find BOTH names already present (it will skip it,
+   leaving a duplicate)? Does a user's own row carry a name the seed is about to
+   introduce? What references each row being renamed or retired —
+   `assembly_materials`, forks via `baselineId`, run types, `takeoff_groups`?
+4. `pnpm build`, then start `dist/index.js` against the copy
+   (`NODE_ENV=production`, a spare `PORT`, `DATABASE_URL` overridden). That is
+   the exact startup path production will take.
+5. Compare before and after, by id: rows added, renamed, retired, deleted (must
+   be zero), user rows changed (must be zero), active baseline rows still on an
+   old spelling (must be zero), and every reference identical.
+6. **Restart it and compare again.** The second boot must change nothing; a
+   seed that is not a no-op the second time will do something on every deploy.
+7. Search the old spellings against the copy's real library, not the seed file
+   — `scripts/searchSpotCheck.mts` reads `BASELINE_MATERIALS`, so it cannot see
+   a user's fork or a stray row.
+
+**What this found the first time it was run (2026-09-26, 12 catalog commits):**
+46 renames, 2 retirements, 421 inserts, no collisions — and one test that
+failed only because an older build's test run had re-seeded old names into the
+shared TEST database (`todo.md` § traps). Without the production-data
+rehearsal, that red test and a real duplicate would have looked the same.
+
 ## 6. Verifying a deploy actually took
 
 A deploy that silently didn't take looks identical to one that did, so check
