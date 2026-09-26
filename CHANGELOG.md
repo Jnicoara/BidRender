@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **Fittings are on screen.** The Plans screen's traced-footage panel lists
+  each conduit type's couplings, connectors and straps with the count, how it
+  was worked out, and "Not priced" where the catalog row has no price. The run
+  type editor has an EMT style picker (set-screw, compression, raintight) and
+  a "Choose fittings yourself" option for naming the exact parts. On the
+  Materials screen, each conduit row now has editable stick length, how sticks
+  join and strap spacing, labelled as defaults.
 - **Fixed saving a starter run type you had once edited and archived.** The
   save was refused as a duplicate of your own archived copy ("Your palette
   already has a conduit type called…"), and each refused attempt left an

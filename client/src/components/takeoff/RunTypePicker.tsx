@@ -73,6 +73,13 @@ export const CONDUIT_SHELF = ["Conduit"];
 export const CABLE_SHELF = ["Wire & Cable"];
 import { runTypeSpec } from "@shared/takeoffCounts";
 import { laborPerFootSentence } from "@shared/runTypeLabor";
+import {
+  EMT_FITTING_STYLES,
+  EMT_FITTING_STYLE_LABELS,
+  isEmtFittingStyle,
+  parseRacewayName,
+  type EmtFittingStyle,
+} from "@shared/runFittingMaterials";
 import { cn } from "@/lib/utils";
 
 export type PickableRunType = {
@@ -98,6 +105,14 @@ export type PickableRunType = {
   groundLaborHours: string | null;
   conductorCount: number | null;
   groundCount: number | null;
+  /** EMT fitting style; NULL reads as set-screw. */
+  fittingStyle: string | null;
+  couplingMaterialId: number | null;
+  connectorMaterialId: number | null;
+  strapMaterialId: number | null;
+  couplingMaterialName: string | null;
+  connectorMaterialName: string | null;
+  strapMaterialName: string | null;
   needsSpecification: boolean;
   isShipped: boolean;
   runCount: number;
@@ -127,6 +142,13 @@ type Draft = {
   groundMaterialName: string | null;
   groundLaborHours: string | null;
   groundCount: number | null;
+  fittingStyle: EmtFittingStyle | null;
+  couplingMaterialId: number | null;
+  couplingMaterialName: string | null;
+  connectorMaterialId: number | null;
+  connectorMaterialName: string | null;
+  strapMaterialId: number | null;
+  strapMaterialName: string | null;
 };
 
 export type RunTypePatch = {
@@ -136,7 +158,26 @@ export type RunTypePatch = {
   conductorCount: number | null;
   groundMaterialId: number | null;
   groundCount: number | null;
+  fittingStyle: EmtFittingStyle | null;
+  couplingMaterialId: number | null;
+  connectorMaterialId: number | null;
+  strapMaterialId: number | null;
 };
+
+/** Where a fitting override is picked from. */
+const FITTING_SHELF = ["Conduit Fittings", "Strut & Supports"];
+
+/**
+ * Whether the style picker applies. By the shipped name first, then by the
+ * word, so a company that renamed its EMT fork still gets the picker.
+ */
+function isEmt(racewayName: string | null): boolean {
+  if (racewayName === null) return false;
+  return (
+    parseRacewayName(racewayName)?.family === "EMT" ||
+    /\bEMT\b/.test(racewayName)
+  );
+}
 
 const draftOf = (type: PickableRunType): Draft => ({
   label: type.label,
@@ -151,6 +192,13 @@ const draftOf = (type: PickableRunType): Draft => ({
   groundMaterialName: type.groundMaterialName,
   groundLaborHours: type.groundLaborHours,
   groundCount: type.groundCount,
+  fittingStyle: isEmtFittingStyle(type.fittingStyle) ? type.fittingStyle : null,
+  couplingMaterialId: type.couplingMaterialId,
+  couplingMaterialName: type.couplingMaterialName,
+  connectorMaterialId: type.connectorMaterialId,
+  connectorMaterialName: type.connectorMaterialName,
+  strapMaterialId: type.strapMaterialId,
+  strapMaterialName: type.strapMaterialName,
 });
 
 /**
@@ -218,10 +266,18 @@ export function MaterialSlot({
   onPick,
   onClear,
   categories,
+  emptyLabel = "Not set — pick one",
 }: {
   title: string;
   hint: string;
   name: string | null;
+  /**
+   * What an empty slot SAYS. An input rather than a constant because empty
+   * means different things in different slots: a missing raceway is a gap,
+   * while an empty fitting override means "the catalog decides" and must not
+   * read as a warning (CLAUDE.md, the `HeightFields` rule).
+   */
+  emptyLabel?: string;
   /** The catalog shelves this slot searches. See MaterialPicker. */
   categories?: readonly string[];
   onPick: (material: {
@@ -273,7 +329,7 @@ export function MaterialSlot({
               <span className="block truncate">{name}</span>
             ) : (
               <span className="block truncate text-muted-foreground">
-                Not set — pick one
+                {emptyLabel}
               </span>
             )}
           </button>
@@ -371,6 +427,7 @@ export function RunTypePicker({
   const [editing, setEditing] = useState<PickableRunType | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
+  const [choosingFittings, setChoosingFittings] = useState(false);
 
   const startEditing = (type: PickableRunType) => {
     setEditing(type);
@@ -379,6 +436,7 @@ export function RunTypePicker({
   const stopEditing = () => {
     setEditing(null);
     setDraft(null);
+    setChoosingFittings(false);
   };
 
   const mine = useMemo(
@@ -661,6 +719,108 @@ export function RunTypePicker({
               partial figure never appears without what it is short by has a
               test that can go red.
             */}
+            {/*
+              FITTINGS — counted from the trace, so nothing here is a number.
+              What the type decides is only WHICH rows they come from.
+
+              The style is the common choice, so it is visible; it applies to
+              EMT only until other families' styles ship (todo.md). Naming
+              fittings by hand is the rare one — a custom raceway, or a part a
+              company always buys — so it sits behind ONE control, and opens
+              by itself when the type already names one (CLAUDE.md § "Hide
+              OURS, never THEIRS").
+            */}
+            {pathType === "conduit" && (
+              <div className="mt-2.5">
+                <p className="text-[0.7rem] font-medium">Fittings</p>
+                {isEmt(draft.racewayMaterialName) ? (
+                  <div
+                    className="mt-1 flex gap-1"
+                    role="radiogroup"
+                    aria-label="EMT fitting style"
+                  >
+                    {EMT_FITTING_STYLES.map(style => {
+                      const chosen =
+                        (draft.fittingStyle ?? "set-screw") === style;
+                      return (
+                        <button
+                          key={style}
+                          type="button"
+                          role="radio"
+                          aria-checked={chosen}
+                          onClick={() =>
+                            setDraft({ ...draft, fittingStyle: style })
+                          }
+                          className={cn(
+                            "flex-1 rounded border px-1.5 py-1 text-[0.7rem]",
+                            chosen
+                              ? "border-[#F5C518] bg-[#F5C518]/10 text-foreground"
+                              : "border-border text-muted-foreground hover:bg-muted"
+                          )}
+                        >
+                          {EMT_FITTING_STYLE_LABELS[style]}
+                          {chosen && draft.fittingStyle === null
+                            ? " (default)"
+                            : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-[0.7rem] text-muted-foreground mt-1">
+                    Couplings, connectors and straps are counted from the trace
+                    and matched to this raceway in the catalog.
+                  </p>
+                )}
+
+                {choosingFittings ||
+                draft.couplingMaterialId !== null ||
+                draft.connectorMaterialId !== null ||
+                draft.strapMaterialId !== null ? (
+                  <>
+                    {(
+                      [
+                        ["coupling", "Coupling"],
+                        ["connector", "Connector"],
+                        ["strap", "Strap"],
+                      ] as const
+                    ).map(([kind, title]) => (
+                      <MaterialSlot
+                        key={kind}
+                        title={title}
+                        categories={FITTING_SHELF}
+                        hint={`Search fittings — “${kind}”…`}
+                        name={draft[`${kind}MaterialName`]}
+                        emptyLabel="From the catalog"
+                        onPick={m =>
+                          setDraft({
+                            ...draft,
+                            [`${kind}MaterialId`]: m.id,
+                            [`${kind}MaterialName`]: m.name,
+                          })
+                        }
+                        onClear={() =>
+                          setDraft({
+                            ...draft,
+                            [`${kind}MaterialId`]: null,
+                            [`${kind}MaterialName`]: null,
+                          })
+                        }
+                      />
+                    ))}
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setChoosingFittings(true)}
+                    className="mt-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                  >
+                    Choose fittings yourself
+                  </button>
+                )}
+              </div>
+            )}
+
             <p className="text-[0.7rem] text-muted-foreground mt-2.5">
               Labor {laborPerFootSentence({ ...draft, pathType })}
             </p>
@@ -698,6 +858,12 @@ export function RunTypePicker({
                       */
                       groundMaterialId: draft.groundMaterialId,
                       groundCount: draft.groundCount,
+                      // Passed through from the draft on a cable, for the
+                      // same reason as the ground: not shown is not cleared.
+                      fittingStyle: draft.fittingStyle,
+                      couplingMaterialId: draft.couplingMaterialId,
+                      connectorMaterialId: draft.connectorMaterialId,
+                      strapMaterialId: draft.strapMaterialId,
                     });
                     stopEditing();
                   } finally {

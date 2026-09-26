@@ -259,10 +259,38 @@ export type RunTypeBridgeRow = {
   sendable: { ok: true } | { ok: false; reason: string; message: string };
 };
 
+/**
+ * One fitting a traced conduit type wants on the bid — counted from the runs,
+ * never typed (`shared/runFittings.ts`). `why` is the sentence that says how
+ * the number was reached, and the panel never shows the number without it.
+ */
+export type RunTypeBridgeFitting = {
+  role: "coupling" | "connector" | "strap";
+  status: "counted" | "included" | "unknown";
+  qty: number;
+  atLeast: boolean;
+  why: string;
+  materialName: string | null;
+  /** Why no material was matched, in words — null when one was. */
+  materialProblem: string | null;
+  /** False for a matched material at $0; null when nothing matched. */
+  priced: boolean | null;
+  onBid: boolean;
+  sendable: { ok: true } | { ok: false; reason: string; message: string };
+};
+
+const FITTING_LABELS: Record<RunTypeBridgeFitting["role"], string> = {
+  coupling: "Couplings",
+  connector: "Connectors",
+  strap: "Straps",
+};
+
 export type RunTypeBridgeEntry = {
   runTypeId: number;
   label: string;
   rows: RunTypeBridgeRow[];
+  /** Conduit types only; empty on a cable type. */
+  fittings: RunTypeBridgeFitting[];
   /** Runs of this type nobody has answered the branch-wiring question for. */
   unansweredCount: number;
   /** Runs excluded because the devices already carry them. */
@@ -650,9 +678,12 @@ export function RunsPanel({
               Traced footage
             </div>
             {runTypeBridge.map(entry => {
-              const sendable = entry.rows.filter(
+              const sendable = [...entry.rows, ...entry.fittings].filter(
                 row => row.sendable.ok && !row.onBid
               );
+              const onBidCount = [...entry.rows, ...entry.fittings].filter(
+                row => row.onBid
+              ).length;
               const busy = sendingRunTypeId === entry.runTypeId;
               return (
                 <div key={entry.runTypeId} className="px-3 pb-2.5">
@@ -672,6 +703,67 @@ export function RunsPanel({
                       </div>
                     ))}
                   </div>
+
+                  {/*
+                    THE FITTINGS, each with the sentence that produced it.
+
+                    A bare "9" beside a coupling is the silent number this
+                    feature is not allowed to show — the estimator has to be
+                    able to check it against the drawing. So the sentence sits
+                    under every row, including the ones with nothing to send
+                    ("belled end — sticks join without couplings"), because
+                    those are the ones a reader would otherwise think were
+                    forgotten.
+
+                    "Not priced" rather than a price: a matched row at $0 is
+                    one nobody has priced, and a zero here would read as a
+                    fitting that costs nothing.
+                  */}
+                  {entry.fittings.length > 0 && (
+                    <div className="mt-1.5 space-y-1">
+                      {entry.fittings.map(fitting => (
+                        <div key={fitting.role}>
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span
+                              className={cn(
+                                "text-[0.7rem] truncate",
+                                fitting.materialName === null &&
+                                  fitting.status === "counted" &&
+                                  fitting.qty > 0
+                                  ? "text-[#F5C518]"
+                                  : "text-muted-foreground"
+                              )}
+                            >
+                              {fitting.materialName ??
+                                FITTING_LABELS[fitting.role]}
+                            </span>
+                            <span className="flex items-baseline gap-1.5 shrink-0">
+                              {fitting.priced === false && (
+                                <span className="text-[0.65rem] text-[#F5C518]">
+                                  Not priced
+                                </span>
+                              )}
+                              <span className="text-[0.7rem] font-mono tabular-nums">
+                                {fitting.status === "counted"
+                                  ? (fitting.atLeast ? "≥ " : "") + fitting.qty
+                                  : "—"}
+                              </span>
+                            </span>
+                          </div>
+                          <p className="text-[0.65rem] text-muted-foreground/80 leading-snug">
+                            {fitting.why}
+                          </p>
+                          {fitting.materialProblem &&
+                            fitting.status === "counted" &&
+                            fitting.qty > 0 && (
+                              <p className="text-[0.65rem] text-[#F5C518] leading-snug">
+                                {fitting.materialProblem}
+                              </p>
+                            )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Why a row cannot cross, in words, once per reason. */}
                   {Array.from(
@@ -733,22 +825,20 @@ export function RunsPanel({
                     at the bid. Found by pressing the button and reading the
                     row, not from the diff.
                   */}
-                  {entry.rows.some(row => row.onBid) && (
+                  {onBidCount > 0 && (
                     <p className="mt-1 text-[0.7rem] text-muted-foreground">
-                      {entry.rows.filter(row => row.onBid).length} on the bid
+                      {onBidCount} on the bid
                       {quantitiesLocked ? (
                         <>
                           {" "}
                           — locked, so tracing no longer changes{" "}
-                          {entry.rows.filter(row => row.onBid).length === 1
-                            ? "it"
-                            : "them"}
+                          {onBidCount === 1 ? "it" : "them"}
                         </>
                       ) : (
                         <>
                           {" "}
                           — the{" "}
-                          {entry.rows.filter(row => row.onBid).length === 1
+                          {onBidCount === 1
                             ? "line follows"
                             : "lines follow"}{" "}
                           the drawing

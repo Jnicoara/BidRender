@@ -83,6 +83,11 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { unitCost } from "@/lib/money";
 import { materialItemKey } from "@shared/materialMarkup";
 import { PercentKindInput } from "@/components/PercentKindInput";
+import {
+  isStickJoint,
+  STICK_JOINTS,
+  type StickJoint,
+} from "@shared/runFittings";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -116,7 +121,34 @@ type Material = {
   description: string | null;
   /** The user's own note of the brand or part number they buy. */
   brandNote: string | null;
+  /** Raceway only — what the fitting count reads. NULL is "not said". */
+  stickLengthFeet: string | null;
+  stickJoint: string | null;
+  strapSpacingFeet: string | null;
+  strapFromBoxFeet: string | null;
 };
+
+/**
+ * A raceway's fitting facts as the editor holds them: strings, blank for
+ * "not said", like the cost and hours. Present only when editing a raceway.
+ */
+type RacewayDraft = {
+  stickLengthFeet: string;
+  stickJoint: StickJoint | "";
+  strapSpacingFeet: string;
+  strapFromBoxFeet: string;
+};
+
+const STICK_JOINT_LABELS: Record<StickJoint, string> = {
+  coupling: "Couplings between sticks",
+  belled: "Belled end — no couplings",
+  coupling_on_stick: "Coupling comes on each stick",
+  continuous: "Coil — no sticks",
+};
+
+const feetText = (value: string | null) =>
+  value === null ? "" : String(Number(value));
+const feetValue = (text: string) => (text.trim() === "" ? null : Number(text));
 
 /**
  * Ask for alias suggestions for a draft. Shared by the add form and the inline
@@ -188,6 +220,8 @@ type Draft = {
    * shipped names having to pick a brand on everyone's behalf.
    */
   brandNote: string;
+  /** Only when editing a raceway; the add form never carries it. */
+  raceway?: RacewayDraft;
 };
 
 const emptyDraft: Draft = {
@@ -208,6 +242,21 @@ function validateDraft(draft: Draft): string | null {
     return "Enter a cost.";
   if (cost < 0) return "Cost cannot be negative.";
   if (cost > MAX_COST) return "That cost is too large.";
+  if (draft.raceway) {
+    const { stickLengthFeet, strapSpacingFeet, strapFromBoxFeet } =
+      draft.raceway;
+    for (const [text, what] of [
+      [stickLengthFeet, "Stick length"],
+      [strapSpacingFeet, "Strap spacing"],
+    ] as const) {
+      const value = feetValue(text);
+      if (value !== null && !(value > 0 && value <= 100))
+        return `${what} must be between 0 and 100 ft, or blank.`;
+    }
+    const fromBox = feetValue(strapFromBoxFeet);
+    if (fromBox !== null && !(fromBox >= 0 && fromBox <= 100))
+      return "The distance from a box must be between 0 and 100 ft, or blank.";
+  }
   return null;
 }
 
@@ -359,6 +408,18 @@ function MaterialRow({
       // findable — the protection moved from "never send it" to "always start
       // from the truth", and editing the terms is now possible either way.
       searchAliases: material.searchAliases ?? "",
+      ...(material.category === "Conduit"
+        ? {
+            raceway: {
+              stickLengthFeet: feetText(material.stickLengthFeet),
+              stickJoint: isStickJoint(material.stickJoint)
+                ? material.stickJoint
+                : "",
+              strapSpacingFeet: feetText(material.strapSpacingFeet),
+              strapFromBoxFeet: feetText(material.strapFromBoxFeet),
+            },
+          }
+        : {}),
     };
     setDraft(opened);
     setOpenedWith(opened);
@@ -533,6 +594,121 @@ function MaterialRow({
             the material findable only by the words in its name.
           </p>
         </div>
+
+        {/*
+          HOW THIS PIPE IS SOLD AND STRAPPED — what couplings and straps are
+          counted from on every run of it (shared/runFittings.ts).
+
+          Labelled as DEFAULTS, because they are: a starting point to match
+          how this company buys and installs, not code advice. Blank means
+          "not said", and the count then says it cannot count rather than
+          guessing — so the placeholders say "not set", never a grey number.
+        */}
+        {draft.raceway && (
+          <div className="mt-3">
+            <p className="text-xs font-medium">
+              How it is sold and strapped{" "}
+              <span className="font-normal text-muted-foreground">
+                — defaults for counting fittings, yours to change
+              </span>
+            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+              <label className="flex items-center gap-1.5">
+                Stick
+                <Input
+                  value={draft.raceway.stickLengthFeet}
+                  onChange={e =>
+                    setDraft({
+                      ...draft,
+                      raceway: {
+                        ...draft.raceway!,
+                        stickLengthFeet: e.target.value,
+                      },
+                    })
+                  }
+                  onFocus={selectOnFocus}
+                  inputMode="decimal"
+                  placeholder="not set"
+                  className="h-8 w-20 text-sm text-right"
+                  aria-label="Stick length in feet"
+                  disabled={isBusy}
+                />
+                ft
+              </label>
+              <Select
+                value={draft.raceway.stickJoint || "unset"}
+                onValueChange={value =>
+                  setDraft({
+                    ...draft,
+                    raceway: {
+                      ...draft.raceway!,
+                      stickJoint:
+                        value === "unset" ? "" : (value as StickJoint),
+                    },
+                  })
+                }
+              >
+                <SelectTrigger
+                  className="h-8 w-60 text-sm"
+                  aria-label="How sticks join"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unset">
+                    Not said (counts couplings)
+                  </SelectItem>
+                  {STICK_JOINTS.map(joint => (
+                    <SelectItem key={joint} value={joint}>
+                      {STICK_JOINT_LABELS[joint]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <label className="flex items-center gap-1.5">
+                Strap every
+                <Input
+                  value={draft.raceway.strapSpacingFeet}
+                  onChange={e =>
+                    setDraft({
+                      ...draft,
+                      raceway: {
+                        ...draft.raceway!,
+                        strapSpacingFeet: e.target.value,
+                      },
+                    })
+                  }
+                  onFocus={selectOnFocus}
+                  inputMode="decimal"
+                  placeholder="not set"
+                  className="h-8 w-20 text-sm text-right"
+                  aria-label="Strap spacing in feet"
+                  disabled={isBusy}
+                />
+                ft, and within
+                <Input
+                  value={draft.raceway.strapFromBoxFeet}
+                  onChange={e =>
+                    setDraft({
+                      ...draft,
+                      raceway: {
+                        ...draft.raceway!,
+                        strapFromBoxFeet: e.target.value,
+                      },
+                    })
+                  }
+                  onFocus={selectOnFocus}
+                  inputMode="decimal"
+                  placeholder="not set"
+                  className="h-8 w-20 text-sm text-right"
+                  aria-label="First strap within this many feet of a box"
+                  disabled={isBusy}
+                />
+                ft of a box
+              </label>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1016,6 +1192,16 @@ export default function MaterialsLibraryPage() {
           // coalesces both to "".
           searchAliases: draft.searchAliases.trim(),
           brandNote: draft.brandNote.trim() || null,
+          // Only a raceway's editor carries these, so every other save omits
+          // them and leaves them alone. Blank clears to "not said".
+          ...(draft.raceway
+            ? {
+                stickLengthFeet: feetValue(draft.raceway.stickLengthFeet),
+                stickJoint: draft.raceway.stickJoint || null,
+                strapSpacingFeet: feetValue(draft.raceway.strapSpacingFeet),
+                strapFromBoxFeet: feetValue(draft.raceway.strapFromBoxFeet),
+              }
+            : {}),
         });
         if (result.forked) {
           toast.success(

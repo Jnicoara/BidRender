@@ -37,6 +37,7 @@ import {
   parseAliasResponse,
 } from "../../shared/aliasSuggestions";
 import * as db from "../db";
+import { STICK_JOINTS } from "../../shared/runFittings";
 
 /**
  * This router's gate: a query needs `library.view`, a mutation needs `library.edit`.
@@ -76,6 +77,8 @@ const aliasSchema = z.string().trim().max(1024).nullable();
 /** The user's note of the brand or part number they buy. Free text. */
 const brandNoteSchema = z.string().trim().max(255).nullable();
 const supplierSchema = z.string().trim().max(128).nullable();
+/** A stick length or strap spacing: positive, and nothing silly. */
+const feetSchema = z.number().positive().max(100);
 
 /** Money crosses the boundary as a number and is stored as an exact decimal string. */
 const toDecimal = (value: number) => value.toFixed(4);
@@ -291,10 +294,34 @@ export const materialsRouter = router({
         searchAliases: aliasSchema.optional(),
         brandNote: brandNoteSchema.optional(),
         supplierName: supplierSchema.optional(),
+        /*
+          The raceway facts the fitting count reads (0082). Editable DEFAULTS:
+          a company that buys 20 ft PVC or straps at 8 ft changes them here,
+          which forks the row like any other edit. Omitted leaves a field
+          alone; null clears it back to "not said", and the count then says so.
+        */
+        stickLengthFeet: feetSchema.nullable().optional(),
+        stickJoint: z.enum(STICK_JOINTS).nullable().optional(),
+        strapSpacingFeet: feetSchema.nullable().optional(),
+        strapFromBoxFeet: z.number().min(0).max(100).nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { id, costPerUnit, laborHours, ...rest } = input;
+      const {
+        id,
+        costPerUnit,
+        laborHours,
+        stickLengthFeet,
+        strapSpacingFeet,
+        strapFromBoxFeet,
+        ...rest
+      } = input;
+      const feetColumn = (value: number | null | undefined) =>
+        value === undefined
+          ? undefined
+          : value === null
+            ? null
+            : value.toFixed(2);
 
       const target = await db.getMaterialById(id, ctx.scope.dataUserId);
       if (!target)
@@ -324,6 +351,15 @@ export const materialsRouter = router({
         */
         ...(laborHours !== undefined
           ? { laborHours: laborHours === null ? null : toDecimal(laborHours) }
+          : {}),
+        ...(stickLengthFeet !== undefined
+          ? { stickLengthFeet: feetColumn(stickLengthFeet) }
+          : {}),
+        ...(strapSpacingFeet !== undefined
+          ? { strapSpacingFeet: feetColumn(strapSpacingFeet) }
+          : {}),
+        ...(strapFromBoxFeet !== undefined
+          ? { strapFromBoxFeet: feetColumn(strapFromBoxFeet) }
           : {}),
       });
 

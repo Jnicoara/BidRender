@@ -847,9 +847,23 @@ export default function BidsPage({
                                   </>
                                 ) : line.takeoffGroupId !== null ? (
                                   "From plans — counts your marks"
+                                ) : line.fittingNote !== null ? (
+                                  "From plans — counted from what you traced"
                                 ) : (
                                   "From plans — follows what you traced"
                                 )}
+                              </div>
+                            ) : null}
+                            {/*
+                              HOW THIS FITTING WAS COUNTED — "9 couplings: 10
+                              sticks of 10 ft over 94.2 ft". Not truncated: it
+                              is the explanation, and a clipped explanation is a
+                              number with half its reason. Null on every line
+                              that is not a fitting.
+                            */}
+                            {line.fittingNote !== null ? (
+                              <div className="text-xs text-muted-foreground">
+                                {line.fittingNote}
                               </div>
                             ) : null}
                             {/*
