@@ -116,10 +116,11 @@ async function trace(
 }
 
 const detail = (bidId: number) => caller().bids.get({ id: bidId });
-const line = (lines: { runMaterialRole: string | null }[], role: string) =>
-  lines.find(l => l.runMaterialRole === role) as
-    | ((typeof lines)[number] & { qty: string; fittingNote: string | null })
-    | undefined;
+/** One run-type line by role, typed as `bids.get` returns it — no cast. */
+const line = <T extends { runMaterialRole: string | null }>(
+  lines: T[],
+  role: string
+): T | undefined => lines.find(l => l.runMaterialRole === role);
 
 beforeAll(async () => {
   if (!hasDb) return;
