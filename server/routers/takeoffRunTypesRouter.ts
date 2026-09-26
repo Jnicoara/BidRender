@@ -41,6 +41,11 @@ import { RUN_PATH_TYPES } from "../../drizzle/schema";
 import { resolveMaterial } from "../../shared/materialLookup";
 import { resolveRunType } from "../../shared/runTypeLookup";
 import { runTypeRows, runRowSendability } from "../../shared/takeoffBridge";
+import {
+  EMT_FITTING_STYLES,
+  fittingRowSendability,
+} from "../../shared/runFittingMaterials";
+import { needsPricing } from "../../shared/materialPricing";
 import { footageByRunType } from "../runTypeFootage";
 import { RUN_MATERIAL_ROLES } from "../../drizzle/schema";
 import * as db from "../db";
@@ -84,6 +89,19 @@ const conductorCountSchema = z.number().int().min(1).max(100).nullable();
  * would be a claim that this run carries no ground.
  */
 const groundCountSchema = z.number().int().min(0).max(10).nullable();
+
+/**
+ * The fitting style and the three named fittings (0082). All optional and
+ * nullable: omitted leaves a field alone, null clears it — a form is a patch
+ * (CLAUDE.md § rule 7). NULL style reads as set-screw; NULL override means
+ * "look it up in the catalog".
+ */
+const fittingFields = {
+  fittingStyle: z.enum(EMT_FITTING_STYLES).nullable().optional(),
+  couplingMaterialId: z.number().int().positive().nullable().optional(),
+  connectorMaterialId: z.number().int().positive().nullable().optional(),
+  strapMaterialId: z.number().int().positive().nullable().optional(),
+};
 
 async function requireOwnType(id: number, userId: number) {
   const type = await db.getRunTypeById(id, userId);
@@ -164,6 +182,9 @@ export const takeoffRunTypesRouter = router({
             t.racewayMaterialId,
             t.conductorMaterialId,
             t.groundMaterialId,
+            t.couplingMaterialId,
+            t.connectorMaterialId,
+            t.strapMaterialId,
           ].filter((id): id is number => id !== null)
         ),
         ctx.scope.dataUserId
@@ -207,6 +228,14 @@ export const takeoffRunTypesRouter = router({
         groundLaborHours: laborOf(type.groundMaterialId),
         conductorCount: type.conductorCount,
         groundCount: type.groundCount,
+        /** NULL reads as set-screw on EMT; ignored on other raceways. */
+        fittingStyle: type.fittingStyle,
+        couplingMaterialId: type.couplingMaterialId,
+        connectorMaterialId: type.connectorMaterialId,
+        strapMaterialId: type.strapMaterialId,
+        couplingMaterialName: nameOf(type.couplingMaterialId),
+        connectorMaterialName: nameOf(type.connectorMaterialId),
+        strapMaterialName: nameOf(type.strapMaterialId),
         status: type.status,
         /**
          * The shipped row this forks, so the screen can follow a run's STORED
@@ -255,6 +284,7 @@ export const takeoffRunTypesRouter = router({
         /** The ground wire itself — bare copper, or the green insulated one. */
         groundMaterialId: z.number().int().positive().nullable().default(null),
         groundCount: groundCountSchema.default(null),
+        ...fittingFields,
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -268,6 +298,10 @@ export const takeoffRunTypesRouter = router({
         conductorCount: input.conductorCount,
         groundMaterialId: input.groundMaterialId,
         groundCount: input.groundCount,
+        fittingStyle: input.fittingStyle ?? null,
+        couplingMaterialId: input.couplingMaterialId ?? null,
+        connectorMaterialId: input.connectorMaterialId ?? null,
+        strapMaterialId: input.strapMaterialId ?? null,
       });
       return { id, label: input.label, pathType: input.pathType };
     }),
@@ -290,6 +324,7 @@ export const takeoffRunTypesRouter = router({
         conductorCount: conductorCountSchema.optional(),
         groundMaterialId: z.number().int().positive().nullable().optional(),
         groundCount: groundCountSchema.optional(),
+        ...fittingFields,
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -422,6 +457,10 @@ export const takeoffRunTypesRouter = router({
       );
       const nameOf = (id: number | null) =>
         id === null ? null : (resolveMaterial(materials, id)?.name ?? null);
+      const fittingsByType = await db.fittingRowsByRunType(
+        ctx.scope.dataUserId,
+        footage
+      );
 
       return visible.map(({ storedId, type }) => {
         // Present by construction: `visible` is built FROM the footage map.
@@ -457,6 +496,27 @@ export const takeoffRunTypesRouter = router({
             feet: row.feet,
             onBid: onBid.has(storedId + ":" + row.role),
             sendable: runRowSendability(row),
+          })),
+          /*
+            The fittings, counted from the same runs. Every one carries `why`,
+            the sentence that says how it was worked out — the screen shows it
+            beside the number, never the number alone. `priced` is false for a
+            matched material at $0, so the preview says "Not priced" instead
+            of printing a price nobody chose.
+          */
+          fittings: (fittingsByType.get(storedId) ?? []).map(row => ({
+            role: row.role,
+            status: row.count.status,
+            qty: row.qty,
+            atLeast: row.count.status === "counted" && row.count.atLeast,
+            why: row.count.why,
+            materialId: row.pick.ok ? row.pick.materialId : null,
+            materialName: row.pick.ok ? row.pick.name : null,
+            materialProblem: row.pick.ok ? null : row.pick.why,
+            fromOverride: row.pick.ok && row.pick.override,
+            priced: row.pick.ok ? !needsPricing(row.pick.costPerUnit) : null,
+            onBid: onBid.has(storedId + ":" + row.role),
+            sendable: fittingRowSendability(row),
           })),
         };
       });
@@ -546,14 +606,45 @@ export const takeoffRunTypesRouter = router({
         },
       });
 
+      /*
+        Pipe, wire and ground by the foot; then the FITTINGS by the each, from
+        the same legs — one list, so the lock rule and the refresh rule below
+        are written once for both. `sendable` carries each kind's own reasons.
+      */
+      const fittings =
+        type.pathType === "conduit"
+          ? ((
+              await db.fittingRowsByRunType(
+                ctx.scope.dataUserId,
+                new Map([[input.runTypeId, f]])
+              )
+            ).get(input.runTypeId) ?? [])
+          : [];
+      const candidates = [
+        ...rows.map(row => ({
+          role: row.role as (typeof RUN_MATERIAL_ROLES)[number],
+          qty: row.feet,
+          materialId: row.materialId,
+          materialName: row.materialName,
+          sendable: runRowSendability(row),
+        })),
+        ...fittings.map(row => ({
+          role: row.role as (typeof RUN_MATERIAL_ROLES)[number],
+          qty: row.qty,
+          materialId: row.pick.ok ? row.pick.materialId : null,
+          materialName: row.pick.ok ? row.pick.name : null,
+          sendable: fittingRowSendability(row),
+        })),
+      ];
+
       const already = new Map(
         existing
           .filter(line => line.archivedAt === null)
           .map(line => [line.runMaterialRole, line])
       );
       const wanted = input.role
-        ? rows.filter(row => row.role === input.role)
-        : rows;
+        ? candidates.filter(row => row.role === input.role)
+        : candidates;
 
       const sent = [];
       const updated = [];
@@ -585,13 +676,13 @@ export const takeoffRunTypesRouter = router({
           continue;
         }
         if (live) {
-          const allowedAgain = runRowSendability(row);
+          const allowedAgain = row.sendable;
           if (!allowedAgain.ok) {
             skipped.push({ role: row.role, why: allowedAgain.message });
             continue;
           }
-          if (Number(live.qty) !== row.feet) {
-            await db.refreshRunTypeLineQty(live.id, row.feet);
+          if (Number(live.qty) !== row.qty) {
+            await db.refreshRunTypeLineQty(live.id, row.qty);
             updated.push(row.role);
           } else {
             skipped.push({
@@ -601,7 +692,7 @@ export const takeoffRunTypesRouter = router({
           }
           continue;
         }
-        const allowed = runRowSendability(row);
+        const allowed = row.sendable;
         if (!allowed.ok) {
           skipped.push({ role: row.role, why: allowed.message });
           continue;
@@ -610,8 +701,8 @@ export const takeoffRunTypesRouter = router({
           // The id the RUNS use — see the note above.
           runTypeId: input.runTypeId,
           role: row.role,
-          // Non-null past `runRowSendability`, which refuses a row with no
-          // material before this point — a line nobody can order.
+          // Non-null past `sendable`, which refuses a row with no material
+          // before this point — a line nobody can order.
           materialId: row.materialId as number,
           /*
             The type, then what this row is — unless that just says it twice.
@@ -626,7 +717,7 @@ export const takeoffRunTypesRouter = router({
             row.materialName && row.materialName !== type.label
               ? type.label + " — " + row.materialName
               : type.label,
-          feet: row.feet,
+          qty: row.qty,
         });
         sent.push(row.role);
       }

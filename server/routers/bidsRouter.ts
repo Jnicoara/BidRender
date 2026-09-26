@@ -70,6 +70,8 @@ import {
   materialItemKey,
 } from "../../shared/materialMarkup";
 import { needsPricing } from "../../shared/materialPricing";
+import { isFittingRole } from "../../shared/runFittings";
+import { footageByRunType } from "../runTypeFootage";
 import * as db from "../db";
 
 /**
@@ -672,6 +674,41 @@ export const bidsRouter = router({
         problems
       );
 
+      /*
+        HOW EACH FITTING WAS COUNTED — "9 couplings: 10 sticks of 10 ft over
+        94.2 ft" — so no fitting quantity reaches the bid screen as a bare
+        number. Only loaded when a fitting line is on the bid.
+
+        Returned WITH the lines rather than from a query of its own, so every
+        mutation that already refreshes `bids.get` refreshes this too; a
+        second query would be one more thing to remember to invalidate
+        (CLAUDE.md § "A test that calls the server cannot see a screen").
+      */
+      const fittingNotes = new Map<string, string>();
+      if (lines.some(l => isFittingRole(l.runMaterialRole))) {
+        const footage = await footageByRunType(
+          bid.id,
+          ctx.scope.dataUserId,
+          bid.distributionHeightInches
+        );
+        const byType = await db.fittingRowsByRunType(
+          ctx.scope.dataUserId,
+          footage
+        );
+        byType.forEach((rows, runTypeId) => {
+          for (const row of rows) {
+            fittingNotes.set(
+              runTypeId + ":" + row.role,
+              // Locked: the quantity is frozen and may differ from what the
+              // drawing now says, so the sentence says which it describes.
+              bid.quantitiesLockedAt === null
+                ? row.count.why
+                : "On the drawing now: " + row.count.why
+            );
+          }
+        });
+      }
+
       return {
         bid,
         /**
@@ -683,6 +720,12 @@ export const bidsRouter = router({
           ...line,
           breakdown,
           problem: reported.find(p => p.lineId === line.id) ?? null,
+          /** How a fitting line's quantity was counted; null on every other line. */
+          fittingNote: isFittingRole(line.runMaterialRole)
+            ? (fittingNotes.get(
+                line.takeoffRunTypeId + ":" + line.runMaterialRole
+              ) ?? "Nothing traced under this type any more")
+            : null,
         })),
         /**
          * True when the totals leave something out. `problems` lists every

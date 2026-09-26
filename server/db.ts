@@ -201,7 +201,24 @@ import { appliedModifiers } from "../shared/modifierLookup";
 import { resolveMaterial, materialIdsToFetch } from "../shared/materialLookup";
 import { resolveAssembly } from "../shared/assemblyLookup";
 import { buildHeightContext, type HeightContext } from "./runVerticals";
-import { groupRunFootage } from "./runTypeFootageCore";
+import { groupRunFootage, type RunTypeFootageRow } from "./runTypeFootageCore";
+import { resolveRunType } from "../shared/runTypeLookup";
+import {
+  countFittings,
+  FITTING_KINDS,
+  isFittingRole,
+  isStickJoint,
+  type FittingCount,
+  type FittingKind,
+  type RacewayFittingSpec,
+} from "../shared/runFittings";
+import {
+  fittingMaterialName,
+  fittingRows,
+  pickFittingMaterial,
+  type FittingMaterialPick,
+  type FittingRow,
+} from "../shared/runFittingMaterials";
 import {
   containsPattern,
   dateRangeBounds,
@@ -4871,10 +4888,27 @@ async function withTracedFootage(
     bid.distributionHeightInches
   );
   const footage = groupRunFootage({ runs, circuitsByRun, scales, heights });
+  // Only when a fitting line is actually on the bid: it costs three queries.
+  const fittings = rows.some(row => isFittingRole(row.runMaterialRole))
+    ? await fittingRowsByRunType(bid.userId, footage)
+    : new Map<number, FittingRow[]>();
 
   return rows.map(row => {
     if (row.takeoffRunTypeId === null || row.runMaterialRole === null) {
       return row;
+    }
+    /*
+      A FITTING is a count re-derived from the legs, exactly as footage is —
+      so tracing another homerun moves the couplings without anybody pressing
+      anything. A count that is not countable any more (the raceway lost its
+      stick length, say) is 0 here and says why on the bid screen.
+    */
+    const role = row.runMaterialRole;
+    if (isFittingRole(role)) {
+      const fitting = fittings
+        .get(row.takeoffRunTypeId)
+        ?.find(r => r.role === role);
+      return { ...row, qty: (fitting?.qty ?? 0).toFixed(4) };
     }
     const f = footage.get(row.takeoffRunTypeId);
     /*
@@ -4883,7 +4917,7 @@ async function withTracedFootage(
       the drawing no longer shows — the failure the derived count exists to
       prevent, arriving through the door nobody was watching.
     */
-    const feet = f ? feetForRole(f, row.runMaterialRole) : 0;
+    const feet = f ? feetForRole(f, role) : 0;
     return { ...row, qty: feet.toFixed(4) };
   });
 }
@@ -4896,7 +4930,7 @@ function feetForRole(
     insulatedFeet: number;
     groundFeet: number;
   },
-  role: RunMaterialRole
+  role: Exclude<RunMaterialRole, FittingKind>
 ): number {
   switch (role) {
     case "raceway":
@@ -4908,12 +4942,6 @@ function feetForRole(
       return footage.cableFeet > 0 ? footage.cableFeet : footage.insulatedFeet;
     case "ground":
       return footage.groundFeet;
-    case "coupling":
-    case "connector":
-    case "strap":
-      // INTERIM, for exactly one commit: nothing writes a fitting line until
-      // the bridge commit, which resolves these from the fitting count.
-      return 0;
   }
 }
 
@@ -10149,6 +10177,178 @@ export async function countBidsInheritingHeights(
 }
 
 /**
+ * THE FITTINGS each run type wants on a bid — counted, and matched to a row.
+ *
+ * Takes the footage already grouped (it carries each type's legs), so the
+ * pipe a coupling is counted over is the exact pipe on the bid. Keyed by the
+ * STORED run type id, like the footage map, so a bid line can be matched back.
+ * Only conduit types appear; a cable type has no fittings here.
+ *
+ * ── Three loads, then pure arithmetic ───────────────────────────────────────
+ * The palette (resolved, so a fork's style and overrides win), the raceway and
+ * override materials (resolved to the company's forks), and the fitting rows
+ * the lookup names — found by BASELINE name, then followed to the company's
+ * fork. Everything after that is `shared/runFittings.ts` and
+ * `shared/runFittingMaterials.ts`, where the tests can reach it.
+ */
+export async function fittingRowsByRunType(
+  userId: number,
+  footage: ReadonlyMap<number, RunTypeFootageRow>
+): Promise<Map<number, FittingRow[]>> {
+  const out = new Map<number, FittingRow[]>();
+  const db = await getDb();
+  if (!db || footage.size === 0) return out;
+
+  const palette = await getRunTypesFor(userId, true);
+  const entries = Array.from(footage.entries())
+    .map(([storedId, row]) => ({
+      storedId,
+      row,
+      type: resolveRunType(palette, storedId),
+    }))
+    .filter(e => e.type !== undefined && e.type.pathType === "conduit");
+  if (entries.length === 0) return out;
+
+  const linked = await getMaterialsByIds(
+    entries.flatMap(({ type }) =>
+      [
+        type!.racewayMaterialId,
+        type!.couplingMaterialId,
+        type!.connectorMaterialId,
+        type!.strapMaterialId,
+      ].filter((id): id is number => id !== null)
+    ),
+    userId
+  );
+  const resolved = (id: number | null) =>
+    id === null ? undefined : resolveMaterial(linked, id);
+
+  // The SHIPPED name of each raceway, which is what the fitting names are
+  // built from. A fork's own name may have been edited; its baseline's not.
+  const baselineIds = Array.from(
+    new Set(
+      entries
+        .map(({ type }) => resolved(type!.racewayMaterialId))
+        .map(m => (m ? (m.userId === null ? m.id : m.baselineId) : null))
+        .filter((id): id is number => id !== null)
+    )
+  );
+  const baselineNames = new Map(
+    baselineIds.length === 0
+      ? []
+      : (
+          await db
+            .select({ id: materials.id, name: materials.name })
+            .from(materials)
+            .where(
+              and(inArray(materials.id, baselineIds), isNull(materials.userId))
+            )
+        ).map(r => [r.id, r.name] as const)
+  );
+  const racewayBaselineName = (m: Material | undefined) => {
+    if (!m) return null;
+    const id = m.userId === null ? m.id : m.baselineId;
+    return id === null ? null : (baselineNames.get(id) ?? null);
+  };
+
+  const wantedNames = Array.from(
+    new Set(
+      entries.flatMap(({ type }) => {
+        const name = racewayBaselineName(resolved(type!.racewayMaterialId));
+        if (name === null) return [];
+        return FITTING_KINDS.map(kind =>
+          fittingMaterialName(name, kind, type!.fittingStyle)
+        ).filter((n): n is string => n !== null);
+      })
+    )
+  );
+  const shippedFittings =
+    wantedNames.length === 0
+      ? []
+      : await db
+          .select({ id: materials.id, name: materials.name })
+          .from(materials)
+          .where(
+            and(
+              inArray(materials.name, wantedNames),
+              isNull(materials.userId),
+              eq(materials.isActive, true)
+            )
+          );
+  const fittingRowsLoaded = await getMaterialsByIds(
+    shippedFittings.map(r => r.id),
+    userId
+  );
+  const found = (name: string) => {
+    const shipped = shippedFittings.find(r => r.name === name);
+    return shipped ? resolveMaterial(fittingRowsLoaded, shipped.id) : undefined;
+  };
+
+  for (const { storedId, row, type } of entries) {
+    const t = type!;
+    const raceway = resolved(t.racewayMaterialId);
+    const spec: RacewayFittingSpec | null = raceway
+      ? {
+          name: raceway.name,
+          stickLengthFeet:
+            raceway.stickLengthFeet === null
+              ? null
+              : Number(raceway.stickLengthFeet),
+          stickJoint: isStickJoint(raceway.stickJoint)
+            ? raceway.stickJoint
+            : null,
+          strapSpacingFeet:
+            raceway.strapSpacingFeet === null
+              ? null
+              : Number(raceway.strapSpacingFeet),
+          strapFromBoxFeet:
+            raceway.strapFromBoxFeet === null
+              ? null
+              : Number(raceway.strapFromBoxFeet),
+        }
+      : null;
+    const counts = spec
+      ? countFittings(row.legs, spec)
+      : noRacewayCounts(row.legs.length);
+
+    const overrides: Record<FittingKind, number | null> = {
+      coupling: t.couplingMaterialId,
+      connector: t.connectorMaterialId,
+      strap: t.strapMaterialId,
+    };
+    const picks = Object.fromEntries(
+      FITTING_KINDS.map(kind => {
+        const override = resolved(overrides[kind]);
+        return [
+          kind,
+          pickFittingMaterial({
+            kind,
+            override: override ?? null,
+            racewayBaselineName: racewayBaselineName(raceway),
+            racewayName: raceway?.name ?? null,
+            style: t.fittingStyle,
+            found,
+          }),
+        ];
+      })
+    ) as Record<FittingKind, FittingMaterialPick>;
+    out.set(storedId, fittingRows(counts, picks));
+  }
+  return out;
+}
+
+/** A conduit type with no raceway named: nothing to count against. */
+function noRacewayCounts(legs: number): Record<FittingKind, FittingCount> {
+  const why =
+    legs === 0
+      ? "Nothing traced"
+      : "This type names no raceway, so its fittings cannot be counted";
+  return Object.fromEntries(
+    FITTING_KINDS.map(kind => [kind, { kind, status: "unknown", why }])
+  ) as Record<FittingKind, FittingCount>;
+}
+
+/**
  * Put ONE of a run type's material rows on the bid.
  *
  * ── The snapshot is a MATERIAL's, not an assembly's, and that is the whole
@@ -10191,7 +10391,8 @@ export async function addRunTypeRowToBid(
     materialId: number;
     /** What the line is called — the type's label plus what this row is. */
     name: string;
-    feet: number;
+    /** Feet for pipe and wire; a COUNT for a fitting — the material's unit. */
+    qty: number;
   }
 ): Promise<{ id: number }> {
   const db = await getDb();
@@ -10214,10 +10415,11 @@ export async function addRunTypeRowToBid(
     takeoffRunTypeId: input.runTypeId,
     runMaterialRole: input.role,
     name: input.name,
-    qty: input.feet.toFixed(4),
+    qty: input.qty.toFixed(4),
     snapshotMaterialCost: Number(material.costPerUnit).toFixed(4),
-    // Hours per unit of sale — per FOOT here — so hours scale with the footage
-    // the way material cost does. D17.
+    // Hours per unit of sale — per FOOT for pipe and wire, per EACH for a
+    // fitting — so hours scale with the quantity the way material cost does.
+    // D17. A fitting's hours are what retired D17(b)'s per-end interim.
     snapshotLaborHours: Number(material.laborHours ?? 0).toFixed(4),
     // A traced run carries no job-condition modifiers of its own. They describe
     // an operation, and this is a length of pipe.

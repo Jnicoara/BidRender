@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **Couplings, connectors and straps now go to the bid with the pipe.**
+  Sending a traced conduit type to a bid now also sends its fittings, counted
+  from the runs and priced from the catalog row for that pipe, size and style
+  (or a fitting you name on the run type — which is how a custom raceway gets
+  fittings). They go through material markup like any other material, follow
+  the drawing as you trace more, and freeze when the bid's quantities are
+  locked. Each fitting line on the bid says how it was counted, for example
+  "9 couplings: 10 sticks of 10 ft over 94.2 ft". A fitting with no catalog
+  match is not sent, and the preview says so.
 - **Conduit now knows how it is sold and supported.** Each raceway in the
   catalog carries a stick length, how its sticks join (EMT needs couplings,
   PVC is belled, rigid and IMC come with a coupling on each stick, flex is a

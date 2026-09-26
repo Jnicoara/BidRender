@@ -17,7 +17,11 @@
  * no shipped name to build from, and gets its fittings from the per-type
  * overrides instead; without one the count says "no catalog match".
  */
-import type { FittingKind } from "./runFittings";
+import {
+  FITTING_KINDS,
+  type FittingCount,
+  type FittingKind,
+} from "./runFittings";
 
 /**
  * EMT's three fitting styles. NULL on a run type reads as set-screw — it is
@@ -126,4 +130,126 @@ export function fittingMaterialName(
     return emtStyledFittingName(size, chosen, kind);
   }
   return `${size} ${family} ${kind}`;
+}
+
+// ── From a count and a material to a row the bid can take ───────────────────
+
+/** Which material a fitting resolved to — or, plainly, why none. */
+export type FittingMaterialPick =
+  | {
+      ok: true;
+      materialId: number;
+      name: string;
+      costPerUnit: string | number;
+      /** From the per-type override, rather than the catalog lookup. */
+      override: boolean;
+    }
+  | { ok: false; why: string };
+
+/**
+ * Pick the material for one fitting.
+ *
+ * The per-type override wins. Otherwise the catalog row for this raceway,
+ * size and style — by the SHIPPED raceway's name, so a company's fork of the
+ * pipe still finds its fittings. `found` is that lookup, already resolved to
+ * the company's own copy where one exists.
+ */
+export function pickFittingMaterial(input: {
+  kind: FittingKind;
+  override: { id: number; name: string; costPerUnit: string | number } | null;
+  racewayBaselineName: string | null;
+  racewayName: string | null;
+  style: string | null;
+  found: (
+    name: string
+  ) => { id: number; name: string; costPerUnit: string | number } | undefined;
+}): FittingMaterialPick {
+  if (input.override) {
+    return {
+      ok: true,
+      materialId: input.override.id,
+      name: input.override.name,
+      costPerUnit: input.override.costPerUnit,
+      override: true,
+    };
+  }
+  if (input.racewayName === null) {
+    return {
+      ok: false,
+      why: "This type names no raceway, so its fittings cannot be looked up",
+    };
+  }
+  const wanted =
+    input.racewayBaselineName === null
+      ? null
+      : fittingMaterialName(input.racewayBaselineName, input.kind, input.style);
+  if (wanted === null) {
+    return {
+      ok: false,
+      why: `No catalog ${input.kind} for ${input.racewayName} — choose one on the run type`,
+    };
+  }
+  const row = input.found(wanted);
+  if (!row) {
+    return { ok: false, why: `No catalog match for ${wanted}` };
+  }
+  return {
+    ok: true,
+    materialId: row.id,
+    name: row.name,
+    costPerUnit: row.costPerUnit,
+    override: false,
+  };
+}
+
+/** One fitting line a run type wants on the bid. */
+export type FittingRow = {
+  role: FittingKind;
+  count: FittingCount;
+  pick: FittingMaterialPick;
+  /** What would go on the bid: the counted quantity, or 0. */
+  qty: number;
+};
+
+export type FittingRowSendability =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "not-counted" | "none" | "no-material";
+      message: string;
+    };
+
+/**
+ * Whether a fitting row can become a bid line, and why not. Every refusal
+ * names itself, like `runRowSendability`, so the preview can say which.
+ *
+ * "included" — belled PVC, a rigid stick's own coupling, a coil — is not a
+ * failure, and its sentence says so. It simply has no line to send.
+ */
+export function fittingRowSendability(row: FittingRow): FittingRowSendability {
+  if (row.count.status !== "counted") {
+    return { ok: false, reason: "not-counted", message: row.count.why };
+  }
+  if (row.qty <= 0) {
+    return { ok: false, reason: "none", message: row.count.why };
+  }
+  if (!row.pick.ok) {
+    return { ok: false, reason: "no-material", message: row.pick.why };
+  }
+  return { ok: true };
+}
+
+export function fittingRows(
+  counts: Record<FittingKind, FittingCount>,
+  picks: Record<FittingKind, FittingMaterialPick>
+): FittingRow[] {
+  return FITTING_KINDS.map(kind => {
+    const count = counts[kind];
+    return {
+      role: kind,
+      count,
+      pick: picks[kind],
+      qty: count.status === "counted" ? count.qty : 0,
+    };
+  });
 }

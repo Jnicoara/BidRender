@@ -231,13 +231,28 @@ describe.skipIf(!hasDb)(
 
       const detail = await caller().bids.get({ id: bidId });
       const allLines = (detail as unknown as { lines?: unknown[] }).lines ?? [];
-      const ours = (
+      const typed = (
         allLines as Array<{
           takeoffRunTypeId: number | null;
+          runMaterialRole: string | null;
           snapshotMaterialCost: string | number;
           qty: string | number;
         }>
       ).filter(l => l.takeoffRunTypeId === type.id);
+      /*
+        The FITTINGS go too, since 2026-09-26 — couplings, connectors and
+        straps counted from the same run. They come from shipped catalog rows,
+        which this test has not priced, so they arrive unpriced and the bid
+        screen says "Not priced" on them. The money assertions below are about
+        pipe and wire, as they always were; fittings have their own suite
+        (runFittingsBridge.test.ts).
+      */
+      expect(typed.map(l => l.runMaterialRole)).toEqual(
+        expect.arrayContaining(["coupling", "connector", "strap"])
+      );
+      const ours = typed.filter(l =>
+        ["raceway", "conductor", "ground"].includes(l.runMaterialRole ?? "")
+      );
       expect(ours.length).toBeGreaterThan(0);
 
       // THE ASSERTION THE BRIEF ASKED FOR: no $0 lines.

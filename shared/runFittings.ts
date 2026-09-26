@@ -57,6 +57,11 @@ export const STICK_JOINTS = [
 ] as const;
 export type StickJoint = (typeof STICK_JOINTS)[number];
 
+/** A stored varchar that is one of the four, or not. */
+export function isStickJoint(value: unknown): value is StickJoint {
+  return (STICK_JOINTS as readonly unknown[]).includes(value);
+}
+
 /** What this module needs to know about the pipe. Structural, not the row. */
 export type RacewayFittingSpec = {
   /** For the sentences: `1/2" EMT`. */
@@ -94,6 +99,13 @@ export type FittingLeg = {
 
 export const FITTING_KINDS = ["coupling", "connector", "strap"] as const;
 export type FittingKind = (typeof FITTING_KINDS)[number];
+
+/** Whether a bid line's run role is a fitting (a count) rather than footage. */
+export function isFittingRole(
+  role: string | null | undefined
+): role is FittingKind {
+  return (FITTING_KINDS as readonly unknown[]).includes(role);
+}
 
 /**
  * One kind of fitting, counted.

@@ -28,6 +28,8 @@ import {
   type StoredCircuit,
 } from "../shared/takeoffQuantities";
 import { runWireOwnership } from "../shared/branchWire";
+import { legFromRun, type FittingLeg } from "../shared/runFittings";
+import { uncountedEnds } from "../shared/takeoffHeights";
 import { verticalsForRunRow, type HeightContext } from "./runVerticals";
 
 export type RunTypeFootageRow = {
@@ -47,6 +49,13 @@ export type RunTypeFootageRow = {
   unansweredCount: number;
   /** Runs of this type excluded because the devices already carry them. */
   branchCount: number;
+  /**
+   * Every counted CONDUIT run of this type as a leg, for the fitting count
+   * (`shared/runFittings.ts`). An unmeasurable run is here too with `feet`
+   * NULL — its connectors can still be counted, and the count says why its
+   * couplings and straps cannot. Empty on a cable type.
+   */
+  legs: FittingLeg[];
 };
 
 /** A run row, as far as grouping its footage is concerned. */
@@ -63,6 +72,9 @@ export type GroupableRun = {
   startHeightInches: number | null;
   endHeightInches: number | null;
   distributionHeightInches: number | null;
+  /** Which stamp each end is linked to — the only way two runs meet. */
+  startStampId: number | null;
+  endStampId: number | null;
 };
 
 export type SheetScale = {
@@ -117,6 +129,7 @@ export function groupRunFootage(input: {
         unmeasurableCount: 0,
         unansweredCount: 0,
         branchCount: 0,
+        legs: [],
       };
       byType.set(runTypeId, row);
     }
@@ -144,12 +157,36 @@ export function groupRunFootage(input: {
         ? sheet.scaleRatio
         : null;
 
+    const verticals = verticalsForRunRow(run, input.heights);
     const quantities = quantitiesForRun(
       { pathType: run.pathType, points: run.points },
       (input.circuitsByRun.get(run.id) ?? []).map(circuitWire),
       ratio,
-      verticalsForRunRow(run, input.heights)
+      verticals
     );
+
+    /*
+      The same run as a LEG for the fitting count, from the same numbers the
+      footage uses — so the pipe a coupling is counted over is exactly the
+      pipe on the bid. Added before the unmeasurable `continue`, because a run
+      with no scale still has two ends and therefore two connectors.
+    */
+    if (run.pathType === "conduit") {
+      row.legs.push(
+        legFromRun({
+          id: run.id,
+          startStampId: run.startStampId,
+          endStampId: run.endStampId,
+          points: run.points,
+          conduitFeet: quantities?.conduitFeet ?? null,
+          countedDrops:
+            (verticals?.start.counted ? 1 : 0) +
+            (verticals?.end.counted ? 1 : 0),
+          uncountedEnds: verticals ? uncountedEnds(verticals).length : 0,
+        })
+      );
+    }
+
     if (!quantities) {
       row.unmeasurableCount++;
       continue;
