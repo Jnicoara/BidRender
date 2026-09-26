@@ -561,6 +561,20 @@
       "when": 1789956900000,
       "tag": "0079_pricing_problem_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "5",
+      "when": 1789957000000,
+      "tag": "0080_company_seat_limit",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "5",
+      "when": 1789957100000,
+      "tag": "0081_backfill_company_seat_limit",
+      "breakpoints": true
     }
   ]
 }

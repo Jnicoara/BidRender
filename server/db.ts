@@ -190,6 +190,11 @@ import {
 } from "./seed/baselineAssemblies";
 import { BASELINE_KITS } from "./seed/baselineKits";
 import { TRADE_ALL, normalizeTradeId, resolveForTrade } from "../shared/trades";
+import {
+  lowerLimitRefusal,
+  seatRefusal,
+  type SeatUsage,
+} from "../shared/seats";
 import { hourlyCostFor } from "../shared/laborRateLookup";
 import { appliedModifiers } from "../shared/modifierLookup";
 import { resolveMaterial, materialIdsToFetch } from "../shared/materialLookup";
@@ -8036,13 +8041,6 @@ export async function getCompanyInvites(
     .limit(limit);
 }
 
-export async function createInvite(data: InsertCompanyInvite): Promise<number> {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
-  const [result] = await db.insert(companyInvites).values(data);
-  return result.insertId;
-}
-
 /**
  * Find an invitation by the hash of its code.
  *
@@ -8078,31 +8076,297 @@ export async function revokeInvite(
     );
 }
 
+/*
+  `createInvite` and `acceptInvite` used to live here and wrote without asking
+  about seats. They were REMOVED rather than left beside the seat-checked
+  versions below (2026-09-26): an unchecked export is a way round the limit for
+  whoever next reaches for the shorter name. Use `createInviteWithinSeats` and
+  `acceptInviteWithinSeats`.
+*/
+
+// ─── Seats ────────────────────────────────────────────────────────────────────
 /**
- * Redeem an invitation: mark it used and add the membership.
+ * Seat enforcement. The rules are in shared/seats.ts; this is where they are
+ * applied, and it is the only place.
  *
- * The two writes are ordered so the invite is consumed FIRST. If the second
- * fails, the code is spent and nobody joined — recoverable by issuing another.
- * The other order would leave a usable code after someone had already joined
- * with it, which is a second stranger in the company.
+ * ── Why a lock, and why on the company row ───────────────────────────────────
+ * "Count, then insert" is two statements. Two owners' tabs inviting at the same
+ * moment would both count four of five and both insert, and the company would
+ * be at six with nothing on screen to say how. So every write that can take a
+ * seat runs in a transaction that first takes `SELECT … FOR UPDATE` on the
+ * company row: the second request waits, then counts what the first one wrote.
+ * One row per company, so this serialises seat changes within a company and
+ * never across companies.
+ *
+ * Freeing a seat (revoking, suspending) takes no lock: it can only move a
+ * count down, and a count that is momentarily too high refuses — which is the
+ * safe direction.
  */
-export async function acceptInvite(
-  invite: CompanyInvite,
-  userId: number
-): Promise<void> {
+type Tx = Parameters<Parameters<MySql2Database["transaction"]>[0]>[0];
+
+export type SeatOutcome<T> =
+  | { ok: true; value: T }
+  | { ok: false; message: string };
+
+async function countSeats(
+  tx: Tx | MySql2Database,
+  companyId: number,
+  seatLimit: number,
+  now: Date
+): Promise<SeatUsage> {
+  const [members] = await tx
+    .select({ n: sql<number>`count(*)` })
+    .from(companyMembers)
+    .where(
+      and(
+        eq(companyMembers.companyId, companyId),
+        eq(companyMembers.status, "active")
+      )
+    );
+  const [pending] = await tx
+    .select({ n: sql<number>`count(*)` })
+    .from(companyInvites)
+    .where(
+      and(
+        eq(companyInvites.companyId, companyId),
+        isNull(companyInvites.acceptedAt),
+        isNull(companyInvites.revokedAt),
+        gt(companyInvites.expiresAt, now)
+      )
+    );
+  return {
+    seatLimit,
+    activeMembers: Number(members?.n ?? 0),
+    pendingInvites: Number(pending?.n ?? 0),
+  };
+}
+
+/**
+ * Run `work` holding the company row, with the seat count read under the lock.
+ * `work` returns a refusal message to roll back, or a value to commit.
+ */
+async function withSeatLock<T>(
+  companyId: number,
+  work: (usage: SeatUsage, tx: Tx) => Promise<SeatOutcome<T>>
+): Promise<SeatOutcome<T>> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  await db
-    .update(companyInvites)
-    .set({ acceptedAt: new Date(), acceptedByUserId: userId })
-    .where(eq(companyInvites.id, invite.id));
-  await db.insert(companyMembers).values({
-    companyId: invite.companyId,
-    userId,
-    role: invite.role,
-    status: "active",
-    invitedByUserId: invite.createdByUserId,
+  const refused = Symbol("refused");
+  let outcome: SeatOutcome<T> | undefined;
+  try {
+    await db.transaction(async tx => {
+      const [company] = await tx
+        .select({ seatLimit: companies.seatLimit })
+        .from(companies)
+        .where(eq(companies.id, companyId))
+        .for("update");
+      if (!company) {
+        outcome = { ok: false, message: "That company no longer exists." };
+        throw refused;
+      }
+      const usage = await countSeats(
+        tx,
+        companyId,
+        company.seatLimit,
+        new Date()
+      );
+      outcome = await work(usage, tx);
+      // A refusal must not commit anything `work` wrote before deciding.
+      if (!outcome.ok) throw refused;
+    });
+  } catch (error) {
+    if (error !== refused) throw error;
+  }
+  return outcome!;
+}
+
+/** Seats for one company, unlocked — for showing, never for deciding. */
+export async function getSeatUsage(
+  companyId: number
+): Promise<SeatUsage | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [company] = await db
+    .select({ seatLimit: companies.seatLimit })
+    .from(companies)
+    .where(eq(companies.id, companyId))
+    .limit(1);
+  if (!company) return undefined;
+  return countSeats(db, companyId, company.seatLimit, new Date());
+}
+
+/** Create an invitation if a seat is free. It then holds that seat. */
+export async function createInviteWithinSeats(
+  data: InsertCompanyInvite
+): Promise<SeatOutcome<number>> {
+  return withSeatLock(data.companyId, async (usage, tx) => {
+    const refusal = seatRefusal(usage, 1);
+    if (refusal) return { ok: false, message: refusal };
+    const [result] = await tx.insert(companyInvites).values(data);
+    return { ok: true, value: result.insertId };
   });
+}
+
+/**
+ * Redeem an invitation, re-checking seats under the lock.
+ *
+ * The invite is RE-READ here rather than trusted from the caller's earlier
+ * read: between the two, another request may have redeemed or revoked it, and
+ * without this two people could join on one code. Checked with `adding` 0
+ * because a pending invite already holds its seat — so this refuses exactly
+ * when the company is already over, e.g. its limit was cut after the code went
+ * out.
+ */
+export async function acceptInviteWithinSeats(
+  inviteId: number,
+  userId: number
+): Promise<SeatOutcome<CompanyInvite>> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [first] = await db
+    .select({ companyId: companyInvites.companyId })
+    .from(companyInvites)
+    .where(eq(companyInvites.id, inviteId))
+    .limit(1);
+  if (!first) return { ok: false, message: "That invitation is not valid." };
+
+  return withSeatLock(first.companyId, async (usage, tx) => {
+    const now = new Date();
+    const [invite] = await tx
+      .select()
+      .from(companyInvites)
+      .where(
+        and(
+          eq(companyInvites.id, inviteId),
+          isNull(companyInvites.acceptedAt),
+          isNull(companyInvites.revokedAt),
+          gt(companyInvites.expiresAt, now)
+        )
+      )
+      .for("update");
+    if (!invite) return { ok: false, message: "That invitation is not valid." };
+
+    const refusal = seatRefusal(usage, 0);
+    if (refusal) return { ok: false, message: refusal };
+
+    // Same order as before this was a transaction, and for the same reason:
+    // consume the code first. Inside one transaction the order no longer
+    // decides what survives a failure — both or neither — but it costs nothing.
+    await tx
+      .update(companyInvites)
+      .set({ acceptedAt: now, acceptedByUserId: userId })
+      .where(eq(companyInvites.id, invite.id));
+    await tx.insert(companyMembers).values({
+      companyId: invite.companyId,
+      userId,
+      role: invite.role,
+      status: "active",
+      invitedByUserId: invite.createdByUserId,
+    });
+    return { ok: true, value: invite };
+  });
+}
+
+/**
+ * Restore a suspended member, if a seat is free.
+ *
+ * Suspending frees a seat, so restoring has to take one — otherwise
+ * suspend, invite, restore walks straight past the limit.
+ */
+export async function restoreMemberWithinSeats(
+  companyId: number,
+  userId: number
+): Promise<SeatOutcome<null>> {
+  return withSeatLock(companyId, async (usage, tx) => {
+    const [member] = await tx
+      .select({ status: companyMembers.status })
+      .from(companyMembers)
+      .where(
+        and(
+          eq(companyMembers.companyId, companyId),
+          eq(companyMembers.userId, userId)
+        )
+      )
+      .limit(1);
+    // Already active holds a seat already; restoring it again takes nothing.
+    if (member?.status !== "suspended") return { ok: true, value: null };
+    const refusal = seatRefusal(usage, 1);
+    if (refusal) return { ok: false, message: refusal };
+    await tx
+      .update(companyMembers)
+      .set({ status: "active" })
+      .where(
+        and(
+          eq(companyMembers.companyId, companyId),
+          eq(companyMembers.userId, userId)
+        )
+      );
+    return { ok: true, value: null };
+  });
+}
+
+/**
+ * Change a company's limit. Refused below what is in use — the rule a plan
+ * downgrade will reuse once billing exists.
+ */
+export async function setSeatLimit(
+  companyId: number,
+  seatLimit: number
+): Promise<SeatOutcome<SeatUsage>> {
+  return withSeatLock(companyId, async (usage, tx) => {
+    const refusal = lowerLimitRefusal(usage, seatLimit);
+    if (refusal) return { ok: false, message: refusal };
+    await tx
+      .update(companies)
+      .set({ seatLimit })
+      .where(eq(companies.id, companyId));
+    return { ok: true, value: { ...usage, seatLimit } };
+  });
+}
+
+/**
+ * Every company with its seats, for the Admin screen. Cross-company by
+ * design, so only an `adminProcedure` may call it.
+ *
+ * Counted in SQL rather than per company, so the screen is one query however
+ * many companies there are. Bounded by `limit`.
+ */
+export async function listCompanySeats(limit = 500): Promise<
+  Array<
+    SeatUsage & {
+      companyId: number;
+      companyName: string;
+      ownerEmail: string | null;
+    }
+  >
+> {
+  const db = await getDb();
+  if (!db) return [];
+  const now = new Date();
+  const rows = await db
+    .select({
+      companyId: companies.id,
+      companyName: companies.name,
+      ownerEmail: users.email,
+      seatLimit: companies.seatLimit,
+      activeMembers: sql<number>`(select count(*) from ${companyMembers}
+        where ${companyMembers.companyId} = ${companies.id}
+          and ${companyMembers.status} = 'active')`,
+      pendingInvites: sql<number>`(select count(*) from ${companyInvites}
+        where ${companyInvites.companyId} = ${companies.id}
+          and ${companyInvites.acceptedAt} is null
+          and ${companyInvites.revokedAt} is null
+          and ${companyInvites.expiresAt} > ${now})`,
+    })
+    .from(companies)
+    .leftJoin(users, eq(users.id, companies.ownerUserId))
+    .orderBy(asc(companies.id))
+    .limit(limit);
+  return rows.map(row => ({
+    ...row,
+    activeMembers: Number(row.activeMembers),
+    pendingInvites: Number(row.pendingInvites),
+  }));
 }
 
 /** Platform-level tier change. Admin only — see the router. */

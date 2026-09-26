@@ -6,6 +6,24 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **Companies now have a seat limit.** Every active member counts, viewers
+  and the owner included, and so does every invitation not yet used, so a
+  company can't send out more codes than it has room for. Suspending someone
+  or revoking an invitation frees the seat straight away. The Crew page shows
+  "X of Y seats used" and, when it's full, says "All Y seats are in use.
+  Remove someone or add a seat." The server checks at every step: sending an
+  invite, accepting one (in case the limit dropped since it was sent) and
+  restoring a suspended member. New companies start with 1 seat. Every
+  existing company was raised to at least what it already uses, so nobody lost
+  access. BidRidge admins set limits by hand in a new "Seats" section on the
+  Admin screen, which refuses a limit below what a company already uses and
+  says how many people to remove first. Billing will set the same number later.
+- **Run types were already shared across a company, and now there's a test
+  that keeps it that way.** A note in the code called them per-user, but every
+  member has always seen the same palette. The note is corrected, and tests
+  now check that a second member sees the first member's types and that one
+  company never sees another's.
+
 - **Admins can now look up an ERR- reference and see what is still
   outstanding.** A new "Pricing problems" section on the Admin screen lists
   every report of a bid line that couldn't be priced, filtered to open,

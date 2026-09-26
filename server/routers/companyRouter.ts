@@ -42,6 +42,7 @@ import {
   outranks,
   type CompanyRole,
 } from "../../shared/permissions";
+import { seatRefusal, seatSummary, seatsInUse } from "../../shared/seats";
 import * as db from "../db";
 
 const manage = requireCapability("members.manage");
@@ -161,7 +162,9 @@ export const companyRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const code = generateInviteCode();
-      const id = await db.createInvite({
+      // A pending invitation holds a seat (shared/seats.ts), so this is
+      // refused when none is free — checked under the company row's lock.
+      const created = await db.createInviteWithinSeats({
         companyId: ctx.scope.companyId,
         email: input.email ?? null,
         role: input.role,
@@ -169,8 +172,30 @@ export const companyRouter = router({
         expiresAt: inviteExpiresAt(new Date()),
         createdByUserId: ctx.scope.actorUserId,
       });
-      return { id, code, role: input.role };
+      if (!created.ok) {
+        throw new TRPCError({ code: "FORBIDDEN", message: created.message });
+      }
+      return { id: created.value, code, role: input.role };
     }),
+
+  /**
+   * "X of Y seats used". Any member may read it: it is a count, it names
+   * nobody, and a viewer wondering why they cannot add a colleague should be
+   * able to see why.
+   */
+  seats: companyProcedure.query(async ({ ctx }) => {
+    const usage = await db.getSeatUsage(ctx.scope.companyId);
+    if (!usage) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Company not found." });
+    }
+    return {
+      ...usage,
+      inUse: seatsInUse(usage),
+      summary: seatSummary(usage),
+      /** Null while a seat is free; the exact refusal the server gives when not. */
+      fullMessage: seatRefusal(usage, 1),
+    };
+  }),
 
   revokeInvite: manage
     .input(z.object({ id: z.number().int().positive() }))
@@ -217,7 +242,16 @@ export const companyRouter = router({
         });
       }
 
-      await db.acceptInvite(invite, ctx.scope.actorUserId);
+      // Re-checks seats and re-reads the invite under the company's lock: the
+      // limit may have been cut since the code went out, and the code may have
+      // been redeemed by someone else a moment ago.
+      const accepted = await db.acceptInviteWithinSeats(
+        invite.id,
+        ctx.scope.actorUserId
+      );
+      if (!accepted.ok) {
+        throw new TRPCError({ code: "FORBIDDEN", message: accepted.message });
+      }
       // Land them in the company they just joined. Without this they would
       // stay in whichever they had longest — usually their own company of one
       // — and the invitation would look like it had done nothing.
@@ -341,7 +375,22 @@ export const companyRouter = router({
         });
       }
 
-      await db.setMemberStatus(ctx.scope.companyId, input.userId, input.status);
+      if (input.status === "active") {
+        // Suspending freed their seat, so restoring takes one back.
+        const restored = await db.restoreMemberWithinSeats(
+          ctx.scope.companyId,
+          input.userId
+        );
+        if (!restored.ok) {
+          throw new TRPCError({ code: "FORBIDDEN", message: restored.message });
+        }
+      } else {
+        await db.setMemberStatus(
+          ctx.scope.companyId,
+          input.userId,
+          input.status
+        );
+      }
       return { success: true };
     }),
 

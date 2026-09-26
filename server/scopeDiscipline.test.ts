@@ -71,6 +71,8 @@ const ADMIN_ONLY: Record<string, string> = {
     "Runs and reports the platform-wide R2 backup. Not a contractor's data at all.",
   "aiUsageRouter.ts":
     "Reports AI spend across every account, so seeing it is seeing across companies. It reads only counts and money — never a prompt, a question or a reply — so there is no contractor data here to scope.",
+  "seatLimitsRouter.ts":
+    "Reads and sets each company's seat limit — a platform decision until billing makes it one, never a company role's. Reads counts only, no contractor data.",
 };
 
 describe("every data router is company-scoped", () => {
@@ -135,14 +137,17 @@ describe("every data router is company-scoped", () => {
   /**
    * Routes allowed to accept a company id from the caller.
    *
-   * Exactly one, and it re-checks membership before honouring it. Everywhere
-   * else this parameter would turn every capability check into theatre: a
-   * member could name someone else's company and be authorised against their
-   * own role in their own.
+   * Two. One MEMBER route, which re-checks membership before honouring it, and
+   * one PLATFORM-ADMIN router, where naming the company is the whole job.
+   * Everywhere else this parameter would turn every capability check into
+   * theatre: a member could name someone else's company and be authorised
+   * against their own role in their own.
    */
   const TAKES_COMPANY_ID: Record<string, string> = {
     "companyRouter.ts":
       "switchCompany, which re-reads the membership and refuses an id the actor cannot reach. Every later request re-resolves the scope anyway, so this is a convenience check, not the guard.",
+    "seatLimitsRouter.ts":
+      "A platform admin choosing which company's seat limit to change. Safe only because the file is also in ADMIN_ONLY, whose check refuses any companyProcedure or protectedProcedure in it — see the test below.",
   };
 
   it("never lets a route take a company id from the caller", () => {
@@ -159,5 +164,18 @@ describe("every data router is company-scoped", () => {
     // removes the check, the exemption becomes a bypass.
     const src = read("companyRouter.ts");
     expect(src).toMatch(/getMembership\(\s*input\.companyId/);
+  });
+
+  it("keeps every company-id route either membership-checked or admin-only", () => {
+    // The seat-limit exemption is only safe while the router is admin-only.
+    // Taking it out of ADMIN_ONLY must fail here, not quietly leave a route
+    // that lets anyone name a company.
+    for (const file of Object.keys(TAKES_COMPANY_ID)) {
+      if (file === "companyRouter.ts") continue;
+      expect({ file, adminOnly: Boolean(ADMIN_ONLY[file]) }).toEqual({
+        file,
+        adminOnly: true,
+      });
+    }
   });
 });

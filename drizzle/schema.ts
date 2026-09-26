@@ -2377,6 +2377,9 @@ export const RUN_PATH_TYPES = ["conduit", "cable"] as const;
  * app-owned row**, shared by everyone and re-stamped from the seed on startup;
  * a set `userId` is that contractor's own. Editing a shipped row forks it
  * rather than changing everyone's (CLAUDE.md § Customization available).
+ * "Contractor" means the COMPANY: `userId` holds the company owner's id, as on
+ * every other table (see the companies block), so every member shares one
+ * palette.
  *
  * **What ships carries IDENTITY and no money.** A handful of recognisable types
  * — 1/2in EMT with 2 #12 and a ground, 12/2 MC — so the first trace does not
@@ -4051,6 +4054,17 @@ export const companies = mysqlTable(
     ownerUserId: int("ownerUserId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /**
+     * How many seats this company may use: active members plus pending
+     * invitations (shared/seats.ts says why both, and why not suspended).
+     *
+     * Set by hand from the Admin screen until billing exists; a plan will set
+     * it later. The default is `DEFAULT_SEAT_LIMIT` — just the owner — and is
+     * written as a literal because this file imports nothing from shared/;
+     * `server/seats.test.ts` fails if the two disagree. 0080 added it and 0081
+     * raised every existing company to at least what it was already using.
+     */
+    seatLimit: int("seatLimit").default(1).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },

@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import EarlyAccessSignups from "@/components/EarlyAccessSignups";
 import { AiSpendPanel } from "@/components/AiSpendPanel";
 import { PricingProblemsPanel } from "@/components/PricingProblemsPanel";
+import { SeatLimitsPanel } from "@/components/SeatLimitsPanel";
 
 export default function AdminSettingsPage() {
   const { user } = useAuth();
@@ -51,8 +52,8 @@ export default function AdminSettingsPage() {
           <div>
             <h1 className="text-lg font-semibold">Admin</h1>
             <p className="text-xs text-muted-foreground">
-              Early access signups, AI spend, pricing problems, and what each
-              platform role can reach.
+              Early access signups, AI spend, pricing problems, seats per
+              company, and what each platform role can reach.
             </p>
           </div>
         </div>
@@ -72,6 +73,8 @@ export default function AdminSettingsPage() {
             contractor's reference is read into. */}
         <PricingProblemsPanel />
 
+        {/* Fourth: seats per company, until billing sets them. */}
+        <SeatLimitsPanel />
         {/* Role reference */}
         <div>
           <h2 className="text-sm font-semibold mb-3">Platform roles</h2>

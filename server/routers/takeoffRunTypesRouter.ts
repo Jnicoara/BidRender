@@ -5,10 +5,20 @@
  * A counted group (takeoffGroupsRouter) is per bid, because "14 exit signs on
  * this school" is a fact about one job. A run type is the opposite kind of
  * thing: "3/4in EMT, 3 #12 THHN" is the same definition on every job this
- * contractor will ever bid. So it is scoped to the USER and behaves like the
- * material catalog — shipped rows everyone shares, the contractor's own
+ * contractor will ever bid. So it is a COMPANY library and behaves like the
+ * material catalog — shipped rows everyone shares, the company's own
  * alongside them, and editing a shipped row forks it rather than changing it
  * for everybody.
+ *
+ * ── Company-wide, and it always was ─────────────────────────────────────────
+ * This said "scoped to the USER" until 2026-09-26, and was read as meaning a
+ * second member could not see the first one's types. They always could: every
+ * procedure here reads and writes under `ctx.scope.dataUserId`, which is the
+ * company OWNER's id (schema.ts, the companies block), so a type any member
+ * makes is filed under the owner and read back by all of them. The column is
+ * still called `userId` because that is how every company table is keyed.
+ * `server/seats.test.ts` § "run types" pins both directions and the isolation
+ * between companies. Never write `ctx.scope.actorUserId` here.
  *
  * ── The decision this implements ────────────────────────────────────────────
  * D3(a) in references/takeoff-spec.md, made 2026-09-14 and reconciled into

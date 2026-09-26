@@ -1,0 +1,20 @@
+-- Seat limits: how many people a company may have (shared/seats.ts).
+--
+-- ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE. One new column on `companies`.
+-- No UPDATE, no existing column touched.
+--
+-- NOT NULL with a DEFAULT, deliberately, and unlike the nullable-no-default
+-- shape used for a column whose meaning changes (references/deploying.md § 5).
+-- Nothing here has an old meaning to preserve: the default is simply what a
+-- company gets, and it has to be in the DATABASE rather than only in the code
+-- because OLD code keeps creating companies (signup, first request) between
+-- this file and the deploy, and it knows nothing about the column.
+--
+-- The 1 is DEFAULT_SEAT_LIMIT in shared/seats.ts — just the owner. It is
+-- written here as a literal because SQL cannot import it; server/seats.test.ts
+-- reads this file and fails if the two disagree.
+--
+-- Every EXISTING company is raised to what it already uses by 0081, so nobody
+-- loses access on deploy day. Between the two files a company with more than
+-- one person reads as over its limit, which old code ignores entirely.
+ALTER TABLE `companies` ADD `seatLimit` int DEFAULT 1 NOT NULL;

@@ -37,6 +37,7 @@ import { earlyAccessRouter } from "./routers/earlyAccessRouter";
 import { backupRouter } from "./routers/backupRouter";
 import { aiUsageRouter } from "./routers/aiUsageRouter";
 import { pricingProblemsRouter } from "./routers/pricingProblemsRouter";
+import { seatLimitsRouter } from "./routers/seatLimitsRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -100,6 +101,8 @@ export const appRouter = router({
   aiUsage: aiUsageRouter,
   // ERR- references from bids that could not be fully priced.
   pricingProblems: pricingProblemsRouter,
+  // Admin-only. Seats per company, set by hand until billing exists.
+  seatLimits: seatLimitsRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -215,6 +215,10 @@ describeDb("a real company with a real crew", () => {
     const [company] = await database!.insert(companies).values({
       name: `Perms Co ${uniq()}`,
       ownerUserId: OWNER,
+      // Room to invite. This suite is about who may act, not how many fit;
+      // seat limits are server/seats.test.ts. Without it the default of one
+      // seat refuses every invitation here before permissions are reached.
+      seatLimit: 20,
     });
     companyId = company.insertId;
     for (const [userId, role, status] of [

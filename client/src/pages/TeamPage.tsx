@@ -62,6 +62,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   const { data: invites = [] } = trpc.company.invites.useQuery(undefined, {
     enabled: canManage,
   });
+  const { data: seats } = trpc.company.seats.useQuery();
 
   const [inviteRole, setInviteRole] = useState<CompanyRole>("estimator");
   const [inviteEmail, setInviteEmail] = useState("");
@@ -69,9 +70,14 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   const [freshCode, setFreshCode] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState("");
 
+  // Every mutation on this screen goes through here, so the seat count is in
+  // it: inviting, revoking, suspending and restoring all move it, and a count
+  // left out of this list would state yesterday's number (CLAUDE.md § "A test
+  // that calls the server cannot see a screen showing yesterday's answer").
   const refresh = () => {
     void utils.company.members.invalidate();
     void utils.company.invites.invalidate();
+    void utils.company.seats.invalidate();
   };
 
   const invite = trpc.company.invite.useMutation({
@@ -103,6 +109,9 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
     onError: error => toast.error(error.message),
     onSuccess: () => refresh(),
   });
+
+  /** The server's own refusal, shown before anyone clicks. Null while a seat is free. */
+  const seatsFull = seats?.fullMessage ?? null;
 
   const accept = trpc.company.acceptInvite.useMutation({
     onError: error => toast.error(error.message),
@@ -232,7 +241,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
               <Button
                 size="sm"
                 className="h-8 gap-1.5"
-                disabled={invite.isPending}
+                disabled={invite.isPending || seatsFull !== null}
                 onClick={() =>
                   invite.mutate({
                     role: inviteRole as Exclude<CompanyRole, "owner">,
@@ -245,18 +254,40 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
                 <UserPlus className="w-3.5 h-3.5" /> Create code
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">{inviteRole}</span>{" "}
-              — {ROLE_BLURB[inviteRole]}
-            </p>
+            {seatsFull ? (
+              <p className="text-xs text-amber-500" role="status">
+                {seatsFull}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">
+                  {inviteRole}
+                </span>{" "}
+                — {ROLE_BLURB[inviteRole]}
+              </p>
+            )}
           </section>
         )}
 
         {/* ── Crew ── */}
         <section className="space-y-2">
-          <h2 className="text-sm font-semibold">
-            In this company ({members.length})
-          </h2>
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-sm font-semibold">
+              In this company ({members.length})
+            </h2>
+            {/* Members plus pending invitations; suspended people hold no
+                seat. The rule is shared/seats.ts. */}
+            {seats && (
+              <span
+                className={cn(
+                  "text-xs shrink-0",
+                  seatsFull ? "text-amber-500" : "text-muted-foreground"
+                )}
+              >
+                {seats.summary}
+              </span>
+            )}
+          </div>
           {isLoading ? (
             <div className="h-20 rounded bg-muted/40 animate-pulse" />
           ) : (
