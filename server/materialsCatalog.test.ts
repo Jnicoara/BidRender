@@ -18,7 +18,7 @@ import {
 } from "./seed/baselineMaterials";
 import { BASELINE_ASSEMBLIES } from "./seed/baselineAssemblies";
 import { MATERIAL_CATEGORIES } from "../drizzle/schema";
-import { materials } from "../drizzle/schema";
+import { materials, users } from "../drizzle/schema";
 import {
   getDb,
   getLibraryMaterials,
@@ -38,7 +38,16 @@ import {
 } from "../shared/runFittingMaterials";
 
 const hasDb = !!process.env.DATABASE_URL;
-const USER = 7373;
+/**
+ * This suite's own fixture user, created in the seeding block's beforeAll.
+ *
+ * It was 7373 until 2026-09-26 — bidArchive.test.ts's id — and this file
+ * never created it. So it passed whenever bidArchive had already run, or the
+ * database still held the row from an older run, and failed on a fresh test
+ * database with a foreign-key error (materials.userId -> users.id): passed
+ * alone, failed in the full suite.
+ */
+const USER = 7393;
 
 // ─── Shape — pure, no database ────────────────────────────────────────────────
 
@@ -451,6 +460,20 @@ describe.skipIf(!hasDb)("seeding the catalog into a live database", () => {
     // baseline it came from — mergeLibraryRows does that by design — and the
     // tests below would then be looking for a row that is deliberately absent.
     const db = await getDb();
+    // The user must exist: a fork is a materials row, and materials.userId is
+    // a real foreign key. Created here rather than borrowed — see USER.
+    const [existing] = await db!
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, USER))
+      .limit(1);
+    if (!existing) {
+      await db!.insert(users).values({
+        id: USER,
+        openId: `test-materials-catalog-${USER}`,
+        name: `Materials catalog user ${USER}`,
+      });
+    }
     await db!.delete(materials).where(eq(materials.userId, USER));
     await seedBaselineMaterials();
   });
