@@ -65,6 +65,10 @@ async function ownAssembly(name: string, costPerUnit: number, hours: number) {
   const [assembly] = await database!.insert(assemblies).values({
     userId: USER,
     name,
+    // Required (NOT NULL). Left out, MySQL stored the enum's first value
+    // anyway — measured "Devices" on the test database, even in strict mode —
+    // so saying it changes no row, only makes the fixture say what it is.
+    category: "Devices",
     baseLaborHours: hours.toFixed(4),
     laborRateId: rate.insertId,
   });
@@ -517,7 +521,19 @@ withDb("a count follows YOUR fork of a shipped assembly", () => {
       id: baselineId,
       baseLaborHours: 1.25,
     });
-    expect(forked!.id).not.toBe(baselineId);
+    /*
+      THE FORK'S id. This read `forked!.id` — but update returns
+      { assembly, forked }, so that was undefined and this assertion compared
+      undefined with the baseline id: it could never fail. Found 2026-09-26
+      when this file was first typechecked.
+
+      Measured against an update that never forks (edit reverted): this line
+      now fails right here, "expected 14391 not to be 14391". The old one
+      passed, and the test only went red two assertions later on a snapshot
+      HOURS mismatch ("expected 0.5 to be 1.25") — caught, but blaming the
+      wrong thing.
+    */
+    expect(forked.assembly?.id).not.toBe(baselineId);
 
     // The group still points at the baseline — that is the whole situation.
     const [stored] = await database!
