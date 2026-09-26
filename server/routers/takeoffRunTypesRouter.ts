@@ -115,15 +115,25 @@ async function refuseDuplicate(
   userId: number,
   label: string,
   pathType: (typeof RUN_PATH_TYPES)[number],
-  exceptId?: number
+  /**
+   * The type being edited. Its whole LINEAGE is exempt — the shipped row and
+   * every fork of it, archived ones included.
+   *
+   * This used to exempt one id, the fork, so editing a shipped type that the
+   * company had once forked and archived was refused as a duplicate of ITS
+   * OWN archived copy: "already has a conduit type called 1/2" EMT, 2 #12 +
+   * ground". Found 2026-09-26 by saving a fitting style on the fixture bid.
+   */
+  except?: { id: number; baselineId: number | null }
 ) {
   const all = await db.getRunTypesFor(userId, true);
   const wanted = label.trim().toLowerCase();
+  const root = except ? (except.baselineId ?? except.id) : null;
   const clash = all.find(
     t =>
       t.label.trim().toLowerCase() === wanted &&
       t.pathType === pathType &&
-      t.id !== exceptId
+      (root === null || (t.id !== root && t.baselineId !== root))
   );
   if (clash) {
     throw new TRPCError({
@@ -330,19 +340,24 @@ export const takeoffRunTypesRouter = router({
     .mutation(async ({ input, ctx }) => {
       const target = await requireOwnType(input.id, ctx.scope.dataUserId);
 
-      const id =
-        target.userId === null
-          ? await db.forkRunType(target.id, ctx.scope.dataUserId)
-          : target.id;
-
+      /*
+        REFUSE BEFORE FORKING. The check ran after the fork until 2026-09-26,
+        so every refused save of a shipped type left a new, unedited fork
+        behind — two of them from two clicks on the fixture bid.
+      */
       if (input.label !== undefined) {
         await refuseDuplicate(
           ctx.scope.dataUserId,
           input.label,
           target.pathType,
-          id
+          target
         );
       }
+
+      const id =
+        target.userId === null
+          ? await db.forkRunType(target.id, ctx.scope.dataUserId)
+          : target.id;
 
       const { id: _ignored, ...rest } = input;
       await db.updateRunType(id, ctx.scope.dataUserId, rest);

@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **Fixed saving a starter run type you had once edited and archived.** The
+  save was refused as a duplicate of your own archived copy ("Your palette
+  already has a conduit type called…"), and each refused attempt left an
+  extra unused copy behind. The save now goes through, and editing a starter
+  type again reuses your existing copy instead of making another.
 - **Couplings, connectors and straps now go to the bid with the pipe.**
   Sending a traced conduit type to a bid now also sends its fittings, counted
   from the runs and priced from the catalog row for that pipe, size and style

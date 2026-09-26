@@ -7262,6 +7262,29 @@ export async function forkRunType(id: number, userId: number): Promise<number> {
   if (source.userId !== null) return source.id;
 
   /*
+    IDEMPOTENT, like `forkMaterial`: an ACTIVE fork this company already has
+    is the one to edit. Without this, editing the shipped row a second time —
+    from a palette that had not refetched yet — minted a second fork, and
+    two active forks of one type is two rows claiming to be "what this
+    company means by it". An ARCHIVED fork is not reused: archiving it was
+    somebody's decision, and a new edit starts a fresh copy.
+  */
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [existing] = await db
+    .select({ id: takeoffRunTypes.id })
+    .from(takeoffRunTypes)
+    .where(
+      and(
+        eq(takeoffRunTypes.userId, userId),
+        eq(takeoffRunTypes.baselineId, source.id),
+        eq(takeoffRunTypes.status, "active")
+      )
+    )
+    .limit(1);
+  if (existing) return existing.id;
+
+  /*
     Everything EXCEPT identity and lifecycle, rather than a list of the
     specification columns.
 

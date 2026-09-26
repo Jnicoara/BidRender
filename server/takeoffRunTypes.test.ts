@@ -18,7 +18,7 @@
  * parallel and shared ids delete each other's rows mid-run.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
 import {
@@ -742,5 +742,66 @@ describeDb("what a foot of this type costs", () => {
     } finally {
       await caller().materials.revert({ id: forkId });
     }
+  });
+});
+
+describeDb("editing a shipped type that was forked before", () => {
+  /*
+    Found 2026-09-26 saving a fitting style on the fixture bid: the company
+    had once forked and ARCHIVED the shipped type, so every save of the
+    shipped row was refused as a duplicate of its own archived copy — and the
+    fork was made BEFORE the refusal, so each click left a stray copy.
+  */
+  it("saves past its own archived fork, and reuses the active one after", async () => {
+    // From the table, not the palette: earlier cases fork shipped types, and a
+    // forked baseline is hidden from the palette by design.
+    const database = await getDb();
+    const [shipped] = await database!
+      .select()
+      .from(takeoffRunTypes)
+      .where(
+        and(
+          isNull(takeoffRunTypes.userId),
+          eq(takeoffRunTypes.label, '3/4" EMT, 3 #12 + ground')
+        )
+      );
+    await database!
+      .delete(takeoffRunTypes)
+      .where(
+        and(
+          eq(takeoffRunTypes.userId, USER),
+          eq(takeoffRunTypes.baselineId, shipped.id)
+        )
+      );
+
+    const first = await caller().takeoffRunTypes.update({
+      id: shipped.id,
+      label: shipped.label,
+    });
+    await caller().takeoffRunTypes.archive({ id: first.id });
+
+    const second = await caller().takeoffRunTypes.update({
+      id: shipped.id,
+      label: shipped.label,
+      fittingStyle: "compression",
+    });
+    expect(second.forked).toBe(true);
+    expect(second.id).not.toBe(first.id);
+
+    // Edited from a palette that has not refetched: the SAME fork, not a third.
+    const third = await caller().takeoffRunTypes.update({
+      id: shipped.id,
+      label: shipped.label,
+      fittingStyle: "raintight",
+    });
+    expect(third.id).toBe(second.id);
+
+    const forks = await database!
+      .select()
+      .from(takeoffRunTypes)
+      .where(eq(takeoffRunTypes.baselineId, shipped.id));
+    const mine = forks.filter(f => f.userId === USER);
+    expect(mine.filter(f => f.status === "active")).toHaveLength(1);
+    expect(mine.find(f => f.id === second.id)!.fittingStyle).toBe("raintight");
   });
 });
