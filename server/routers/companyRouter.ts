@@ -142,10 +142,21 @@ export const companyRouter = router({
     .input(
       z.object({
         email: z.string().trim().email().max(320).optional(),
-        // `owner` is absent from INVITABLE_ROLES, so it cannot be requested.
-        role: z.enum(
-          INVITABLE_ROLES as unknown as [CompanyRole, ...CompanyRole[]]
-        ),
+        /*
+          `owner` is absent from INVITABLE_ROLES, so it cannot be requested —
+          and, since 2026-09-26, cannot be WRITTEN either: `role: "owner"` no
+          longer compiles, which is what permissions.test.ts's
+          @ts-expect-error lines assert.
+
+          This used to be `INVITABLE_ROLES as unknown as [CompanyRole, ...]`,
+          from when zod 3's z.enum wanted a non-empty tuple and a .filter()
+          result is an array. The cast named the wrong type — every role,
+          owner included — so the input TYPE admitted owner while the
+          runtime VALUES refused it. zod 4 takes any readonly string array
+          and types the enum from its elements, so no cast is needed. The
+          runtime list is unchanged: the same INVITABLE_ROLES array.
+        */
+        role: z.enum(INVITABLE_ROLES),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -261,9 +272,8 @@ export const companyRouter = router({
     .input(
       z.object({
         userId: z.number().int().positive(),
-        role: z.enum(
-          INVITABLE_ROLES as unknown as [CompanyRole, ...CompanyRole[]]
-        ),
+        // Same list as `invite`, same reason for no cast — see there.
+        role: z.enum(INVITABLE_ROLES),
       })
     )
     .mutation(async ({ input, ctx }) => {
