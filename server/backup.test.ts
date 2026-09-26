@@ -372,7 +372,9 @@ describe("stored files", () => {
     const declared = new Set(FILE_SOURCES.map(s => s.column));
 
     const suspicious = new Set<string>();
-    for (const match of schema.matchAll(/^\s+(\w*(?:K|k)ey)\w*:\s/gm)) {
+    for (const match of Array.from(
+      schema.matchAll(/^\s+(\w*(?:K|k)ey)\w*:\s/gm)
+    )) {
       const column = match[1];
       // Lookup/grouping keys are not files. Named explicitly so that adding a
       // real file column cannot hide behind a broad pattern.
@@ -398,7 +400,7 @@ describe("stored files", () => {
       suspicious.add(column);
     }
 
-    for (const column of suspicious) {
+    for (const column of Array.from(suspicious)) {
       expect(
         declared.has(column),
         `drizzle/schema.ts has a storage-key column "${column}" that FILE_SOURCES does not back up`
