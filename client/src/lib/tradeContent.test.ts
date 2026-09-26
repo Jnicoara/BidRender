@@ -226,7 +226,9 @@ describe("the page stays as small as it was rebuilt to be", () => {
   it("offers one destination, not a menu of calls to action", () => {
     // Nav button, hero button and the skip link all point at the same anchor;
     // there is no second offer anywhere on the page.
-    const anchors = [...html.matchAll(/href="#([^"]+)"/g)].map(m => m[1]);
+    const anchors = Array.from(html.matchAll(/href="#([^"]+)"/g)).map(
+      m => m[1]
+    );
     expect(new Set(anchors)).toEqual(new Set(["early-access"]));
   });
 
@@ -256,7 +258,7 @@ describe("it reuses the app's visual language", () => {
     // The old page painted #F5C518 into pills, washes, rules and icon tiles.
     // The wordmark is the one literal that survives, because it is lifted
     // verbatim from the app's own sidebar.
-    const literals = [...html.matchAll(/#F5C518/gi)];
+    const literals = Array.from(html.matchAll(/#F5C518/gi));
     expect(literals.length).toBeLessThanOrEqual(1);
     expect(html).toContain("bg-primary");
   });
@@ -322,7 +324,7 @@ describe("the layout is mobile-first", () => {
     // The bug this catches: `grid-cols-3` written without a breakpoint prefix,
     // invisible on the laptop it was written on and unreadable on the phone
     // half of this audience. Columns must be opt-in at `sm:` and up.
-    const classes = [...html.matchAll(/class="([^"]*)"/g)].flatMap(m =>
+    const classes = Array.from(html.matchAll(/class="([^"]*)"/g)).flatMap(m =>
       m[1].split(/\s+/)
     );
     const bare = classes.filter(c => /^grid-cols-[2-9]/.test(c));
@@ -335,7 +337,7 @@ describe("the layout is mobile-first", () => {
   });
 
   it("carries no fixed pixel widths that could overflow a phone", () => {
-    const fixed = [...html.matchAll(/class="([^"]*)"/g)]
+    const fixed = Array.from(html.matchAll(/class="([^"]*)"/g))
       .flatMap(m => m[1].split(/\s+/))
       .filter(c => /^w-\[\d{3,}px\]$/.test(c));
     expect(fixed, `fixed widths on the landing page: ${fixed}`).toEqual([]);
