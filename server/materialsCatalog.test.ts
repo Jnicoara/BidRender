@@ -58,7 +58,9 @@ describe("shipped catalog shape", () => {
     const seen = new Map<string, number>();
     for (const m of BASELINE_MATERIALS)
       seen.set(m.name, (seen.get(m.name) ?? 0) + 1);
-    const dupes = [...seen].filter(([, n]) => n > 1).map(([name]) => name);
+    const dupes = Array.from(seen)
+      .filter(([, n]) => n > 1)
+      .map(([name]) => name);
     expect(dupes, `duplicated: ${dupes.join(", ")}`).toEqual([]);
   });
 
@@ -131,7 +133,7 @@ describe("alias hygiene across the whole catalog", () => {
     const offenders: string[] = [];
     for (const m of BASELINE_MATERIALS) {
       const text = ` ${m.searchAliases.toLowerCase()} `;
-      for (const other of names) {
+      for (const other of Array.from(names)) {
         if (other === m.name.toLowerCase()) continue;
         if (text.includes(` ${other} `))
           offenders.push(`${m.name} -> "${other}"`);
