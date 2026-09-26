@@ -129,7 +129,7 @@ describe.skipIf(!hasDb)(
       // ── The materials, priced so nothing can pass at zero ──────────────────
       const emtId = await priceMaterial('1/2" EMT', 1.25);
       const thhnId = await priceMaterial("#12 THHN", 0.18);
-      const groundId = await priceMaterial("#12 bare copper, solid", 0.12);
+      const groundId = await priceMaterial("#12 bare CU, solid", 0.12);
 
       /*
       THE SEAM. A run type built from catalog materials, exactly as the picker
@@ -273,7 +273,7 @@ describe.skipIf(!hasDb)(
       const { bidId, sheetId } = await setup();
       const emtId = await priceMaterial('1/2" EMT', 1.25);
       const thhnId = await priceMaterial("#12 THHN", 0.18);
-      const bareId = await priceMaterial("#12 bare copper, solid", 0.12);
+      const bareId = await priceMaterial("#12 bare CU, solid", 0.12);
 
       const type = await caller().takeoffRunTypes.create({
         label: `1/2" EMT IG ${Date.now()}${Math.random()}`,

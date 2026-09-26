@@ -98,6 +98,44 @@ export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
   // GFCI is the spec that makes it a spa disconnect.
   "50A spa disconnect": "50A GFCI spa disconnect",
   "60A spa disconnect": "60A GFCI spa disconnect",
+  // Metal written AL / CU, the supply-house short form (owner, 2026-09-25;
+  // wireAndCable.ts header). The full words stay as search aliases.
+  ...Object.fromEntries(
+    [
+      ...["#8", "#6", "#4", "#2", "#1", "#1/0", "#2/0", "#3/0", "#4/0"].map(
+        g => `${g} XHHW`
+      ),
+      ...["250", "300", "350", "400", "500"].map(k => `${k} kcmil XHHW`),
+      ...[
+        "4-4-4-6",
+        "2-2-2-4",
+        "1/0-3",
+        "2/0-3",
+        "3/0-3",
+        "4/0-4/0-2/0",
+        "4/0-4/0-4/0-2/0",
+        "250-250-250",
+      ].map(s => `${s} SER`),
+      "4-4-6 SEU",
+      "2-2-4 SEU",
+      "#4/0 USE-2",
+      "1/0 URD triplex",
+    ].map(stem => [`${stem} aluminum`, `${stem} AL`])
+  ),
+  ...Object.fromEntries([
+    ...["#14", "#12", "#10", "#8"].map(g => [
+      `${g} bare copper, solid`,
+      `${g} bare CU, solid`,
+    ]),
+    ...["#10", "#8", "#6", "#4", "#2", "#1/0", "#2/0"].map(g => [
+      `${g} bare copper, stranded`,
+      `${g} bare CU, stranded`,
+    ]),
+    ...["8-3", "6-3", "4-3", "2-3", "1-3"].map(s => [
+      `${s} SER copper`,
+      `${s} SER CU`,
+    ]),
+  ]),
 };
 
 /**
@@ -134,6 +172,11 @@ export const RETIRED_BASELINE_MATERIALS: string[] = [
   // An unsized placeholder, replaced by the four sized 480V-208Y/120V
   // transformers in power.ts (2026-09-25). Nothing in the code named it.
   "Dry-type transformer",
+  // The four-wire 4/0 SER a second time, in shorthand: "-3" is three
+  // insulated conductors plus a ground (see the 3/0-3 row's note), so this
+  // was 4/0-4/0-4/0-2/0. Retired rather than renamed because that row
+  // already exists; "4/0-3" is an alias on it (2026-09-25, wireAndCable.ts).
+  "4/0-3 SER aluminum",
 ];
 
 /**

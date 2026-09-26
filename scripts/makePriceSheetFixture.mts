@@ -4,7 +4,7 @@
  * The point is that the names are not invented. A synthetic fixture tends to
  * contain the awkward cases someone thought of; this one contains the awkward
  * cases the catalog actually has — inch marks in `1/2" EMT`, an embedded comma
- * in `#10 bare copper, stranded`, `#` and `/` and `-` throughout — because they
+ * in `#10 bare CU, stranded`, `#` and `/` and `-` throughout — because they
  * are lifted straight from the rows the importer has to match against.
  *
  * Formatting is modelled on how supply houses really export: a header row,

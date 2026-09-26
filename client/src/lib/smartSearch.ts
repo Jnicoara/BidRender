@@ -406,6 +406,11 @@ const ALIAS_MAP: Record<string, string[]> = {
   grounding: ["ground wire", "ground rod", "grounding electrode"],
   bonding: ["bonding jumper", "bonding wire", "equipotential bond"],
   "bare copper": ["ground wire", "bare ground", "solid bare copper"],
+  // The catalog writes it "bare CU" since 2026-09-25. This table expands the
+  // ITEM's text too, so without this key the renamed rows lost everything the
+  // one above gave them — "ground wire" stopped finding them, and "copper" put
+  // ground rods first.
+  "bare cu": ["ground wire", "bare ground", "bare copper"],
 
   // ── Rough-In Hardware ──────────────────────────────────────────────────────
   // "romex staple" is deliberately absent, and the reason generalises.
@@ -646,7 +651,7 @@ function termTier(term: string, indexed: IndexedItem<SearchableItem>): number {
  * The conductor size at the front of a cable spec — "2/0" of "2/0-3", "12"
  * of "12-2", "4/0" of "4/0-4/0-2/0" — or null. A spec is a size followed by
  * counts or more sizes, and it answers to its leading size too: "2/0 ser"
- * must find "2/0-3 SER aluminum", and did before sizes became strict.
+ * must find "2/0-3 SER AL", and did before sizes became strict.
  */
 /**
  * The sizes one size WORD stands for: itself, both halves of a dual size

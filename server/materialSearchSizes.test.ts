@@ -189,7 +189,7 @@ describe("counts and cable specs keep working", () => {
   it("a cable spec typed with a space, and a conductor inside a spec", () => {
     expect(search("6 3")[0]).toBe("6-3 NM-B");
     expect(search("12 2")[0]).toBe("12-2 NM-B");
-    expect(search("2/0 ser")).toContain("2/0-3 SER aluminum");
+    expect(search("2/0 ser")).toContain("2/0-3 SER AL");
   });
 
   it('"12" still finds #12 wire, and "#12" is only the gauge', () => {

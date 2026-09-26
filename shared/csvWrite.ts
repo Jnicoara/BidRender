@@ -8,7 +8,7 @@
  *
  * ── Every field is quoted, unconditionally ───────────────────────────────────
  * Not "quoted when it needs it". The catalog genuinely contains commas
- * (`#10 bare copper, stranded` is a shipped material) and inch marks
+ * (`#10 bare CU, stranded` is a shipped material) and inch marks
  * (`1/2" EMT`), and a quote-only-when-needed rule is one forgotten branch away
  * from splitting a name across two columns. This app has already shipped that
  * bug once, in the price importer, and paid for it — see

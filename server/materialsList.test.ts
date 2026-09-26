@@ -303,7 +303,7 @@ const docFixture = (
   preparedOn: new Date("2026-08-14T10:00:00Z"),
   entries: [
     {
-      name: "#10 bare copper, stranded",
+      name: "#10 bare CU, stranded",
       unit: "foot",
       qty: 250,
       category: "Wire & Cable",
@@ -325,9 +325,9 @@ const docFixture = (
 describe("the CSV a supplier opens", () => {
   it("quotes a material name containing a comma instead of splitting it", () => {
     const csv = toCsv(docFixture());
-    const line = csv.split("\r\n").find(l => l.includes("bare copper"))!;
+    const line = csv.split("\r\n").find(l => l.includes("bare CU"))!;
     // One name, one cell — five cells on the row, not six.
-    expect(line).toContain('"#10 bare copper, stranded"');
+    expect(line).toContain('"#10 bare CU, stranded"');
     expect(line.split('","')).toHaveLength(5);
   });
 

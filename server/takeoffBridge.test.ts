@@ -294,7 +294,7 @@ describe("a run type becomes one line per material", () => {
     conductorMaterialId: 2,
     conductorMaterialName: "#12 THHN",
     groundMaterialId: 68,
-    groundMaterialName: "#12 bare copper, solid",
+    groundMaterialName: "#12 bare CU, solid",
   };
 
   it("splits pipe, wire and ground into three orderable rows", () => {
@@ -357,7 +357,7 @@ describe("a run type becomes one line per material", () => {
       conductorMaterialId: 45,
       conductorMaterialName: "12-2 MC cable",
       groundMaterialId: 68,
-      groundMaterialName: "#12 bare copper, solid",
+      groundMaterialName: "#12 bare CU, solid",
       footage: {
         conduitFeet: 0,
         cableFeet: 210,

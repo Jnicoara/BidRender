@@ -43,14 +43,14 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   "8/3 NM-B": "8-3 NM-B",
   "10/2 UF-B": "10-2 UF-B",
   "12/2 UF-B": "12-2 UF-B",
-  "Bare copper, #2": "#2 bare copper, stranded",
-  "Bare copper, #4": "#4 bare copper, stranded",
-  "Bare copper, 1/0": "#1/0 bare copper, stranded",
+  "Bare copper, #2": "#2 bare CU, stranded",
+  "Bare copper, #4": "#4 bare CU, stranded",
+  "Bare copper, 1/0": "#1/0 bare CU, stranded",
   // The sheet does not say copper or aluminum. XHHW-2 at these sizes is
   // bought as aluminum feeder, and the catalog ships it only that way.
-  "XHHW-2, #2": "#2 XHHW aluminum",
-  "XHHW-2, 1/0": "#1/0 XHHW aluminum",
-  "XHHW-2, 4/0": "#4/0 XHHW aluminum",
+  "XHHW-2, #2": "#2 XHHW AL",
+  "XHHW-2, 1/0": "#1/0 XHHW AL",
+  "XHHW-2, 4/0": "#4/0 XHHW AL",
   '4" rigid coupling': '4" rigid conduit coupling',
   // The four cable connectors are sized by jacket diameter and already stand
   // for every style — snap-in, two-screw, duplex — see connectors.ts.
@@ -165,7 +165,7 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   "Video doorbell transformer": "Doorbell transformer",
   "Fan mounting brace, adjustable": "Ceiling fan brace box",
   "Fan wall control": "Fan speed control",
-  "Spa bonding wire, #8 solid": "#8 bare copper, solid",
+  "Spa bonding wire, #8 solid": "#8 bare CU, solid",
   // The shipped manual transfer switch already stands for both sizes.
   "Transfer switch, 6-circuit": "Manual transfer switch",
   "Transfer switch, 10-circuit": "Manual transfer switch",
@@ -173,8 +173,8 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   // ── Batch 6: the held questions, answered by the owner 2026-09-25
   // "-3" is three insulated conductors and the reduced ground, so these are
   // the shipped rows written out in full.
-  "Aluminum SER, 4/0": "4/0-4/0-4/0-2/0 SER aluminum",
-  "SER cable, 1/0-1/0-1/0-2": "1/0-3 SER aluminum",
+  "Aluminum SER, 4/0": "4/0-4/0-4/0-2/0 SER AL",
+  "SER cable, 1/0-1/0-1/0-2": "1/0-3 SER AL",
   // At 400A and 600A a safety switch is the fused one the catalog ships.
   "400A safety switch": "400A fused disconnect",
   "600A safety switch": "600A fused disconnect",
@@ -322,12 +322,12 @@ export const RENAMED_FROM_SHEET: Record<string, string> = {
   // ── Batch 6
   // SE cable by its full conductor set, metal stated. The sheet named no
   // metal; these are stocked in aluminum (wireAndCable.ts).
-  "SER cable, 2-2-2-4": "2-2-2-4 SER aluminum",
-  "SER cable, 4-4-4-6": "4-4-4-6 SER aluminum",
-  "SEU cable, 2-2-4": "2-2-4 SEU aluminum",
-  "SEU cable, 4-4-6": "4-4-6 SEU aluminum",
-  "USE-2, 4/0": "#4/0 USE-2 aluminum",
-  "Aluminum URD, 1/0": "1/0 URD triplex aluminum",
+  "SER cable, 2-2-2-4": "2-2-2-4 SER AL",
+  "SER cable, 4-4-4-6": "4-4-4-6 SER AL",
+  "SEU cable, 2-2-4": "2-2-4 SEU AL",
+  "SEU cable, 4-4-6": "4-4-6 SEU AL",
+  "USE-2, 4/0": "#4/0 USE-2 AL",
+  "Aluminum URD, 1/0": "1/0 URD triplex AL",
   '5" LED disc light': '5"/6" LED disc light',
   ...Object.fromEntries(
     ["15", "30", "45", "75"].map(kva => [

@@ -15,7 +15,7 @@
  * ── Tested against the catalog's own names, not invented ones ────────────────
  * The fixtures in server/fixtures are generated from BASELINE_MATERIALS by
  * scripts/makePriceSheetFixture.mts, so the names under test are the real ones,
- * with the real awkward characters: `#10 bare copper, stranded` has a comma in
+ * with the real awkward characters: `#10 bare CU, stranded` has a comma in
  * it, `1/2" EMT` has an inch mark, and both go through the quoting rules. Three
  * formats are covered because supply houses export all three — a properly
  * quoted CSV, one from an exporter that quotes nothing, and cells pasted out of
@@ -99,8 +99,8 @@ describe("the thousands separator", () => {
 
 describe("RFC 4180 field splitting", () => {
   it("keeps a comma inside a quoted field", () => {
-    expect(splitDelimited('"#10 bare copper, stranded",3.75', ",")).toEqual([
-      ["#10 bare copper, stranded", "3.75"],
+    expect(splitDelimited('"#10 bare CU, stranded",3.75', ",")).toEqual([
+      ["#10 bare CU, stranded", "3.75"],
     ]);
   });
 
@@ -132,7 +132,7 @@ describe("RFC 4180 field splitting", () => {
 
   it("returns fields exactly as written, padding included", () => {
     // Not trimmed here on purpose: rejoining an unquoted name that was split
-    // at its own comma has to put back the space in `bare copper, stranded`.
+    // at its own comma has to put back the space in `bare CU, stranded`.
     // Callers trim individual fields.
     expect(splitDelimited('  padded  ,"  kept  "', ",")).toEqual([
       ["  padded  ", "  kept  "],
@@ -159,11 +159,11 @@ describe("finding the separator", () => {
   });
 
   it("prefers the tab even when names contain commas", () => {
-    const text = "#10 bare copper, stranded\t3.75\n#8 bare copper, solid\t2.10";
+    const text = "#10 bare CU, stranded\t3.75\n#8 bare CU, solid\t2.10";
     expect(detectDelimiter(text)).toBe("\t");
     const { rows } = parsePriceList(text);
     expect(rows[0]).toEqual({
-      name: "#10 bare copper, stranded",
+      name: "#10 bare CU, stranded",
       costPerUnit: 3.75,
     });
   });
@@ -342,7 +342,7 @@ describe("a real supply-house sheet", () => {
     expect(rows).toHaveLength(EXPECTED_ROWS);
 
     // Names whose own comma was never quoted come back whole.
-    const stranded = rows.find(r => r.name === "#10 bare copper, stranded");
+    const stranded = rows.find(r => r.name === "#10 bare CU, stranded");
     expect(stranded).toBeDefined();
     expect(stranded!.costPerUnit).toBeGreaterThan(0);
   });

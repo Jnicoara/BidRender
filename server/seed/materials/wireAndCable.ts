@@ -14,8 +14,21 @@
  * its description rather than relying on the name: an estimator pulling a
  * feeder price from a catalog they last touched in spring needs to be told, at
  * the moment they look at it, that this is the number most likely to be stale.
+ *
+ * ── The metal is written AL / CU in a name ───────────────────────────────────
+ * Decided by the owner 2026-09-25: "#4/0 XHHW AL", "#12 bare CU, solid", "8-3
+ * SER CU" — the short form a supply house writes. Every row that states its
+ * metal does it this way; a row that does not (THHN, NM-B) is copper and says
+ * nothing, as it always has. The full words stay findable as aliases (AL_WORDS,
+ * CU_WORDS), and the rows were renamed in place through
+ * RENAMED_BASELINE_MATERIALS, so every id — and everything pointing at one —
+ * is the row it was.
  */
 import { aliases, UNPRICED, type BaselineMaterial } from "./types";
+
+/** What an estimator types for a metal the name writes as AL / CU. */
+const AL_WORDS = "aluminum aluminium alum";
+const CU_WORDS = "copper";
 
 // ─── THHN/THWN copper ─────────────────────────────────────────────────────────
 
@@ -126,12 +139,13 @@ const ALUMINUM_NOTE =
 const aluminumFeeder: BaselineMaterial[] = ALUMINUM_SIZES.map(size => {
   const isKcmil = !size.startsWith("#");
   return {
-    name: isKcmil ? `${size} kcmil XHHW aluminum` : `${size} XHHW aluminum`,
+    name: isKcmil ? `${size} kcmil XHHW AL` : `${size} XHHW AL`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
     category: "Wire & Cable" as const,
     searchAliases: aliases(
-      "al alum aluminium xhhw-2 thhn feeder service stranded",
+      AL_WORDS,
+      "xhhw-2 thhn feeder service stranded",
       isKcmil ? aliases("mcm", `${size}mcm`) : gaugeAliases(size)
     ),
     description: ALUMINUM_NOTE,
@@ -286,11 +300,12 @@ const trayCable: BaselineMaterial[] = [
 
 const bareCopper: BaselineMaterial[] = [
   ...["#14", "#12", "#10", "#8"].map(gauge => ({
-    name: `${gauge} bare copper, solid`,
+    name: `${gauge} bare CU, solid`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
     category: "Wire & Cable" as const,
     searchAliases: aliases(
+      CU_WORDS,
       gaugeAliases(gauge),
       "ground grounding earth bond bonding gec egc green",
       // #8 solid is what a pool or spa's equipotential bonding grid is run in.
@@ -298,11 +313,12 @@ const bareCopper: BaselineMaterial[] = [
     ),
   })),
   ...["#10", "#8", "#6", "#4", "#2", "#1/0", "#2/0"].map(gauge => ({
-    name: `${gauge} bare copper, stranded`,
+    name: `${gauge} bare CU, stranded`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
     category: "Wire & Cable" as const,
     searchAliases: aliases(
+      CU_WORDS,
       gaugeAliases(gauge),
       "ground grounding earth bond bonding gec egc green"
     ),
@@ -322,11 +338,12 @@ const SE_SLANG = "service entrance seu se cable feeder";
  */
 const serCopper: BaselineMaterial[] = ["8-3", "6-3", "4-3", "2-3", "1-3"].map(
   size => ({
-    name: `${size} SER copper`,
+    name: `${size} SER CU`,
     unitOfSale: "foot",
     costPerUnit: UNPRICED,
     category: "Wire & Cable",
     searchAliases: aliases(
+      CU_WORDS,
       size.replace("-", "/"),
       SE_SLANG,
       "range dryer subpanel"
@@ -342,24 +359,43 @@ const serAluminum: BaselineMaterial[] = [
   { size: "1/0-3", note: undefined },
   { size: "2/0-3", note: undefined },
   { size: "3/0-3", note: "3 conductors with a 1/0 ground." },
-  { size: "4/0-3", note: undefined },
+  /*
+    Two 4/0 rows, and they are DIFFERENT cables — the thing to check before
+    anyone merges them:
+      4/0-4/0-2/0      THREE conductors: two hots and a reduced neutral. The
+                       200A single-phase service entrance run to a meter.
+      4/0-4/0-4/0-2/0  FOUR: three insulated conductors and a 2/0 ground. The
+                       feeder to a 200A subpanel, where neutral and ground are
+                       kept apart.
+    There used to be a third, "4/0-3 SER aluminum", which was the four-wire
+    one again in the shorthand the 3/0-3 row above uses ("-3" = three
+    insulated plus a ground). It was retired on 2026-09-25 (index.ts), and
+    "4/0-3" is an alias on the full-set row so the shorthand still finds it.
+  */
   {
     size: "4/0-4/0-2/0",
-    note: "The standard single-phase 200A residential service conductor set.",
+    note: "Three conductors — the standard single-phase 200A residential service conductor set.",
   },
-  { size: "4/0-4/0-4/0-2/0", note: undefined },
+  {
+    size: "4/0-4/0-4/0-2/0",
+    note: "Four conductors — three insulated and a 2/0 ground; the 200A subpanel feeder. Also written 4/0-3.",
+  },
   { size: "250-250-250", note: undefined },
 ].map(({ size, note }) => ({
-  name: `${size} SER aluminum`,
+  name: `${size} SER AL`,
   unitOfSale: "foot" as const,
   costPerUnit: UNPRICED,
   category: "Wire & Cable" as const,
   searchAliases: aliases(
     size.replace(/-/g, "/"),
-    "al alum aluminium",
+    AL_WORDS,
     SE_SLANG,
     "mast riser",
-    size === "4/0-4/0-2/0" ? "200a service" : ""
+    size === "4/0-4/0-2/0" ? "200a service" : "",
+    // No "3 wire" / "4 wire" aliases on either: "4/0-3" is shorthand for the
+    // FOUR-wire cable, and a "3" alias on the three-wire one made it answer
+    // "4/0-3" first — the exact confusion this pair invites.
+    size === "4/0-4/0-4/0-2/0" ? "4/0-3 4/0/3 subpanel" : ""
   ),
   description: note ? `${note} ${ALUMINUM_NOTE}` : ALUMINUM_NOTE,
 }));
@@ -370,13 +406,14 @@ const serAluminum: BaselineMaterial[] = [
  * Added from the pricing sheet, 2026-09-25, aluminum as it is stocked.
  */
 const seuAluminum: BaselineMaterial[] = ["4-4-6", "2-2-4"].map(size => ({
-  name: `${size} SEU aluminum`,
+  name: `${size} SEU AL`,
   unitOfSale: "foot" as const,
   costPerUnit: UNPRICED,
   category: "Wire & Cable" as const,
   searchAliases: aliases(
     size.replace(/-/g, "/"),
-    "al alum aluminium service entrance se cable flat concentric"
+    AL_WORDS,
+    "service entrance se cable flat concentric"
   ),
   description: ALUMINUM_NOTE,
 }));
@@ -389,24 +426,26 @@ const seuAluminum: BaselineMaterial[] = ["4-4-6", "2-2-4"].map(size => ({
  */
 const undergroundService: BaselineMaterial[] = [
   {
-    name: "#4/0 USE-2 aluminum",
+    name: "#4/0 USE-2 AL",
     unitOfSale: "foot",
     costPerUnit: UNPRICED,
     category: "Wire & Cable",
     searchAliases: aliases(
       gaugeAliases("#4/0"),
-      "al alum aluminium use rhh rhw-2 underground direct burial service lateral single conductor"
+      AL_WORDS,
+      "use rhh rhw-2 underground direct burial service lateral single conductor"
     ),
     description: ALUMINUM_NOTE,
   },
   {
-    name: "1/0 URD triplex aluminum",
+    name: "1/0 URD triplex AL",
     unitOfSale: "foot",
     costPerUnit: UNPRICED,
     category: "Wire & Cable",
     searchAliases: aliases(
       gaugeAliases("#1/0"),
-      "al alum aluminium underground residential distribution direct burial service lateral"
+      AL_WORDS,
+      "underground residential distribution direct burial service lateral"
     ),
     description: ALUMINUM_NOTE,
   },

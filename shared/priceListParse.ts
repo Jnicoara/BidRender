@@ -78,7 +78,7 @@ export type PriceListParse = {
  * genuinely stateful: a delimiter inside quotes is data, a newline inside
  * quotes is data, and `""` inside quotes is one literal quote. A regex that
  * looked right would be wrong on exactly the rows that matter — the ones with
- * `1/2" EMT` and `#10 bare copper, stranded` in them.
+ * `1/2" EMT` and `#10 bare CU, stranded` in them.
  *
  * Deviations from the spec, both toward accepting real files:
  *
@@ -103,7 +103,7 @@ export function splitDelimited(raw: string, delimiter: Delimiter): string[][] {
     // nothing about trimming, and this parser has a specific need for the
     // original bytes: when an unquoted comma inside a name splits it across
     // two fields, the name is put back together by rejoining them, and a trim
-    // here would silently drop the space in `bare copper, stranded` and make
+    // here would silently drop the space in `bare CU, stranded` and make
     // the reassembled name match nothing. Consumers trim individual fields.
     fields.push(field);
     field = "";
@@ -177,7 +177,7 @@ export function splitDelimited(raw: string, delimiter: Delimiter): string[][] {
  *
  *   Whether the LAST field parses as a price. This is the decisive one, and it
  *   is what separates the case consistency cannot: pasting
- *   `#10 bare copper, stranded<TAB>3.75` splits into exactly two fields under
+ *   `#10 bare CU, stranded<TAB>3.75` splits into exactly two fields under
  *   BOTH comma and tab, perfectly consistently. Only the tab split puts a
  *   readable price in the last field; the comma split leaves
  *   ` stranded<TAB>3.75` there, which is not a price. A separator that reveals
@@ -217,7 +217,7 @@ export function detectDelimiter(raw: string): Delimiter {
     // character is the real separator and this candidate split the row in the
     // wrong place. Decisive, and asymmetric on purpose: those three never
     // occur inside a material name or a price, whereas a comma frequently
-    // does — `#10 bare copper, stranded` is a real catalog row — so a comma
+    // does — `#10 bare CU, stranded` is a real catalog row — so a comma
     // inside a field is not evidence of anything.
     const foreign = DELIMITERS.filter(d => d !== delimiter && d !== ",").some(
       other =>
@@ -504,7 +504,7 @@ export function parsePriceList(raw: string): PriceListParse {
       cost = found?.value ?? null;
       // Everything left of the price is the name, rejoined with the delimiter.
       // That is what recovers a name whose own comma was never quoted:
-      // `#10 bare copper, stranded,3.75` comes back whole.
+      // `#10 bare CU, stranded,3.75` comes back whole.
       name =
         found === null
           ? ""

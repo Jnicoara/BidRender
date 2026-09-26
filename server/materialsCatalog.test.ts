@@ -163,6 +163,32 @@ describe("alias hygiene across the whole catalog", () => {
     expect(byName.get("LED tape light")?.unitOfSale).toBe("foot");
   });
 
+  it("writes a stated metal as AL / CU, and keeps the full word findable", () => {
+    // Owner's decision, 2026-09-25 (wireAndCable.ts header). A new row
+    // written "… aluminum" would split its family from the renamed ones.
+    const spelled = BASELINE_MATERIALS.filter(m =>
+      /\b(aluminum|aluminium|copper)\b/i.test(m.name)
+    ).map(m => m.name);
+    expect(spelled).toEqual([]);
+
+    const unfindable = BASELINE_MATERIALS.filter(m => {
+      const words = m.searchAliases.toLowerCase().split(/\s+/);
+      if (/\bAL\b/.test(m.name)) return !words.includes("aluminum");
+      if (/\bCU\b/.test(m.name)) return !words.includes("copper");
+      return false;
+    }).map(m => m.name);
+    expect(unfindable).toEqual([]);
+  });
+
+  it("keeps the three-wire and four-wire 4/0 SER, and only those", () => {
+    // "4/0-3" was the four-wire cable in shorthand — a duplicate, retired
+    // 2026-09-25. The three-wire 4/0-4/0-2/0 is a different cable.
+    const names = BASELINE_MATERIALS.map(m => m.name);
+    expect(names).toContain("4/0-4/0-2/0 SER AL");
+    expect(names).toContain("4/0-4/0-4/0-2/0 SER AL");
+    expect(names.filter(n => /^4\/0-3 SER/.test(n))).toEqual([]);
+  });
+
   it("ships exactly two wafer sizes, with no duplicate 6 inch row", () => {
     const wafers = BASELINE_MATERIALS.filter(m => m.name.includes("wafer")).map(
       m => m.name

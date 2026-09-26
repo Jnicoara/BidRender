@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **Wire and cable now write the metal the way a supply house does: AL and
+  CU.** "#4/0 XHHW aluminum" is "#4/0 XHHW AL", "#12 bare copper, solid" is
+  "#12 bare CU, solid", and the same for every SER, SEU, USE-2 and URD row —
+  42 items. They were renamed in place, so bids, assemblies and run types that
+  use them are untouched, and typing "aluminum" or "copper" still finds them.
+  The duplicate "4/0-3 SER aluminum" was the four-wire 4/0-4/0-4/0-2/0 cable
+  in shorthand, so it was retired and "4/0-3" now finds that row; the
+  three-wire 4/0-4/0-2/0 is a different cable and stays.
+
 - **Ten held catalog questions answered: 22 items added, 13 pricing-sheet
   rows folded into existing items, 17 dropped from the sheet.** Disconnects are now a
   full family — fused and non-fused, 30 to 200A, indoor (NEMA 1) and outdoor

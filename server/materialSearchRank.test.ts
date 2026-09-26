@@ -347,6 +347,20 @@ describe("the searches that must not regress, against the shipped catalog", () =
     expect(hits.some(name => /Wire nuts|fixture wire/i.test(name))).toBe(false);
   });
 
+  it("gives bare copper wire for copper, though the name now says CU", () => {
+    // After the AL/CU rename (2026-09-25) "copper" survived only as an alias
+    // and three ground rods ("copper clad") led the search. The ranker reads
+    // CU in a name as the word; this is what goes red if it stops.
+    expect(top("copper")[0]).toMatch(/bare CU/);
+    expect(top("aluminum")[0]).toMatch(/ AL$/);
+  });
+
+  it("answers the SER shorthand 4/0-3 with the four-wire cable", () => {
+    // "-3" is three insulated conductors plus a ground; the three-wire
+    // 4/0-4/0-2/0 is a different cable and must not lead.
+    expect(top("4/0-3")[0]).toBe("4/0-4/0-4/0-2/0 SER AL");
+  });
+
   it("still answers slang with the material that carries it", () => {
     expect(top("marrette")[0]).toBe("Wire nuts");
     expect(top("romex")[0]).toContain("NM-B");

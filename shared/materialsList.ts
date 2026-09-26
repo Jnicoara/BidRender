@@ -282,7 +282,7 @@ export function lineCount(doc: MaterialsListDoc): number {
 /**
  * Quoting moved to shared/csvWrite.ts once the accounting export needed the
  * same rules. Two copies of RFC 4180 quoting is how one of them ends up
- * handling `#10 bare copper, stranded` and the other splitting it.
+ * handling `#10 bare CU, stranded` and the other splitting it.
  */
 
 /**

@@ -107,7 +107,7 @@ const COUNT_NOT_STATED = Number.NaN;
  * It said every shipped conduit type is in that state, citing the note in
  * `runTypeSpec` that 0064 split the count out and invented no ground wire.
  * Asked of the running app on 2026-09-20, both shipped conduit types name
- * "#12 bare copper, solid" (`server/seed/baselineRunTypes.ts`); it is the CABLE
+ * "#12 bare CU, solid" (`server/seed/baselineRunTypes.ts`); it is the CABLE
  * rows that carry a ground with no wire, and a cable gets no ground line here
  * at all. The rule stands on its own — a user can make such a type, and the
  * backfilled "Conduit" row is unspecified throughout — but the justification

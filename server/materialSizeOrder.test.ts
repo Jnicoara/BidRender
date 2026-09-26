@@ -321,23 +321,15 @@ describe("dimensions and trailing sizes", () => {
   });
 
   it("strips a whole conductor set, not just its first pair", () => {
-    // "2-2-2-4 SER aluminum" used to lose only "2-2", leaving the type
-    // "-2-4 SER aluminum" — a family of one per size, sorted by the leftover
+    // "2-2-2-4 SER AL" used to lose only "2-2", leaving the type
+    // "-2-4 SER AL" — a family of one per size, sorted by the leftover
     // digits (found 2026-09-25, when the first plain-gauge sets shipped).
-    expect(materialTypeName("2-2-2-4 SER aluminum")).toBe("SER aluminum");
-    expect(materialTypeName("4-4-6 SEU aluminum")).toBe("SEU aluminum");
+    expect(materialTypeName("2-2-2-4 SER AL")).toBe("SER AL");
+    expect(materialTypeName("4-4-6 SEU AL")).toBe("SEU AL");
     expect(materialTypeName("12-2 NM-B")).toBe("NM-B");
     expect(
-      sorted([
-        "2-2-2-4 SER aluminum",
-        "1/0-3 SER aluminum",
-        "4-4-4-6 SER aluminum",
-      ])
-    ).toEqual([
-      "4-4-4-6 SER aluminum",
-      "2-2-2-4 SER aluminum",
-      "1/0-3 SER aluminum",
-    ]);
+      sorted(["2-2-2-4 SER AL", "1/0-3 SER AL", "4-4-4-6 SER AL"])
+    ).toEqual(["4-4-4-6 SER AL", "2-2-2-4 SER AL", "1/0-3 SER AL"]);
   });
 
   it("orders transformers by kVA, including a fractional rating", () => {

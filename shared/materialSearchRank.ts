@@ -361,7 +361,7 @@ export function queryTier(row: RankableRow, word: string): MatchTier {
   }
   if (endsWithWord(type, term)) return TIER.IS_A;
 
-  if (hasWordPrefix(norm(row.name), term)) return TIER.MODIFIER;
+  if (hasWordPrefix(withMetalWords(norm(row.name)), term)) return TIER.MODIFIER;
 
   /*
     The word is nowhere in the name. The row may still BE one — but only if its
@@ -399,6 +399,26 @@ const escapeRe = (s: string): string =>
 function hasWordPrefix(text: string, term: string): boolean {
   if (!term) return false;
   return new RegExp("(^| )" + escapeRe(term)).test(text);
+}
+
+/**
+ * A name with its metal abbreviation read as the word — "#12 bare cu solid"
+ * also says "copper".
+ *
+ * The catalog writes the metal AL / CU (2026-09-25, wireAndCable.ts). Before
+ * that, "copper" was IN "#12 bare copper, solid" and a search for it matched
+ * the name, which outranks an alias. After it, the word survived only as an
+ * alias — the same tier as the ground rods' "copper clad" — and "copper" led
+ * with three ground rods. Reading the abbreviation as the word puts every row
+ * back on the tier its old name earned. Whole words only: "cu" in a name is
+ * the metal; a word that merely starts with it is not.
+ */
+const METAL_WORDS: Record<string, string> = { al: "aluminum", cu: "copper" };
+function withMetalWords(name: string): string {
+  return name.replace(
+    /(^| )(al|cu)(?= |$)/g,
+    (_m, lead: string, abbr: string) => `${lead}${abbr} ${METAL_WORDS[abbr]}`
+  );
 }
 
 /** The row's own alias words, as whole terms. */

@@ -7089,7 +7089,7 @@ export async function getRunTypesFor(
     runs' stored id with it — so the bid bridge reported the ground as
     "Not said what this is" and refused to price the type, while the picker and
     the run's own spec line (which read the ACTIVE list) showed
-    `+ #12 bare copper, solid` two inches away.
+    `+ #12 bare CU, solid` two inches away.
 
     Two screens describing one run's materials differently, and the bid-facing
     one was the wrong one: the ground could never reach a bid. Nothing failed —

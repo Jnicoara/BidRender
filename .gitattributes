@@ -16,6 +16,14 @@
 # `eol=crlf`, because cmd.exe will not run an LF-terminated batch file.
 * text=auto eol=lf
 
+# Supply-house exports end their lines in CRLF, and the price-sheet fixtures
+# are generated that way ON PURPOSE (scripts/makePriceSheetFixture.mts) so the
+# parser is tested against the bytes a real export has. Stored byte-exact:
+# the LF rule above would quietly convert them on the next commit and every
+# fresh clone would test the easy case instead (found 2026-09-25).
+server/fixtures/*.csv -text
+server/fixtures/*.tsv -text
+
 # Declared rather than left to detection, so a corrupt diff can never be
 # attempted on them.
 *.png binary

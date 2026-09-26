@@ -82,7 +82,7 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
     conductorMaterialName: "#12 THHN",
     conductorCount: 2,
     groundCount: 1,
-    groundMaterialName: "#12 bare copper, solid",
+    groundMaterialName: "#12 bare CU, solid",
   },
   {
     label: '3/4" EMT, 3 #12 + ground',
@@ -91,7 +91,7 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
     conductorMaterialName: "#12 THHN",
     conductorCount: 3,
     groundCount: 1,
-    groundMaterialName: "#12 bare copper, solid",
+    groundMaterialName: "#12 bare CU, solid",
   },
   {
     label: "12-2 MC cable",

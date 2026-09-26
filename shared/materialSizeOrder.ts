@@ -162,7 +162,7 @@ function inchesOf(token: string): number | null {
  * evidence of its unit; none of them settles for a bare number.
  */
 function readSize(name: string): SizeKey | null {
-  // A hashed gauge — "#12 THHN", "#4/0 XHHW aluminum". Unambiguous.
+  // A hashed gauge — "#12 THHN", "#4/0 XHHW AL". Unambiguous.
   const hashed = name.match(/^#(\d{1,4}\/0|\d{1,4})(?![\d/])/);
   if (hashed) return conductor(hashed[1]);
 
@@ -189,7 +189,7 @@ function readSize(name: string): SizeKey | null {
   const kcmil = name.match(/^(\d{2,4})\s*kcmil\b/i);
   if (kcmil) return conductor(kcmil[1]);
 
-  // An aught with no hash — "4/0-3 SER aluminum", "1/0-3 SER aluminum".
+  // An aught with no hash — "1/0-3 SER AL", "2/0-3 SER AL".
   const aught = name.match(/^(\d\/0)(?![\d/])/);
   if (aught) {
     const key = conductor(aught[1]);
@@ -208,7 +208,7 @@ function readSize(name: string): SizeKey | null {
     if (key) return { ...key, count: Number(cable[2]) };
   }
 
-  // A kcmil element list — "250-250-250 SER aluminum". Written as three sizes
+  // A kcmil element list — "250-250-250 SER AL". Written as three sizes
   // rather than a gauge and a count, so it needs its own branch; the leading
   // element is still what determines how big the cable is.
   const kcmilSet = name.match(/^(\d{3,4})-\d{3,4}\b/);
@@ -327,15 +327,15 @@ const SIZE_PREFIXES: RegExp[] = [
   // A conductor range — "14-10 AWG crimp lug". Consumes the unit word, so the
   // five lug ranges all derive the same type and list as one family.
   /^\d{1,4}(?:\/0)?-\d{1,4}(?:\/0)?\s+AWG\s+/i,
-  // Multi-element aught cables — "4/0-4/0-2/0 SER aluminum".
+  // Multi-element aught cables — "4/0-4/0-2/0 SER AL".
   /^#?\d\/0(?:-\d(?:\/0)?)*\s+/,
   // kcmil, named — "250 kcmil THHN". Consumes the unit word too.
   /^\d{2,4}\s*kcmil\s+/i,
-  // kcmil element lists — "250-250-250 SER aluminum".
+  // kcmil element lists — "250-250-250 SER AL".
   /^\d{3,4}(?:-\d{3,4})+\s+/,
-  // A plain-gauge conductor set — "2-2-2-4 SER aluminum", "4-4-6 SEU
-  // aluminum". Before the two-element cable spec below, which would take only
-  // "2-2" and leave "-2-4 SER aluminum" as the type.
+  // A plain-gauge conductor set — "2-2-2-4 SER AL", "4-4-6 SEU AL".
+  // Before the two-element cable spec below, which would take only
+  // "2-2" and leave "-2-4 SER AL" as the type.
   /^\d{1,2}(?:-\d{1,2}(?:\/0)?){2,}\s+/,
   // Cable specs — "12-2 NM-B", "14-3 MC cable".
   /^\d{1,4}-\d(?![\d/])\s*/,

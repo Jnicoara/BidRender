@@ -134,7 +134,7 @@ describe("nothing missing is ever read as zero", () => {
 
       This test used to claim it described every shipped type. It does not:
       asked of the running app on 2026-09-20, both shipped conduit types name
-      "#12 bare copper, solid". The state is still reachable — a half-filled-in
+      "#12 bare CU, solid". The state is still reachable — a half-filled-in
       type, or the backfilled "Conduit" row — which is why the case is here.
     */
     const labor = laborPerFootForRunType({
