@@ -22,6 +22,7 @@ import {
   type FittingLeg,
   type RacewayFittingSpec,
 } from "../shared/runFittings";
+import type { EndVertical } from "../shared/takeoffHeights";
 
 const EMT: RacewayFittingSpec = {
   name: '1/2" EMT',
@@ -29,6 +30,7 @@ const EMT: RacewayFittingSpec = {
   stickJoint: "coupling",
   strapSpacingFeet: 10,
   strapFromBoxFeet: 3,
+  lbHubsTakeConnectors: true,
 };
 
 function leg(
@@ -38,8 +40,26 @@ function leg(
   feet: number | null,
   feetIsFloor = false
 ): FittingLeg {
-  return { id, from, to, feet, feetIsFloor, points: [], drops: 0 };
+  return {
+    id,
+    from,
+    to,
+    feet,
+    feetIsFloor,
+    points: [],
+    feetPerPoint: null,
+    startDrop: { state: "none" },
+    endDrop: { state: "none" },
+    answers: [],
+  };
 }
+
+/** Both ends level: the verticals a run gets when it carries straight on. */
+const LEVEL: EndVertical = {
+  counted: false,
+  kind: "distribution",
+  reason: "level",
+};
 
 describe("sticks and couplings", () => {
   it("rounds sticks up and does not add one for a float tail", () => {
@@ -224,8 +244,9 @@ describe("legs from today's runs", () => {
   const base = {
     points: [],
     conduitFeet: 40,
-    countedDrops: 1,
-    uncountedEnds: 0,
+    verticals: { start: LEVEL, end: LEVEL },
+    feetPerPoint: null,
+    answers: [],
   };
 
   it("gives an unlinked end a node of its own", () => {
@@ -262,8 +283,18 @@ describe("legs from today's runs", () => {
         id: 3,
         startStampId: null,
         endStampId: null,
-        uncountedEnds: 1,
+        verticals: {
+          start: LEVEL,
+          end: { counted: false, kind: "receptacle", reason: "height-not-set" },
+        },
       }).feetIsFloor
     ).toBe(true);
+  });
+
+  it("does NOT mark it a floor when both ends are level", () => {
+    expect(
+      legFromRun({ ...base, id: 4, startStampId: null, endStampId: null })
+        .feetIsFloor
+    ).toBe(false);
   });
 });

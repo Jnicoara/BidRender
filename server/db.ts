@@ -215,6 +215,7 @@ import {
 import {
   fittingMaterialName,
   fittingRows,
+  lbHubsTakeConnectors,
   pickFittingMaterial,
   type FittingMaterialPick,
   type FittingRow,
@@ -4887,7 +4888,15 @@ async function withTracedFootage(
     bid.userId,
     bid.distributionHeightInches
   );
-  const footage = groupRunFootage({ runs, circuitsByRun, scales, heights });
+  const footage = groupRunFootage({
+    runs,
+    circuitsByRun,
+    scales,
+    heights,
+    // BENDS BUILD, STEP 1 OF 8: nothing stores a pull-point answer until
+    // `takeoff_pull_points` lands in 0084 (step 3). Step 4 loads them here.
+    pullPointAnswersByRun: new Map(),
+  });
   // Only when a fitting line is actually on the bid: it costs three queries.
   const fittings = rows.some(row => isFittingRole(row.runMaterialRole))
     ? await fittingRowsByRunType(bid.userId, footage)
@@ -10328,6 +10337,10 @@ export async function fittingRowsByRunType(
             raceway.strapFromBoxFeet === null
               ? null
               : Number(raceway.strapFromBoxFeet),
+          lbHubsTakeConnectors: lbHubsTakeConnectors(
+            racewayBaselineName(raceway),
+            raceway.name
+          ),
         }
       : null;
     const counts = spec

@@ -29,7 +29,8 @@ import {
 } from "../shared/takeoffQuantities";
 import { runWireOwnership } from "../shared/branchWire";
 import { legFromRun, type FittingLeg } from "../shared/runFittings";
-import { uncountedEnds } from "../shared/takeoffHeights";
+import type { PullPointAnswer } from "../shared/runBends";
+import { pointsToRealInches } from "../shared/takeoffGeometry";
 import { verticalsForRunRow, type HeightContext } from "./runVerticals";
 
 export type RunTypeFootageRow = {
@@ -109,6 +110,11 @@ export function groupRunFootage(input: {
   circuitsByRun: ReadonlyMap<number, readonly StoredCircuit[]>;
   scales: ReadonlyMap<number, SheetScale>;
   heights: HeightContext;
+  /**
+   * Each run's stored pull-point answers (`takeoff_pull_points`). Required, so
+   * a caller cannot forget them: an accepted LB changes the connector count.
+   */
+  pullPointAnswersByRun: ReadonlyMap<number, readonly PullPointAnswer[]>;
 }): Map<number, RunTypeFootageRow> {
   const byType = new Map<number, RunTypeFootageRow>();
 
@@ -172,6 +178,7 @@ export function groupRunFootage(input: {
       with no scale still has two ends and therefore two connectors.
     */
     if (run.pathType === "conduit") {
+      const inchesPerPoint = pointsToRealInches(1, ratio);
       row.legs.push(
         legFromRun({
           id: run.id,
@@ -179,10 +186,9 @@ export function groupRunFootage(input: {
           endStampId: run.endStampId,
           points: run.points,
           conduitFeet: quantities?.conduitFeet ?? null,
-          countedDrops:
-            (verticals?.start.counted ? 1 : 0) +
-            (verticals?.end.counted ? 1 : 0),
-          uncountedEnds: verticals ? uncountedEnds(verticals).length : 0,
+          verticals,
+          feetPerPoint: inchesPerPoint === null ? null : inchesPerPoint / 12,
+          answers: input.pullPointAnswersByRun.get(run.id) ?? [],
         })
       );
     }

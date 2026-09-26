@@ -30,13 +30,27 @@
  * reach React — CLAUDE.md § "prefer a forcing function to a reminder".
  *
  * ── Where elbows and pull points plug in ─────────────────────────────────────
- * `FittingKind` is the extension point: an "elbow" kind reads each leg's
- * `points` (corner angles) and `drops` (one 90 per counted vertical), and a
- * pull-point proposal walks the same corners accumulating degrees. Legs carry
- * both today so that build adds a kind rather than reshaping the input. See
- * `todo.md` § "Bends and pull points".
+ * `shared/runBends.ts` reads the same legs: each leg's `points` for corner
+ * angles, its two `EndDrop`s for the 90 at each counted vertical, and its
+ * stored pull-point answers. An ACCEPTED pull point is a box, so it also
+ * changes the counts here — `splitAtPullPoints` cuts the leg there, and the
+ * couplings, connectors and straps follow from the pieces with no rule of
+ * their own.
+ *
+ * This comment used to say legs carried `drops` as a bare count so the bend
+ * build would add a kind rather than reshape the input. It did reshape it: a
+ * pull point at the top of the END drop needs to know which end, and splitting
+ * a leg needs each drop's feet. The count became two `EndDrop`s (2026-09-26).
  */
 import type { PagePoint as Point } from "./takeoffGeometry";
+import {
+  endDropOf,
+  placeAnswer,
+  type BendLeg,
+  type EndDrop,
+  type PullPointAnswer,
+} from "./runBends";
+import type { EndVertical } from "./takeoffHeights";
 
 /**
  * How one stick of this raceway joins the next.
@@ -73,11 +87,15 @@ export type RacewayFittingSpec = {
   strapSpacingFeet: number | null;
   /** How close to a box the first strap goes. NULL is not set. */
   strapFromBoxFeet: number | null;
+  /**
+   * Whether pipe entering an LB's hubs needs a connector of its own. EMT does
+   * (a threaded hub takes an EMT connector); rigid and IMC thread straight in,
+   * and PVC glues straight in. Required, so a new caller has to decide.
+   */
+  lbHubsTakeConnectors: boolean;
 };
 
-export type FittingLeg = {
-  /** Stable, for the per-run breakdown. The run id today. */
-  id: string;
+export type FittingLeg = BendLeg & {
   /** Node keys. Equal keys on two legs mean those ends meet. */
   from: string;
   to: string;
@@ -91,10 +109,6 @@ export type FittingLeg = {
    * every count built on it is "at least".
    */
   feetIsFloor: boolean;
-  /** For the elbow build: the traced corners. Page units, as stored. */
-  points: readonly Point[];
-  /** For the elbow build: how many counted verticals (each a 90). */
-  drops: number;
 };
 
 export const FITTING_KINDS = ["coupling", "connector", "strap"] as const;
@@ -185,11 +199,129 @@ export function countFittings(
   legs: readonly FittingLeg[],
   raceway: RacewayFittingSpec
 ): Record<FittingKind, FittingCount> {
+  const pieces = legs.flatMap(splitAtPullPoints);
   return {
-    coupling: countCouplings(legs, raceway),
-    connector: countConnectors(legs),
-    strap: countStraps(legs, raceway),
+    coupling: countCouplings(pieces, raceway),
+    connector: countConnectors(pieces, raceway),
+    strap: countStraps(pieces, raceway),
   };
+}
+
+/** Node keys for an accepted pull point — an LB or a pull box. */
+const LB_NODE = "lb:";
+const PULL_BOX_NODE = "box:";
+
+/**
+ * Cut a leg at every ACCEPTED pull point still on it.
+ *
+ * A pull point is a box in the middle of the pipe, so each side is a leg of
+ * its own: it starts a fresh stick, its conduit ends meet the box, and it is
+ * strapped near the box. Nothing else here needs to know pull points exist.
+ *
+ * ── Feet, split honestly ─────────────────────────────────────────────────────
+ * The leg's `feet` is traced plus its counted drops. The drops belong to the
+ * ends, so each goes whole to the piece at its end; the traced part is shared
+ * by page length. A pull point at the top of the END drop makes the drop its
+ * own piece. An unmeasured leg stays unmeasured in every piece — unknown is
+ * never split into zeros.
+ */
+export function splitAtPullPoints(leg: FittingLeg): FittingLeg[] {
+  const cuts: { vertex: number; answer: PullPointAnswer }[] = [];
+  let atEndDrop: PullPointAnswer | null = null;
+  for (const answer of leg.answers) {
+    if (answer.status !== "accepted") continue;
+    const where = placeAnswer(leg, answer);
+    if (where === null) continue;
+    if ("endDrop" in where) atEndDrop = answer;
+    else cuts.push({ vertex: where.vertex, answer });
+  }
+  if (cuts.length === 0 && atEndDrop === null) return [leg];
+  cuts.sort((a, b) => a.vertex - b.vertex);
+
+  const nodeOf = (answer: PullPointAnswer) =>
+    (answer.kind === "lb" ? LB_NODE : PULL_BOX_NODE) + String(answer.id);
+  const dropFeet = (drop: EndDrop) =>
+    drop.state === "counted" ? drop.feet : 0;
+  const startFeet = dropFeet(leg.startDrop);
+  const endFeet = dropFeet(leg.endDrop);
+  const traced =
+    leg.feet === null ? null : Math.max(0, leg.feet - startFeet - endFeet);
+
+  const bounds = [0, ...cuts.map(c => c.vertex), leg.points.length - 1];
+  const lengths = bounds
+    .slice(1)
+    .map((to, i) => pageLength(leg.points, bounds[i], to));
+  const total = lengths.reduce((a, b) => a + b, 0);
+
+  const pieces: FittingLeg[] = [];
+  lengths.forEach((length, i) => {
+    const first = i === 0;
+    const last = i === lengths.length - 1;
+    const share =
+      traced === null
+        ? null
+        : total > 0
+          ? (traced * length) / total
+          : first
+            ? traced
+            : 0;
+    const feet =
+      share === null
+        ? null
+        : round2(
+            share +
+              (first ? startFeet : 0) +
+              (last && atEndDrop === null ? endFeet : 0)
+          );
+    pieces.push({
+      ...leg,
+      id: `${leg.id}#${i + 1}`,
+      from: first ? leg.from : nodeOf(cuts[i - 1].answer),
+      to: last
+        ? atEndDrop
+          ? nodeOf(atEndDrop)
+          : leg.to
+        : nodeOf(cuts[i].answer),
+      feet,
+      feetIsFloor:
+        (first && leg.startDrop.state === "unknown") ||
+        (last && atEndDrop === null && leg.endDrop.state === "unknown"),
+      points: leg.points.slice(bounds[i], bounds[i + 1] + 1),
+      startDrop: first ? leg.startDrop : { state: "none" },
+      endDrop: last && atEndDrop === null ? leg.endDrop : { state: "none" },
+      answers: [],
+    });
+  });
+  if (atEndDrop) {
+    pieces.push({
+      ...leg,
+      id: `${leg.id}#drop`,
+      from: nodeOf(atEndDrop),
+      to: leg.to,
+      feet: leg.feet === null ? null : round2(endFeet),
+      feetIsFloor: false,
+      points: [],
+      startDrop: { state: "none" },
+      endDrop: leg.endDrop,
+      answers: [],
+    });
+  }
+  return pieces;
+}
+
+function pageLength(
+  points: readonly Point[],
+  from: number,
+  to: number
+): number {
+  let sum = 0;
+  for (let i = from + 1; i <= to; i++) {
+    sum += Math.hypot(
+      points[i].x - points[i - 1].x,
+      points[i].y - points[i - 1].y
+    );
+  }
+  return sum;
 }
 
 function countCouplings(
@@ -274,7 +406,10 @@ function countCouplings(
   };
 }
 
-function countConnectors(legs: readonly FittingLeg[]): FittingCount {
+function countConnectors(
+  legs: readonly FittingLeg[],
+  raceway: RacewayFittingSpec
+): FittingCount {
   const kind = "connector" as const;
   if (legs.length === 0) {
     return {
@@ -287,13 +422,35 @@ function countConnectors(legs: readonly FittingLeg[]): FittingCount {
   }
   // One per conduit end, which is the sum of the degrees — and the degrees are
   // what the sentence explains, because "in and out of a box is two" is the
-  // part a reader wants to check.
+  // part a reader wants to check. Pull points are said on their own, because
+  // an LB's hubs follow the pipe rather than the box rule.
   const byDegree = new Map<number, number>();
   let qty = 0;
-  for (const degree of Array.from(nodeDegrees(legs).values())) {
+  let lbs = 0;
+  let pullBoxes = 0;
+  for (const [node, degree] of Array.from(nodeDegrees(legs).entries())) {
+    if (node.startsWith(LB_NODE)) {
+      lbs++;
+      if (raceway.lbHubsTakeConnectors) qty += degree;
+      continue;
+    }
+    if (node.startsWith(PULL_BOX_NODE)) {
+      pullBoxes++;
+      qty += degree;
+      continue;
+    }
     byDegree.set(degree, (byDegree.get(degree) ?? 0) + 1);
     qty += degree;
   }
+  const pullParts: string[] = [];
+  if (pullBoxes > 0)
+    pullParts.push(`${plural(pullBoxes, "pull box", "pull boxes")} (2 each)`);
+  if (lbs > 0)
+    pullParts.push(
+      raceway.lbHubsTakeConnectors
+        ? `${plural(lbs, "LB")} (2 each, into the hubs)`
+        : `${plural(lbs, "LB")} (none — the pipe goes straight into the hubs)`
+    );
   const parts = Array.from(byDegree.entries())
     .sort((a, b) => a[0] - b[0])
     .map(([degree, nodes]) => {
@@ -307,7 +464,7 @@ function countConnectors(legs: readonly FittingLeg[]): FittingCount {
     status: "counted",
     qty,
     atLeast: false,
-    why: `${plural(qty, "connector")}: one per conduit end — ${parts.join(", ")}`,
+    why: `${plural(qty, "connector")}: one per conduit end — ${[...parts, ...pullParts].join(", ")}`,
   };
 }
 
@@ -373,11 +530,15 @@ function countStraps(
  *
  * `feet` is the run's PIPE — `conduitFeet` from `quantitiesForRun`, traced
  * plus counted verticals — so couplings and straps include the drops, per the
- * decision of 2026-09-26. `uncountedEnds` is how many ends have a vertical
- * that could not be counted; any makes the figure a floor.
+ * decision of 2026-09-26. An end whose vertical could not be counted makes
+ * the figure a floor — the same test `uncountedEnds` makes, read here through
+ * `endDropOf` so the bend count and the footage cannot disagree about it.
  *
  * An end linked to a stamp becomes that stamp's node, so two runs meeting at
  * one box share it. An unlinked end is a node of its own: a line end.
+ *
+ * `answers` are this run's stored pull-point answers; `feetPerPoint` is the
+ * sheet's scale, which merging a traced sweep needs (`runBends.ts`).
  */
 export function legFromRun(run: {
   id: number;
@@ -385,9 +546,12 @@ export function legFromRun(run: {
   endStampId: number | null;
   points: readonly Point[];
   conduitFeet: number | null;
-  countedDrops: number;
-  uncountedEnds: number;
+  verticals: { start: EndVertical; end: EndVertical };
+  feetPerPoint: number | null;
+  answers: readonly PullPointAnswer[];
 }): FittingLeg {
+  const startDrop = endDropOf(run.verticals.start);
+  const endDrop = endDropOf(run.verticals.end);
   return {
     id: String(run.id),
     from:
@@ -397,9 +561,12 @@ export function legFromRun(run: {
     to:
       run.endStampId !== null ? `stamp:${run.endStampId}` : `run:${run.id}:end`,
     feet: run.conduitFeet,
-    feetIsFloor: run.uncountedEnds > 0,
+    feetIsFloor: startDrop.state === "unknown" || endDrop.state === "unknown",
     points: run.points,
-    drops: run.countedDrops,
+    feetPerPoint: run.feetPerPoint,
+    startDrop,
+    endDrop,
+    answers: run.answers,
   };
 }
 

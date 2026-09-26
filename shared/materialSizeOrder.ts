@@ -96,6 +96,18 @@ const TRADE_SIZE_RANK = new Map<string, number>(
 );
 
 /**
+ * Whether trade size `a` is at least `b` — `'1-1/4"'` against `'1"'`. NULL
+ * when either is not a trade size this table knows, so a caller has to say
+ * what an unreadable size means rather than getting a quiet `false`.
+ */
+export function tradeSizeAtLeast(a: string, b: string): boolean | null {
+  const ra = TRADE_SIZE_RANK.get(a);
+  const rb = TRADE_SIZE_RANK.get(b);
+  if (ra === undefined || rb === undefined) return null;
+  return ra >= rb;
+}
+
+/**
  * Which scale a row's size is measured on. Ordered so that when a category does
  * mix them, the grouping reads sensibly: conductors, then raceway, then rated
  * equipment, then physical lengths, then everything unsized.

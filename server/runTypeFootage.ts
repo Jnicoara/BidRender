@@ -40,5 +40,13 @@ export async function footageByRunType(
     distributionHeightInches
   );
 
-  return groupRunFootage({ runs, circuitsByRun, scales, heights });
+  return groupRunFootage({
+    runs,
+    circuitsByRun,
+    scales,
+    heights,
+    // BENDS BUILD, STEP 1 OF 8: nothing stores a pull-point answer until
+    // `takeoff_pull_points` lands in 0084 (step 3). Step 4 loads them here.
+    pullPointAnswersByRun: new Map(),
+  });
 }

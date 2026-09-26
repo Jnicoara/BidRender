@@ -22,6 +22,8 @@ import {
   type FittingCount,
   type FittingKind,
 } from "./runFittings";
+import type { BendMethod, PullPointKind } from "./runBends";
+import { tradeSizeAtLeast } from "./materialSizeOrder";
 
 /**
  * EMT's three fitting styles. NULL on a run type reads as set-screw — it is
@@ -71,6 +73,180 @@ export function parseRacewayName(
   return (FAMILY_LABELS as readonly string[]).includes(family)
     ? { size, family: family as RacewayFamilyLabel }
     : null;
+}
+
+const FLEX_FAMILIES: readonly RacewayFamilyLabel[] = [
+  "flexible metal conduit",
+  "liquidtight flexible conduit",
+];
+const PVC_FAMILIES: readonly RacewayFamilyLabel[] = [
+  "PVC Sch 40",
+  "PVC Sch 80",
+];
+
+/** The raceway's size and family, from its shipped name or else its own. */
+function readRaceway(
+  baselineName: string | null,
+  ownName: string | null
+): { size: string; family: RacewayFamilyLabel } | null {
+  return (
+    (baselineName === null ? null : parseRacewayName(baselineName)) ??
+    (ownName === null ? null : parseRacewayName(ownName))
+  );
+}
+
+/**
+ * Whether pipe going into an LB needs a connector at each hub. EMT does;
+ * rigid and IMC thread straight in; PVC glues straight in.
+ *
+ * A raceway whose family cannot be read (a custom one) gets connectors
+ * counted: one too many connectors is a visible line somebody deletes, one too
+ * few is a part nobody knows is missing.
+ */
+export function lbHubsTakeConnectors(
+  baselineName: string | null,
+  ownName: string | null
+): boolean {
+  const parsed = readRaceway(baselineName, ownName);
+  return parsed === null || parsed.family === "EMT";
+}
+
+/**
+ * Factory elbows or field bends for this raceway, with the sentence that says
+ * why. The decision (owner, 2026-09-26): factory elbows from the company's
+ * size up, bent in the field below it; PVC always takes factory elbows; flex
+ * turns itself. The size is compared through `TRADE_SIZE_ORDER`, never by
+ * arithmetic on the text.
+ */
+export function bendMethodFor(
+  baselineName: string | null,
+  ownName: string | null,
+  factoryElbowFrom: string
+): BendMethod {
+  const parsed = readRaceway(baselineName, ownName);
+  const name = ownName ?? baselineName ?? "This raceway";
+  if (parsed === null) {
+    return {
+      method: "unknown",
+      why: `The size of ${name} cannot be read from its name, so its bends cannot be sorted into elbows or field bends`,
+    };
+  }
+  if (FLEX_FAMILIES.includes(parsed.family)) {
+    return {
+      method: "none",
+      why: `${name} turns corners itself — no elbows, no bending`,
+    };
+  }
+  if (PVC_FAMILIES.includes(parsed.family)) {
+    return { method: "factory", why: "PVC always takes factory elbows" };
+  }
+  const atLeast = tradeSizeAtLeast(parsed.size, factoryElbowFrom);
+  if (atLeast === null) {
+    return {
+      method: "unknown",
+      why: `${parsed.size} is not a trade size this app knows, so its bends cannot be sorted into elbows or field bends`,
+    };
+  }
+  return atLeast
+    ? {
+        method: "factory",
+        why: `factory elbows from ${factoryElbowFrom} up`,
+      }
+    : {
+        method: "field",
+        why: `${parsed.size} ${parsed.family} is bent in the field below ${factoryElbowFrom}`,
+      };
+}
+
+/**
+ * Which pull point to PROPOSE: an LB below the company's size, a pull box from
+ * it up (owner, 2026-09-26; default 2"). Flex has no LB, so always a box. The
+ * person can switch it on the drawing; this is only what is offered first.
+ */
+export function pullPointKindFor(
+  baselineName: string | null,
+  ownName: string | null,
+  pullBoxFrom: string
+): PullPointKind {
+  const parsed = readRaceway(baselineName, ownName);
+  if (parsed === null) return "pullBox";
+  if (FLEX_FAMILIES.includes(parsed.family)) return "pullBox";
+  return tradeSizeAtLeast(parsed.size, pullBoxFrom) === false
+    ? "lb"
+    : "pullBox";
+}
+
+/**
+ * Trade size in inches for the pull-box rule. An explicit table, like
+ * `TRADE_SIZE_ORDER`: `1-1/4"` is not something to parse into a number.
+ */
+const TRADE_SIZE_INCHES: Readonly<Record<string, number>> = {
+  '1/2"': 0.5,
+  '3/4"': 0.75,
+  '1"': 1,
+  '1-1/4"': 1.25,
+  '1-1/2"': 1.5,
+  '2"': 2,
+  '2-1/2"': 2.5,
+  '3"': 3,
+  '3-1/2"': 3.5,
+  '4"': 4,
+};
+
+/** The pull boxes the catalog ships (`boxes.ts`), smallest first. */
+const PULL_BOX_SIDES = [4, 6, 8, 12, 16, 24] as const;
+
+export function pullBoxName(side: number): string {
+  return `${side}x${side} pull box`;
+}
+
+/**
+ * The smallest shipped pull box for an ANGLE pull on this raceway: NEC
+ * 314.28(A)(2), at least 6 × the trade size. A proposal always sits on a bend,
+ * so it is always an angle pull. Other conduits entering the same box are not
+ * known here, which is why the sentence says "at least".
+ */
+export function pullBoxFor(
+  baselineName: string | null,
+  ownName: string | null
+): { name: string; why: string } | { name: null; why: string } {
+  const parsed = readRaceway(baselineName, ownName);
+  const inches = parsed ? TRADE_SIZE_INCHES[parsed.size] : undefined;
+  if (!parsed || inches === undefined) {
+    return {
+      name: null,
+      why: "The raceway's size cannot be read, so no pull box size is proposed — choose one on the run type",
+    };
+  }
+  const needed = 6 * inches;
+  const side = PULL_BOX_SIDES.find(s => s >= needed);
+  if (side === undefined) {
+    return {
+      name: null,
+      why: `An angle pull on ${parsed.size} needs at least ${needed}" — larger than any shipped pull box`,
+    };
+  }
+  return {
+    name: pullBoxName(side),
+    why: `angle pull: at least 6 × ${parsed.size} = ${trimInches(needed)}" (NEC 314.28), more if other conduits enter the box`,
+  };
+}
+
+function trimInches(value: number): string {
+  return String(Math.round(value * 100) / 100);
+}
+
+/** `1" EMT 90-degree elbow` — the seed's names, read by the lookup too. */
+export function elbowName(
+  size: string,
+  family: string,
+  angle: 90 | 45
+): string {
+  return `${size} ${family} ${angle}-degree elbow`;
+}
+
+export function lbName(size: string, family: string): string {
+  return `${size} ${family} LB conduit body`;
 }
 
 /**
