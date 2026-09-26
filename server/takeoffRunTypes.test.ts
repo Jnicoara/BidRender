@@ -722,7 +722,14 @@ describeDb("what a foot of this type costs", () => {
       id: shipped.id,
       laborHours: 0.0125,
     });
-    expect(fork!.material.id).not.toBe(shipped.id);
+    // `material` is read back after the write (getMaterialById) and can come
+    // back empty. Failing here names that, where `fork!.material.id` would
+    // have thrown a bare TypeError — and asserted nothing about the fork.
+    const forkId = fork.material?.id;
+    if (forkId === undefined) {
+      throw new Error("materials.update returned no material");
+    }
+    expect(forkId).not.toBe(shipped.id);
 
     try {
       const after = (await caller().takeoffRunTypes.list()).find(
@@ -733,7 +740,7 @@ describeDb("what a foot of this type costs", () => {
       expect(laborUnitHours(after.conductorLaborHours)).toBe(0.0125);
       expect(laborPerFootForRunType(after).hours).toBe(0.0125);
     } finally {
-      await caller().materials.revert({ id: fork!.material.id });
+      await caller().materials.revert({ id: forkId });
     }
   });
 });
