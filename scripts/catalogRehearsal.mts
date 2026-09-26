@@ -91,6 +91,12 @@ const REFERENCES: [string, string][] = [
   ["takeoff_run_types", "couplingMaterialId"],
   ["takeoff_run_types", "connectorMaterialId"],
   ["takeoff_run_types", "strapMaterialId"],
+  // The bend overrides (0084). Missing from this list for the release that
+  // added them — harmless then, all empty on production — added after it.
+  ["takeoff_run_types", "elbow90MaterialId"],
+  ["takeoff_run_types", "elbow45MaterialId"],
+  ["takeoff_run_types", "lbMaterialId"],
+  ["takeoff_run_types", "pullBoxMaterialId"],
   ["bid_line_items", "runMaterialId"],
   ["markup_rules", "itemKey"],
   ["materials", "baselineId"],

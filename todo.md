@@ -1302,9 +1302,12 @@ fills only its own new column and is guarded on NULL. Then run
 refuses to count without 0082. (Run 2026-09-26 without 0082: production has
 2 bids, 2 untyped runs and no bid lines, so nothing there is affected.)
 
-- [x] **BUILT 2026-09-26 on `local-dev`, NOT DEPLOYED: bends and pull points**
-      (D19 in `references/takeoff-spec.md`). Eight commits, `c648f9b` to the
-      docs commit. **Before it can go live:**
+- [x] **DEPLOYED 2026-09-26 as `e07f1e4` (rollback target `99b8c4e`, backup
+      `2026-09-26T20-57-13Z`): bends and pull points** (D19 in
+      `references/takeoff-spec.md`), with the "Not priced, never 0 h" labor
+      fix (`1956a90`). Rehearsal, migration and live checks are recorded in
+      `references/deploying.md` § 5b "Third run". What the deploy needed,
+      kept for the record — all done:
   - **0084 is step 1 (additive): apply it BEFORE the push.** Two new tables
     (both name `utf8mb4_unicode_ci`), nullable columns, enum values appended;
     no UPDATE. Step 3 is empty. Applied to `bidrender_local` and
@@ -1329,10 +1332,14 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       bends would count bending twice. Nothing moves by default (every shipped
       unit is NULL). The editor says "per bend"; worth a sentence on the
       Materials screen if a company reports it.
-- [ ] **Other run-type lines still print "0 h" when their material has no
-      labor unit.** The send flattens a NULL unit to 0 (`runLinePricing`), so
-      the bid cannot tell it apart afterwards. Field bends keep the NULL and
-      show "— h" (`lineHoursUnset`); the rest predate this build.
+- [x] **FIXED 2026-09-26 (`1956a90`, deployed in `e07f1e4`): run-type lines
+      printed "0 h" when their material had no labor unit.** A missing unit
+      now stays NULL on every traced line; the hours cell reads "Not priced",
+      a strip names the lines, and Send again fills the hours in once the
+      part has them. **Still true:** lines sent BEFORE the fix froze the
+      missing unit as 0 and read "0 h" — they cannot be told apart from a
+      set zero. Production had no bid lines at deploy time, so no live bid
+      carries any.
 - [ ] **LB covers and gaskets, LL/LR/T/C bodies and PVC sweeps are not in the
       catalog.** Sweeps wait for an Underground category (answer 2).
 - [ ] **Three local tables are on the wrong collation** —

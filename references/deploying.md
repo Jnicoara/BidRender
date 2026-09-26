@@ -741,6 +741,31 @@ orphans. Second boot changed nothing. The three earlier rounds (AL/CU, SER
 full sets, disconnects) had already run on production and left no active row
 on an old spelling.
 
+**Third run — bends and pull points, deployed as `e07f1e4` on 2026-09-26.**
+**Rollback target: `99b8c4e`.** Backup **`2026-09-26T20-57-13Z`** (59 tables,
+3,090 rows, 5 files) restored and verified, kept with `KEEP_SCRATCH=1`; 0084
+applied to the copy (1 file, 85 recorded), no drift. First boot of the built
+release on the copy: 1,192 → 1,237 shipped rows, **45 added** (the 45°
+elbows), nothing renamed, retired or deleted, no company row touched, every
+reference identical; second boot changed nothing; `search` reported exactly
+the known 9 / 12 from earlier rounds. Production then: `schemaDrift` named
+exactly 0084's five items, `migrate.mts` applied 1, a second run applied
+nothing, drift clean; the old build read bid 25, its runs, the Send preview,
+materials and run types normally on the new schema. Pushed 21:04:26Z; the
+new build (`builtAt` 21:05:00Z) was serving at 21:06:58Z. Production's
+catalog then matched the rehearsal line for line — 1,192 → 1,237, 45 added,
+VERDICT CLEAN. The script's reference list did not yet include 0084's four
+override columns (all empty on production); added afterwards.
+
+Live checks on bid 25 as the smoke account (a 1-1/4" EMT type and two runs
+added for the check, all removed afterwards, sheet 196's scale cleared): a
+three-corner run read "270° of bend on the drawing (3 corners) … At least
+that"; a five-corner run proposed an LB at its fifth corner (450°); accepting
+it in the live UI took the 90s from ≥ 8 to ≥ 7, connectors 4 → 6 ("1 LB (2
+each, into the hubs)"), LB 0 → 1, and straps stayed ≥ 20 but redistributed
+(4 near a box + 16 spaced → 6 + 14) — the two beside the LB replace two
+spacing straps on those lengths.
+
 **`search` caught a real regression before production did.** The old name
 `2-1/2" EMT coupling` matched all three new EMT styles equally and the tie fell
 to the alphabet — compression first, the renamed set-screw row third. Fixed
