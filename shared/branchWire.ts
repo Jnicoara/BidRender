@@ -40,6 +40,7 @@
  */
 
 import { DISTRIBUTION_KIND } from "./takeoffHeights";
+import { kindAtEnd } from "./runNetwork";
 
 /** Feet of whip, as the column stores it or as tRPC hands it over. */
 export type WhipFeet = string | number | null | undefined;
@@ -118,13 +119,22 @@ export type RunWireOwnership = "homerun" | "branch" | "unanswered";
 export function runWireOwnership(run: {
   startKind: string | null | undefined;
   endKind: string | null | undefined;
+  /**
+   * The tee each end sits on (D20). Required: a tee end is never a device
+   * end, and a caller that could omit these would ask the branch question
+   * about a leg whose "device" is the split. See `kindAtEnd`.
+   */
+  startTeeId: number | null | undefined;
+  endTeeId: number | null | undefined;
   /** What the estimator answered when asked. NULL = never asked or skipped. */
   branchWiring?: boolean | null;
 }): RunWireOwnership {
   if (run.branchWiring === true) return "branch";
   if (run.branchWiring === false) return "homerun";
-  if (isPanel(run.startKind) || isPanel(run.endKind)) return "homerun";
-  if (isDevice(run.startKind) && isDevice(run.endKind)) return "unanswered";
+  const start = kindAtEnd(run.startKind, run.startTeeId);
+  const end = kindAtEnd(run.endKind, run.endTeeId);
+  if (isPanel(start) || isPanel(end)) return "homerun";
+  if (isDevice(start) && isDevice(end)) return "unanswered";
   return "homerun";
 }
 
@@ -146,6 +156,8 @@ function isDevice(kind: string | null | undefined): boolean {
 export function shouldAskAboutBranchWiring(run: {
   startKind: string | null | undefined;
   endKind: string | null | undefined;
+  startTeeId: number | null | undefined;
+  endTeeId: number | null | undefined;
   branchWiring?: boolean | null;
 }): boolean {
   return runWireOwnership(run) === "unanswered";

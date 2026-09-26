@@ -18,6 +18,44 @@ import {
   PANEL_KIND,
 } from "../shared/branchWire";
 
+/** A run with no end on a tee — every run before branch legs (D20). */
+const PLAIN = { startTeeId: null, endTeeId: null };
+
+describe("a tee end is never a device end (D20)", () => {
+  it("does not ask the branch question about a leg from a tee to a device", () => {
+    // Without the tee, receptacle → receptacle is the ambiguous case. With
+    // the start on a tee, the start is the split, not a device.
+    expect(
+      runWireOwnership({
+        startKind: "receptacle",
+        endKind: "receptacle",
+        startTeeId: 30,
+        endTeeId: null,
+      })
+    ).toBe("homerun");
+    expect(
+      shouldAskAboutBranchWiring({
+        startKind: "switch",
+        endKind: "receptacle",
+        startTeeId: null,
+        endTeeId: 31,
+      })
+    ).toBe(false);
+  });
+
+  it("still honors the estimator's recorded answer on a leg", () => {
+    expect(
+      runWireOwnership({
+        startKind: "receptacle",
+        endKind: "receptacle",
+        startTeeId: 30,
+        endTeeId: null,
+        branchWiring: true,
+      })
+    ).toBe("branch");
+  });
+});
+
 describe("an unset whip is not a whip of zero", () => {
   it("reads NULL and undefined as unset", () => {
     expect(whipFeetOf(null)).toBeNull();
@@ -52,22 +90,39 @@ describe("whose wire a traced run is", () => {
     // The definition of a homerun, and the majority of traced runs. A guard
     // that fired on these would teach people to read past it.
     expect(
-      runWireOwnership({ startKind: PANEL_KIND, endKind: "receptacle" })
+      runWireOwnership({
+        ...PLAIN,
+        startKind: PANEL_KIND,
+        endKind: "receptacle",
+      })
     ).toBe("homerun");
     expect(
-      runWireOwnership({ startKind: "receptacle", endKind: PANEL_KIND })
+      runWireOwnership({
+        ...PLAIN,
+        startKind: "receptacle",
+        endKind: PANEL_KIND,
+      })
     ).toBe("homerun");
     expect(
-      shouldAskAboutBranchWiring({ startKind: PANEL_KIND, endKind: "switch" })
+      shouldAskAboutBranchWiring({
+        ...PLAIN,
+        startKind: PANEL_KIND,
+        endKind: "switch",
+      })
     ).toBe(false);
   });
 
   it("devices at BOTH ends is the ambiguous case, and it asks", () => {
     expect(
-      runWireOwnership({ startKind: "receptacle", endKind: "receptacle" })
+      runWireOwnership({
+        ...PLAIN,
+        startKind: "receptacle",
+        endKind: "receptacle",
+      })
     ).toBe("unanswered");
     expect(
       shouldAskAboutBranchWiring({
+        ...PLAIN,
         startKind: "ceiling-box",
         endKind: "switch",
       })
@@ -79,6 +134,7 @@ describe("whose wire a traced run is", () => {
     // for, so it is a device here rather than an exception.
     expect(
       shouldAskAboutBranchWiring({
+        ...PLAIN,
         startKind: "junction-box-wall",
         endKind: "receptacle",
       })
@@ -91,17 +147,21 @@ describe("whose wire a traced run is", () => {
       it is a receptacle. Reading unknown as a device would fire the guard on
       every half-finished run on the sheet.
     */
-    expect(runWireOwnership({ startKind: null, endKind: "receptacle" })).toBe(
-      "homerun"
-    );
-    expect(shouldAskAboutBranchWiring({ startKind: null, endKind: null })).toBe(
-      false
-    );
+    expect(
+      runWireOwnership({ ...PLAIN, startKind: null, endKind: "receptacle" })
+    ).toBe("homerun");
+    expect(
+      shouldAskAboutBranchWiring({ ...PLAIN, startKind: null, endKind: null })
+    ).toBe(false);
   });
 
   it("does not treat 'carries on at run height' as a device either", () => {
     expect(
-      runWireOwnership({ startKind: "distribution", endKind: "receptacle" })
+      runWireOwnership({
+        ...PLAIN,
+        startKind: "distribution",
+        endKind: "receptacle",
+      })
     ).toBe("homerun");
   });
 
@@ -113,6 +173,7 @@ describe("whose wire a traced run is", () => {
     */
     expect(
       runWireOwnership({
+        ...PLAIN,
         startKind: "receptacle",
         endKind: "receptacle",
         branchWiring: false,
@@ -120,6 +181,7 @@ describe("whose wire a traced run is", () => {
     ).toBe("homerun");
     expect(
       runWireOwnership({
+        ...PLAIN,
         startKind: PANEL_KIND,
         endKind: "receptacle",
         branchWiring: true,

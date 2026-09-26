@@ -27,6 +27,7 @@ import {
   type HeightRow,
   type RunVerticals,
 } from "../shared/takeoffHeights";
+import { heightAtEnd, kindAtEnd } from "../shared/runNetwork";
 /*
   NO DATABASE IMPORT, DELIBERATELY.
 
@@ -118,6 +119,13 @@ export type RunEnds = {
   startHeightInches: number | null;
   endHeightInches: number | null;
   distributionHeightInches: number | null;
+  /**
+   * The tee each end sits on (D20). REQUIRED, not optional: a tee end has no
+   * vertical, and a caller that could leave these out would count a phantom
+   * drop at every branch. See `kindAtEnd`.
+   */
+  startTeeId: number | null;
+  endTeeId: number | null;
 };
 
 /**
@@ -137,25 +145,28 @@ export function verticalsForRunRow(
     run: run.distributionHeightInches,
   });
 
+  // A tee end carries straight on at run height — no drop (D20).
+  const startKind = kindAtEnd(run.startKind, run.startTeeId);
+  const endKind = kindAtEnd(run.endKind, run.endTeeId);
   const startHeight = resolveMountingHeight(
-    run.startKind,
+    startKind,
     context.layers,
-    run.startHeightInches
+    heightAtEnd(run.startHeightInches, run.startTeeId)
   );
   const endHeight = resolveMountingHeight(
-    run.endKind,
+    endKind,
     context.layers,
-    run.endHeightInches
+    heightAtEnd(run.endHeightInches, run.endTeeId)
   );
 
   return verticalsForRun(
     {
-      kind: run.startKind,
+      kind: startKind,
       endInches: startHeight.inches,
       distributionInches: distribution.inches,
     },
     {
-      kind: run.endKind,
+      kind: endKind,
       endInches: endHeight.inches,
       distributionInches: distribution.inches,
     }

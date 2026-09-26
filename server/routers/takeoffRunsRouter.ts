@@ -341,6 +341,8 @@ export const takeoffRunsRouter = router({
           wireOwnership: runWireOwnership({
             startKind: run.startKind,
             endKind: run.endKind,
+            startTeeId: run.startTeeId,
+            endTeeId: run.endTeeId,
             branchWiring: run.branchWiring,
           }),
           /**

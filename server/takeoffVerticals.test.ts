@@ -1071,6 +1071,8 @@ describe("resolving a stored run's verticals", () => {
     startHeightInches: null,
     endHeightInches: null,
     distributionHeightInches: null,
+    startTeeId: null,
+    endTeeId: null,
   };
 
   it("drops to a receptacle from the company's run height", () => {
@@ -1119,6 +1121,27 @@ describe("resolving a stored run's verticals", () => {
       COMPANY
     );
     expect(verticals.feet).toBe(6);
+  });
+
+  it("adds NO drop at a tee end, whatever kind the end still stores (D20)", () => {
+    // A branch leg from a tee to a receptacle: ONE drop, at the receptacle.
+    // The start sits on the main at run height — same pipe, same elevation.
+    // Its stored kind says "receptacle" and a height override is set, both
+    // left over from before the end was teed: neither may count.
+    const leg = {
+      ...PANEL_TO_RECEPTACLE,
+      startKind: "receptacle",
+      startHeightInches: 18,
+      startTeeId: 30,
+    };
+    const verticals = verticalsForRunRow(leg, COMPANY);
+    expect(verticals.feet).toBe(8.5);
+    expect(verticals.start.counted).toBe(false);
+
+    // The same row without the tee counts two drops — the double count.
+    expect(
+      verticalsForRunRow({ ...leg, startTeeId: null }, COMPANY).feet
+    ).toBeGreaterThan(8.5);
   });
 
   it("adds nothing at an end nobody has answered", () => {

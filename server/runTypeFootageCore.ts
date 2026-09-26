@@ -168,6 +168,8 @@ export function groupRunFootage(input: {
     const ownership = runWireOwnership({
       startKind: run.startKind,
       endKind: run.endKind,
+      startTeeId: run.startTeeId,
+      endTeeId: run.endTeeId,
       branchWiring: run.branchWiring,
     });
     if (ownership === "branch") {

@@ -25,6 +25,7 @@
  */
 import type { FittingCount, FittingLeg } from "./runFittings";
 import { TRADE_SIZE_ORDER } from "./materialSizeOrder";
+import { DISTRIBUTION_KIND } from "./takeoffHeights";
 
 /**
  * What stands at a split.
@@ -165,6 +166,38 @@ export function cutPathAt(
 
 function copy(p: Pt): Pt {
   return { x: p.x, y: p.y };
+}
+
+// ── A tee end has no vertical and is not a device ────────────────────────────
+
+/**
+ * An end's kind as heights and wire ownership must read it.
+ *
+ * A branch leaves the main at the main's own elevation — same pipe, same
+ * height — so a tee end is "carries straight on at run height": no drop, and
+ * never a device end. Read any other way, every branch would count a phantom
+ * drop at the split, which is the double count § 5d names.
+ *
+ * Applied INSIDE `verticalsForRunRow` and `runWireOwnership`, both of which
+ * require the tee id in their input, so a new caller cannot read a tee end's
+ * stored kind by leaving the id out. The stored kind is not touched: the
+ * server refuses to set one on a tee end, and if a tee is deleted the end
+ * goes back to whatever it says.
+ */
+export function kindAtEnd(
+  kind: string | null | undefined,
+  teeId: number | null | undefined
+): string | null {
+  if (teeId !== null && teeId !== undefined) return DISTRIBUTION_KIND;
+  return kind ?? null;
+}
+
+/** An end's own height override, which a tee end never has. */
+export function heightAtEnd(
+  inches: number | null,
+  teeId: number | null | undefined
+): number | null {
+  return teeId !== null && teeId !== undefined ? null : inches;
 }
 
 /** The root a row belongs to. */
