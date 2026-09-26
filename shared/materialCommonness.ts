@@ -112,6 +112,23 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   '3/4" EMT set-screw coupling': "core",
   '1" EMT set-screw connector': "common",
   '1" EMT set-screw coupling': "common",
+  // Set-screw at EVERY size, because it is what "EMT coupling" means at the
+  // counter. Found 2026-09-26 by the catalog rehearsal: the old name
+  // "2-1/2" EMT coupling" matches all three styles equally, and without this
+  // the tie fell to the alphabet — compression first, the renamed set-screw
+  // row third. Same reasoning as the 70–125A two-pole breakers above.
+  '1-1/4" EMT set-screw connector': "common",
+  '1-1/4" EMT set-screw coupling': "common",
+  '1-1/2" EMT set-screw connector': "common",
+  '1-1/2" EMT set-screw coupling': "common",
+  '2" EMT set-screw connector': "common",
+  '2" EMT set-screw coupling': "common",
+  '2-1/2" EMT set-screw connector': "common",
+  '2-1/2" EMT set-screw coupling': "common",
+  '3" EMT set-screw connector': "common",
+  '3" EMT set-screw coupling': "common",
+  '4" EMT set-screw connector': "common",
+  '4" EMT set-screw coupling': "common",
   "EMT strap": "common",
 
   // ── Boxes ──
