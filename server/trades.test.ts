@@ -230,7 +230,7 @@ describe.skipIf(!hasDb)("the migration's backfill", () => {
     expect(seen).toContain("electrical");
     // The only other value the seed uses. Anything else appearing here means a
     // trade got introduced without going through the registry.
-    for (const trade of seen) {
+    for (const trade of Array.from(seen)) {
       expect(["electrical", "low-voltage"]).toContain(trade);
     }
   });
