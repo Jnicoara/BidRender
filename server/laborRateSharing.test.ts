@@ -299,10 +299,18 @@ describe.skipIf(!hasDb)("there is no per-assembly rate override", () => {
   it("the update endpoint offers no way to set a rate on the assembly", async () => {
     const { assembly } = await assemblyUsing("Journeyman", 1);
     // Zod strips unknown keys, so this is accepted but must change nothing.
-    await caller().assemblies.update({
+    //
+    // Held in a variable rather than cast: TypeScript rejects extra keys only
+    // on a FRESH literal, so a named object carries them to the endpoint while
+    // `id` is still type-checked. It replaced `...({ … } as never)`, which
+    // told the compiler to trust it and was itself an error (spreading never).
+    const withRateKeys = {
       id: assembly.id,
-      ...({ hourlyCost: 999, laborRate: 999, rateOverride: 999 } as never),
-    });
+      hourlyCost: 999,
+      laborRate: 999,
+      rateOverride: 999,
+    };
+    await caller().assemblies.update(withRateKeys);
     const priced = await caller().assemblies.price({ id: assembly.id });
     expect(priced.line.laborCost).toBeCloseTo(38, 2);
   });
