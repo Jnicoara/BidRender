@@ -40,6 +40,7 @@ import {
   runFeet,
   totalQuantities,
   wireFeetByCircuit,
+  type RunCircuit,
 } from "../shared/takeoffQuantities";
 
 /** Scale ratios by their drawing notation, for readable tests. */
@@ -413,7 +414,14 @@ describe("wire footage is counted per circuit, per conductor", () => {
   it("gives one circuit its conductors' worth", () => {
     const result = wireFeetByCircuit(
       RUN_100FT,
-      [{ name: "Ckt 1", conductorCount: 3, groundCount: 0 }],
+      [
+        {
+          name: "Ckt 1",
+          conductorCount: 3,
+          groundCount: 0,
+          separateGround: false,
+        },
+      ],
       QUARTER_INCH
     );
     expect(result!.perCircuit[0].feet).toBe(300);
@@ -424,9 +432,24 @@ describe("wire footage is counted per circuit, per conductor", () => {
     // The headline case from the brief. Undercounting here is money the
     // contractor spends and never quoted for.
     const circuits = [
-      { name: "Ckt 1", conductorCount: 3, groundCount: 0 },
-      { name: "Ckt 2", conductorCount: 3, groundCount: 0 },
-      { name: "Ckt 3", conductorCount: 3, groundCount: 0 },
+      {
+        name: "Ckt 1",
+        conductorCount: 3,
+        groundCount: 0,
+        separateGround: false,
+      },
+      {
+        name: "Ckt 2",
+        conductorCount: 3,
+        groundCount: 0,
+        separateGround: false,
+      },
+      {
+        name: "Ckt 3",
+        conductorCount: 3,
+        groundCount: 0,
+        separateGround: false,
+      },
     ];
     const result = wireFeetByCircuit(RUN_100FT, circuits, QUARTER_INCH);
     expect(result!.totalFeet).toBe(900);
@@ -435,9 +458,24 @@ describe("wire footage is counted per circuit, per conductor", () => {
 
   it("handles circuits with different conductor counts on one run", () => {
     const circuits = [
-      { name: "Lighting", conductorCount: 2, groundCount: 0 },
-      { name: "Recep", conductorCount: 3, groundCount: 0 },
-      { name: "3-phase", conductorCount: 4, groundCount: 0 },
+      {
+        name: "Lighting",
+        conductorCount: 2,
+        groundCount: 0,
+        separateGround: false,
+      },
+      {
+        name: "Recep",
+        conductorCount: 3,
+        groundCount: 0,
+        separateGround: false,
+      },
+      {
+        name: "3-phase",
+        conductorCount: 4,
+        groundCount: 0,
+        separateGround: false,
+      },
     ];
     const result = wireFeetByCircuit(RUN_100FT, circuits, QUARTER_INCH);
     expect(result!.perCircuit.map(c => c.feet)).toEqual([200, 300, 400]);
@@ -454,10 +492,30 @@ describe("wire footage is counted per circuit, per conductor", () => {
 
   it("ignores a nonsense conductor count instead of producing NaN", () => {
     const circuits = [
-      { name: "Good", conductorCount: 3, groundCount: 0 },
-      { name: "Bad", conductorCount: Number.NaN, groundCount: 0 },
-      { name: "Negative", conductorCount: -2, groundCount: 0 },
-      { name: "Zero", conductorCount: 0, groundCount: 0 },
+      {
+        name: "Good",
+        conductorCount: 3,
+        groundCount: 0,
+        separateGround: false,
+      },
+      {
+        name: "Bad",
+        conductorCount: Number.NaN,
+        groundCount: 0,
+        separateGround: false,
+      },
+      {
+        name: "Negative",
+        conductorCount: -2,
+        groundCount: 0,
+        separateGround: false,
+      },
+      {
+        name: "Zero",
+        conductorCount: 0,
+        groundCount: 0,
+        separateGround: false,
+      },
     ];
     const result = wireFeetByCircuit(RUN_100FT, circuits, QUARTER_INCH);
     expect(result!.totalFeet).toBe(300);
@@ -468,7 +526,14 @@ describe("wire footage is counted per circuit, per conductor", () => {
     expect(
       wireFeetByCircuit(
         { pathType: "cable", points: RUN_100FT.points },
-        [{ name: "x", conductorCount: 2, groundCount: 0 }],
+        [
+          {
+            name: "x",
+            conductorCount: 2,
+            groundCount: 0,
+            separateGround: false,
+          },
+        ],
         QUARTER_INCH
       )
     ).toBeNull();
@@ -478,7 +543,14 @@ describe("wire footage is counted per circuit, per conductor", () => {
     expect(
       wireFeetByCircuit(
         RUN_100FT,
-        [{ name: "Ckt 1", conductorCount: 3, groundCount: 0 }],
+        [
+          {
+            name: "Ckt 1",
+            conductorCount: 3,
+            groundCount: 0,
+            separateGround: false,
+          },
+        ],
         null
       )
     ).toBeNull();
@@ -506,7 +578,14 @@ describe("cable runs", () => {
   it("produce no separate wire footage", () => {
     const quantities = quantitiesForRun(
       CABLE_100FT,
-      [{ name: "Ckt 1", conductorCount: 3, groundCount: 0 }],
+      [
+        {
+          name: "Ckt 1",
+          conductorCount: 3,
+          groundCount: 0,
+          separateGround: false,
+        },
+      ],
       QUARTER_INCH,
       NO_VERTICALS
     )!;
@@ -527,8 +606,18 @@ describe("a shared run across a whole takeoff", () => {
       {
         run: RUN_100FT,
         circuits: [
-          { name: "Ckt 1", conductorCount: 3, groundCount: 0 },
-          { name: "Ckt 2", conductorCount: 3, groundCount: 0 },
+          {
+            name: "Ckt 1",
+            conductorCount: 3,
+            groundCount: 0,
+            separateGround: false,
+          },
+          {
+            name: "Ckt 2",
+            conductorCount: 3,
+            groundCount: 0,
+            separateGround: false,
+          },
         ],
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
@@ -546,13 +635,27 @@ describe("a shared run across a whole takeoff", () => {
     const totals = totalQuantities([
       {
         run: RUN_100FT,
-        circuits: [{ name: "A", conductorCount: 2, groundCount: 0 }],
+        circuits: [
+          {
+            name: "A",
+            conductorCount: 2,
+            groundCount: 0,
+            separateGround: false,
+          },
+        ],
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
       },
       {
         run: shortRun,
-        circuits: [{ name: "B", conductorCount: 3, groundCount: 0 }],
+        circuits: [
+          {
+            name: "B",
+            conductorCount: 3,
+            groundCount: 0,
+            separateGround: false,
+          },
+        ],
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
       },
@@ -566,7 +669,14 @@ describe("a shared run across a whole takeoff", () => {
     const totals = totalQuantities([
       {
         run: RUN_100FT,
-        circuits: [{ name: "A", conductorCount: 3, groundCount: 0 }],
+        circuits: [
+          {
+            name: "A",
+            conductorCount: 3,
+            groundCount: 0,
+            separateGround: false,
+          },
+        ],
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
       },
@@ -587,13 +697,27 @@ describe("a shared run across a whole takeoff", () => {
     const totals = totalQuantities([
       {
         run: RUN_100FT,
-        circuits: [{ name: "A", conductorCount: 2, groundCount: 0 }],
+        circuits: [
+          {
+            name: "A",
+            conductorCount: 2,
+            groundCount: 0,
+            separateGround: false,
+          },
+        ],
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
       },
       {
         run: RUN_100FT,
-        circuits: [{ name: "B", conductorCount: 2, groundCount: 0 }],
+        circuits: [
+          {
+            name: "B",
+            conductorCount: 2,
+            groundCount: 0,
+            separateGround: false,
+          },
+        ],
         ratio: null,
         verticals: NO_VERTICALS,
       },
@@ -647,7 +771,14 @@ describe("the full breakdown for one run", () => {
     expect(
       quantitiesForRun(
         RUN_100FT,
-        [{ name: "A", conductorCount: 3, groundCount: 0 }],
+        [
+          {
+            name: "A",
+            conductorCount: 3,
+            groundCount: 0,
+            separateGround: false,
+          },
+        ],
         null,
         NO_VERTICALS
       )
@@ -658,8 +789,8 @@ describe("the full breakdown for one run", () => {
     const quantities = quantitiesForRun(
       RUN_100FT,
       [
-        { name: "A", conductorCount: 3, groundCount: 0 },
-        { name: "B", conductorCount: 3, groundCount: 0 },
+        { name: "A", conductorCount: 3, groundCount: 0, separateGround: false },
+        { name: "B", conductorCount: 3, groundCount: 0, separateGround: false },
       ],
       QUARTER_INCH,
       NO_VERTICALS
@@ -676,7 +807,14 @@ describe("the full breakdown for one run", () => {
     // what this now says out loud.
     const quantities = quantitiesForRun(
       RUN_100FT,
-      [{ name: "Panel A-12", conductorCount: 3, groundCount: 1 }],
+      [
+        {
+          name: "Panel A-12",
+          conductorCount: 3,
+          groundCount: 1,
+          separateGround: false,
+        },
+      ],
       QUARTER_INCH,
       NO_VERTICALS
     )!;
@@ -723,9 +861,24 @@ describe("a realistic takeoff, checked by hand", () => {
     const feederQuantities = quantitiesForRun(
       feeder,
       [
-        { name: "Ckt 1", conductorCount: 4, groundCount: 0 },
-        { name: "Ckt 2", conductorCount: 4, groundCount: 0 },
-        { name: "Ckt 3", conductorCount: 4, groundCount: 0 },
+        {
+          name: "Ckt 1",
+          conductorCount: 4,
+          groundCount: 0,
+          separateGround: false,
+        },
+        {
+          name: "Ckt 2",
+          conductorCount: 4,
+          groundCount: 0,
+          separateGround: false,
+        },
+        {
+          name: "Ckt 3",
+          conductorCount: 4,
+          groundCount: 0,
+          separateGround: false,
+        },
       ],
       EIGHTH_INCH,
       NO_VERTICALS
@@ -747,9 +900,24 @@ describe("a realistic takeoff, checked by hand", () => {
       {
         run: feeder,
         circuits: [
-          { name: "Ckt 1", conductorCount: 4, groundCount: 0 },
-          { name: "Ckt 2", conductorCount: 4, groundCount: 0 },
-          { name: "Ckt 3", conductorCount: 4, groundCount: 0 },
+          {
+            name: "Ckt 1",
+            conductorCount: 4,
+            groundCount: 0,
+            separateGround: false,
+          },
+          {
+            name: "Ckt 2",
+            conductorCount: 4,
+            groundCount: 0,
+            separateGround: false,
+          },
+          {
+            name: "Ckt 3",
+            conductorCount: 4,
+            groundCount: 0,
+            separateGround: false,
+          },
         ],
         ratio: EIGHTH_INCH,
         verticals: NO_VERTICALS,
@@ -807,23 +975,65 @@ describe("counting the ground separately", () => {
    */
   const PAIRS: {
     what: string;
-    before: { name: string; conductorCount: number; groundCount: 0 };
-    after: { name: string; conductorCount: number; groundCount: number };
+    /*
+      RunCircuit rather than the three fields written out, which is how this
+      table fell behind when `separateGround` became required (0072). `before`
+      keeps its one extra promise: the pre-split meaning, ground inside the
+      count, so no ground of its own.
+
+      Every pair shares the run's ground (`separateGround: false`), which is
+      what they were already doing — they predate the field, and an absent
+      one reads as false everywhere the arithmetic looks at it. Including
+      "isolated-ground": it is about a circuit NEEDING two grounds, and the
+      run total is 400 ft whether those two are shared or separate.
+    */
+    before: RunCircuit & { groundCount: 0 };
+    after: RunCircuit;
   }[] = [
     {
       what: "2 #12 and a ground",
-      before: { name: "Ckt 1", conductorCount: 3, groundCount: 0 },
-      after: { name: "Ckt 1", conductorCount: 2, groundCount: 1 },
+      before: {
+        name: "Ckt 1",
+        conductorCount: 3,
+        groundCount: 0,
+        separateGround: false,
+      },
+      after: {
+        name: "Ckt 1",
+        conductorCount: 2,
+        groundCount: 1,
+        separateGround: false,
+      },
     },
     {
       what: "3 #12 and a ground",
-      before: { name: "Ckt 1", conductorCount: 4, groundCount: 0 },
-      after: { name: "Ckt 1", conductorCount: 3, groundCount: 1 },
+      before: {
+        name: "Ckt 1",
+        conductorCount: 4,
+        groundCount: 0,
+        separateGround: false,
+      },
+      after: {
+        name: "Ckt 1",
+        conductorCount: 3,
+        groundCount: 1,
+        separateGround: false,
+      },
     },
     {
       what: "an isolated-ground circuit, two grounds",
-      before: { name: "IG", conductorCount: 4, groundCount: 0 },
-      after: { name: "IG", conductorCount: 2, groundCount: 2 },
+      before: {
+        name: "IG",
+        conductorCount: 4,
+        groundCount: 0,
+        separateGround: false,
+      },
+      after: {
+        name: "IG",
+        conductorCount: 2,
+        groundCount: 2,
+        separateGround: false,
+      },
     },
   ];
 
@@ -857,7 +1067,14 @@ describe("counting the ground separately", () => {
   it("splits the footage without changing it", () => {
     const run = quantitiesForRun(
       RUN_100FT,
-      [{ name: "Ckt 1", conductorCount: 2, groundCount: 1 }],
+      [
+        {
+          name: "Ckt 1",
+          conductorCount: 2,
+          groundCount: 1,
+          separateGround: false,
+        },
+      ],
       QUARTER_INCH,
       NO_VERTICALS
     )!;
@@ -933,13 +1150,27 @@ describe("counting the ground separately", () => {
     // with the rest of them.
     const flat = quantitiesForRun(
       RUN_100FT,
-      [{ name: "Ckt 1", conductorCount: 2, groundCount: 1 }],
+      [
+        {
+          name: "Ckt 1",
+          conductorCount: 2,
+          groundCount: 1,
+          separateGround: false,
+        },
+      ],
       QUARTER_INCH,
       NO_VERTICALS
     )!;
     const dropped = quantitiesForRun(
       RUN_100FT,
-      [{ name: "Ckt 1", conductorCount: 2, groundCount: 1 }],
+      [
+        {
+          name: "Ckt 1",
+          conductorCount: 2,
+          groundCount: 1,
+          separateGround: false,
+        },
+      ],
       QUARTER_INCH,
       {
         start: {
@@ -967,8 +1198,18 @@ describe("counting the ground separately", () => {
     const quantities = quantitiesForRun(
       RUN_100FT,
       [
-        { name: "Bad", conductorCount: 2, groundCount: Number.NaN },
-        { name: "Negative", conductorCount: 2, groundCount: -1 },
+        {
+          name: "Bad",
+          conductorCount: 2,
+          groundCount: Number.NaN,
+          separateGround: false,
+        },
+        {
+          name: "Negative",
+          conductorCount: 2,
+          groundCount: -1,
+          separateGround: false,
+        },
       ],
       QUARTER_INCH,
       NO_VERTICALS
@@ -991,8 +1232,18 @@ describe("the two purchases a conduit run makes", () => {
     const quantities = quantitiesForRun(
       RUN_100FT,
       [
-        { name: "Ckt 1", conductorCount: 2, groundCount: 1 },
-        { name: "Ckt 2", conductorCount: 3, groundCount: 1 },
+        {
+          name: "Ckt 1",
+          conductorCount: 2,
+          groundCount: 1,
+          separateGround: false,
+        },
+        {
+          name: "Ckt 2",
+          conductorCount: 3,
+          groundCount: 1,
+          separateGround: false,
+        },
       ],
       QUARTER_INCH,
       NO_VERTICALS
@@ -1028,8 +1279,18 @@ describe("the two purchases a conduit run makes", () => {
     const quantities = quantitiesForRun(
       RUN_100FT,
       [
-        { name: "Ckt 1", conductorCount: 2, groundCount: 1 },
-        { name: "Ckt 2", conductorCount: 2, groundCount: 2 },
+        {
+          name: "Ckt 1",
+          conductorCount: 2,
+          groundCount: 1,
+          separateGround: false,
+        },
+        {
+          name: "Ckt 2",
+          conductorCount: 2,
+          groundCount: 2,
+          separateGround: false,
+        },
       ],
       QUARTER_INCH,
       NO_VERTICALS
@@ -1047,7 +1308,12 @@ describe("the two purchases a conduit run makes", () => {
     const quantities = quantitiesForRun(
       RUN_100FT,
       [
-        { name: "Ckt 1", conductorCount: 2, groundCount: 1 },
+        {
+          name: "Ckt 1",
+          conductorCount: 2,
+          groundCount: 1,
+          separateGround: false,
+        },
         {
           name: "IG",
           conductorCount: 2,
@@ -1112,7 +1378,12 @@ describe("the two purchases a conduit run makes", () => {
     const quantities = quantitiesForRun(
       RUN_100FT,
       [
-        { name: "Ckt 1", conductorCount: 2, groundCount: 1 },
+        {
+          name: "Ckt 1",
+          conductorCount: 2,
+          groundCount: 1,
+          separateGround: false,
+        },
         { name: "IG", conductorCount: 2, groundCount: 1, separateGround: true },
       ],
       QUARTER_INCH,
@@ -1143,7 +1414,14 @@ describe("the two purchases a conduit run makes", () => {
     // is noise standing where a number goes.
     const quantities = quantitiesForRun(
       RUN_100FT,
-      [{ name: "Ckt 1", conductorCount: 3, groundCount: 0 }],
+      [
+        {
+          name: "Ckt 1",
+          conductorCount: 3,
+          groundCount: 0,
+          separateGround: false,
+        },
+      ],
       QUARTER_INCH,
       NO_VERTICALS
     )!;
