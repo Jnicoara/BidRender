@@ -439,6 +439,56 @@ withDb("a locked bid holds still; a draft beside it does not", () => {
     await caller().bids.unlockQuantities({ bidId });
     expect(pipe((await detail(bidId)).lines)).toBeCloseTo(200, 0);
   });
+
+  /*
+    SENDING AGAIN WAS THE LOCK'S OPEN DOOR. `sendToBid` refreshes an existing
+    run-type line's quantity in place, and on a locked bid that column IS the
+    frozen answer — so tracing more and pressing Send rewrote a quoted number.
+    Measured on the stored column as well as the resolved line, because the
+    resolved line reads the column once locked and would hide nothing.
+  */
+  it("does not let Send-again overwrite locked footage", async () => {
+    const list = await caller().materials.list();
+    const emt = list.find(m => m.name === '1/2" EMT')!;
+    const type = await caller().takeoffRunTypes.create({
+      label: `Lock resend EMT ${Date.now()}${Math.random()}`,
+      pathType: "conduit",
+      racewayMaterialId: emt.id,
+    });
+    const { bidId, sheetId } = await aBid("Locked, sent again");
+    const trace = (name: string) =>
+      caller().takeoffRuns.save({
+        bidId,
+        sheetId,
+        name,
+        pathType: "conduit",
+        runTypeId: type.id,
+        status: "committed",
+        points: [
+          { x: 0, y: 0 },
+          { x: HUNDRED_FEET_PTS, y: 0 },
+        ],
+      });
+
+    await trace("Homerun 1");
+    await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+    await caller().bids.lockQuantities({ bidId });
+    const before = await storedQty(bidId);
+
+    await trace("Homerun 2");
+    const again = await caller().takeoffRunTypes.sendToBid({
+      bidId,
+      runTypeId: type.id,
+    });
+
+    expect(again.updated).toEqual([]);
+    expect(again.skipped.map(s => s.why).join(" ")).toMatch(/locked/i);
+    expect(await storedQty(bidId)).toEqual(before);
+    const pipe = (await detail(bidId)).lines.find(
+      l => l.runMaterialRole === "raceway"
+    )!;
+    expect(Number(pipe.qty)).toBeCloseTo(100, 0);
+  });
 });
 
 withDb("locking writes the drawing's answer into the column", () => {

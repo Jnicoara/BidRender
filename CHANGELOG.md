@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **Fixed a hole in the quantity lock.** On a bid whose quantities were locked,
+  pressing "Send to bid" again on a traced run type after tracing more
+  overwrote the frozen footage, changing a number that may already have been
+  quoted. It now leaves the locked line alone and says the bid is locked.
 - **Companies now have a seat limit.** Every active member counts, viewers
   and the owner included, and so does every invitation not yet used, so a
   company can't send out more codes than it has room for. Suspending someone

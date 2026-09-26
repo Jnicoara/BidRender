@@ -569,6 +569,21 @@ export const takeoffRunTypesRouter = router({
           than either. The PRICING is never re-snapshotted — only the feet.
         */
         const live = already.get(row.role);
+        /*
+          A LOCKED bid keeps the footage it was sent at. This used to refresh
+          regardless, so pressing Send again after tracing more quietly
+          rewrote a quantity somebody had already quoted — the column IS the
+          frozen answer once `quantitiesLockedAt` is set, so this UPDATE was
+          the lock's one open door. A NEW row still arrives, frozen at today's
+          number, the same as a count sent to a locked bid.
+        */
+        if (live && bid.quantitiesLockedAt !== null) {
+          skipped.push({
+            role: row.role,
+            why: "This bid's quantities are locked. Unlock the bid to update it from the drawing.",
+          });
+          continue;
+        }
         if (live) {
           const allowedAgain = runRowSendability(row);
           if (!allowedAgain.ok) {
