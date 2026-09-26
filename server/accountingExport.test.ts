@@ -76,8 +76,21 @@ const uniq = () => `${Date.now()}${Math.random()}`;
 
 const NOW = new Date("2026-08-14T12:00:00Z");
 
-/** A source with everything zeroed, so each test states only what it varies. */
-const source = (over: Partial<AccountingSource> = {}): AccountingSource => ({
+/**
+ * A source with everything zeroed, so each test states only what it varies.
+ *
+ * `totals` is partial as well — the defaults below are merged under whatever
+ * a case passes. It used to be typed `Partial<AccountingSource>`, which is
+ * shallow: it allowed leaving `totals` out but demanded every field once it
+ * was given, so the day `materialMarkup` became required, twelve cases that
+ * correctly relied on its default 0 stopped compiling (unseen, since pnpm
+ * check skips tests). The type now says what the function does.
+ */
+const source = (
+  over: Partial<Omit<AccountingSource, "totals">> & {
+    totals?: Partial<AccountingSource["totals"]>;
+  } = {}
+): AccountingSource => ({
   bidId: 501,
   bidName: "Maple Street duplex",
   customerName: "Northwood Builders",
