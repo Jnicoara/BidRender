@@ -115,11 +115,21 @@ const FAMILIES: Family[] = [
   },
 ];
 
-/** The four fittings every family ships at every size. */
+/**
+ * The five fittings every family ships at every size.
+ *
+ * The 45 was added 2026-09-26 for the bend count (`shared/runBends.ts`): a
+ * traced corner of 15–67° takes one, and without the row every such corner
+ * had nothing to price against. Its name comes from `elbowName`, the same
+ * function the lookup builds with; `materialsCatalog.test.ts` checks every
+ * elbow and LB the lookup can ask for exists here. Sweeps (large-radius, for
+ * underground) are NOT here, by decision — no Underground category yet.
+ */
 const FITTINGS = [
   { suffix: "connector", slang: "fitting terminal adapter male box" },
   { suffix: "coupling", slang: "coupler splice join" },
   { suffix: "90-degree elbow", slang: "ell bend sweep factory" },
+  { suffix: "45-degree elbow", slang: "ell bend factory forty five" },
   { suffix: "LB conduit body", slang: "condulet access fitting pull" },
 ];
 

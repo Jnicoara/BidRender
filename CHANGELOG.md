@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **45° elbows are in the catalog** for EMT, PVC 40, PVC 80, rigid and IMC,
+  at every trade size (45 new items, unpriced like the rest). They are there
+  for the bend count coming from traced runs, where a corner of about 15–67°
+  takes a 45. Searching "1/2 emt 45" finds one; a plain search for a size of
+  pipe still lists the pipe first and its 90 ahead of its 45.
 - **Pressing Send again now fixes two things on lines already on the bid.**
   A traced line that reads "Not priced" picks up the material's current
   price once you have priced it; a price that is already set is never

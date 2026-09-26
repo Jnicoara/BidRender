@@ -30,6 +30,12 @@ import {
 import { countNeedingPricing, needsPricing } from "../shared/materialPricing";
 import { smartSearch } from "../client/src/lib/smartSearch";
 import { wordsInName } from "../shared/aliasSuggestions";
+import {
+  elbowName,
+  lbName,
+  parseRacewayName,
+  pullBoxFor,
+} from "../shared/runFittingMaterials";
 
 const hasDb = !!process.env.DATABASE_URL;
 const USER = 7373;
@@ -107,6 +113,46 @@ describe("shipped catalog shape", () => {
 });
 
 // ─── Alias hygiene ────────────────────────────────────────────────────────────
+
+describe("every part the bend count can ask for is shipped", () => {
+  /*
+    The bend count finds its parts by BUILDING a name (`elbowName`, `lbName`,
+    `pullBoxFor`) — the same functions the seed is meant to agree with. A name
+    the lookup builds and the seed does not ship is a line that says "no
+    catalog match" on every run of that raceway, and nothing else would notice.
+  */
+  const names = new Set(BASELINE_MATERIALS.map(m => m.name));
+  const raceways = BASELINE_MATERIALS.filter(m => m.category === "Conduit")
+    .map(m => parseRacewayName(m.name))
+    .filter((p): p is NonNullable<typeof p> => p !== null);
+
+  it("reads a size and family off every rigid raceway row", () => {
+    // 5 rigid families x 9 trade sizes, + 2 flex families x 4 sizes.
+    expect(raceways).toHaveLength(53);
+  });
+
+  it("ships a 90, a 45 and an LB for every rigid raceway", () => {
+    const missing: string[] = [];
+    for (const { size, family } of raceways) {
+      if (family.includes("flexible")) continue;
+      for (const want of [
+        elbowName(size, family, 90),
+        elbowName(size, family, 45),
+        lbName(size, family),
+      ]) {
+        if (!names.has(want)) missing.push(want);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it("ships every pull box the NEC sizing can propose", () => {
+    const missing = raceways
+      .map(r => pullBoxFor(`${r.size} ${r.family}`, null).name)
+      .filter((n): n is string => n !== null && !names.has(n));
+    expect(missing).toEqual([]);
+  });
+});
 
 describe("alias hygiene across the whole catalog", () => {
   it("never restates a word the material's own name already contains", () => {
@@ -312,6 +358,14 @@ describe("searching the enlarged catalog", () => {
     for (const query of ['1-1/4" emt', "1 1/4 emt", "1.25 emt"]) {
       expectHit(query, '1-1/4" EMT');
     }
+  });
+
+  it("finds a 45 the way it is asked for at the counter", () => {
+    expectHit('1/2" emt 45', '1/2" EMT 45-degree elbow', 3);
+    expectHit("3/4 pvc 45", '3/4" PVC Sch 40 45-degree elbow', 3);
+    expectHit("2 rigid 45 ell", '2" rigid conduit 45-degree elbow', 3);
+    // The 90 stays the answer for a 90, not its new neighbour.
+    expect(search('1/2" emt 90', 1)).toEqual(['1/2" EMT 90-degree elbow']);
   });
 
   it("finds new families by their job-site names", () => {

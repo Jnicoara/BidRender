@@ -38,7 +38,49 @@
 
 export type StarterCommonness = "core" | "common";
 
+/**
+ * The 90 over the 45, every rigid family and size — and the PIPE with it.
+ *
+ * Added 2026-09-26 with the 45s. They tied the 90 on "3/4 pvc", "1-1/4
+ * rigid" and "elbow", and won on the alphabet ("45" sorts before "90"). A 90
+ * is the elbow nearly every job buys; the 45 is the one somebody asks for.
+ *
+ * The pipe is here too because marking only the 90 overshot: on "1-1/4
+ * rigid" the 90 then beat the pipe itself, which had no rank of its own and
+ * had only ever led on the alphabet. A pipe is at least as common as its own
+ * elbow, and with both "common" the tie goes back to the name, where the
+ * pipe's is shorter. Spread FIRST in the table, so a hand-written entry for
+ * the same name (1/2" EMT is "core") overrides it.
+ *
+ * `materialsCatalog.test.ts` fails on any key that is not a shipped name, so a
+ * size or family written wrong here cannot pass quietly.
+ */
+function rigidRacewaysAndTheirNineties(): Record<string, StarterCommonness> {
+  const sizes = [
+    '1/2"',
+    '3/4"',
+    '1"',
+    '1-1/4"',
+    '1-1/2"',
+    '2"',
+    '2-1/2"',
+    '3"',
+    '4"',
+  ];
+  const families = ["EMT", "PVC Sch 40", "PVC Sch 80", "rigid conduit", "IMC"];
+  const out: Record<string, StarterCommonness> = {};
+  for (const family of families) {
+    for (const size of sizes) {
+      out[`${size} ${family}`] = "common";
+      out[`${size} ${family} 90-degree elbow`] = "common";
+    }
+  }
+  return out;
+}
+
 export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
+  // First, so every entry below for the same name wins. See the function.
+  ...rigidRacewaysAndTheirNineties(),
   // ── Breakers ──
   "15A Single-Pole breaker": "core",
   "20A Single-Pole breaker": "core",
