@@ -183,7 +183,7 @@ describe.skipIf(!hasDb)("importing a supplier price list", () => {
     expect(result.unmatched).toHaveLength(0);
 
     const after = await caller().materials.list();
-    for (const [i, starter] of starters.entries()) {
+    for (const [i, starter] of Array.from(starters.entries())) {
       const row = after.find(m => m.name === starter.name)!;
       expect(Number(row.costPerUnit)).toBeCloseTo(1 + i, 4);
       expect(row.supplierName).toBe("Rexel");
