@@ -41,6 +41,7 @@ import {
   taxRulesFor,
   toTaxJurisdiction,
 } from "../bidPricing";
+import { refuseIfIncomplete, reportPricingProblems } from "../pricingProblems";
 import { resolveBidClient } from "../../shared/bidClient";
 import { explainTaxStatus } from "../../shared/salesTax";
 import { storagePresignPut } from "../storage";
@@ -344,7 +345,7 @@ export const proposalsRouter = router({
         markedUp: row.markedUp,
       }));
 
-      const { priced, units, totals, salesTax } = bidRollup(
+      const { priced, units, totals, salesTax, problems } = bidRollup(
         bid,
         lines,
         company,
@@ -354,6 +355,17 @@ export const proposalsRouter = router({
         },
         expenses
       );
+
+      // A proposal built on a total that leaves a line out is a wrong price
+      // sent to a client. Refuse, with the references. See pricingProblems.ts.
+      // Scope-only prints no money, so an incomplete total cannot leak through
+      // it — it stays available, and is still reported.
+      const reported = await reportPricingProblems(
+        ctx.scope.dataUserId,
+        bid.id,
+        problems
+      );
+      if (input.mode === "full") refuseIfIncomplete(reported, "a proposal");
 
       // The bid's own text still wins; a linked client only fills in what was
       // left blank. With no client this returns bid.clientName/siteAddress

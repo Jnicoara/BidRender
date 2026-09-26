@@ -26,8 +26,15 @@ import {
   type ResolvedPricingSettings,
   roundMoney,
   sumLineCosts,
+  type BidPriceBreakdown,
   type CompanyPricingDefaults,
+  type LineItemBreakdown,
 } from "../shared/pricing";
+import {
+  lineProblem,
+  thrownDetail,
+  type LineProblem,
+} from "../shared/linePricingProblems";
 import { storedMarkupPct } from "../shared/materialMarkup";
 import {
   DEFAULT_TAX_RULES,
@@ -305,8 +312,23 @@ export function rollUpBid(
       bid.productivityPct === null ? null : Number(bid.productivityPct),
   });
 
-  const breakdowns = lines.map(line =>
-    priceLine(line, settings.productivityPct)
+  /*
+    Each line priced on its own, so one that cannot be priced costs the bid
+    that line rather than the whole screen — and, through the list endpoints
+    that price a page of bids at once, every OTHER bid on the page. A broken
+    line is `null` here and contributes nothing below; `problems` says which
+    and why. See shared/linePricingProblems.ts.
+  */
+  const guarded = lines.map(line =>
+    priceLineGuarded(line, settings.productivityPct)
+  );
+  const breakdowns = guarded.map(g => g.breakdown);
+  const problems: PricingProblem[] = [];
+  guarded.forEach((g, index) => {
+    if (g.problem) problems.push({ lineId: lines[index].id, ...g.problem });
+  });
+  const pricedBreakdowns = breakdowns.filter(
+    (b): b is LineItemBreakdown => b !== null
   );
   /**
    * Materials and labor, plus any charge the user marked up.
@@ -319,7 +341,7 @@ export function rollUpBid(
    *
    * Flat charges are absent by design; they are added after profit.
    */
-  const lineSums = sumLineCosts(breakdowns);
+  const lineSums = sumLineCosts(pricedBreakdowns);
   const workCost = lineSums.directCost;
   const directCost = roundMoney(workCost + sumMarkedUpExpenses(expenses));
   /*
@@ -327,14 +349,75 @@ export function rollUpBid(
     the direct cost above and so takes overhead and profit, but it is not
     material and no markup rule ever reaches it.
   */
-  const bidPrice = calculateBidPrice({
-    directCost,
-    materialMarkup: lineSums.materialMarkup,
-    overhead: settings.overhead,
-    profit: settings.profit,
-  });
+  let bidPrice: BidPriceBreakdown;
+  try {
+    bidPrice = calculateBidPrice({
+      directCost,
+      materialMarkup: lineSums.materialMarkup,
+      overhead: settings.overhead,
+      profit: settings.profit,
+    });
+  } catch (error) {
+    /*
+      Settings with no finite price — a margin at or past 100%, a negative
+      overhead. Inputs refuse both, so this is stored data nothing validated.
+      The bid prices at cost with markup, which is what `priceFromDirectCost`
+      already does for the dashboard card, and is flagged incomplete so that
+      number is never read as a price.
+    */
+    problems.push({
+      lineId: null,
+      code: "bid-settings-invalid",
+      detail: thrownDetail(error),
+    });
+    const costWithMarkup = roundMoney(directCost + lineSums.materialMarkup);
+    bidPrice = {
+      directCost,
+      materialMarkup: lineSums.materialMarkup,
+      costWithMarkup,
+      overheadAmount: 0,
+      costWithOverhead: costWithMarkup,
+      profitAmount: 0,
+      finalPrice: costWithMarkup,
+      profitMethod: settings.profit.method,
+    };
+  }
 
-  return { settings, breakdowns, workCost, directCost, bidPrice };
+  return {
+    settings,
+    breakdowns,
+    workCost,
+    directCost,
+    bidPrice,
+    /** Every line or setting that could not be priced. Empty on a sound bid. */
+    problems,
+    /** True when `problems` is not empty: the totals leave something out. */
+    incomplete: problems.length > 0,
+  };
+}
+
+/** One thing on a bid that could not be priced. `lineId` null = the bid itself. */
+export type PricingProblem = LineProblem & { lineId: number | null };
+
+/**
+ * `priceLine`, but a line it cannot price comes back as a named problem rather
+ * than an exception — the guard that keeps one bad row from taking a whole bid,
+ * and every bid priced beside it, down.
+ */
+export function priceLineGuarded(
+  line: BidLineItem,
+  productivityPct: number
+): { breakdown: LineItemBreakdown | null; problem: LineProblem | null } {
+  const found = lineProblem(line);
+  if (found) return { breakdown: null, problem: found };
+  try {
+    return { breakdown: priceLine(line, productivityPct), problem: null };
+  } catch (error) {
+    return {
+      breakdown: null,
+      problem: { code: "calculation-failed", detail: thrownDetail(error) },
+    };
+  }
 }
 
 /**
@@ -362,16 +445,22 @@ export function bidRollup(
    */
   expenses: readonly ExpenseLine[] = []
 ) {
-  const { settings, breakdowns, directCost, bidPrice } = rollUpBid(
-    bid,
-    lines,
-    company,
-    expenses
-  );
+  const { settings, breakdowns, directCost, bidPrice, problems, incomplete } =
+    rollUpBid(bid, lines, company, expenses);
+  /*
+    `breakdown` is null for a line that could not be priced. Nullable rather
+    than a zero breakdown on purpose: a zero is exactly the false $0 this is
+    here to prevent, and the type makes every screen decide what to show.
+  */
   const priced = lines.map((line, index) => ({
     line,
     breakdown: breakdowns[index],
+    problem: problems.find(p => p.lineId === line.id) ?? null,
   }));
+  const pricedOnly = priced.filter(
+    (p): p is (typeof priced)[number] & { breakdown: LineItemBreakdown } =>
+      p.breakdown !== null
+  );
 
   // Unit subtotals, so a hotel bid can answer "what does one room cost?"
   //
@@ -383,7 +472,7 @@ export function bidRollup(
     string,
     { directCost: number; costWithMarkup: number; lines: number }
   >();
-  for (const { line, breakdown } of priced) {
+  for (const { line, breakdown } of pricedOnly) {
     if (!line.unitLabel) continue;
     const current = unitTotals.get(line.unitLabel) ?? {
       directCost: 0,
@@ -408,7 +497,9 @@ export function bidRollup(
     `sumLineCosts` returns all three from one pass, so the parts equal the
     whole by construction rather than by both happening to round the same way.
   */
-  const { materialCost, laborCost, materialMarkup } = sumLineCosts(breakdowns);
+  const { materialCost, laborCost, materialMarkup } = sumLineCosts(
+    pricedOnly.map(p => p.breakdown)
+  );
 
   /**
    * Sales tax, computed here so the bid screen and the proposal cannot differ.
@@ -482,6 +573,10 @@ export function bidRollup(
   return {
     settings,
     priced,
+    /** What could not be priced; see rollUpBid. Empty on a sound bid. */
+    problems,
+    /** The totals leave something out. Proposal and export refuse on this. */
+    incomplete,
     units: Array.from(unitTotals, ([label, totals]) => ({
       label,
       ...totals,
@@ -493,7 +588,7 @@ export function bidRollup(
       // bidPrice carries its own directCost (identical, rounded through the
       // engine) — spread it first so the authoritative one wins.
       ...bidPrice,
-      totalLaborHours: priced.reduce(
+      totalLaborHours: pricedOnly.reduce(
         (sum, p) => sum + p.breakdown.totalLaborHours,
         0
       ),
@@ -506,7 +601,7 @@ export function bidRollup(
        * totalLaborHours does — comparing one to the other is the whole point,
        * and they have to be on the same footing.
        */
-      laborHoursBeforeProductivity: priced.reduce(
+      laborHoursBeforeProductivity: pricedOnly.reduce(
         (sum, p) => sum + p.breakdown.hoursAfterModifiers * Number(p.line.qty),
         0
       ),

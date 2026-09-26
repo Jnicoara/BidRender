@@ -59,6 +59,7 @@ import {
   type DueUrgency,
 } from "@/lib/bidDashboard";
 import { moneyWhole } from "@/lib/money";
+import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 
 /** Deadlines read as a weekday and date — "Fri 14 Aug" scans faster than a slashed number. */
 const formatDue = (value: string | Date | null) => {
@@ -339,7 +340,15 @@ export default function DashboardPage({
           </div>
           <div className="text-right shrink-0 mr-2">
             <div className="text-xs text-muted-foreground">
-              Out for bid ({summary.openCount})
+              Out for bid ({summary.openCount}){" "}
+              <IncompletePriceTag
+                show={bids.some(
+                  b =>
+                    b.incomplete &&
+                    !b.isSample &&
+                    (b.status === "Draft" || b.status === "Active")
+                )}
+              />
             </div>
             <div className="font-mono text-base text-[#F5C518]">
               {moneyWhole(summary.openValue)}
@@ -515,6 +524,11 @@ export default function DashboardPage({
                       {stats.count}
                     </span>
                     <span className="ml-auto font-mono text-xs text-muted-foreground">
+                      {/* A column summing a short bid is short too. */}
+                      <IncompletePriceTag
+                        show={group.bids.some(b => b.incomplete)}
+                        className="mr-1.5"
+                      />
                       {moneyWhole(stats.value)}
                     </span>
                   </div>
@@ -558,8 +572,12 @@ export default function DashboardPage({
                                   </span>
                                 )}
                               </span>
-                              <span className="font-mono text-sm shrink-0">
+                              <span className="font-mono text-sm shrink-0 text-right">
                                 {moneyWhole(bid.finalPrice)}
+                                <IncompletePriceTag
+                                  show={bid.incomplete}
+                                  className="block"
+                                />
                               </span>
                               {/* Quiet until the card is hovered or focused —
                                   the dashboard is for reading, and a delete-ish

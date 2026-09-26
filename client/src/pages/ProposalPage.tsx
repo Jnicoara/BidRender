@@ -137,7 +137,12 @@ export default function ProposalPage({
    * visit starts on the real document, and switching is one click.
    */
   const [mode, setMode] = useState<"full" | "scope-only">("full");
-  const { data, isLoading } = trpc.proposals.document.useQuery({ bidId, mode });
+  const { data, isLoading, error } = trpc.proposals.document.useQuery(
+    { bidId, mode },
+    // A refusal (an incomplete bid) will refuse again; retrying only delays
+    // the sentence that says why.
+    { retry: false }
+  );
   const [showDesign, setShowDesign] = useState(false);
   /** Screen zoom only — the printed page is always full size. */
   const [zoom, setZoom] = useState(0.8);
@@ -177,6 +182,36 @@ export default function ProposalPage({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  /*
+    The server refuses a priced proposal for a bid whose total leaves a line
+    out, naming the ERR- references. Without this branch that refusal fell
+    through to "Building the proposal…" and sat there forever — a refusal that
+    reads as a hang. Scope-only is still offered, since it prints no money.
+  */
+  if (error) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center gap-3 bg-background px-6 text-center">
+        <p className="max-w-md text-sm text-muted-foreground">
+          {error.message}
+        </p>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={onBack}>
+            Back to the bid
+          </Button>
+          {mode === "full" && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setMode("scope-only")}
+            >
+              Scope-only instead
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading || !data) {
     return (

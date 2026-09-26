@@ -388,6 +388,9 @@ describe("stored files", () => {
           // markup_rules.itemKey — the material an item markup override is
           // for (`materialItemKey`). An id, not a file.
           "itemKey",
+          // pricing_problem_reports.dedupeKey — "<bid>:<line>:<code>", the
+          // key one problem is upserted under. Not a file.
+          "dedupeKey",
         ].includes(column)
       ) {
         continue;

@@ -4,6 +4,7 @@ import {
   eq,
   asc,
   inArray,
+  notInArray,
   isNull,
   isNotNull,
   gte,
@@ -159,6 +160,7 @@ import {
   projectItems,
   bidSummary,
   aiUsageDaily,
+  pricingProblemReports,
   takeoffHeightDefaults,
   takeoffMountingHeights,
   bidMountingHeights,
@@ -169,6 +171,10 @@ import {
   type RunMaterialRole,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import {
+  problemDedupeKey,
+  type LineProblemCode,
+} from "../shared/linePricingProblems";
 import {
   BASELINE_MATERIALS,
   RENAMED_BASELINE_MATERIALS,
@@ -8974,12 +8980,35 @@ function lineHoursSql(productivityPct: number) {
  * fractional quantity lands a fraction of a cent from rounding the halves
  * separately.
  */
+/**
+ * A line the engine would refuse — `lineProblem` in
+ * shared/linePricingProblems.ts, as SQL.
+ *
+ * The rollup leaves such a line OUT of every total and flags the bid; these sums
+ * have to leave out exactly the same lines, or a dashboard card and the bid it
+ * opens disagree by the broken line's value. server/linePricingProblems.test.ts
+ * prices a broken bid both ways and asserts they match.
+ *
+ * TRUE for an ordinary line. NULL columns are "not typed yet" and are fine,
+ * hence the COALESCEs; the NULL row a LEFT JOIN produces for a bid with no
+ * lines comes out NULL, and every CASE below reads that as "contributes 0".
+ */
+const lineIsPriceable = sql`(${bidLineItems.qty} >= 0 AND ${bidLineItems.snapshotLaborRate} >= 0 AND COALESCE(${bidLineItems.snapshotLaborHours}, 0) >= 0 AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) >= 0 AND COALESCE(${bidLineItems.snapshotMarkupPct}, 0) >= 0)`;
+
 function costSums(productivityPct: number) {
+  // Every per-line figure is gated on lineIsPriceable, so a broken line adds
+  // nothing — the same as the rollup, which prices it as null.
+  const ok = (value: ReturnType<typeof sql>) =>
+    sql`CASE WHEN ${lineIsPriceable} THEN ${value} ELSE 0 END`;
   const hours = lineHoursSql(productivityPct);
   // COALESCE for the reason lineHoursSql gives: an untyped price (drizzle/0074)
   // must total as 0, not turn the whole line NULL and drop it from the sum.
-  const materialCents = sql`ROUND(COALESCE(${bidLineItems.snapshotMaterialCost}, 0) * 100) * ${bidLineItems.qty}`;
-  const laborCents = sql`ROUND(${hours} * ${bidLineItems.qty} * ${bidLineItems.snapshotLaborRate} * 100)`;
+  const materialCents = ok(
+    sql`ROUND(COALESCE(${bidLineItems.snapshotMaterialCost}, 0) * 100) * ${bidLineItems.qty}`
+  );
+  const laborCents = ok(
+    sql`ROUND(${hours} * ${bidLineItems.qty} * ${bidLineItems.snapshotLaborRate} * 100)`
+  );
   /*
     MATERIAL MARKUP, per line, rounded exactly as the engine rounds it.
 
@@ -8993,8 +9022,16 @@ function costSums(productivityPct: number) {
     NULL `snapshotMarkupPct` — a line from before markup rules — is 0%, the
     same reading `storedMarkupPct` gives it.
   */
-  const markupCents = sql`ROUND(ROUND(ROUND(COALESCE(${bidLineItems.snapshotMaterialCost}, 0) * 100) * ${bidLineItems.qty}) * COALESCE(${bidLineItems.snapshotMarkupPct}, 0))`;
+  const markupCents = ok(
+    sql`ROUND(ROUND(ROUND(COALESCE(${bidLineItems.snapshotMaterialCost}, 0) * 100) * ${bidLineItems.qty}) * COALESCE(${bidLineItems.snapshotMarkupPct}, 0))`
+  );
   return {
+    /**
+     * Lines left out of the sums below because the engine would refuse them.
+     * Non-zero means every figure in this row is SHORT, and a screen showing
+     * them must say so rather than present them as the bid's value.
+     */
+    brokenLines: sql<string>`COALESCE(SUM(CASE WHEN ${bidLineItems.id} IS NOT NULL AND NOT ${lineIsPriceable} THEN 1 ELSE 0 END), 0)`,
     materialCents: sql<string>`COALESCE(SUM(${materialCents}), 0)`,
     laborCents: sql<string>`COALESCE(SUM(${laborCents}), 0)`,
     directCents: sql<string>`COALESCE(SUM(ROUND(${materialCents} + ${laborCents})), 0)`,
@@ -9012,7 +9049,7 @@ function costSums(productivityPct: number) {
       proving material markup moved nothing.
     */
     markedUpExpenseCents: sql<string>`(SELECT COALESCE(SUM(ROUND(${bidExpenses.amount} * 100)), 0) FROM ${bidExpenses} WHERE ${bidExpenses.bidId} = ${bids.id} AND ${bidExpenses.markedUp} = 1)`,
-    totalHours: sql<string>`COALESCE(SUM(${hours} * ${bidLineItems.qty}), 0)`,
+    totalHours: sql<string>`COALESCE(SUM(${ok(sql`${hours} * ${bidLineItems.qty}`)}), 0)`,
   };
 }
 
@@ -9343,6 +9380,8 @@ export type DashboardBidRow = Bid & {
   materialMarkup: number;
   markedUpExpenses: number;
   totalHours: number;
+  /** Lines the sums above leave out because they cannot be priced. */
+  brokenLines: number;
 };
 
 /**
@@ -9395,6 +9434,7 @@ export async function getDashboardBids(
     materialMarkup: Number(row.markupCents) / 100,
     markedUpExpenses: Number(row.markedUpExpenseCents) / 100,
     totalHours: Number(row.totalHours),
+    brokenLines: Number(row.brokenLines),
   }));
 }
 
@@ -9925,4 +9965,125 @@ export async function heightContextForBid(
     job,
     bidDistributionInches,
   });
+}
+
+// ─── Pricing problem reports ─────────────────────────────────────────────────
+/**
+ * Record what a bid's rollup could not price, and close what it now can.
+ *
+ * Called with the FULL set of problems from one pricing of the bid, so anything
+ * open for this bid and absent from `problems` has been fixed and is resolved
+ * here. Returns each problem's report id — its ERR- reference — keyed by
+ * dedupe key, for the screen.
+ *
+ * An upsert per problem rather than a read-then-write: two tabs opening the
+ * same broken bid at once must land on one row, not two with different
+ * references for the same fault. See drizzle/schema.ts § pricingProblemReports.
+ */
+export async function recordPricingProblems(
+  userId: number,
+  bidId: number,
+  problems: readonly {
+    lineId: number | null;
+    code: LineProblemCode;
+    detail: string;
+  }[],
+  now: Date
+): Promise<Map<string, number>> {
+  const db = await getDb();
+  const refs = new Map<string, number>();
+  if (!db) return refs;
+
+  const keys = problems.map(p => problemDedupeKey(bidId, p.lineId, p.code));
+
+  // Resolve first: open rows for this bid that this pricing did not see. On a
+  // sound bid (the overwhelming case) this is the only statement that runs,
+  // and it touches nothing unless the bid had an open problem.
+  await db
+    .update(pricingProblemReports)
+    .set({ resolvedAt: now })
+    .where(
+      and(
+        eq(pricingProblemReports.bidId, bidId),
+        isNull(pricingProblemReports.resolvedAt),
+        keys.length > 0
+          ? notInArray(pricingProblemReports.dedupeKey, keys)
+          : undefined
+      )
+    );
+
+  if (problems.length === 0) return refs;
+
+  for (let i = 0; i < problems.length; i++) {
+    const p = problems[i];
+    await db
+      .insert(pricingProblemReports)
+      .values({
+        userId,
+        bidId,
+        lineId: p.lineId,
+        code: p.code,
+        detail: p.detail.slice(0, 500),
+        dedupeKey: keys[i],
+        firstSeenAt: now,
+        lastSeenAt: now,
+      })
+      .onDuplicateKeyUpdate({
+        set: {
+          detail: p.detail.slice(0, 500),
+          lastSeenAt: now,
+          occurrences: sql`${pricingProblemReports.occurrences} + 1`,
+          // Broken again after being fixed: the same reference reopens.
+          resolvedAt: null,
+        },
+      });
+  }
+
+  const rows = await db
+    .select({
+      id: pricingProblemReports.id,
+      dedupeKey: pricingProblemReports.dedupeKey,
+    })
+    .from(pricingProblemReports)
+    .where(inArray(pricingProblemReports.dedupeKey, keys));
+  for (const row of rows) refs.set(row.dedupeKey, row.id);
+  return refs;
+}
+
+/**
+ * One report by its id, for the reference lookup. Scoped to a company unless
+ * `userId` is null, which only the admin lookup passes.
+ */
+export async function getPricingProblemReport(
+  id: number,
+  userId: number | null
+) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db
+    .select()
+    .from(pricingProblemReports)
+    .where(
+      and(
+        eq(pricingProblemReports.id, id),
+        userId === null ? undefined : eq(pricingProblemReports.userId, userId)
+      )
+    )
+    .limit(1);
+  return row;
+}
+
+/** The most recently seen reports across every company. Admin only. */
+export async function listPricingProblemReports(opts: {
+  openOnly: boolean;
+  limit: number;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(pricingProblemReports)
+    .where(opts.openOnly ? isNull(pricingProblemReports.resolvedAt) : undefined)
+    .orderBy(desc(pricingProblemReports.lastSeenAt))
+    .limit(opts.limit);
 }

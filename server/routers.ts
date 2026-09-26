@@ -36,6 +36,7 @@ import { planCopilotRouter } from "./routers/planCopilotRouter";
 import { earlyAccessRouter } from "./routers/earlyAccessRouter";
 import { backupRouter } from "./routers/backupRouter";
 import { aiUsageRouter } from "./routers/aiUsageRouter";
+import { pricingProblemsRouter } from "./routers/pricingProblemsRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -97,6 +98,8 @@ export const appRouter = router({
   // scripts/backup.mts is the same job without needing the app to be up.
   backup: backupRouter,
   aiUsage: aiUsageRouter,
+  // ERR- references from bids that could not be fully priced.
+  pricingProblems: pricingProblemsRouter,
 });
 
 export type AppRouter = typeof appRouter;

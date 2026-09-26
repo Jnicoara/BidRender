@@ -48,6 +48,7 @@ import {
 } from "@shared/bidSearch";
 import { moneyWhole } from "@/lib/money";
 import { useDebounced } from "@/hooks/useDebounced";
+import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 
 const ANY = "__any__";
 
@@ -370,6 +371,7 @@ export function BidSearchPanel({
                 </span>
                 <span className="font-mono text-sm shrink-0 w-24 text-right">
                   {moneyWhole(bid.finalPrice)}
+                  <IncompletePriceTag show={bid.incomplete} className="block" />
                 </span>
               </button>
               {onArchive && !bid.archivedAt && (

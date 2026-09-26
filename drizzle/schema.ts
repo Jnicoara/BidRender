@@ -4439,3 +4439,63 @@ export const aiUsageDaily = mysqlTable(
 
 export type AiUsageDaily = typeof aiUsageDaily.$inferSelect;
 export type InsertAiUsageDaily = typeof aiUsageDaily.$inferInsert;
+
+/**
+ * Things on a bid the pricing engine could not price, one row per problem.
+ *
+ * Written by the rollup's callers (`recordPricingProblems`) whenever a bid is
+ * priced for a screen and something in it is broken — a line with an
+ * impossible stored value, or bid settings with no finite price. See
+ * shared/linePricingProblems.ts for what counts and why a broken line is left
+ * out of the totals rather than priced at $0.
+ *
+ * ── The row id IS the reference number ───────────────────────────────────────
+ * `ERR-<id>`, shown on the line and in the bid's warning strip, so a problem
+ * can be pointed at over the phone and looked up (`pricingProblems.lookup`).
+ *
+ * ── One row per problem, not per sighting ────────────────────────────────────
+ * Pricing is a READ, and a bid is read constantly. `dedupeKey` is unique, so
+ * seeing the same problem again updates `lastSeenAt` and `occurrences` rather
+ * than adding a row, and the reference stays the same for the life of the
+ * problem. Fixed, it gets `resolvedAt`; broken again, the same row reopens.
+ *
+ * ── Numbers only, never job contents ─────────────────────────────────────────
+ * `detail` is the offending value or the engine's own message ("quantity cannot
+ * be negative, received: -2"), which names a field and a number and never a
+ * line's text. Same rule as `ai_usage_daily`: a diagnostic table must not turn
+ * into a copy of what contractors are bidding.
+ */
+export const pricingProblemReports = mysqlTable(
+  "pricing_problem_reports",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    /** The company's scope id (`ctx.scope.dataUserId`), like every table. */
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    bidId: int("bidId")
+      .notNull()
+      .references(() => bids.id, { onDelete: "cascade" }),
+    /** NULL for a problem with the bid itself rather than one line. */
+    lineId: int("lineId").references(() => bidLineItems.id, {
+      onDelete: "cascade",
+    }),
+    /** `LINE_PROBLEM_CODES` in shared/linePricingProblems.ts. */
+    code: varchar("code", { length: 64 }).notNull(),
+    detail: varchar("detail", { length: 500 }).notNull(),
+    /** `<bidId>:<lineId|bid>:<code>` — see `problemDedupeKey`. */
+    dedupeKey: varchar("dedupeKey", { length: 128 }).notNull(),
+    occurrences: int("occurrences").default(1).notNull(),
+    firstSeenAt: timestamp("firstSeenAt").defaultNow().notNull(),
+    lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+    /** Set when the bid was next priced and the problem was gone. */
+    resolvedAt: timestamp("resolvedAt"),
+  },
+  t => [
+    unique("pricing_problem_reports_dedupe_uq").on(t.dedupeKey),
+    index("pricing_problem_reports_bid_idx").on(t.bidId),
+    index("pricing_problem_reports_lastSeen_idx").on(t.lastSeenAt),
+  ]
+);
+
+export type PricingProblemReport = typeof pricingProblemReports.$inferSelect;

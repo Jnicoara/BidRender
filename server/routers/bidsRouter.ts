@@ -26,6 +26,7 @@ import {
   taxRulesFor,
   toTaxJurisdiction,
 } from "../bidPricing";
+import { reportPricingProblems } from "../pricingProblems";
 import { explainTaxStatus } from "../../shared/salesTax";
 import { roundMoney } from "../../shared/pricing";
 import {
@@ -240,12 +241,18 @@ export const bidsRouter = router({
       const priced = await Promise.all(
         rows.map(async bid => {
           const lines = await db.getBidLineItems(bid.id);
-          const { directCost, bidPrice } = rollUpBid(bid, lines, company);
+          const { directCost, bidPrice, incomplete } = rollUpBid(
+            bid,
+            lines,
+            company
+          );
           return {
             ...bid,
             lineCount: lines.length,
             directCost,
             finalPrice: bidPrice.finalPrice,
+            /** The price leaves something out; show it as incomplete. */
+            incomplete,
           };
         })
       );
@@ -302,13 +309,14 @@ export const bidsRouter = router({
         materialMarkup,
         markedUpExpenses,
         totalHours,
+        brokenLines,
         ...bid
       } = row;
       // The card's direct cost is the bid screen's: lines plus marked-up
       // charges (rollUpBid). Leaving the charges out read a bid carrying a
       // marked-up permit short by that permit until 2026-09-25.
       const fullDirect = roundMoney(directCost + markedUpExpenses);
-      const { price } = priceFromDirectCost(
+      const { price, priced } = priceFromDirectCost(
         bid,
         fullDirect,
         materialMarkup,
@@ -319,6 +327,12 @@ export const bidsRouter = router({
         lineCount,
         directCost: fullDirect,
         finalPrice: price,
+        /**
+         * The card's price leaves something out: a line the SQL skipped as
+         * unpriceable (the same lines the bid screen flags), or settings with
+         * no finite price. The card says so instead of showing a clean total.
+         */
+        incomplete: brokenLines > 0 || !priced,
       };
     });
   }),
@@ -561,7 +575,7 @@ export const bidsRouter = router({
         // reads the same whether it is archived or not — someone deciding what to
         // rescue is looking at exactly the number they saw before archiving it.
         const lines = await db.getBidLineItems(bid.id);
-        const { bidPrice } = rollUpBid(bid, lines, company);
+        const { bidPrice, incomplete } = rollUpBid(bid, lines, company);
         // Non-null by construction: getArchivedBids filters on archivedAt.
         const archivedAt = bid.archivedAt as Date;
         return {
@@ -569,6 +583,7 @@ export const bidsRouter = router({
           archivedAt,
           lineCount: lines.length,
           finalPrice: bidPrice.finalPrice,
+          incomplete,
           purgeDueAt: purgeDueAt(archivedAt),
           daysRemaining: daysRemaining(archivedAt, now),
           urgency: retentionUrgency(archivedAt, now),
@@ -630,7 +645,16 @@ export const bidsRouter = router({
         markedUp: row.markedUp,
       }));
 
-      const { settings, priced, units, totals, salesTax, taxRate } = bidRollup(
+      const {
+        settings,
+        priced,
+        units,
+        totals,
+        salesTax,
+        taxRate,
+        problems,
+        incomplete,
+      } = bidRollup(
         bid,
         lines,
         company,
@@ -641,9 +665,31 @@ export const bidsRouter = router({
         expenses
       );
 
+      // Always, so a problem fixed since the last look gets resolved.
+      const reported = await reportPricingProblems(
+        ctx.scope.dataUserId,
+        bid.id,
+        problems
+      );
+
       return {
         bid,
-        lines: priced.map(({ line, breakdown }) => ({ ...line, breakdown })),
+        /**
+         * `breakdown` is null on a line that could not be priced, and
+         * `problem` then says why and carries its ERR- reference. The screen
+         * shows that INSTEAD of a figure — never $0.
+         */
+        lines: priced.map(({ line, breakdown }) => ({
+          ...line,
+          breakdown,
+          problem: reported.find(p => p.lineId === line.id) ?? null,
+        })),
+        /**
+         * True when the totals leave something out. `problems` lists every
+         * one, including a problem with the bid's own settings (lineId null).
+         */
+        incomplete,
+        problems: reported,
         units,
         totals,
         settings,

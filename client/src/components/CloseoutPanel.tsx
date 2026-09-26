@@ -420,6 +420,21 @@ export function CloseoutPanel({ bidId }: { bidId: number }) {
                       {data?.estimate && (
                         <span className="text-xs text-muted-foreground pb-2">
                           Estimated {hrs(data.estimate.totalHours)}
+                          {/* Short by the lines that can't be priced; saving
+                              refuses until they are fixed on the bid. */}
+                          {data.estimate.unpriceableLines > 0 && (
+                            <span className="text-red-500">
+                              {" "}
+                              · incomplete, {
+                                data.estimate.unpriceableLines
+                              }{" "}
+                              line
+                              {data.estimate.unpriceableLines === 1
+                                ? ""
+                                : "s"}{" "}
+                              can't be priced
+                            </span>
+                          )}
                         </span>
                       )}
                     </div>

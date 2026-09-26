@@ -44,9 +44,10 @@ export function AccountingExportDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { data, isLoading } = trpc.accounting.quickbooks.useQuery(
+  const { data, isLoading, error } = trpc.accounting.quickbooks.useQuery(
     { bidId },
-    { enabled: open }
+    // A refusal for an incomplete bid refuses again; see ProposalPage.
+    { enabled: open, retry: false }
   );
   const [downloaded, setDownloaded] = useState(false);
 
@@ -92,6 +93,10 @@ export function AccountingExportDialog({
                 />
               ))}
             </div>
+          ) : error ? (
+            // The server's sentence, which names the ERR- references and says
+            // where to fix them. An empty dialog would read as "nothing to send".
+            <p className="py-4 text-sm text-red-500">{error.message}</p>
           ) : (
             <div className="space-y-4">
               {doc && (

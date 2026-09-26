@@ -36,6 +36,7 @@ import { selectOnFocus } from "@/lib/selectOnFocus";
 import { smartSearch } from "@/lib/smartSearch";
 import { addAssemblyOverheadHours } from "@shared/pricing";
 import { money } from "@/lib/money";
+import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { otherPercentCaption } from "@/lib/percentKind";
 
 const round = (value: number, places = 2) => {
@@ -256,7 +257,10 @@ export default function QuickBidPage({
             </p>
           </div>
           <div className="text-right shrink-0">
-            <div className="text-xs text-muted-foreground">Bid price</div>
+            <div className="text-xs text-muted-foreground">
+              Bid price{" "}
+              <IncompletePriceTag show={detail?.incomplete ?? false} />
+            </div>
             <div className="font-mono text-base text-[#F5C518]">
               {detail ? money(detail.totals.finalPrice) : "—"}
             </div>
@@ -465,9 +469,25 @@ export default function QuickBidPage({
                     className="h-7 w-16 text-sm"
                     ariaLabel={`Quantity of ${line.name}`}
                   />
-                  <span className="font-mono text-sm w-24 text-right shrink-0">
-                    {money(line.breakdown.directCost)}
-                  </span>
+                  {/* Never $0 for a line that could not be priced — see the
+                      same column on BidsPage. */}
+                  {line.breakdown === null ? (
+                    <span
+                      className="text-xs w-24 text-right shrink-0 text-red-500"
+                      title={line.problem?.message ?? undefined}
+                    >
+                      Can't price
+                      {line.problem?.ref ? (
+                        <span className="block font-mono">
+                          {line.problem.ref}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <span className="font-mono text-sm w-24 text-right shrink-0">
+                      {money(line.breakdown.directCost)}
+                    </span>
+                  )}
                   <Button
                     size="sm"
                     variant="ghost"
@@ -532,7 +552,9 @@ export default function QuickBidPage({
                 </div>
               </div>
               <div className="ml-auto text-right">
-                <div className="text-xs text-muted-foreground">Bid price</div>
+                <div className="text-xs text-muted-foreground">
+                  Bid price <IncompletePriceTag show={detail.incomplete} />
+                </div>
                 <div className="font-mono text-lg text-[#F5C518]">
                   {money(detail.totals.finalPrice)}
                 </div>

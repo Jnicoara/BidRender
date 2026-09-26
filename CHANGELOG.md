@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **A bid line the app can't price now says so, instead of breaking the bid
+  or hiding in the total.** Before, one line holding an impossible value,
+  such as a negative quantity or rate, stopped the whole bid from opening.
+  It also stopped the search and archive lists from loading for every other
+  bid. The dashboard added it in as a wrong number. Now that line shows "Can't
+  price" with a reference like ERR-1042, the other lines price normally, and
+  every total that leaves it out is marked "incomplete". The priced proposal,
+  the accounting export and the close-out refuse until it is fixed, and say
+  which reference to fix. Each problem is filed once, marked resolved when
+  fixed, and can be looked up by its reference.
+
 - **A 250-350 kcmil lug joins the crimp lugs.** Lugs are sold by the range of
   wire they take, and the ranges stopped at 4/0, so there was nothing to
   offer for a 250 or 350 kcmil feeder. Searching "350 lug" or "kcmil lug" now

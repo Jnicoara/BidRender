@@ -21,6 +21,7 @@ import {
   taxRulesFor,
   toTaxJurisdiction,
 } from "../bidPricing";
+import { refuseIfIncomplete, reportPricingProblems } from "../pricingProblems";
 import { resolveBidClient } from "../../shared/bidClient";
 import {
   buildAccountingExport,
@@ -68,7 +69,7 @@ export const accountingRouter = router({
           db.getBidExpenses(bid.id),
         ]);
 
-      const { totals } = bidRollup(
+      const { totals, problems } = bidRollup(
         bid,
         lines,
         company,
@@ -82,6 +83,13 @@ export const accountingRouter = router({
           taxable: row.taxable,
           markedUp: row.markedUp,
         }))
+      );
+
+      // An incomplete total imported into the books is a wrong number nothing
+      // will flag again. Refuse, with the references.
+      refuseIfIncomplete(
+        await reportPricingProblems(ctx.scope.dataUserId, bid.id, problems),
+        "an accounting export"
       );
 
       // The same name the proposal prints. A file addressed to one name and a

@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { RETENTION_DAYS, type RetentionUrgency } from "@shared/retention";
 import { moneyWhole } from "@/lib/money";
+import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 
 /** Only a deadline worth acting on gets colour. The rest stays quiet. */
 const URGENCY_STYLE: Record<RetentionUrgency, string> = {
@@ -166,6 +167,7 @@ export default function BidArchivePage({
                     <span className="text-xs font-mono text-muted-foreground">
                       {moneyWhole(bid.finalPrice)}
                     </span>
+                    <IncompletePriceTag show={bid.incomplete} />
                   </div>
                 </div>
 

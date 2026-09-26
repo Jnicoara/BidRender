@@ -31,6 +31,7 @@ import {
   suggestHours,
 } from "../../shared/closeout";
 import { bidRollup, companyDefaultsFor } from "../bidPricing";
+import { refuseIfIncomplete, reportPricingProblems } from "../pricingProblems";
 import * as db from "../db";
 
 /** Recording what a job took is bid work. */
@@ -61,18 +62,30 @@ async function estimateFor(bidId: number, userId: number) {
     companyDefaultsFor(userId),
   ]);
   const live = lines.filter(line => line.archivedAt === null);
-  const { priced, totals } = bidRollup(bid, live, company);
+  const { priced, totals, problems } = bidRollup(bid, live, company);
 
   return {
     bid,
     totalHours: totals.totalLaborHours,
-    lines: priced.map(({ line, breakdown }) => ({
-      bidLineItemId: line.id,
-      assemblyId: line.assemblyId,
-      assemblyName: line.name,
-      qty: Number(line.qty),
-      estimatedHours: breakdown.totalLaborHours,
-    })),
+    /*
+      A line that could not be priced has no estimated hours to compare
+      against, so it is not offered. `problems` is what says the estimate is
+      short: `save` refuses on it, and `get` reports it as incomplete.
+    */
+    lines: priced.flatMap(({ line, breakdown }) =>
+      breakdown === null
+        ? []
+        : [
+            {
+              bidLineItemId: line.id,
+              assemblyId: line.assemblyId,
+              assemblyName: line.name,
+              qty: Number(line.qty),
+              estimatedHours: breakdown.totalLaborHours,
+            },
+          ]
+    ),
+    problems,
   };
 }
 
@@ -117,6 +130,8 @@ export const closeoutRouter = router({
           estimate: {
             totalHours: estimate.totalHours,
             lines: estimate.lines,
+            /** Lines left out because they cannot be priced. See estimateFor. */
+            unpriceableLines: estimate.problems.length,
           },
           variance: null,
           impliedProductivity: null,
@@ -158,6 +173,7 @@ export const closeoutRouter = router({
         estimate: {
           totalHours: estimate.totalHours,
           lines: estimate.lines,
+          unpriceableLines: estimate.problems.length,
         },
         variance: compareHours(estimated, actual),
         impliedProductivity: impliedProductivity(estimated, actual),
@@ -199,6 +215,17 @@ export const closeoutRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const estimate = await estimateFor(input.bidId, ctx.scope.dataUserId);
+
+      // The estimate is FROZEN here. Freezing one that leaves a line out would
+      // compare every future job against a number that was short from day one.
+      refuseIfIncomplete(
+        await reportPricingProblems(
+          ctx.scope.dataUserId,
+          input.bidId,
+          estimate.problems
+        ),
+        "a close-out"
+      );
 
       if (input.mode === "total" && input.totalActualHours === undefined) {
         throw new TRPCError({

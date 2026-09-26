@@ -74,6 +74,8 @@ import { SampleBidNotice } from "@/components/SampleBidNotice";
 import { QuantityLockPanel } from "@/components/QuantityLockPanel";
 import { countUnpricedLaborLines } from "@shared/laborRatePricing";
 import { canPriceByHand, missingEntryCounts } from "@shared/handPricedLines";
+import { problemFixHint } from "@shared/linePricingProblems";
+import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import {
   HandPricedLineFields,
   handPricedGap,
@@ -435,6 +437,8 @@ export default function BidsPage({
     taxRate,
     taxNote,
     fromPlans,
+    incomplete,
+    problems,
   } = detailQuery.data;
 
   /**
@@ -467,7 +471,9 @@ export default function BidsPage({
   ].filter((label): label is string => label !== null);
 
   /** Whether any line carries material markup — see the note on each line. */
-  const showMarkupNotes = lines.some(l => l.breakdown.materialMarkupPct > 0);
+  const showMarkupNotes = lines.some(
+    l => (l.breakdown?.materialMarkupPct ?? 0) > 0
+  );
 
   /**
    * "Re-apply markup rules", offered only when it would change something, and
@@ -766,10 +772,18 @@ export default function BidsPage({
                             />
                           </>
                         )}
+                        {/* A unit holding a line that cannot be priced says
+                            its subtotal is short, rather than showing the sum
+                            of the rest as if it were the unit's cost. */}
                         <span className="text-xs text-muted-foreground/70 ml-auto font-mono">
+                          {group.lines.some(l => l.breakdown === null) && (
+                            <span className="text-red-500 font-sans mr-1.5">
+                              incomplete
+                            </span>
+                          )}
                           {money(
                             group.lines.reduce(
-                              (sum, l) => sum + l.breakdown.directCost,
+                              (sum, l) => sum + (l.breakdown?.directCost ?? 0),
                               0
                             )
                           )}
@@ -853,7 +867,8 @@ export default function BidsPage({
                             {showMarkupNotes ? (
                               <div className="text-xs text-muted-foreground truncate">
                                 {describeLineMarkup(line)}
-                                {line.breakdown.materialMarkup > 0
+                                {line.breakdown &&
+                                line.breakdown.materialMarkup > 0
                                   ? ` · +${money(line.breakdown.materialMarkup)}`
                                   : ""}
                               </div>
@@ -891,6 +906,17 @@ export default function BidsPage({
                                   onChanged={refresh}
                                 />
                               </>
+                            ) : null}
+                            {/* Why it cannot be priced and what to do — the
+                                strip says HOW MANY, only the line says WHICH. */}
+                            {line.problem ? (
+                              <div className="text-xs text-red-500">
+                                {line.problem.message}{" "}
+                                {problemFixHint(line.problem.code, {
+                                  quantityTypeable: source === "typed",
+                                  pricedByHand: canPriceByHand(line),
+                                })}
+                              </div>
                             ) : null}
                           </div>
                           {/*
@@ -937,12 +963,36 @@ export default function BidsPage({
                               ariaLabel={`Quantity of ${line.name}`}
                             />
                           )}
-                          <span className="font-mono text-xs w-24 text-right shrink-0 text-muted-foreground">
-                            {round(line.breakdown.totalLaborHours, 2)} h
-                          </span>
-                          <span className="font-mono text-sm w-24 text-right shrink-0">
-                            {money(line.breakdown.directCost)}
-                          </span>
+                          {/*
+                            A line the engine could not price shows THAT, in
+                            the columns where its hours and money would be —
+                            never "0 h" and "$0.00", which read as a line that
+                            genuinely costs nothing. The reference is what
+                            somebody quotes to get it looked at.
+                          */}
+                          {line.breakdown === null ? (
+                            <span
+                              className="w-48 text-right shrink-0 text-xs text-red-500"
+                              title={line.problem?.message ?? undefined}
+                            >
+                              Can't price
+                              {line.problem?.ref ? (
+                                <span className="font-mono">
+                                  {" "}
+                                  · {line.problem.ref}
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : (
+                            <>
+                              <span className="font-mono text-xs w-24 text-right shrink-0 text-muted-foreground">
+                                {round(line.breakdown.totalLaborHours, 2)} h
+                              </span>
+                              <span className="font-mono text-sm w-24 text-right shrink-0">
+                                {money(line.breakdown.directCost)}
+                              </span>
+                            </>
+                          )}
                           <Button
                             size="sm"
                             variant="ghost"
@@ -985,6 +1035,44 @@ export default function BidsPage({
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
                 Bid total
               </div>
+
+              {/*
+                Something on this bid could not be priced, so EVERY figure in
+                this card is short by it. Red, not the amber the rest of the
+                strip uses: amber means "this is a real total with something
+                unfinished"; this means the total itself is not the bid's.
+                First in the card because it contradicts all of it, not one
+                line. The references are what gets quoted to have it looked at.
+              */}
+              {incomplete && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-md border border-red-500/40 bg-red-500/10 px-2.5 py-2 mb-2"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      Incomplete —{" "}
+                      {problems.some(p => p.lineId === null)
+                        ? "this bid's pricing settings are invalid"
+                        : `${problems.length} line${
+                            problems.length === 1 ? "" : "s"
+                          } can't be priced`}
+                    </span>{" "}
+                    and {problems.length === 1 ? "is" : "are"} left out of every
+                    total below. The proposal and the accounting export stay off
+                    until it is fixed.
+                    {problems.some(p => p.ref !== null) && (
+                      <span className="block font-mono mt-0.5">
+                        {problems
+                          .map(p => p.ref)
+                          .filter((ref): ref is string => ref !== null)
+                          .join(" · ")}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              )}
               <div className="flex items-baseline justify-between gap-3 py-1">
                 <span className="text-xs text-muted-foreground">Materials</span>
                 <span className="font-mono text-sm">
@@ -1246,7 +1334,12 @@ export default function BidsPage({
               </div>
               <div className="border-t border-border my-2" />
               <div className="flex items-baseline justify-between gap-3 py-1">
-                <span className="text-sm font-medium">Bid price</span>
+                <span className="text-sm font-medium">
+                  Bid price
+                  {/* On the headline number itself: the one figure people
+                      read without reading anything else on the card. */}
+                  <IncompletePriceTag show={incomplete} className="ml-1.5" />
+                </span>
                 <span className="font-mono text-base text-[#F5C518]">
                   {/* The work alone. A marked-up charge is inside finalPrice
                       but is billed on its own line below, so showing
