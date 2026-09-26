@@ -350,6 +350,12 @@ compiler with tests included. Fixing those 28 left **33 pre-existing errors**
 in ten other test files, which have been accumulating unseen for as long as the
 exclusion has been there.
 
+> **Re-measured 2026-09-26: 124 errors across 23 test files.** The 33 above
+> nearly quadrupled in six days, which is this section's point proven: nothing
+> sees them, so nothing stops them. The breakdown is in `todo.md` § "Typecheck
+> the tests". If a fresh count does not match, the number here is stale again
+> — re-measure rather than trusting either figure.
+
 **What that means for everything decided today:** a type-level guarantee that
 stops at the test boundary is not a guarantee. A fixture can construct a shape
 the production code cannot, and a test that compiles only because nothing
@@ -359,7 +365,7 @@ three broken mappings lived — and they are absent in exactly the place that is
 supposed to be catching things.
 
 **Not fixed, deliberately, and not urgent enough to do badly.** Including tests
-means clearing 33 errors across files nobody is otherwise touching, and doing
+means clearing those errors (124 as of 2026-09-26) across files nobody is otherwise touching, and doing
 that in a hurry is how a test gets "fixed" by weakening its assertion. See
 `todo.md`. Until then: **when you make something uncompilable, say whether the
 tests were part of "everything".**

@@ -927,13 +927,17 @@ inherited from whoever's `.env` it happens to run under, and with the flag on,
 a suite that ever forgot a mock would spend real money on every run. Both lines
 are commented where they sit.
 
-> **Not 0 on `bidrender_test_clean` — measured 2026-09-26.** `server/v545.test.ts`
-> fails 8 of its tests there, identically on a clean worktree of HEAD, with
-> `companies_ownerUserId_users_id_fk`: it acts as user id 1 and that scratch
-> database has no user 1. It tests only the retired `master_*` routers. Either
-> create user 1 in its `beforeAll` like every other suite, or delete the file
-> with the legacy model. Until then, a run on this database is 8 known
-> failures, all in that one file — anything else red is new.
+> **FIXED 2026-09-26 — the suite is 0 failures on `bidrender_test_clean`.**
+> `server/v545.test.ts` failed 8 tests there with
+> `companies_ownerUserId_users_id_fk`: written in the Manus era, it acted as a
+> hand-built user `id: 1` — the owner's real account on the old dev database —
+> and the scratch database has no user 1. It now inserts its own fixture user
+> (5450), builds its context from that row as read back, and deletes it after.
+> **Six more of its tests had been passing while testing nothing**
+> (`if (!createdId) return;`), so the real count broken was 14, not 8; those
+> guards are assertions now. The remaining non-passes are 4 deliberate
+> `skipIf(!hasGateway)` model checks, and the `[BackupToR2] FAILED` line in the
+> output is a passing test exercising that failure path.
 
 **The baseline is now 0 failures.** The last 3 were all in `backup` and needed a
 database grant rather than a flag; granted 2026-09-19, and `server/backup.test.ts`
@@ -1220,7 +1224,7 @@ path is ever revived, give it the same treatment first.
 
 - [ ] **There is no way to take a takeoff out of the app as numbers.** Asked 2026-09-19, and it is a door the product promised early: numbers come off the plans and go into whatever the estimator already uses. Two CSVs exist and neither is it. The **materials list** (Takeoff → "Materials list" → CSV, and the same dialog on the bid) is a SUPPLIER document — quantities with no prices, and `shared/materialsList.ts` has nowhere to put one on purpose; traced runs arrive in it as one lump of conduit, one of cable and one of wire, because nothing carries the run TYPE through to it. The **accounting export** (`shared/accountingExport.ts`) is the bid's money in QuickBooks invoice shape, with cost and margin deliberately absent. What is missing is the takeoff itself: **every count by type with its quantity, and every run by type with its traced, vertical and extra footage**, per sheet and for the bid, with the sheet each came from. Most of it is already computed — `takeoffGroups.list` has the counts, `takeoffRuns.totals` has the footage, `shared/csvWrite.ts` writes the file — so this is a new shape over existing numbers rather than new arithmetic. **Two things to get right:** it is an internal document, so unlike the supplier list it MAY carry prices, and the choice of whether it does has to be explicit rather than inherited from whichever builder was copied; and it must say what it does not include, the way the materials list already does about verticals and extra. See `references/plan-viewer-overhaul.md` § 5j for the extra footage it will have to show once that exists. **Build § 5n first** — an export of run footage by type, taken from a palette in which no type names a material, writes rows that carry a name and no specification.
 
-- [ ] **Typecheck the tests.** `tsconfig.json` excludes `**/*.test.ts`, so `pnpm check` — the correctness gate — covers no test file at all. Measured 2026-09-20: making one field required produced 0 errors from `pnpm check` and 28 from a config that includes tests; after fixing those, **33 pre-existing errors remain across ten test files** (`server/pricing.test.ts` 7, `server/auth.email.test.ts` 4, `client/src/lib/tradeContent.test.ts` 4, and the rest in ones and twos). **Why it matters more than it looks:** every forcing function added on 2026-09-20 — the required field, the props union, the row-taking mapper — is enforced in `server/`, `shared/` and `client/src/` and is silently absent in the tests, so a fixture can construct a shape the production code cannot. That is the difference between a type-level guarantee and a type-level suggestion. **Do it as its own piece, not inside another change:** the 33 have to be read individually, and the failure mode of hurrying is a test "fixed" by weakening what it asserts. Flip the exclusion, fix them, and the gate finally means what CLAUDE.md says it means.
+- [ ] **Typecheck the tests.** `tsconfig.json` excludes `**/*.test.ts`, so `pnpm check` — the correctness gate — covers no test file at all. Measured 2026-09-20: making one field required produced 0 errors from `pnpm check` and 28 from a config that includes tests; after fixing those, **33 pre-existing errors remain across ten test files** (`server/pricing.test.ts` 7, `server/auth.email.test.ts` 4, `client/src/lib/tradeContent.test.ts` 4, and the rest in ones and twos). **Re-measured 2026-09-26: 124 errors across 23 files** — it has nearly quadrupled in six days, because nothing checks it. Largest: `server/takeoffMath.test.ts` 38, `server/materialMarkupAgreement.test.ts` 26, `server/accountingExport.test.ts` 12, `server/takeoffVerticals.test.ts` 8, `server/pricing.test.ts` 7. `server/v545.test.ts` had 2 and is now clean. Measured with a tsconfig that extends the real one and drops only the `**/*.test.ts` exclusion. **The growth is the argument for doing this soon:** every week it waits, the piece gets bigger. **Why it matters more than it looks:** every forcing function added on 2026-09-20 — the required field, the props union, the row-taking mapper — is enforced in `server/`, `shared/` and `client/src/` and is silently absent in the tests, so a fixture can construct a shape the production code cannot. That is the difference between a type-level guarantee and a type-level suggestion. **Do it as its own piece, not inside another change:** the 33 have to be read individually, and the failure mode of hurrying is a test "fixed" by weakening what it asserts. Flip the exclusion, fix them, and the gate finally means what CLAUDE.md says it means.
 
 ## Material markup (references/material-markup.md)
 
