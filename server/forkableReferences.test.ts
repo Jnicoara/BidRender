@@ -128,6 +128,13 @@ const REGISTRY: Record<string, Entry> = {
     resolver: "resolveMaterial",
     readBy: "server/db.ts",
   },
+  // Which part a run-type line holds (0083). Resolved in resendPlans and
+  // compared by materialItemKey, so a fork of the same part is not a swap.
+  "bid_line_items.runMaterialId": {
+    kind: "resolver",
+    resolver: "resolveMaterial",
+    readBy: "server/routers/takeoffRunTypesRouter.ts",
+  },
   "takeoff_runs.runTypeId": {
     kind: "resolver",
     resolver: "resolveRunType",

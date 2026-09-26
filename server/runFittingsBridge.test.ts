@@ -319,3 +319,117 @@ withDb(
     });
   }
 );
+
+withDb("Send-again refills and swaps (owner's decisions, 2026-09-26)", () => {
+  /*
+    REFILL. A fitting sent while its catalog row was $0 froze at $0 and read
+    "Not priced" forever — pricing the part later could not reach the line.
+    Send-again now fills it from the material's current price, and only a
+    price that is NOT set: a second price change must not move it.
+  */
+  it("refills a line sent unpriced, and never overwrites a set price", async () => {
+    const type = await emtType("EMT refill");
+    const { bidId, sheetId } = await aBid("Refill");
+    await trace(bidId, sheetId, type.id, 94.2);
+    await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+    expect(
+      Number(
+        line((await detail(bidId)).lines, "coupling")!.snapshotMaterialCost
+      )
+    ).toBe(0);
+
+    const coupling = await shipped('1/2" EMT set-screw coupling');
+    await caller().materials.update({ id: coupling.id, costPerUnit: 0.45 });
+
+    const [preview] = await caller().takeoffRunTypes.bridgeForBid({ bidId });
+    expect(preview.fittings.find(f => f.role === "coupling")!.resend).toEqual({
+      kind: "refill",
+      price: 0.45,
+    });
+
+    const again = await caller().takeoffRunTypes.sendToBid({
+      bidId,
+      runTypeId: type.id,
+    });
+    expect(again.refilled).toContain('1/2" EMT set-screw coupling');
+    const refilled = line((await detail(bidId)).lines, "coupling")!;
+    expect(Number(refilled.snapshotMaterialCost)).toBeCloseTo(0.45, 4);
+    expect(refilled.breakdown!.materialCost).toBeCloseTo(9 * 0.45, 2);
+
+    // The price is set now. A later change to the part must not reach it.
+    const fork = await shipped('1/2" EMT set-screw coupling');
+    await caller().materials.update({ id: fork.id, costPerUnit: 0.6 });
+    await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+    expect(
+      Number(
+        line((await detail(bidId)).lines, "coupling")!.snapshotMaterialCost
+      )
+    ).toBeCloseTo(0.45, 4);
+  });
+
+  it("keeps the line on a style change, and swaps it on Send-again with a preview", async () => {
+    const type = await emtType("EMT swap");
+    const { bidId, sheetId } = await aBid("Swap");
+    await trace(bidId, sheetId, type.id, 94.2);
+    await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+
+    await caller().takeoffRunTypes.update({
+      id: type.id,
+      fittingStyle: "compression",
+    });
+    // The style change alone moves nothing on the bid.
+    expect(line((await detail(bidId)).lines, "coupling")!.name).toMatch(
+      /set-screw coupling$/
+    );
+
+    const [preview] = await caller().takeoffRunTypes.bridgeForBid({ bidId });
+    expect(preview.fittings.find(f => f.role === "coupling")!.resend).toEqual({
+      kind: "swap",
+      text: "set-screw coupling → compression coupling, 9",
+    });
+    // Straps have no style, so nothing to swap there.
+    expect(preview.fittings.find(f => f.role === "strap")!.resend).toBeNull();
+
+    const again = await caller().takeoffRunTypes.sendToBid({
+      bidId,
+      runTypeId: type.id,
+    });
+    expect(again.swapped).toContain(
+      "set-screw coupling → compression coupling, 9"
+    );
+    const swapped = line((await detail(bidId)).lines, "coupling")!;
+    expect(swapped.name).toMatch(/compression coupling$/);
+    expect(Number(swapped.qty)).toBe(9);
+    expect(swapped.runMaterialId).toBe(
+      (await shipped('1/2" EMT compression coupling')).id
+    );
+  });
+
+  it("touches nothing on a locked bid — no swap, no refill, no preview of one", async () => {
+    const type = await emtType("EMT locked swap");
+    const { bidId, sheetId } = await aBid("Locked swap");
+    await trace(bidId, sheetId, type.id, 94.2);
+    await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+    await caller().bids.lockQuantities({ bidId });
+
+    const coupling = await shipped('1/2" EMT set-screw coupling');
+    await caller().materials.update({ id: coupling.id, costPerUnit: 0.45 });
+    await caller().takeoffRunTypes.update({
+      id: type.id,
+      fittingStyle: "compression",
+    });
+
+    const [preview] = await caller().takeoffRunTypes.bridgeForBid({ bidId });
+    expect(preview.fittings.every(f => f.resend === null)).toBe(true);
+
+    const again = await caller().takeoffRunTypes.sendToBid({
+      bidId,
+      runTypeId: type.id,
+    });
+    expect(again.swapped).toEqual([]);
+    expect(again.refilled).toEqual([]);
+    const held = line((await detail(bidId)).lines, "coupling")!;
+    expect(held.name).toMatch(/set-screw coupling$/);
+    expect(Number(held.snapshotMaterialCost)).toBe(0);
+  });
+});

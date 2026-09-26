@@ -1273,8 +1273,9 @@ release: EMT couplings and connectors are renamed in place to "set-screw"
 straps; the catalog is 1,190 rows (counted from `BASELINE_MATERIALS`
 2026-09-26). Check it against a
 restored copy of production with the build that ships, together with the
-other pending rename rounds, per `references/deploying.md` § 5b. And 0082 is
-step 1 (additive): apply it before the push. Then run
+other pending rename rounds, per `references/deploying.md` § 5b. And 0082 and
+0083 are both step 1 (additive): apply them before the push. 0083's backfill
+fills only its own new column and is guarded on NULL. Then run
 `scripts/fittingsImpact.mts` against production for the fitting counts; it
 refuses to count without 0082. (Run 2026-09-26 without 0082: production has
 2 bids, 2 untyped runs and no bid lines, so nothing there is affected.)
@@ -1318,15 +1319,21 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       whose own box or device assembly includes an EMT connector will count
       that connector twice once the run's end connector reaches the bid. No
       guard, by decision (2026-09-26); worth one if it shows up in practice.
-- [ ] **Decide: does Send-again re-price a line that was sent unpriced?** A
+- [x] **DECIDED AND BUILT 2026-09-26: yes, Send-again refills a "Not priced"
+      line, never a set price, never on a locked bid; and a style change
+      swaps fitting lines on Send-again with the swap named in the preview.
+      `shared/resendLine.ts`, `bid_line_items.runMaterialId` (0083), and the
+      R4 note in `references/takeoff-spec.md`. The question as it stood:**
+      **Does Send-again re-price a line that was sent unpriced?** A
       run-type line freezes its price at send (R4). A fitting sent while its
       catalog row was $0 therefore stays "Not priced" on that bid after the
       row is priced, and the only way out is removing the line and sending
       again. Re-snapshotting a $0 snapshot on Send-again would fix it without
       touching any price somebody chose — but it is an exception to R4 and
       the owner's call.
-- [ ] **Changing a type's fitting style does not change lines already on a
-      bid.** Their material is frozen with their price (R4), the same as
+- [x] **(Resolved with the item above.) Changing a type's fitting style does
+      not change lines already on a bid** — still true, by decision; Send-again
+      now swaps them. The original note: Their material is frozen with their price (R4), the same as
       changing a type's raceway. The preview shows the new part while the
       bid line keeps the old name. Same decision as above, really.
 - [ ] **The proposal still prints money per unit/section** without the

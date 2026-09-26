@@ -13,6 +13,7 @@
 import { markAppearance, markPath } from "@shared/takeoffMarks";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { money } from "@/lib/money";
 import {
   Check,
   Plus,
@@ -257,7 +258,19 @@ export type RunTypeBridgeRow = {
   onBid: boolean;
   /** `ok` or a named refusal with a sentence a person can act on. */
   sendable: { ok: true } | { ok: false; reason: string; message: string };
+  /** What Send-again would change on the line already on the bid. */
+  resend: ResendPreview;
 };
+
+/**
+ * What Send-again will do to a line already on the bid — `shared/resendLine.ts`,
+ * the same plan the send applies. Null when it changes nothing but quantity,
+ * and always null on a locked bid.
+ */
+export type ResendPreview =
+  | { kind: "swap"; text: string }
+  | { kind: "refill"; price: number }
+  | null;
 
 /**
  * One fitting a traced conduit type wants on the bid — counted from the runs,
@@ -277,7 +290,15 @@ export type RunTypeBridgeFitting = {
   priced: boolean | null;
   onBid: boolean;
   sendable: { ok: true } | { ok: false; reason: string; message: string };
+  resend: ResendPreview;
 };
+
+/** The sentence the panel shows for a pending Send-again change. */
+function resendSentence(resend: NonNullable<ResendPreview>): string {
+  return resend.kind === "swap"
+    ? `On Send: ${resend.text}`
+    : `On Send: price filled in at ${money(resend.price)}`;
+}
 
 const FITTING_LABELS: Record<RunTypeBridgeFitting["role"], string> = {
   coupling: "Couplings",
@@ -684,22 +705,34 @@ export function RunsPanel({
               const onBidCount = [...entry.rows, ...entry.fittings].filter(
                 row => row.onBid
               ).length;
+              /*
+                Lines already on the bid that Send-again would CHANGE — a
+                swapped part or a filled-in price. Counted into the button, or
+                a style change would leave nothing to press.
+              */
+              const toUpdate = [...entry.rows, ...entry.fittings].filter(
+                row => row.onBid && row.resend !== null
+              ).length;
               const busy = sendingRunTypeId === entry.runTypeId;
               return (
                 <div key={entry.runTypeId} className="px-3 pb-2.5">
                   <p className="text-xs font-medium truncate">{entry.label}</p>
                   <div className="mt-1 space-y-0.5">
                     {entry.rows.map(row => (
-                      <div
-                        key={row.role}
-                        className="flex items-baseline justify-between gap-2"
-                      >
-                        <span className="text-[0.7rem] text-muted-foreground truncate">
-                          {row.materialName ?? "Not said what this is"}
-                        </span>
-                        <span className="text-[0.7rem] font-mono tabular-nums shrink-0">
-                          {row.feet} ft
-                        </span>
+                      <div key={row.role}>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-[0.7rem] text-muted-foreground truncate">
+                            {row.materialName ?? "Not said what this is"}
+                          </span>
+                          <span className="text-[0.7rem] font-mono tabular-nums shrink-0">
+                            {row.feet} ft
+                          </span>
+                        </div>
+                        {row.resend && (
+                          <p className="text-[0.65rem] text-[#F5C518] leading-snug">
+                            {resendSentence(row.resend)}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -753,6 +786,17 @@ export function RunsPanel({
                           <p className="text-[0.65rem] text-muted-foreground/80 leading-snug">
                             {fitting.why}
                           </p>
+                          {/*
+                            What Send-again will do to the line already on the
+                            bid — a swapped part or a filled-in price — said
+                            BEFORE the button is pressed, in amber because it
+                            changes money on the bid.
+                          */}
+                          {fitting.resend && (
+                            <p className="text-[0.65rem] text-[#F5C518] leading-snug">
+                              {resendSentence(fitting.resend)}
+                            </p>
+                          )}
                           {fitting.materialProblem &&
                             fitting.status === "counted" &&
                             fitting.qty > 0 && (
@@ -846,7 +890,7 @@ export function RunsPanel({
                       )}
                     </p>
                   )}
-                  {sendable.length > 0 && onSendRunType ? (
+                  {(sendable.length > 0 || toUpdate > 0) && onSendRunType ? (
                     <button
                       type="button"
                       disabled={busy}
@@ -855,9 +899,16 @@ export function RunsPanel({
                     >
                       {busy
                         ? "Sending…"
-                        : `Send ${sendable.length} line${
-                            sendable.length === 1 ? "" : "s"
-                          } to bid`}
+                        : [
+                            sendable.length > 0
+                              ? `Send ${sendable.length} line${sendable.length === 1 ? "" : "s"} to bid`
+                              : null,
+                            toUpdate > 0
+                              ? `${sendable.length > 0 ? "update" : "Update"} ${toUpdate} on the bid`
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(", ")}
                     </button>
                   ) : null}
                 </div>

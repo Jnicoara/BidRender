@@ -3464,6 +3464,12 @@ export default function TakeoffPage({
         );
       if (result.updated.length > 0)
         parts.push(`${result.updated.length} updated`);
+      // What Send-again changed beyond the quantity, named — a swapped part
+      // or a filled-in price is a change to the bid's money.
+      if (result.swapped.length > 0)
+        parts.push(`swapped ${result.swapped.join("; ")}`);
+      if (result.refilled.length > 0)
+        parts.push(`price filled in for ${result.refilled.join(", ")}`);
       const blocked = result.skipped.filter(
         s => s.why !== "Already on the bid, and unchanged."
       );

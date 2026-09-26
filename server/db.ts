@@ -10437,6 +10437,8 @@ export async function addRunTypeRowToBid(
     bidId,
     takeoffRunTypeId: input.runTypeId,
     runMaterialRole: input.role,
+    // Which part this is, so Send-again can refill or swap it (0083).
+    runMaterialId: input.materialId,
     name: input.name,
     qty: input.qty.toFixed(4),
     snapshotMaterialCost: Number(material.costPerUnit).toFixed(4),
@@ -10487,6 +10489,61 @@ export async function getBidLinesForRunType(
  * it again after tracing more and the line follows the drawing, rather than
  * being refused with nothing to do about it.
  */
+/**
+ * Send-again's two price changes to a run-type line — `shared/resendLine.ts`
+ * decides WHICH; this only writes it.
+ *
+ *   refill  the line was sent while its part was unpriced: the material's
+ *           price now, and the markup re-resolved against it (a markup band
+ *           keyed on price was chosen against $0). Hours are left as sent.
+ *   swap    the type now names a different part (the fitting style changed):
+ *           the line becomes that part — name, price, hours and markup, as if
+ *           sent fresh. The labour RATE stays as sent; a part change is not a
+ *           rate change.
+ *
+ * The caller refuses a locked bid before reaching here, and never asks for a
+ * refill over a price that is set. Both are guards in the router; this
+ * function trusts them and says so rather than re-checking half of them.
+ */
+export async function resnapshotRunTypeLine(
+  lineId: number,
+  userId: number,
+  input:
+    | { mode: "refill"; materialId: number }
+    | { mode: "swap"; materialId: number; name: string }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [materialRows, markupRuleSet] = await Promise.all([
+    getMaterialsByIds([input.materialId], userId),
+    getMarkupRuleSet(userId),
+  ]);
+  const material = resolveMaterial(materialRows, input.materialId);
+  if (!material) throw new Error("Material not found");
+
+  const priced = {
+    snapshotMaterialCost: Number(material.costPerUnit).toFixed(4),
+    ...markupSnapshot(
+      [markupPartForMaterial(material, input.materialId)],
+      markupRuleSet
+    ),
+    runMaterialId: input.materialId,
+  };
+  await db
+    .update(bidLineItems)
+    .set(
+      input.mode === "refill"
+        ? priced
+        : {
+            ...priced,
+            name: input.name,
+            snapshotLaborHours: Number(material.laborHours ?? 0).toFixed(4),
+            snapshotAt: new Date(),
+          }
+    )
+    .where(eq(bidLineItems.id, lineId));
+}
+
 export async function refreshRunTypeLineQty(
   lineId: number,
   feet: number

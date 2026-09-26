@@ -360,6 +360,15 @@ from now on.
   materials list and nothing else. R2 is that bridge, and the labour answer is
   what unblocks writing it — not a fix to something already wrong.
 
+- **R4 — two exceptions for Send-again on a run type, decided by the owner
+  2026-09-26** (`shared/resendLine.ts`). (1) A line that reads "Not priced"
+  is REFILLED from the material's current price — a $0 snapshot of an
+  unpriced row was never a price anybody chose, so freezing it froze nothing.
+  A price that is set is never overwritten. (2) A fitting line whose type now
+  names a different part (its STYLE changed) is SWAPPED to that part, price
+  and all, and the Send preview names the swap first ("set-screw coupling →
+  compression coupling, 9"). Changing the style alone moves nothing; only
+  Send does. Neither touches a locked bid. Everything else about R4 stands.
 - **R6** — On the old screen these lived on each run's calculator card, all
   defaulting to 0 and typed by hand per run. Makeup has moved to R7 and routing
   waste to T16; what remains here is service loop, pull points and fittings.

@@ -1167,7 +1167,7 @@ export default function BidsPage({
                           : notPricedFromPlans === 1
                             ? "One is"
                             : `${notPricedFromPlans} are`
-                      } from traced runs: price the material on the Materials screen, then remove the line and send it again from the Plans screen — a sent line keeps the price it was sent with.`}
+                      } from traced runs: price the material on the Materials screen, then press Send again on the Plans screen — it fills in the price on a line that has none, and never changes one that is set.`}
                   </p>
                 </div>
               )}

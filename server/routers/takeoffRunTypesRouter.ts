@@ -46,6 +46,9 @@ import {
   fittingRowSendability,
 } from "../../shared/runFittingMaterials";
 import { needsPricing } from "../../shared/materialPricing";
+import { materialItemKey } from "../../shared/materialMarkup";
+import { isFittingRole } from "../../shared/runFittings";
+import { resendPlan, swapText, type ResendPlan } from "../../shared/resendLine";
 import { footageByRunType } from "../runTypeFootage";
 import { RUN_MATERIAL_ROLES } from "../../drizzle/schema";
 import * as db from "../db";
@@ -102,6 +105,67 @@ const fittingFields = {
   connectorMaterialId: z.number().int().positive().nullable().optional(),
   strapMaterialId: z.number().int().positive().nullable().optional(),
 };
+
+/**
+ * What a run-type line is called: the type, then what this row is — unless
+ * that just says it twice. One function, because Send and a style swap both
+ * name lines and must name them the same way.
+ */
+function runLineName(typeLabel: string, materialName: string | null): string {
+  return materialName && materialName !== typeLabel
+    ? typeLabel + " — " + materialName
+    : typeLabel;
+}
+
+/**
+ * Send-again's plan for each role already on the bid — refill, swap or keep
+ * (`shared/resendLine.ts`). Used by BOTH the preview and the send, so what
+ * the panel promises is what the button does.
+ *
+ * Parts are compared by `materialItemKey`, which survives a fork: the line
+ * may have been sent with the shipped row and the type now resolves to the
+ * company's copy of the same part, which is not a swap.
+ */
+async function resendPlans(
+  userId: number,
+  candidates: readonly {
+    role: string;
+    materialId: number | null;
+  }[],
+  liveLines: readonly {
+    runMaterialRole: string | null;
+    runMaterialId: number | null;
+    snapshotMaterialCost: string | null;
+  }[]
+): Promise<Map<string, ResendPlan>> {
+  const ids = [
+    ...candidates.map(c => c.materialId),
+    ...liveLines.map(l => l.runMaterialId),
+  ].filter((id): id is number => id !== null);
+  const rows = ids.length ? await db.getMaterialsByIds(ids, userId) : [];
+  const part = (id: number | null) => {
+    if (id === null) return null;
+    const m = resolveMaterial(rows, id);
+    return m
+      ? { key: materialItemKey(m), name: m.name, costPerUnit: m.costPerUnit }
+      : null;
+  };
+  const plans = new Map<string, ResendPlan>();
+  for (const candidate of candidates) {
+    const line = liveLines.find(l => l.runMaterialRole === candidate.role);
+    if (!line) continue;
+    plans.set(
+      candidate.role,
+      resendPlan({
+        isFitting: isFittingRole(candidate.role),
+        linePart: part(line.runMaterialId),
+        currentPart: part(candidate.materialId),
+        lineCost: line.snapshotMaterialCost,
+      })
+    );
+  }
+  return plans;
+}
 
 async function requireOwnType(id: number, userId: number) {
   const type = await db.getRunTypeById(id, userId);
@@ -477,64 +541,105 @@ export const takeoffRunTypesRouter = router({
         footage
       );
 
-      return visible.map(({ storedId, type }) => {
-        // Present by construction: `visible` is built FROM the footage map.
-        const f = footage.get(storedId)!;
-        const rows = runTypeRows({
-          pathType: type.pathType,
-          racewayMaterialId: type.racewayMaterialId,
-          racewayMaterialName: nameOf(type.racewayMaterialId),
-          conductorMaterialId: type.conductorMaterialId,
-          conductorMaterialName: nameOf(type.conductorMaterialId),
-          groundMaterialId: type.groundMaterialId,
-          groundMaterialName: nameOf(type.groundMaterialId),
-          footage: {
-            conduitFeet: f.conduitFeet,
-            cableFeet: f.cableFeet,
-            insulatedFeet: f.insulatedFeet,
-            groundFeet: f.groundFeet,
-          },
-        });
-        return {
-          // The id the RUNS use, which is what a bid line records.
-          runTypeId: storedId,
-          label: type.label,
-          pathType: type.pathType,
-          /** Said out loud, so a smaller number has a reason beside it. */
-          unmeasurableCount: f.unmeasurableCount,
-          unansweredCount: f.unansweredCount,
-          branchCount: f.branchCount,
-          rows: rows.map(row => ({
-            role: row.role,
-            materialId: row.materialId,
-            materialName: row.materialName,
-            feet: row.feet,
-            onBid: onBid.has(storedId + ":" + row.role),
-            sendable: runRowSendability(row),
-          })),
+      return Promise.all(
+        visible.map(async ({ storedId, type }) => {
+          // Present by construction: `visible` is built FROM the footage map.
+          const f = footage.get(storedId)!;
+          const fittingRowsHere = fittingsByType.get(storedId) ?? [];
+          const rows = runTypeRows({
+            pathType: type.pathType,
+            racewayMaterialId: type.racewayMaterialId,
+            racewayMaterialName: nameOf(type.racewayMaterialId),
+            conductorMaterialId: type.conductorMaterialId,
+            conductorMaterialName: nameOf(type.conductorMaterialId),
+            groundMaterialId: type.groundMaterialId,
+            groundMaterialName: nameOf(type.groundMaterialId),
+            footage: {
+              conduitFeet: f.conduitFeet,
+              cableFeet: f.cableFeet,
+              insulatedFeet: f.insulatedFeet,
+              groundFeet: f.groundFeet,
+            },
+          });
           /*
+          What Send-again would do to each line ALREADY on the bid — the same
+          plan the send applies (`resendPlans`), so the preview can say
+          "set-screw coupling → compression coupling, 9" or "price filled in"
+          before anybody presses anything. Nothing on a locked bid.
+        */
+          const plans =
+            bid.quantitiesLockedAt === null
+              ? await resendPlans(
+                  ctx.scope.dataUserId,
+                  [
+                    ...rows.map(r => ({
+                      role: r.role,
+                      materialId: r.materialId,
+                    })),
+                    ...fittingRowsHere.map(r => ({
+                      role: r.role,
+                      materialId: r.pick.ok ? r.pick.materialId : null,
+                    })),
+                  ],
+                  lines.filter(
+                    l =>
+                      l.takeoffRunTypeId === storedId && l.archivedAt === null
+                  )
+                )
+              : new Map<string, ResendPlan>();
+          const resendOf = (role: string, qty: number) => {
+            const plan = plans.get(role);
+            if (!plan || plan.kind === "keep") return null;
+            return plan.kind === "swap"
+              ? {
+                  kind: "swap" as const,
+                  text: swapText(plan.from, plan.to, qty),
+                }
+              : { kind: "refill" as const, price: plan.price };
+          };
+          return {
+            // The id the RUNS use, which is what a bid line records.
+            runTypeId: storedId,
+            label: type.label,
+            pathType: type.pathType,
+            /** Said out loud, so a smaller number has a reason beside it. */
+            unmeasurableCount: f.unmeasurableCount,
+            unansweredCount: f.unansweredCount,
+            branchCount: f.branchCount,
+            rows: rows.map(row => ({
+              role: row.role,
+              materialId: row.materialId,
+              materialName: row.materialName,
+              feet: row.feet,
+              onBid: onBid.has(storedId + ":" + row.role),
+              sendable: runRowSendability(row),
+              resend: resendOf(row.role, row.feet),
+            })),
+            /*
             The fittings, counted from the same runs. Every one carries `why`,
             the sentence that says how it was worked out — the screen shows it
             beside the number, never the number alone. `priced` is false for a
             matched material at $0, so the preview says "Not priced" instead
             of printing a price nobody chose.
           */
-          fittings: (fittingsByType.get(storedId) ?? []).map(row => ({
-            role: row.role,
-            status: row.count.status,
-            qty: row.qty,
-            atLeast: row.count.status === "counted" && row.count.atLeast,
-            why: row.count.why,
-            materialId: row.pick.ok ? row.pick.materialId : null,
-            materialName: row.pick.ok ? row.pick.name : null,
-            materialProblem: row.pick.ok ? null : row.pick.why,
-            fromOverride: row.pick.ok && row.pick.override,
-            priced: row.pick.ok ? !needsPricing(row.pick.costPerUnit) : null,
-            onBid: onBid.has(storedId + ":" + row.role),
-            sendable: fittingRowSendability(row),
-          })),
-        };
-      });
+            fittings: fittingRowsHere.map(row => ({
+              role: row.role,
+              status: row.count.status,
+              qty: row.qty,
+              atLeast: row.count.status === "counted" && row.count.atLeast,
+              why: row.count.why,
+              materialId: row.pick.ok ? row.pick.materialId : null,
+              materialName: row.pick.ok ? row.pick.name : null,
+              materialProblem: row.pick.ok ? null : row.pick.why,
+              fromOverride: row.pick.ok && row.pick.override,
+              priced: row.pick.ok ? !needsPricing(row.pick.costPerUnit) : null,
+              onBid: onBid.has(storedId + ":" + row.role),
+              sendable: fittingRowSendability(row),
+              resend: resendOf(row.role, row.qty),
+            })),
+          };
+        })
+      );
     }),
 
   /**
@@ -660,10 +765,22 @@ export const takeoffRunTypesRouter = router({
       const wanted = input.role
         ? candidates.filter(row => row.role === input.role)
         : candidates;
+      // Refill or swap, per role — the same plan the preview showed. Only
+      // asked on an unlocked bid; a locked one is refused below regardless.
+      const plans =
+        bid.quantitiesLockedAt === null
+          ? await resendPlans(
+              ctx.scope.dataUserId,
+              wanted,
+              existing.filter(line => line.archivedAt === null)
+            )
+          : new Map<string, ResendPlan>();
 
       const sent = [];
       const updated = [];
       const skipped = [];
+      const swapped: string[] = [];
+      const refilled: string[] = [];
       for (const row of wanted) {
         /*
           Already there: REFRESH the footage rather than refusing.
@@ -696,8 +813,29 @@ export const takeoffRunTypesRouter = router({
             skipped.push({ role: row.role, why: allowedAgain.message });
             continue;
           }
-          if (Number(live.qty) !== row.qty) {
-            await db.refreshRunTypeLineQty(live.id, row.qty);
+          /*
+            SWAP to the type's current part, or REFILL a line sent unpriced —
+            owner's decisions of 2026-09-26, decided in shared/resendLine.ts.
+            A price already set is never refilled over.
+          */
+          const plan = plans.get(row.role) ?? { kind: "keep" as const };
+          if (plan.kind === "swap" && row.materialId !== null) {
+            await db.resnapshotRunTypeLine(live.id, ctx.scope.dataUserId, {
+              mode: "swap",
+              materialId: row.materialId,
+              name: runLineName(type.label, row.materialName),
+            });
+            swapped.push(swapText(plan.from, plan.to, row.qty));
+          } else if (plan.kind === "refill" && row.materialId !== null) {
+            await db.resnapshotRunTypeLine(live.id, ctx.scope.dataUserId, {
+              mode: "refill",
+              materialId: row.materialId,
+            });
+            refilled.push(row.materialName ?? row.role);
+          }
+          const qtyMoved = Number(live.qty) !== row.qty;
+          if (qtyMoved) await db.refreshRunTypeLineQty(live.id, row.qty);
+          if (qtyMoved || plan.kind !== "keep") {
             updated.push(row.role);
           } else {
             skipped.push({
@@ -726,16 +864,15 @@ export const takeoffRunTypesRouter = router({
             produced "12-2 MC cable — 12-2 MC cable", which is not information,
             it is furniture. RunsPanel already refuses the same duplication on
             its spec line, and by the same test: what the two strings SAY,
-            rather than what kind of run they belong to.
+            rather than what kind of run they belong to. `runLineName`, shared
+            with the style swap above.
           */
-          name:
-            row.materialName && row.materialName !== type.label
-              ? type.label + " — " + row.materialName
-              : type.label,
+          name: runLineName(type.label, row.materialName),
           qty: row.qty,
         });
         sent.push(row.role);
       }
-      return { sent, updated, skipped };
+      /** `swapped` and `refilled` say what Send-again did, for the toast. */
+      return { sent, updated, skipped, swapped, refilled };
     }),
 });

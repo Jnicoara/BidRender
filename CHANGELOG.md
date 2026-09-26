@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **Pressing Send again now fixes two things on lines already on the bid.**
+  A traced line that reads "Not priced" picks up the material's current
+  price once you have priced it; a price that is already set is never
+  changed. And if you changed a conduit type's fitting style (say set-screw
+  to compression), Send again swaps its fitting lines to the new part, and
+  the Plans screen says exactly what will change before you press it —
+  "set-screw coupling → compression coupling, 9". Changing the style on its
+  own leaves the bid alone, and a bid with locked quantities is never
+  touched.
 - **The supplier materials list now includes conduit fittings, and stopped
   mislabelling lines.** Couplings, connectors and straps counted from traced
   runs are listed as ordinary items, merged with the same part from any

@@ -3718,6 +3718,20 @@ export const bidLineItems = mysqlTable(
      * the jacket.
      */
     runMaterialRole: mysqlEnum("runMaterialRole", RUN_MATERIAL_ROLES),
+    /**
+     * WHICH PART a run-type line was sent with (0083) — the material id the
+     * send used, as stored (a baseline or the company's fork).
+     *
+     * The role says which footage feeds the line; this says which part it is.
+     * It exists for Send-again (2026-09-26): a type whose fitting STYLE changed
+     * swaps the line to the current part, and a line sent while its part was
+     * unpriced is refilled — both need to know what the line holds without
+     * parsing its name. NULL on every other line, and on a run-type line whose
+     * part nobody can recover (the send then leaves its part alone).
+     */
+    runMaterialId: int("runMaterialId").references(() => materials.id, {
+      onDelete: "set null",
+    }),
 
     // ── The snapshot: four inputs, frozen ──
     /**
