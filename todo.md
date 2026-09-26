@@ -1259,6 +1259,28 @@ path is ever revived, give it the same treatment first.
 
 ## Fittings counted from the trace (shared/runFittings.ts, built 2026-09-26)
 
+**DEPLOYED 2026-09-26 as `99b8c4e`** (rollback target `1952c2f`). 0082 and 0083
+applied to production before the push; schema drift clean at 84. Rehearsed on
+backup `2026-09-26T18-27-04Z` — results in `references/deploying.md` § 5b.
+Live checks as the smoke account on www.bidridge.com: 1,190 active shipped rows
+(the account sees 1,184 because six of its own deleted copies hide their
+shipped rows); "emt coupling" lists set-screw first at every size; a 40 ft EMT
+run on bid 25 sent 3 couplings, 2 connectors and 5 straps with their
+sentences, every line read "Not priced" and the strip said 4 lines were left
+out; the supplier list itemised the three fittings. The test lines, run and
+sheet scale were removed afterwards — production back to 0 bid lines, 2 runs.
+
+- [ ] **Old disconnect and breaker spellings land on the renamed row SECOND.**
+      "30A fused disconnect" now matches the new NEMA 1 row and the renamed
+      NEMA 3R row equally, and the tie goes to NEMA 1; "30A breaker" ties
+      with "30A 2-Pole breaker". Live since `1c29584`. Whether the old
+      spelling should prefer the renamed row is a ranking decision.
+- [ ] **A comma in a search finds nothing.** "#12 bare copper, solid" returns
+      no rows while "#12 bare copper solid" finds it — the tokenizer keeps
+      the comma on the word. Found by `scripts/catalogRehearsal.mts search`;
+      not caused by any rename. Also `5/6" wafer LED downlight` (the old
+      spelling) reads as a fraction and finds nothing.
+
 Couplings (sticks minus one per leg, drops included), connectors (one per
 conduit end, by node degree) and straps (one near each box, then spacing)
 reach the bid through Send, the markup engine and the quantity lock. D17(b)'s

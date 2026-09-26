@@ -723,6 +723,36 @@ deletions, no user row touched, every reference identical. Run the same
 before/after comparison against production itself after the first boot — the
 rehearsal says what should happen, and only production says it did.
 
+**Steps 3, 5, 6 and 7 are now one script: `scripts/catalogRehearsal.mts`**
+(read only). `snapshot <file>` before and after the boot, `compare` the two
+(renames grouped by release round, company rows touched, old spellings still
+active, duplicates, every reference into `materials` by id, orphans, and a
+CLEAN / NOT CLEAN verdict), and `search`, which runs every old spelling
+through the app's own search and ranking against the copy's real library.
+
+**Second run — the fittings batch, deployed as `99b8c4e` on 2026-09-26.**
+Backup `2026-09-26T18-27-04Z` restored and verified (59 tables, 3,025 rows),
+kept with `KEEP_SCRATCH=1`, 0082 + 0083 applied (2 files), no drift. First
+boot: 1,129 → 1,192 shipped rows (1,190 active, matching the new build's
+1,190), 63 added, **18 renamed** — the rename list has 20 new or re-pointed
+entries, but 2 re-point spellings production had already renamed — nothing
+retired or deleted, no company row touched, every reference identical, no
+orphans. Second boot changed nothing. The three earlier rounds (AL/CU, SER
+full sets, disconnects) had already run on production and left no active row
+on an old spelling.
+
+**`search` caught a real regression before production did.** The old name
+`2-1/2" EMT coupling` matched all three new EMT styles equally and the tie fell
+to the alphabet — compression first, the renamed set-screw row third. Fixed
+before the push by making set-screw at every size "common" in
+`shared/materialCommonness.ts`. What it still reports, all from earlier
+rounds and live before this release: the 8 old disconnect spellings and
+`30A breaker` land on the renamed row SECOND (the NEMA 1 row and the 2-pole
+row match the old words equally), and 12 old spellings find nothing — the
+11 bare-copper names, only because a typed comma defeats the tokenizer
+("#12 bare copper solid" and "12 bare copper" both find the row), and
+`5/6" wafer LED downlight`. See `todo.md`.
+
 ## 6. Verifying a deploy actually took
 
 A deploy that silently didn't take looks identical to one that did, so check
