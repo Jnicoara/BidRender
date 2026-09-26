@@ -335,30 +335,53 @@ const SE_SLANG = "service entrance seu se cable feeder";
  * Above 1 AWG the product sold and stocked is aluminum, near-universally — a
  * copper 4/0 SER is a special order, not a catalog item, so it is deliberately
  * absent rather than listed and un-buyable.
+ *
+ * ── Every SER row is named by its FULL conductor set ─────────────────────────
+ * Three insulated conductors, then the ground: "4-4-4-6", not "4-3". Owner's
+ * decision, 2026-09-25. The "-3" shorthand hides the one number that differs
+ * between otherwise identical-looking cables — the ground — and it is how the
+ * catalog once shipped "4/0-3" beside "4/0-4/0-4/0-2/0" as two rows for one
+ * cable. The shorthand stays an alias, in both spellings, so "6-3" and "6/3"
+ * still find the row.
+ *
+ * The sets are the manufacturers', not derived: Southwire SPEC 10040 (copper
+ * 6-6-6-6, 4-4-4-6, 2-2-2-4, 1-1-1-3) and its aluminum SER product pages
+ * (1/0-1/0-1/0-2, 2/0-2/0-2/0-1, 3/0-3/0-3/0-1/0); Southwire makes no #8
+ * copper SER, and 8-8-8-8 is the set other makers sell (checked 2026-09-25).
+ * A ground size is not arithmetic — look it up before adding a size.
  */
-const serCopper: BaselineMaterial[] = ["8-3", "6-3", "4-3", "2-3", "1-3"].map(
-  size => ({
-    name: `${size} SER CU`,
-    unitOfSale: "foot",
-    costPerUnit: UNPRICED,
-    category: "Wire & Cable",
-    searchAliases: aliases(
-      CU_WORDS,
-      size.replace("-", "/"),
-      SE_SLANG,
-      "range dryer subpanel"
-    ),
-  })
-);
+const shorthandAliases = (shorthand?: string) =>
+  shorthand ? `${shorthand} ${shorthand.replace(/-/g, "/")}` : "";
+
+const serCopper: BaselineMaterial[] = [
+  { size: "8-8-8-8", shorthand: "8-3" },
+  { size: "6-6-6-6", shorthand: "6-3" },
+  { size: "4-4-4-6", shorthand: "4-3" },
+  { size: "2-2-2-4", shorthand: "2-3" },
+  { size: "1-1-1-3", shorthand: "1-3" },
+].map(({ size, shorthand }) => ({
+  name: `${size} SER CU`,
+  unitOfSale: "foot",
+  costPerUnit: UNPRICED,
+  category: "Wire & Cable",
+  searchAliases: aliases(
+    CU_WORDS,
+    size.replace(/-/g, "/"),
+    shorthandAliases(shorthand),
+    SE_SLANG,
+    "range dryer subpanel"
+  ),
+}));
 
 const serAluminum: BaselineMaterial[] = [
-  // Named by the full conductor set, three insulated and the reduced ground —
-  // the pricing sheet's wording, 2026-09-25. 60A and 100A subpanel feeders.
+  // Three insulated conductors and the reduced ground; see serCopper above.
+  // The 60A and 100A subpanel feeders came from the pricing sheet already
+  // written out, and have no shorthand in the catalog's history.
   { size: "4-4-4-6", note: undefined },
   { size: "2-2-2-4", note: undefined },
-  { size: "1/0-3", note: undefined },
-  { size: "2/0-3", note: undefined },
-  { size: "3/0-3", note: "3 conductors with a 1/0 ground." },
+  { size: "1/0-1/0-1/0-2", shorthand: "1/0-3", note: undefined },
+  { size: "2/0-2/0-2/0-1", shorthand: "2/0-3", note: undefined },
+  { size: "3/0-3/0-3/0-1/0", shorthand: "3/0-3", note: undefined },
   /*
     Two 4/0 rows, and they are DIFFERENT cables — the thing to check before
     anyone merges them:
@@ -368,9 +391,13 @@ const serAluminum: BaselineMaterial[] = [
                        feeder to a 200A subpanel, where neutral and ground are
                        kept apart.
     There used to be a third, "4/0-3 SER aluminum", which was the four-wire
-    one again in the shorthand the 3/0-3 row above uses ("-3" = three
-    insulated plus a ground). It was retired on 2026-09-25 (index.ts), and
-    "4/0-3" is an alias on the full-set row so the shorthand still finds it.
+    one again in shorthand ("-3" = three insulated plus a ground). It was
+    retired on 2026-09-25 (index.ts), and "4/0-3" is an alias on the full-set
+    row so the shorthand still finds it.
+
+    No "3 wire" / "4 wire" aliases on either: "4/0-3" is shorthand for the
+    FOUR-wire cable, and a "3" alias on the three-wire one made it answer
+    "4/0-3" first — the exact confusion this pair invites.
   */
   {
     size: "4/0-4/0-2/0",
@@ -378,27 +405,37 @@ const serAluminum: BaselineMaterial[] = [
   },
   {
     size: "4/0-4/0-4/0-2/0",
-    note: "Four conductors — three insulated and a 2/0 ground; the 200A subpanel feeder. Also written 4/0-3.",
+    shorthand: "4/0-3",
+    note: "Four conductors — three insulated and a 2/0 ground; the 200A subpanel feeder.",
   },
+  // Three conductors, no separate ground: a set, not shorthand.
   { size: "250-250-250", note: undefined },
-].map(({ size, note }) => ({
-  name: `${size} SER AL`,
-  unitOfSale: "foot" as const,
-  costPerUnit: UNPRICED,
-  category: "Wire & Cable" as const,
-  searchAliases: aliases(
-    size.replace(/-/g, "/"),
-    AL_WORDS,
-    SE_SLANG,
-    "mast riser",
-    size === "4/0-4/0-2/0" ? "200a service" : "",
-    // No "3 wire" / "4 wire" aliases on either: "4/0-3" is shorthand for the
-    // FOUR-wire cable, and a "3" alias on the three-wire one made it answer
-    // "4/0-3" first — the exact confusion this pair invites.
-    size === "4/0-4/0-4/0-2/0" ? "4/0-3 4/0/3 subpanel" : ""
-  ),
-  description: note ? `${note} ${ALUMINUM_NOTE}` : ALUMINUM_NOTE,
-}));
+].map(
+  ({
+    size,
+    shorthand,
+    note,
+  }: {
+    size: string;
+    shorthand?: string;
+    note?: string;
+  }) => ({
+    name: `${size} SER AL`,
+    unitOfSale: "foot" as const,
+    costPerUnit: UNPRICED,
+    category: "Wire & Cable" as const,
+    searchAliases: aliases(
+      size.replace(/-/g, "/"),
+      shorthandAliases(shorthand),
+      AL_WORDS,
+      SE_SLANG,
+      "mast riser",
+      size === "4/0-4/0-2/0" ? "200a service" : "",
+      size === "4/0-4/0-4/0-2/0" ? "subpanel" : ""
+    ),
+    description: note ? `${note} ${ALUMINUM_NOTE}` : ALUMINUM_NOTE,
+  })
+);
 
 /**
  * SEU: two insulated conductors inside a concentric bare neutral, flat. The

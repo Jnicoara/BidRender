@@ -109,9 +109,6 @@ export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
       ...[
         "4-4-4-6",
         "2-2-2-4",
-        "1/0-3",
-        "2/0-3",
-        "3/0-3",
         "4/0-4/0-2/0",
         "4/0-4/0-4/0-2/0",
         "250-250-250",
@@ -131,11 +128,32 @@ export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
       `${g} bare copper, stranded`,
       `${g} bare CU, stranded`,
     ]),
-    ...["8-3", "6-3", "4-3", "2-3", "1-3"].map(s => [
-      `${s} SER copper`,
-      `${s} SER CU`,
-    ]),
   ]),
+  /*
+    SER shorthand written out as the full conductor set (owner, 2026-09-25;
+    the sets and their sources are in wireAndCable.ts). BOTH older spellings
+    point straight at the final name — the pre-AL/CU one a database that
+    missed the previous release still holds, and the AL/CU one that release
+    wrote — so no database depends on the rename pass walking a chain in
+    order. The shorthand survives as an alias on each row.
+  */
+  ...Object.fromEntries(
+    (
+      [
+        ["8-3", "8-8-8-8", "copper", "CU"],
+        ["6-3", "6-6-6-6", "copper", "CU"],
+        ["4-3", "4-4-4-6", "copper", "CU"],
+        ["2-3", "2-2-2-4", "copper", "CU"],
+        ["1-3", "1-1-1-3", "copper", "CU"],
+        ["1/0-3", "1/0-1/0-1/0-2", "aluminum", "AL"],
+        ["2/0-3", "2/0-2/0-2/0-1", "aluminum", "AL"],
+        ["3/0-3", "3/0-3/0-3/0-1/0", "aluminum", "AL"],
+      ] as const
+    ).flatMap(([short, full, word, abbr]) => [
+      [`${short} SER ${word}`, `${full} SER ${abbr}`],
+      [`${short} SER ${abbr}`, `${full} SER ${abbr}`],
+    ])
+  ),
 };
 
 /**
@@ -173,7 +191,7 @@ export const RETIRED_BASELINE_MATERIALS: string[] = [
   // transformers in power.ts (2026-09-25). Nothing in the code named it.
   "Dry-type transformer",
   // The four-wire 4/0 SER a second time, in shorthand: "-3" is three
-  // insulated conductors plus a ground (see the 3/0-3 row's note), so this
+  // insulated conductors plus a ground (3/0-3 is 3/0-3/0-3/0-1/0), so this
   // was 4/0-4/0-4/0-2/0. Retired rather than renamed because that row
   // already exists; "4/0-3" is an alias on it (2026-09-25, wireAndCable.ts).
   "4/0-3 SER aluminum",

@@ -174,7 +174,7 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   // "-3" is three insulated conductors and the reduced ground, so these are
   // the shipped rows written out in full.
   "Aluminum SER, 4/0": "4/0-4/0-4/0-2/0 SER AL",
-  "SER cable, 1/0-1/0-1/0-2": "1/0-3 SER AL",
+  "SER cable, 1/0-1/0-1/0-2": "1/0-1/0-1/0-2 SER AL",
   // At 400A and 600A a safety switch is the fused one the catalog ships.
   "400A safety switch": "400A fused disconnect",
   "600A safety switch": "600A fused disconnect",

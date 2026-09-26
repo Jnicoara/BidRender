@@ -180,6 +180,25 @@ describe("alias hygiene across the whole catalog", () => {
     expect(unfindable).toEqual([]);
   });
 
+  it("names every SER cable by its full conductor set, never '-3' shorthand", () => {
+    // The shorthand hides the ground size, which is the number that tells two
+    // similar cables apart; it is how 4/0-3 and 4/0-4/0-4/0-2/0 once shipped as
+    // two rows for one cable (owner's decision 2026-09-25, wireAndCable.ts).
+    const shorthand = BASELINE_MATERIALS.filter(m =>
+      /^[\d/]+-\d (SER|SEU)\b/.test(m.name)
+    ).map(m => m.name);
+    expect(shorthand).toEqual([]);
+    // ...and the old spelling still finds the row.
+    const byName = new Map(BASELINE_MATERIALS.map(m => [m.name, m]));
+    for (const [full, short] of [
+      ["8-8-8-8 SER CU", "8-3"],
+      ["1-1-1-3 SER CU", "1-3"],
+      ["3/0-3/0-3/0-1/0 SER AL", "3/0-3"],
+    ]) {
+      expect(byName.get(full)?.searchAliases.split(" ")).toContain(short);
+    }
+  });
+
   it("keeps the three-wire and four-wire 4/0 SER, and only those", () => {
     // "4/0-3" was the four-wire cable in shorthand — a duplicate, retired
     // 2026-09-25. The three-wire 4/0-4/0-2/0 is a different cable.

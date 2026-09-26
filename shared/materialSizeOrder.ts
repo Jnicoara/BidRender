@@ -189,7 +189,7 @@ function readSize(name: string): SizeKey | null {
   const kcmil = name.match(/^(\d{2,4})\s*kcmil\b/i);
   if (kcmil) return conductor(kcmil[1]);
 
-  // An aught with no hash — "1/0-3 SER AL", "2/0-3 SER AL".
+  // An aught with no hash — "1/0-1/0-1/0-2 SER AL", "4/0-4/0-2/0 SER AL".
   const aught = name.match(/^(\d\/0)(?![\d/])/);
   if (aught) {
     const key = conductor(aught[1]);

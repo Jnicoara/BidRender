@@ -328,8 +328,8 @@ describe("dimensions and trailing sizes", () => {
     expect(materialTypeName("4-4-6 SEU AL")).toBe("SEU AL");
     expect(materialTypeName("12-2 NM-B")).toBe("NM-B");
     expect(
-      sorted(["2-2-2-4 SER AL", "1/0-3 SER AL", "4-4-4-6 SER AL"])
-    ).toEqual(["4-4-4-6 SER AL", "2-2-2-4 SER AL", "1/0-3 SER AL"]);
+      sorted(["2-2-2-4 SER AL", "1/0-1/0-1/0-2 SER AL", "4-4-4-6 SER AL"])
+    ).toEqual(["4-4-4-6 SER AL", "2-2-2-4 SER AL", "1/0-1/0-1/0-2 SER AL"]);
   });
 
   it("orders transformers by kVA, including a fractional rating", () => {

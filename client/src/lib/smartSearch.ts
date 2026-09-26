@@ -651,7 +651,7 @@ function termTier(term: string, indexed: IndexedItem<SearchableItem>): number {
  * The conductor size at the front of a cable spec — "2/0" of "2/0-3", "12"
  * of "12-2", "4/0" of "4/0-4/0-2/0" — or null. A spec is a size followed by
  * counts or more sizes, and it answers to its leading size too: "2/0 ser"
- * must find "2/0-3 SER AL", and did before sizes became strict.
+ * must find "2/0-2/0-2/0-1 SER AL", and did before sizes became strict.
  */
 /**
  * The sizes one size WORD stands for: itself, both halves of a dual size

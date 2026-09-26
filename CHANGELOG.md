@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **SER cable is now named by its full conductor set.** "6-3 SER CU" is
+  "6-6-6-6 SER CU", "3/0-3 SER AL" is "3/0-3/0-3/0-1/0 SER AL", and so on
+  for all eight rows still written in shorthand. The shorthand hid the
+  ground size, which is the one number that tells similar cables apart. The
+  sets come from the manufacturers' own specifications. The rows were renamed in
+  place, so bids that use them are untouched, and "6-3" or "6/3" still finds
+  them.
+
 - **Wire and cable now write the metal the way a supply house does: AL and
   CU.** "#4/0 XHHW aluminum" is "#4/0 XHHW AL", "#12 bare copper, solid" is
   "#12 bare CU, solid", and the same for every SER, SEU, USE-2 and URD row —
