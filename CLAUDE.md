@@ -1389,6 +1389,19 @@ conventions and both are load-bearing:**
 - **MONEY — unset renders as 0, and shouts.** An unpriced material IS the one
   showing `$0`, and the Materials screen filters to exactly those. A blank
   there would read as "not applicable" (`references/writing-style.md` § 8).
+
+  > **Narrowed 2026-09-26, by the owner: ON A BID LINE, unpriced says "Not
+  > priced", never $0.** A bid line is what becomes a quote, and a `$0.00`
+  > there reads as a part that costs nothing. So every bid line nobody priced
+  > shows "Not priced" in its cost cell, and the total says how many lines it
+  > leaves out. This matches what the bid already did — a free count stays
+  > blank, and a line the engine cannot price says "Can't price", never $0.
+  > The Materials screen keeps `$0` plus its filter, which is where this rule
+  > still applies as written. Which lines count as not priced is decided per
+  > kind of line in `shared/lineNotPriced.ts` (a typed 0 on a hand-priced line
+  > is an answer; a labor-only assembly is priced), and the cell is ONE
+  > component, `LineCost`, shared by the bid and Count screens.
+
 - **MEASUREMENT — unset must NEVER render as 0.** Zero is a legitimate answer —
   a floor box really is at 0'-0" — so a zero reads as a considered one. A
   length, a height, a count of conductors, a percentage that inherits.

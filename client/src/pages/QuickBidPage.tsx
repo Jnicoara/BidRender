@@ -36,6 +36,7 @@ import { selectOnFocus } from "@/lib/selectOnFocus";
 import { smartSearch } from "@/lib/smartSearch";
 import { addAssemblyOverheadHours } from "@shared/pricing";
 import { money } from "@/lib/money";
+import { LineCost } from "@/components/LineCost";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { otherPercentCaption } from "@/lib/percentKind";
 
@@ -469,25 +470,9 @@ export default function QuickBidPage({
                     className="h-7 w-16 text-sm"
                     ariaLabel={`Quantity of ${line.name}`}
                   />
-                  {/* Never $0 for a line that could not be priced — see the
-                      same column on BidsPage. */}
-                  {line.breakdown === null ? (
-                    <span
-                      className="text-xs w-24 text-right shrink-0 text-red-500"
-                      title={line.problem?.message ?? undefined}
-                    >
-                      Can't price
-                      {line.problem?.ref ? (
-                        <span className="block font-mono">
-                          {line.problem.ref}
-                        </span>
-                      ) : null}
-                    </span>
-                  ) : (
-                    <span className="font-mono text-sm w-24 text-right shrink-0">
-                      {money(line.breakdown.directCost)}
-                    </span>
-                  )}
+                  {/* Never $0 for a line that could not be priced, or that
+                      nobody priced — the same cell as BidsPage. */}
+                  <LineCost line={line} className="w-24 text-right shrink-0" />
                   <Button
                     size="sm"
                     variant="ghost"

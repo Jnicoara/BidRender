@@ -84,6 +84,8 @@ import { quantitySource } from "@shared/quantityLock";
 import { describeLineMarkup } from "@shared/materialMarkup";
 import { otherPercentCaption } from "@/lib/percentKind";
 import { money } from "@/lib/money";
+import { LineCost } from "@/components/LineCost";
+import { lineNotPriced } from "@shared/lineNotPriced";
 
 const STATUSES = ["Draft", "Active", "Won", "Lost"] as const;
 type Status = (typeof STATUSES)[number];
@@ -454,6 +456,19 @@ export default function BidsPage({
    * clears its entry the moment the optimistic update lands.
    */
   const missingEntry = missingEntryCounts(lines);
+
+  /**
+   * EVERY line the total leaves unpriced, of any kind — the lines whose cost
+   * cell says "Not priced". Supersedes counting only hand-priced blanks here,
+   * which left a $0 pipe or fitting from an unpriced catalog row out of the
+   * strip entirely. Read through the same rule the cell uses.
+   */
+  const notPriced = lines.filter(l =>
+    lineNotPriced(l, l.breakdown?.directCost ?? null)
+  );
+  const notPricedFromPlans = notPriced.filter(
+    l => l.takeoffRunTypeId !== null
+  ).length;
 
   /**
    * Which pricing settings this bid has taken off the company default.
@@ -1002,9 +1017,15 @@ export default function BidsPage({
                               <span className="font-mono text-xs w-24 text-right shrink-0 text-muted-foreground">
                                 {round(line.breakdown.totalLaborHours, 2)} h
                               </span>
-                              <span className="font-mono text-sm w-24 text-right shrink-0">
-                                {money(line.breakdown.directCost)}
-                              </span>
+                              {/*
+                                "Not priced" rather than $0.00 on a line
+                                nobody priced (owner, 2026-09-26) — see
+                                LineCost and shared/lineNotPriced.
+                              */}
+                              <LineCost
+                                line={line}
+                                className="w-24 text-right shrink-0"
+                              />
                             </>
                           )}
                           <Button
@@ -1115,17 +1136,38 @@ export default function BidsPage({
                 Two entries rather than one, because they are missing from two
                 different numbers above and want two different things typed.
               */}
-              {missingEntry.noPrice > 0 && (
+              {/*
+                EVERY unpriced line, not only the hand-priced ones — since
+                2026-09-26 a line nobody priced says "Not priced" instead of
+                $0, and this is where the total admits how many it leaves out.
+                The advice differs by where the line came from, because a
+                hand-priced line can take a typed price and a line sent from
+                the plans froze its price when it was sent.
+              */}
+              {notPriced.length > 0 && (
                 <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
                   <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     <span className="text-foreground font-medium">
-                      {missingEntry.noPrice} line
-                      {missingEntry.noPrice === 1 ? " has" : "s have"} no price
+                      {notPriced.length} line
+                      {notPriced.length === 1 ? " is" : "s are"} not priced
                     </span>{" "}
-                    — {missingEntry.noPrice === 1 ? "it is" : "they are"} in the
-                    Materials total above at $0. Type a price on the line (0 is
-                    fine if it really costs nothing).
+                    — the Materials total above leaves{" "}
+                    {notPriced.length === 1 ? "it" : "them"} out, so this bid is
+                    short by whatever {notPriced.length === 1 ? "it" : "they"}{" "}
+                    cost.
+                    {missingEntry.noPrice > 0 &&
+                      " Type a price on a line priced by hand (0 is fine if it really costs nothing)."}
+                    {notPricedFromPlans > 0 &&
+                      ` ${
+                        notPricedFromPlans === notPriced.length
+                          ? notPriced.length === 1
+                            ? "It is"
+                            : `All ${notPriced.length} are`
+                          : notPricedFromPlans === 1
+                            ? "One is"
+                            : `${notPricedFromPlans} are`
+                      } from traced runs: price the material on the Materials screen, then remove the line and send it again from the Plans screen — a sent line keeps the price it was sent with.`}
                   </p>
                 </div>
               )}

@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **A bid line nobody priced now says "Not priced" instead of $0.00.** That
+  covers every kind of line: pipe, wire and fittings from an unpriced catalog
+  row, a count or assembly line that comes to nothing, and a hand-priced line
+  with no price typed. A price you typed as 0 still shows $0.00. The bid
+  total now says how many lines it leaves out and what to do about them. Same
+  on the Count screen.
 - **Fittings are on screen.** The Plans screen's traced-footage panel lists
   each conduit type's couplings, connectors and straps with the count, how it
   was worked out, and "Not priced" where the catalog row has no price. The run

@@ -1,0 +1,76 @@
+/**
+ * "Not priced" instead of $0 on a bid line — which lines, and which not.
+ * See shared/lineNotPriced.ts for why each kind of line reads $0 differently.
+ */
+import { describe, expect, it } from "vitest";
+import { countNotPriced, lineNotPriced } from "../shared/lineNotPriced";
+
+const base = {
+  qty: "4",
+  assemblyId: null as number | null,
+  takeoffRunTypeId: null as number | null,
+  snapshotMaterialCost: null as string | null,
+  snapshotLaborHours: null as string | null,
+};
+
+describe("a line priced by hand", () => {
+  it("is not priced while the price is blank", () => {
+    expect(lineNotPriced(base, 0)).toBe(true);
+  });
+  it("is priced at a TYPED zero — an owner-supplied part is an answer", () => {
+    expect(lineNotPriced({ ...base, snapshotMaterialCost: "0" }, 0)).toBe(
+      false
+    );
+  });
+});
+
+describe("a line from a run type", () => {
+  const run = { ...base, takeoffRunTypeId: 7, snapshotLaborHours: "0" };
+  it("is not priced when its catalog row was $0 — nobody chose that zero", () => {
+    expect(lineNotPriced({ ...run, snapshotMaterialCost: "0.0000" }, 0)).toBe(
+      true
+    );
+  });
+  it("is not priced even with labor on it, because the material is missing", () => {
+    expect(
+      lineNotPriced(
+        { ...run, snapshotMaterialCost: "0.0000", snapshotLaborHours: "0.1" },
+        12.5
+      )
+    ).toBe(true);
+  });
+  it("is priced once the snapshot carries a price", () => {
+    expect(lineNotPriced({ ...run, snapshotMaterialCost: "0.4500" }, 1.8)).toBe(
+      false
+    );
+  });
+});
+
+describe("a line from an assembly", () => {
+  const assembly = { ...base, assemblyId: 3, snapshotMaterialCost: "0" };
+  it("is not priced when the whole line comes to $0", () => {
+    expect(lineNotPriced(assembly, 0)).toBe(true);
+  });
+  it("is priced when it is labor only — no material is legitimate there", () => {
+    expect(lineNotPriced(assembly, 85)).toBe(false);
+  });
+});
+
+describe("nothing to price", () => {
+  it("is never 'not priced' at a zero quantity — $0 for nothing is true", () => {
+    expect(lineNotPriced({ ...base, qty: "0" }, 0)).toBe(false);
+  });
+});
+
+it("counts the lines a total leaves out", () => {
+  expect(
+    countNotPriced([
+      { line: base, directCost: 0 },
+      { line: { ...base, snapshotMaterialCost: "0" }, directCost: 0 },
+      {
+        line: { ...base, assemblyId: 1, snapshotMaterialCost: "0" },
+        directCost: 0,
+      },
+    ])
+  ).toBe(2);
+});
