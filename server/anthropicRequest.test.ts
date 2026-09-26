@@ -13,18 +13,28 @@
  * place the difference between "handled" and "silently absent" is visible.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { invokeAnthropic, resetAnthropicForTests } from "./llm/anthropic";
 
-const create = vi.fn();
+/*
+  vi.hoisted, because vi.mock is hoisted above the imports and its factory
+  needs `create`. This used to declare `create` normally and then load the
+  adapter with a top-level `await import(...)` so the mock factory would find
+  it — which does not compile under this tsconfig (no `target`, so no
+  top-level await). vi.hoisted is vitest's own answer to the same ordering
+  problem: `create` now exists before anything is imported.
+
+  The mock is load-bearing, and measured to be: with it removed, 8 of these
+  10 tests fail, because they read what the SDK was sent through `sent()`.
+  The other 2 check that a bad request is refused before any call is made,
+  which holds with or without a mock.
+*/
+const { create } = vi.hoisted(() => ({ create: vi.fn() }));
 
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
     messages = { create };
   },
 }));
-
-const { invokeAnthropic, resetAnthropicForTests } = await import(
-  "./llm/anthropic"
-);
 
 /** A minimal well-formed reply, so the adapter's own parsing is satisfied. */
 const REPLY = {
