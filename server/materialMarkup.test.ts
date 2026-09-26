@@ -26,7 +26,7 @@ import {
 import { calculateLineItem } from "../shared/pricing";
 import { bidRollup } from "./bidPricing";
 import { buildAccountingExport } from "../shared/accountingExport";
-import type { Bid, BidLineItem } from "../drizzle/schema";
+import type { Bid, BidLineItem, StoredMarkupSource } from "../drizzle/schema";
 
 const rules = (over: Partial<MarkupRuleSet> = {}): MarkupRuleSet => ({
   ...NO_MARKUP_RULES,
@@ -223,6 +223,19 @@ describe("one line from its parts", () => {
 // ─── What a line prices with ──────────────────────────────────────────────────
 
 describe("a stored line", () => {
+  /**
+   * A markup source as the column stores it — `parts` included, because that
+   * is what a real line hands describeLineMarkup. The function reads only
+   * `level` and `label`, so `parts` changes no sentence; it is here so the
+   * fixture is a stored row rather than a trimmed one. Typed rather than a
+   * fresh literal, which is what lets the full stored shape through.
+   */
+  const stored = (level: string, label: string): StoredMarkupSource => ({
+    level,
+    label,
+    parts: [],
+  });
+
   it("reads NULL — a line from before markup rules — as 0%", () => {
     expect(storedMarkupPct(null)).toBe(0);
     expect(storedMarkupPct("0.350000")).toBe(0.35);
@@ -238,32 +251,23 @@ describe("a stored line", () => {
     expect(
       describeLineMarkup({
         snapshotMarkupPct: "0.350000",
-        snapshotMarkupSource: {
-          level: "category",
-          label: "from Wire & Cable category",
-          parts: [],
-        },
+        snapshotMarkupSource: stored("category", "from Wire & Cable category"),
       })
     ).toBe("35% markup from Wire & Cable category");
     expect(
       describeLineMarkup({
         snapshotMarkupPct: "0.000000",
-        snapshotMarkupSource: {
-          level: "none",
-          label: "no markup rule set",
-          parts: [],
-        },
+        snapshotMarkupSource: stored("none", "no markup rule set"),
       })
     ).toBe("no markup rule set");
     // A blend names its parts rather than one "from".
     expect(
       describeLineMarkup({
         snapshotMarkupPct: "0.315531",
-        snapshotMarkupSource: {
-          level: "mixed",
-          label: "Mixed — 1 from company default, 1 from item override",
-          parts: [],
-        },
+        snapshotMarkupSource: stored(
+          "mixed",
+          "Mixed — 1 from company default, 1 from item override"
+        ),
       })
     ).toBe(
       "31.55% blended markup — 1 from company default, 1 from item override"
