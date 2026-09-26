@@ -213,14 +213,19 @@ export function groupRunFootage(input: {
     */
     if (run.pathType === "conduit") {
       const inchesPerPoint = pointsToRealInches(1, ratio);
+      /*
+        A quantity trace makes no tees (D21). One switched from route keeps
+        its tee rows for switching back, unread: no box, no joined node.
+      */
+      const tees = run.traceMode === "quantity" ? null : input.teesById;
       const startTee =
-        run.startTeeId === null
+        run.startTeeId === null || tees === null
           ? null
-          : (input.teesById.get(run.startTeeId) ?? null);
+          : (tees.get(run.startTeeId) ?? null);
       const endTee =
-        run.endTeeId === null
+        run.endTeeId === null || tees === null
           ? null
-          : (input.teesById.get(run.endTeeId) ?? null);
+          : (tees.get(run.endTeeId) ?? null);
       for (const tee of [startTee, endTee]) {
         if (tee && !row.tees.some(t => t.id === tee.id)) row.tees.push(tee);
       }

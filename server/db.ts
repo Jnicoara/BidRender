@@ -264,8 +264,10 @@ import { resolveLineQty } from "../shared/takeoffBridge";
 import { followsDrawing } from "../shared/quantityLock";
 import type { PlanRemovalImpact } from "../shared/planRemoval";
 import {
+  quantityCircuit,
   traceModeOf,
   wireCircuitsFor,
+  type TraceMode,
   type WireCircuits,
 } from "../shared/traceMode";
 
@@ -7343,6 +7345,8 @@ export async function addBranchLeg(
       startStampId: start.kind === "stamp" ? start.stampId : null,
       startTeeId: teeId,
       endKind: input.endKind,
+      // Every row of a run carries its mode (D21, 0086).
+      traceMode: root.traceMode,
     });
     const id = created.insertId;
 
@@ -7358,6 +7362,126 @@ export async function addBranchLeg(
         .values(seed.map(c => circuitCopy(c, id)));
 
     return { id, teeId, cutRunId };
+  });
+}
+
+// ── Quantity mode (D21) ──────────────────────────────────────────────────────
+
+/**
+ * Switch a whole run between route and quantity, root and legs together.
+ *
+ * Deletes nothing, in either direction (answer 5): circuits, D18 answers,
+ * pull-point answers and tees stay in their rows and are simply not read
+ * while the mode says quantity. Going to ROUTE gives every conduit row that
+ * has no circuit one circuit from its type — the same circuit the quantity
+ * arithmetic had been reading — so the wire on the bid does not drop to zero
+ * the moment the mode changes. Its unanswered ends become ordinary questions.
+ */
+export async function setRunTraceMode(
+  rootRunId: number,
+  userId: number,
+  mode: TraceMode
+): Promise<{ rows: number; circuitsAdded: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const palette = mode === "route" ? await getRunTypesFor(userId, true) : [];
+  return db.transaction(async tx => {
+    const group = await tx
+      .select()
+      .from(takeoffRuns)
+      .where(
+        and(
+          or(
+            eq(takeoffRuns.id, rootRunId),
+            eq(takeoffRuns.parentRunId, rootRunId)
+          ),
+          eq(takeoffRuns.userId, userId)
+        )
+      );
+    if (group.length === 0) return { rows: 0, circuitsAdded: 0 };
+    await tx
+      .update(takeoffRuns)
+      .set({ traceMode: mode, updatedAt: new Date() })
+      .where(
+        inArray(
+          takeoffRuns.id,
+          group.map(r => r.id)
+        )
+      );
+    let circuitsAdded = 0;
+    if (mode === "route") {
+      const existing = await tx
+        .select({ runId: takeoffRunCircuits.runId })
+        .from(takeoffRunCircuits)
+        .where(
+          inArray(
+            takeoffRunCircuits.runId,
+            group.map(r => r.id)
+          )
+        );
+      const has = new Set(existing.map(c => c.runId));
+      for (const row of group) {
+        if (has.has(row.id) || row.runTypeId === null) continue;
+        const circuit = quantityCircuit(
+          resolveRunType(palette, row.runTypeId) ?? null
+        );
+        if (!circuit) continue;
+        await tx.insert(takeoffRunCircuits).values({
+          runId: row.id,
+          userId,
+          name: circuit.name,
+          conductorCount: circuit.conductorCount,
+          groundCount: circuit.groundCount,
+        });
+        circuitsAdded++;
+      }
+    }
+    return { rows: group.length, circuitsAdded };
+  });
+}
+
+/**
+ * Write a batch of drop answers onto quantity leg ends, all or nothing.
+ *
+ * Each answer is an END KIND (D21): a device kind approves a drop, the
+ * distribution kind dismisses it, NULL takes the answer back so the end is
+ * proposed again. A height override rides along when one is given. One
+ * transaction, so "Approve all" can never leave half a trace answered.
+ */
+export async function answerQuantityDrops(
+  userId: number,
+  answers: readonly {
+    runId: number;
+    end: "start" | "end";
+    kind: string | null;
+    heightInches?: number | null;
+  }[]
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.transaction(async tx => {
+    for (const a of answers) {
+      const patch: Partial<InsertTakeoffRun> =
+        a.end === "start"
+          ? {
+              startKind: a.kind,
+              ...(a.heightInches !== undefined
+                ? { startHeightInches: a.heightInches }
+                : {}),
+            }
+          : {
+              endKind: a.kind,
+              ...(a.heightInches !== undefined
+                ? { endHeightInches: a.heightInches }
+                : {}),
+            };
+      await tx
+        .update(takeoffRuns)
+        .set({ ...patch, updatedAt: new Date() })
+        .where(
+          and(eq(takeoffRuns.id, a.runId), eq(takeoffRuns.userId, userId))
+        );
+    }
   });
 }
 
@@ -8483,6 +8607,21 @@ export async function getAssemblyMaterialQuantities(
  * a footage without that sheet's scale. Fetched for the whole bid in one query
  * because a run list spans sheets and documents.
  */
+/** What each of a bid's sheets is called, for a list that names where. */
+export async function getSheetNamesForBid(
+  bidId: number,
+  userId: number
+): Promise<Map<number, string>> {
+  const db = await getDb();
+  if (!db) return new Map();
+  const rows = await db
+    .select({ id: bidPdfSheets.id, name: bidPdfSheets.name })
+    .from(bidPdfSheets)
+    .innerJoin(bidPdfs, eq(bidPdfSheets.bidPdfId, bidPdfs.id))
+    .where(and(eq(bidPdfs.bidId, bidId), eq(bidPdfSheets.userId, userId)));
+  return new Map(rows.map(row => [row.id, row.name]));
+}
+
 export async function getSheetScalesForBid(
   bidId: number,
   userId: number
