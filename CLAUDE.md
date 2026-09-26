@@ -356,14 +356,16 @@ exclusion has been there.
 > the tests". If a fresh count does not match, the number here is stale again
 > — re-measure rather than trusting either figure.
 >
-> **Cleared to 4 later the same day**, one file per commit, no cast, no `any`,
-> no `@ts-ignore`, no assertion weakened. The last 4 are held on purpose,
-> because they are FINDINGS rather than typing gaps — see `todo.md`: a fork
-> assertion in `takeoffBridgeFlow.test.ts` that compared `undefined` and could
-> never fail, and `@ts-expect-error` lines in `permissions.test.ts` that are
-> unused because a cast in `companyRouter.ts` erased "owner is not invitable"
-> from the types. Both were invisible for exactly the reason this section
-> gives, and both were found the moment the files were compiled.
+> **Cleared to 0 later the same day**, one file per commit, no cast, no `any`,
+> no `@ts-ignore`, no assertion weakened. The last 4 were FINDINGS rather than
+> typing gaps, both fixed (`todo.md`): a fork assertion in
+> `takeoffBridgeFlow.test.ts` that compared `undefined` and could never fail,
+> and `@ts-expect-error` lines in `permissions.test.ts` left unused by a cast
+> in `companyRouter.ts` that had erased "owner is not invitable" from the
+> types since the day both were written. Both were invisible for exactly the
+> reason this section gives, and both were found the moment the files were
+> compiled. **The exclusion is still in place** — 0 today can become 124
+> again the same way; flipping it is the open item in `todo.md`.
 
 **What that means for everything decided today:** a type-level guarantee that
 stops at the test boundary is not a guarantee. A fixture can construct a shape
@@ -374,7 +376,7 @@ three broken mappings lived — and they are absent in exactly the place that is
 supposed to be catching things.
 
 **Not fixed, deliberately, and not urgent enough to do badly.** Including tests
-means clearing those errors (4 left as of 2026-09-26, both findings) across files nobody is otherwise touching, and doing
+means clearing those errors (0 as of 2026-09-26; the exclusion itself is still on) across files nobody is otherwise touching, and doing
 that in a hurry is how a test gets "fixed" by weakening its assertion. See
 `todo.md`. Until then: **when you make something uncompilable, say whether the
 tests were part of "everything".**
