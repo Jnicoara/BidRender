@@ -35,6 +35,14 @@ export type TraceDraft = {
   name: string;
   pathType: RunPathType;
   points: PagePoint[];
+  /**
+   * The run this is a LEG of (D20), or null for a run's first leg. A leg is
+   * not autosaved to the server until it is finished — it has no row of its
+   * own until `addLeg` makes one — so this mirror is the only copy in between.
+   * Optional in storage: a draft written before legs existed has none, and is
+   * read as a first leg, which is what it was.
+   */
+  legRootId: number | null;
   /** When it was last touched, for the staleness check. */
   savedAt: number;
 };
@@ -115,6 +123,7 @@ export function loadDraft(
           : "Recovered run",
       pathType: parsed.pathType === "cable" ? "cable" : "conduit",
       points,
+      legRootId: typeof parsed.legRootId === "number" ? parsed.legRootId : null,
       savedAt: parsed.savedAt,
     };
   } catch {

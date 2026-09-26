@@ -204,6 +204,7 @@ import {
   saveDraft,
   saveStampQueue,
 } from "@/lib/traceDraft";
+import { legSnapLabel, resolveLegStart, type LegSnap } from "@/lib/legSnap";
 import { LegendPanel } from "@/components/takeoff/LegendPanel";
 import { CoPilotPanel } from "@/components/takeoff/CoPilotPanel";
 import { snapshotPage } from "@/lib/planSnapshot";
@@ -2025,6 +2026,19 @@ export default function TakeoffPage({
   const [recoverable, setRecoverable] =
     useState<ReturnType<typeof loadDraft>>(null);
 
+  // ── Branch legs (D20) ─────────────────────────────────────────────────────
+  /**
+   * The run new legs are being added to, once the first leg is saved. NULL
+   * while tracing a plain run — which is every trace until "New leg".
+   */
+  const [legRootId, setLegRootId] = useState<number | null>(null);
+  /** Where the previous leg stopped: one end of the dashed jump. */
+  const [legPrevEnd, setLegPrevEnd] = useState<PagePoint | null>(null);
+  /** How the leg being traced began — resolved by the snap on its first click. */
+  const [legStart, setLegStart] = useState<LegSnap | null>(null);
+  /** A leg is being saved; clicks wait rather than snapping to a stale run. */
+  const [legBusy, setLegBusy] = useState(false);
+
   // ── Stamping (phase 2c, on groups since phase 6) ──────────────────────────
   /**
    * What the stamp tool is holding. Chosen once, then click, click, click.
@@ -3399,6 +3413,23 @@ export default function TakeoffPage({
   });
   const removeRun = trpc.takeoffRuns.remove.useMutation({
     onError: e => toast.error(e.message),
+    onSuccess: result => {
+      // A tee the last branch left behind that could not be joined back is
+      // still a box on the drawing — said, not left to be discovered (D20).
+      if (result.keptAsBox.length > 0)
+        toast.message(
+          "The box at that tee stays — the two sides carry different circuits or types, so they were not joined back into one leg."
+        );
+    },
+    onSettled: refreshRuns,
+  });
+  /**
+   * A leg added to a run (D20). Through `refreshRuns` like every run
+   * mutation: a tee cuts a leg, which moves the drawing, the panel, the
+   * totals and the Send preview at once.
+   */
+  const addLeg = trpc.takeoffRuns.addLeg.useMutation({
+    onError: e => toast.error(e.message),
     onSettled: refreshRuns,
   });
   const acceptSuggestion = trpc.takeoffRuns.acceptSuggestion.useMutation({
@@ -3524,6 +3555,12 @@ export default function TakeoffPage({
    */
   useEffect(() => {
     if (!tracing || !activeSheet || tracePoints.length < 2) return;
+    /*
+      A second or later LEG is not autosaved here: `save` would make it a run
+      of its own. It gets its row from `addLeg` when it is finished or the
+      next leg begins; until then the local mirror below is its copy (D20).
+    */
+    if (legRootId !== null) return;
     const timer = window.setInterval(() => {
       if (tracePoints.length === savedPointCount.current) return;
       saveRun.mutate(
@@ -3548,7 +3585,7 @@ export default function TakeoffPage({
       );
     }, 4000);
     return () => window.clearInterval(timer);
-  }, [tracing, activeSheet?.id, tracePoints, tracePathType, bidId]);
+  }, [tracing, activeSheet?.id, tracePoints, tracePathType, bidId, legRootId]);
 
   /** The crash mat: mirrored locally on every change, which is nearly free. */
   useEffect(() => {
@@ -3560,8 +3597,9 @@ export default function TakeoffPage({
       name: `Run on ${activeSheet.name}`,
       pathType: tracePathType,
       points: tracePoints,
+      legRootId,
     });
-  }, [tracing, activeSheet?.id, tracePoints, tracePathType, bidId]);
+  }, [tracing, activeSheet?.id, tracePoints, tracePathType, bidId, legRootId]);
 
   /** Offer to restore a stranded local draft when a sheet opens. */
   useEffect(() => {
@@ -3586,14 +3624,25 @@ export default function TakeoffPage({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [tracing, tracePoints]);
 
-  const startTracing = useCallback((pathType: RunPathType) => {
-    setTracePathType(pathType);
-    setTracePoints([]);
-    draftRunId.current = null;
-    savedPointCount.current = 0;
-    setTracing(true);
-    setSelectedRunId(null);
+  const resetLegs = useCallback(() => {
+    setLegRootId(null);
+    setLegPrevEnd(null);
+    setLegStart(null);
+    setLegBusy(false);
   }, []);
+
+  const startTracing = useCallback(
+    (pathType: RunPathType) => {
+      setTracePathType(pathType);
+      setTracePoints([]);
+      draftRunId.current = null;
+      savedPointCount.current = 0;
+      resetLegs();
+      setTracing(true);
+      setSelectedRunId(null);
+    },
+    [resetLegs]
+  );
 
   /**
    * Arm a kind of run, and start tracing it.
@@ -3615,8 +3664,182 @@ export default function TakeoffPage({
     [startTracing]
   );
 
-  const finishTrace = useCallback(() => {
-    if (!activeSheet || tracePoints.length < 2) return;
+  /**
+   * Save the leg being traced (D20): the run's first leg through `save`, as
+   * every run is; any later leg through `addLeg`, with how it began. Returns
+   * the run's root id. Refreshes the runs first, so a snap onto a leg that
+   * was just cut reads the pieces rather than the leg as it was.
+   */
+  const persistLeg = useCallback(async (): Promise<number | null> => {
+    if (!activeSheet || tracePoints.length < 2) return legRootId;
+    let rootId = legRootId;
+    if (rootId === null) {
+      const saved = await saveRun.mutateAsync({
+        bidId,
+        sheetId: activeSheet.id,
+        id: draftRunId.current ?? undefined,
+        name: `Run on ${activeSheet.name}`,
+        pathType: tracePathType,
+        points: tracePoints,
+        status: "draft",
+        startKind: traceEnds.startKind,
+        endKind: traceEnds.endKind,
+        runTypeId: armedRunType[tracePathType]?.id ?? null,
+      });
+      rootId = saved.id;
+    } else {
+      const start = legStart ?? {
+        kind: "free" as const,
+        point: tracePoints[0],
+      };
+      await addLeg.mutateAsync({
+        runId: rootId,
+        points: tracePoints,
+        start:
+          start.kind === "tee"
+            ? {
+                kind: "tee",
+                hostRunId: start.hostRunId,
+                at: start.point,
+                // The snap already put the point ON the leg (or its corner
+                // or end); this only absorbs float noise.
+                tolerance: 0.5,
+                fitting: start.fitting,
+                stampId: start.stampId,
+              }
+            : start.kind === "stamp"
+              ? { kind: "stamp", stampId: start.stampId, startKind: null }
+              : { kind: "free", startKind: null },
+        endKind: traceEnds.endKind,
+        ...(armedRunType[tracePathType]
+          ? { runTypeId: armedRunType[tracePathType]!.id }
+          : {}),
+      });
+    }
+    await utils.takeoffRuns.listForSheet.invalidate({
+      sheetId: activeSheet.id,
+    });
+    return rootId;
+  }, [
+    activeSheet,
+    tracePoints,
+    legRootId,
+    legStart,
+    bidId,
+    tracePathType,
+    traceEnds,
+    armedRunType,
+  ]);
+
+  /**
+   * "New leg" (D20, answer 4): save this leg and keep tracing the same run.
+   * The next click — or `at`, for a Shift-click — says where the next leg
+   * starts, resolved by the snap.
+   */
+  const beginNewLeg = useCallback(
+    async (at?: { point: PagePoint; tolerance: number; free: boolean }) => {
+      if (legBusy || tracePoints.length < 2) return;
+      setLegBusy(true);
+      try {
+        const rootId = await persistLeg();
+        if (rootId === null) return;
+        setLegRootId(rootId);
+        setLegPrevEnd(tracePoints[tracePoints.length - 1]);
+        setTracePoints([]);
+        setLegStart(null);
+        draftRunId.current = null;
+        savedPointCount.current = 0;
+        if (at) placeLegStart(at, rootId);
+      } catch {
+        // The mutation's own onError has said why; the leg stays on screen.
+      } finally {
+        setLegBusy(false);
+      }
+    },
+    [legBusy, tracePoints, persistLeg]
+  );
+
+  /** The candidates a new leg can snap to: this run's legs, the sheet's marks. */
+  const snapLegStart = useCallback(
+    (
+      at: { point: PagePoint; tolerance: number; free: boolean },
+      rootId: number | null = legRootId
+    ): LegSnap => {
+      const sheetRuns =
+        (activeSheet &&
+          utils.takeoffRuns.listForSheet.getData({
+            sheetId: activeSheet.id,
+          })) ||
+        runs;
+      return resolveLegStart({
+        at: at.point,
+        tolerance: at.tolerance,
+        free: at.free,
+        legs: sheetRuns
+          .filter(r => r.id === rootId || r.parentRunId === rootId)
+          .map(r => ({ id: r.id, points: r.points as PagePoint[] })),
+        stamps: visibleStamps.map(s => ({ id: s.id, x: s.x, y: s.y })),
+      });
+    },
+    [activeSheet, utils, runs, legRootId, visibleStamps]
+  );
+
+  /** The first click of a leg: snapped, then the leg's first point. */
+  function placeLegStart(
+    at: { point: PagePoint; tolerance: number; free: boolean },
+    rootId: number | null = legRootId
+  ) {
+    const snap = snapLegStart(at, rootId);
+    setLegStart(snap);
+    setTracePoints([snap.point]);
+  }
+
+  /**
+   * Add a leg to a run that is already on the drawing — from its row in the
+   * runs panel. Tracing starts in the "where does the leg start" state.
+   */
+  const addLegTo = useCallback(
+    (run: {
+      id: number;
+      parentRunId: number | null;
+      pathType: RunPathType;
+    }) => {
+      setTracePathType(run.pathType);
+      setTracePoints([]);
+      draftRunId.current = null;
+      savedPointCount.current = 0;
+      setLegRootId(run.parentRunId ?? run.id);
+      setLegPrevEnd(null);
+      setLegStart(null);
+      setTracing(true);
+      setSelectedRunId(null);
+    },
+    []
+  );
+
+  const finishTrace = useCallback(async () => {
+    if (!activeSheet) return;
+    if (legRootId !== null) {
+      // A run of legs: save the last one if it has any length, then commit
+      // the whole run — root and every leg together.
+      if (legBusy) return;
+      setLegBusy(true);
+      try {
+        const rootId = await persistLeg();
+        if (rootId !== null) commitRun.mutate({ id: rootId });
+        clearDraft(activeSheet.id);
+        setTracing(false);
+        setTracePoints([]);
+        draftRunId.current = null;
+        savedPointCount.current = 0;
+        setRecoverable(null);
+        resetLegs();
+      } catch {
+        setLegBusy(false);
+      }
+      return;
+    }
+    if (tracePoints.length < 2) return;
     saveRun.mutate(
       {
         bidId,
@@ -3658,15 +3881,26 @@ export default function TakeoffPage({
     commitRun,
     traceEnds,
     armedRunType,
+    legRootId,
+    legBusy,
+    persistLeg,
+    resetLegs,
   ]);
 
   const cancelTrace = useCallback(() => {
     if (activeSheet) clearDraft(activeSheet.id);
+    /*
+      Discarding while adding legs throws away the leg in progress, never the
+      legs already saved — those are finished work, and they are committed
+      with the run rather than left behind as drafts.
+    */
+    if (legRootId !== null) commitRun.mutate({ id: legRootId });
     setTracing(false);
     setTracePoints([]);
     draftRunId.current = null;
     savedPointCount.current = 0;
-  }, [activeSheet?.id]);
+    resetLegs();
+  }, [activeSheet?.id, legRootId, commitRun, resetLegs]);
 
   const handleSheetVisible = useCallback(
     (pageNumber: number, text: string) => {
@@ -4897,6 +5131,16 @@ export default function TakeoffPage({
                       onSelectStamp={setSelectedStampId}
                       focusPoint={focusPoint}
                       chromeTarget={size.chromeTarget}
+                      legs={{
+                        active: legRootId !== null,
+                        pending: legRootId !== null && tracePoints.length === 0,
+                        busy: legBusy,
+                        prevEnd: legPrevEnd,
+                        startLabel: legStart ? legSnapLabel(legStart) : null,
+                        onNewLeg: at => void beginNewLeg(at),
+                        onStart: at => placeLegStart(at),
+                        preview: at => snapLegStart(at),
+                      }}
                     />
                   </>
                 ) : null

@@ -52,6 +52,7 @@ import {
   type PagePoint,
 } from "@shared/takeoffGeometry";
 import type { Measurability, RunPathType } from "@shared/takeoffQuantities";
+import { legSnapLabel, type LegSnap } from "@/lib/legSnap";
 
 /**
  * How wide a run's invisible click target is, in SCREEN pixels.
@@ -85,7 +86,50 @@ export type ExistingRun = {
     }[];
     accepted: { x: number; y: number; kind: "lb" | "pullBox" }[];
   } | null;
+  /** Branch legs (D20): the run this row is a leg of; NULL on a root. */
+  parentRunId?: number | null;
+  /** The tee at each end, if the end sits on one. */
+  startTee?: DrawnTee | null;
+  endTee?: DrawnTee | null;
 };
+
+type DrawnTee = {
+  id: number;
+  x: number;
+  y: number;
+  fitting: "box" | "body" | "mark" | null;
+};
+
+/**
+ * Adding legs to a run while tracing (D20). Absent when the page does not
+ * support it; `active` once the run has a first leg saved.
+ */
+export type TraceLegs = {
+  /** A run is taking legs — the Finish commits all of it. */
+  active: boolean;
+  /** Waiting for the click that says where the next leg starts. */
+  pending: boolean;
+  /** A leg is being saved; clicks wait. */
+  busy: boolean;
+  /** Where the previous leg stopped — one end of the dashed jump. */
+  prevEnd: PagePoint | null;
+  /** How the leg in progress began, for the words in the pill. */
+  startLabel: string | null;
+  /** Save this leg and start another; `at` is a Shift-click's point. */
+  onNewLeg: (at?: LegClick) => void;
+  /** The first click of a leg. */
+  onStart: (at: LegClick) => void;
+  /** What a click here would do — the same rule the click uses. */
+  preview: (at: LegClick) => LegSnap;
+};
+
+export type LegClick = { point: PagePoint; tolerance: number; free: boolean };
+
+/**
+ * How far a new leg's first click reaches for the run, in SCREEN pixels. Half
+ * the run's hit target: aiming near a run is aiming at it, and no further.
+ */
+const LEG_SNAP_PX = HIT_TARGET_PX * 0.75;
 
 /** The short label a pull-point marker carries on the drawing. */
 const PULL_POINT_LABEL: Record<"lb" | "pullBox", string> = {
@@ -169,7 +213,10 @@ export function TraceLayer({
   onSelectStamp,
   focusPoint,
   chromeTarget,
+  legs,
 }: {
+  /** Branch legs while tracing (D20). Omitted, "New leg" does not exist. */
+  legs?: TraceLegs;
   /** Canvas size in device pixels — the overlay matches it exactly. */
   width: number;
   height: number;
@@ -238,6 +285,24 @@ export function TraceLayer({
   const guidesRef = useRef<CrosshairHandle | null>(null);
   /** Where the pointer is, for the rubber-band segment from the last vertex. */
   const [hover, setHover] = useState<PagePoint | null>(null);
+  /** Alt is held: a new leg's first click places a free point (D20). */
+  const [hoverAlt, setHoverAlt] = useState(false);
+
+  /** A leg can be finished with nothing traced yet: the run's legs are saved. */
+  const canFinish = points.length >= 2 || Boolean(legs?.active);
+
+  /**
+   * The snap reach in PAGE points: a fixed distance on SCREEN, whatever the
+   * zoom — the same idea as the run's hit target. Measured off the overlay's
+   * laid-out size, which already includes the zoom transform.
+   */
+  const snapReach = useCallback((): number => {
+    const svg = svgRef.current;
+    if (!svg) return LEG_SNAP_PX;
+    const rect = svg.getBoundingClientRect();
+    const devicePerCss = rect.width === 0 ? 1 : width / rect.width;
+    return (LEG_SNAP_PX * devicePerCss) / renderScale;
+  }, [width, renderScale]);
 
   const ratio = measurability.ok ? measurability.ratio : null;
 
@@ -300,7 +365,7 @@ export function TraceLayer({
         e.stopPropagation();
         if (points.length > 0) onPointsChange(points.slice(0, -1));
         else onCancel();
-      } else if (e.key === "Enter" && points.length >= 2) {
+      } else if (e.key === "Enter" && canFinish) {
         e.preventDefault();
         onFinish();
       } else if (
@@ -313,7 +378,7 @@ export function TraceLayer({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [tracing, points, onPointsChange, onCancel, onFinish]);
+  }, [tracing, points, onPointsChange, onCancel, onFinish, canFinish]);
 
   /**
    * ── Not measurable ────────────────────────────────────────────────────────
@@ -384,6 +449,7 @@ export function TraceLayer({
               page.y * renderScale
             );
           setHover(page);
+          if (e.altKey !== hoverAlt) setHoverAlt(e.altKey);
         }}
         onPointerLeave={() => {
           guidesRef.current?.hide();
@@ -407,6 +473,22 @@ export function TraceLayer({
           const page = pointerToPage(e);
           if (!page) return;
           if (tracing) {
+            /*
+              Branch legs (D20). While a leg is being saved a click would snap
+              to the run as it was before the save, so it waits. The first
+              click of a leg is snapped — onto this run, a mark, or free with
+              Alt — and Shift-click ends this leg and starts the next there.
+            */
+            if (legs?.busy) return;
+            const at = { point: page, tolerance: snapReach(), free: e.altKey };
+            if (legs?.pending) {
+              legs.onStart(at);
+              return;
+            }
+            if (legs && e.shiftKey && points.length >= 2) {
+              legs.onNewLeg(at);
+              return;
+            }
             onPointsChange([...points, page]);
             return;
           }
@@ -417,7 +499,7 @@ export function TraceLayer({
         onDoubleClick={e => {
           // Double-click finishes, which is what every drawing tool does. The
           // extra point the first click added is already in the path.
-          if (tracing && points.length >= 2) {
+          if (tracing && canFinish) {
             e.preventDefault();
             onFinish();
           }
@@ -492,6 +574,87 @@ export function TraceLayer({
             </g>
           );
         })}
+
+        {/*
+          BRANCH LEGS (D20). The jump between two legs is NOT pipe, so it is
+          drawn thin, grey and dashed — clearly not a run — and nothing
+          measures it. Only a leg that did not start on the run has one: a
+          branch starts ON the run, and its tee is drawn instead.
+        */}
+        {(() => {
+          const byRoot = new Map<number, ExistingRun[]>();
+          for (const run of existingRuns) {
+            const root = run.parentRunId ?? run.id;
+            byRoot.set(root, [...(byRoot.get(root) ?? []), run]);
+          }
+          const jumps: React.ReactNode[] = [];
+          byRoot.forEach(group => {
+            const ordered = [...group].sort((a, b) => a.id - b.id);
+            ordered.forEach((leg, i) => {
+              if (i === 0 || leg.parentRunId == null || leg.startTee) return;
+              const prev = ordered[i - 1].points;
+              if (prev.length === 0 || leg.points.length === 0) return;
+              const a = toScreen(prev[prev.length - 1]);
+              const b = toScreen(leg.points[0]);
+              jumps.push(
+                <line
+                  key={`jump-${leg.id}`}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke="#94A3B8"
+                  strokeWidth={runStroke * 0.6}
+                  strokeDasharray={`${runStroke * 2} ${runStroke * 2}`}
+                  strokeOpacity={0.9}
+                >
+                  <title>Jump between legs — not pipe, not measured</title>
+                </line>
+              );
+            });
+          });
+          return jumps;
+        })()}
+        {(() => {
+          // One square per tee, however many legs meet there.
+          const tees = new Map<number, { tee: DrawnTee; color: string }>();
+          for (const run of existingRuns) {
+            for (const tee of [run.startTee, run.endTee]) {
+              if (tee && !tees.has(tee.id))
+                tees.set(tee.id, { tee, color: runAppearance(run).color });
+            }
+          }
+          const half = markRadiusInOverlay(zoom) * 0.55;
+          const stroke = markStrokeInOverlay(zoom);
+          return Array.from(tees.values()).map(({ tee, color }) => {
+            // A tee on a mark is that mark's box: the mark already shows it.
+            if (tee.fitting === "mark") return null;
+            const at = toScreen(tee);
+            const answered = tee.fitting === "box";
+            return (
+              <rect
+                key={`tee-${tee.id}`}
+                x={at.x - half}
+                y={at.y - half}
+                width={half * 2}
+                height={half * 2}
+                fill={answered ? color : "none"}
+                fillOpacity={answered ? 0.85 : 0}
+                stroke={answered ? "#0b0b0b" : color}
+                strokeWidth={stroke}
+                strokeDasharray={
+                  answered ? undefined : `${half * 0.5} ${half * 0.4}`
+                }
+              >
+                <title>
+                  {answered
+                    ? "Branch tee — a box where the branch leaves"
+                    : "Branch tee — no box chosen yet"}
+                </title>
+              </rect>
+            );
+          });
+        })()}
 
         {/* Stamps already placed. Uniform high-contrast markers rather than
             symbols imitating the drawing: the job here is to see at a glance
@@ -682,6 +845,75 @@ export function TraceLayer({
             className="animate-pulse"
           />
         )}
+
+        {/*
+          The next leg (D20): while choosing where it starts, a ring shows
+          what the click will do — the same rule the click uses — and a dashed
+          grey jump runs from where the last leg stopped. The jump stays until
+          the leg is finished, and is never part of any length.
+        */}
+        {tracing &&
+          legs?.active &&
+          (() => {
+            const preview =
+              legs.pending && hover
+                ? legs.preview({
+                    point: hover,
+                    tolerance: snapReach(),
+                    free: hoverAlt,
+                  })
+                : null;
+            const to = points[0] ?? preview?.point ?? null;
+            const r = markRadiusInOverlay(zoom) * 0.7;
+            const stroke = markStrokeInOverlay(zoom);
+            return (
+              <>
+                {legs.prevEnd && to && (
+                  <line
+                    x1={toScreen(legs.prevEnd).x}
+                    y1={toScreen(legs.prevEnd).y}
+                    x2={toScreen(to).x}
+                    y2={toScreen(to).y}
+                    stroke="#94A3B8"
+                    strokeWidth={runStroke * 0.6}
+                    strokeDasharray={`${runStroke * 2} ${runStroke * 2}`}
+                  />
+                )}
+                {preview && (
+                  <g pointerEvents="none">
+                    {preview.kind === "tee" ? (
+                      <rect
+                        x={toScreen(preview.point).x - r}
+                        y={toScreen(preview.point).y - r}
+                        width={r * 2}
+                        height={r * 2}
+                        fill="#F5C518"
+                        fillOpacity={0.25}
+                        stroke="#F5C518"
+                        strokeWidth={stroke}
+                      />
+                    ) : (
+                      <circle
+                        cx={toScreen(preview.point).x}
+                        cy={toScreen(preview.point).y}
+                        r={r}
+                        fill="none"
+                        stroke={
+                          preview.kind === "stamp" ? "#F5C518" : "#94A3B8"
+                        }
+                        strokeWidth={stroke}
+                        strokeDasharray={
+                          preview.kind === "free"
+                            ? `${r * 0.4} ${r * 0.3}`
+                            : undefined
+                        }
+                      />
+                    )}
+                  </g>
+                )}
+              </>
+            );
+          })()}
 
         {/* The trace in progress */}
         {tracing && points.length > 0 && (
@@ -881,7 +1113,41 @@ export function TraceLayer({
                 </>
               )}
 
+              {legs?.active && (
+                <>
+                  <div className="w-px h-4 bg-border" />
+                  <span className="text-[0.7rem] text-muted-foreground">
+                    {legs.busy
+                      ? "Saving the leg…"
+                      : legs.pending
+                        ? hover
+                          ? legSnapLabel(
+                              legs.preview({
+                                point: hover,
+                                tolerance: snapReach(),
+                                free: hoverAlt,
+                              })
+                            )
+                          : "Click where the next leg starts"
+                        : (legs.startLabel ?? "New leg")}
+                  </span>
+                </>
+              )}
+
               <div className="w-px h-4 bg-border" />
+
+              {legs && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 text-xs pointer-events-auto"
+                  onClick={() => legs.onNewLeg()}
+                  disabled={points.length < 2 || legs.busy}
+                  title="Keep this leg and start another on the same run — a branch if you start on the run (Shift-click the next start)"
+                >
+                  New leg
+                </Button>
+              )}
 
               <Button
                 size="sm"
@@ -898,7 +1164,7 @@ export function TraceLayer({
                 size="sm"
                 className="h-6 gap-1 text-xs pointer-events-auto"
                 onClick={onFinish}
-                disabled={points.length < 2}
+                disabled={!canFinish || Boolean(legs?.busy)}
                 title="Finish this run (Enter or double-click)"
               >
                 <Check className="w-3 h-3" /> Finish
@@ -913,8 +1179,14 @@ export function TraceLayer({
                 variant="ghost"
                 className="h-6 w-6 p-0 text-muted-foreground pointer-events-auto"
                 onClick={onCancel}
-                title="Discard this run (Escape twice)"
-                aria-label="Discard this run"
+                title={
+                  legs?.active
+                    ? "Discard this leg — the legs already saved stay (Escape twice)"
+                    : "Discard this run (Escape twice)"
+                }
+                aria-label={
+                  legs?.active ? "Discard this leg" : "Discard this run"
+                }
               >
                 <X className="w-3.5 h-3.5" />
               </Button>

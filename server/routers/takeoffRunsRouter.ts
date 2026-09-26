@@ -229,6 +229,18 @@ export const takeoffRunsRouter = router({
             );
 
       const bendContext = await bendContextForRuns(runs, ctx.scope.dataUserId);
+      // Tees, loaded once for the sheet — the drawing marks them and the
+      // panel says what each leg leaves from (D20).
+      const teeById = new Map(
+        (
+          await db.getTeeRowsForRuns(runs.map(rootOf), ctx.scope.dataUserId)
+        ).map(t => [
+          t.id,
+          { id: t.id, x: t.x, y: t.y, fitting: t.fitting, stampId: t.stampId },
+        ])
+      );
+      const teeOf = (id: number | null) =>
+        id === null ? null : (teeById.get(id) ?? null);
       const inchesPerPoint = pointsToRealInches(1, ratio);
       const feetPerPoint = inchesPerPoint === null ? null : inchesPerPoint / 12;
 
@@ -287,6 +299,13 @@ export const takeoffRunsRouter = router({
         return {
           id: run.id,
           name: run.name,
+          /**
+           * Branch legs (D20): the run this row is a leg of (NULL on a root),
+           * and the tee at each end. Listed field by field — a screen shape.
+           */
+          parentRunId: run.parentRunId,
+          startTee: teeOf(run.startTeeId),
+          endTee: teeOf(run.endTeeId),
           /**
            * What this run IS, and what to call it.
            *

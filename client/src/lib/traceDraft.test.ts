@@ -50,6 +50,7 @@ const draft = (over: Partial<Parameters<typeof saveDraft>[0]> = {}) => ({
   name: "Feeder",
   pathType: "conduit" as const,
   points: POINTS,
+  legRootId: null,
   ...over,
 });
 
@@ -82,6 +83,24 @@ describe("round-tripping a draft", () => {
 
     expect(loadDraft(1)!.name).toBe("Sheet one run");
     expect(loadDraft(2)!.name).toBe("Sheet two run");
+  });
+
+  it("remembers which run a leg in progress belongs to (D20)", () => {
+    // A leg has no server row until it is finished, so this is the only copy.
+    saveDraft(draft({ legRootId: 17 }));
+    expect(loadDraft(1)!.legRootId).toBe(17);
+  });
+
+  it("reads a draft written before legs existed as a first leg", () => {
+    // Under the same key, a browser may hold one right now.
+    const { legRootId: _none, ...old } = draft();
+    store.set(
+      "helixbid:trace-draft:1",
+      JSON.stringify({ ...old, savedAt: Date.now() })
+    );
+    const recovered = loadDraft(1)!;
+    expect(recovered.points).toEqual(POINTS);
+    expect(recovered.legRootId).toBeNull();
   });
 
   it("remembers the server row once there is one, so autosave updates in place", () => {

@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **A traced run can now have more than one leg — usually a branch.** While
+  tracing, press "New leg" (or Shift-click) and the next click starts another
+  leg of the same run. Start it on the run and it becomes a branch: a box is
+  drawn where it leaves, and the run is split there so each stretch between
+  boxes counts its own fittings — three connectors at the split, one tee box
+  and cover. Start it anywhere else (hold Alt to be sure) and it is a separate
+  stretch of the same run; the gap between the two is drawn dashed and grey
+  and is never counted as pipe.
 - **Labor on traced lines now says "Not priced" instead of "0 h" when the
   part has no labor hours set.** It used to freeze a missing labor unit as
   zero, which printed "0 h" beside a real cost and quietly left that labor
