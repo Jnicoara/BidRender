@@ -45,6 +45,22 @@ const callerFor = (userId: number) =>
 const caller = () => callerFor(USER);
 
 /**
+ * A line's breakdown, failing the test if the line could not be priced.
+ *
+ * `breakdown` is null for an unpriceable line (shared/linePricingProblems.ts).
+ * Every bid in this file is sound, so a null is a failure, and it has to fail
+ * loudly: reading `breakdown?.directCost ?? 0` instead would count such a line
+ * as 0 on BOTH sides of "totals equal the sum of the lines" — the rollup
+ * leaves it out too — and that assertion would pass with a line missing.
+ */
+function priced<B>(line: { name: string; breakdown: B | null }): B {
+  if (line.breakdown === null) {
+    throw new Error(`line "${line.name}" could not be priced`);
+  }
+  return line.breakdown;
+}
+
+/**
  * A material this suite prices itself, so the arithmetic below has real numbers
  * to work with.
  *
@@ -670,7 +686,7 @@ describe.skipIf(!hasDb)("quick-bid add flow (merge)", () => {
     )!;
     expect(Number(receptacleLine.qty)).toBeCloseTo(10, 4);
     expect(detail.totals.directCost).toBeCloseTo(
-      detail.lines.reduce((sum, l) => sum + l.breakdown.directCost, 0),
+      detail.lines.reduce((sum, l) => sum + priced(l).directCost, 0),
       2
     );
     expect(detail.totals.finalPrice).toBeGreaterThan(0);
@@ -977,7 +993,7 @@ describe.skipIf(!hasDb)("mass duplicate", () => {
     const before = await caller().bids.get({ id: bid.id });
 
     const target = before.lines.find(l => l.unitLabel === "Room 102")!;
-    const lineCost = target.breakdown.directCost;
+    const lineCost = priced(target).directCost;
     await caller().bids.removeLine({ bidId: bid.id, id: target.id });
 
     const after = await caller().bids.get({ id: bid.id });
