@@ -237,7 +237,11 @@ describe.skipIf(!hasDb)("archiving a bid", () => {
       state: "WA",
       county: "King",
       city: "Seattle",
-      components: [{ name: "State", ratePct: 6.5 }],
+      // `label`, as TaxRateComponent has always named it; this said `name`,
+      // which stored a component no screen could title. Nothing here asserts
+      // on it — the area exists so the bid can point taxJurisdictionId at a
+      // real row.
+      components: [{ label: "State", ratePct: 6.5 }],
     });
 
     const bid = await newBid("Archived bid with tax");
