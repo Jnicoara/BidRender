@@ -30,7 +30,7 @@ pnpm dev:r2           # same, but plan files go to the Cloudflare R2 bucket bidr
 pnpm r2:ls [prefix]   # list what is actually in that bucket
 pnpm build            # vite build (client) + esbuild bundle (server) -> dist/
 pnpm start            # run production build (NODE_ENV=production)
-pnpm check            # tsc --noEmit — run after any nontrivial change
+pnpm check            # tsc --noEmit, app AND test files — run after any nontrivial change
 pnpm test             # vitest run (server/**, client/src/lib/**, scripts/** — see vitest.config.ts)
 pnpm format           # prettier --write .
 pnpm db:push          # drizzle-kit generate, then scripts/migrate.mts, against DATABASE_URL
@@ -338,48 +338,35 @@ would change what somebody sees, make it impossible to add by accident. And
 when both apply to one row, map it twice rather than picking a winner — the
 cost is a few lines and the alternative is one of the two failures.
 
-### The forcing functions stop at the test boundary, and that is a real hole
+### `pnpm check` covers the tests — it did not until 2026-09-26
 
-**Found 2026-09-20 while closing a different one.** `tsconfig.json` excludes
-`**/*.test.ts`, so `pnpm check` — the thing this file calls the correctness gate
-— **does not typecheck a single test file.**
+**Every test file is typechecked by `pnpm check`, to the same bar as shipped
+code**: `server/**`, `client/src/**` and `scripts/**/*.test.ts`, with the same
+`compilerOptions`. A type error in a test fails the gate like any other. There
+is no separate count to track any more; the gate is the count.
 
-The measurement, because it is the point: making `RunCircuit.groundCount`
-required produced **zero** errors from `pnpm check` and **28** from the same
-compiler with tests included. Fixing those 28 left **33 pre-existing errors**
-in ten other test files, which have been accumulating unseen for as long as the
-exclusion has been there.
+**Why this section exists.** Until 2026-09-26 `tsconfig.json` excluded
+`**/*.test.ts`, so the correctness gate compiled no test at all. Nothing saw
+the errors, so nothing stopped them: 33 on 2026-09-20, 124 across 23 files six
+days later. A type-level guarantee that stops at the test boundary is not a
+guarantee — a fixture can build a shape the production code cannot, and a test
+that compiles only because nothing compiled it asserts against a value the
+types forbid. Clearing them (one file per commit, no cast, no `any`, no
+`@ts-ignore`, no assertion weakened) found two real faults the exclusion had
+hidden since the day they were written: a fork assertion that compared
+`undefined` and could never fail, and a cast in `companyRouter.ts` that erased
+"owner is not invitable" from the types. See `todo.md`.
 
-> **Re-measured 2026-09-26: 124 errors across 23 test files.** The 33 above
-> nearly quadrupled in six days, which is this section's point proven: nothing
-> sees them, so nothing stops them. The breakdown is in `todo.md` § "Typecheck
-> the tests". If a fresh count does not match, the number here is stale again
-> — re-measure rather than trusting either figure.
->
-> **Cleared to 0 later the same day**, one file per commit, no cast, no `any`,
-> no `@ts-ignore`, no assertion weakened. The last 4 were FINDINGS rather than
-> typing gaps, both fixed (`todo.md`): a fork assertion in
-> `takeoffBridgeFlow.test.ts` that compared `undefined` and could never fail,
-> and `@ts-expect-error` lines in `permissions.test.ts` left unused by a cast
-> in `companyRouter.ts` that had erased "owner is not invitable" from the
-> types since the day both were written. Both were invisible for exactly the
-> reason this section gives, and both were found the moment the files were
-> compiled. **The exclusion is still in place** — 0 today can become 124
-> again the same way; flipping it is the open item in `todo.md`.
+**So: do not re-add the exclusion to get a change through.** If a test stops
+compiling, the change broke a fixture's contract with the code, which is
+exactly what the gate is for. Fix the fixture honestly — CLAUDE.md's rules
+against weakening an assertion apply to types too.
 
-**What that means for everything decided today:** a type-level guarantee that
-stops at the test boundary is not a guarantee. A fixture can construct a shape
-the production code cannot, and a test that compiles only because nothing
-compiled it will happily assert against a value the types forbid. The forcing
-functions are real in `server/`, `shared/` and `client/src/`, which is where the
-three broken mappings lived — and they are absent in exactly the place that is
-supposed to be catching things.
-
-**Not fixed, deliberately, and not urgent enough to do badly.** Including tests
-means clearing those errors (0 as of 2026-09-26; the exclusion itself is still on) across files nobody is otherwise touching, and doing
-that in a hurry is how a test gets "fixed" by weakening its assertion. See
-`todo.md`. Until then: **when you make something uncompilable, say whether the
-tests were part of "everything".**
+**What is still NOT covered: the rest of `scripts/`.** Its tests are in; its
+16 `.mts` tools (`migrate.mts`, `schemaDrift.mts` among them) are not.
+Measured 2026-09-26, including them would report 43 errors in 11 files — and
+42 of those are the missing `target` in `tsconfig.json` (top-level `await`,
+iteration), not type faults. The `target` decision comes first; see `todo.md`.
 
 **Measuring the wrong thing looks exactly like measuring.** The first attempt to
 check the re-run behaviour ran the file once against a database that had two
