@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **The supplier materials list now includes conduit fittings, and stopped
+  mislabelling lines.** Couplings, connectors and straps counted from traced
+  runs are listed as ordinary items, merged with the same part from any
+  assembly, with a note when a count is a minimum or has no catalog match.
+  Pipe and wire lines sent from traced runs were being listed as "not
+  itemised, because the assembly is no longer in the library", which was
+  false and would have been read by the supply house; they are no longer in
+  that note, and its wording now says what is actually true of the rest.
 - **A bid line nobody priced now says "Not priced" instead of $0.00.** That
   covers every kind of line: pipe, wire and fittings from an unpriced catalog
   row, a count or assembly line that comes to nothing, and a hand-priced line

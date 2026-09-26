@@ -463,8 +463,65 @@ describeDb("building the list from a real bid", () => {
 
     const doc = await caller().materialsList.get({ bidId });
     const note = doc.notes.find(n => n.includes(name))!;
-    expect(note).toContain("no longer in the library");
+    /*
+      Reworded 2026-09-26. `set null` makes a deleted assembly look exactly
+      like a count or line that never had one, so the note says both — the
+      old "no longer in the library" was false for every run-type line and
+      free count that also landed here.
+    */
+    expect(note).toContain("whose assembly was since deleted");
     expect(note).not.toContain("labor only");
+  });
+
+  it("never lists a traced run type's lines as not itemised, and itemises its fittings", async () => {
+    const bidId = await newBid();
+    const sheetId = await newSheet(bidId, 48);
+    const emt = (await caller().materials.list()).find(
+      m => m.name === '1/2" EMT'
+    )!;
+    const type = await caller().takeoffRunTypes.create({
+      label: `List EMT ${uniq()}`,
+      pathType: "conduit",
+      racewayMaterialId: emt.id,
+    });
+    // 40 ft at 1/4" = 1'-0": 4 sticks, 3 couplings, 2 connectors.
+    const saved = await caller().takeoffRuns.save({
+      bidId,
+      sheetId,
+      name: "Homerun",
+      pathType: "conduit",
+      runTypeId: type.id,
+      status: "committed",
+      points: [
+        { x: 0, y: 0 },
+        { x: 720, y: 0 },
+      ],
+    });
+    await caller().takeoffRuns.setEnds({
+      id: saved.id,
+      startKind: "distribution",
+      endKind: "distribution",
+      distributionHeightInches: 120,
+      branchWiring: false,
+    });
+    await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+
+    const doc = await caller().materialsList.get({ bidId });
+    expect(doc.notes.some(n => n.includes(type.label))).toBe(false);
+    expect(doc.notes.some(n => n.includes("no longer in the library"))).toBe(
+      false
+    );
+    const coupling = doc.entries.find(
+      e => e.name === '1/2" EMT set-screw coupling'
+    )!;
+    expect(coupling.qty).toBe(3);
+    expect(coupling.unit).toBe("each");
+    expect(coupling.sources[0]).toContain(type.label);
+    expect(
+      doc.entries.find(e => e.name === '1/2" EMT set-screw connector')!.qty
+    ).toBe(2);
+    // Pipe stays in the measured section, once.
+    expect(doc.measured.find(m => m.label === "Conduit")!.feet).toBe(40);
   });
 
   it("adds a stamped and a bid-added assembly together into one line", async () => {

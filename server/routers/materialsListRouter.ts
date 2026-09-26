@@ -57,6 +57,8 @@ import {
   type MaterialsListDoc,
 } from "../../shared/materialsList";
 import * as db from "../db";
+import { footageByRunType } from "../runTypeFootage";
+import { resolveRunType } from "../../shared/runTypeLookup";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -130,10 +132,25 @@ export const materialsListRouter = router({
         supplier chasing a part that was never a part is the app lying about
         itself.
       */
-      const gone = new Set<string>();
+      /*
+        `noAssembly`, not "gone" — and the rename is the fix.
+
+        Until 2026-09-26 this set was called `gone` and its note told the
+        supplier each name was "no longer in the library". That was true of
+        almost nothing in it: run-type lines (pipe, wire and fittings, which
+        are read from the runs below), and free counts and lines priced by
+        hand, which never had an assembly at all. A deleted assembly does land
+        here too, but `assemblyId` is `set null` on delete, so it is
+        indistinguishable from a line that never had one — and the note says
+        exactly that much and no more.
+      */
+      const noAssembly = new Set<string>();
       const noParts = new Set<string>();
 
       for (const line of liveLines) {
+        // Pipe, wire and fittings from traced runs are read from the runs
+        // themselves below; listing the line too would count them twice.
+        if (line.takeoffRunTypeId !== null) continue;
         const materials =
           line.assemblyId === null
             ? []
@@ -141,7 +158,7 @@ export const materialsListRouter = router({
         // Named in the notes rather than dropped, either way: a supplier
         // reading a short list cannot tell that something is missing from it.
         if (materials.length === 0) {
-          (line.assemblyId === null ? gone : noParts).add(line.name);
+          (line.assemblyId === null ? noAssembly : noParts).add(line.name);
           continue;
         }
         sources.push({
@@ -187,7 +204,7 @@ export const materialsListRouter = router({
             ? []
             : (byAssembly.get(group.assemblyId) ?? []);
         if (materials.length === 0) {
-          (group.assemblyId === null ? gone : noParts).add(group.name);
+          (group.assemblyId === null ? noAssembly : noParts).add(group.name);
           continue;
         }
         sources.push({
@@ -206,6 +223,85 @@ export const materialsListRouter = router({
         dial is an argument here rather than something applied to the finished
         totals where it could not tell the two apart.
       */
+      /*
+        FITTINGS COUNTED FROM THE TRACE — couplings, connectors and straps —
+        as ordinary orderable lines, so the CSV, the PDF and the dialog all
+        carry them with no change of their own. One source per run TYPE, so a
+        coupling used by two types reads "from" both, and it merges with the
+        same part inside any assembly by name, like every other material.
+
+        From every traced conduit type on the job, whether or not it was sent
+        to the bid — the same scope as the measured footage below, so the
+        pipe and its fittings describe the same runs.
+
+        What cannot be listed is SAID: a count with no catalog match, or one
+        that could not be counted, goes into the notes by name. A minimum
+        ("at least") is said too, since it reaches a supplier as a number.
+      */
+      const fittingShortfalls: string[] = [];
+      const footage = await footageByRunType(
+        input.bidId,
+        ctx.scope.dataUserId,
+        bid.distributionHeightInches
+      );
+      const fittingsByType = await db.fittingRowsByRunType(
+        ctx.scope.dataUserId,
+        footage
+      );
+      if (fittingsByType.size > 0) {
+        const palette = await db.getRunTypesFor(ctx.scope.dataUserId, true);
+        const minimums: string[] = [];
+        const unmatched: string[] = [];
+        const uncounted: string[] = [];
+        fittingsByType.forEach((rows, runTypeId) => {
+          const label =
+            resolveRunType(palette, runTypeId)?.label ?? "A traced run type";
+          for (const row of rows) {
+            if (
+              row.count.status === "unknown" &&
+              footage.get(runTypeId)?.legs.length
+            ) {
+              uncounted.push(`${label} ${row.role}s — ${row.count.why}`);
+              continue;
+            }
+            if (row.count.status !== "counted" || row.qty <= 0) continue;
+            if (!row.pick.ok) {
+              unmatched.push(
+                `${row.qty} ${row.role}s for ${label} (${row.pick.why})`
+              );
+              continue;
+            }
+            if (row.count.atLeast) minimums.push(row.pick.name);
+            sources.push({
+              name: `${label} (counted from traced runs)`,
+              count: row.qty,
+              materials: [
+                {
+                  name: row.pick.name,
+                  unit: "each",
+                  category: "Conduit Fittings",
+                  qty: 1,
+                  isBranchWhip: false,
+                },
+              ],
+            });
+          }
+        });
+        if (minimums.length > 0) {
+          fittingShortfalls.push(
+            `Minimums, not totals — some traced runs have a drop with no height, so these are counted over a length that is short: ${Array.from(new Set(minimums)).join(", ")}.`
+          );
+        }
+        if (unmatched.length > 0) {
+          fittingShortfalls.push(
+            `Counted but not listed, because no catalog part matches: ${unmatched.join("; ")}.`
+          );
+        }
+        if (uncounted.length > 0) {
+          fittingShortfalls.push(`Not counted: ${uncounted.join("; ")}.`);
+        }
+      }
+
       const entries = aggregateMaterials(sources, Number(bid.whipAdjustPct));
 
       // ── Traced runs: footage, kept apart from the counted materials ────────
@@ -263,12 +359,17 @@ export const materialsListRouter = router({
           } length is not included above.`
         );
       }
-      if (gone.size > 0) {
+      if (noAssembly.size > 0) {
         notes.push(
-          `Not itemised, because the assembly is no longer in the library: ${Array.from(
-            gone
+          `Counted on this job but not itemised, because no assembly says what ${
+            noAssembly.size === 1 ? "it is" : "they are"
+          } made of — a count or line with no assembly, or one whose assembly was since deleted: ${Array.from(
+            noAssembly
           ).join(", ")}.`
         );
+      }
+      if (fittingShortfalls.length > 0) {
+        notes.push(...fittingShortfalls);
       }
       if (noParts.size > 0) {
         notes.push(
