@@ -742,6 +742,37 @@ export function normalizeQuerySizes(query: string): string {
   return normalizeSizeWords(query).replace(SPOKEN_CABLE, "$1$2-$3");
 }
 
+/**
+ * Punctuation that only ever SEPARATES words in a query — "#12 bare copper,
+ * solid", "wire nut (red)", "gfci?". The query is split on whitespace, so
+ * before this a comma stayed on its word, "copper," matched nothing, and
+ * because every word must match, the whole search came back empty.
+ */
+const SEPARATOR_PUNCTUATION = /[,;:()[\]{}!?]/g;
+
+/**
+ * A period that is not part of a number. "1.5" and ".75" keep theirs — a
+ * decimal is a size — while the full stop in "breaker." or "no. 12" goes.
+ */
+const STRAY_PERIOD = /\.(?!\d)/g;
+
+/**
+ * The query with separator punctuation turned into spaces. Everything a size
+ * is written with survives: the inch mark, the slash of 1/2, the hyphen of
+ * 1-1/4 and 12-2, the hash of #12 and the decimal point of 1.5.
+ *
+ * Ranking already reads a query this way (norm in shared/materialSearchRank.ts
+ * turns punctuation into spaces), so this also stops the matcher and the
+ * ranker disagreeing about what was typed.
+ */
+export function separateQueryWords(query: string): string {
+  return query
+    .replace(SEPARATOR_PUNCTUATION, " ")
+    .replace(STRAY_PERIOD, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // ─── Expand a single token against the alias map ─────────────────────────────
 /**
  * What one typed word matched, kept split by provenance.
@@ -1105,8 +1136,10 @@ export function smartSearchCorrected<T extends SearchableItem>(
   query: string,
   maxResults = 100
 ): CorrectedSearch<T> {
-  // Inches spelled out become the mark first — see normalizeSizeWords.
-  const q = normalizeQuerySizes(normalize(query));
+  // Separator punctuation goes first, so "1/2, emt" is two words before
+  // sizes are read — see separateQueryWords. Then inches spelled out become
+  // the mark — see normalizeSizeWords.
+  const q = normalizeQuerySizes(separateQueryWords(normalize(query)));
   const none = { results: [], correctedQuery: null, searchedQuery: q };
   if (!q) return none;
   const index = indexFor(items);

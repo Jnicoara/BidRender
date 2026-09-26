@@ -9,7 +9,7 @@
  * Pure module, no DOM, so it runs in the default node environment.
  */
 import { describe, it, expect } from "vitest";
-import { smartSearch } from "./smartSearch";
+import { smartSearch, separateQueryWords } from "./smartSearch";
 
 /** The starter material names, which is where the original bug was seen. */
 const MATERIALS = [
@@ -285,5 +285,58 @@ describe("a size and a type still go straight to the row", () => {
 
   it("still finds a breaker by amperage", () => {
     expect(search("20A breaker")[0]).toBe("20A breaker");
+  });
+});
+
+/**
+ * Punctuation between words separates them; it does not become part of one.
+ *
+ * The query is split on whitespace, so a comma used to stay on its word —
+ * "copper," — which matched nothing, and because every word must match, the
+ * whole search came back empty (todo.md, "A comma in a search finds nothing").
+ * Each case below asserts the punctuated query answers exactly what the plain
+ * one does, so a rule that merely returned SOMETHING would still fail.
+ */
+describe("punctuation in a query separates words", () => {
+  const names = [
+    ...MATERIALS,
+    "#12 bare copper, solid",
+    '1-1/4" EMT',
+    "1.5 in PVC",
+  ];
+  const same = (punctuated: string, plain: string) =>
+    expect(search(punctuated, names)).toEqual(search(plain, names));
+
+  it("a comma finds what the words find without it", () => {
+    expect(search("#12 bare copper, solid", names)[0]).toBe(
+      "#12 bare copper, solid"
+    );
+    same("#12 bare copper, solid", "#12 bare copper solid");
+    same("wire nuts,", "wire nuts");
+    same("12-2,nm-b", "12-2 nm-b");
+  });
+
+  it("semicolons, colons, brackets, ! and ? are separators too", () => {
+    same("gfci; receptacle", "gfci receptacle");
+    same("emt: 1/2", "emt 1/2");
+    same("receptacle (gfci)", "receptacle gfci");
+    same("[dimmer]", "dimmer");
+    same("dimmer!", "dimmer");
+    same("gfci?", "gfci");
+  });
+
+  it("a full stop goes, a decimal point stays", () => {
+    same("wall plate.", "wall plate");
+    expect(separateQueryWords("1.5 in pvc.")).toBe("1.5 in pvc");
+    expect(separateQueryWords(".75 emt")).toBe(".75 emt");
+  });
+
+  it('keeps every mark a size is written with: " / - # .', () => {
+    expect(separateQueryWords('1-1/4" emt, #12 thhn, 1.5')).toBe(
+      '1-1/4" emt #12 thhn 1.5'
+    );
+    expect(search('1/2", emt')[0]).toBe('1/2" EMT');
+    expect(search("#12, thhn")[0]).toBe("#12 THHN");
+    expect(search('1-1/4" emt,', names)[0]).toBe('1-1/4" EMT');
   });
 });

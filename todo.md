@@ -1315,11 +1315,16 @@ sheet scale were removed afterwards — production back to 0 bid lines, 2 runs.
       NEMA 3R row equally, and the tie goes to NEMA 1; "30A breaker" ties
       with "30A 2-Pole breaker". Live since `1c29584`. Whether the old
       spelling should prefer the renamed row is a ranking decision.
-- [ ] **A comma in a search finds nothing.** "#12 bare copper, solid" returns
-      no rows while "#12 bare copper solid" finds it — the tokenizer keeps
-      the comma on the word. Found by `scripts/catalogRehearsal.mts search`;
-      not caused by any rename. Also `5/6" wafer LED downlight` (the old
-      spelling) reads as a fraction and finds nothing.
+- [x] **FIXED 2026-09-26 (Track B): a comma in a search found nothing.**
+      "#12 bare copper, solid" returned no rows while "#12 bare copper solid"
+      found it — the tokenizer kept the comma on the word.
+      `separateQueryWords` in `client/src/lib/smartSearch.ts` now turns
+      , ; : brackets ! ? and a non-decimal full stop into spaces before the
+      split, keeping " / - # . inside sizes. Pinned in `smartSearch.test.ts`.
+- [ ] **`5/6" wafer LED downlight` (the old spelling) reads as a fraction
+      and finds nothing.** Split out of the comma item above on 2026-09-26:
+      a size-parsing problem, not punctuation. Found by
+      `scripts/catalogRehearsal.mts search`.
 
 Couplings (sticks minus one per leg, drops included), connectors (one per
 conduit end, by node degree) and straps (one near each box, then spacing)

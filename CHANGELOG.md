@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **A comma in a material search no longer makes it find nothing.** Typing
+  "#12 bare copper, solid" used to return no rows at all. Commas, semicolons,
+  brackets, question marks and stray full stops now just separate words,
+  while sizes like 1-1/4", #12 and 1.5 keep their marks.
 - **A traced run can now have more than one leg — usually a branch.** While
   tracing, press "New leg" (or Shift-click) and the next click starts another
   leg of the same run. Start it on the run and it becomes a branch: a box is
