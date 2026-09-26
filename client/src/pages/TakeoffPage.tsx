@@ -5167,6 +5167,10 @@ export default function TakeoffPage({
             }
           >
             <RunsPanel
+              onAddLeg={run => {
+                if (measurability?.ok === false) return;
+                addLegTo({ ...run, parentRunId: run.parentRunId ?? null });
+              }}
               runs={visibleRuns.map(r => ({
                 ...r,
                 firstPoint: r.points[0] ?? null,
@@ -5292,6 +5296,10 @@ export default function TakeoffPage({
                   }
                   verticals={run.quantities?.verticals ?? null}
                   suggestion={suggestionForRun(run.id)}
+                  teeEnds={{
+                    start: Boolean(run.startTee),
+                    end: Boolean(run.endTee),
+                  }}
                 />
               )}
               legend={

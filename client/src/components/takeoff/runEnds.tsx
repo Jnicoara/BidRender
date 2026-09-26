@@ -212,15 +212,31 @@ function VerticalLine({
  * controls on a run is too many, and a crowded panel is one people stop
  * reading (§ 6).
  */
+/** A tee end, said rather than asked (D20). */
+function TeeEnd() {
+  return (
+    <span className="h-6 flex-1 flex items-center text-xs text-muted-foreground">
+      Branch tee — carries on at run height, no drop
+    </span>
+  );
+}
+
 export function RunEndsEditor({
   bidId,
   runId,
   ends,
   verticals,
   suggestion,
+  teeEnds = { start: false, end: false },
 }: {
   bidId: number;
   runId: number;
+  /**
+   * Which ends sit on a branch tee (D20). A tee end carries on at run height
+   * and belongs to no mark, so it gets a statement instead of a picker — the
+   * server refuses a kind there, and a picker it refuses is a dead control.
+   */
+  teeEnds?: { start: boolean; end: boolean };
   ends: RunEndsValue;
   verticals: RunVerticals | null;
   /** A stamp sitting on this run's end that nothing has claimed yet. */
@@ -252,23 +268,31 @@ export function RunEndsEditor({
 
       <div className="flex items-center gap-1.5">
         <span className="text-[0.7rem] text-muted-foreground w-8">From</span>
-        <EndKindSelect
-          bidId={bidId}
-          value={ends.startKind}
-          onChange={startKind => save({ startKind })}
-          ariaLabel="What this run starts at"
-          className="h-6 flex-1 text-xs"
-        />
+        {teeEnds.start ? (
+          <TeeEnd />
+        ) : (
+          <EndKindSelect
+            bidId={bidId}
+            value={ends.startKind}
+            onChange={startKind => save({ startKind })}
+            ariaLabel="What this run starts at"
+            className="h-6 flex-1 text-xs"
+          />
+        )}
       </div>
       <div className="flex items-center gap-1.5">
         <span className="text-[0.7rem] text-muted-foreground w-8">To</span>
-        <EndKindSelect
-          bidId={bidId}
-          value={ends.endKind}
-          onChange={endKind => save({ endKind })}
-          ariaLabel="What this run ends at"
-          className="h-6 flex-1 text-xs"
-        />
+        {teeEnds.end ? (
+          <TeeEnd />
+        ) : (
+          <EndKindSelect
+            bidId={bidId}
+            value={ends.endKind}
+            onChange={endKind => save({ endKind })}
+            ariaLabel="What this run ends at"
+            className="h-6 flex-1 text-xs"
+          />
+        )}
       </div>
 
       {/*
@@ -281,7 +305,7 @@ export function RunEndsEditor({
         feature refuses. When assemblies carry a height type (Phase 8), the
         same chip can offer both and the wording changes with it.
       */}
-      {suggestion && (
+      {suggestion && !teeEnds.end && (
         <div className="flex items-start gap-2 rounded border border-[#38BDF8]/40 bg-[#38BDF8]/5 px-2 py-1.5">
           <span className="text-[0.7rem] flex-1 min-w-0">
             <span className="font-medium">{suggestion.label}</span> is marked at

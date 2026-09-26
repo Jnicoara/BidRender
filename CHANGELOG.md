@@ -14,6 +14,13 @@ This is the human-readable companion to the git history — read this to see wha
   and cover. Start it anywhere else (hold Alt to be sure) and it is a separate
   stretch of the same run; the gap between the two is drawn dashed and grey
   and is never counted as pipe.
+- **The runs list shows a run's legs together.** A run with legs gets a line
+  giving how many legs it has and the run's total length, with an "Add leg"
+  button; each leg shows its own length, whether it starts from a tee or
+  separately, and whether it carries the same circuits as the first leg. A leg
+  end on a tee says "Branch tee — carries on at run height, no drop" instead of
+  asking what is there. Deleting the last branch at a tee joins the main back
+  into one leg when both sides still match.
 - **Labor on traced lines now says "Not priced" instead of "0 h" when the
   part has no labor hours set.** It used to freeze a missing labor unit as
   zero, which printed "0 h" beside a real cost and quietly left that labor

@@ -11,7 +11,8 @@
  * conductor counts are exactly the sort of number someone types down a column.
  */
 import { markAppearance, markPath } from "@shared/takeoffMarks";
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { layoutLegs } from "@/lib/runLegs";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/money";
 import {
@@ -304,6 +305,11 @@ export type PanelRun = {
   scaleChangedSinceTraced: boolean;
   /** Where the run starts, so a click can jump the viewer to it. */
   firstPoint: { x: number; y: number } | null;
+  /** Branch legs (D20): the run this row is a leg of; NULL on a root. */
+  parentRunId?: number | null;
+  /** The tee each end sits on, if any. */
+  startTee?: { id: number } | null;
+  endTee?: { id: number } | null;
 };
 
 const feet = (value: number) =>
@@ -548,8 +554,14 @@ export function RunsPanel({
   onAnswerPullPoint,
   onUndoPullPoint,
   pullPointBusy = false,
+  onAddLeg,
 }: {
   runs: PanelRun[];
+  /**
+   * Start tracing another leg of this run (D20) — a branch off it, or a
+   * separate stretch of it. Optional: without it the panel offers none.
+   */
+  onAddLeg?: (run: PanelRun) => void;
   /**
    * Accept or dismiss a proposed pull point, and take an answer back. Optional
    * like the branch-wiring answer: a caller that cannot store one shows the
@@ -1141,49 +1153,84 @@ export function RunsPanel({
             </p>
           </div>
         ) : (
-          runs.map(run => {
+          layoutLegs(runs).map(({ row: run, place }) => {
             const isSelected = run.id === selectedRunId;
-            return (
+            /*
+              BRANCH LEGS (D20). A run of several legs gets a header — the
+              leg count and the run's total, which is the sum of the legs and
+              nothing else (the jump between legs is not pipe) — and its legs
+              are indented under it, each saying how it begins. A plain run
+              looks exactly as it always has.
+            */
+            const multi = place.count > 1;
+            const header = multi && place.index === 1 && (
               <div
-                key={run.id}
-                className={cn(
-                  "border-b border-border px-3 py-2.5 cursor-pointer transition-colors",
-                  isSelected ? "bg-[#F5C518]/5" : "hover:bg-muted/40"
-                )}
-                onClick={() => {
-                  onSelectRun(isSelected ? null : run.id);
-                  const first = run.firstPoint;
-                  if (first) onJumpTo(first);
-                }}
+                key={`legs-${place.rootId}`}
+                className="flex items-center justify-between gap-2 border-b border-border/60 bg-muted/20 px-3 py-1.5"
               >
-                <div className="flex items-start gap-2">
-                  {/*
+                <span className="text-[0.7rem] text-muted-foreground">
+                  {place.count} legs · run total{" "}
+                  <span className="font-mono text-foreground">
+                    {place.runTotalFeet === null
+                      ? "not measurable"
+                      : feet(place.runTotalFeet)}
+                  </span>
+                </span>
+                {onAddLeg && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-[0.7rem]"
+                    onClick={() => onAddLeg(run)}
+                  >
+                    Add leg
+                  </Button>
+                )}
+              </div>
+            );
+            return (
+              <Fragment key={run.id}>
+                {header}
+                <div
+                  className={cn(
+                    "border-b border-border px-3 py-2.5 cursor-pointer transition-colors",
+                    multi && "pl-6",
+                    isSelected ? "bg-[#F5C518]/5" : "hover:bg-muted/40"
+                  )}
+                  onClick={() => {
+                    onSelectRun(isSelected ? null : run.id);
+                    const first = run.firstPoint;
+                    if (first) onJumpTo(first);
+                  }}
+                >
+                  <div className="flex items-start gap-2">
+                    {/*
                     The same two icons the tool buttons use — imported from
                     runIcons so they cannot drift apart again. This row used a
                     lightning bolt for conduit, which says "electrical": not
                     information inside an electrical estimating app, and not
                     what the button that produced the row looked like.
                   */}
-                  {/*
+                    {/*
                     In the run's OWN colour, which is the row's answer to "which
                     of these lines is this?". The icon used to be conduit yellow
                     or cable emerald, matching how the lines were drawn then;
                     now colour means which TYPE, so the row reads its colour
                     from the same function the line does. See runIcons.
                   */}
-                  {run.pathType === "conduit" ? (
-                    <ConduitIcon
-                      className="w-3.5 h-3.5 mt-0.5 shrink-0"
-                      style={{ color: runAppearance(run).color }}
-                    />
-                  ) : (
-                    <CableIcon
-                      className="w-3.5 h-3.5 mt-0.5 shrink-0"
-                      style={{ color: runAppearance(run).color }}
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    {/*
+                    {run.pathType === "conduit" ? (
+                      <ConduitIcon
+                        className="w-3.5 h-3.5 mt-0.5 shrink-0"
+                        style={{ color: runAppearance(run).color }}
+                      />
+                    ) : (
+                      <CableIcon
+                        className="w-3.5 h-3.5 mt-0.5 shrink-0"
+                        style={{ color: runAppearance(run).color }}
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      {/*
                       Two lines, and which fact goes on top is the decision.
 
                       What it IS, not what the app called it when it was drawn:
@@ -1195,15 +1242,37 @@ export function RunsPanel({
                       different number. The type is what prices the run, so it
                       goes on top and truncates last. See runNameParts.
                     */}
-                    <p className="text-sm truncate">
-                      {run.typeName ?? run.displayName ?? run.name}
-                    </p>
-                    {run.endsName && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        {run.endsName}
+                      <p className="text-sm truncate">
+                        {run.typeName ?? run.displayName ?? run.name}
                       </p>
-                    )}
-                    {/*
+                      {run.endsName && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {run.endsName}
+                        </p>
+                      )}
+                      {multi && (
+                        <p className="text-[0.7rem] text-muted-foreground truncate">
+                          Leg {place.index}
+                          {place.startsAs === "branch"
+                            ? // Not "branch": the main's continuation past a
+                              // tee starts there too, and nothing stored tells
+                              // the two apart. "From a tee" is true of both.
+                              " · from a tee"
+                            : place.startsAs === "separate"
+                              ? " · separate start, not joined"
+                              : ""}
+                          {place.index > 1 &&
+                            (place.sameCircuitsAsFirst ? (
+                              " · same circuits as leg 1"
+                            ) : (
+                              <span className="text-[#F5C518]/90">
+                                {" "}
+                                · circuits differ from leg 1
+                              </span>
+                            ))}
+                        </p>
+                      )}
+                      {/*
                       What it is made of, under what it is called.
 
                       The row said what a run was NAMED and never what it was,
@@ -1225,78 +1294,115 @@ export function RunsPanel({
                       and the test is what the two lines SAY rather than what
                       kind of run they belong to.
                     */}
-                    {(() => {
-                      const named = run.typeName ?? run.displayName ?? run.name;
-                      if (run.spec === named) return null;
-                      return (
-                        <p
-                          className={cn(
-                            "text-[0.7rem] truncate",
-                            run.spec
-                              ? "text-muted-foreground"
-                              : "text-[#F5C518]/80"
-                          )}
-                        >
-                          {run.spec ??
-                            "No materials on this type — cannot be priced"}
-                        </p>
-                      );
-                    })()}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                      {run.isSuggestion && (
-                        <Badge
-                          variant="outline"
-                          className="text-[0.65rem] px-1.5 py-0 border-[#F5C518]/40 text-[#F5C518]"
-                        >
-                          <Sparkles className="w-2.5 h-2.5 mr-1" /> Suggested
-                        </Badge>
-                      )}
-                      {run.status === "draft" && !run.isSuggestion && (
-                        <Badge
-                          variant="outline"
-                          className="text-[0.65rem] px-1.5 py-0 text-muted-foreground"
-                        >
-                          Draft
-                        </Badge>
-                      )}
-                      {/*
+                      {(() => {
+                        const named =
+                          run.typeName ?? run.displayName ?? run.name;
+                        if (run.spec === named) return null;
+                        return (
+                          <p
+                            className={cn(
+                              "text-[0.7rem] truncate",
+                              run.spec
+                                ? "text-muted-foreground"
+                                : "text-[#F5C518]/80"
+                            )}
+                          >
+                            {run.spec ??
+                              "No materials on this type — cannot be priced"}
+                          </p>
+                        );
+                      })()}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        {run.isSuggestion && (
+                          <Badge
+                            variant="outline"
+                            className="text-[0.65rem] px-1.5 py-0 border-[#F5C518]/40 text-[#F5C518]"
+                          >
+                            <Sparkles className="w-2.5 h-2.5 mr-1" /> Suggested
+                          </Badge>
+                        )}
+                        {run.status === "draft" && !run.isSuggestion && (
+                          <Badge
+                            variant="outline"
+                            className="text-[0.65rem] px-1.5 py-0 text-muted-foreground"
+                          >
+                            Draft
+                          </Badge>
+                        )}
+                        {/*
                         A proposal waiting on an answer, said on the CLOSED row
                         too: the controls live in the open run, and a question
                         nobody can see from the list is one nobody answers.
                         Dashed like the marker on the drawing.
                       */}
-                      {(() => {
-                        const waiting =
-                          run.bends?.proposals.filter(p => p.answer === null)
-                            .length ?? 0;
-                        return waiting > 0 ? (
-                          <Badge
-                            variant="outline"
-                            className="text-[0.65rem] px-1.5 py-0 border-dashed border-[#F5C518]/60 text-[#F5C518]"
-                          >
-                            {waiting === 1
-                              ? "Pull point to review"
-                              : `${waiting} pull points to review`}
-                          </Badge>
-                        ) : null;
-                      })()}
+                        {(() => {
+                          const waiting =
+                            run.bends?.proposals.filter(p => p.answer === null)
+                              .length ?? 0;
+                          return waiting > 0 ? (
+                            <Badge
+                              variant="outline"
+                              className="text-[0.65rem] px-1.5 py-0 border-dashed border-[#F5C518]/60 text-[#F5C518]"
+                            >
+                              {waiting === 1
+                                ? "Pull point to review"
+                                : `${waiting} pull points to review`}
+                            </Badge>
+                          ) : null;
+                        })()}
+                        {/*
+                        A plain run, open: the way to give it a branch. A run
+                        that already has legs offers this on its header.
+                      */}
+                        {!multi &&
+                          isSelected &&
+                          onAddLeg &&
+                          !run.isSuggestion && (
+                            <button
+                              className="text-[0.7rem] underline text-muted-foreground hover:text-foreground"
+                              onClick={e => {
+                                e.stopPropagation();
+                                onAddLeg(run);
+                              }}
+                            >
+                              Add leg
+                            </button>
+                          )}
+                      </div>
                     </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={e => {
+                        e.stopPropagation();
+                        onRemoveRun(run.id);
+                      }}
+                      /*
+                      On a run of legs, the FIRST leg's bin deletes the whole
+                      run — the root carries it all — and says so. Any other
+                      leg's deletes that leg alone.
+                    */
+                      aria-label={
+                        multi
+                          ? place.index === 1
+                            ? `Delete the whole run, all ${place.count} legs`
+                            : `Delete leg ${place.index}`
+                          : `Delete ${run.name}`
+                      }
+                      title={
+                        multi
+                          ? place.index === 1
+                            ? `Delete the whole run — all ${place.count} legs`
+                            : `Delete leg ${place.index} only`
+                          : undefined
+                      }
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={e => {
-                      e.stopPropagation();
-                      onRemoveRun(run.id);
-                    }}
-                    aria-label={`Delete ${run.name}`}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
 
-                {/*
+                  {/*
                   WHOSE WIRE IS THIS? ASKED, NEVER DECIDED (D18).
 
                   Devices carry the branch wiring between each other and a
@@ -1315,90 +1421,91 @@ export function RunsPanel({
                   goes quiet — re-asking is how a confirmed answer gets
                   un-confirmed.
                 */}
-                {run.wireOwnership === "unanswered" && onAnswerBranchWiring && (
-                  <div className="mt-1.5 rounded border border-border/60 bg-muted/20 px-2 py-1.5">
-                    <p className="text-[0.7rem] text-muted-foreground">
-                      Devices at both ends — is this the branch wiring your
-                      devices already include?
-                    </p>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-6 px-2 text-[0.7rem]"
-                        onClick={e => {
-                          e.stopPropagation();
-                          onAnswerBranchWiring(run.id, true);
-                        }}
-                      >
-                        Yes — don't count it twice
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-6 px-2 text-[0.7rem]"
-                        onClick={e => {
-                          e.stopPropagation();
-                          onAnswerBranchWiring(run.id, false);
-                        }}
-                      >
-                        No — it's a homerun
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                  {run.wireOwnership === "unanswered" &&
+                    onAnswerBranchWiring && (
+                      <div className="mt-1.5 rounded border border-border/60 bg-muted/20 px-2 py-1.5">
+                        <p className="text-[0.7rem] text-muted-foreground">
+                          Devices at both ends — is this the branch wiring your
+                          devices already include?
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[0.7rem]"
+                            onClick={e => {
+                              e.stopPropagation();
+                              onAnswerBranchWiring(run.id, true);
+                            }}
+                          >
+                            Yes — don't count it twice
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[0.7rem]"
+                            onClick={e => {
+                              e.stopPropagation();
+                              onAnswerBranchWiring(run.id, false);
+                            }}
+                          >
+                            No — it's a homerun
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
-                {/*
+                  {/*
                   Answered "branch", so the devices own it. Said out loud rather
                   than the row quietly showing less, and reversible in one tap —
                   an answer nobody can change is a trap, not a decision.
                 */}
-                {run.branchWiring === true && (
-                  <p className="text-[0.7rem] text-muted-foreground mt-1.5">
-                    Branch wiring — your devices already include this cable, so
-                    it is not counted again.{" "}
-                    {onAnswerBranchWiring && (
-                      <button
-                        className="underline hover:text-foreground"
-                        onClick={e => {
-                          e.stopPropagation();
-                          onAnswerBranchWiring(run.id, null);
-                        }}
-                      >
-                        Change
-                      </button>
-                    )}
-                  </p>
-                )}
+                  {run.branchWiring === true && (
+                    <p className="text-[0.7rem] text-muted-foreground mt-1.5">
+                      Branch wiring — your devices already include this cable,
+                      so it is not counted again.{" "}
+                      {onAnswerBranchWiring && (
+                        <button
+                          className="underline hover:text-foreground"
+                          onClick={e => {
+                            e.stopPropagation();
+                            onAnswerBranchWiring(run.id, null);
+                          }}
+                        >
+                          Change
+                        </button>
+                      )}
+                    </p>
+                  )}
 
-                {/* A run that cannot be measured says so instead of showing 0 */}
-                {run.quantities === null ? (
-                  <p className="text-xs text-[#F5C518] mt-1.5 flex items-start gap-1.5">
-                    <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-                    Flat length not measurable — no scale on this sheet, so this
-                    run is not in the totals.
-                  </p>
-                ) : (
-                  <div className="mt-1.5 space-y-0.5">
-                    {/* Conduit and wire kept visually separate: they are two
+                  {/* A run that cannot be measured says so instead of showing 0 */}
+                  {run.quantities === null ? (
+                    <p className="text-xs text-[#F5C518] mt-1.5 flex items-start gap-1.5">
+                      <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                      Flat length not measurable — no scale on this sheet, so
+                      this run is not in the totals.
+                    </p>
+                  ) : (
+                    <div className="mt-1.5 space-y-0.5">
+                      {/* Conduit and wire kept visually separate: they are two
                       different purchases measured along one line. */}
-                    {run.quantities.conduitFeet !== null && (
-                      <Footage
-                        label="Conduit"
-                        flat={run.quantities.runFeet}
-                        vertical={run.quantities.verticalFeet}
-                        total={run.quantities.conduitFeet}
-                      />
-                    )}
-                    {run.quantities.cableFeet !== null && (
-                      <Footage
-                        label="Cable"
-                        flat={run.quantities.runFeet}
-                        vertical={run.quantities.verticalFeet}
-                        total={run.quantities.cableFeet}
-                      />
-                    )}
-                    {/*
+                      {run.quantities.conduitFeet !== null && (
+                        <Footage
+                          label="Conduit"
+                          flat={run.quantities.runFeet}
+                          vertical={run.quantities.verticalFeet}
+                          total={run.quantities.conduitFeet}
+                        />
+                      )}
+                      {run.quantities.cableFeet !== null && (
+                        <Footage
+                          label="Cable"
+                          flat={run.quantities.runFeet}
+                          vertical={run.quantities.verticalFeet}
+                          total={run.quantities.cableFeet}
+                        />
+                      )}
+                      {/*
                       WIRE, OR THE REASON THERE IS NONE.
 
                       A newly traced run has no circuits — the type's
@@ -1418,52 +1525,52 @@ export function RunsPanel({
                       work, which the branch-wiring guard above refuses to do
                       for the same reason.
                     */}
-                    {run.pathType === "conduit" &&
-                      (run.circuits.length === 0 ? (
-                        <div className="flex items-baseline justify-between text-xs gap-2">
-                          <span className="text-muted-foreground shrink-0">
-                            Wires in this pipe
-                          </span>
-                          <span className="flex items-baseline gap-2">
-                            <span className="font-mono text-muted-foreground/70">
-                              none
+                      {run.pathType === "conduit" &&
+                        (run.circuits.length === 0 ? (
+                          <div className="flex items-baseline justify-between text-xs gap-2">
+                            <span className="text-muted-foreground shrink-0">
+                              Wires in this pipe
                             </span>
-                            <button
-                              className="underline text-muted-foreground hover:text-foreground"
-                              onClick={e => {
-                                e.stopPropagation();
-                                // Opens the run, because the circuit rows this
-                                // is about only exist on an open one.
-                                onSelectRun(run.id);
-                                setAddingTo(run.id);
-                                setCircuitName(nextCircuitName(run.circuits));
-                              }}
-                            >
-                              Add wires
-                            </button>
-                          </span>
-                        </div>
-                      ) : (
-                        <Footage
-                          label={
-                            <>
-                              Wire
-                              <span className="text-muted-foreground/60">
-                                {" "}
-                                ({run.circuits.length}{" "}
-                                {run.circuits.length === 1
-                                  ? "circuit"
-                                  : "circuits"}
-                                )
+                            <span className="flex items-baseline gap-2">
+                              <span className="font-mono text-muted-foreground/70">
+                                none
                               </span>
-                            </>
-                          }
-                          flat={wireFlat(run)}
-                          vertical={wireVertical(run)}
-                          total={run.quantities.totalWireFeet}
-                        />
-                      ))}
-                    {/*
+                              <button
+                                className="underline text-muted-foreground hover:text-foreground"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  // Opens the run, because the circuit rows this
+                                  // is about only exist on an open one.
+                                  onSelectRun(run.id);
+                                  setAddingTo(run.id);
+                                  setCircuitName(nextCircuitName(run.circuits));
+                                }}
+                              >
+                                Add wires
+                              </button>
+                            </span>
+                          </div>
+                        ) : (
+                          <Footage
+                            label={
+                              <>
+                                Wire
+                                <span className="text-muted-foreground/60">
+                                  {" "}
+                                  ({run.circuits.length}{" "}
+                                  {run.circuits.length === 1
+                                    ? "circuit"
+                                    : "circuits"}
+                                  )
+                                </span>
+                              </>
+                            }
+                            flat={wireFlat(run)}
+                            vertical={wireVertical(run)}
+                            total={run.quantities.totalWireFeet}
+                          />
+                        ))}
+                      {/*
                       The bare copper, on its own line, and only when there is
                       some.
 
@@ -1477,18 +1584,18 @@ export function RunsPanel({
                       above: a bare figure of 0.00 ft is noise standing where a
                       number goes.
                     */}
-                    {run.pathType === "conduit" && wireGround(run) > 0 && (
-                      <div className="flex items-baseline justify-between text-xs gap-2 pl-3">
-                        <span className="text-muted-foreground/70 shrink-0">
-                          of which bare ground
-                        </span>
-                        <span className="font-mono text-right text-muted-foreground/70">
-                          {feet(wireGround(run))}
-                        </span>
-                      </div>
-                    )}
+                      {run.pathType === "conduit" && wireGround(run) > 0 && (
+                        <div className="flex items-baseline justify-between text-xs gap-2 pl-3">
+                          <span className="text-muted-foreground/70 shrink-0">
+                            of which bare ground
+                          </span>
+                          <span className="font-mono text-right text-muted-foreground/70">
+                            {feet(wireGround(run))}
+                          </span>
+                        </div>
+                      )}
 
-                    {/*
+                      {/*
                       An incomplete total has to shout, and a HALF total is
                       incomplete. An unset height makes a run quietly low and
                       nothing on screen says so — the same argument § 2.3 makes
@@ -1507,12 +1614,12 @@ export function RunsPanel({
                       because it needs you to already suspect the run you are
                       about to open.
                     */}
-                    {verticalsNotice(run.quantities?.verticals) && (
-                      <div className="flex items-baseline text-xs gap-2">
-                        <span className="text-muted-foreground shrink-0">
-                          Verticals
-                        </span>
-                        {/*
+                      {verticalsNotice(run.quantities?.verticals) && (
+                        <div className="flex items-baseline text-xs gap-2">
+                          <span className="text-muted-foreground shrink-0">
+                            Verticals
+                          </span>
+                          {/*
                           LEFT, where every other value in this panel is right.
 
                           The rows above it hold numbers, and a number is read
@@ -1525,88 +1632,88 @@ export function RunsPanel({
                           the "copying a layout does not copy the behaviour"
                           trap in CLAUDE.md arriving as typography.
                         */}
-                        <span className="text-[0.7rem] text-[#F5C518] text-left">
-                          {verticalsNotice(run.quantities?.verticals)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                          <span className="text-[0.7rem] text-[#F5C518] text-left">
+                            {verticalsNotice(run.quantities?.verticals)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                {run.scaleChangedSinceTraced && (
-                  <p className="text-[0.7rem] text-[#F5C518] mt-1">
-                    The sheet's scale changed since this was traced — check the
-                    length.
-                  </p>
-                )}
+                  {run.scaleChangedSinceTraced && (
+                    <p className="text-[0.7rem] text-[#F5C518] mt-1">
+                      The sheet's scale changed since this was traced — check
+                      the length.
+                    </p>
+                  )}
 
-                {/*
+                  {/*
                   What is at each end, and the verticals they produce. Shown
                   only on the open run: nine controls on every row is a panel
                   people stop reading.
                 */}
-                {isSelected && renderRunType && !run.isSuggestion && (
-                  <div
-                    className="mt-2 pt-2 border-t border-border/60"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    {renderRunType(run)}
-                  </div>
-                )}
-
-                {isSelected && renderRunEnds && !run.isSuggestion && (
-                  <div onClick={e => e.stopPropagation()}>
-                    {renderRunEnds(run)}
-                  </div>
-                )}
-
-                {/* Bends and pull points, after the ends that produce the
-                    drops they count. */}
-                {isSelected &&
-                  run.bends &&
-                  !run.isSuggestion &&
-                  onAnswerPullPoint &&
-                  onUndoPullPoint && (
-                    <div onClick={e => e.stopPropagation()}>
-                      <RunPullPoints
-                        run={run}
-                        bends={run.bends}
-                        onAnswer={onAnswerPullPoint}
-                        onUndo={onUndoPullPoint}
-                        busy={pullPointBusy}
-                      />
+                  {isSelected && renderRunType && !run.isSuggestion && (
+                    <div
+                      className="mt-2 pt-2 border-t border-border/60"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {renderRunType(run)}
                     </div>
                   )}
 
-                {/* Circuits, only for conduit and only when this run is open */}
-                {isSelected && run.pathType === "conduit" && (
-                  <div
-                    className="mt-2 pt-2 border-t border-border/60 space-y-1.5"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    {run.circuits.map(circuit => (
-                      <div
-                        key={circuit.id}
-                        className="flex items-center gap-1.5"
-                      >
-                        <span className="text-xs flex-1 min-w-0 truncate">
-                          {circuit.name}
-                        </span>
-                        <InlineNumberField
-                          value={circuit.conductorCount}
-                          onSave={next =>
-                            onUpdateCircuit(circuit.id, {
-                              conductorCount: next,
-                            })
-                          }
-                          rules={{ min: 1, max: 60 }}
-                          className="h-6 w-12 text-xs"
-                          ariaLabel={`Conductors for ${circuit.name}`}
+                  {isSelected && renderRunEnds && !run.isSuggestion && (
+                    <div onClick={e => e.stopPropagation()}>
+                      {renderRunEnds(run)}
+                    </div>
+                  )}
+
+                  {/* Bends and pull points, after the ends that produce the
+                    drops they count. */}
+                  {isSelected &&
+                    run.bends &&
+                    !run.isSuggestion &&
+                    onAnswerPullPoint &&
+                    onUndoPullPoint && (
+                      <div onClick={e => e.stopPropagation()}>
+                        <RunPullPoints
+                          run={run}
+                          bends={run.bends}
+                          onAnswer={onAnswerPullPoint}
+                          onUndo={onUndoPullPoint}
+                          busy={pullPointBusy}
                         />
-                        <span className="text-[0.7rem] text-muted-foreground">
-                          cond.
-                        </span>
-                        {/*
+                      </div>
+                    )}
+
+                  {/* Circuits, only for conduit and only when this run is open */}
+                  {isSelected && run.pathType === "conduit" && (
+                    <div
+                      className="mt-2 pt-2 border-t border-border/60 space-y-1.5"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {run.circuits.map(circuit => (
+                        <div
+                          key={circuit.id}
+                          className="flex items-center gap-1.5"
+                        >
+                          <span className="text-xs flex-1 min-w-0 truncate">
+                            {circuit.name}
+                          </span>
+                          <InlineNumberField
+                            value={circuit.conductorCount}
+                            onSave={next =>
+                              onUpdateCircuit(circuit.id, {
+                                conductorCount: next,
+                              })
+                            }
+                            rules={{ min: 1, max: 60 }}
+                            className="h-6 w-12 text-xs"
+                            ariaLabel={`Conductors for ${circuit.name}`}
+                          />
+                          <span className="text-[0.7rem] text-muted-foreground">
+                            cond.
+                          </span>
+                          {/*
                           The ground, and the reason it is nullable here.
 
                           This is the first place a person types a ground on a
@@ -1618,17 +1725,17 @@ export function RunsPanel({
                           for, in the field that decides how much bare copper
                           gets bought.
                         */}
-                        <InlineNumberField
-                          value={circuit.groundCount}
-                          whenUnset={{ placeholder: "?" }}
-                          onSave={next =>
-                            onUpdateCircuit(circuit.id, { groundCount: next })
-                          }
-                          rules={{ min: 0, max: 10 }}
-                          className="h-6 w-10 text-xs"
-                          ariaLabel={`Grounds for ${circuit.name}`}
-                        />
-                        {/*
+                          <InlineNumberField
+                            value={circuit.groundCount}
+                            whenUnset={{ placeholder: "?" }}
+                            onSave={next =>
+                              onUpdateCircuit(circuit.id, { groundCount: next })
+                            }
+                            rules={{ min: 0, max: 10 }}
+                            className="h-6 w-10 text-xs"
+                            ariaLabel={`Grounds for ${circuit.name}`}
+                          />
+                          {/*
                           SHARED OR ITS OWN — a toggle, not a checkbox buried
                           in a dialog, because it moves a wire quantity.
 
@@ -1637,105 +1744,105 @@ export function RunsPanel({
                           the exception and says so, in the accent colour, at
                           the point where the run's ground line will change.
                         */}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onUpdateCircuit(circuit.id, {
-                              separateGround: !circuit.separateGround,
-                            })
-                          }
-                          className={cn(
-                            "text-[0.7rem] rounded px-1 py-0.5 border transition-colors",
-                            circuit.separateGround
-                              ? "border-[#F5C518]/60 text-[#F5C518]"
-                              : // Dotted underline at rest, because at 11px a
-                                // bare word beside "cond." reads as a label
-                                // and nobody would find the isolated-ground
-                                // option. It changes a wire quantity, so it
-                                // has to look like something you can press.
-                                "border-transparent text-muted-foreground underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 hover:text-foreground hover:border-border"
-                          )}
-                          title={
-                            circuit.separateGround
-                              ? "This circuit pulls its own ground. Click to share the run's."
-                              : "This circuit shares the run's ground. Click to give it its own."
-                          }
-                          aria-pressed={circuit.separateGround}
-                          aria-label={`Ground for ${circuit.name}: ${
-                            circuit.separateGround ? "its own" : "shared"
-                          }`}
-                        >
-                          {circuit.separateGround ? "own gnd." : "gnd."}
-                        </button>
-                        <span className="text-[0.7rem] font-mono text-muted-foreground w-16 text-right">
-                          {run.quantities
-                            ? feet(
-                                run.quantities.wireByCircuit.find(
-                                  w => w.name === circuit.name
-                                )?.feet ?? 0
-                              )
-                            : "—"}
-                        </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onUpdateCircuit(circuit.id, {
+                                separateGround: !circuit.separateGround,
+                              })
+                            }
+                            className={cn(
+                              "text-[0.7rem] rounded px-1 py-0.5 border transition-colors",
+                              circuit.separateGround
+                                ? "border-[#F5C518]/60 text-[#F5C518]"
+                                : // Dotted underline at rest, because at 11px a
+                                  // bare word beside "cond." reads as a label
+                                  // and nobody would find the isolated-ground
+                                  // option. It changes a wire quantity, so it
+                                  // has to look like something you can press.
+                                  "border-transparent text-muted-foreground underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 hover:text-foreground hover:border-border"
+                            )}
+                            title={
+                              circuit.separateGround
+                                ? "This circuit pulls its own ground. Click to share the run's."
+                                : "This circuit shares the run's ground. Click to give it its own."
+                            }
+                            aria-pressed={circuit.separateGround}
+                            aria-label={`Ground for ${circuit.name}: ${
+                              circuit.separateGround ? "its own" : "shared"
+                            }`}
+                          >
+                            {circuit.separateGround ? "own gnd." : "gnd."}
+                          </button>
+                          <span className="text-[0.7rem] font-mono text-muted-foreground w-16 text-right">
+                            {run.quantities
+                              ? feet(
+                                  run.quantities.wireByCircuit.find(
+                                    w => w.name === circuit.name
+                                  )?.feet ?? 0
+                                )
+                              : "—"}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => onRemoveCircuit(circuit.id)}
+                            aria-label={`Remove ${circuit.name}`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
+
+                      {addingTo === run.id ? (
+                        <div className="flex items-center gap-1.5">
+                          <Input
+                            value={circuitName}
+                            onChange={e => setCircuitName(e.target.value)}
+                            onFocus={selectOnFocus}
+                            onKeyDown={e => {
+                              if (e.key === "Enter" && circuitName.trim()) {
+                                addOneCircuit(run, circuitName.trim());
+                              }
+                              if (e.key === "Escape") {
+                                setAddingTo(null);
+                                setCircuitName("");
+                              }
+                            }}
+                            placeholder="Ckt 12"
+                            className="h-6 text-xs flex-1"
+                            autoFocus
+                          />
+                          <Button
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => {
+                              if (!circuitName.trim()) return;
+                              addOneCircuit(run, circuitName.trim());
+                            }}
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      ) : (
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-                          onClick={() => onRemoveCircuit(circuit.id)}
-                          aria-label={`Remove ${circuit.name}`}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    ))}
-
-                    {addingTo === run.id ? (
-                      <div className="flex items-center gap-1.5">
-                        <Input
-                          value={circuitName}
-                          onChange={e => setCircuitName(e.target.value)}
-                          onFocus={selectOnFocus}
-                          onKeyDown={e => {
-                            if (e.key === "Enter" && circuitName.trim()) {
-                              addOneCircuit(run, circuitName.trim());
-                            }
-                            if (e.key === "Escape") {
-                              setAddingTo(null);
-                              setCircuitName("");
-                            }
-                          }}
-                          placeholder="Ckt 12"
-                          className="h-6 text-xs flex-1"
-                          autoFocus
-                        />
-                        <Button
-                          size="sm"
-                          className="h-6 px-2 text-xs"
+                          className="h-6 gap-1 text-xs text-muted-foreground"
                           onClick={() => {
-                            if (!circuitName.trim()) return;
-                            addOneCircuit(run, circuitName.trim());
+                            setAddingTo(run.id);
+                            setCircuitName(nextCircuitName(run.circuits));
                           }}
                         >
-                          Add
+                          <Plus className="w-3 h-3" />{" "}
+                          {run.circuits.length === 0
+                            ? "Add wires to this run"
+                            : "Add another circuit"}
                         </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 gap-1 text-xs text-muted-foreground"
-                        onClick={() => {
-                          setAddingTo(run.id);
-                          setCircuitName(nextCircuitName(run.circuits));
-                        }}
-                      >
-                        <Plus className="w-3 h-3" />{" "}
-                        {run.circuits.length === 0
-                          ? "Add wires to this run"
-                          : "Add another circuit"}
-                      </Button>
-                    )}
+                      )}
 
-                    {/*
+                      {/*
                       WHAT THE GROUND ACTUALLY COMES TO, said out loud.
 
                       The sharing rule is invisible from the circuit rows: two
@@ -1749,22 +1856,22 @@ export function RunsPanel({
                       the bid takes — not recomputed here, so the line and the
                       bid cannot disagree.
                     */}
-                    {run.circuits.length > 0 && run.quantities && (
-                      <div className="flex items-baseline justify-between text-[0.7rem] gap-2 pt-0.5">
-                        <span className="text-muted-foreground/70">
-                          {groundSentence(
-                            run.quantities.grounds,
-                            run.circuits.filter(c => !c.separateGround).length
-                          )}
-                        </span>
-                        <span className="font-mono text-muted-foreground/70 shrink-0">
-                          {feet(run.quantities.groundFeet)}
-                        </span>
-                      </div>
-                    )}
+                      {run.circuits.length > 0 && run.quantities && (
+                        <div className="flex items-baseline justify-between text-[0.7rem] gap-2 pt-0.5">
+                          <span className="text-muted-foreground/70">
+                            {groundSentence(
+                              run.quantities.grounds,
+                              run.circuits.filter(c => !c.separateGround).length
+                            )}
+                          </span>
+                          <span className="font-mono text-muted-foreground/70 shrink-0">
+                            {feet(run.quantities.groundFeet)}
+                          </span>
+                        </div>
+                      )}
 
-                    <p className="text-[0.7rem] text-muted-foreground/70">
-                      {/*
+                      <p className="text-[0.7rem] text-muted-foreground/70">
+                        {/*
                         BOTH RULES, because they are now different and the
                         line above states the one that surprises people.
 
@@ -1774,38 +1881,40 @@ export function RunsPanel({
                         "1 ground shared by 2 circuits" it reads as a
                         contradiction — so it says which is which.
                       */}
-                      {run.circuits.length === 0
-                        ? "No wires in this pipe yet — an empty conduit counts pipe and no wire."
-                        : "Each circuit pulls its own wire down this one conduit. They share one ground, sized to the largest — unless you give one its own."}
-                    </p>
-                  </div>
-                )}
+                        {run.circuits.length === 0
+                          ? "No wires in this pipe yet — an empty conduit counts pipe and no wire."
+                          : "Each circuit pulls its own wire down this one conduit. They share one ground, sized to the largest — unless you give one its own."}
+                      </p>
+                    </div>
+                  )}
 
-                {isSelected && (run.status === "draft" || run.isSuggestion) && (
-                  <div
-                    className="mt-2 flex items-center gap-1.5"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    {run.isSuggestion ? (
-                      <Button
-                        size="sm"
-                        className="h-6 gap-1 text-xs"
-                        onClick={() => onAcceptSuggestion(run.id)}
+                  {isSelected &&
+                    (run.status === "draft" || run.isSuggestion) && (
+                      <div
+                        className="mt-2 flex items-center gap-1.5"
+                        onClick={e => e.stopPropagation()}
                       >
-                        <Check className="w-3 h-3" /> Accept this route
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        className="h-6 gap-1 text-xs"
-                        onClick={() => onCommitRun(run.id)}
-                      >
-                        <Check className="w-3 h-3" /> Finish run
-                      </Button>
+                        {run.isSuggestion ? (
+                          <Button
+                            size="sm"
+                            className="h-6 gap-1 text-xs"
+                            onClick={() => onAcceptSuggestion(run.id)}
+                          >
+                            <Check className="w-3 h-3" /> Accept this route
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="h-6 gap-1 text-xs"
+                            onClick={() => onCommitRun(run.id)}
+                          >
+                            <Check className="w-3 h-3" /> Finish run
+                          </Button>
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
-              </div>
+                </div>
+              </Fragment>
             );
           })
         )}
