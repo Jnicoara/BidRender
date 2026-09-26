@@ -182,6 +182,12 @@ export function groupRunFootage(input: {
       row.legs.push(
         legFromRun({
           id: run.id,
+          // No leg rows or tees can exist before 0085 (branch legs step 4),
+          // which is where these start being read off the row. Every run is
+          // its own root with plain ends until then.
+          parentRunId: null,
+          startTee: null,
+          endTee: null,
           startStampId: run.startStampId,
           endStampId: run.endStampId,
           points: run.points,

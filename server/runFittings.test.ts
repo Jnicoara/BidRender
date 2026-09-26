@@ -42,6 +42,7 @@ function leg(
 ): FittingLeg {
   return {
     id,
+    runId: id,
     from,
     to,
     feet,
@@ -254,6 +255,9 @@ describe("legs from today's runs", () => {
     verticals: { start: LEVEL, end: LEVEL },
     feetPerPoint: null,
     answers: [],
+    parentRunId: null,
+    startTee: null,
+    endTee: null,
   };
 
   it("gives an unlinked end a node of its own", () => {

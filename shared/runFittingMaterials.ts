@@ -234,6 +234,51 @@ export function pullBoxFor(
   };
 }
 
+/**
+ * The box at a branch tee (D20, answer 3): a 4" square box and blank cover up
+ * to 3/4", 4-11/16" from 1" to 1-1/4", and the pull-box rule from 1-1/2" up —
+ * a tee in large pipe is an angle pull, and a pull box comes with its screw
+ * cover. Box fill is not checked (the same stance as conduit fill: never).
+ */
+export function teeBoxFor(
+  baselineName: string | null,
+  ownName: string | null
+):
+  | { box: string; cover: string | null; why: string }
+  | { box: null; cover: null; why: string } {
+  const parsed = readRaceway(baselineName, ownName);
+  const inches = parsed ? TRADE_SIZE_INCHES[parsed.size] : undefined;
+  if (!parsed || inches === undefined) {
+    return {
+      box: null,
+      cover: null,
+      why: "The raceway's size cannot be read, so no tee box size is proposed",
+    };
+  }
+  if (inches <= 0.75) {
+    return {
+      box: '4" square box',
+      cover: '4" square blank cover',
+      why: `a 4" square box at each tee on ${parsed.size}`,
+    };
+  }
+  if (inches <= 1.25) {
+    return {
+      box: '4-11/16" square box',
+      cover: '4-11/16" square blank cover',
+      why: `a 4-11/16" square box at each tee on ${parsed.size}`,
+    };
+  }
+  const pull = pullBoxFor(baselineName, ownName);
+  return pull.name === null
+    ? { box: null, cover: null, why: pull.why }
+    : {
+        box: pull.name,
+        cover: null,
+        why: `a pull box at each tee — ${pull.why}`,
+      };
+}
+
 function trimInches(value: number): string {
   return String(Math.round(value * 100) / 100);
 }

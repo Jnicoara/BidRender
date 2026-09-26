@@ -54,6 +54,7 @@ import {
   type PullPointAnswer,
 } from "./runBends";
 import type { EndVertical } from "./takeoffHeights";
+import { TEE_NODE, endNodeKey, type TeeRef } from "./runNetwork";
 
 /**
  * How one stick of this raceway joins the next.
@@ -99,6 +100,13 @@ export type RacewayFittingSpec = {
 };
 
 export type FittingLeg = BendLeg & {
+  /**
+   * The RUN this leg belongs to — its root row's id (D20). Sentences count
+   * runs, never legs: a run of three legs with no scale is "1 run", not 3.
+   * Explicit rather than parsed out of `id`, which is what `runOf` used to do
+   * and would have read every leg row of a branched run as a run of its own.
+   */
+  runId: string;
   /** Node keys. Equal keys on two legs mean those ends meet. */
   from: string;
   to: string;
@@ -462,10 +470,22 @@ function countConnectors(
   // part a reader wants to check. Pull points are said on their own, because
   // an LB's hubs follow the pipe rather than the box rule.
   const byDegree = new Map<number, number>();
+  const teesByDegree = new Map<number, number>();
   let qty = 0;
   let lbs = 0;
   let pullBoxes = 0;
   for (const [node, degree] of Array.from(nodeDegrees(legs).entries())) {
+    /*
+      A tee is said as a tee, not by its degree here. Legs of different sizes
+      are counted in different groups, so a 1/2" branch off a 3/4" main sees
+      the tee as degree 1 in its own group — "1 line end" would be a true
+      count and a false sentence (D20).
+    */
+    if (node.startsWith(TEE_NODE)) {
+      teesByDegree.set(degree, (teesByDegree.get(degree) ?? 0) + 1);
+      qty += degree;
+      continue;
+    }
     if (node.startsWith(LB_NODE)) {
       lbs++;
       if (raceway.lbHubsTakeConnectors) qty += degree;
@@ -496,6 +516,13 @@ function countConnectors(
         return `${plural(nodes, "in-and-out box", "in-and-out boxes")} (2 each)`;
       return `${plural(nodes, "box", "boxes")} where ${degree} conduits meet`;
     });
+  const teeParts = Array.from(teesByDegree.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(
+      ([degree, nodes]) =>
+        `${plural(nodes, "branch tee")} (${degree} ${nodes === 1 ? "" : "each "}of this size)`
+    );
+  parts.push(...teeParts);
   return {
     kind,
     status: "counted",
@@ -572,15 +599,21 @@ function countStraps(
  * `endDropOf` so the bend count and the footage cannot disagree about it.
  *
  * An end linked to a stamp becomes that stamp's node, so two runs meeting at
- * one box share it. An unlinked end is a node of its own: a line end.
+ * one box share it. An end on a TEE becomes the tee's node, so the legs
+ * meeting at a split share it (D20) — see `endNodeKey` for which wins. An
+ * unlinked end is a node of its own: a line end.
  *
  * `answers` are this run's stored pull-point answers; `feetPerPoint` is the
  * sheet's scale, which merging a traced sweep needs (`runBends.ts`).
  */
 export function legFromRun(run: {
   id: number;
+  /** The root row this leg belongs to; NULL on a root (every plain run). */
+  parentRunId: number | null;
   startStampId: number | null;
   endStampId: number | null;
+  startTee: TeeRef | null;
+  endTee: TeeRef | null;
   points: readonly Point[];
   conduitFeet: number | null;
   verticals: { start: EndVertical; end: EndVertical };
@@ -591,12 +624,9 @@ export function legFromRun(run: {
   const endDrop = endDropOf(run.verticals.end);
   return {
     id: String(run.id),
-    from:
-      run.startStampId !== null
-        ? `stamp:${run.startStampId}`
-        : `run:${run.id}:start`,
-    to:
-      run.endStampId !== null ? `stamp:${run.endStampId}` : `run:${run.id}:end`,
+    runId: String(run.parentRunId ?? run.id),
+    from: endNodeKey(run.id, "start", run.startStampId, run.startTee),
+    to: endNodeKey(run.id, "end", run.endStampId, run.endTee),
     feet: run.conduitFeet,
     feetIsFloor: startDrop.state === "unknown" || endDrop.state === "unknown",
     points: run.points,
@@ -620,14 +650,14 @@ function prefix(atLeast: boolean): string {
 }
 
 /**
- * The run a leg came from. `splitAtPullPoints` names its pieces
- * `<run>#<n>`, so a run cut by a pull box is still ONE run in a sentence —
- * counting pieces said "3 runs are short" about two runs (found on screen,
- * 2026-09-26).
+ * The run a leg came from. A run cut by a pull box is still ONE run in a
+ * sentence — counting pieces said "3 runs are short" about two runs (found on
+ * screen, 2026-09-26). So is a run with branch legs (D20), which is why this
+ * reads `runId` rather than the `<run>#<n>` piece names it used to parse: a
+ * leg row has an id of its own, and parsing would count it as a run.
  */
 function runOf(leg: FittingLeg): string {
-  const cut = leg.id.indexOf("#");
-  return cut < 0 ? leg.id : leg.id.slice(0, cut);
+  return leg.runId;
 }
 
 /** How many distinct RUNS these legs are. */

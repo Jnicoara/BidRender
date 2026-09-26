@@ -77,6 +77,7 @@ function fittingLeg(
 ): FittingLeg {
   return {
     ...bendLeg(points, opts),
+    runId: opts.runId ?? opts.id ?? "1",
     from: opts.from ?? "run:1:start",
     to: opts.to ?? "run:1:end",
     feet,
