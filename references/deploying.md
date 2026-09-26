@@ -709,6 +709,12 @@ failed only because an older build's test run had re-seeded old names into the
 shared TEST database (`todo.md` § traps). Without the production-data
 rehearsal, that red test and a real duplicate would have looked the same.
 
+**And production then matched it line for line** (deployed as `1c29584`,
+2026-09-26): 722 → 1143 rows, the same 46 renames, the same 2 retirements, no
+deletions, no user row touched, every reference identical. Run the same
+before/after comparison against production itself after the first boot — the
+rehearsal says what should happen, and only production says it did.
+
 ## 6. Verifying a deploy actually took
 
 A deploy that silently didn't take looks identical to one that did, so check
