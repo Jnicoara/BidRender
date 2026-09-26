@@ -25,17 +25,24 @@ import {
   sumLineCosts,
   sumModifiers,
   toCents,
+  type CompanyPricingDefaults,
 } from "@shared/pricing";
 
 // ─── Company defaults vs per-bid overrides ────────────────────────────────────
 
 describe("resolveBidPricingSettings", () => {
-  const company = {
+  // Typed, so the next field added to the company defaults names this fixture
+  // instead of slipping past it (pnpm check skips tests). productivityPct was
+  // the one it missed: 0 is "no adjustment", which is what its absence already
+  // produced for everything asserted here — measured, overhead, profit, both
+  // sources and the final price are identical either way.
+  const company: CompanyPricingDefaults = {
     overheadEnabled: true,
     overheadMode: "percentage" as const,
     overheadValue: 0.1,
     profitMethod: "markup" as const,
     profitValue: 0.2,
+    productivityPct: 0,
   };
 
   it("inherits both groups when the bid overrides nothing", () => {
