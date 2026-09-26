@@ -37,6 +37,35 @@ vi.mock("./_core/sdk", () => ({
 
 import * as dbMod from "./db";
 import { appRouter } from "./routers";
+import type { User } from "../drizzle/schema";
+
+/** The User columns added after these fixtures were written. */
+type LaterUserColumns =
+  | "accessTier"
+  | "activeCompanyId"
+  | "onboardingCompletedAt"
+  | "checklistDismissedAt";
+
+/**
+ * A users row as the database returns one: what each case states, plus the
+ * later columns at the schema's own defaults (accessTier "standard", the rest
+ * NULL).
+ *
+ * These mocks were hand-built rows and fell four columns behind User, unseen
+ * because pnpm check skips tests. The missing ones never touched a result
+ * asserted here — auth copies them into the returned user (publicUser.ts) and
+ * no case reads them — but a mock with fewer columns than any real row is a
+ * user that cannot exist. Typed User, so the next column names this helper.
+ */
+function userRow(fields: Omit<User, LaterUserColumns>): User {
+  return {
+    ...fields,
+    accessTier: "standard",
+    activeCompanyId: null,
+    onboardingCompletedAt: null,
+    checklistDismissedAt: null,
+  };
+}
 
 type SetCookieCall = {
   name: string;
@@ -73,20 +102,22 @@ describe("auth.signup", () => {
     vi.mocked(dbMod.upsertUser).mockResolvedValue(undefined);
     vi.mocked(dbMod.getUserByEmail)
       .mockResolvedValueOnce(undefined) // first call: check existing
-      .mockResolvedValueOnce({
-        // second call: fetch after insert
-        id: 1,
-        openId: "email_abc",
-        email: "test@example.com",
-        name: "Test User",
-        passwordHash: "hashed:Password1!",
-        emailVerified: false,
-        loginMethod: "email_password",
-        role: "user",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        lastSignedIn: new Date(),
-      });
+      .mockResolvedValueOnce(
+        userRow({
+          // second call: fetch after insert
+          id: 1,
+          openId: "email_abc",
+          email: "test@example.com",
+          name: "Test User",
+          passwordHash: "hashed:Password1!",
+          emailVerified: false,
+          loginMethod: "email_password",
+          role: "user",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          lastSignedIn: new Date(),
+        })
+      );
 
     const { ctx, cookies } = makeCtx();
     const caller = appRouter.createCaller(ctx);
@@ -106,19 +137,21 @@ describe("auth.signup", () => {
 
   it("throws CONFLICT if email already exists", async () => {
     // Always return an existing user (simulates email already registered)
-    vi.mocked(dbMod.getUserByEmail).mockResolvedValue({
-      id: 1,
-      openId: "email_existing",
-      email: "existing@example.com",
-      name: "Existing",
-      passwordHash: "hashed:Password1!",
-      emailVerified: false,
-      loginMethod: "email_password",
-      role: "user",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
-    });
+    vi.mocked(dbMod.getUserByEmail).mockResolvedValue(
+      userRow({
+        id: 1,
+        openId: "email_existing",
+        email: "existing@example.com",
+        name: "Existing",
+        passwordHash: "hashed:Password1!",
+        emailVerified: false,
+        loginMethod: "email_password",
+        role: "user",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastSignedIn: new Date(),
+      })
+    );
 
     const { ctx } = makeCtx();
     const caller = appRouter.createCaller(ctx);
@@ -136,19 +169,21 @@ describe("auth.login", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("logs in with correct credentials and sets session cookie", async () => {
-    vi.mocked(dbMod.getUserByEmail).mockResolvedValue({
-      id: 2,
-      openId: "email_user2",
-      email: "user@example.com",
-      name: "User Two",
-      passwordHash: "hashed:Correct1!",
-      emailVerified: true,
-      loginMethod: "email_password",
-      role: "user",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
-    });
+    vi.mocked(dbMod.getUserByEmail).mockResolvedValue(
+      userRow({
+        id: 2,
+        openId: "email_user2",
+        email: "user@example.com",
+        name: "User Two",
+        passwordHash: "hashed:Correct1!",
+        emailVerified: true,
+        loginMethod: "email_password",
+        role: "user",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastSignedIn: new Date(),
+      })
+    );
     vi.mocked(dbMod.upsertUser).mockResolvedValue(undefined);
 
     const { ctx, cookies } = makeCtx();
@@ -164,19 +199,21 @@ describe("auth.login", () => {
   });
 
   it("rejects wrong password with UNAUTHORIZED", async () => {
-    vi.mocked(dbMod.getUserByEmail).mockResolvedValue({
-      id: 2,
-      openId: "email_user2",
-      email: "user@example.com",
-      name: "User Two",
-      passwordHash: "hashed:Correct1!",
-      emailVerified: true,
-      loginMethod: "email_password",
-      role: "user",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
-    });
+    vi.mocked(dbMod.getUserByEmail).mockResolvedValue(
+      userRow({
+        id: 2,
+        openId: "email_user2",
+        email: "user@example.com",
+        name: "User Two",
+        passwordHash: "hashed:Correct1!",
+        emailVerified: true,
+        loginMethod: "email_password",
+        role: "user",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastSignedIn: new Date(),
+      })
+    );
 
     const { ctx } = makeCtx();
     const caller = appRouter.createCaller(ctx);
