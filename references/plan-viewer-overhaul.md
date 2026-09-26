@@ -3526,6 +3526,16 @@ smallest of them. Building them does not open the gate.
 
 ## 5k. Branching a run — asked 2026-09-19, recommended, NOT approved
 
+> **DECIDED 2026-09-26 as D20 in `references/takeoff-spec.md`, with two
+> changes to what is written below.** (1) A tee CUTS its host leg into two
+> rows at the split, because the main route past the tee carries different
+> circuits from the stretch before it and one row holds one circuit list —
+> this section never said what happened to that stretch. (2) It is built
+> BEFORE T9 (extend), overriding "Where it belongs in the order" below. The
+> rest stands: a leg is a row, the tee end contributes no vertical, circuits
+> are seeded from the parent and owned by the leg, the snap is shown and
+> never assumed.
+
 **The ask:** while tracing conduit, start a new line but keep it on the same run
 — a branch off the main route, or a second leg belonging to the same circuit.
 Today every trace is its own run.

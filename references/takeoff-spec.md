@@ -692,6 +692,8 @@ against this.**
 > not approved, and it belongs **after T9 (extend a finished run)** — extending
 > needs no schema change and removes the "I stopped and want to keep going" half
 > of the request on its own.
+>
+> **Decided 2026-09-26 as D20 below**, built before T9 by the owner's answer.
 
 **D8 — Location tags (C10, C11). Decided 2026-09-14.**
 
@@ -1015,6 +1017,48 @@ calculator numbers off this screen and sent them to assemblies and company
 defaults. Nothing here is typed per run: the limits are company defaults and
 every count comes from the drawing. What IS new on the screen is a
 proposal waiting for an answer, which is the same shape as a suggested run.
+
+**D20 — Branch legs on a traced run (R6, T10). Decided 2026-09-26 by the
+owner, all seven recommended answers.** Builds `plan-viewer-overhaul.md` § 5k,
+which moves from "recommended" to decided, with the two changes marked below.
+
+- **A leg is its own `takeoff_runs` row**, linked to the run's ROOT by
+  `parentRunId` (a branch off a branch still points at the root). The root
+  carries the name; every row keeps its own type, circuits, two ends, D18
+  answer and pull-point answers. Existing runs are roots with no legs — no
+  data changes (0085 is additive).
+- **A tee is a stored row, `takeoff_run_tees`,** never inferred from two ends
+  lying close together (the rule `runFittings.ts` already states). A leg end
+  on a tee has NO vertical and is never a device end — § 5d's double-count
+  trap, closed in code.
+- **Answer 1 — a tee CUTS the host leg in two** at the snapped point. § 5k did
+  not say what happens to the main route past the tee; it carries different
+  circuits from the stretch before it, and one row has one circuit list. After
+  the cut every row is a leg between two nodes, which is the shape
+  `countFittings` and `countBends` already count: 3 connectors at a tee, a
+  strap near the box on each leg, a fresh stick each side, no elbow at a
+  corner the box makes, and the pull-point degrees restart there.
+- **Answer 2 — circuits are copied to both new legs** and each leg says "same
+  as main" until it differs. An overcount is visible; asking at every split
+  would be a form on every branch, which D3 rejected by name.
+- **Answer 3 — the fitting at the split:** a 4" square box and blank cover up
+  to 3/4", 4-11/16" from 1" to 1-1/4", `pullBoxFor` from 1-1/2" up. A sticky
+  toolbar choice, remembered like D3's run type. A tee on a mark uses that
+  box and counts nothing new. One box per tee, owned by the largest raceway
+  meeting there — never once per type group. T bodies wait for catalog rows.
+- **Answer 4 — a new leg starts with Shift-click or the toolbar button.**
+  Double-click still finishes. The jump between legs is drawn dashed and is
+  never measured.
+- **Answer 5 — snapping is onto the same run only**, within `HIT_TARGET_PX`:
+  a mark, then a leg end, then a point along a leg. Alt places a free point.
+- **Answer 6 — deleting the last branch at a tee joins the host back** when
+  both pieces agree on type and circuits; otherwise the tee stays as an
+  in-and-out box and the panel says so.
+- **Answer 7 — built before T9 (extend a finished run)**, which overrides the
+  order § 5k gave. T9 stays its own item.
+
+Hand and AI traces reach the same counts because both go through one server
+function (`addLeg`) and one pure count over (legs, tees).
 
 **Smaller calls:**
 
