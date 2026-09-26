@@ -311,16 +311,16 @@ from now on.
 
 ## 5. Getting results onto the bid
 
-| ID  | What it does                                                                                                                            | Status       | Source                          | Need         |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ------------------------------- | ------------ |
-| R1  | **Stamped counts become quantities on the bid.** Building 2026-09-19 for assembly counts (level 4); typed and material counts follow.   | **Building** | Your request                    | Essential    |
-| R2  | **Traced footage becomes quantities on the bid.** T4 now exists, but R2 is GATED on labor for a run — see the note below.               | **Missing**  | Your request, Old screen        | Essential    |
-| R3  | A clear rule for when the same assembly is on the bid twice — once from the plans and once added by hand — so nothing is counted twice. | **Building** | Found in this review            | Essential    |
-| R4  | Quantities from the plans follow the app's cost-snapshot rule: costs are frozen when the line is created, like every other bid line.    | **Building** | CLAUDE.md, Found in this review | Essential    |
-| R5  | Materials list for a supplier: quantities only, no prices, built from stamps, runs and bid lines, as CSV or PDF.                        | **Works**    | Changelog Aug 14                | Nice-to-have |
-| R6  | Other per-run estimating details from the old screen: service loop, pull points, fittings. Makeup is now R7; routing waste is T16.      | **Missing**  | Old screen                      | Nice-to-have |
-| R7  | **Makeup allowances:** extra conductor at each termination and at the panel, from defaults set once, shown as its own amount.           | **Missing**  | Decided 2026-09-14 (section 13) | Essential    |
-| R8  | **From a bid line back to the plan:** click a line that came from the plans and open the Takeoff screen on its marks.                   | **Missing**  | Proposed (section 14)           | Nice-to-have |
+| ID  | What it does                                                                                                                            | Status                                                                          | Source                          | Need         |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------- | ------------ |
+| R1  | **Stamped counts become quantities on the bid.** Building 2026-09-19 for assembly counts (level 4); typed and material counts follow.   | **Building**                                                                    | Your request                    | Essential    |
+| R2  | **Traced footage becomes quantities on the bid.** T4 now exists, but R2 is GATED on labor for a run — see the note below.               | **Missing**                                                                     | Your request, Old screen        | Essential    |
+| R3  | A clear rule for when the same assembly is on the bid twice — once from the plans and once added by hand — so nothing is counted twice. | **Building**                                                                    | Found in this review            | Essential    |
+| R4  | Quantities from the plans follow the app's cost-snapshot rule: costs are frozen when the line is created, like every other bid line.    | **Building**                                                                    | CLAUDE.md, Found in this review | Essential    |
+| R5  | Materials list for a supplier: quantities only, no prices, built from stamps, runs and bid lines, as CSV or PDF.                        | **Works**                                                                       | Changelog Aug 14                | Nice-to-have |
+| R6  | Other per-run estimating details from the old screen: service loop, pull points, fittings. Makeup is now R7; routing waste is T16.      | **Partial** — fittings, bends and pull points built (D19); service loop missing | Old screen                      | Nice-to-have |
+| R7  | **Makeup allowances:** extra conductor at each termination and at the panel, from defaults set once, shown as its own amount.           | **Missing**                                                                     | Decided 2026-09-14 (section 13) | Essential    |
+| R8  | **From a bid line back to the plan:** click a line that came from the plans and open the Takeoff screen on its marks.                   | **Missing**                                                                     | Proposed (section 14)           | Nice-to-have |
 
 **Notes**
 
@@ -378,8 +378,12 @@ from now on.
   on 2026-09-20, when materials gained labour units.
   **Fittings landed 2026-09-26** — couplings, connectors and straps are counted
   from the trace and reach the bid (`shared/runFittings.ts`). D17(b) is retired;
-  see the note on it. Service loop and pull points remain Missing here; pull
-  points and elbows are the next build (`todo.md`).
+  see the note on it.
+  **Bends and pull points landed 2026-09-26 (D19)** — 90s, 45s and field
+  bends counted from the trace, and pull points proposed on the drawing where
+  the degrees pass the company limit, added only when answered
+  (`shared/runBends.ts`). **Service loop is the one part of R6 still
+  Missing.**
   See D15 before bringing any of it back: it is the biggest bloat risk in this
   document.
 - **Watch for double counting before R2 ships — SETTLED 2026-09-20, see D18.**
@@ -753,6 +757,12 @@ against this.**
   assemblies or company defaults, set once.
 - **Bloat warning:** this was the single most complicated part of the old screen.
 
+> **Narrowed 2026-09-26 by D19 (bends and pull points).** Still nothing typed
+> per run: the bend limits are company defaults (Settings → Heights) and every
+> count comes from the drawing, which is this pick. What D19 adds to the
+> screen is a pull point PROPOSED at a corner, waiting for a yes or no — a
+> question, not a calculator field.
+
 **D16 — Fixing the changelog (section 8).**
 
 - (a) Edit the old entries.
@@ -819,7 +829,7 @@ rule in `ASSEMBLIES_PLAN.md`.
 > hours (`addRunTypeRowToBid`) — so retiring it moved no number on any bid.
 > There is therefore no field to set to zero; this note is the zero.
 > `scripts/fittingsImpact.mts` reports what the counted fittings change.
-> Elbows and pull points are the next build (`todo.md`).
+> Elbows and pull points were the next build, and landed 2026-09-26 as D19.
 
 - (a) A vertical foot costs the same as a flat foot.
 - (b) Per foot, plus **a fixed amount per counted end**.
@@ -958,6 +968,53 @@ missing hour is worse than a missing price** — a missing price understates one
 line, a missing hour is multiplied by the rate across every line that touches
 that material. Hence a NULLABLE column with no default: never-set and
 deliberately-zero must not be the same value.
+
+**D19 — Bends and pull points, counted from the trace (R6). Decided and built
+2026-09-26.**
+
+The owner's design, and six answers given the same day:
+
+- **Bends come from the geometry in plain code, no AI.** Each corner's measured
+  angle, plus one 90 at each counted drop, through the same function a hand
+  trace and an AI trace both reach (`shared/runBends.ts`), so they count the
+  same by construction. Corners turn into 90s and 45s; every count reads "at
+  least", because plans do not show the kicks and offsets at boxes.
+- **Wobble (answer 4):** same-direction turns under 3 ft apart merge into one
+  bend FIRST (a traced sweep), then anything under 15° is drawing wobble —
+  neither a bend nor degrees. Fixed defaults, no setting.
+- **Factory or field:** a company setting, "factory elbows from" (1-1/4"
+  shipped). Below it a bend is field-bent — labor only. PVC always takes
+  factory elbows; flex turns itself.
+- **Field-bend labor (answer 3)** lives on the RACEWAY row,
+  `materials.fieldBendLaborHours`. NULL reads "Not priced", never 0. The line
+  points at the pipe but carries $0 material and never the pipe's price.
+- **Pull points:** degrees summed per run; where they pass the company limit
+  (360° shipped, 270° offered) a pull point is PROPOSED at the bend that tips
+  it over, marked on the drawing, and never added without a person's answer.
+  **An LB below a size, a pull box from it up (answer 1)** — a third company
+  setting, 2" shipped. A pull box is sized by NEC 314.28's angle pull (6 × the
+  trade size) to a shipped box.
+- **Editing a run (answer 5):** answers are stored by POSITION, not vertex
+  index; an answer whose corner still exists is kept, and a new or moved
+  corner is proposed afresh.
+- **45° elbows only (answer 2)** were added to the catalog; sweeps wait for an
+  Underground category.
+- **A user assembly that already holds an elbow (answer 6)** is left
+  unguarded, as connectors are — logged in `todo.md`.
+
+**What an accepted pull point does:** it is a box, so it cuts the run —
+couplings restart per piece, connectors follow (two into a pull box; two into
+an EMT LB's hubs, none into rigid, IMC or PVC), straps go near it, the elbow
+at its corner comes off, and the degree count restarts. A dismissal is "pull
+through": the count restarts after it too, so one "no" is not a proposal on
+every following bend, and the over-limit total stays on screen as the
+person's choice.
+
+**This narrows D15, which it does not reverse.** D15 kept the old per-run
+calculator numbers off this screen and sent them to assemblies and company
+defaults. Nothing here is typed per run: the limits are company defaults and
+every count comes from the drawing. What IS new on the screen is a
+proposal waiting for an answer, which is the same shape as a suggested run.
 
 **Smaller calls:**
 

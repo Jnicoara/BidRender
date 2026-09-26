@@ -1302,11 +1302,53 @@ fills only its own new column and is guarded on NULL. Then run
 refuses to count without 0082. (Run 2026-09-26 without 0082: production has
 2 bids, 2 untyped runs and no bid lines, so nothing there is affected.)
 
-- [ ] **NEXT BUILD: bends and pull points.** Decided by the owner 2026-09-26.
+- [x] **BUILT 2026-09-26 on `local-dev`, NOT DEPLOYED: bends and pull points**
+      (D19 in `references/takeoff-spec.md`). Eight commits, `c648f9b` to the
+      docs commit. **Before it can go live:**
+  - **0084 is step 1 (additive): apply it BEFORE the push.** Two new tables
+    (both name `utf8mb4_unicode_ci`), nullable columns, enum values appended;
+    no UPDATE. Step 3 is empty. Applied to `bidrender_local` and
+    `bidrender_test_clean`; a second run applies nothing.
+  - **It is a catalog release: 45 new baseline rows (the 45° elbows), no
+    renames.** Rehearsed on `bidrender_local` only (1192 -> 1237, VERDICT
+    CLEAN). Rehearse on a restored copy of PRODUCTION with the build that
+    ships, per `references/deploying.md` § 5b, with the other pending rounds.
+  - **Every field bend reads "Not priced" until hours are set.** No raceway
+    ships `fieldBendLaborHours`; it is set per pipe on the Materials screen
+    ("Field bend \_\_\_ h each").
+  - The design as it was written before the build, kept for the record:
+- [ ] **Double counting: a user's own assembly that already holds an elbow or
+      an LB.** Now that the trace counts elbows and LBs, a company whose own
+      assembly includes one (a panel feed with its 90s, say) will count it
+      twice once the run's elbow reaches the bid. **No guard, by decision**
+      (owner, 2026-09-26, answer 6) — the same stance as connectors below.
+      No starter assembly carries an elbow, LB or pull box (searched the seed
+      by those names). Worth a guard if it shows up in practice.
+- [ ] **Field-bend and elbow hours may already be inside a pipe's per-foot
+      labor unit.** A company whose EMT hours come from a book that folds in
+      bends would count bending twice. Nothing moves by default (every shipped
+      unit is NULL). The editor says "per bend"; worth a sentence on the
+      Materials screen if a company reports it.
+- [ ] **Other run-type lines still print "0 h" when their material has no
+      labor unit.** The send flattens a NULL unit to 0 (`runLinePricing`), so
+      the bid cannot tell it apart afterwards. Field bends keep the NULL and
+      show "— h" (`lineHoursUnset`); the rest predate this build.
+- [ ] **LB covers and gaskets, LL/LR/T/C bodies and PVC sweeps are not in the
+      catalog.** Sweeps wait for an Underground category (answer 2).
+- [ ] **Three local tables are on the wrong collation** —
+      `ai_usage_daily`, `bid_mounting_heights`, `takeoff_mounting_heights`
+      (reported by `scripts/schemaDrift.mts` on `bidrender_local`, 2026-09-26).
+      Pre-existing, not from 0084; `deploying.md` has the CONVERT statements.
+- [x] (The design as planned — two lines turned out wrong, marked.) **NEXT
+      BUILD: bends and pull points.** Decided by the owner 2026-09-26.
   - **Bends from the trace geometry, in plain code, no AI:** each corner's
     measured angle, plus one 90 at each counted vertical drop. Legs already
     carry `points` and `drops` for this (`FittingLeg`), so it adds an
     `"elbow"` `FittingKind` rather than reshaping the input.
+    > **Wrong, as built:** it DID reshape the input. A pull point at the top
+    > of the END drop needs to know which end, and splitting a leg needs each
+    > drop's feet, so `drops: number` became two `EndDrop`s. And "elbow" is
+    > five kinds: `elbow90`, `elbow45`, `fieldBend`, `lb`, `pullBox`.
   - **A company setting: "factory elbows from this size up"**, default
     1-1/4". Below it, bends are field-bent — labor only, no fitting. PVC
     always uses factory elbows or sweeps. The size comes from the raceway's
@@ -1317,6 +1359,10 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
     option), PROPOSE an LB or pull box at the spot where it tips over —
     proposed and marked on the drawing for approval, the same as drops,
     never added silently.
+    > **"The same as drops" named nothing that existed:** drops have no
+    > propose-and-approve flow today. Pull points are the first; they borrow
+    > the plan reader's dashed-means-proposed convention, and their answers
+    > live in `takeoff_pull_points`.
   - **Bend counts read "at least N"**, since plans do not show the kicks and
     offsets at boxes.
 - [ ] **Fitting styles for the other families.** EMT has set-screw /

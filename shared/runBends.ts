@@ -6,8 +6,8 @@
  * Bends come from the trace geometry in plain code, no AI: each corner's
  * measured angle, plus one 90 at each counted vertical. Pull points are
  * PROPOSED where the degrees along a run tip over the company limit, and only
- * a person's answer is stored. `todo.md` § "Bends and pull points" and the plan
- * sent back that day.
+ * a person's answer is stored. D19 in `references/takeoff-spec.md` records the
+ * design and the six answers that settled it.
  *
  * ── Geometry in, never the tool ──────────────────────────────────────────────
  * Like `runFittings.ts`, this reads points and ends and nothing else. A run
