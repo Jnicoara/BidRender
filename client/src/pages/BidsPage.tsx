@@ -1364,7 +1364,10 @@ export default function BidsPage({
                   with nothing tying them together. This is that total. */}
               {totals.expensesTotal > 0 && salesTax.status === "disabled" && (
                 <div className="flex items-baseline justify-between gap-3 py-1">
-                  <span className="text-sm font-medium">Total due</span>
+                  <span className="text-sm font-medium">
+                    Total due{" "}
+                    <IncompletePriceTag show={incomplete} className="ml-1" />
+                  </span>
                   <span className="font-mono text-base text-[#F5C518]">
                     {money(totals.totalDue)}
                   </span>
@@ -1430,7 +1433,13 @@ export default function BidsPage({
 
                   {salesTax.status !== "no-rate" && (
                     <div className="flex items-baseline justify-between gap-3 py-1">
-                      <span className="text-sm font-medium">Total due</span>
+                      <span className="text-sm font-medium">
+                        Total due{" "}
+                        <IncompletePriceTag
+                          show={incomplete}
+                          className="ml-1"
+                        />
+                      </span>
                       <span className="font-mono text-base text-[#F5C518]">
                         {money(totals.totalDue)}
                       </span>
