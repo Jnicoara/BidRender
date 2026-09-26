@@ -443,4 +443,140 @@ describeDb("a broken line on a real bid", () => {
       callerFor(OTHER_USER).pricingProblems.lookup({ ref })
     ).rejects.toThrow(/No report/);
   });
+
+  // ─── The admin screen's procedures ───────────────────────────────────────
+
+  /** A platform admin. Not a member of either fixture company. */
+  const admin = () =>
+    appRouter.createCaller({
+      user: {
+        id: OTHER_USER,
+        openId: `test-pricing-problems-${OTHER_USER}`,
+        role: "admin",
+        accessTier: "internal",
+      },
+    } as unknown as TrpcContext);
+
+  it("refuses the admin procedures to anyone who is not an admin", async () => {
+    // A company OWNER is still not a platform admin. The Admin screen's nav
+    // button and page check are conveniences; this is the lock.
+    await expect(
+      caller().pricingProblems.list({ status: "all" })
+    ).rejects.toThrow(/permission|admin|FORBIDDEN/i);
+    await expect(caller().pricingProblems.counts()).rejects.toThrow(
+      /permission|admin|FORBIDDEN/i
+    );
+    await expect(
+      caller().pricingProblems.find({ ref: "ERR-1" })
+    ).rejects.toThrow(/permission|admin|FORBIDDEN/i);
+  });
+
+  it("lists a report as open, then as resolved once the line is fixed", async () => {
+    const { bidId, lineIds } = await fixtureBid();
+    await corrupt(lineIds[0], "-1");
+    const ref = (await caller().bids.get({ id: bidId })).problems[0].ref!;
+
+    /** Every page of one filter — the shared test DB holds other suites' rows. */
+    const allRefs = async (status: "open" | "resolved") => {
+      const refs: string[] = [];
+      let cursor: string | null = null;
+      do {
+        const page = await admin().pricingProblems.list({ status, cursor });
+        refs.push(...page.items.map(r => r.ref));
+        cursor = page.nextCursor;
+      } while (cursor);
+      return refs;
+    };
+
+    const countsBefore = await admin().pricingProblems.counts();
+    expect(await allRefs("open")).toContain(ref);
+    expect(await allRefs("resolved")).not.toContain(ref);
+
+    // Found from ANOTHER company's admin session: the admin lookup crosses
+    // companies, where the contractor's `lookup` would not.
+    const found = await admin().pricingProblems.find({ ref });
+    expect(found).toMatchObject({
+      ref,
+      status: "open",
+      bidId,
+      lineId: lineIds[0],
+      userId: USER,
+      resolvedAt: null,
+    });
+
+    await corrupt(lineIds[0], "1");
+    await caller().bids.get({ id: bidId });
+
+    expect(await allRefs("open")).not.toContain(ref);
+    expect(await allRefs("resolved")).toContain(ref);
+    const resolved = await admin().pricingProblems.find({ ref });
+    expect(resolved.status).toBe("resolved");
+    expect(resolved.resolvedAt).not.toBeNull();
+
+    // The headline moved by exactly this one report, and in the right
+    // direction — measured on both sides rather than asserted from one.
+    const countsAfter = await admin().pricingProblems.counts();
+    expect(countsAfter.open).toBe(countsBefore.open - 1);
+    expect(countsAfter.resolved).toBe(countsBefore.resolved + 1);
+  });
+
+  it("pages every report exactly once, in raised order, both ways", async () => {
+    // More rows than one page (50), written straight into the table so the
+    // test is about paging rather than about pricing sixty bids.
+    const database = (await getDb())!;
+    const { bidId } = await fixtureBid();
+    const values = Array.from({ length: 63 }, (_, i) => ({
+      userId: USER,
+      bidId,
+      lineId: null,
+      code: "calculation-failed",
+      detail: `paging fixture ${i}`,
+      dedupeKey: `paging:${bidId}:${i}`,
+    }));
+    await database.insert(pricingProblemReports).values(values);
+    const mine = new Set(
+      (
+        await database
+          .select({ id: pricingProblemReports.id })
+          .from(pricingProblemReports)
+          .where(eq(pricingProblemReports.bidId, bidId))
+      ).map(r => formatErrorRef(r.id))
+    );
+    expect(mine.size).toBe(63);
+
+    for (const order of ["newest", "oldest"] as const) {
+      const seen: number[] = [];
+      let cursor: string | null = null;
+      let pages = 0;
+      do {
+        const page = await admin().pricingProblems.list({
+          status: "open",
+          order,
+          cursor,
+        });
+        seen.push(...page.items.map(r => parseErrorRef(r.ref)!));
+        cursor = page.nextCursor;
+        pages++;
+      } while (cursor);
+
+      expect(pages).toBeGreaterThan(1);
+      // No row twice across a page boundary, and none skipped.
+      expect(new Set(seen).size).toBe(seen.length);
+      const ours = seen.filter(id => mine.has(formatErrorRef(id)));
+      expect(ours).toHaveLength(63);
+      const sorted = [...seen].sort((a, b) =>
+        order === "newest" ? b - a : a - b
+      );
+      expect(seen).toEqual(sorted);
+    }
+  });
+
+  it("answers a malformed or missing reference in words", async () => {
+    await expect(
+      admin().pricingProblems.find({ ref: "BID-12" })
+    ).rejects.toThrow(/not a reference/);
+    await expect(
+      admin().pricingProblems.find({ ref: "ERR-2147483000" })
+    ).rejects.toThrow(/No report ERR-2147483000/);
+  });
 });

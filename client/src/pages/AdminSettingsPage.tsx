@@ -23,6 +23,7 @@ import { Shield, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import EarlyAccessSignups from "@/components/EarlyAccessSignups";
 import { AiSpendPanel } from "@/components/AiSpendPanel";
+import { PricingProblemsPanel } from "@/components/PricingProblemsPanel";
 
 export default function AdminSettingsPage() {
   const { user } = useAuth();
@@ -50,7 +51,8 @@ export default function AdminSettingsPage() {
           <div>
             <h1 className="text-lg font-semibold">Admin</h1>
             <p className="text-xs text-muted-foreground">
-              Early access signups, and what each platform role can reach.
+              Early access signups, AI spend, pricing problems, and what each
+              platform role can reach.
             </p>
           </div>
         </div>
@@ -65,6 +67,10 @@ export default function AdminSettingsPage() {
         {/* Second, because "what is this costing" is the other question with a
             different answer every day. */}
         <AiSpendPanel />
+
+        {/* Third: what is broken in the field, and the ERR- lookup a
+            contractor's reference is read into. */}
+        <PricingProblemsPanel />
 
         {/* Role reference */}
         <div>

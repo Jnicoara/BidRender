@@ -7,6 +7,7 @@ import {
   notInArray,
   isNull,
   isNotNull,
+  gt,
   gte,
   lte,
   lt,
@@ -10073,17 +10074,69 @@ export async function getPricingProblemReport(
   return row;
 }
 
-/** The most recently seen reports across every company. Admin only. */
-export async function listPricingProblemReports(opts: {
-  openOnly: boolean;
-  limit: number;
+/** Which reports a listing wants. `open` is "still outstanding". */
+export type PricingProblemStatusFilter = "open" | "resolved" | "all";
+
+function pricingProblemStatusWhere(status: PricingProblemStatusFilter) {
+  if (status === "open") return isNull(pricingProblemReports.resolvedAt);
+  if (status === "resolved") return isNotNull(pricingProblemReports.resolvedAt);
+  return undefined;
+}
+
+/**
+ * One page of reports across EVERY company, in the order they were raised.
+ * Admin only — the router is what enforces that.
+ *
+ * ── Keyed on the id, and that is the raised order ────────────────────────────
+ * `firstSeenAt` is written once, at insert, and a problem that breaks again
+ * reopens its own row rather than adding one — so id order and raised order
+ * are the same order, and paging on the primary key needs no new index. The
+ * cursor still carries the timestamp (`toPage` encodes both) but only the id
+ * is compared.
+ *
+ * Fetches `pageSize + 1` so `toPage` can tell whether another page exists
+ * without a second, counting query.
+ */
+export async function listPricingProblemReportsPage(opts: {
+  status: PricingProblemStatusFilter;
+  order: "newest" | "oldest";
+  afterId: number | null;
+  pageSize: number;
 }) {
   const db = await getDb();
   if (!db) return [];
+  const newest = opts.order === "newest";
   return db
     .select()
     .from(pricingProblemReports)
-    .where(opts.openOnly ? isNull(pricingProblemReports.resolvedAt) : undefined)
-    .orderBy(desc(pricingProblemReports.lastSeenAt))
-    .limit(opts.limit);
+    .where(
+      and(
+        pricingProblemStatusWhere(opts.status),
+        opts.afterId === null
+          ? undefined
+          : newest
+            ? lt(pricingProblemReports.id, opts.afterId)
+            : gt(pricingProblemReports.id, opts.afterId)
+      )
+    )
+    .orderBy(
+      newest ? desc(pricingProblemReports.id) : asc(pricingProblemReports.id)
+    )
+    .limit(opts.pageSize + 1);
+}
+
+/** How many reports are open and how many resolved, across every company. */
+export async function countPricingProblemReports(): Promise<{
+  open: number;
+  resolved: number;
+}> {
+  const db = await getDb();
+  if (!db) return { open: 0, resolved: 0 };
+  const [row] = await db
+    .select({
+      open: sql<string>`COALESCE(SUM(${pricingProblemReports.resolvedAt} IS NULL), 0)`,
+      resolved: sql<string>`COALESCE(SUM(${pricingProblemReports.resolvedAt} IS NOT NULL), 0)`,
+    })
+    .from(pricingProblemReports);
+  return { open: Number(row?.open ?? 0), resolved: Number(row?.resolved ?? 0) };
 }

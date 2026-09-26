@@ -4,6 +4,16 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-26]
+
+- **Admins can now look up an ERR- reference and see what is still
+  outstanding.** A new "Pricing problems" section on the Admin screen lists
+  every report of a bid line that couldn't be priced, filtered to open,
+  resolved or all, newest or oldest first. It shows when each was raised and
+  resolved and which company, bid and line it was on, by id only, so no job
+  details are shown. It is only offered to BidRidge admins, and the server
+  refuses anyone else.
+
 ## [2026-09-25]
 
 - **A bid line the app can't price now says so, instead of breaking the bid
