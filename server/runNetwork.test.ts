@@ -37,6 +37,7 @@ const EMT: RacewayFittingSpec = {
   strapSpacingFeet: 10,
   strapFromBoxFeet: 3,
   lbHubsTakeConnectors: true,
+  teeCoverIncluded: false,
 };
 const BENDS = {
   method: { method: "factory" as const, why: "factory" },
@@ -131,7 +132,7 @@ describe("cutting a leg at a tee", () => {
 
   it("removes the elbow at a corner the tee box turns", () => {
     // Uncut, the corner at (900,0) is a 90. Cut there, it is the box.
-    const whole = countFittings([row({ id: 1, points: MAIN })], EMT, BENDS);
+    const whole = countFittings([row({ id: 1, points: MAIN })], EMT, BENDS, []);
     expect(whole.elbow90).toMatchObject({ status: "counted", qty: 1 });
 
     const cut = cutPathAt(MAIN, { x: 899, y: 1 }, 3)!;
@@ -140,7 +141,7 @@ describe("cutting a leg at a tee", () => {
       row({ id: 1, points: cut.before, endTee: TEE }),
       row({ id: 2, parentRunId: 1, points: cut.after, startTee: TEE }),
     ];
-    expect(countFittings(legs, EMT, BENDS).elbow90).toMatchObject({
+    expect(countFittings(legs, EMT, BENDS, []).elbow90).toMatchObject({
       status: "counted",
       qty: 0,
     });
@@ -151,14 +152,14 @@ describe("fittings at a tee", () => {
   it("counts three connectors where a third conduit leaves", () => {
     const legs = teedRun();
     expect(nodeDegrees(legs).get("tee:9")).toBe(3);
-    const f = countFittings(legs, EMT, BENDS);
+    const f = countFittings(legs, EMT, BENDS, []);
     // 3 at the tee + the panel end + the far end of the main + the branch end.
     expect(f.connector).toMatchObject({ status: "counted", qty: 6 });
     expect(f.connector.why).toMatch(/1 branch tee \(3 of this size\)/);
   });
 
   it("straps near the box on each of the three legs", () => {
-    const f = countFittings(teedRun(), EMT, BENDS);
+    const f = countFittings(teedRun(), EMT, BENDS, []);
     // Every leg is longer than 6 ft, so each has a strap near both its boxes:
     // 28.89 ft, 55 ft and 23.89 ft give 2+4+1 between them.
     expect(f.strap).toMatchObject({ status: "counted", qty: 13 });
@@ -171,15 +172,15 @@ describe("fittings at a tee", () => {
       (sum, leg) => sum + Math.max(0, Math.ceil(leg.feet! / 10 - 1e-9) - 1),
       0
     );
-    expect(countFittings(legs, EMT, BENDS).coupling).toMatchObject({
+    expect(countFittings(legs, EMT, BENDS, []).coupling).toMatchObject({
       qty: perLeg,
     });
   });
 
   it("does not depend on the order the rows arrive in", () => {
     const legs = teedRun();
-    const a = countFittings(legs, EMT, BENDS);
-    const b = countFittings([legs[2], legs[0], legs[1]], EMT, BENDS);
+    const a = countFittings(legs, EMT, BENDS, []);
+    const b = countFittings([legs[2], legs[0], legs[1]], EMT, BENDS, []);
     for (const kind of Object.keys(a) as (keyof typeof a)[]) {
       expect(b[kind]).toEqual(a[kind]);
     }
@@ -189,7 +190,7 @@ describe("fittings at a tee", () => {
 describe("a run of several legs is ONE run in every sentence", () => {
   it("says 1 run, not 3, when none of its legs can be measured", () => {
     const legs = teedRun().map(leg => ({ ...leg, feet: null }));
-    const f = countFittings(legs, EMT, BENDS);
+    const f = countFittings(legs, EMT, BENDS, []);
     expect(f.coupling.why).toMatch(/^1 run on a sheet with no scale/);
   });
 });
@@ -276,6 +277,39 @@ describe("the box at a tee is bought once", () => {
         { id: 4, fitting: "body", stampId: null },
       ])
     ).toEqual({ boxes: 1, onMarks: 1, unanswered: 2 });
+  });
+});
+
+describe("tee box and cover lines", () => {
+  it("counts a box and a cover per owned tee", () => {
+    const f = countFittings(teedRun(), EMT, BENDS, [TEE]);
+    expect(f.teeBox).toMatchObject({ status: "counted", qty: 1 });
+    expect(f.teeBox.why).toBe("1 tee box: one at each branch tee");
+    expect(f.teeCover).toMatchObject({ status: "counted", qty: 1 });
+  });
+
+  it("buys nothing for a tee this raceway does not own", () => {
+    const f = countFittings(teedRun(), EMT, BENDS, []);
+    expect(f.teeBox).toMatchObject({ qty: 0, why: "No branch tees" });
+  });
+
+  it("says the cover comes with a pull box", () => {
+    const f = countFittings(
+      teedRun(),
+      { ...EMT, teeCoverIncluded: true },
+      BENDS,
+      [TEE]
+    );
+    expect(f.teeCover.status).toBe("included");
+  });
+
+  it("reads 'at least' and names an unanswered tee", () => {
+    const f = countFittings(teedRun(), EMT, BENDS, [
+      TEE,
+      { id: 10, fitting: null, stampId: null },
+    ]);
+    expect(f.teeBox).toMatchObject({ qty: 1, atLeast: true });
+    expect(f.teeBox.why).toMatch(/1 tee has no box chosen — not counted/);
   });
 });
 

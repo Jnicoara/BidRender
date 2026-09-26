@@ -31,6 +31,7 @@ const EMT: RacewayFittingSpec = {
   strapSpacingFeet: 10,
   strapFromBoxFeet: 3,
   lbHubsTakeConnectors: true,
+  teeCoverIncluded: false,
 };
 
 function leg(
@@ -65,7 +66,7 @@ const BENDS = {
   limit: 360,
 };
 function count(legs: readonly FittingLeg[], spec: RacewayFittingSpec) {
-  return countFittings(legs, spec, BENDS);
+  return countFittings(legs, spec, BENDS, []);
 }
 
 /** Both ends level: the verticals a run gets when it carries straight on. */

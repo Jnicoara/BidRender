@@ -26,6 +26,7 @@ import {
 import { needsPricing } from "./materialPricing";
 import { isBendRole, type BendMethod, type PullPointKind } from "./runBends";
 import { tradeSizeAtLeast } from "./materialSizeOrder";
+import { isTeeRole } from "./runNetwork";
 
 /**
  * EMT's three fitting styles. NULL on a run type reads as set-screw — it is
@@ -358,6 +359,10 @@ export function fittingMaterialName(
       return flex ? null : lbName(size, family);
     case "pullBox":
       return pullBoxFor(racewayBaselineName, null).name;
+    case "teeBox":
+      return teeBoxFor(racewayBaselineName, null).box;
+    case "teeCover":
+      return teeBoxFor(racewayBaselineName, null).cover;
     case "fieldBend":
       // Not a part: a field bend's "material" is the raceway itself, picked
       // in `pickFittingMaterial` before any name is built.
@@ -546,7 +551,9 @@ export function fittingRowSpeaks(row: {
   qty: number;
   onBid: boolean;
 }): boolean {
-  if (!isBendRole(row.role)) return true;
+  // A tee box speaks by the same rule as a bend: most runs have no tee, and
+  // "No branch tees" listed as "not sent" would read as a failure.
+  if (!isBendRole(row.role) && !isTeeRole(row.role)) return true;
   if (row.onBid || row.status === "unknown") return true;
   return row.status === "counted" && row.qty > 0;
 }

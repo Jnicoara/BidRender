@@ -29,6 +29,7 @@ import {
 } from "../shared/takeoffQuantities";
 import { runWireOwnership } from "../shared/branchWire";
 import { legFromRun, type FittingLeg } from "../shared/runFittings";
+import type { TeeRef } from "../shared/runNetwork";
 import type { PullPointAnswer } from "../shared/runBends";
 import { pointsToRealInches } from "../shared/takeoffGeometry";
 import { verticalsForRunRow, type HeightContext } from "./runVerticals";
@@ -57,6 +58,12 @@ export type RunTypeFootageRow = {
    * couplings and straps cannot. Empty on a cable type.
    */
   legs: FittingLeg[];
+  /**
+   * Every tee these legs meet (D20). NOT the tees this type buys a box for —
+   * a tee between two sizes is here in both groups, and which one buys the
+   * box is decided across all of them by `teeBoxOwners`.
+   */
+  tees: TeeRef[];
 };
 
 /** A run row, as far as grouping its footage is concerned. */
@@ -73,9 +80,14 @@ export type GroupableRun = {
   startHeightInches: number | null;
   endHeightInches: number | null;
   distributionHeightInches: number | null;
-  /** Which stamp each end is linked to — the only way two runs meet. */
+  /** Which stamp each end is linked to — one way two runs meet. */
   startStampId: number | null;
   endStampId: number | null;
+  /** The root this leg belongs to; NULL on a root (D20). */
+  parentRunId: number | null;
+  /** The tee each end sits on — the other way legs meet. */
+  startTeeId: number | null;
+  endTeeId: number | null;
 };
 
 export type SheetScale = {
@@ -115,6 +127,12 @@ export function groupRunFootage(input: {
    * a caller cannot forget them: an accepted LB changes the connector count.
    */
   pullPointAnswersByRun: ReadonlyMap<number, readonly PullPointAnswer[]>;
+  /**
+   * Every tee on these runs, by id (`takeoff_run_tees`). Required for the same
+   * reason: without it a branch's three conduit ends read as three line ends,
+   * and the tee box is never bought.
+   */
+  teesById: ReadonlyMap<number, TeeRef>;
 }): Map<number, RunTypeFootageRow> {
   const byType = new Map<number, RunTypeFootageRow>();
 
@@ -136,6 +154,7 @@ export function groupRunFootage(input: {
         unansweredCount: 0,
         branchCount: 0,
         legs: [],
+        tees: [],
       };
       byType.set(runTypeId, row);
     }
@@ -179,15 +198,23 @@ export function groupRunFootage(input: {
     */
     if (run.pathType === "conduit") {
       const inchesPerPoint = pointsToRealInches(1, ratio);
+      const startTee =
+        run.startTeeId === null
+          ? null
+          : (input.teesById.get(run.startTeeId) ?? null);
+      const endTee =
+        run.endTeeId === null
+          ? null
+          : (input.teesById.get(run.endTeeId) ?? null);
+      for (const tee of [startTee, endTee]) {
+        if (tee && !row.tees.some(t => t.id === tee.id)) row.tees.push(tee);
+      }
       row.legs.push(
         legFromRun({
           id: run.id,
-          // No leg rows or tees can exist before 0085 (branch legs step 4),
-          // which is where these start being read off the row. Every run is
-          // its own root with plain ends until then.
-          parentRunId: null,
-          startTee: null,
-          endTee: null,
+          parentRunId: run.parentRunId,
+          startTee,
+          endTee,
           startStampId: run.startStampId,
           endStampId: run.endStampId,
           points: run.points,

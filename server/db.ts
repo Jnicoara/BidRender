@@ -165,6 +165,7 @@ import {
   takeoffHeightDefaults,
   takeoffBendDefaults,
   takeoffPullPoints,
+  takeoffRunTees,
   type TakeoffBendDefaults,
   takeoffMountingHeights,
   bidMountingHeights,
@@ -227,9 +228,12 @@ import {
   bendMethodFor,
   lbHubsTakeConnectors,
   pickFittingMaterial,
+  parseRacewayName,
+  teeBoxFor,
   type FittingMaterialPick,
   type FittingRow,
 } from "../shared/runFittingMaterials";
+import { rootOf, teeBoxOwners, type TeeRef } from "../shared/runNetwork";
 import {
   containsPattern,
   dateRangeBounds,
@@ -4908,6 +4912,8 @@ async function withTracedFootage(
       runs.map(run => run.id),
       bid.userId
     ),
+    // A tee joins three conduit ends and buys a box (D20).
+    teesById: await getTeesForRuns(runs.map(rootOf), bid.userId),
   });
   // Only when a fitting line is actually on the bid: it costs three queries.
   const fittings = rows.some(row => isFittingRole(row.runMaterialRole))
@@ -10077,6 +10083,36 @@ export async function setBendDefaults(
 }
 
 /** Every stored pull-point answer on these runs, by run. */
+/**
+ * Every tee on these runs, by id, as the counting reads them (D20). Keyed by
+ * the ROOT ids — a tee belongs to the run, not to any one leg.
+ */
+export async function getTeesForRuns(
+  rootRunIds: readonly number[],
+  userId: number
+): Promise<Map<number, TeeRef>> {
+  const out = new Map<number, TeeRef>();
+  const db = await getDb();
+  if (!db || rootRunIds.length === 0) return out;
+  const rows = await db
+    .select()
+    .from(takeoffRunTees)
+    .where(
+      and(
+        inArray(takeoffRunTees.rootRunId, Array.from(new Set(rootRunIds))),
+        eq(takeoffRunTees.userId, userId)
+      )
+    );
+  for (const row of rows) {
+    out.set(row.id, {
+      id: row.id,
+      fitting: row.fitting,
+      stampId: row.stampId,
+    });
+  }
+  return out;
+}
+
 export async function getPullPointAnswersForRuns(
   runIds: readonly number[],
   userId: number
@@ -10553,9 +10589,33 @@ export async function fittingRowsByRunType(
     return shipped ? resolveMaterial(fittingRowsLoaded, shipped.id) : undefined;
   };
 
+  /*
+    Which type BUYS the box at each tee, decided across every group at once
+    (D20): a tee between a 3/4" main and a 1/2" branch is in both groups, and
+    counting its box in each would buy two. The size comes from the shipped
+    raceway name, never arithmetic on the text.
+  */
+  const sizeByType = new Map(
+    entries.map(({ storedId, type }) => {
+      const raceway = resolved(type!.racewayMaterialId);
+      const name = racewayBaselineName(raceway) ?? raceway?.name ?? null;
+      return [
+        storedId,
+        name === null ? null : (parseRacewayName(name)?.size ?? null),
+      ];
+    })
+  );
+  const teeOwners = teeBoxOwners(
+    new Map(entries.map(({ storedId, row }) => [storedId, row.legs])),
+    typeId => sizeByType.get(typeId) ?? null
+  );
+
   for (const { storedId, row, type } of entries) {
     const t = type!;
     const raceway = resolved(t.racewayMaterialId);
+    const ownedTees = row.tees.filter(
+      tee => teeOwners.get(tee.id) === storedId
+    );
     const spec: RacewayFittingSpec | null = raceway
       ? {
           name: raceway.name,
@@ -10578,17 +10638,27 @@ export async function fittingRowsByRunType(
             racewayBaselineName(raceway),
             raceway.name
           ),
+          teeCoverIncluded:
+            teeBoxFor(racewayBaselineName(raceway), raceway.name).box !==
+              null &&
+            teeBoxFor(racewayBaselineName(raceway), raceway.name).cover ===
+              null,
         }
       : null;
     const counts = spec
-      ? countFittings(row.legs, spec, {
-          method: bendMethodFor(
-            racewayBaselineName(raceway),
-            raceway?.name ?? null,
-            bendSettings.factoryElbowFrom
-          ),
-          limit: bendSettings.pullPointLimit,
-        })
+      ? countFittings(
+          row.legs,
+          spec,
+          {
+            method: bendMethodFor(
+              racewayBaselineName(raceway),
+              raceway?.name ?? null,
+              bendSettings.factoryElbowFrom
+            ),
+            limit: bendSettings.pullPointLimit,
+          },
+          ownedTees
+        )
       : noRacewayCounts(row.legs.length);
 
     const overrides: Record<FittingKind, number | null> = {
@@ -10601,6 +10671,10 @@ export async function fittingRowsByRunType(
       pullBox: t.pullBoxMaterialId,
       // No override: a field bend's line is the raceway's, by definition.
       fieldBend: null,
+      // No per-type override yet: the tee box is sized from the pipe
+      // (`teeBoxFor`). A company that wants another box forks the row.
+      teeBox: null,
+      teeCover: null,
     };
     const picks = Object.fromEntries(
       FITTING_KINDS.map(kind => {

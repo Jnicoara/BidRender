@@ -5,6 +5,7 @@ import {
   json,
   mysqlEnum,
   mysqlTable,
+  type AnyMySqlColumn,
   text,
   mediumtext,
   timestamp,
@@ -2608,6 +2609,12 @@ export const RUN_MATERIAL_ROLES = [
   "fieldBend",
   "lb",
   "pullBox",
+  /*
+    The box at a branch tee and its blank cover (D20, 0085), appended. One per
+    tee, bought by the largest raceway meeting there (`teeBoxOwners`).
+  */
+  "teeBox",
+  "teeCover",
 ] as const;
 export type RunMaterialRole = (typeof RUN_MATERIAL_ROLES)[number];
 
@@ -2772,10 +2779,36 @@ export const takeoffRuns = mysqlTable(
       onDelete: "set null",
     }),
 
+    // ── Branch legs (D20, 0085) ───────────────────────────────────────────
+    //
+    // A run is a ROOT row plus leg rows pointing at it. NULL here is a root,
+    // which is what every run was before legs existed — so no row needed
+    // changing. Always the ROOT, never the leg a branch left from: the
+    // topology lives in the tees, and a one-level self-reference keeps
+    // "which run is this" one lookup. See shared/runNetwork.ts.
+    parentRunId: int("parentRunId").references(
+      (): AnyMySqlColumn => takeoffRuns.id,
+      { onDelete: "cascade" }
+    ),
+    /**
+     * The tee an end sits on. A tee end has NO vertical and is never a device
+     * end (the double-count trap § 5d names) — `teeEndKind` enforces that for
+     * every reader. `set null`: a deleted tee leaves a line end, not a hole.
+     */
+    startTeeId: int("startTeeId").references(
+      (): AnyMySqlColumn => takeoffRunTees.id,
+      { onDelete: "set null" }
+    ),
+    endTeeId: int("endTeeId").references(
+      (): AnyMySqlColumn => takeoffRunTees.id,
+      { onDelete: "set null" }
+    ),
+
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   t => [
+    index("takeoff_runs_parentRunId_idx").on(t.parentRunId),
     index("takeoff_runs_bidId_idx").on(t.bidId),
     index("takeoff_runs_runTypeId_idx").on(t.runTypeId),
     index("takeoff_runs_sheetId_idx").on(t.sheetId),
@@ -2994,6 +3027,51 @@ export const takeoffPullPoints = mysqlTable(
 );
 
 export type TakeoffPullPoint = typeof takeoffPullPoints.$inferSelect;
+
+/**
+ * WHERE A BRANCH LEAVES A RUN (D20, 0085).
+ *
+ * A stored row, never inferred from two leg ends lying close together — the
+ * rule `shared/runFittings.ts` states for every node. Creating one cuts the
+ * leg it lands on into two rows, so three leg ends meet here.
+ *
+ * `fitting` is what stands at the split (`TEE_FITTINGS` in
+ * shared/runNetwork.ts): a box sized to the pipe, a T body (reserved until the
+ * catalog ships them), or a mark already on the drawing. NULL is unanswered.
+ */
+export const TEE_FITTING_VALUES = ["box", "body", "mark"] as const;
+
+export const takeoffRunTees = mysqlTable(
+  "takeoff_run_tees",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    /** The COMPANY OWNER, like every other row here. */
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The run it belongs to. Deleting the run takes its tees with it. */
+    rootRunId: int("rootRunId")
+      .notNull()
+      .references((): AnyMySqlColumn => takeoffRuns.id, {
+        onDelete: "cascade",
+      }),
+    x: double("x").notNull(),
+    y: double("y").notNull(),
+    fitting: mysqlEnum("fitting", TEE_FITTING_VALUES),
+    /** The mark it stands on, when `fitting` is "mark". */
+    stampId: int("stampId").references(() => takeoffStamps.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    index("takeoff_run_tees_rootRunId_idx").on(t.rootRunId),
+    index("takeoff_run_tees_userId_idx").on(t.userId),
+  ]
+);
+
+export type TakeoffRunTee = typeof takeoffRunTees.$inferSelect;
 
 /**
  * A company's own mounting heights: overrides of the shipped types, types they

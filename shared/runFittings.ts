@@ -54,7 +54,13 @@ import {
   type PullPointAnswer,
 } from "./runBends";
 import type { EndVertical } from "./takeoffHeights";
-import { TEE_NODE, endNodeKey, type TeeRef } from "./runNetwork";
+import {
+  TEE_KINDS,
+  TEE_NODE,
+  endNodeKey,
+  teeFittingCounts,
+  type TeeRef,
+} from "./runNetwork";
 
 /**
  * How one stick of this raceway joins the next.
@@ -97,6 +103,11 @@ export type RacewayFittingSpec = {
    * and PVC glues straight in. Required, so a new caller has to decide.
    */
   lbHubsTakeConnectors: boolean;
+  /**
+   * The box at a tee on this raceway comes with its cover — a pull box, from
+   * 1-1/2" up (`teeBoxFor`). Required for the same reason as the field above.
+   */
+  teeCoverIncluded: boolean;
 };
 
 export type FittingLeg = BendLeg & {
@@ -137,6 +148,9 @@ export const FITTING_KINDS = [
   "connector",
   "strap",
   ...BEND_KINDS,
+  // The box at a branch tee and its cover (D20). Counted once per tee, by the
+  // run type that owns it — `teeBoxOwners` in runNetwork.ts.
+  ...TEE_KINDS,
 ] as const;
 export type FittingKind = (typeof FITTING_KINDS)[number];
 
@@ -153,6 +167,8 @@ export const FITTING_KIND_LABELS: Record<
   fieldBend: { one: "field bend", many: "field bends" },
   lb: { one: "LB", many: "LBs" },
   pullBox: { one: "pull box", many: "pull boxes" },
+  teeBox: { one: "tee box", many: "tee boxes" },
+  teeCover: { one: "tee box cover", many: "tee box covers" },
 };
 
 /** Whether a bid line's run role is a fitting (a count) rather than footage. */
@@ -239,7 +255,13 @@ export function nodeDegrees(legs: readonly FittingLeg[]): Map<string, number> {
 export function countFittings(
   legs: readonly FittingLeg[],
   raceway: RacewayFittingSpec,
-  bends: { method: BendMethod; limit: number }
+  bends: { method: BendMethod; limit: number },
+  /**
+   * The tees whose box THIS raceway buys (`teeBoxOwners`). Required, so a
+   * caller has to decide: passing every tee its legs touch would buy the box
+   * at a mixed-size tee twice.
+   */
+  ownedTees: readonly TeeRef[]
 ): Record<FittingKind, FittingCount> {
   const pieces = legs.flatMap(splitAtPullPoints);
   return {
@@ -249,6 +271,7 @@ export function countFittings(
     // Bends read the UNSPLIT legs: a pull point replaces the bend it sits on,
     // which only the whole leg can see.
     ...countBends(legs, bends.method, bends.limit).counts,
+    ...teeFittingCounts(ownedTees, raceway.teeCoverIncluded),
   };
 }
 

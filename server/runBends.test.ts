@@ -114,7 +114,7 @@ function answer(
 
 /** Couplings, connectors and straps, with the bend kinds riding along. */
 function fittings(legs: readonly FittingLeg[], spec: RacewayFittingSpec) {
-  return countFittings(legs, spec, { method: FACTORY, limit: 360 });
+  return countFittings(legs, spec, { method: FACTORY, limit: 360 }, []);
 }
 
 const EMT_SPEC: RacewayFittingSpec = {
@@ -124,6 +124,7 @@ const EMT_SPEC: RacewayFittingSpec = {
   strapSpacingFeet: 10,
   strapFromBoxFeet: 3,
   lbHubsTakeConnectors: true,
+  teeCoverIncluded: false,
 };
 
 describe("the turn at a corner", () => {

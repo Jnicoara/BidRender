@@ -8,6 +8,7 @@
  */
 import * as db from "./db";
 import { groupRunFootage, type RunTypeFootageRow } from "./runTypeFootageCore";
+import { rootOf } from "../shared/runNetwork";
 
 export type { RunTypeFootageRow };
 
@@ -50,5 +51,7 @@ export async function footageByRunType(
       runs.map(run => run.id),
       userId
     ),
+    // A tee joins three conduit ends and buys a box (D20).
+    teesById: await db.getTeesForRuns(runs.map(rootOf), userId),
   });
 }

@@ -23,7 +23,7 @@
  * Nothing here knows how a leg was drawn, and nothing depends on the ORDER the
  * rows arrive in — `server/runNetwork.test.ts` shuffles them to prove it.
  */
-import type { FittingLeg } from "./runFittings";
+import type { FittingCount, FittingLeg } from "./runFittings";
 import { TRADE_SIZE_ORDER } from "./materialSizeOrder";
 
 /**
@@ -213,6 +213,72 @@ export function teeBoxOwners(
   const owners = new Map<number, number>();
   best.forEach((c, teeId) => owners.set(teeId, c.typeId));
   return owners;
+}
+
+/** The two parts a tee box sends. Appended to `FITTING_KINDS`. */
+export const TEE_KINDS = ["teeBox", "teeCover"] as const;
+export type TeeKind = (typeof TEE_KINDS)[number];
+
+export function isTeeRole(role: string | null | undefined): role is TeeKind {
+  return (TEE_KINDS as readonly unknown[]).includes(role);
+}
+
+/**
+ * The tee box and cover counts for the tees one run type owns, each with the
+ * sentence that says how it was worked out.
+ *
+ * An unanswered tee makes the box count "at least": the split is real and
+ * something stands there, but nobody has said what, so nothing is bought
+ * for it silently.
+ */
+export function teeFittingCounts(
+  owned: readonly TeeRef[],
+  coverIncluded: boolean
+): { teeBox: FittingCount; teeCover: FittingCount } {
+  if (owned.length === 0) {
+    const none = (kind: TeeKind): FittingCount => ({
+      kind,
+      status: "counted",
+      qty: 0,
+      atLeast: false,
+      why: "No branch tees",
+    });
+    return { teeBox: none("teeBox"), teeCover: none("teeCover") };
+  }
+  const { boxes, onMarks, unanswered } = countTeeBoxes(owned);
+  const notes: string[] = [];
+  if (onMarks > 0)
+    notes.push(
+      `${onMarks} ${onMarks === 1 ? "tee is" : "tees are"} on a mark already counted`
+    );
+  if (unanswered > 0)
+    notes.push(
+      `${unanswered} ${unanswered === 1 ? "tee has" : "tees have"} no box chosen — not counted`
+    );
+  const tail = notes.length > 0 ? ` (${notes.join("; ")})` : "";
+  const atLeast = unanswered > 0;
+  const lead = atLeast ? "At least " : "";
+  const teeBox: FittingCount = {
+    kind: "teeBox",
+    status: "counted",
+    qty: boxes,
+    atLeast,
+    why: `${lead}${boxes} ${boxes === 1 ? "tee box" : "tee boxes"}: one at each branch tee${tail}`,
+  };
+  const teeCover: FittingCount = coverIncluded
+    ? {
+        kind: "teeCover",
+        status: "included",
+        why: "The pull box at a tee comes with its cover",
+      }
+    : {
+        kind: "teeCover",
+        status: "counted",
+        qty: boxes,
+        atLeast,
+        why: `${lead}${boxes} blank ${boxes === 1 ? "cover" : "covers"}: one on each tee box${tail}`,
+      };
+  return { teeBox, teeCover };
 }
 
 /**
