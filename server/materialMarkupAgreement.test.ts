@@ -368,7 +368,14 @@ describe.skipIf(!hasDb)("markup from rule to line to dashboard", () => {
   }
 
   async function newBid() {
-    return caller().bids.create({ name: `Markup bid ${Date.now()}` });
+    const bid = await caller().bids.create({
+      name: `Markup bid ${Date.now()}`,
+    });
+    // `create` reads the row back (getBidById), which can come back empty.
+    // Failing here names the cause; letting it through failed later as
+    // "cannot read properties of undefined" on whichever line touched it.
+    if (!bid) throw new Error("bids.create returned no bid");
+    return bid;
   }
 
   it("stores each line's markup and says where it came from", async () => {
@@ -412,7 +419,10 @@ describe.skipIf(!hasDb)("markup from rule to line to dashboard", () => {
     expect(byAssembly(mixed.id).snapshotMarkupSource!.level).toBe("mixed");
 
     // Priced: wire line is 2 × $20 = $40 material, $20 markup.
-    expect(byAssembly(wire.id).breakdown.materialMarkup).toBe(20);
+    // `breakdown` is null on a line that cannot be priced
+    // (shared/linePricingProblems.ts); a null here gives undefined, which
+    // fails toBe(20) exactly as a wrong number would.
+    expect(byAssembly(wire.id).breakdown?.materialMarkup).toBe(20);
   });
 
   it("puts the dashboard card on the bid's own price, to the cent", async () => {
