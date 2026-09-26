@@ -705,6 +705,13 @@ export function totalQuantities(
      * are none — see `quantitiesForRun` for why this may not be optional.
      */
     verticals: RunVerticals | null;
+    /**
+     * The RUN this row belongs to — its root's id (D20). The three counts
+     * below count RUNS, and a branched run is several rows: without this a
+     * run of three legs with no heights read "3 runs are counted flat only".
+     * Required, so a caller has to say which run a row is part of.
+     */
+    runKey: number;
   }[]
 ): {
   /** Traced plus vertical. What gets bought. */
@@ -774,9 +781,20 @@ export function totalQuantities(
   let conduitVertical = 0;
   let cableVertical = 0;
   let wireVertical = 0;
-  let unmeasurable = 0;
-  let flatOnly = 0;
-  let partialVertical = 0;
+  // Per RUN, then counted: a run is unmeasurable, flat-only or partial as a
+  // whole, whichever of its legs made it so.
+  const byRun = new Map<
+    number,
+    { unmeasurable: boolean; unanswered: boolean; verticalFeet: number }
+  >();
+  const runState = (key: number) => {
+    let state = byRun.get(key);
+    if (!state) {
+      state = { unmeasurable: false, unanswered: false, verticalFeet: 0 };
+      byRun.set(key, state);
+    }
+    return state;
+  };
 
   for (const entry of runs) {
     const quantities = quantitiesForRun(
@@ -785,8 +803,9 @@ export function totalQuantities(
       entry.ratio,
       entry.verticals
     );
+    const state = runState(entry.runKey);
     if (!quantities) {
-      unmeasurable++;
+      state.unmeasurable = true;
       continue;
     }
     conduit += quantities.conduitFeet ?? 0;
@@ -807,10 +826,8 @@ export function totalQuantities(
     const unanswered = quantities.verticals
       ? uncountedEnds(quantities.verticals).length
       : 2;
-    if (unanswered > 0) {
-      if (quantities.verticalFeet > 0) partialVertical++;
-      else flatOnly++;
-    }
+    if (unanswered > 0) state.unanswered = true;
+    state.verticalFeet += quantities.verticalFeet;
 
     // A flat run still contributes nothing to the vertical shares below.
     if (quantities.verticalFeet <= 0) continue;
@@ -830,6 +847,19 @@ export function totalQuantities(
       cableVertical += quantities.verticalFeet;
     }
   }
+
+  let unmeasurable = 0;
+  let flatOnly = 0;
+  let partialVertical = 0;
+  byRun.forEach(state => {
+    if (state.unmeasurable) {
+      unmeasurable++;
+      return;
+    }
+    if (!state.unanswered) return;
+    if (state.verticalFeet > 0) partialVertical++;
+    else flatOnly++;
+  });
 
   return {
     conduitFeet: round2(conduit),

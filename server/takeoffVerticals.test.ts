@@ -56,6 +56,13 @@ import {
   type HeightContext,
 } from "./runVerticals";
 
+/** Each entry a run of its own, unless a test says otherwise (D20). */
+function totalsOf(
+  runs: Omit<Parameters<typeof totalQuantities>[0][number], "runKey">[]
+) {
+  return totalQuantities(runs.map((entry, i) => ({ ...entry, runKey: i })));
+}
+
 const QUARTER_INCH = 48; // 1/4" = 1'-0"
 
 /** 100 ft of traced pipe at 1/4" scale — 25 inches of paper, 1800 points. */
@@ -515,7 +522,7 @@ describe("the headline number from the brief", () => {
         distributionInches: DISTRIBUTION_10FT,
       }
     );
-    const totals = totalQuantities(
+    const totals = totalsOf(
       Array.from({ length: 30 }, () => ({
         run: RUN_100FT,
         circuits: [],
@@ -650,7 +657,7 @@ describe("a bid with no heights set reads exactly as it did before", () => {
   });
 
   it("totals a whole bid unchanged, and says how many runs are flat only", () => {
-    const totals = totalQuantities([
+    const totals = totalsOf([
       {
         run: RUN_100FT,
         circuits,
@@ -677,7 +684,7 @@ describe("a bid with no heights set reads exactly as it did before", () => {
   it("does not count an unmeasurable run as flat-only", () => {
     // Two different problems. One needs a scale, the other needs a height, and
     // reporting them as one number would send the estimator to the wrong screen.
-    const totals = totalQuantities([
+    const totals = totalsOf([
       { run: RUN_100FT, circuits: [], ratio: null, verticals: NO_VERTICALS },
       {
         run: RUN_100FT,
@@ -688,6 +695,27 @@ describe("a bid with no heights set reads exactly as it did before", () => {
     ]);
     expect(totals.unmeasurableCount).toBe(1);
     expect(totals.flatOnlyCount).toBe(1);
+  });
+
+  it("counts a run of three legs as ONE run (D20)", () => {
+    // A branched run is three rows. Keyed by the row it read "3 runs are
+    // counted flat only" about one run — and "3 runs have no scale".
+    const leg = {
+      run: RUN_100FT,
+      circuits: [],
+      ratio: QUARTER_INCH,
+      verticals: NO_VERTICALS,
+      runKey: 40,
+    };
+    const flat = totalQuantities([leg, leg, leg]);
+    expect(flat.conduitFeet).toBe(300);
+    expect(flat.flatOnlyCount).toBe(1);
+
+    const unscaled = totalQuantities([
+      { ...leg, ratio: null },
+      { ...leg, ratio: null },
+    ]);
+    expect(unscaled.unmeasurableCount).toBe(1);
   });
 });
 
@@ -1300,7 +1328,7 @@ describe("what the BID TOTAL says about half-counted verticals", () => {
   };
 
   const bid = (verticals: ReturnType<typeof verticalsForRun>) =>
-    totalQuantities([
+    totalsOf([
       { run: RUN_100FT, circuits: [], ratio: QUARTER_INCH, verticals },
     ]);
 
@@ -1335,7 +1363,7 @@ describe("what the BID TOTAL says about half-counted verticals", () => {
   });
 
   it("keeps the two apart across a mixed bid", () => {
-    const totals = totalQuantities([
+    const totals = totalsOf([
       {
         run: RUN_100FT,
         circuits: [],

@@ -61,6 +61,7 @@ import { footageByRunType } from "../runTypeFootage";
 import { resolveRunType } from "../../shared/runTypeLookup";
 import { FITTING_KIND_LABELS } from "../../shared/runFittings";
 import { isBendRole } from "../../shared/runBends";
+import { isTeeRole, rootOf } from "../../shared/runNetwork";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -254,6 +255,7 @@ export const materialsListRouter = router({
         const palette = await db.getRunTypesFor(ctx.scope.dataUserId, true);
         const minimums: string[] = [];
         const bendMinimums: string[] = [];
+        const teeMinimums: string[] = [];
         const unmatched: string[] = [];
         const uncounted: string[] = [];
         fittingsByType.forEach((rows, runTypeId) => {
@@ -285,6 +287,7 @@ export const materialsListRouter = router({
             // drop: the plans never show the kicks and offsets at boxes.
             if (row.count.atLeast) {
               if (isBendRole(row.role)) bendMinimums.push(row.pick.name);
+              else if (isTeeRole(row.role)) teeMinimums.push(row.pick.name);
               else minimums.push(row.pick.name);
             }
             sources.push({
@@ -294,7 +297,8 @@ export const materialsListRouter = router({
                 {
                   name: row.pick.name,
                   unit: "each",
-                  category: "Conduit Fittings",
+                  // A tee box is a box, and is ordered with the boxes (D20).
+                  category: isTeeRole(row.role) ? "Boxes" : "Conduit Fittings",
                   qty: 1,
                   isBranchWhip: false,
                 },
@@ -315,6 +319,11 @@ export const materialsListRouter = router({
         if (bendMinimums.length > 0) {
           fittingShortfalls.push(
             `Minimums, not totals — elbows are counted from the corners and drops on the drawing, and plans do not show the kicks and offsets at boxes: ${Array.from(new Set(bendMinimums)).join(", ")}.`
+          );
+        }
+        if (teeMinimums.length > 0) {
+          fittingShortfalls.push(
+            `Minimums, not totals — a branch tee on the drawing has no box chosen yet, so it is not in these: ${Array.from(new Set(teeMinimums)).join(", ")}.`
           );
         }
         if (uncounted.length > 0) {
@@ -362,6 +371,8 @@ export const materialsListRouter = router({
             circuits: (circuitsByRun.get(run.id) ?? []).map(circuitWire),
             ratio: usable,
             verticals: verticalsForRunRow(run, heights),
+            // A branched run is several rows and ONE run in the notes (D20).
+            runKey: rootOf(run),
           };
         })
       );

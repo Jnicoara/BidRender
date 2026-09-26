@@ -59,6 +59,7 @@ import * as db from "../db";
 import { EMPTY_HEIGHT_CONTEXT, verticalsForRunRow } from "../runVerticals";
 import { resolveRunType } from "../../shared/runTypeLookup";
 import { resolveMaterial } from "../../shared/materialLookup";
+import { rootOf } from "../../shared/runNetwork";
 import {
   circuitPlan,
   findMatchingRunType,
@@ -1142,6 +1143,8 @@ export const takeoffRunsRouter = router({
           circuits: circuits.filter(c => c.runId === run.id).map(circuitWire),
           ratio: ratioBySheet.get(run.sheetId) ?? null,
           verticals: verticalsForRunRow(run, heights),
+          // A branched run is several rows and ONE run in the counts (D20).
+          runKey: rootOf(run),
         }))
       );
     }),

@@ -43,6 +43,17 @@ import {
   type RunCircuit,
 } from "../shared/takeoffQuantities";
 
+/**
+ * Every fixture in this file is a run of its own, so each entry is keyed by
+ * its position. Branched runs — several rows, one run — are tested where
+ * they are built, in takeoffVerticals.test.ts.
+ */
+function totalsOf(
+  runs: Omit<Parameters<typeof totalQuantities>[0][number], "runKey">[]
+) {
+  return totalQuantities(runs.map((entry, i) => ({ ...entry, runKey: i })));
+}
+
 /** Scale ratios by their drawing notation, for readable tests. */
 const QUARTER_INCH = 48; // 1/4" = 1'-0"
 const EIGHTH_INCH = 96; // 1/8" = 1'-0"
@@ -602,7 +613,7 @@ describe("cable runs", () => {
 
 describe("a shared run across a whole takeoff", () => {
   it("counts the pipe once and the wire per circuit", () => {
-    const totals = totalQuantities([
+    const totals = totalsOf([
       {
         run: RUN_100FT,
         circuits: [
@@ -632,7 +643,7 @@ describe("a shared run across a whole takeoff", () => {
       pathType: "conduit" as const,
       points: [p(0, 0), p(12.5 * 72, 0)],
     }; // 50ft
-    const totals = totalQuantities([
+    const totals = totalsOf([
       {
         run: RUN_100FT,
         circuits: [
@@ -666,7 +677,7 @@ describe("a shared run across a whole takeoff", () => {
 
   it("keeps conduit and cable in separate totals", () => {
     const cableRun = { pathType: "cable" as const, points: RUN_100FT.points };
-    const totals = totalQuantities([
+    const totals = totalsOf([
       {
         run: RUN_100FT,
         circuits: [
@@ -694,7 +705,7 @@ describe("a shared run across a whole takeoff", () => {
 
   it("reports unmeasurable runs rather than counting them as zero", () => {
     // A total that silently drops a run reads as complete when it is not.
-    const totals = totalQuantities([
+    const totals = totalsOf([
       {
         run: RUN_100FT,
         circuits: [
@@ -728,7 +739,7 @@ describe("a shared run across a whole takeoff", () => {
   });
 
   it("totals nothing, and flags nothing, for an empty takeoff", () => {
-    expect(totalQuantities([])).toEqual({
+    expect(totalsOf([])).toEqual({
       conduitFeet: 0,
       cableFeet: 0,
       wireFeet: 0,
@@ -746,7 +757,7 @@ describe("a shared run across a whole takeoff", () => {
     // A site plan at 1" = 100' and a floor plan at 1/4" = 1'-0" in one bid.
     // The same traced geometry means very different footages, and each run
     // must use its own sheet's ratio.
-    const totals = totalQuantities([
+    const totals = totalsOf([
       {
         run: RUN_100FT,
         circuits: [],
@@ -896,7 +907,7 @@ describe("a realistic takeoff, checked by hand", () => {
     expect(branchQuantities.cableFeet).toBe(40);
     expect(branchQuantities.conduitFeet).toBeNull();
 
-    const totals = totalQuantities([
+    const totals = totalsOf([
       {
         run: feeder,
         circuits: [
