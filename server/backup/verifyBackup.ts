@@ -61,6 +61,13 @@ export async function verifyBackup(options: {
   /** Which run to check. Defaults to the newest in the bucket. */
   runId?: string;
   scratchSchema?: string;
+  /**
+   * Leave the restored schema in place instead of dropping it, so a migration
+   * can be rehearsed on production's DATA without a second, manual restore
+   * (references/deploying.md § 5a, steps 2 and 3). The caller owns cleaning
+   * it up.
+   */
+  keepScratch?: boolean;
   onProgress?: (message: string) => void;
 }): Promise<VerifyResult> {
   const say = options.onProgress ?? (() => {});
@@ -111,7 +118,8 @@ export async function verifyBackup(options: {
       sql,
       options.scratchDatabaseUrl,
       schema,
-      say
+      say,
+      options.keepScratch ?? false
     );
     result.restored = { tables: restored.size, rows: sumOf(restored) };
 
@@ -145,12 +153,13 @@ export async function verifyBackup(options: {
   }
 }
 
-/** Load the dump into a fresh schema and count what landed. Drops it after. */
+/** Load the dump into a fresh schema and count what landed. Drops it after, unless kept. */
 async function restoreInto(
   sql: string,
   scratchDatabaseUrl: string,
   schema: string,
-  say: (message: string) => void
+  say: (message: string) => void,
+  keep: boolean
 ): Promise<Map<string, number>> {
   const connection = await mysql.createConnection({
     // The scratch server is a DIFFERENT server, and production's CA says
@@ -190,7 +199,11 @@ async function restoreInto(
       counts.set(name, Number(countRows[0].n));
     }
 
-    await connection.query(`DROP DATABASE \`${schema}\``);
+    if (keep) {
+      say(`Kept \`${schema}\` for a rehearsal. Drop it when done.`);
+    } else {
+      await connection.query(`DROP DATABASE \`${schema}\``);
+    }
     return counts;
   } finally {
     await connection.end();

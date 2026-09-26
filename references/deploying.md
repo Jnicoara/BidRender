@@ -527,9 +527,17 @@ Expect **eleven** applied and no drift.
 > a mismatch means either this line is stale again or the database is not where
 > you think it is, and those want opposite responses.
 
-> **Worth building before the next migration:** a `KEEP_SCRATCH=1` flag on
-> `verifyBackup.mts` would make steps 2 and 3 one command instead of a manual
-> restore. It drops the schema unconditionally today.
+> **Built 2026-09-26: `KEEP_SCRATCH=1` on `verifyBackup.mts`** makes steps 2
+> and 3 one restore. It verifies the backup as usual and then leaves
+> `bidrender_backup_verify` in place instead of dropping it; point
+> `DATABASE_URL` at that schema for `migrate.mts` / `schemaDrift.mts`, and drop
+> it when done. First used for 0080/0081 (seat limits).
+>
+> ```bash
+> DOTENV_CONFIG_PATH=.env.production.local \
+> VERIFY_DATABASE_URL=mysql://…@127.0.0.1:3307/bidrender_test_clean \
+> KEEP_SCRATCH=1 pnpm tsx scripts/verifyBackup.mts <runId>
+> ```
 
 #### 4. Ask production what it is missing
 

@@ -5,6 +5,9 @@
  *   VERIFY_DATABASE_URL=mysql://root:pass@localhost:3306/mysql \
  *   pnpm tsx scripts/verifyBackup.mts [runId]
  *
+ * Add KEEP_SCRATCH=1 to leave the restored schema (`bidrender_backup_verify`)
+ * in place for a migration rehearsal instead of dropping it.
+ *
  * Downloads what is really in the bucket, restores it into a scratch schema on
  * a server YOU name, and compares the result against the manifest that backup
  * wrote about itself.
@@ -68,6 +71,9 @@ const result = await verifyBackup({
   target: createR2Target(configResult.config),
   scratchDatabaseUrl: scratchUrl,
   runId: process.argv[2],
+  // KEEP_SCRATCH=1 leaves the restored copy for a migration rehearsal —
+  // deploying.md § 5a steps 2 and 3 as one command. Its name is printed.
+  keepScratch: process.env.KEEP_SCRATCH === "1",
   onProgress: message => console.log(message),
 });
 
