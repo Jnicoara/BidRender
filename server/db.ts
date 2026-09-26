@@ -180,6 +180,7 @@ import {
   BASELINE_MATERIALS,
   RENAMED_BASELINE_MATERIALS,
   RETIRED_BASELINE_MATERIALS,
+  type BaselineMaterial,
 } from "./seed/baselineMaterials";
 import { BASELINE_LABOR_RATES } from "./seed/baselineLaborRates";
 import { BASELINE_RUN_TYPES } from "./seed/baselineRunTypes";
@@ -1775,6 +1776,7 @@ async function seedBaselineMaterialsUnlocked(): Promise<void> {
     description: m.description ?? null,
     trade: m.trade ?? "electrical",
     defaultQty: m.defaultQty != null ? m.defaultQty.toFixed(4) : null,
+    ...racewayColumns(m),
     userId: null,
   }));
 
@@ -1832,6 +1834,30 @@ async function seedBaselineMaterialsUnlocked(): Promise<void> {
  * ever does — proven red by deleting the filter, which returned the fixture's
  * $12.50 as $0.
  */
+/** The raceway facts of a seed row as column values — all NULL off a raceway. */
+function racewayColumns(m: BaselineMaterial): {
+  stickLengthFeet: string | null;
+  stickJoint: string | null;
+  strapSpacingFeet: string | null;
+  strapFromBoxFeet: string | null;
+} {
+  const r = m.raceway;
+  const dec = (value: number | null | undefined) =>
+    value === null || value === undefined ? null : value.toFixed(2);
+  return {
+    stickLengthFeet: dec(r?.stickLengthFeet),
+    stickJoint: r?.stickJoint ?? null,
+    strapSpacingFeet: dec(r?.strapSpacingFeet),
+    strapFromBoxFeet: dec(r?.strapFromBoxFeet),
+  };
+}
+
+const RACEWAY_NUMBER_KEYS = [
+  "stickLengthFeet",
+  "strapSpacingFeet",
+  "strapFromBoxFeet",
+] as const;
+
 async function backfillMaterialMetadata(): Promise<void> {
   const db = await getDb();
   if (!db) return;
@@ -1846,6 +1872,10 @@ async function backfillMaterialMetadata(): Promise<void> {
       description: materials.description,
       trade: materials.trade,
       costPerUnit: materials.costPerUnit,
+      stickLengthFeet: materials.stickLengthFeet,
+      stickJoint: materials.stickJoint,
+      strapSpacingFeet: materials.strapSpacingFeet,
+      strapFromBoxFeet: materials.strapFromBoxFeet,
     })
     .from(materials)
     .where(isNull(materials.userId));
@@ -1880,6 +1910,18 @@ async function backfillMaterialMetadata(): Promise<void> {
       intended.defaultQty != null ? intended.defaultQty.toFixed(4) : null;
     if (row.defaultQty !== wantQty) patch.defaultQty = wantQty;
 
+    // The raceway facts the fitting count reads. Compared numerically for the
+    // same reason as the price: "10.00" against 10.
+    const wantRaceway = racewayColumns(intended);
+    for (const key of RACEWAY_NUMBER_KEYS) {
+      const have = row[key] === null ? null : Number(row[key]);
+      const want = wantRaceway[key] === null ? null : Number(wantRaceway[key]);
+      if (have !== want) patch[key] = wantRaceway[key];
+    }
+    if (row.stickJoint !== wantRaceway.stickJoint) {
+      patch.stickJoint = wantRaceway.stickJoint;
+    }
+
     if (Object.keys(patch).length > 0) {
       await db.update(materials).set(patch).where(eq(materials.id, row.id));
     }
@@ -1892,6 +1934,10 @@ async function backfillMaterialMetadata(): Promise<void> {
       category: materials.category,
       searchAliases: materials.searchAliases,
       defaultQty: materials.defaultQty,
+      stickLengthFeet: materials.stickLengthFeet,
+      stickJoint: materials.stickJoint,
+      strapSpacingFeet: materials.strapSpacingFeet,
+      strapFromBoxFeet: materials.strapFromBoxFeet,
     })
     .from(materials)
     .where(
@@ -1901,7 +1947,9 @@ async function backfillMaterialMetadata(): Promise<void> {
         or(
           isNull(materials.category),
           isNull(materials.searchAliases),
-          isNull(materials.defaultQty)
+          isNull(materials.defaultQty),
+          isNull(materials.stickJoint),
+          isNull(materials.strapSpacingFeet)
         )
       )
     );
@@ -1924,6 +1972,21 @@ async function backfillMaterialMetadata(): Promise<void> {
     // Only NULL is filled; a material with no default legitimately stays NULL.
     if (fork.defaultQty === null && source.defaultQty != null) {
       patch.defaultQty = source.defaultQty.toFixed(4);
+    }
+    /*
+      A raceway forked before 0082 has no stick length or strap spacing — so
+      a contractor who priced their EMT would see "no stick length set" on
+      every run of it. NULL is "never set, inherit", the rule this whole pass
+      runs on; a value the contractor chose is left alone field by field.
+    */
+    if (source.raceway) {
+      const inherited = racewayColumns(source);
+      for (const key of RACEWAY_NUMBER_KEYS) {
+        if (fork[key] === null && inherited[key] !== null) {
+          patch[key] = inherited[key];
+        }
+      }
+      if (fork.stickJoint === null) patch.stickJoint = inherited.stickJoint;
     }
     if (Object.keys(patch).length > 0) {
       await db.update(materials).set(patch).where(eq(materials.id, fork.id));
@@ -4845,6 +4908,12 @@ function feetForRole(
       return footage.cableFeet > 0 ? footage.cableFeet : footage.insulatedFeet;
     case "ground":
       return footage.groundFeet;
+    case "coupling":
+    case "connector":
+    case "strap":
+      // INTERIM, for exactly one commit: nothing writes a fitting line until
+      // the bridge commit, which resolves these from the fitting count.
+      return 0;
   }
 }
 

@@ -18,6 +18,7 @@ import type {
   MATERIAL_UNITS_OF_SALE,
   MaterialCategory,
 } from "../../../drizzle/schema";
+import type { StickJoint } from "../../../shared/runFittings";
 import { wordsInName } from "../../../shared/aliasSuggestions";
 
 type UnitOfSale = (typeof MATERIAL_UNITS_OF_SALE)[number];
@@ -59,6 +60,20 @@ export type BaselineMaterial = {
    * on a device. The builder treats every one as an editable suggestion.
    */
   defaultQty?: number;
+  /**
+   * RACEWAY ONLY: what the fitting count reads (`shared/runFittings.ts`) —
+   * stick length and joint, strap spacing and distance from a box. Editable
+   * defaults, never code advice; a company changes them by forking the row.
+   * Omitted on everything that is not a raceway.
+   */
+  raceway?: RacewayFacts;
+};
+
+export type RacewayFacts = {
+  stickLengthFeet: number | null;
+  stickJoint: StickJoint;
+  strapSpacingFeet: number;
+  strapFromBoxFeet: number;
 };
 
 /**

@@ -181,3 +181,46 @@ describe.skipIf(!hasDb)("a restart never touches a user's own price", () => {
     expect(restored.searchAliases).toBe(shipped.searchAliases);
   });
 });
+
+describe.skipIf(!hasDb)("a raceway's fitting facts (0082)", () => {
+  /*
+    A contractor who priced their EMT before 0082 holds a FORK with no stick
+    length and no strap spacing — and the fitting count would say "no stick
+    length set" on every run of it. So a NULL on a fork inherits, like every
+    other never-set field. A value the contractor chose stays, field by field.
+  */
+  it("fills a pre-0082 fork's NULLs and keeps what the contractor chose", async () => {
+    const shipped = (await caller().materials.list()).find(
+      m => m.name === '1/2" EMT'
+    )!;
+    await caller().materials.update({ id: shipped.id, costPerUnit: 0.62 });
+    const fork = (await caller().materials.list()).find(
+      m => m.name === '1/2" EMT'
+    )!;
+    expect(fork.userId).toBe(USER);
+
+    const db = await getDb();
+    // As it stood before 0082, except for one number the contractor set.
+    await db!
+      .update(materials)
+      .set({
+        stickLengthFeet: "20.00",
+        stickJoint: null,
+        strapSpacingFeet: null,
+        strapFromBoxFeet: null,
+      })
+      .where(eq(materials.id, fork.id));
+
+    await seedBaselineMaterials();
+
+    const [after] = await db!
+      .select()
+      .from(materials)
+      .where(eq(materials.id, fork.id));
+    expect(Number(after.stickLengthFeet)).toBe(20);
+    expect(after.stickJoint).toBe("coupling");
+    expect(Number(after.strapSpacingFeet)).toBe(10);
+    expect(Number(after.strapFromBoxFeet)).toBe(3);
+    expect(Number(after.costPerUnit)).toBeCloseTo(0.62, 4);
+  });
+});

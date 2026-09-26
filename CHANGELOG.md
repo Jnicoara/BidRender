@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **Conduit now knows how it is sold and supported.** Each raceway in the
+  catalog carries a stick length, how its sticks join (EMT needs couplings,
+  PVC is belled, rigid and IMC come with a coupling on each stick, flex is a
+  coil) and a strap spacing, all as editable defaults. EMT couplings and
+  connectors now say their style: the existing rows became "set-screw" (same
+  rows, so nothing that uses them changed) and compression and raintight
+  versions were added, along with sized one-hole straps for EMT, PVC and
+  rigid. All new rows are unpriced, like the rest of the catalog.
 - **Groundwork for counting conduit fittings from the trace.** New rules work
   out couplings (from stick length, per leg, drops included), connectors (one
   per conduit end, so two at an in-and-out box and three where a branch

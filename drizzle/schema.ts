@@ -673,6 +673,25 @@ export const materials = mysqlTable(
      */
     laborHours: decimal("laborHours", { precision: 10, scale: 4 }),
 
+    /**
+     * RACEWAY ONLY — what the fitting count needs to know about the pipe
+     * (`shared/runFittings.ts`). NULL on everything else, and NULL on a
+     * raceway means "not said": the count says so rather than guessing.
+     *
+     * All four are editable DEFAULTS, seeded per family and re-stamped on
+     * baseline rows like every other seed field. A company that buys 20 ft
+     * PVC or straps at 8 ft edits the material, which forks it, and the
+     * seed never touches the fork.
+     *
+     * `stickJoint` is one of `STICK_JOINTS` — coupling, belled,
+     * coupling_on_stick, continuous — as a varchar so a new joint is content
+     * rather than a migration.
+     */
+    stickLengthFeet: decimal("stickLengthFeet", { precision: 6, scale: 2 }),
+    stickJoint: varchar("stickJoint", { length: 24 }),
+    strapSpacingFeet: decimal("strapSpacingFeet", { precision: 6, scale: 2 }),
+    strapFromBoxFeet: decimal("strapFromBoxFeet", { precision: 6, scale: 2 }),
+
     unitOfSale: mysqlEnum("unitOfSale", MATERIAL_UNITS_OF_SALE)
       .default("each")
       .notNull(),
@@ -2481,6 +2500,32 @@ export const takeoffRunTypes = mysqlTable(
      */
     groundCount: int("groundCount"),
 
+    /**
+     * Which fitting style this type's couplings and connectors are —
+     * `set-screw`, `compression` or `raintight` on EMT (`EMT_FITTING_STYLES`).
+     * NULL reads as set-screw, which is what "EMT coupling" means at the
+     * counter, and the screen says "set-screw (default)" so it is visible.
+     * Ignored on every other raceway until their styles ship (todo.md).
+     */
+    fittingStyle: varchar("fittingStyle", { length: 24 }),
+    /**
+     * Named fittings that win over the catalog lookup — so a CUSTOM raceway,
+     * which the lookup cannot size, still gets its fittings, and a company
+     * can pin a particular part. NULL means "look it up". `set null` like
+     * every other provenance link here.
+     */
+    couplingMaterialId: int("couplingMaterialId").references(
+      () => materials.id,
+      { onDelete: "set null" }
+    ),
+    connectorMaterialId: int("connectorMaterialId").references(
+      () => materials.id,
+      { onDelete: "set null" }
+    ),
+    strapMaterialId: int("strapMaterialId").references(() => materials.id, {
+      onDelete: "set null",
+    }),
+
     /** active / archived / deleted. See materials.status — same lifecycle. */
     status: mysqlEnum("status", LIBRARY_STATUSES).default("active").notNull(),
     archivedAt: timestamp("archivedAt"),
@@ -2510,7 +2555,19 @@ export type RunPathType = (typeof RUN_PATH_TYPES)[number];
  *             ground is inside the jacket and is already in the cable's own
  *             footage — counting it here would count it twice.
  */
-export const RUN_MATERIAL_ROLES = ["raceway", "conductor", "ground"] as const;
+export const RUN_MATERIAL_ROLES = [
+  "raceway",
+  "conductor",
+  "ground",
+  /*
+    The fittings, counted from the trace rather than measured along it —
+    `shared/runFittings.ts`. Conduit types only; their quantity is a COUNT of
+    each, not feet, and it is re-derived on every read like the footage.
+  */
+  "coupling",
+  "connector",
+  "strap",
+] as const;
 export type RunMaterialRole = (typeof RUN_MATERIAL_ROLES)[number];
 
 export const RUN_STATUSES = ["draft", "committed"] as const;

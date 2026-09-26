@@ -575,6 +575,13 @@
       "when": 1789957100000,
       "tag": "0081_backfill_company_seat_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "5",
+      "when": 1789957200000,
+      "tag": "0082_run_fittings",
+      "breakpoints": true
     }
   ]
 }

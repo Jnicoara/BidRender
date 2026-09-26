@@ -29,7 +29,8 @@ import {
 } from "./safetyAndSupport";
 import { STRUT } from "./strut";
 import { WIRE_AND_CABLE } from "./wireAndCable";
-import { dropRestatedWords, type BaselineMaterial } from "./types";
+import { dropRestatedWords, TRADE_SIZES, type BaselineMaterial } from "./types";
+import { emtStyledFittingName } from "../../../shared/runFittingMaterials";
 
 export type { BaselineMaterial } from "./types";
 
@@ -49,8 +50,11 @@ export type { BaselineMaterial } from "./types";
  */
 export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
   '1/2" PVC': '1/2" PVC Sch 40',
-  'EMT connector 1/2"': '1/2" EMT connector',
-  'EMT connector 3/4"': '3/4" EMT connector',
+  // Straight to the set-screw name (2026-09-26, below), not via the
+  // intermediate `1/2" EMT connector`, so no database depends on the pass
+  // walking a chain in order — the same choice the SER entries make.
+  'EMT connector 1/2"': '1/2" EMT set-screw connector',
+  'EMT connector 3/4"': '3/4" EMT set-screw connector',
   // Written 5"/6" so the leading measurement is a real 5 inches. "5/6" reads
   // as the fraction five-sixths to anything parsing sizes, which sorted the
   // wafer below the 4" one.
@@ -153,6 +157,23 @@ export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
       [`${short} SER ${word}`, `${full} SER ${abbr}`],
       [`${short} SER ${abbr}`, `${full} SER ${abbr}`],
     ])
+  ),
+  /*
+    EMT couplings and connectors state their style (owner, 2026-09-26): the
+    plain rows ARE the set-screw ones — it is what "EMT coupling" means at the
+    counter — and compression and raintight arrive beside them as new rows.
+    Renamed in place so every assembly and stamp keeps its id. Every word of
+    the old name is still in the new one, so searching the old name finds the
+    row without an alias (and `materialsCatalog.test.ts` refuses aliases that
+    restate the name).
+  */
+  ...Object.fromEntries(
+    TRADE_SIZES.flatMap(size =>
+      (["coupling", "connector"] as const).map(kind => [
+        `${size} EMT ${kind}`,
+        emtStyledFittingName(size, "set-screw", kind),
+      ])
+    )
   ),
 };
 

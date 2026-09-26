@@ -23,7 +23,14 @@ import {
   TRADE_SIZES,
   UNPRICED,
   type BaselineMaterial,
+  type RacewayFacts,
 } from "./types";
+import {
+  EMT_FITTING_STYLES,
+  emtStyledFittingName,
+  oneHoleStrapName,
+  type EmtFittingStyle,
+} from "../../../shared/runFittingMaterials";
 
 // ─── The five rigid families ──────────────────────────────────────────────────
 
@@ -32,28 +39,79 @@ type Family = {
   label: string;
   /** Slang for the family itself, minus anything its label already says. */
   slang: string;
+  /**
+   * What the fitting count reads off the pipe, per size. EDITABLE DEFAULTS,
+   * shipped so a fresh catalog counts something — not code advice, and the
+   * screen labels them as defaults. See `shared/runFittings.ts`.
+   */
+  raceway: (size: string) => RacewayFacts;
 };
+
+/**
+ * PVC's strap spacing steps up with size — the familiar 3 / 5 / 6 / 7 ft
+ * table. A default for a company to change, like everything here.
+ */
+function pvcStrapSpacing(size: string): number {
+  if (['1/2"', '3/4"', '1"'].includes(size)) return 3;
+  if (['1-1/4"', '1-1/2"', '2"'].includes(size)) return 5;
+  if (['2-1/2"', '3"'].includes(size)) return 6;
+  return 7;
+}
 
 const FAMILIES: Family[] = [
   {
     label: "EMT",
     slang: "thinwall thin wall pipe tube tubing electrical metallic steel",
+    // Decided 2026-09-26: 10 ft sticks, strapped every 10 ft and within 3 ft
+    // of a box.
+    raceway: () => ({
+      stickLengthFeet: 10,
+      stickJoint: "coupling",
+      strapSpacingFeet: 10,
+      strapFromBoxFeet: 3,
+    }),
   },
   {
     label: "PVC Sch 40",
     slang: "schedule sch40 plastic poly grey gray underground buried",
+    // Belled: each stick takes the next without a coupling (2026-09-26).
+    raceway: size => ({
+      stickLengthFeet: 10,
+      stickJoint: "belled",
+      strapSpacingFeet: pvcStrapSpacing(size),
+      strapFromBoxFeet: 3,
+    }),
   },
   {
     label: "PVC Sch 80",
     slang: "schedule sch80 plastic poly grey gray heavy wall exposed riser",
+    raceway: size => ({
+      stickLengthFeet: 10,
+      stickJoint: "belled",
+      strapSpacingFeet: pvcStrapSpacing(size),
+      strapFromBoxFeet: 3,
+    }),
   },
   {
     label: "rigid conduit",
     slang: "rmc grc galvanized galvanised threaded heavy wall grc",
+    // Sold with one coupling threaded on each stick (2026-09-26).
+    raceway: () => ({
+      stickLengthFeet: 10,
+      stickJoint: "coupling_on_stick",
+      strapSpacingFeet: 10,
+      strapFromBoxFeet: 3,
+    }),
   },
   {
     label: "IMC",
     slang: "intermediate metal threaded galvanized galvanised",
+    raceway: () => ({
+      stickLengthFeet: 10,
+      stickJoint: "coupling_on_stick",
+      strapSpacingFeet: 10,
+      strapFromBoxFeet: 3,
+    }),
   },
 ];
 
@@ -65,26 +123,94 @@ const FITTINGS = [
   { suffix: "LB conduit body", slang: "condulet access fitting pull" },
 ];
 
+/**
+ * EMT's couplings and connectors come in three styles, so EMT does not take
+ * the plain two from FITTINGS. Set-screw is the RENAMED original row (see
+ * RENAMED_BASELINE_MATERIALS) — "EMT coupling" at the counter means set-screw
+ * — and compression and raintight are new. Names come from
+ * `shared/runFittingMaterials.ts`, which the fitting lookup reads too.
+ */
+const EMT_STYLE_SLANG: Record<EmtFittingStyle, string> = {
+  "set-screw": "setscrew set screw ss",
+  compression: "comp gland nut",
+  raintight: "rain tight rain-tight wet outdoor",
+};
+
+function emtStyledFittings(size: string): BaselineMaterial[] {
+  const family = FAMILIES[0];
+  return EMT_FITTING_STYLES.flatMap(style =>
+    FITTINGS.filter(
+      f => f.suffix === "coupling" || f.suffix === "connector"
+    ).map(fitting => ({
+      name: emtStyledFittingName(
+        size,
+        style,
+        fitting.suffix as "coupling" | "connector"
+      ),
+      unitOfSale: "each" as const,
+      costPerUnit: UNPRICED,
+      category: "Conduit Fittings" as const,
+      searchAliases: aliases(
+        sizeAliases(size),
+        family.slang,
+        fitting.slang,
+        EMT_STYLE_SLANG[style]
+      ),
+    }))
+  );
+}
+
 const rigidFamilies: BaselineMaterial[] = FAMILIES.flatMap(family => [
   // The raceway itself, priced by the foot the way it is estimated even though
-  // it is bought in 10 ft sticks.
+  // it is bought in 10 ft sticks — which `raceway` records for the count.
   ...TRADE_SIZES.map(size => ({
     name: `${size} ${family.label}`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
     category: "Conduit" as const,
     searchAliases: aliases(sizeAliases(size), family.slang, "conduit raceway"),
+    raceway: family.raceway(size),
   })),
-  ...TRADE_SIZES.flatMap(size =>
-    FITTINGS.map(fitting => ({
+  ...TRADE_SIZES.flatMap(size => [
+    ...FITTINGS.filter(
+      fitting =>
+        family.label !== "EMT" ||
+        (fitting.suffix !== "coupling" && fitting.suffix !== "connector")
+    ).map(fitting => ({
       name: `${size} ${family.label} ${fitting.suffix}`,
       unitOfSale: "each" as const,
       costPerUnit: UNPRICED,
       category: "Conduit Fittings" as const,
       searchAliases: aliases(sizeAliases(size), family.slang, fitting.slang),
-    }))
-  ),
+    })),
+    ...(family.label === "EMT" ? emtStyledFittings(size) : []),
+  ]),
 ]);
+
+/**
+ * Sized one-hole straps, one family per outside diameter: EMT, PVC (40 and 80
+ * share it) and rigid (rigid and IMC share it). What the strap count prices
+ * against — the unsized "EMT strap" below stays for assemblies that use it.
+ */
+const STRAP_FAMILIES = [
+  { label: "EMT", slang: "thinwall" },
+  { label: "PVC", slang: "plastic schedule sch40 sch80" },
+  { label: "rigid", slang: "rmc grc imc galvanized" },
+];
+
+const straps: BaselineMaterial[] = STRAP_FAMILIES.flatMap(family =>
+  TRADE_SIZES.map(size => ({
+    name: oneHoleStrapName(size, family.label),
+    unitOfSale: "each" as const,
+    costPerUnit: UNPRICED,
+    category: "Conduit Fittings" as const,
+    searchAliases: aliases(
+      sizeAliases(size),
+      family.slang,
+      "1 hole clamp conduit pipe hanger support"
+    ),
+  }))
+);
 
 // ─── Flex ─────────────────────────────────────────────────────────────────────
 
@@ -110,6 +236,14 @@ const flex: BaselineMaterial[] = FLEX_FAMILIES.flatMap(family => [
     costPerUnit: UNPRICED,
     category: "Conduit" as const,
     searchAliases: aliases(sizeAliases(size), family.slang, "raceway"),
+    // A coil, not sticks: no couplings. Strapped every 4-1/2 ft and within
+    // 12 in of a box — defaults, like the rigid families'.
+    raceway: {
+      stickLengthFeet: null,
+      stickJoint: "continuous" as const,
+      strapSpacingFeet: 4.5,
+      strapFromBoxFeet: 1,
+    },
   })),
   ...FLEX_SIZES.flatMap(size =>
     [
@@ -175,6 +309,7 @@ const weatherheads: BaselineMaterial[] = [
 
 export const CONDUIT: BaselineMaterial[] = [
   ...rigidFamilies,
+  ...straps,
   ...flex,
   ...terminations,
   ...weatherheads,
