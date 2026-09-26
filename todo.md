@@ -1257,14 +1257,20 @@ path is ever revived, give it the same treatment first.
 - [ ] **A billing plan should set `seatLimit` through `db.setSeatLimit`**, so a downgrade hits the same "remove N first" refusal. Nothing else writes the column today except 0081.
 - [ ] **Nobody but a platform admin can add a seat.** "Remove someone or add a seat" names an action an owner cannot yet take themselves; it becomes self-serve with billing.
 
-## Branch legs on a traced run (D20, built 2026-09-26, NOT deployed)
+## Branch legs on a traced run (D20, built 2026-09-26)
+
+**DEPLOYED 2026-09-26 as `b69c35d`** (rollback target `e07f1e4`). 0085 applied
+to production before the push; drift clean at 86; `fittingsImpact` 0 leg rows,
+0 tees. Rehearsed on backup `2026-09-26T23-08-29Z`; results and the live
+checks on bid 25 in `references/deploying.md` § 5b "Fourth run". Bid 25 back
+to 0 lines and 0 runs afterwards.
 
 On `local-dev` as the ten "Branch legs step N" commits. A run is a root row
 plus leg rows (`parentRunId`); a tee (`takeoff_run_tees`) cuts the leg it
 lands on, so every row is a leg between two nodes and the fitting and bend
 counts need no rule of their own. `shared/runNetwork.ts` is the module.
 
-- [ ] **Deploy — three steps, and step 3 is empty.**
+- [x] **Deploy — three steps, and step 3 is empty.** Done as below.
   1. **0085 is step 1 (additive): apply it BEFORE the push.** One new table
      (named `utf8mb4_unicode_ci`), three nullable columns on `takeoff_runs`,
      and `teeBox`/`teeCover` appended to `bid_line_items.runMaterialRole`. No

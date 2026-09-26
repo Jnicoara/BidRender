@@ -766,6 +766,56 @@ each, into the hubs)"), LB 0 → 1, and straps stayed ≥ 20 but redistributed
 (4 near a box + 16 spaced → 6 + 14) — the two beside the LB replace two
 spacing straps on those lengths.
 
+**Fourth run — branch legs (D20), deployed as `b69c35d` on 2026-09-26.**
+**Rollback target: `e07f1e4`.** A schema release, not a catalog one. Backup
+**`2026-09-26T23-08-29Z`** (61 tables, 3,137 rows, 5 files) restored and
+verified, kept with `KEEP_SCRATCH=1`. On the copy: `schemaDrift` named exactly
+0085's three items at 85 recorded; 0085 applied (1 file), a second run applied
+nothing, no drift. The built release booted on the copy twice —
+`catalogRehearsal` CLEAN both times (1,237 → 1,237, nothing added, renamed,
+retired or deleted, no company row touched, every reference identical).
+
+**"Existing totals unchanged" was checked by the ROUTERS, not by eye.** A
+throwaway read-only script called `takeoffRuns.totals`,
+`takeoffRunTypes.bridgeForBid` and `takeoffRuns.listForSheet` (quantities,
+wire ownership, bends) for every bid as its owner, and wrote the result to a
+file. Run from a worktree at `e07f1e4` on the copy BEFORE 0085, and again
+from the old build AFTER it, and from the new build after it: **all three
+byte-identical.** Production has 2 bids and 2 runs, both on bid 23 (the
+owner's; bid 25 had none). The same script against production itself: the
+old build on the migrated database, and the new build after the push, both
+byte-identical to the backup. Worth repeating for any release that touches a
+read path: it compares everything the screens are built from, and it cannot
+pass on a figure nobody looked at.
+
+Production: `schemaDrift` named exactly 0085's three items; `migrate.mts`
+applied 1, a second run applied nothing, drift clean. `fittingsImpact`:
+**0 leg rows, 0 tees**, no fittings to add, no line to read "Not priced".
+Pushed 23:15:46Z; the new build (`builtAt` 23:16:35Z) was serving at
+23:18:43Z on both hosts.
+
+Live checks on bid 25 as the smoke account (sheet 196 given 1/4" = 1'-0" for
+the check): a 1/2" EMT main of 75.08 ft (one corner) with a branch
+Shift-clicked off it 30.80 ft along, 13.48 ft long. Stored as three legs
+(30.80 + 44.28 + 13.48) meeting at one tee, all committed; the tee drawn as a
+box at the split. With a run height on each leg, every tee end read level —
+no drop — and `setEnds` refused a kind on a tee end. Counts: **6 connectors
+("3 line ends, 1 branch tee (3 of this size)")**, 1 tee box (`4" square box`)
+and 1 blank cover, 1 field bend (the main's corner — none at the split), 8
+couplings, 11 straps; raceway 88.56 ft = main + branch, so the jump back to
+the tee was not counted. "Send 7 lines to bid" put the tee box on the bid at
+qty 1 with its sentence ($0: the shipped box is unpriced). Deleting leg 3 in
+the panel joined the main back into one 75.08 ft leg with no tee, the header
+went, and the sent lines followed on their own: tee box 1 → 0, connectors
+6 → 2, raceway 88.56 → 75.08. Then the 7 lines, the run and sheet 196's scale
+were removed; bid 25 back to 0 lines, 0 runs, no sheet scaled, and the
+router snapshot of production byte-identical to the backup again.
+
+**Driving the live viewer from the extension:** in the hidden tab, clicks by
+coordinate landed nowhere until a screenshot had been taken (the click frame
+was not the CSS one). Pointer events dispatched on the overlay `<svg>` at
+CSS coordinates, with `shiftKey` for the branch, drove the real handlers.
+
 **`search` caught a real regression before production did.** The old name
 `2-1/2" EMT coupling` matched all three new EMT styles equally and the tie fell
 to the alphabet — compression first, the renamed set-screw row third. Fixed
