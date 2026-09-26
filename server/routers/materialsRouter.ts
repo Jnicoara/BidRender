@@ -39,6 +39,24 @@ import {
 import * as db from "../db";
 import { STICK_JOINTS } from "../../shared/runFittings";
 import { MAX_LABOR_UNIT_HOURS } from "../../shared/materialLabor";
+import { RENAMED_BASELINE_MATERIALS } from "../../shared/renamedMaterials";
+
+/**
+ * How importPrices compares a price-list name to a catalog name: case- and
+ * space-insensitive. A supply house writes "12-2 NM-B" where the catalog says
+ * "12-2 NM-B " often enough that an exact match would report half a real
+ * price list as unmatched.
+ */
+const priceListKey = (name: string) =>
+  name.trim().toLowerCase().replace(/\s+/g, " ");
+
+/** The shipped rename map, old -> new, keyed the way importPrices matches. */
+const RENAMED_BASELINE_MATERIALS_BY_KEY = new Map(
+  Object.entries(RENAMED_BASELINE_MATERIALS).map(([from, to]) => [
+    priceListKey(from),
+    to,
+  ])
+);
 
 /**
  * This router's gate: a query needs `library.view`, a mutation needs `library.edit`.
@@ -522,6 +540,12 @@ export const materialsRouter = router({
    *
    * Baselines fork on write, exactly as a hand edit does — a shared row cannot
    * carry one user's supplier price.
+   *
+   * ── An old catalog name still prices its row ─────────────────────────────────
+   * A supplier's sheet lags the catalog: it still says "20A breaker" after the
+   * row became "20A Single-Pole breaker". A name that matches nothing falls
+   * back to RENAMED_BASELINE_MATERIALS and is reported in `renamed`, so the
+   * screen can say which material it priced. An exact match always wins first.
    */
   importPrices: procedure
     .input(
@@ -543,19 +567,28 @@ export const materialsRouter = router({
         ctx.scope.dataUserId,
         "active"
       );
-      // Name match is case- and space-insensitive: a supply house writes
-      // "12-2 NM-B" where the catalog says "12-2 NM-B " often enough that an
-      // exact match would report half a real price list as unmatched.
-      const key = (name: string) =>
-        name.trim().toLowerCase().replace(/\s+/g, " ");
+      const key = priceListKey;
       const byName = new Map(existing.map(row => [key(row.name), row]));
 
       const priced: string[] = [];
       const unmatched: string[] = [];
+      // Rows found through a shipped rename rather than by their own name,
+      // reported so the user sees which material the old spelling priced.
+      const renamed: Array<{ from: string; to: string }> = [];
       const stamped = new Date();
 
       for (const row of input.rows) {
-        const target = byName.get(key(row.name));
+        // A name the company actually has wins outright — including an OLD
+        // name on a copy they forked before the rename, which is theirs and
+        // is the row they mean. Only a miss falls back to the rename map.
+        // A retired name is in no map, so it stays unmatched: retiring a row
+        // means nothing should be priced through it.
+        let target = byName.get(key(row.name));
+        if (!target) {
+          const to = RENAMED_BASELINE_MATERIALS_BY_KEY.get(key(row.name));
+          target = to === undefined ? undefined : byName.get(key(to));
+          if (target) renamed.push({ from: row.name, to: target.name });
+        }
         if (!target) {
           unmatched.push(row.name);
           continue;
@@ -564,6 +597,13 @@ export const materialsRouter = router({
           target.userId === null
             ? await db.forkMaterial(target.id, ctx.scope.dataUserId)
             : target.id;
+        // The next row naming the same material — two old spellings of one
+        // row, say — must write the fork, not fork the shipped row again.
+        byName.set(key(target.name), {
+          ...target,
+          id: editableId,
+          userId: ctx.scope.dataUserId,
+        });
 
         await db.updateMaterial(editableId, ctx.scope.dataUserId, {
           costPerUnit: toDecimal(row.costPerUnit),
@@ -573,6 +613,6 @@ export const materialsRouter = router({
         priced.push(target.name);
       }
 
-      return { priced, unmatched };
+      return { priced, unmatched, renamed };
     }),
 });

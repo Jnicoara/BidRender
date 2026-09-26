@@ -386,6 +386,7 @@ function ImportPriceListDialog({
   const [result, setResult] = useState<{
     priced: string[];
     unmatched: string[];
+    renamed: Array<{ from: string; to: string }>;
   } | null>(null);
 
   const importPrices = trpc.materials.importPrices.useMutation({
@@ -444,6 +445,17 @@ function ImportPriceListDialog({
             <div className="text-emerald-400">
               Priced {result.priced.length}.
             </div>
+            {result.renamed.length > 0 && (
+              <div className="text-muted-foreground">
+                {result.renamed.slice(0, 20).map(({ from, to }) => (
+                  <div key={from}>
+                    “{from}” priced as {to}
+                  </div>
+                ))}
+                {result.renamed.length > 20 &&
+                  `and ${result.renamed.length - 20} more under their new names`}
+              </div>
+            )}
             {result.unmatched.length > 0 && (
               <div className="text-amber-400">
                 No match for: {result.unmatched.slice(0, 20).join(", ")}

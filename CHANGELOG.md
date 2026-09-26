@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **A supplier price list that uses an old material name now prices the
+  material.** A sheet still saying "20A breaker" prices the 20A Single-Pole
+  breaker, and the import says so ("priced as …"). A material you kept under
+  its old name is priced directly; retired materials still come back as "no
+  match".
 - **The Crew page now says "revoked" for an invite code you revoked.** It
   used to call it "expired", which was untrue — a code revoked a second ago
   had not run out, somebody had cancelled it.
