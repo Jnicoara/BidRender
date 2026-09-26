@@ -18,6 +18,14 @@
  * not the answer after deploy. Run it against a rehearsal copy booted once on
  * the new build for the after-deploy figures (references/deploying.md § 5b).
  *
+ * ── AND 0085, for the same reason ───────────────────────────────────────────
+ * Branch legs (D20) are read through the same loader, which selects 0085's
+ * columns on every run. Without 0085 the count cannot run at all, and this
+ * says so rather than dying on "Unknown column". 0085 is additive too: apply
+ * it, then run this. No existing run changes — every one is a root with plain
+ * ends — so the counts it prints should equal the ones from before 0085; if
+ * they do not, stop and find out why before deploying.
+ *
  * ── What changes on an existing bid, and what does not ──────────────────────
  * D17(b)'s per-end labour was an INTERIM that was never built, so retiring it
  * moves no number anywhere. What this release changes:
@@ -68,6 +76,27 @@ const [cols] = (await db.execute(
   so this says which half it is skipping rather than refusing the lot.
 */
 const has0082 = Number(cols[0]?.n ?? 0) > 0;
+const [teeTable] = (await db.execute(
+  sql`SELECT COUNT(*) AS n FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'takeoff_run_tees'`
+)) as unknown as [{ n: number }[]];
+const has0085 = Number(teeTable[0]?.n ?? 0) > 0;
+if (!has0085) {
+  console.log(
+    "\nThis database does not have migration 0085 yet (takeoff_run_tees)." +
+      "\nFittings cannot be COUNTED until it is applied (additive, step 1)."
+  );
+} else {
+  const [legs] = (await db.execute(
+    sql`SELECT
+          (SELECT COUNT(*) FROM takeoff_runs WHERE parentRunId IS NOT NULL) AS legs,
+          (SELECT COUNT(*) FROM takeoff_run_tees) AS tees`
+  )) as unknown as [{ legs: number; tees: number }[]];
+  console.log(
+    `\nBranch legs: ${legs[0]?.legs ?? 0} leg rows, ${legs[0]?.tees ?? 0} tees.` +
+      " Zero on the day 0085 is applied — nothing existing changes."
+  );
+}
 if (!has0082) {
   console.log(
     "\nThis database does not have migration 0082 yet (materials.stickLengthFeet)." +
@@ -110,7 +139,7 @@ console.log(
   "\n── 1. Fittings a Send would add (also what the supplier list gains) ──"
 );
 for (const bid of allBids.filter(b => bidIds.includes(b.id))) {
-  if (!has0082) {
+  if (!has0082 || !has0085) {
     bidsWithFittings++;
     if (bid.status.toLowerCase() !== "draft") bidsOut++;
     console.log(
@@ -118,7 +147,7 @@ for (const bid of allBids.filter(b => bidIds.includes(b.id))) {
         `, locked ${bid.quantitiesLockedAt === null ? "no" : "YES"}` +
         `, sample ${bid.isSample}, archived ${bid.archivedAt === null ? "no" : "yes"}` +
         `, owner ${bid.userId} <${emailOf.get(bid.userId) ?? "?"}>` +
-        " — has typed traced runs; counts need 0082"
+        " — has typed traced runs; counts need 0082 and 0085"
     );
     continue;
   }

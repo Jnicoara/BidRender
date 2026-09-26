@@ -1257,6 +1257,46 @@ path is ever revived, give it the same treatment first.
 - [ ] **A billing plan should set `seatLimit` through `db.setSeatLimit`**, so a downgrade hits the same "remove N first" refusal. Nothing else writes the column today except 0081.
 - [ ] **Nobody but a platform admin can add a seat.** "Remove someone or add a seat" names an action an owner cannot yet take themselves; it becomes self-serve with billing.
 
+## Branch legs on a traced run (D20, built 2026-09-26, NOT deployed)
+
+On `local-dev` as the ten "Branch legs step N" commits. A run is a root row
+plus leg rows (`parentRunId`); a tee (`takeoff_run_tees`) cuts the leg it
+lands on, so every row is a leg between two nodes and the fitting and bend
+counts need no rule of their own. `shared/runNetwork.ts` is the module.
+
+- [ ] **Deploy — three steps, and step 3 is empty.**
+  1. **0085 is step 1 (additive): apply it BEFORE the push.** One new table
+     (named `utf8mb4_unicode_ci`), three nullable columns on `takeoff_runs`,
+     and `teeBox`/`teeCover` appended to `bid_line_items.runMaterialRole`. No
+     UPDATE. Applied to `bidrender_local` and `bidrender_test_clean`; a second
+     run applies nothing. After it, `scripts/schemaDrift.mts` should report no
+     drift on these tables — **if it reports any, stop and find out why before
+     pushing.**
+  2. Push. **Not a catalog release** — no seed rows change (the tee box and
+     cover are the existing `4" square box` / `4-11/16"` rows and their blank
+     covers, and the shipped pull boxes).
+  3. Nothing.
+  - `scripts/fittingsImpact.mts` now needs 0085 as well as 0082, and prints
+    the leg and tee counts: **0 leg rows and 0 tees on the day 0085 is
+    applied**, because no existing run changes. Any other number means rows
+    were written by a build that should not have been running — stop.
+- [ ] **T bodies at a tee.** `takeoff_run_tees.fitting` reserves `body`, but
+      the catalog has no T conduit bodies (see the LL/LR/T/C item below), so
+      nothing offers it and a stored one counts as unanswered. Add the rows
+      (with slang: "tee body", "T condulet") and offer it in the snap.
+- [ ] **A cable run's tee buys nothing.** Cable types have no fitting slot
+      (the MC item below), so a branch on a cable run counts its footage and
+      drops but no junction box at the split. Same fix as MC connectors.
+- [ ] **The main past a tee and the branch both read "from a tee"** in the
+      runs panel, because nothing stored says which is which. Worth storing if
+      the wording confuses anybody.
+- [ ] **Deleting the FIRST leg of a run deletes the whole run** (it is the
+      root). The bin says so in its label. Promoting another leg to root
+      instead is possible if anybody asks.
+- [ ] **Recovering a stranded leg draft** — the draft remembers `legRootId`,
+      but nothing on screen offers a stranded draft back at all yet (T7 is
+      still half-wired).
+
 ## Fittings counted from the trace (shared/runFittings.ts, built 2026-09-26)
 
 **DEPLOYED 2026-09-26 as `99b8c4e`** (rollback target `1952c2f`). 0082 and 0083

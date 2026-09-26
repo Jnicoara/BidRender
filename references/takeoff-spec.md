@@ -1060,6 +1060,12 @@ which moves from "recommended" to decided, with the two changes marked below.
 Hand and AI traces reach the same counts because both go through one server
 function (`addLeg`) and one pure count over (legs, tees).
 
+**Built 2026-09-26** (`shared/runNetwork.ts`, migration 0085; not yet
+deployed — see `todo.md` § "Branch legs"). This builds the "leave a gap
+inside one run" half of **T10**: a leg that starts off the run is that gap,
+drawn dashed and never measured. The "split one run into two" half is still
+not built. The T table's statuses above are as read on 2026-09-14.
+
 **Smaller calls:**
 
 - Crosshair lines (V14): **skip** — no use on a touchscreen.
