@@ -26,6 +26,7 @@
 import type { FittingCount, FittingLeg } from "./runFittings";
 import { TRADE_SIZE_ORDER } from "./materialSizeOrder";
 import { DISTRIBUTION_KIND } from "./takeoffHeights";
+import { placeAnswer, type PullPointAnswer } from "./runBends";
 
 /**
  * What stands at a split.
@@ -166,6 +167,81 @@ export function cutPathAt(
 
 function copy(p: Pt): Pt {
   return { x: p.x, y: p.y };
+}
+
+/**
+ * Where each stored pull-point answer goes when its leg is cut at a tee.
+ *
+ * Answers are stored by POSITION (D19, answer 5), which is what makes this
+ * safe: a corner that is still an interior corner of one piece keeps its
+ * answer there. The end-drop answer belonged to the old END, which is now the
+ * second piece's end. A corner answer ON the cut is dropped — the tee box
+ * stands there now, and a pull point on a box would be a second box.
+ */
+export function rehomeAnswersAtCut(
+  answers: readonly PullPointAnswer[],
+  before: readonly Pt[],
+  after: readonly Pt[]
+): { keep: number[]; move: number[]; drop: number[] } {
+  const keep: number[] = [];
+  const move: number[] = [];
+  const drop: number[] = [];
+  // Only the POSITION is asked about, as `dropOrphanedPullPoints` asks it.
+  const present = { state: "unknown" } as const;
+  for (const answer of answers) {
+    if (placeAnswer({ points: before, endDrop: present }, answer) !== null) {
+      if (answer.place === "corner") {
+        keep.push(answer.id);
+        continue;
+      }
+    }
+    if (placeAnswer({ points: after, endDrop: present }, answer) !== null) {
+      move.push(answer.id);
+      continue;
+    }
+    drop.push(answer.id);
+  }
+  return { keep, move, drop };
+}
+
+/** A circuit as rejoining compares it: what it carries, not its id. */
+export type CircuitShape = {
+  name: string;
+  conductorCount: number;
+  groundCount: number | null;
+  separateGround: boolean | null;
+};
+
+function circuitsKey(circuits: readonly CircuitShape[]): string {
+  return JSON.stringify(
+    circuits
+      .map(c => [c.name, c.conductorCount, c.groundCount, c.separateGround])
+      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
+  );
+}
+
+/**
+ * Whether the two pieces of a cut leg can become one again once the last
+ * branch at their tee is deleted (D20, answer 6).
+ *
+ * Only when nothing would be lost: the same type, and the same circuits. If
+ * the estimator had told the far piece it carries fewer circuits, joining
+ * would have to pick one list and silently discard the other — so the tee
+ * stays as an in-and-out box instead, and the panel says so.
+ */
+export function canRejoin(
+  a: { runTypeId: number | null; circuits: readonly CircuitShape[] },
+  b: { runTypeId: number | null; circuits: readonly CircuitShape[] }
+): boolean {
+  return (
+    a.runTypeId === b.runTypeId &&
+    circuitsKey(a.circuits) === circuitsKey(b.circuits)
+  );
+}
+
+/** Join a path that ends at a tee to the one that starts there. */
+export function joinPaths(a: readonly Pt[], b: readonly Pt[]): Pt[] {
+  return [...a.map(copy), ...b.slice(1).map(copy)];
 }
 
 // ── A tee end has no vertical and is not a device ────────────────────────────

@@ -503,6 +503,29 @@ export const takeoffRunsRouter = router({
             message: "That run belongs to another sheet.",
           });
         }
+        /*
+          An end on a TEE stays on the tee (D20): the tee is where three legs
+          meet, and a leg that drifted off it would still be joined in the
+          counts while visibly apart on the drawing. Pinned here, by
+          construction, rather than trusted to the client.
+        */
+        const pins = [
+          existing.startTeeId === null
+            ? null
+            : await db.getTeeById(existing.startTeeId, ctx.scope.dataUserId),
+          existing.endTeeId === null
+            ? null
+            : await db.getTeeById(existing.endTeeId, ctx.scope.dataUserId),
+        ];
+        if ((pins[0] || pins[1]) && input.points.length >= 2) {
+          const points = input.points.map(p => ({ x: p.x, y: p.y }));
+          if (pins[0]) points[0] = { x: pins[0].x, y: pins[0].y };
+          if (pins[1])
+            points[points.length - 1] = { x: pins[1].x, y: pins[1].y };
+          const pinned = ratio === null ? null : pathRealInches(points, ratio);
+          values.points = points;
+          values.lengthInches = pinned === null ? null : pinned.toFixed(4);
+        }
         await db.updateRun(input.id, ctx.scope.dataUserId, values);
         // New points: an answered pull point whose corner moved or went is
         // dropped, so that corner is proposed afresh. Answers whose corner is
@@ -559,12 +582,25 @@ export const takeoffRunsRouter = router({
         });
       }
 
-      await db.updateRun(input.id, ctx.scope.dataUserId, {
-        status: "committed",
-        isSuggestion: false,
-        lengthInches: inches.toFixed(4),
-        scaleRatioUsed: String(ratio),
-      });
+      /*
+        The WHOLE run commits together — root and every leg (D20). A leg left
+        a draft behind a committed root would be half a run in one total and
+        whole in another.
+      */
+      const group = await db.getRunGroup(
+        run.parentRunId ?? run.id,
+        ctx.scope.dataUserId
+      );
+      for (const row of group) {
+        const rowInches =
+          row.id === run.id ? inches : pathRealInches(row.points ?? [], ratio);
+        await db.updateRun(row.id, ctx.scope.dataUserId, {
+          status: "committed",
+          isSuggestion: false,
+          lengthInches: rowInches === null ? null : rowInches.toFixed(4),
+          scaleRatioUsed: String(ratio),
+        });
+      }
       return { id: input.id, lengthFeet: toBillableFeet(inches) };
     }),
 
@@ -585,10 +621,17 @@ export const takeoffRunsRouter = router({
         });
       }
       await requireMeasurableSheet(run.sheetId, ctx.scope.dataUserId);
-      await db.updateRun(input.id, ctx.scope.dataUserId, {
-        isSuggestion: false,
-        status: "draft",
-      });
+      // Accepting a suggestion accepts every leg of it (D20).
+      const group = await db.getRunGroup(
+        run.parentRunId ?? run.id,
+        ctx.scope.dataUserId
+      );
+      for (const row of group) {
+        await db.updateRun(row.id, ctx.scope.dataUserId, {
+          isSuggestion: false,
+          status: "draft",
+        });
+      }
       return { success: true };
     }),
 
@@ -805,12 +848,143 @@ export const takeoffRunsRouter = router({
       };
     }),
 
+  /**
+   * Delete a run, or ONE leg of it (D20).
+   *
+   * The root is the run: deleting it takes every leg and tee with it. Any
+   * other row is one leg, and the tees it touched are tidied afterwards — the
+   * last branch at a tee joins the main back into one leg when the two pieces
+   * agree, and otherwise the tee stays as an in-and-out box (`keptAsBox`, so
+   * the screen can say so rather than leave a box nobody drew on purpose).
+   */
   remove: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
-      await requireRun(input.id, ctx.scope.dataUserId);
-      await db.deleteRun(input.id, ctx.scope.dataUserId);
-      return { success: true };
+      const run = await requireRun(input.id, ctx.scope.dataUserId);
+      const sheet = await requireSheet(run.sheetId, ctx.scope.dataUserId);
+      const measurability = measurabilityOf(sheetScale(sheet));
+      const result = await db.removeLeg(
+        input.id,
+        ctx.scope.dataUserId,
+        measurability.ok ? measurability.ratio : null
+      );
+      return { success: true, ...result };
+    }),
+
+  /**
+   * Add a leg to a run (D20): a branch from a tee on one of its legs, a new
+   * start on a mark, or a free start somewhere else on the sheet.
+   *
+   * ONE door for every way a leg is made — by hand today, by the AI reader
+   * later — so the same points and the same tee give the same counts whoever
+   * drew them. The work is `db.addBranchLeg`; this checks it is allowed.
+   */
+  addLeg: procedure
+    .input(
+      z.object({
+        /** Any row of the run: the root or one of its legs. */
+        runId: z.number().int().positive(),
+        points: pointsSchema.min(2),
+        start: z.discriminatedUnion("kind", [
+          z.object({ kind: z.literal("free"), startKind: kindSchema }),
+          z.object({
+            kind: z.literal("stamp"),
+            stampId: z.number().int().positive(),
+            startKind: kindSchema,
+          }),
+          z.object({
+            kind: z.literal("tee"),
+            hostRunId: z.number().int().positive(),
+            at: pointSchema,
+            tolerance: z.number().finite().min(0).max(1000),
+            fitting: z.enum(["box", "mark"]),
+            stampId: z.number().int().positive().nullable(),
+          }),
+        ]),
+        endKind: kindSchema,
+        /**
+         * The leg's own type. Omitted, it follows the leg it leaves (or the
+         * root) — a branch starts as what it branches from and may differ.
+         */
+        runTypeId: z.number().int().positive().nullable().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const from = await requireRun(input.runId, userId);
+      const root =
+        from.parentRunId === null
+          ? from
+          : await requireRun(from.parentRunId, userId);
+      const group = await db.getRunGroup(root.id, userId);
+
+      const start = input.start;
+      if (start.kind === "tee" && !group.some(r => r.id === start.hostRunId)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A branch can only leave a leg of the same run.",
+        });
+      }
+      if (start.kind === "tee" && start.fitting === "mark" && !start.stampId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A tee on a mark needs the mark.",
+        });
+      }
+      const stampIds = [
+        start.kind === "stamp" ? start.stampId : null,
+        start.kind === "tee" ? start.stampId : null,
+      ].filter((id): id is number => id !== null);
+      if (stampIds.length > 0) {
+        const onSheet = new Set(
+          (await db.getStampsForSheet(root.sheetId, userId)).map(s => s.id)
+        );
+        if (stampIds.some(id => !onSheet.has(id)))
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "That mark is not on this sheet.",
+          });
+      }
+      if (start.kind !== "tee") await requireKnownKind(start.startKind, userId);
+      await requireKnownKind(input.endKind, userId);
+
+      // The type: named, or the leg it leaves, or the root's.
+      const host =
+        start.kind === "tee"
+          ? group.find(r => r.id === start.hostRunId)!
+          : root;
+      let runTypeId = host.runTypeId;
+      let runTypeLabel = host.runTypeLabel;
+      if (input.runTypeId === null) {
+        runTypeId = null;
+        runTypeLabel = null;
+      } else if (input.runTypeId !== undefined) {
+        const type = await db.getRunTypeById(input.runTypeId, userId);
+        if (!type)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "That run type is not in your palette.",
+          });
+        if (type.pathType !== root.pathType)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `"${type.label}" is a ${type.pathType} type, and this is a ${root.pathType} run.`,
+          });
+        runTypeId = type.id;
+        runTypeLabel = type.label;
+      }
+
+      const sheet = await requireSheet(root.sheetId, userId);
+      const measurability = measurabilityOf(sheetScale(sheet));
+      return db.addBranchLeg(userId, {
+        root,
+        points: input.points,
+        start,
+        endKind: input.endKind,
+        runTypeId,
+        runTypeLabel,
+        ratio: measurability.ok ? measurability.ratio : null,
+      });
     }),
 
   // ── Circuits on a run ──────────────────────────────────────────────────────
@@ -1012,6 +1186,31 @@ export const takeoffRunsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.scope.dataUserId;
       const run = await requireRun(input.id, userId);
+
+      /*
+        A GUARD (CLAUDE.md rule 7): a tee end carries straight on at run
+        height and belongs to no mark (D20). A kind, height or mark stored on
+        it would be ignored by every count — `kindAtEnd` sees the tee first —
+        which is a value on screen that means nothing. So it is refused.
+      */
+      const onTee = (end: "start" | "end") =>
+        (end === "start" ? run.startTeeId : run.endTeeId) !== null;
+      const touches = (end: "start" | "end") =>
+        end === "start"
+          ? input.startKind != null ||
+            input.startHeightInches != null ||
+            input.startStampId != null
+          : input.endKind != null ||
+            input.endHeightInches != null ||
+            input.endStampId != null;
+      for (const end of ["start", "end"] as const) {
+        if (onTee(end) && touches(end))
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "That end is a branch tee — it carries on at run height, so it has no kind, height or mark.",
+          });
+      }
 
       if (input.startKind !== undefined)
         await requireKnownKind(input.startKind, userId);

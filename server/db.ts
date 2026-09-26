@@ -166,6 +166,7 @@ import {
   takeoffBendDefaults,
   takeoffPullPoints,
   takeoffRunTees,
+  type TakeoffRunTee,
   type TakeoffBendDefaults,
   takeoffMountingHeights,
   bidMountingHeights,
@@ -233,7 +234,16 @@ import {
   type FittingMaterialPick,
   type FittingRow,
 } from "../shared/runFittingMaterials";
-import { rootOf, teeBoxOwners, type TeeRef } from "../shared/runNetwork";
+import {
+  canRejoin,
+  cutPathAt,
+  joinPaths,
+  rehomeAnswersAtCut,
+  rootOf,
+  teeBoxOwners,
+  type TeeRef,
+} from "../shared/runNetwork";
+import { pathRealInches } from "../shared/takeoffGeometry";
 import {
   containsPattern,
   dateRangeBounds,
@@ -7055,6 +7065,428 @@ export async function deleteRun(id: number, userId: number) {
   await db
     .delete(takeoffRuns)
     .where(and(eq(takeoffRuns.id, id), eq(takeoffRuns.userId, userId)));
+}
+
+// ── Branch legs (D20) ────────────────────────────────────────────────────────
+
+/** A run and every leg of it: the root first, then legs by id. */
+export async function getRunGroup(
+  rootRunId: number,
+  userId: number
+): Promise<TakeoffRun[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(takeoffRuns)
+    .where(
+      and(
+        or(
+          eq(takeoffRuns.id, rootRunId),
+          eq(takeoffRuns.parentRunId, rootRunId)
+        ),
+        eq(takeoffRuns.userId, userId)
+      )
+    )
+    .orderBy(asc(takeoffRuns.id));
+}
+
+export async function getTeeById(
+  id: number,
+  userId: number
+): Promise<TakeoffRunTee | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db
+    .select()
+    .from(takeoffRunTees)
+    .where(and(eq(takeoffRunTees.id, id), eq(takeoffRunTees.userId, userId)))
+    .limit(1);
+  return row;
+}
+
+/** The tee rows of these runs, for the drawing and the panel. */
+export async function getTeeRowsForRuns(
+  rootRunIds: readonly number[],
+  userId: number
+): Promise<TakeoffRunTee[]> {
+  const db = await getDb();
+  if (!db || rootRunIds.length === 0) return [];
+  return db
+    .select()
+    .from(takeoffRunTees)
+    .where(
+      and(
+        inArray(takeoffRunTees.rootRunId, Array.from(new Set(rootRunIds))),
+        eq(takeoffRunTees.userId, userId)
+      )
+    )
+    .orderBy(asc(takeoffRunTees.id));
+}
+
+type Pt = { x: number; y: number };
+
+/** How a new leg begins. */
+export type LegStart =
+  /** A free click: a line end of its own, with the kind the picker says. */
+  | { kind: "free"; startKind: string | null }
+  /** On a mark: that mark's box, the way a run end links to one. */
+  | { kind: "stamp"; stampId: number; startKind: string | null }
+  /**
+   * On a leg of this run: a TEE. Along the leg, the leg is cut in two there;
+   * at an end of it, the tee stands at that end (and is reused if one is
+   * already there, which makes a cross).
+   */
+  | {
+      kind: "tee";
+      hostRunId: number;
+      at: Pt;
+      /** Page points within which "on a vertex" counts — the snap radius. */
+      tolerance: number;
+      fitting: "box" | "mark";
+      stampId: number | null;
+    };
+
+function lengthFields(points: Pt[], ratio: number | null) {
+  const inches = ratio === null ? null : pathRealInches(points, ratio);
+  return {
+    lengthInches: inches === null ? null : inches.toFixed(4),
+    scaleRatioUsed: ratio === null ? null : String(ratio),
+  };
+}
+
+/** The circuit columns a copy carries — everything but identity. */
+function circuitCopy(
+  circuit: TakeoffRunCircuit,
+  runId: number
+): InsertTakeoffRunCircuit {
+  const {
+    id: _id,
+    runId: _runId,
+    createdAt: _c,
+    updatedAt: _u,
+    ...rest
+  } = circuit;
+  return { ...rest, runId };
+}
+
+/**
+ * Add a leg to a run (D20), in one transaction.
+ *
+ * A tee along a leg CUTS it: the host keeps the part before the tee and its
+ * start; a new row takes the part after, with the host's old end (kind,
+ * height, mark) and the pull-point answers that now sit on it; both pieces and
+ * the branch get the host's circuits. The branch's first point is set to the
+ * tee's exactly, so the tee is where all three meet by construction rather
+ * than to within a click.
+ *
+ * The hand path and a future AI path both come through here, which is what
+ * makes them count the same.
+ */
+export async function addBranchLeg(
+  userId: number,
+  input: {
+    root: TakeoffRun;
+    points: Pt[];
+    start: LegStart;
+    endKind: string | null;
+    runTypeId: number | null;
+    runTypeLabel: string | null;
+    ratio: number | null;
+  }
+): Promise<{ id: number; teeId: number | null; cutRunId: number | null }> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const { root, start, ratio } = input;
+
+  return db.transaction(async tx => {
+    const group = await tx
+      .select()
+      .from(takeoffRuns)
+      .where(
+        and(
+          or(eq(takeoffRuns.id, root.id), eq(takeoffRuns.parentRunId, root.id)),
+          eq(takeoffRuns.userId, userId)
+        )
+      );
+    const points = input.points.map(p => ({ x: p.x, y: p.y }));
+    let teeId: number | null = null;
+    let cutRunId: number | null = null;
+    let seedFrom = root.id;
+
+    if (start.kind === "tee") {
+      const host = group.find(r => r.id === start.hostRunId);
+      if (!host) throw new Error("That leg is not part of this run.");
+      seedFrom = host.id;
+      const hostPoints = host.points ?? [];
+      const cut = cutPathAt(hostPoints, start.at, start.tolerance);
+
+      const newTee = async (at: Pt) => {
+        const [result] = await tx.insert(takeoffRunTees).values({
+          userId,
+          rootRunId: root.id,
+          x: at.x,
+          y: at.y,
+          fitting: start.fitting,
+          stampId: start.fitting === "mark" ? start.stampId : null,
+        });
+        return result.insertId;
+      };
+
+      if (cut) {
+        teeId = await newTee(cut.point);
+        points[0] = { ...cut.point };
+        // The piece after the tee takes the host's old end with it.
+        const { id: _id, createdAt: _c, updatedAt: _u, ...hostColumns } = host;
+        const [after] = await tx.insert(takeoffRuns).values({
+          ...hostColumns,
+          parentRunId: root.id,
+          points: cut.after,
+          ...lengthFields(cut.after, ratio),
+          startKind: null,
+          startHeightInches: null,
+          startStampId: null,
+          startTeeId: teeId,
+        });
+        cutRunId = after.insertId;
+        await tx
+          .update(takeoffRuns)
+          .set({
+            points: cut.before,
+            ...lengthFields(cut.before, ratio),
+            endKind: null,
+            endHeightInches: null,
+            endStampId: null,
+            endTeeId: teeId,
+            updatedAt: new Date(),
+          })
+          .where(eq(takeoffRuns.id, host.id));
+
+        // Pull-point answers go with the corner they sit on.
+        const answers = await tx
+          .select()
+          .from(takeoffPullPoints)
+          .where(
+            and(
+              eq(takeoffPullPoints.runId, host.id),
+              eq(takeoffPullPoints.userId, userId)
+            )
+          );
+        const plan = rehomeAnswersAtCut(answers, cut.before, cut.after);
+        if (plan.move.length > 0)
+          await tx
+            .update(takeoffPullPoints)
+            .set({ runId: cutRunId })
+            .where(inArray(takeoffPullPoints.id, plan.move));
+        if (plan.drop.length > 0)
+          await tx
+            .delete(takeoffPullPoints)
+            .where(inArray(takeoffPullPoints.id, plan.drop));
+
+        const circuits = await tx
+          .select()
+          .from(takeoffRunCircuits)
+          .where(eq(takeoffRunCircuits.runId, host.id));
+        if (circuits.length > 0)
+          await tx
+            .insert(takeoffRunCircuits)
+            .values(circuits.map(c => circuitCopy(c, cutRunId!)));
+      } else {
+        // On an END of the host: the tee stands there. Reuse one already
+        // there, which makes a cross rather than two boxes at one spot.
+        const n = hostPoints.length;
+        const toStart = Math.hypot(
+          hostPoints[0].x - start.at.x,
+          hostPoints[0].y - start.at.y
+        );
+        const toEnd = Math.hypot(
+          hostPoints[n - 1].x - start.at.x,
+          hostPoints[n - 1].y - start.at.y
+        );
+        const end = toStart <= toEnd ? "start" : "end";
+        const endPoint = end === "start" ? hostPoints[0] : hostPoints[n - 1];
+        const existing = end === "start" ? host.startTeeId : host.endTeeId;
+        teeId = existing ?? (await newTee(endPoint));
+        points[0] = { ...endPoint };
+        if (existing === null) {
+          // A tee end is not a device and has no mark of its own — the tee
+          // wins for counting anyway (`endNodeKey`); clearing says so in data.
+          await tx
+            .update(takeoffRuns)
+            .set(
+              end === "start"
+                ? {
+                    startTeeId: teeId,
+                    startStampId: null,
+                    updatedAt: new Date(),
+                  }
+                : { endTeeId: teeId, endStampId: null, updatedAt: new Date() }
+            )
+            .where(eq(takeoffRuns.id, host.id));
+        }
+      }
+    }
+
+    const [created] = await tx.insert(takeoffRuns).values({
+      bidId: root.bidId,
+      sheetId: root.sheetId,
+      userId,
+      parentRunId: root.id,
+      name: root.name,
+      pathType: root.pathType,
+      points,
+      ...lengthFields(points, ratio),
+      status: root.status,
+      isSuggestion: root.isSuggestion,
+      location: root.location,
+      runTypeId: input.runTypeId,
+      runTypeLabel: input.runTypeLabel,
+      distributionHeightInches: root.distributionHeightInches,
+      startKind: start.kind === "tee" ? null : start.startKind,
+      startStampId: start.kind === "stamp" ? start.stampId : null,
+      startTeeId: teeId,
+      endKind: input.endKind,
+    });
+    const id = created.insertId;
+
+    // Circuits are seeded from the leg it leaves, owned by the new leg (§ 5k,
+    // answer 2): "same as main" until somebody says otherwise.
+    const seed = await tx
+      .select()
+      .from(takeoffRunCircuits)
+      .where(eq(takeoffRunCircuits.runId, seedFrom));
+    if (seed.length > 0)
+      await tx
+        .insert(takeoffRunCircuits)
+        .values(seed.map(c => circuitCopy(c, id)));
+
+    return { id, teeId, cutRunId };
+  });
+}
+
+/**
+ * Delete ONE leg, and tidy the tees it touched (D20, answer 6).
+ *
+ * Deleting the root is deleting the run: its legs and tees go with it by
+ * cascade. For any other leg, each tee it touched is looked at afterwards:
+ *
+ *   nothing left      the tee goes
+ *   one end left      the tee goes and that end is a line end again
+ *   two, a through    the two pieces are joined back into one when they agree
+ *     pair            on type and circuits (`canRejoin`); otherwise the tee
+ *                     stays as an in-and-out box, and the result says so
+ *   three or more     still a tee; nothing changes
+ */
+export async function removeLeg(
+  id: number,
+  userId: number,
+  ratio: number | null
+): Promise<{ rejoined: number[]; keptAsBox: number[] }> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const row = await getRunById(id, userId);
+  if (!row) return { rejoined: [], keptAsBox: [] };
+  if (row.parentRunId === null) {
+    await deleteRun(id, userId);
+    return { rejoined: [], keptAsBox: [] };
+  }
+
+  return db.transaction(async tx => {
+    const rejoined: number[] = [];
+    const keptAsBox: number[] = [];
+    const teeIds = [row.startTeeId, row.endTeeId].filter(
+      (t): t is number => t !== null
+    );
+    await tx
+      .delete(takeoffRuns)
+      .where(and(eq(takeoffRuns.id, id), eq(takeoffRuns.userId, userId)));
+
+    for (const teeId of Array.from(new Set(teeIds))) {
+      const at = await tx
+        .select()
+        .from(takeoffRuns)
+        .where(
+          and(
+            or(
+              eq(takeoffRuns.startTeeId, teeId),
+              eq(takeoffRuns.endTeeId, teeId)
+            ),
+            eq(takeoffRuns.userId, userId)
+          )
+        );
+      const dropTee = () =>
+        tx.delete(takeoffRunTees).where(eq(takeoffRunTees.id, teeId));
+
+      if (at.length === 0) {
+        await dropTee();
+        continue;
+      }
+      if (at.length === 1) {
+        const only = at[0];
+        await tx
+          .update(takeoffRuns)
+          .set(
+            only.startTeeId === teeId
+              ? { startTeeId: null, updatedAt: new Date() }
+              : { endTeeId: null, updatedAt: new Date() }
+          )
+          .where(eq(takeoffRuns.id, only.id));
+        await dropTee();
+        continue;
+      }
+      if (at.length > 2) continue;
+
+      const a = at.find(r => r.endTeeId === teeId);
+      const b = at.find(r => r.startTeeId === teeId && r.id !== a?.id);
+      if (!a || !b) {
+        keptAsBox.push(teeId);
+        continue;
+      }
+      const circuits = await tx
+        .select()
+        .from(takeoffRunCircuits)
+        .where(inArray(takeoffRunCircuits.runId, [a.id, b.id]));
+      const of = (runId: number) => circuits.filter(c => c.runId === runId);
+      if (
+        !canRejoin(
+          { runTypeId: a.runTypeId, circuits: of(a.id) },
+          { runTypeId: b.runTypeId, circuits: of(b.id) }
+        )
+      ) {
+        keptAsBox.push(teeId);
+        continue;
+      }
+      // Keep the ROOT if either piece is it — deleting the root would take
+      // the whole run with it.
+      const keep = b.parentRunId === null ? b : a;
+      const gone = keep === a ? b : a;
+      const points = joinPaths(a.points ?? [], b.points ?? []);
+      await tx
+        .update(takeoffRuns)
+        .set({
+          points,
+          ...lengthFields(points, ratio),
+          startKind: a.startKind,
+          startHeightInches: a.startHeightInches,
+          startStampId: a.startStampId,
+          startTeeId: a.startTeeId,
+          endKind: b.endKind,
+          endHeightInches: b.endHeightInches,
+          endStampId: b.endStampId,
+          endTeeId: b.endTeeId,
+          updatedAt: new Date(),
+        })
+        .where(eq(takeoffRuns.id, keep.id));
+      await tx
+        .update(takeoffPullPoints)
+        .set({ runId: keep.id })
+        .where(eq(takeoffPullPoints.runId, gone.id));
+      await tx.delete(takeoffRuns).where(eq(takeoffRuns.id, gone.id));
+      await dropTee();
+      rejoined.push(teeId);
+    }
+    return { rejoined, keptAsBox };
+  });
 }
 
 /** Circuits pulled through one run. */
