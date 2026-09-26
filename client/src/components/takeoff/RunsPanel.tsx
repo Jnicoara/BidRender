@@ -38,10 +38,203 @@ import { runAppearance } from "@shared/takeoffMarks";
 import type { RunQuantities, totalQuantities } from "@shared/takeoffQuantities";
 import { verticalsNotice } from "@shared/takeoffHeights";
 import { FITTING_KIND_LABELS, type FittingKind } from "@shared/runFittings";
+import { isBendRole } from "@shared/runBends";
+
+/**
+ * One run's bends and pull points, as the server works them out
+ * (`server/runBendDetail.ts`). Proposals are never stored; `answer` is the
+ * person's decision where one was made.
+ */
+export type RunBendsView = {
+  limit: number;
+  summary: string | null;
+  overLimit: string[];
+  proposals: {
+    place: "corner" | "end-drop";
+    x: number;
+    y: number;
+    degrees: number;
+    suggestedKind: "lb" | "pullBox";
+    answer: {
+      id: number;
+      status: "accepted" | "dismissed";
+      kind: "lb" | "pullBox";
+    } | null;
+  }[];
+  accepted: {
+    place: "corner" | "end-drop";
+    x: number;
+    y: number;
+    answerId: number;
+    kind: "lb" | "pullBox";
+  }[];
+};
+
+/** What answering a pull point sends. The spot is the proposal's own. */
+export type PullPointAnswerInput = {
+  runId: number;
+  place: "corner" | "end-drop";
+  x: number;
+  y: number;
+  kind: "lb" | "pullBox";
+  status: "accepted" | "dismissed";
+};
+
+/**
+ * The open run's bends: what the drawing adds up to, and each pull point to
+ * accept, switch, dismiss or take back.
+ *
+ * NOTHING here adds a part on its own. A proposal is a question with its
+ * reason beside it — "450° since the last pull point" — and only a button a
+ * person presses stores an answer (owner, 2026-09-26: never add one silently).
+ */
+function RunPullPoints({
+  run,
+  bends,
+  onAnswer,
+  onUndo,
+  busy,
+}: {
+  run: { id: number };
+  bends: RunBendsView;
+  onAnswer: (answer: PullPointAnswerInput) => void;
+  onUndo: (answerId: number) => void;
+  busy: boolean;
+}) {
+  const where = (place: "corner" | "end-drop") =>
+    place === "end-drop" ? "at the top of the drop" : "at this corner";
+  const button = "h-6 px-2 text-[0.7rem]";
+  return (
+    <div className="mt-2 pt-2 border-t border-border/60 space-y-1.5">
+      {bends.summary && (
+        <p className="text-[0.7rem] text-muted-foreground leading-snug">
+          {bends.summary}
+        </p>
+      )}
+      {bends.overLimit.map(line => (
+        <p key={line} className="text-[0.7rem] text-[#F5C518] leading-snug">
+          {line}
+        </p>
+      ))}
+
+      {bends.proposals
+        .filter(p => p.answer === null)
+        .map(p => {
+          const other = p.suggestedKind === "lb" ? "pullBox" : "lb";
+          const spot = {
+            runId: run.id,
+            place: p.place,
+            x: p.x,
+            y: p.y,
+          };
+          return (
+            <div
+              key={`${p.place}:${p.x}:${p.y}`}
+              className="rounded border border-dashed border-[#F5C518]/60 px-2 py-1.5 space-y-1"
+            >
+              <p className="text-[0.7rem] leading-snug">
+                <span className="text-[#F5C518] font-medium">
+                  Pull point proposed
+                </span>{" "}
+                {where(p.place)} — {p.degrees}° since the last one, past the{" "}
+                {bends.limit}° limit.
+              </p>
+              <div className="flex flex-wrap gap-1">
+                <Button
+                  size="sm"
+                  className={button}
+                  disabled={busy}
+                  onClick={() =>
+                    onAnswer({
+                      ...spot,
+                      kind: p.suggestedKind,
+                      status: "accepted",
+                    })
+                  }
+                >
+                  {p.suggestedKind === "lb" ? "Add an LB" : "Add a pull box"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={button}
+                  disabled={busy}
+                  onClick={() =>
+                    onAnswer({ ...spot, kind: other, status: "accepted" })
+                  }
+                >
+                  {other === "lb" ? "An LB instead" : "A pull box instead"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={button}
+                  disabled={busy}
+                  onClick={() =>
+                    onAnswer({
+                      ...spot,
+                      kind: p.suggestedKind,
+                      status: "dismissed",
+                    })
+                  }
+                >
+                  No, pull through
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+
+      {bends.accepted.map(a => (
+        <div
+          key={`accepted-${a.answerId}`}
+          className="flex items-center justify-between gap-2"
+        >
+          <p className="text-[0.7rem] leading-snug">
+            {a.kind === "lb" ? "LB" : "Pull box"} added {where(a.place)}.
+          </p>
+          <Button
+            size="sm"
+            variant="ghost"
+            className={button}
+            disabled={busy}
+            onClick={() => onUndo(a.answerId)}
+          >
+            Undo
+          </Button>
+        </div>
+      ))}
+
+      {bends.proposals
+        .filter(p => p.answer?.status === "dismissed")
+        .map(p => (
+          <div
+            key={`dismissed-${p.answer!.id}`}
+            className="flex items-center justify-between gap-2"
+          >
+            <p className="text-[0.7rem] text-muted-foreground leading-snug">
+              Pull point dismissed {where(p.place)}.
+            </p>
+            <Button
+              size="sm"
+              variant="ghost"
+              className={button}
+              disabled={busy}
+              onClick={() => onUndo(p.answer!.id)}
+            >
+              Undo
+            </Button>
+          </div>
+        ))}
+    </div>
+  );
+}
 
 export type PanelRun = {
   id: number;
   name: string;
+  /** Bends and pull points on a conduit run; null on cable. */
+  bends?: RunBendsView | null;
   /** What it IS — type and ends as one sentence. See runDisplayName. */
   displayName?: string;
   /** What it IS, alone. The top line of the row. */
@@ -308,6 +501,26 @@ function resendSentence(resend: NonNullable<ResendPreview>): string {
   }
 }
 
+/**
+ * Which fitting rows the Send preview lists.
+ *
+ * Couplings, connectors and straps ALWAYS show, with their sentence, even
+ * with nothing to send ("belled end — sticks join without couplings"):
+ * without it a reader would think the part was forgotten.
+ *
+ * The BEND kinds are five rows that mostly do not apply — a type is either
+ * factory-elbowed or field-bent, and most runs have no LB — and five lines of
+ * "none" under every type is a list nobody reads. So a bend row shows when it
+ * has something to send, is already on the bid, or cannot be counted (that
+ * needs saying). The one that applies is never hidden while it counts
+ * anything, and an unanswered pull point is flagged on its run instead.
+ */
+function showFittingRow(fitting: RunTypeBridgeFitting): boolean {
+  if (!isBendRole(fitting.role)) return true;
+  if (fitting.onBid || fitting.status === "unknown") return true;
+  return fitting.status === "counted" && fitting.qty > 0;
+}
+
 /** "Couplings", "90° elbows" — from the one table the server words with too. */
 function fittingLabel(role: FittingKind): string {
   const many = FITTING_KIND_LABELS[role].many;
@@ -355,8 +568,19 @@ export function RunsPanel({
   onSendRunType,
   sendingRunTypeId,
   quantitiesLocked = false,
+  onAnswerPullPoint,
+  onUndoPullPoint,
+  pullPointBusy = false,
 }: {
   runs: PanelRun[];
+  /**
+   * Accept or dismiss a proposed pull point, and take an answer back. Optional
+   * like the branch-wiring answer: a caller that cannot store one shows the
+   * sentence and no dead buttons.
+   */
+  onAnswerPullPoint?: (answer: PullPointAnswerInput) => void;
+  onUndoPullPoint?: (answerId: number) => void;
+  pullPointBusy?: boolean;
   /**
    * Answer "whose wire is this run?" — true branch, false homerun, null to put
    * the question back. Optional so a caller that cannot answer simply does not
@@ -762,7 +986,7 @@ export function RunsPanel({
                   */}
                   {entry.fittings.length > 0 && (
                     <div className="mt-1.5 space-y-1">
-                      {entry.fittings.map(fitting => (
+                      {entry.fittings.filter(showFittingRow).map(fitting => (
                         <div key={fitting.role}>
                           <div className="flex items-baseline justify-between gap-2">
                             <span
@@ -1055,6 +1279,27 @@ export function RunsPanel({
                           Draft
                         </Badge>
                       )}
+                      {/*
+                        A proposal waiting on an answer, said on the CLOSED row
+                        too: the controls live in the open run, and a question
+                        nobody can see from the list is one nobody answers.
+                        Dashed like the marker on the drawing.
+                      */}
+                      {(() => {
+                        const waiting =
+                          run.bends?.proposals.filter(p => p.answer === null)
+                            .length ?? 0;
+                        return waiting > 0 ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[0.65rem] px-1.5 py-0 border-dashed border-[#F5C518]/60 text-[#F5C518]"
+                          >
+                            {waiting === 1
+                              ? "Pull point to review"
+                              : `${waiting} pull points to review`}
+                          </Badge>
+                        ) : null;
+                      })()}
                     </div>
                   </div>
                   <Button
@@ -1334,6 +1579,24 @@ export function RunsPanel({
                     {renderRunEnds(run)}
                   </div>
                 )}
+
+                {/* Bends and pull points, after the ends that produce the
+                    drops they count. */}
+                {isSelected &&
+                  run.bends &&
+                  !run.isSuggestion &&
+                  onAnswerPullPoint &&
+                  onUndoPullPoint && (
+                    <div onClick={e => e.stopPropagation()}>
+                      <RunPullPoints
+                        run={run}
+                        bends={run.bends}
+                        onAnswer={onAnswerPullPoint}
+                        onUndo={onUndoPullPoint}
+                        busy={pullPointBusy}
+                      />
+                    </div>
+                  )}
 
                 {/* Circuits, only for conduit and only when this run is open */}
                 {isSelected && run.pathType === "conduit" && (

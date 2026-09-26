@@ -10436,6 +10436,45 @@ export async function countBidsInheritingHeights(
  * fork. Everything after that is `shared/runFittings.ts` and
  * `shared/runFittingMaterials.ts`, where the tests can reach it.
  */
+/**
+ * A lookup from a resolved raceway to its SHIPPED name — the name every
+ * fitting, elbow and LB is built from, and the size the bend rules read. A
+ * company's fork may have renamed the pipe; its baseline has not. NULL for a
+ * raceway the company made itself, which has no shipped name.
+ *
+ * One function, used by the bid bridge and the run list, so the two cannot
+ * read a raceway's size differently.
+ */
+export async function shippedNamesOf(
+  raceways: readonly (Material | undefined)[]
+): Promise<(m: Material | undefined) => string | null> {
+  const db = await getDb();
+  const baselineIds = Array.from(
+    new Set(
+      raceways
+        .map(m => (m ? (m.userId === null ? m.id : m.baselineId) : null))
+        .filter((id): id is number => id !== null)
+    )
+  );
+  const baselineNames = new Map(
+    !db || baselineIds.length === 0
+      ? []
+      : (
+          await db
+            .select({ id: materials.id, name: materials.name })
+            .from(materials)
+            .where(
+              and(inArray(materials.id, baselineIds), isNull(materials.userId))
+            )
+        ).map(r => [r.id, r.name] as const)
+  );
+  return (m: Material | undefined) => {
+    if (!m) return null;
+    const id = m.userId === null ? m.id : m.baselineId;
+    return id === null ? null : (baselineNames.get(id) ?? null);
+  };
+}
+
 export async function fittingRowsByRunType(
   userId: number,
   footage: ReadonlyMap<number, RunTypeFootageRow>
@@ -10477,31 +10516,9 @@ export async function fittingRowsByRunType(
 
   // The SHIPPED name of each raceway, which is what the fitting names are
   // built from. A fork's own name may have been edited; its baseline's not.
-  const baselineIds = Array.from(
-    new Set(
-      entries
-        .map(({ type }) => resolved(type!.racewayMaterialId))
-        .map(m => (m ? (m.userId === null ? m.id : m.baselineId) : null))
-        .filter((id): id is number => id !== null)
-    )
+  const racewayBaselineName = await shippedNamesOf(
+    entries.map(({ type }) => resolved(type!.racewayMaterialId))
   );
-  const baselineNames = new Map(
-    baselineIds.length === 0
-      ? []
-      : (
-          await db
-            .select({ id: materials.id, name: materials.name })
-            .from(materials)
-            .where(
-              and(inArray(materials.id, baselineIds), isNull(materials.userId))
-            )
-        ).map(r => [r.id, r.name] as const)
-  );
-  const racewayBaselineName = (m: Material | undefined) => {
-    if (!m) return null;
-    const id = m.userId === null ? m.id : m.baselineId;
-    return id === null ? null : (baselineNames.get(id) ?? null);
-  };
 
   const wantedNames = Array.from(
     new Set(

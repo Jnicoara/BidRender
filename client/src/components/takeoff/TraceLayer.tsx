@@ -71,6 +71,26 @@ export type ExistingRun = {
   points: PagePoint[];
   status: "draft" | "committed";
   isSuggestion: boolean;
+  /**
+   * Pull points on this run (`server/runBendDetail.ts`): the proposals and
+   * the accepted ones. Only positions and state — the words and the buttons
+   * are in the run panel, where the rest of a run is edited.
+   */
+  bends?: {
+    proposals: {
+      x: number;
+      y: number;
+      suggestedKind: "lb" | "pullBox";
+      answer: { status: "accepted" | "dismissed" } | null;
+    }[];
+    accepted: { x: number; y: number; kind: "lb" | "pullBox" }[];
+  } | null;
+};
+
+/** The short label a pull-point marker carries on the drawing. */
+const PULL_POINT_LABEL: Record<"lb" | "pullBox", string> = {
+  lb: "LB",
+  pullBox: "PB",
 };
 
 const RUN_COLOR: Record<RunPathType, string> = {
@@ -520,6 +540,109 @@ export function TraceLayer({
               <title>{placed.name}</title>
             </g>
           );
+        })}
+
+        {/*
+          PULL POINTS, on top of runs and marks so a proposal is never hidden
+          under the thing it is about.
+
+          A BOX, because an LB and a pull box are both boxes, and because no
+          count is drawn as an outline with a label — so it cannot be mistaken
+          for a stamp. Proposed is dashed amber ("LB?"), the app's word for
+          provisional; accepted is solid ("LB"); dismissed is a slate dash
+          ("no LB"), kept on the drawing so the "no" is visible rather than looking
+          like a corner nobody checked. Sized through the same clamp as a
+          mark. Clicking one selects its run, whose row holds the buttons.
+        */}
+        {existingRuns.flatMap(run => {
+          if (!run.bends) return [];
+          const r = markRadiusInOverlay(zoom) * 0.85;
+          const stroke = markStrokeInOverlay(zoom) * 0.8;
+          const font = markRadiusInOverlay(zoom) * 1.05;
+          const select = () =>
+            !tracing && onSelectRun(run.id === selectedRunId ? null : run.id);
+          const marker = (
+            key: string,
+            p: { x: number; y: number },
+            label: string,
+            state: "proposed" | "accepted" | "dismissed",
+            title: string
+          ) => {
+            const at = toScreen(p);
+            /*
+              Dismissed is SLATE at full strength, not a faded grey: it was
+              #94A3B8 at 60% first, and on white paper at 19% the "no PB" was
+              unreadable (seen 2026-09-26) — a "no" nobody can see is the
+              unchecked-looking corner this marker exists to avoid.
+            */
+            const color = state === "dismissed" ? "#64748B" : "#F5C518";
+            return (
+              <g
+                key={key}
+                className={tracing ? "" : "pointer-events-auto cursor-pointer"}
+                onClick={select}
+              >
+                <rect
+                  x={at.x - r}
+                  y={at.y - r}
+                  width={r * 2}
+                  height={r * 2}
+                  fill={state === "accepted" ? color : "none"}
+                  fillOpacity={state === "accepted" ? 0.3 : 0}
+                  stroke={color}
+                  strokeWidth={stroke}
+                  strokeDasharray={
+                    state === "accepted" ? undefined : `${r * 0.5} ${r * 0.35}`
+                  }
+                />
+                <text
+                  x={at.x + r * 1.35}
+                  y={at.y + font * 0.35}
+                  fontSize={font}
+                  fontWeight={600}
+                  fill={color}
+                  // A dark halo makes amber read on white paper and drowns
+                  // slate, so the dismissed label gets a light one.
+                  stroke={state === "dismissed" ? "#ffffff" : "#0b0b0b"}
+                  strokeWidth={font * 0.18}
+                  paintOrder="stroke"
+                >
+                  {label}
+                </text>
+                <title>{title}</title>
+              </g>
+            );
+          };
+          return [
+            ...run.bends.proposals
+              .filter(p => p.answer?.status !== "accepted")
+              .map((p, i) =>
+                p.answer?.status === "dismissed"
+                  ? marker(
+                      `pp-${run.id}-d${i}`,
+                      p,
+                      "no " + PULL_POINT_LABEL[p.suggestedKind],
+                      "dismissed",
+                      "Pull point dismissed — pulled through"
+                    )
+                  : marker(
+                      `pp-${run.id}-p${i}`,
+                      p,
+                      PULL_POINT_LABEL[p.suggestedKind] + "?",
+                      "proposed",
+                      "Pull point proposed — open the run to answer"
+                    )
+              ),
+            ...run.bends.accepted.map((a, i) =>
+              marker(
+                `pp-${run.id}-a${i}`,
+                a,
+                PULL_POINT_LABEL[a.kind],
+                "accepted",
+                a.kind === "lb" ? "LB added" : "Pull box added"
+              )
+            ),
+          ];
         })}
 
         {/* Proposals from the plan reader. Under the focus ring and over the

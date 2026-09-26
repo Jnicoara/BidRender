@@ -321,6 +321,76 @@ withDb("factory elbows from the company size up", () => {
   });
 });
 
+withDb("the run list gives the drawing what it marks", () => {
+  it("carries the proposal, then the accepted point, then the dismissal", async () => {
+    const type = await emtType('1-1/4"');
+    const { bidId, sheetId } = await aBid("Markers");
+    const run = await trace(bidId, sheetId, type.id, FIVE_CORNERS);
+    const bendsOf = async () =>
+      (await caller().takeoffRuns.listForSheet({ sheetId })).find(
+        r => r.id === run.id
+      )!.bends!;
+
+    let bends = await bendsOf();
+    expect(bends.proposals).toEqual([
+      {
+        place: "corner",
+        ...FIVE_CORNERS[5],
+        degrees: 450,
+        // 1-1/4" is below the 2" default, so an LB is offered first.
+        suggestedKind: "lb",
+        answer: null,
+      },
+    ]);
+    expect(bends.summary).toMatch(/^450° of bend on the drawing \(5 corners\)/);
+
+    await caller().takeoffRuns.answerPullPoint({
+      runId: run.id,
+      place: "corner",
+      ...FIVE_CORNERS[5],
+      kind: "lb",
+      status: "accepted",
+    });
+    bends = await bendsOf();
+    expect(bends.proposals).toEqual([]);
+    expect(bends.accepted).toMatchObject([
+      { place: "corner", ...FIVE_CORNERS[5], kind: "lb" },
+    ]);
+
+    await caller().takeoffRuns.clearPullPointAnswer({
+      id: bends.accepted[0].answerId,
+    });
+    await caller().takeoffRuns.answerPullPoint({
+      runId: run.id,
+      place: "corner",
+      ...FIVE_CORNERS[5],
+      kind: "lb",
+      status: "dismissed",
+    });
+    bends = await bendsOf();
+    expect(bends.proposals[0].answer).toMatchObject({ status: "dismissed" });
+    expect(bends.overLimit).toEqual([
+      "450° pulled through with no pull point — past the 360° limit, by your choice",
+    ]);
+  });
+
+  it("gives a cable run no bends at all", async () => {
+    const { bidId, sheetId } = await aBid("Cable");
+    const run = await caller().takeoffRuns.save({
+      bidId,
+      sheetId,
+      name: "MC",
+      pathType: "cable",
+      status: "committed",
+      points: L,
+    });
+    const listed = (await caller().takeoffRuns.listForSheet({ sheetId })).find(
+      r => r.id === run.id
+    )!;
+    expect(listed.bends).toBeNull();
+  });
+});
+
 withDb("a pull point is proposed, and only an answer adds one", () => {
   it("proposes at the corner that tips 360°, and adds nothing until accepted", async () => {
     const type = await emtType('1-1/4"');

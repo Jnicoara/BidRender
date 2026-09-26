@@ -3432,6 +3432,22 @@ export default function TakeoffPage({
     onError: e => toast.error(e.message),
     onSettled: refreshRuns,
   });
+  /**
+   * A person's answer to a proposed pull point, and taking one back.
+   *
+   * Through `refreshRuns` for the reason every run mutation is: an answer
+   * moves the marker on the drawing and the row (the run list), the elbow,
+   * connector and LB counts in the Send preview (the bridge), and the
+   * totals — three queries, one helper, nothing left showing the old answer.
+   */
+  const answerPullPoint = trpc.takeoffRuns.answerPullPoint.useMutation({
+    onError: e => toast.error(e.message),
+    onSettled: refreshRuns,
+  });
+  const undoPullPoint = trpc.takeoffRuns.clearPullPointAnswer.useMutation({
+    onError: e => toast.error(e.message),
+    onSettled: refreshRuns,
+  });
 
   /**
    * What each traced run type would put on this bid (R2).
@@ -4937,6 +4953,11 @@ export default function TakeoffPage({
               onRemoveStamp={id => removeStamp.mutate({ id })}
               onAnswerBranchWiring={(runId, answer) =>
                 setBranchWiring.mutate({ id: runId, branchWiring: answer })
+              }
+              onAnswerPullPoint={answer => answerPullPoint.mutate(answer)}
+              onUndoPullPoint={id => undoPullPoint.mutate({ id })}
+              pullPointBusy={
+                answerPullPoint.isPending || undoPullPoint.isPending
               }
               runTypeBridge={runTypeBridge.data}
               sendingRunTypeId={sendingRunTypeId}

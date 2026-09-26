@@ -394,7 +394,7 @@ function countCouplings(
   }
 
   const measured = legs.filter(leg => leg.feet !== null);
-  const unmeasured = legs.length - measured.length;
+  const unmeasured = runsIn(legs.filter(leg => leg.feet === null));
   const sticks = measured.reduce(
     (sum, leg) => sum + sticksFor(leg.feet!, stick),
     0
@@ -534,7 +534,7 @@ function countStraps(
     };
   }
   const measured = legs.filter(leg => leg.feet !== null);
-  const unmeasured = legs.length - measured.length;
+  const unmeasured = runsIn(legs.filter(leg => leg.feet === null));
   if (measured.length === 0) {
     return { kind, status: "unknown", why: unmeasuredWhy(unmeasured) };
   }
@@ -619,6 +619,22 @@ function prefix(atLeast: boolean): string {
   return atLeast ? "At least " : "";
 }
 
+/**
+ * The run a leg came from. `splitAtPullPoints` names its pieces
+ * `<run>#<n>`, so a run cut by a pull box is still ONE run in a sentence —
+ * counting pieces said "3 runs are short" about two runs (found on screen,
+ * 2026-09-26).
+ */
+function runOf(leg: FittingLeg): string {
+  const cut = leg.id.indexOf("#");
+  return cut < 0 ? leg.id : leg.id.slice(0, cut);
+}
+
+/** How many distinct RUNS these legs are. */
+function runsIn(legs: readonly FittingLeg[]): number {
+  return new Set(legs.map(runOf)).size;
+}
+
 function tail(
   atLeast: boolean,
   unmeasured: number,
@@ -626,9 +642,9 @@ function tail(
 ): string {
   const notes: string[] = [];
   if (unmeasured > 0) notes.push(unmeasuredWhy(unmeasured).toLowerCase());
-  const floors = legs.filter(
-    leg => leg.feet !== null && leg.feetIsFloor
-  ).length;
+  const floors = runsIn(
+    legs.filter(leg => leg.feet !== null && leg.feetIsFloor)
+  );
   if (floors > 0) {
     notes.push(
       `${plural(floors, "run")} ${floors === 1 ? "has" : "have"} a drop with no height, so ${floors === 1 ? "its" : "their"} length is short`

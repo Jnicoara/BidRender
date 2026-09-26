@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **Proposed pull points appear on the drawing for you to answer.** When the
+  bends along a conduit run add up past the limit (360° unless changed), a
+  dashed amber box marked "LB?" or "PB?" sits at the corner where it tips
+  over, and the run's row says "Pull point to review". Open the run to see
+  the degrees it adds up to and choose: add the LB or pull box offered, the
+  other one instead, or "No, pull through". An added one turns solid; a
+  dismissed one stays on the drawing in grey ("no PB") and the run says it
+  went past the limit by your choice. Every answer has an Undo. Nothing is
+  added to the bid until you answer, and the Send list only shows bend
+  lines that actually have something on them.
 - **New settings for bends, under Settings → Heights.** A folded "Bends and
   pull points" section shows what is in effect and holds three choices: the
   size from which bends take factory elbows (1-1/4" unless changed), the

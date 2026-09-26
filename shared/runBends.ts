@@ -609,9 +609,7 @@ export function countBends(
       `${plural(wobble, "corner")} under ${MIN_BEND_DEGREES}° treated as drawing wobble`
     );
   if (unknownDrops > 0)
-    notes.push(
-      `${plural(unknownDrops, "end")} with a drop not counted yet (no height)`
-    );
+    notes.push(`${plural(unknownDrops, "end")} whose drop has no height yet`);
   notes.push(NO_KICKS);
   const tail = ` (${notes.join("; ")})`;
 
@@ -717,6 +715,51 @@ export function countBends(
     legs: perLeg,
     unansweredProposals,
   };
+}
+
+/**
+ * What ONE run says about its bends, in the panel under the run — the degrees
+ * on the drawing and what they add up to, and anything over the limit.
+ *
+ * The type-level counts (`countBends`) say how many elbows the bid gets; this
+ * says why THIS run proposes what it does, which is the question somebody
+ * looking at a dashed marker on the drawing is asking.
+ */
+export function describeRunBends(
+  bends: LegBends,
+  walk: LegPullPoints,
+  limit: number
+): { summary: string | null; overLimit: string[] } {
+  const corners = bends.bends.filter(b => b.place.kind === "corner").length;
+  const drops = bends.bends.length - corners;
+  const degrees = Math.round(bends.bends.reduce((s, b) => s + b.degrees, 0));
+  const parts: string[] = [];
+  if (corners > 0) parts.push(plural(corners, "corner"));
+  if (drops > 0) parts.push(plural(drops, "drop"));
+  const notes: string[] = [];
+  if (bends.unknownDrops > 0)
+    notes.push(`${plural(bends.unknownDrops, "drop")} not counted yet`);
+  if (bends.wobble > 0)
+    notes.push(
+      `${plural(bends.wobble, "small corner")} under ${MIN_BEND_DEGREES}° ignored`
+    );
+  const summary =
+    bends.bends.length === 0 && notes.length === 0
+      ? null
+      : `${degrees}° of bend on the drawing` +
+        (parts.length > 0 ? ` (${parts.join(", ")})` : "") +
+        (notes.length > 0 ? ` — ${notes.join("; ")}` : "") +
+        `. At least that: kicks and offsets at boxes are not drawn.`;
+
+  // A dismissed proposal leaves a stretch over the limit on purpose; say so,
+  // so a "no" does not quietly look like a run that was fine.
+  const overLimit = walk.proposals
+    .filter(p => p.answer?.status === "dismissed")
+    .map(
+      p =>
+        `${p.degrees}° pulled through with no pull point — past the ${limit}° limit, by your choice`
+    );
+  return { summary, overLimit };
 }
 
 /** Whether an accepted pull point sits on this bend and so makes the turn. */

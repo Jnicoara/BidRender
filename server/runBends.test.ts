@@ -14,6 +14,7 @@
 import { describe, expect, it } from "vitest";
 import {
   countBends,
+  describeRunBends,
   fittingsForBend,
   legBends,
   placeAnswer,
@@ -288,7 +289,7 @@ describe("drops", () => {
     expect(b.bends).toHaveLength(1);
     expect(b.unknownDrops).toBe(1);
     const r = countBends([bendLeg(L, { endDrop: UNKNOWN })], FACTORY, 360);
-    expect(r.counts.elbow90.why).toMatch(/1 end with a drop not counted yet/);
+    expect(r.counts.elbow90.why).toMatch(/1 end whose drop has no height yet/);
   });
 });
 
@@ -622,6 +623,30 @@ describe("an accepted pull point is a box — the other fittings follow", () => 
     });
     expect(splitAtPullPoints(leg)).toHaveLength(1);
   });
+
+  it("still says ONE run is short when a pull box cuts it in two", () => {
+    // Found on screen 2026-09-26: accepting a pull box turned "2 runs have a
+    // drop with no height" into "3 runs" with nothing new traced, because the
+    // sentence counted the PIECES the box cut the run into.
+    const leg = fittingLeg(pts, feet, {
+      startDrop: UNKNOWN,
+      endDrop: UNKNOWN,
+      feetIsFloor: true,
+      answers: [answer(9, pts[1], "accepted", "pullBox")],
+    });
+    const f = fittings([leg], EMT_SPEC);
+    expect(f.strap.why).toMatch(/\(1 run has a drop with no height/);
+    expect(f.coupling.why).toMatch(/\(1 run has a drop with no height/);
+  });
+
+  it("still says ONE run has no scale when a pull box cuts it in two", () => {
+    const leg = fittingLeg(pts, null, {
+      answers: [answer(9, pts[1], "accepted", "pullBox")],
+    });
+    const other = { ...fittingLeg(pts, 50), id: "2", from: "x", to: "y" };
+    const f = fittings([leg, other], EMT_SPEC);
+    expect(f.strap.why).toMatch(/\(1 run on a sheet with no scale/);
+  });
 });
 
 describe("factory or field, and which pull point to offer", () => {
@@ -680,6 +705,44 @@ describe("factory or field, and which pull point to offer", () => {
     expect(lbHubsTakeConnectors('1" IMC', null)).toBe(false);
     expect(lbHubsTakeConnectors('1" PVC Sch 80', null)).toBe(false);
     expect(lbHubsTakeConnectors(null, "Mystery pipe")).toBe(true);
+  });
+});
+
+describe("what one run says under its row", () => {
+  it("adds up the degrees and says it is a floor", () => {
+    const leg = bendLeg(zigzag(3), { endDrop: DROP(6), startDrop: UNKNOWN });
+    const b = legBends(leg);
+    const { summary, overLimit } = describeRunBends(
+      b,
+      walkPullPoints(leg, 360, b.bends),
+      360
+    );
+    expect(summary).toBe(
+      "360° of bend on the drawing (3 corners, 1 drop) — 1 drop not counted yet. At least that: kicks and offsets at boxes are not drawn."
+    );
+    expect(overLimit).toEqual([]);
+  });
+
+  it("says nothing about a straight, level run", () => {
+    const leg = bendLeg([
+      { x: 0, y: 0 },
+      { x: 400, y: 0 },
+    ]);
+    const b = legBends(leg);
+    expect(
+      describeRunBends(b, walkPullPoints(leg, 360, b.bends), 360).summary
+    ).toBeNull();
+  });
+
+  it("keeps a dismissed over-limit stretch on screen, as the person's choice", () => {
+    const pts6 = zigzag(6);
+    const leg = bendLeg(pts6, { answers: [answer(2, pts6[5], "dismissed")] });
+    const b = legBends(leg);
+    expect(
+      describeRunBends(b, walkPullPoints(leg, 360, b.bends), 360).overLimit
+    ).toEqual([
+      "450° pulled through with no pull point — past the 360° limit, by your choice",
+    ]);
   });
 });
 

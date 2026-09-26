@@ -32,7 +32,12 @@ import {
   RUN_STATUSES,
   TAKEOFF_LOCATIONS,
 } from "../../drizzle/schema";
-import { pathRealInches, toBillableFeet } from "../../shared/takeoffGeometry";
+import {
+  pathRealInches,
+  pointsToRealInches,
+  toBillableFeet,
+} from "../../shared/takeoffGeometry";
+import { bendContextForRuns, runBendsFor } from "../runBendDetail";
 import {
   DISTRIBUTION_KIND,
   shippedHeightType,
@@ -222,6 +227,10 @@ export const takeoffRunsRouter = router({
               bid?.distributionHeightInches ?? null
             );
 
+      const bendContext = await bendContextForRuns(runs, ctx.scope.dataUserId);
+      const inchesPerPoint = pointsToRealInches(1, ratio);
+      const feetPerPoint = inchesPerPoint === null ? null : inchesPerPoint / 12;
+
       return runs.map(run => {
         /*
           Through `circuitWire`, plus the id the panel needs to edit a row.
@@ -343,6 +352,24 @@ export const takeoffRunsRouter = router({
             run.scaleRatioUsed != null &&
             ratio != null &&
             Math.abs(Number(run.scaleRatioUsed) - ratio) > 1e-6,
+          /**
+           * Bends and pull points on THIS run (`shared/runBends.ts`): the
+           * sentence under the row, and the proposals and accepted points the
+           * drawing marks. NULL on a cable run, which has no fittings.
+           *
+           * Here rather than in a query of its own so the refresh helper the
+           * run mutations already use keeps it current — a new query beside
+           * it is the staleness CLAUDE.md § "yesterday's answer" describes.
+           */
+          bends:
+            run.pathType === "conduit"
+              ? runBendsFor(
+                  run,
+                  verticalsForRunRow(run, heights),
+                  feetPerPoint,
+                  bendContext
+                )
+              : null,
         };
       });
     }),
