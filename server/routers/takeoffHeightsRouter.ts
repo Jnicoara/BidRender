@@ -30,6 +30,14 @@ import {
   shippedHeightType,
   slugForHeightType,
 } from "../../shared/takeoffHeights";
+import {
+  BEND_SIZE_CHOICES,
+  DEFAULT_FACTORY_ELBOW_FROM,
+  DEFAULT_PULL_BOX_FROM,
+  DEFAULT_PULL_POINT_LIMIT,
+  PULL_POINT_LIMITS,
+  resolveBendSettings,
+} from "../../shared/runBends";
 import * as db from "../db";
 
 /** Company settings: the same gate labor rates and sales tax sit behind. */
@@ -115,6 +123,52 @@ export const takeoffHeightsRouter = router({
    * to be able to take it back, so clearing is a value this accepts rather than
    * a deletion the UI has to find another route for.
    */
+  /**
+   * The company's bend settings (0084): each stored value, NULL for "the
+   * shipped default", beside what is in effect — so the screen can say
+   * "1-1/4" (default)" without knowing what the default is.
+   */
+  bends: settings.query(async ({ ctx }) => {
+    const row = await db.getBendDefaultsRow(ctx.scope.dataUserId);
+    const stored = {
+      factoryElbowFromSize: row?.factoryElbowFromSize ?? null,
+      pullPointLimitDegrees: row?.pullPointLimitDegrees ?? null,
+      pullBoxFromSize: row?.pullBoxFromSize ?? null,
+    };
+    return {
+      stored,
+      effective: resolveBendSettings(stored),
+      defaults: {
+        factoryElbowFrom: DEFAULT_FACTORY_ELBOW_FROM,
+        pullPointLimit: DEFAULT_PULL_POINT_LIMIT,
+        pullBoxFrom: DEFAULT_PULL_BOX_FROM,
+      },
+      sizes: BEND_SIZE_CHOICES,
+      limits: PULL_POINT_LIMITS,
+    };
+  }),
+
+  /**
+   * Change any of the three. Omitted leaves a setting alone; NULL puts it back
+   * to the shipped default. Company-wide, so the same gate as every other
+   * company default: it recounts elbows and pull points on every job.
+   */
+  setBends: settings
+    .input(
+      z.object({
+        factoryElbowFromSize: z.enum(BEND_SIZE_CHOICES).nullable().optional(),
+        pullPointLimitDegrees: z
+          .union([z.literal(360), z.literal(270)])
+          .nullable()
+          .optional(),
+        pullBoxFromSize: z.enum(BEND_SIZE_CHOICES).nullable().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await db.setBendDefaults(ctx.scope.dataUserId, input);
+      return { ok: true };
+    }),
+
   setCompanyDistribution: settings
     .input(z.object({ inches: inchesSchema.nullable() }))
     .mutation(async ({ input, ctx }) => {

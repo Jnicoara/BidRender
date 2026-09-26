@@ -72,6 +72,7 @@ import {
   countNeedingLaborUnit,
   needsLaborUnit,
   laborUnitHours,
+  MAX_LABOR_UNIT_HOURS,
 } from "@shared/materialLabor";
 import {
   MATERIAL_CATEGORY_ORDER,
@@ -126,6 +127,8 @@ type Material = {
   stickJoint: string | null;
   strapSpacingFeet: string | null;
   strapFromBoxFeet: string | null;
+  /** Raceway only — labor hours for one field bend (0084). NULL is not set. */
+  fieldBendLaborHours: string | null;
 };
 
 /**
@@ -137,6 +140,8 @@ type RacewayDraft = {
   stickJoint: StickJoint | "";
   strapSpacingFeet: string;
   strapFromBoxFeet: string;
+  /** Hours for one field bend. Blank is "not set" — never read as 0 h. */
+  fieldBendLaborHours: string;
 };
 
 const STICK_JOINT_LABELS: Record<StickJoint, string> = {
@@ -256,6 +261,12 @@ function validateDraft(draft: Draft): string | null {
     const fromBox = feetValue(strapFromBoxFeet);
     if (fromBox !== null && !(fromBox >= 0 && fromBox <= 100))
       return "The distance from a box must be between 0 and 100 ft, or blank.";
+    const bendHours = feetValue(draft.raceway.fieldBendLaborHours);
+    if (
+      bendHours !== null &&
+      !(bendHours >= 0 && bendHours <= MAX_LABOR_UNIT_HOURS)
+    )
+      return `Hours per field bend must be between 0 and ${MAX_LABOR_UNIT_HOURS}, or blank.`;
   }
   return null;
 }
@@ -417,6 +428,7 @@ function MaterialRow({
                 : "",
               strapSpacingFeet: feetText(material.strapSpacingFeet),
               strapFromBoxFeet: feetText(material.strapFromBoxFeet),
+              fieldBendLaborHours: feetText(material.fieldBendLaborHours),
             },
           }
         : {}),
@@ -705,6 +717,36 @@ function MaterialRow({
                   disabled={isBusy}
                 />
                 ft of a box
+              </label>
+              {/*
+                Labor for one bend made with a bender, below the company's
+                factory-elbow size (Settings → Heights). Blank is "not set",
+                and a field bend on a bid then reads "Not priced" — never a
+                free bend. Divided off: it is labor, not how the pipe is sold
+                or strapped, and without it "…ft of a box Field bend" read as
+                one phrase.
+              */}
+              <label className="flex items-center gap-1.5 border-l border-border pl-3 ml-1">
+                Field bend
+                <Input
+                  value={draft.raceway.fieldBendLaborHours}
+                  onChange={e =>
+                    setDraft({
+                      ...draft,
+                      raceway: {
+                        ...draft.raceway!,
+                        fieldBendLaborHours: e.target.value,
+                      },
+                    })
+                  }
+                  onFocus={selectOnFocus}
+                  inputMode="decimal"
+                  placeholder="not set"
+                  className="h-8 w-20 text-sm text-right"
+                  aria-label="Labor hours for one field bend"
+                  disabled={isBusy}
+                />
+                h each
               </label>
             </div>
           </div>
@@ -1200,6 +1242,9 @@ export default function MaterialsLibraryPage() {
                 stickJoint: draft.raceway.stickJoint || null,
                 strapSpacingFeet: feetValue(draft.raceway.strapSpacingFeet),
                 strapFromBoxFeet: feetValue(draft.raceway.strapFromBoxFeet),
+                fieldBendLaborHours: feetValue(
+                  draft.raceway.fieldBendLaborHours
+                ),
               }
             : {}),
         });

@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **New settings for bends, under Settings → Heights.** A folded "Bends and
+  pull points" section shows what is in effect and holds three choices: the
+  size from which bends take factory elbows (1-1/4" unless changed), the
+  degrees of bend allowed before a pull point is proposed (360°, or 270° to
+  leave room for the kicks the plans do not show), and the size from which a
+  pull box is offered instead of an LB (2"). Each can go back to the default.
+  The Materials editor for a pipe now also has "Field bend ___ h each", the
+  labor for one bend made with a bender.
 - **Elbows, field bends, LBs and pull boxes now reach the bid from traced
   conduit**, through Send like couplings do. Elbows are counted from each
   corner's angle and each drop, and always read "at least", because plans

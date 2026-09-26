@@ -38,6 +38,7 @@ import {
 } from "../../shared/aliasSuggestions";
 import * as db from "../db";
 import { STICK_JOINTS } from "../../shared/runFittings";
+import { MAX_LABOR_UNIT_HOURS } from "../../shared/materialLabor";
 
 /**
  * This router's gate: a query needs `library.view`, a mutation needs `library.edit`.
@@ -48,7 +49,6 @@ const procedure = scoped("library.view", "library.edit");
 
 /** decimal(10,4) — four decimal places, and it must stay under 10 total digits. */
 const MAX_COST = 999999.9999;
-const MAX_LABOR_UNIT_HOURS = 12;
 const costSchema = z.number().min(0).max(MAX_COST);
 
 /**

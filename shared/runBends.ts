@@ -50,6 +50,24 @@ export const MERGE_WITHIN_FEET = 3;
 export const PULL_POINT_LIMITS = [360, 270] as const;
 export type PullPointLimit = (typeof PULL_POINT_LIMITS)[number];
 
+/**
+ * The trade sizes a company can pick for either size setting: exactly the
+ * sizes the catalog ships raceway in (`TRADE_SIZES` in the conduit seed), so
+ * no setting can name a size no run can have. `runBendsSettings.test.ts`
+ * fails if the two lists drift.
+ */
+export const BEND_SIZE_CHOICES = [
+  '1/2"',
+  '3/4"',
+  '1"',
+  '1-1/4"',
+  '1-1/2"',
+  '2"',
+  '2-1/2"',
+  '3"',
+  '4"',
+] as const;
+
 /** Shipped defaults for the three company settings (NULL = these). */
 export const DEFAULT_FACTORY_ELBOW_FROM = '1-1/4"';
 export const DEFAULT_PULL_POINT_LIMIT: PullPointLimit = 360;

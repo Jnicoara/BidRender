@@ -42,6 +42,12 @@
 export type LaborUnit = string | number | null | undefined;
 
 /**
+ * The most hours a single labor unit may carry — per unit of sale, or per
+ * field bend. Shared so the editor refuses exactly what the server refuses.
+ */
+export const MAX_LABOR_UNIT_HOURS = 12;
+
+/**
  * The labor unit as a number, or NULL when nobody has set one.
  *
  * A non-numeric value is a broken row and comes back NULL, so it lands in the
