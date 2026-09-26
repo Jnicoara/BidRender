@@ -80,8 +80,12 @@ function SeatRow({ row }: { row: Row }) {
         <span
           className={cn(
             "text-xs shrink-0",
-            row.inUse >= row.seatLimit
-              ? "text-amber-500"
+            // Only OVER is flagged. With a default of one seat, "full" is the
+            // ordinary state of nearly every company, and colouring it turned
+            // the whole list amber (seen on screen 2026-09-26). Over should
+            // never happen — the server refuses it — so if it does, it shouts.
+            row.inUse > row.seatLimit
+              ? "text-destructive"
               : "text-muted-foreground"
           )}
         >
