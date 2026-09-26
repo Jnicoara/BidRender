@@ -85,7 +85,7 @@ import { describeLineMarkup } from "@shared/materialMarkup";
 import { otherPercentCaption } from "@/lib/percentKind";
 import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
-import { lineNotPriced } from "@shared/lineNotPriced";
+import { lineHoursUnset, lineNotPriced } from "@shared/lineNotPriced";
 
 const STATUSES = ["Draft", "Active", "Won", "Lost"] as const;
 type Status = (typeof STATUSES)[number];
@@ -1014,8 +1014,12 @@ export default function BidsPage({
                             </span>
                           ) : (
                             <>
+                              {/* Unset hours are not zero hours — a field
+                                  bend with none reads "— h", never "0 h". */}
                               <span className="font-mono text-xs w-24 text-right shrink-0 text-muted-foreground">
-                                {round(line.breakdown.totalLaborHours, 2)} h
+                                {lineHoursUnset(line)
+                                  ? "— h"
+                                  : `${round(line.breakdown.totalLaborHours, 2)} h`}
                               </span>
                               {/*
                                 "Not priced" rather than $0.00 on a line

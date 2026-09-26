@@ -246,6 +246,44 @@ withDb("a field bend is labor only", () => {
     ).toBeCloseTo(0.25, 4);
   });
 
+  it("does not report the bend rows that do not apply as 'not sent'", async () => {
+    // Seen on screen 2026-09-26: the Send toast listed "PVC always takes
+    // factory elbows" and "No LBs accepted on the drawing" as not sent, which
+    // reads as four failures on a send that went exactly right.
+    const type = await emtType('1/2"');
+    const { bidId, sheetId } = await aBid("Quiet send");
+    await trace(bidId, sheetId, type.id, L);
+    const result = await caller().takeoffRunTypes.sendToBid({
+      bidId,
+      runTypeId: type.id,
+    });
+    expect(result.sent).toContain("fieldBend");
+    expect(result.skipped.map(s => s.role)).not.toEqual(
+      expect.arrayContaining(["elbow90"])
+    );
+    for (const role of ["elbow90", "elbow45", "lb", "pullBox"]) {
+      expect(result.skipped.map(s => s.role)).not.toContain(role);
+    }
+  });
+
+  it("still reports a coupling row that sends nothing — it always speaks", async () => {
+    const pvc = await caller().takeoffRunTypes.create({
+      label: `PVC quiet ${Date.now()}${Math.random()}`,
+      pathType: "conduit",
+      racewayMaterialId: (await shipped('1" PVC Sch 40')).id,
+    });
+    const { bidId, sheetId } = await aBid("PVC send");
+    await trace(bidId, sheetId, pvc.id, L);
+    const result = await caller().takeoffRunTypes.sendToBid({
+      bidId,
+      runTypeId: pvc.id,
+    });
+    expect(result.skipped.find(s => s.role === "coupling")?.why).toMatch(
+      /belled end/
+    );
+    expect(result.skipped.map(s => s.role)).not.toContain("fieldBend");
+  });
+
   it("never reaches the supplier list as pipe", async () => {
     const type = await emtType('1/2"');
     const { bidId, sheetId } = await aBid("Supplier");

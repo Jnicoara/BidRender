@@ -24,7 +24,7 @@ import {
   type FittingKind,
 } from "./runFittings";
 import { needsPricing } from "./materialPricing";
-import type { BendMethod, PullPointKind } from "./runBends";
+import { isBendRole, type BendMethod, type PullPointKind } from "./runBends";
 import { tradeSizeAtLeast } from "./materialSizeOrder";
 
 /**
@@ -478,6 +478,32 @@ export function fittingRowSendability(row: FittingRow): FittingRowSendability {
     return { ok: false, reason: "no-material", message: row.pick.why };
   }
   return { ok: true };
+}
+
+/**
+ * Whether a fitting row is worth SAYING anything about — in the Send preview,
+ * and in what Send reports as "not sent". One rule for both, so the toast
+ * cannot list what the preview deliberately hid.
+ *
+ * Couplings, connectors and straps always are, with their sentence, even with
+ * nothing to send ("belled end — sticks join without couplings"): without it
+ * a reader would think the part was forgotten.
+ *
+ * The BEND kinds are five rows that mostly do not apply — a type is either
+ * factory-elbowed or field-bent, and most runs have no LB. A bend row speaks
+ * when it has something to send, is already on the bid, or cannot be counted
+ * (that needs saying). "PVC always takes factory elbows" reported as "not
+ * sent" read as a failure (seen 2026-09-26), which is what this stops.
+ */
+export function fittingRowSpeaks(row: {
+  role: FittingKind;
+  status: FittingCount["status"];
+  qty: number;
+  onBid: boolean;
+}): boolean {
+  if (!isBendRole(row.role)) return true;
+  if (row.onBid || row.status === "unknown") return true;
+  return row.status === "counted" && row.qty > 0;
 }
 
 export function fittingRows(

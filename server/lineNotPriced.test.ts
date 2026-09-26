@@ -3,7 +3,11 @@
  * See shared/lineNotPriced.ts for why each kind of line reads $0 differently.
  */
 import { describe, expect, it } from "vitest";
-import { countNotPriced, lineNotPriced } from "../shared/lineNotPriced";
+import {
+  countNotPriced,
+  lineHoursUnset,
+  lineNotPriced,
+} from "../shared/lineNotPriced";
 
 const base = {
   qty: "4",
@@ -66,6 +70,16 @@ describe("a field bend — labor on a part that is $0 by nature", () => {
     expect(lineNotPriced({ ...bend, snapshotLaborHours: "0.0000" }, 0)).toBe(
       false
     );
+  });
+  it("shows its hours as unset, not as 0 h, while they are NULL", () => {
+    expect(lineHoursUnset({ ...bend, snapshotLaborHours: null })).toBe(true);
+    expect(lineHoursUnset({ ...bend, snapshotLaborHours: "0.0000" })).toBe(
+      false
+    );
+    // Every other line flattens a missing unit to 0 at send; nothing to say.
+    expect(
+      lineHoursUnset({ runMaterialRole: "coupling", snapshotLaborHours: null })
+    ).toBe(false);
   });
 });
 

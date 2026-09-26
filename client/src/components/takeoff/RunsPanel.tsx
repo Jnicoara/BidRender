@@ -38,7 +38,7 @@ import { runAppearance } from "@shared/takeoffMarks";
 import type { RunQuantities, totalQuantities } from "@shared/takeoffQuantities";
 import { verticalsNotice } from "@shared/takeoffHeights";
 import { FITTING_KIND_LABELS, type FittingKind } from "@shared/runFittings";
-import { isBendRole } from "@shared/runBends";
+import { fittingRowSpeaks } from "@shared/runFittingMaterials";
 
 /**
  * One run's bends and pull points, as the server works them out
@@ -499,26 +499,6 @@ function resendSentence(resend: NonNullable<ResendPreview>): string {
     case "refillHours":
       return `On Send: labor filled in at ${resend.hours} h per bend`;
   }
-}
-
-/**
- * Which fitting rows the Send preview lists.
- *
- * Couplings, connectors and straps ALWAYS show, with their sentence, even
- * with nothing to send ("belled end — sticks join without couplings"):
- * without it a reader would think the part was forgotten.
- *
- * The BEND kinds are five rows that mostly do not apply — a type is either
- * factory-elbowed or field-bent, and most runs have no LB — and five lines of
- * "none" under every type is a list nobody reads. So a bend row shows when it
- * has something to send, is already on the bid, or cannot be counted (that
- * needs saying). The one that applies is never hidden while it counts
- * anything, and an unanswered pull point is flagged on its run instead.
- */
-function showFittingRow(fitting: RunTypeBridgeFitting): boolean {
-  if (!isBendRole(fitting.role)) return true;
-  if (fitting.onBid || fitting.status === "unknown") return true;
-  return fitting.status === "counted" && fitting.qty > 0;
 }
 
 /** "Couplings", "90° elbows" — from the one table the server words with too. */
@@ -986,7 +966,10 @@ export function RunsPanel({
                   */}
                   {entry.fittings.length > 0 && (
                     <div className="mt-1.5 space-y-1">
-                      {entry.fittings.filter(showFittingRow).map(fitting => (
+                      {/* Bend rows with nothing to say are left out — the same
+                          rule Send uses for what it reports (fittingRowSpeaks);
+                          an unanswered pull point is flagged on its run. */}
+                      {entry.fittings.filter(fittingRowSpeaks).map(fitting => (
                         <div key={fitting.role}>
                           <div className="flex items-baseline justify-between gap-2">
                             <span

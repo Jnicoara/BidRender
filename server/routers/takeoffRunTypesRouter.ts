@@ -44,6 +44,7 @@ import { runTypeRows, runRowSendability } from "../../shared/takeoffBridge";
 import {
   EMT_FITTING_STYLES,
   fittingRowSendability,
+  fittingRowSpeaks,
   pickIsPriced,
 } from "../../shared/runFittingMaterials";
 import { materialItemKey } from "../../shared/materialMarkup";
@@ -793,6 +794,7 @@ export const takeoffRunTypesRouter = router({
           materialId: row.materialId,
           materialName: row.materialName,
           sendable: runRowSendability(row),
+          speaks: true,
         })),
         ...fittings.map(row => ({
           role: row.role as (typeof RUN_MATERIAL_ROLES)[number],
@@ -800,6 +802,15 @@ export const takeoffRunTypesRouter = router({
           materialId: row.pick.ok ? row.pick.materialId : null,
           materialName: row.pick.ok ? row.pick.name : null,
           sendable: fittingRowSendability(row),
+          // A bend row that does not apply ("PVC always takes factory
+          // elbows") is not reported as "not sent" — see fittingRowSpeaks.
+          // `onBid` false: a row with a live line is handled before this.
+          speaks: fittingRowSpeaks({
+            role: row.role,
+            status: row.count.status,
+            qty: row.qty,
+            onBid: false,
+          }),
         })),
       ];
 
@@ -900,7 +911,8 @@ export const takeoffRunTypesRouter = router({
         }
         const allowed = row.sendable;
         if (!allowed.ok) {
-          skipped.push({ role: row.role, why: allowed.message });
+          if (row.speaks)
+            skipped.push({ role: row.role, why: allowed.message });
           continue;
         }
         await db.addRunTypeRowToBid(input.bidId, ctx.scope.dataUserId, {

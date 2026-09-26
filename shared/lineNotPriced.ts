@@ -65,6 +65,25 @@ export function lineNotPriced(
   return directCost === 0;
 }
 
+/**
+ * Whether the line's HOURS are unset rather than zero, so its hours cell must
+ * not print "0 h".
+ *
+ * Only a field bend can say so: it is the one run-type line that keeps a NULL
+ * in `snapshotLaborHours` (every other flattens a missing unit to 0 at send,
+ * and the zero cannot be told apart afterwards). Its hours ARE its price, so
+ * "0 h" beside "Not priced" states a number nobody set — seen on the bid
+ * screen 2026-09-26.
+ */
+export function lineHoursUnset(line: {
+  runMaterialRole: string | null;
+  snapshotLaborHours: string | number | null;
+}): boolean {
+  return (
+    line.runMaterialRole === "fieldBend" && line.snapshotLaborHours === null
+  );
+}
+
 /** How many lines on a bid the total leaves unpriced. */
 export function countNotPriced(
   lines: readonly { line: NotPricedLineLike; directCost: number | null }[]
