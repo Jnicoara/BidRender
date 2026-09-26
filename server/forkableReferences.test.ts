@@ -188,7 +188,15 @@ const REGISTRY: Record<string, Entry> = {
 
 /** Every table in the schema, with its drizzle config. */
 function allTables() {
-  return Object.values(schema)
+  /*
+    `unknown[]`, because that is what this really is: every export of the
+    schema module — tables, enum arrays, helpers — to be narrowed by the
+    runtime check below. Typed as the module's own union, the guard's target
+    was not assignable to it (TS2677). An annotation, not a cast: anything is
+    assignable to unknown, and the compiler checks that it is.
+  */
+  const values: unknown[] = Object.values(schema);
+  return values
     .filter(
       (value): value is Parameters<typeof getTableConfig>[0] =>
         Boolean(value) &&
