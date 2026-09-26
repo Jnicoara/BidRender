@@ -135,6 +135,9 @@ describe.skipIf(!hasDb)("a restart never touches a user's own price", () => {
       costPerUnit: 41.25,
       category: "Consumables",
     });
+    // `create` reads the row back and can come back empty; fail by name here
+    // rather than as a bare TypeError on `created.id` below.
+    if (!created) throw new Error("materials.create returned no material");
 
     await seedBaselineMaterials();
 
