@@ -471,7 +471,13 @@ describe("when the connection dies but the browser has not noticed", () => {
     const storage = fakeStorage();
     const sender = frozenSender();
     let clock = 0;
-    let tick: (() => void) | null = null;
+    /*
+      On an object rather than a `let`: the watch is handed over inside a
+      callback, which TypeScript's flow analysis cannot see, so a `let` still
+      read as `null` below and `tick?.()` narrowed to `never`. A property is
+      read at its declared type.
+    */
+    const stall: { tick: (() => void) | null } = { tick: null };
     const seen: { stalled: boolean; paused: boolean }[] = [];
 
     const running = uploadInParts({
@@ -486,14 +492,19 @@ describe("when the connection dies but the browser has not noticed", () => {
       waitForOnline: async () => {},
       now: () => clock,
       startStallWatch: t => {
-        tick = t;
+        stall.tick = t;
         return () => {};
       },
     });
 
     await new Promise(r => setTimeout(r, 0));
     clock = 11_000; // eleven seconds of nothing
-    tick?.();
+    // Stricter than the `tick?.()` it replaces, which did nothing at all if
+    // the watch had never started — the failure then surfaced as a bare
+    // `stalled` mismatch two lines down, with no reason attached.
+    if (!stall.tick)
+      throw new Error("uploadInParts never started its stall watch");
+    stall.tick();
 
     const last = seen[seen.length - 1];
     expect(last.stalled).toBe(true);
