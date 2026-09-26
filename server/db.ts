@@ -212,6 +212,7 @@ import {
   type FittingKind,
   type RacewayFittingSpec,
 } from "../shared/runFittings";
+import { isBendRole, type BendKind } from "../shared/runBends";
 import {
   fittingMaterialName,
   fittingRows,
@@ -4919,6 +4920,9 @@ async function withTracedFootage(
         ?.find(r => r.role === role);
       return { ...row, qty: (fitting?.qty ?? 0).toFixed(4) };
     }
+    // BENDS BUILD, STEP 3 OF 8: the roles exist (0084) but nothing counts
+    // them yet, so a bend line keeps what it holds. Step 4 derives it live.
+    if (isBendRole(role)) return row;
     const f = footage.get(row.takeoffRunTypeId);
     /*
       A type with nothing traced under it any more is 0, not the stored number.
@@ -4939,7 +4943,7 @@ function feetForRole(
     insulatedFeet: number;
     groundFeet: number;
   },
-  role: Exclude<RunMaterialRole, FittingKind>
+  role: Exclude<RunMaterialRole, FittingKind | BendKind>
 ): number {
   switch (role) {
     case "raceway":

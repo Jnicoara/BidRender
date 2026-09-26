@@ -128,6 +128,29 @@ const REGISTRY: Record<string, Entry> = {
     resolver: "resolveMaterial",
     readBy: "server/db.ts",
   },
+  // The bend overrides (0084). Nothing reads them in the commit that adds the
+  // columns; the bridge that does (bends step 4) resolves them with the other
+  // overrides and turns these into resolvers.
+  "takeoff_run_types.elbow90MaterialId": {
+    kind: "unreviewed",
+    since: "2026-09-26",
+    why: "Column added by 0084; the bend bridge that reads it lands next.",
+  },
+  "takeoff_run_types.elbow45MaterialId": {
+    kind: "unreviewed",
+    since: "2026-09-26",
+    why: "Column added by 0084; the bend bridge that reads it lands next.",
+  },
+  "takeoff_run_types.lbMaterialId": {
+    kind: "unreviewed",
+    since: "2026-09-26",
+    why: "Column added by 0084; the bend bridge that reads it lands next.",
+  },
+  "takeoff_run_types.pullBoxMaterialId": {
+    kind: "unreviewed",
+    since: "2026-09-26",
+    why: "Column added by 0084; the bend bridge that reads it lands next.",
+  },
   // Which part a run-type line holds (0083). Resolved in resendPlans and
   // compared by materialItemKey, so a fork of the same part is not a swap.
   "bid_line_items.runMaterialId": {
@@ -354,6 +377,9 @@ describe("every stored id into a forkable row is accounted for", () => {
     const unreviewed = Object.entries(REGISTRY).filter(
       ([, entry]) => entry.kind === "unreviewed"
     );
-    expect(unreviewed.length).toBeLessThanOrEqual(9);
+    // 9 -> 13 on 2026-09-26 for the four bend overrides 0084 adds before the
+    // bridge that reads them; bends step 4 resolves them and puts this back
+    // to 9.
+    expect(unreviewed.length).toBeLessThanOrEqual(13);
   });
 });

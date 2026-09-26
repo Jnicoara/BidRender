@@ -498,6 +498,11 @@ export const BEND_KINDS = [
 ] as const;
 export type BendKind = (typeof BEND_KINDS)[number];
 
+/** Whether a bid line's run role is a bend or pull point (a count). */
+export function isBendRole(role: string | null | undefined): role is BendKind {
+  return (BEND_KINDS as readonly unknown[]).includes(role);
+}
+
 /** Same three shapes as `FittingCount`, over the bend kinds. */
 export type BendCount =
   | {

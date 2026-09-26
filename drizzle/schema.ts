@@ -13,6 +13,7 @@ import {
   index,
   decimal,
   date,
+  double,
   unique,
 } from "drizzle-orm/mysql-core";
 
@@ -691,6 +692,18 @@ export const materials = mysqlTable(
     stickJoint: varchar("stickJoint", { length: 24 }),
     strapSpacingFeet: decimal("strapSpacingFeet", { precision: 6, scale: 2 }),
     strapFromBoxFeet: decimal("strapFromBoxFeet", { precision: 6, scale: 2 }),
+    /**
+     * RACEWAY ONLY — labor hours for ONE field bend of this pipe (0084). A
+     * bend below the company's factory-elbow size is made with a bender, so it
+     * has no part to hang hours on; they live on the pipe instead, beside its
+     * other facts. NULL is "not set", and a field-bend line with no hours
+     * reads "Not priced" on the bid — never 0, which would price bending at
+     * nothing (owner, 2026-09-26). Same NULL-vs-0 rule as `laborHours`.
+     */
+    fieldBendLaborHours: decimal("fieldBendLaborHours", {
+      precision: 10,
+      scale: 4,
+    }),
 
     unitOfSale: mysqlEnum("unitOfSale", MATERIAL_UNITS_OF_SALE)
       .default("each")
@@ -2525,6 +2538,23 @@ export const takeoffRunTypes = mysqlTable(
     strapMaterialId: int("strapMaterialId").references(() => materials.id, {
       onDelete: "set null",
     }),
+    /**
+     * The same, for the bend count (`shared/runBends.ts`, 0084): the 90, the
+     * 45, the LB and the pull box. NULL looks the part up from the raceway's
+     * shipped name; a pull box looked up is sized by NEC 314.28.
+     */
+    elbow90MaterialId: int("elbow90MaterialId").references(() => materials.id, {
+      onDelete: "set null",
+    }),
+    elbow45MaterialId: int("elbow45MaterialId").references(() => materials.id, {
+      onDelete: "set null",
+    }),
+    lbMaterialId: int("lbMaterialId").references(() => materials.id, {
+      onDelete: "set null",
+    }),
+    pullBoxMaterialId: int("pullBoxMaterialId").references(() => materials.id, {
+      onDelete: "set null",
+    }),
 
     /** active / archived / deleted. See materials.status — same lifecycle. */
     status: mysqlEnum("status", LIBRARY_STATUSES).default("active").notNull(),
@@ -2567,6 +2597,17 @@ export const RUN_MATERIAL_ROLES = [
   "coupling",
   "connector",
   "strap",
+  /*
+    Bends and pull points (`shared/runBends.ts`, 0084), appended so every
+    stored value keeps its index. `fieldBend` is labor only: the line points
+    at the RACEWAY, carries no material cost by nature, and takes its hours
+    from `materials.fieldBendLaborHours`.
+  */
+  "elbow90",
+  "elbow45",
+  "fieldBend",
+  "lb",
+  "pullBox",
 ] as const;
 export type RunMaterialRole = (typeof RUN_MATERIAL_ROLES)[number];
 
@@ -2871,6 +2912,88 @@ export const takeoffHeightDefaults = mysqlTable(
 export type TakeoffHeightDefaults = typeof takeoffHeightDefaults.$inferSelect;
 export type InsertTakeoffHeightDefaults =
   typeof takeoffHeightDefaults.$inferInsert;
+
+/**
+ * A company's three bend settings (0084, `shared/runBends.ts`). One row per
+ * company, and every column NULL means "the shipped default" — so a later
+ * change to a default reaches every company that never touched it, and
+ * "reset" is writing NULL, not remembering a number.
+ *
+ * Its own table rather than columns on `takeoff_height_defaults`, which says it
+ * holds the distribution height "and nothing else" — and rather than
+ * `pricing_defaults`, because these are counting settings, and a mistake here
+ * should not be able to reach overhead and profit.
+ */
+export const takeoffBendDefaults = mysqlTable(
+  "takeoff_bend_defaults",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Trade size from which bends take factory elbows: `1-1/4"` shipped. */
+    factoryElbowFromSize: varchar("factoryElbowFromSize", { length: 16 }),
+    /** Degrees of bend allowed between pull points: 360 shipped, or 270. */
+    pullPointLimitDegrees: int("pullPointLimitDegrees"),
+    /** Trade size from which a pull box is proposed instead of an LB: `2"`. */
+    pullBoxFromSize: varchar("pullBoxFromSize", { length: 16 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [unique("takeoff_bend_defaults_user_uq").on(t.userId)]
+);
+
+export type TakeoffBendDefaults = typeof takeoffBendDefaults.$inferSelect;
+
+export const PULL_POINT_PLACES = ["corner", "end-drop"] as const;
+export const PULL_POINT_KIND_VALUES = ["lb", "pullBox"] as const;
+export const PULL_POINT_STATUSES = ["accepted", "dismissed"] as const;
+
+/**
+ * A PERSON'S ANSWER to a proposed pull point (0084). Proposals themselves are
+ * never stored: they are worked out from the trace on every read, so a
+ * re-traced run proposes afresh. Only accept and dismiss are kept.
+ *
+ * ── Keyed by POSITION, not by vertex index ───────────────────────────────────
+ * Inserting a point earlier in a run shifts every index after it, so an answer
+ * that followed the index would move to a different corner without saying so.
+ * An answer records where it is on the page; while a vertex is still there it
+ * holds, and a moved corner is proposed again (owner, 2026-09-26, decision 5).
+ * `placeAnswer` in `shared/runBends.ts` does the matching.
+ *
+ * `x`/`y` are DOUBLE, as the trace's own points are JSON numbers: a decimal
+ * would round them, and a rounded answer never matches its corner again.
+ */
+export const takeoffPullPoints = mysqlTable(
+  "takeoff_pull_points",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    /** The COMPANY OWNER, like every other row here. */
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    runId: int("runId")
+      .notNull()
+      .references(() => takeoffRuns.id, { onDelete: "cascade" }),
+    place: mysqlEnum("place", PULL_POINT_PLACES).notNull(),
+    x: double("x").notNull(),
+    y: double("y").notNull(),
+    kind: mysqlEnum("kind", PULL_POINT_KIND_VALUES).notNull(),
+    status: mysqlEnum("status", PULL_POINT_STATUSES).notNull(),
+    /** Who answered — authorship only, never for scoping. */
+    answeredBy: int("answeredBy").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    index("takeoff_pull_points_runId_idx").on(t.runId),
+    index("takeoff_pull_points_userId_idx").on(t.userId),
+  ]
+);
+
+export type TakeoffPullPoint = typeof takeoffPullPoints.$inferSelect;
 
 /**
  * A company's own mounting heights: overrides of the shipped types, types they
