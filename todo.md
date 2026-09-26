@@ -40,6 +40,13 @@ left as written rather than rewritten to match the rename.
       Needs a way to say "this is our example price, not yours": a column, or
       comparing against the seed value. **Blocks the upload, not the sheet.**
 
+- [ ] **No lug covers 400–500 kcmil.** The range lugs stop at 250-350 kcmil
+      (added 2026-09-25 for the pricing sheet's 350 kcmil lugs), while the
+      catalog ships 400 and 500 kcmil THHN and XHHW AL. The per-size 500 kcmil
+      lug was retired with the move to ranges and nothing replaced it. The
+      next range is an owner's call — which span a supply house sells, e.g.
+      350-500 kcmil — so it is not guessed here.
+
 - [ ] Replace fractional resize recentering with true page-box centering in the PDF viewer
 - [ ] Ensure the PDF canvas stays fully within the left pane as the divider moves
 - [ ] Connect estimate engine to user's custom materials DB (fall back to built-in DB)

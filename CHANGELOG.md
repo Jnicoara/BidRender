@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-25]
 
+- **A 250-350 kcmil lug joins the crimp lugs.** Lugs are sold by the range of
+  wire they take, and the ranges stopped at 4/0, so there was nothing to
+  offer for a 250 or 350 kcmil feeder. Searching "350 lug" or "kcmil lug" now
+  finds it, and it lists with the other five lugs in size order. The pricing
+  sheet's two 350 kcmil lugs are this item. There is still no lug for 400 or
+  500 kcmil wire.
+
 - **SER cable is now named by its full conductor set.** "6-3 SER CU" is
   "6-6-6-6 SER CU", "3/0-3 SER AL" is "3/0-3/0-3/0-1/0 SER AL", and so on
   for all eight rows still written in shorthand. The shorthand hid the

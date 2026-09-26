@@ -178,8 +178,28 @@ describe("conductor ranges", () => {
     expect(materialSizeKey("12-3 NM-B")[2]).toBe(3);
   });
 
+  it("reads a kcmil range as one of the family, after the aughts", () => {
+    // The unit word decides the family: without "kcmil" in the range prefix,
+    // "250-350 kcmil crimp lug" derived the type "kcmil crimp lug" and listed
+    // apart from the five AWG ranges (2026-09-25).
+    expect(materialTypeName("250-350 kcmil crimp lug")).toBe("crimp lug");
+    expect(
+      sorted([
+        "250-350 kcmil crimp lug",
+        "2/0-4/0 AWG crimp lug",
+        "1-1/0 AWG crimp lug",
+      ])
+    ).toEqual([
+      "1-1/0 AWG crimp lug",
+      "2/0-4/0 AWG crimp lug",
+      "250-350 kcmil crimp lug",
+    ]);
+  });
+
   it("covers every lug range the catalog actually ships", () => {
-    const lugs = BASELINE_MATERIALS.filter(m => /AWG crimp lug$/.test(m.name));
+    // Every crimp lug, not "AWG crimp lug": the narrower pattern would have
+    // skipped the kcmil range and passed over it.
+    const lugs = BASELINE_MATERIALS.filter(m => /crimp lug$/.test(m.name));
     expect(lugs.length).toBeGreaterThan(0);
     const unread = lugs.filter(m => !hasSize(m.name)).map(m => m.name);
     expect(unread).toEqual([]);

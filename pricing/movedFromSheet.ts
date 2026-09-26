@@ -173,6 +173,10 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   // ── Batch 6: the held questions, answered by the owner 2026-09-25
   // "-3" is three insulated conductors and the reduced ground, so these are
   // the shipped rows written out in full.
+  // The owner's answer: 350 kcmil lugs are the range lug that covers 350,
+  // added for them (connectors.ts) — as the 4/0 lugs folded into 2/0-4/0.
+  "Compression lug, 350 kcmil": "250-350 kcmil crimp lug",
+  "Mechanical lug, 350 kcmil": "250-350 kcmil crimp lug",
   "Aluminum SER, 4/0": "4/0-4/0-4/0-2/0 SER AL",
   "SER cable, 1/0-1/0-1/0-2": "1/0-1/0-1/0-2 SER AL",
   // At 400A and 600A a safety switch is the fused one the catalog ships.

@@ -1,5 +1,5 @@
 Category: Connectors & Terminations
-Items: 32
+Items: 31
 
 Category | Name | Size
 Connectors & Terminations | Butt splice | -
@@ -8,13 +8,13 @@ Connectors & Terminations | 1/2" cable connector | 1/2"
 Connectors & Terminations | 3/4" cable connector | 3/4"
 Connectors & Terminations | 1" cable connector | 1"
 Connectors & Terminations | Cable staple | -
-Connectors & Terminations | Compression lug, 350 kcmil | 350 kcmil
 Connectors & Terminations | Cord grip | -
 Connectors & Terminations | 14-10 AWG crimp lug | -
 Connectors & Terminations | 8-6 AWG crimp lug | -
 Connectors & Terminations | 4-2 AWG crimp lug | -
 Connectors & Terminations | 1-1/0 AWG crimp lug | 1/0
 Connectors & Terminations | 2/0-4/0 AWG crimp lug | 2/0
+Connectors & Terminations | 250-350 kcmil crimp lug | 350 kcmil
 Connectors & Terminations | #2 crimp sleeve | #2
 Connectors & Terminations | #4/0 crimp sleeve | #4
 Connectors & Terminations | DIN rail | -
@@ -25,7 +25,6 @@ Connectors & Terminations | Lever wire connector, 2-port | -
 Connectors & Terminations | Lever wire connector, 3-port | -
 Connectors & Terminations | Lever wire connector, 5-port | -
 Connectors & Terminations | MC anti-short bushing | -
-Connectors & Terminations | Mechanical lug, 350 kcmil | 350 kcmil
 Connectors & Terminations | Push-in wire connector | -
 Connectors & Terminations | Ring terminal | -
 Connectors & Terminations | Spade terminal | -

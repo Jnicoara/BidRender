@@ -74,7 +74,7 @@ const cableConnectors: BaselineMaterial[] = ['3/8"', '1/2"', '3/4"', '1"'].map(
  * that is what the box says. Listing a lug per gauge invented rows nobody can
  * order and, worse, implied a precision that does not exist — an estimator
  * hunting for a "#3 lug" would find nothing while the part they need sits
- * under 4-2. Five ranges cover everything from a device pigtail to a service.
+ * under 4-2. Six ranges cover a device pigtail up to a 350 kcmil feeder.
  */
 const LUG_RANGES = [
   { range: "14-10 AWG", slang: "14 12 10 small device" },
@@ -82,6 +82,16 @@ const LUG_RANGES = [
   { range: "4-2 AWG", slang: "4 3 2 feeder" },
   { range: "1-1/0 AWG", slang: "1 1/0 aught ought service" },
   { range: "2/0-4/0 AWG", slang: "2/0 3/0 4/0 aught ought service large" },
+  /*
+    Added 2026-09-25, when the pricing sheet's 350 kcmil lugs needed a range
+    to fold into and there was none: the per-size 250/350/500 kcmil lugs were
+    retired when lugs moved to ranges (index.ts), and nothing covered kcmil
+    after them. 500 kcmil is still not covered — see todo.md.
+  */
+  {
+    range: "250-350 kcmil",
+    slang: "250 300 350 mcm kcmil feeder service large",
+  },
 ];
 
 const lugs: BaselineMaterial[] = LUG_RANGES.map(({ range, slang }) => ({

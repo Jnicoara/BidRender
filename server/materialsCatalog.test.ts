@@ -247,6 +247,9 @@ describe("alias hygiene across the whole catalog", () => {
       "4-2 AWG crimp lug",
       "1-1/0 AWG crimp lug",
       "2/0-4/0 AWG crimp lug",
+      // Added 2026-09-25: the 350 kcmil lugs from the pricing sheet had no
+      // range to fold into once the per-size kcmil lugs were retired.
+      "250-350 kcmil crimp lug",
     ]);
   });
 

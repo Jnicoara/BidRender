@@ -182,7 +182,13 @@ function readSize(name: string): SizeKey | null {
   // wrong, while the other two ("1-1/0" and "14-10") matched no branch at all
   // and sorted to the end as sizeless, splitting one family of five into
   // three and two.
-  const range = name.match(/^(\d{1,4}(?:\/0)?)-\d{1,4}(?:\/0)?\s+AWG\b/i);
+  //
+  // "kcmil" is the same marker one scale up — "250-350 kcmil crimp lug"
+  // (2026-09-25). Its leading element is a kcmil size, which CONDUCTOR_SIZES
+  // already ranks above 4/0.
+  const range = name.match(
+    /^(\d{1,4}(?:\/0)?)-\d{1,4}(?:\/0)?\s+(?:AWG|kcmil)\b/i
+  );
   if (range) return conductor(range[1]);
 
   // kcmil, named as such — "250 kcmil THHN".
@@ -324,9 +330,10 @@ export function hasSize(name: string): boolean {
  * "Wire nuts" and is what stops such a row being grouped at all.
  */
 const SIZE_PREFIXES: RegExp[] = [
-  // A conductor range — "14-10 AWG crimp lug". Consumes the unit word, so the
-  // five lug ranges all derive the same type and list as one family.
-  /^\d{1,4}(?:\/0)?-\d{1,4}(?:\/0)?\s+AWG\s+/i,
+  // A conductor range — "14-10 AWG crimp lug", "250-350 kcmil crimp lug".
+  // Consumes the unit word, so every lug range, AWG or kcmil, derives the
+  // same type and lists as one family.
+  /^\d{1,4}(?:\/0)?-\d{1,4}(?:\/0)?\s+(?:AWG|kcmil)\s+/i,
   // Multi-element aught cables — "4/0-4/0-2/0 SER AL".
   /^#?\d\/0(?:-\d(?:\/0)?)*\s+/,
   // kcmil, named — "250 kcmil THHN". Consumes the unit word too.
