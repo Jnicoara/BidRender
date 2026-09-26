@@ -59,6 +59,8 @@ import {
 import * as db from "../db";
 import { footageByRunType } from "../runTypeFootage";
 import { resolveRunType } from "../../shared/runTypeLookup";
+import { FITTING_KIND_LABELS } from "../../shared/runFittings";
+import { isBendRole } from "../../shared/runBends";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -251,27 +253,40 @@ export const materialsListRouter = router({
       if (fittingsByType.size > 0) {
         const palette = await db.getRunTypesFor(ctx.scope.dataUserId, true);
         const minimums: string[] = [];
+        const bendMinimums: string[] = [];
         const unmatched: string[] = [];
         const uncounted: string[] = [];
         fittingsByType.forEach((rows, runTypeId) => {
           const label =
             resolveRunType(palette, runTypeId)?.label ?? "A traced run type";
           for (const row of rows) {
+            /*
+              A FIELD BEND is labor, not a part. Its line points at the
+              raceway, so listing it would order "7 × 3/4" EMT" — pipe, by
+              the each, on top of the pipe already listed by the foot.
+            */
+            if (row.role === "fieldBend") continue;
+            const kind = FITTING_KIND_LABELS[row.role].many;
             if (
               row.count.status === "unknown" &&
               footage.get(runTypeId)?.legs.length
             ) {
-              uncounted.push(`${label} ${row.role}s — ${row.count.why}`);
+              uncounted.push(`${label} ${kind} — ${row.count.why}`);
               continue;
             }
             if (row.count.status !== "counted" || row.qty <= 0) continue;
             if (!row.pick.ok) {
               unmatched.push(
-                `${row.qty} ${row.role}s for ${label} (${row.pick.why})`
+                `${row.qty} ${kind} for ${label} (${row.pick.why})`
               );
               continue;
             }
-            if (row.count.atLeast) minimums.push(row.pick.name);
+            // A bend count is a floor for a different reason than a short
+            // drop: the plans never show the kicks and offsets at boxes.
+            if (row.count.atLeast) {
+              if (isBendRole(row.role)) bendMinimums.push(row.pick.name);
+              else minimums.push(row.pick.name);
+            }
             sources.push({
               name: `${label} (counted from traced runs)`,
               count: row.qty,
@@ -295,6 +310,11 @@ export const materialsListRouter = router({
         if (unmatched.length > 0) {
           fittingShortfalls.push(
             `Counted but not listed, because no catalog part matches: ${unmatched.join("; ")}.`
+          );
+        }
+        if (bendMinimums.length > 0) {
+          fittingShortfalls.push(
+            `Minimums, not totals — elbows are counted from the corners and drops on the drawing, and plans do not show the kicks and offsets at boxes: ${Array.from(new Set(bendMinimums)).join(", ")}.`
           );
         }
         if (uncounted.length > 0) {

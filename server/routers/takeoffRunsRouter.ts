@@ -22,6 +22,12 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import {
+  PULL_POINT_KIND_VALUES,
+  PULL_POINT_PLACES,
+  PULL_POINT_STATUSES,
+} from "../../drizzle/schema";
+import { placeAnswer } from "../../shared/runBends";
+import {
   RUN_PATH_TYPES,
   RUN_STATUSES,
   TAKEOFF_LOCATIONS,
@@ -469,6 +475,14 @@ export const takeoffRunsRouter = router({
           });
         }
         await db.updateRun(input.id, ctx.scope.dataUserId, values);
+        // New points: an answered pull point whose corner moved or went is
+        // dropped, so that corner is proposed afresh. Answers whose corner is
+        // still there are kept (owner, 2026-09-26, decision 5).
+        await db.dropOrphanedPullPoints(
+          input.id,
+          ctx.scope.dataUserId,
+          input.points
+        );
         return {
           id: input.id,
           measured: inches !== null,
@@ -1011,6 +1025,54 @@ export const takeoffRunsRouter = router({
       if (Object.keys(patch).length === 0) return { ok: true };
 
       await db.updateRun(input.id, userId, patch);
+      return { ok: true };
+    }),
+
+  /**
+   * Accept or dismiss a PROPOSED pull point — the only way one is ever
+   * stored. Nothing adds an LB or a pull box without a person answering here
+   * (owner, 2026-09-26: "never add one silently").
+   *
+   * The spot must be on the run as it is now: a corner at an interior vertex,
+   * or the top of the drop at its last point. An answer nothing can match
+   * would be kept, counted nowhere, and say nothing — so it is refused.
+   */
+  answerPullPoint: procedure
+    .input(
+      z.object({
+        runId: z.number().int().positive(),
+        place: z.enum(PULL_POINT_PLACES),
+        x: z.number().finite(),
+        y: z.number().finite(),
+        kind: z.enum(PULL_POINT_KIND_VALUES),
+        status: z.enum(PULL_POINT_STATUSES),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const run = await requireRun(input.runId, ctx.scope.dataUserId);
+      const where = placeAnswer(
+        { points: run.points ?? [], endDrop: { state: "unknown" } },
+        { id: 0, ...input }
+      );
+      if (where === null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "That spot is not a corner of this run any more. Look at the drawing again.",
+        });
+      await db.answerPullPoint(
+        ctx.scope.dataUserId,
+        ctx.scope.actorUserId,
+        input
+      );
+      return { ok: true };
+    }),
+
+  /** Take an answer back, so the spot is proposed afresh. */
+  clearPullPointAnswer: procedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      await db.clearPullPointAnswer(ctx.scope.dataUserId, input.id);
       return { ok: true };
     }),
 });

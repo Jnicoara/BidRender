@@ -18,10 +18,12 @@
  * overrides instead; without one the count says "no catalog match".
  */
 import {
+  FITTING_KIND_LABELS,
   FITTING_KINDS,
   type FittingCount,
   type FittingKind,
 } from "./runFittings";
+import { needsPricing } from "./materialPricing";
 import type { BendMethod, PullPointKind } from "./runBends";
 import { tradeSizeAtLeast } from "./materialSizeOrder";
 
@@ -296,16 +298,35 @@ export function fittingMaterialName(
   const parsed = parseRacewayName(racewayBaselineName);
   if (!parsed) return null;
   const { size, family } = parsed;
+  const flex = FLEX_FAMILIES.includes(family);
 
-  if (kind === "strap") {
-    const label = strapFamily(family);
-    return label === null ? null : oneHoleStrapName(size, label);
+  switch (kind) {
+    case "strap": {
+      const label = strapFamily(family);
+      return label === null ? null : oneHoleStrapName(size, label);
+    }
+    case "elbow90":
+      return flex ? null : elbowName(size, family, 90);
+    case "elbow45":
+      return flex ? null : elbowName(size, family, 45);
+    case "lb":
+      return flex ? null : lbName(size, family);
+    case "pullBox":
+      return pullBoxFor(racewayBaselineName, null).name;
+    case "fieldBend":
+      // Not a part: a field bend's "material" is the raceway itself, picked
+      // in `pickFittingMaterial` before any name is built.
+      return null;
+    case "coupling":
+    case "connector":
+      if (family === "EMT") {
+        const chosen = isEmtFittingStyle(style)
+          ? style
+          : DEFAULT_EMT_FITTING_STYLE;
+        return emtStyledFittingName(size, chosen, kind);
+      }
+      return `${size} ${family} ${kind}`;
   }
-  if (family === "EMT") {
-    const chosen = isEmtFittingStyle(style) ? style : DEFAULT_EMT_FITTING_STYLE;
-    return emtStyledFittingName(size, chosen, kind);
-  }
-  return `${size} ${family} ${kind}`;
 }
 
 // ── From a count and a material to a row the bid can take ───────────────────
@@ -319,8 +340,31 @@ export type FittingMaterialPick =
       costPerUnit: string | number;
       /** From the per-type override, rather than the catalog lookup. */
       override: boolean;
+      /**
+       * Set only on a FIELD BEND, whose "material" is the raceway: the hours
+       * for one bend (`materials.fieldBendLaborHours`), NULL when not set. A
+       * field bend is priced by these, never by the pipe's cost per foot.
+       */
+      fieldBendHours?: string | number | null;
     }
   | { ok: false; why: string };
+
+/** A raceway row as the field-bend pick needs it. */
+export type FieldBendRaceway = {
+  id: number;
+  name: string;
+  fieldBendLaborHours: string | number | null;
+};
+
+/**
+ * Whether this pick is priced, as the Send preview says it. A part is priced by
+ * its cost; a field bend by its hours — a set 0 is an answer, only NULL is not.
+ */
+export function pickIsPriced(pick: FittingMaterialPick): boolean | null {
+  if (!pick.ok) return null;
+  if (pick.fieldBendHours !== undefined) return pick.fieldBendHours !== null;
+  return !needsPricing(pick.costPerUnit);
+}
 
 /**
  * Pick the material for one fitting.
@@ -335,11 +379,32 @@ export function pickFittingMaterial(input: {
   override: { id: number; name: string; costPerUnit: string | number } | null;
   racewayBaselineName: string | null;
   racewayName: string | null;
+  /** The resolved raceway row — a field bend's line points at it. */
+  raceway: FieldBendRaceway | null;
   style: string | null;
   found: (
     name: string
   ) => { id: number; name: string; costPerUnit: string | number } | undefined;
 }): FittingMaterialPick {
+  if (input.kind === "fieldBend") {
+    // Labor only. The line points at the pipe so Send-again can see a changed
+    // raceway, and carries NO material cost: the pipe is already bought by
+    // the foot, and pricing a bend at the pipe's cost would buy it twice.
+    if (!input.raceway) {
+      return {
+        ok: false,
+        why: "This type names no raceway, so its field bends cannot be priced",
+      };
+    }
+    return {
+      ok: true,
+      materialId: input.raceway.id,
+      name: `${input.raceway.name} field bend`,
+      costPerUnit: 0,
+      override: false,
+      fieldBendHours: input.raceway.fieldBendLaborHours,
+    };
+  }
   if (input.override) {
     return {
       ok: true,
@@ -362,7 +427,7 @@ export function pickFittingMaterial(input: {
   if (wanted === null) {
     return {
       ok: false,
-      why: `No catalog ${input.kind} for ${input.racewayName} — choose one on the run type`,
+      why: `No catalog ${FITTING_KIND_LABELS[input.kind].one} for ${input.racewayName} — choose one on the run type`,
     };
   }
   const row = input.found(wanted);

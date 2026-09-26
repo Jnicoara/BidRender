@@ -37,6 +37,7 @@ import {
 import { runAppearance } from "@shared/takeoffMarks";
 import type { RunQuantities, totalQuantities } from "@shared/takeoffQuantities";
 import { verticalsNotice } from "@shared/takeoffHeights";
+import { FITTING_KIND_LABELS, type FittingKind } from "@shared/runFittings";
 
 export type PanelRun = {
   id: number;
@@ -270,6 +271,8 @@ export type RunTypeBridgeRow = {
 export type ResendPreview =
   | { kind: "swap"; text: string }
   | { kind: "refill"; price: number }
+  /** A field bend sent with no hours, now that its raceway has them. */
+  | { kind: "refillHours"; hours: number }
   | null;
 
 /**
@@ -278,7 +281,7 @@ export type ResendPreview =
  * the number was reached, and the panel never shows the number without it.
  */
 export type RunTypeBridgeFitting = {
-  role: "coupling" | "connector" | "strap";
+  role: FittingKind;
   status: "counted" | "included" | "unknown";
   qty: number;
   atLeast: boolean;
@@ -295,16 +298,21 @@ export type RunTypeBridgeFitting = {
 
 /** The sentence the panel shows for a pending Send-again change. */
 function resendSentence(resend: NonNullable<ResendPreview>): string {
-  return resend.kind === "swap"
-    ? `On Send: ${resend.text}`
-    : `On Send: price filled in at ${money(resend.price)}`;
+  switch (resend.kind) {
+    case "swap":
+      return `On Send: ${resend.text}`;
+    case "refill":
+      return `On Send: price filled in at ${money(resend.price)}`;
+    case "refillHours":
+      return `On Send: labor filled in at ${resend.hours} h per bend`;
+  }
 }
 
-const FITTING_LABELS: Record<RunTypeBridgeFitting["role"], string> = {
-  coupling: "Couplings",
-  connector: "Connectors",
-  strap: "Straps",
-};
+/** "Couplings", "90° elbows" — from the one table the server words with too. */
+function fittingLabel(role: FittingKind): string {
+  const many = FITTING_KIND_LABELS[role].many;
+  return many.charAt(0).toUpperCase() + many.slice(1);
+}
 
 export type RunTypeBridgeEntry = {
   runTypeId: number;
@@ -768,7 +776,7 @@ export function RunsPanel({
                               )}
                             >
                               {fitting.materialName ??
-                                FITTING_LABELS[fitting.role]}
+                                fittingLabel(fitting.role)}
                             </span>
                             <span className="flex items-baseline gap-1.5 shrink-0">
                               {fitting.priced === false && (

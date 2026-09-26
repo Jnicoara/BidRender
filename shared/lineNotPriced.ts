@@ -14,7 +14,9 @@
  *     0 is an answer — an owner-supplied fixture — and is shown as $0.
  *   • FROM A RUN TYPE (pipe, wire, fittings): the material cost came off a
  *     catalog row, and a catalog row at 0 is by definition unpriced
- *     (`needsPricing`). Nobody chose that zero.
+ *     (`needsPricing`). Nobody chose that zero. EXCEPT a field bend, which is
+ *     labor only: its $0 is by nature, and it is not priced while its HOURS
+ *     are NULL (2026-09-26).
  *   • FROM AN ASSEMBLY or a count: a labor-only assembly legitimately carries
  *     no material, so only a line whose WHOLE cost is $0 is not priced.
  *
@@ -30,6 +32,12 @@ export type NotPricedLineLike = {
   qty: string | number;
   assemblyId: number | null;
   takeoffRunTypeId: number | null;
+  /**
+   * Which part of a run type this line is. Required, not optional: a FIELD
+   * BEND reads differently from every other run-type line, and a caller that
+   * could leave this out would quietly price it the wrong way.
+   */
+  runMaterialRole: string | null;
   snapshotMaterialCost: string | number | null;
   snapshotLaborHours: string | number | null;
 };
@@ -43,6 +51,15 @@ export function lineNotPriced(
   if (!Number.isFinite(qty) || qty <= 0) return false;
   if (canPriceByHand(line)) return lineNeedsPrice(line);
   if (line.takeoffRunTypeId !== null) {
+    /*
+      A FIELD BEND is labor on a part that is $0 by nature (the pipe is on its
+      own line), so its $0 cost is an answer and its HOURS decide: NULL is
+      "Not priced" (owner, 2026-09-26). A set 0 is an answer, like a labor
+      unit's — `shared/materialLabor.ts`.
+    */
+    if (line.runMaterialRole === "fieldBend") {
+      return line.snapshotLaborHours === null;
+    }
     return needsPricing(line.snapshotMaterialCost);
   }
   return directCost === 0;

@@ -45,8 +45,10 @@ export async function footageByRunType(
     circuitsByRun,
     scales,
     heights,
-    // BENDS BUILD, STEP 1 OF 8: nothing stores a pull-point answer until
-    // `takeoff_pull_points` lands in 0084 (step 3). Step 4 loads them here.
-    pullPointAnswersByRun: new Map(),
+    // An accepted LB is a box: it changes connectors, straps and elbows.
+    pullPointAnswersByRun: await db.getPullPointAnswersForRuns(
+      runs.map(run => run.id),
+      userId
+    ),
   });
 }

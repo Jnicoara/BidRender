@@ -54,6 +54,19 @@ function leg(
   };
 }
 
+/**
+ * These tests are about couplings, connectors and straps; the bend kinds that
+ * ride along are covered in runBends.test.ts. Every call goes through here so
+ * the bend settings are one decision, not twenty.
+ */
+const BENDS = {
+  method: { method: "factory" as const, why: 'factory elbows from 1-1/4" up' },
+  limit: 360,
+};
+function count(legs: readonly FittingLeg[], spec: RacewayFittingSpec) {
+  return countFittings(legs, spec, BENDS);
+}
+
 /** Both ends level: the verticals a run gets when it carries straight on. */
 const LEVEL: EndVertical = {
   counted: false,
@@ -70,7 +83,7 @@ describe("sticks and couplings", () => {
   });
 
   it("is sticks minus one, and says how", () => {
-    const c = countFittings([leg("1", "a", "b", 94.2)], EMT).coupling;
+    const c = count([leg("1", "a", "b", 94.2)], EMT).coupling;
     expect(c).toMatchObject({ status: "counted", qty: 9, atLeast: false });
     if (c.status !== "counted") throw new Error();
     expect(c.why).toBe("9 couplings: 10 sticks of 10 ft over 94.2 ft");
@@ -80,7 +93,7 @@ describe("sticks and couplings", () => {
     // 15 + 15 as one length would be 3 sticks, 2 couplings. As two legs it is
     // 2 sticks each, 1 coupling each — the box between them is a joint.
     const legs = [leg("1", "a", "b", 15), leg("2", "b", "c", 15)];
-    const c = countFittings(legs, EMT).coupling;
+    const c = count(legs, EMT).coupling;
     expect(c).toMatchObject({ status: "counted", qty: 2 });
     if (c.status !== "counted") throw new Error();
     expect(c.why).toMatch(/4 sticks of 10 ft over 30 ft, counted per leg/);
@@ -92,7 +105,7 @@ describe("sticks and couplings", () => {
       name: '1" PVC Sch 40',
       stickJoint: "belled" as const,
     };
-    const c = countFittings([leg("1", "a", "b", 94.2)], pvc).coupling;
+    const c = count([leg("1", "a", "b", 94.2)], pvc).coupling;
     expect(c.status).toBe("included");
     expect(c.why).toBe(
       "10 sticks of 10 ft, belled end — sticks join without couplings"
@@ -105,7 +118,7 @@ describe("sticks and couplings", () => {
       name: '1" rigid conduit',
       stickJoint: "coupling_on_stick" as const,
     };
-    const c = countFittings([leg("1", "a", "b", 31)], rmc).coupling;
+    const c = count([leg("1", "a", "b", 31)], rmc).coupling;
     expect(c.status).toBe("included");
     expect(c.why).toMatch(/4 sticks of 10 ft — a coupling comes on each stick/);
   });
@@ -116,13 +129,13 @@ describe("sticks and couplings", () => {
       stickLengthFeet: null,
       stickJoint: "continuous" as const,
     };
-    expect(countFittings([leg("1", "a", "b", 31)], fmc).coupling.status).toBe(
+    expect(count([leg("1", "a", "b", 31)], fmc).coupling.status).toBe(
       "included"
     );
   });
 
   it("refuses to guess without a stick length — never a quiet zero", () => {
-    const c = countFittings([leg("1", "a", "b", 31)], {
+    const c = count([leg("1", "a", "b", 31)], {
       ...EMT,
       stickLengthFeet: null,
     }).coupling;
@@ -131,7 +144,7 @@ describe("sticks and couplings", () => {
   });
 
   it("an unset stick joint reads as plain ends", () => {
-    const c = countFittings([leg("1", "a", "b", 31)], {
+    const c = count([leg("1", "a", "b", 31)], {
       ...EMT,
       stickJoint: null,
     }).coupling;
@@ -141,17 +154,14 @@ describe("sticks and couplings", () => {
 
 describe("connectors — one per conduit end, explained by what meets where", () => {
   it("is one at each end of a lone run", () => {
-    const c = countFittings(
-      [leg("1", "run:1:start", "run:1:end", 40)],
-      EMT
-    ).connector;
+    const c = count([leg("1", "run:1:start", "run:1:end", 40)], EMT).connector;
     expect(c).toMatchObject({ status: "counted", qty: 2 });
     expect(c.why).toBe("2 connectors: one per conduit end — 2 line ends");
   });
 
   it("is two at an in-and-out box", () => {
     const legs = [leg("1", "panel", "box", 40), leg("2", "box", "recep", 12)];
-    const c = countFittings(legs, EMT).connector;
+    const c = count(legs, EMT).connector;
     expect(c).toMatchObject({ qty: 4 });
     expect(c.why).toBe(
       "4 connectors: one per conduit end — 2 line ends, 1 in-and-out box (2 each)"
@@ -167,13 +177,13 @@ describe("connectors — one per conduit end, explained by what meets where", ()
       leg("branch", "tee", "recep", 14),
     ];
     expect(nodeDegrees(legs).get("tee")).toBe(3);
-    const c = countFittings(legs, EMT).connector;
+    const c = count(legs, EMT).connector;
     expect(c).toMatchObject({ qty: 6 });
     expect(c.why).toMatch(/3 line ends, 1 box where 3 conduits meet/);
   });
 
   it("needs no scale — an unmeasurable run still has two ends", () => {
-    const f = countFittings([leg("1", "a", "b", null)], EMT);
+    const f = count([leg("1", "a", "b", null)], EMT);
     expect(f.connector).toMatchObject({ status: "counted", qty: 2 });
     expect(f.coupling.status).toBe("unknown");
     expect(f.strap.status).toBe("unknown");
@@ -195,7 +205,7 @@ describe("straps", () => {
   });
 
   it("says where each strap came from, drops included", () => {
-    const s = countFittings([leg("1", "a", "b", 25)], EMT).strap;
+    const s = count([leg("1", "a", "b", 25)], EMT).strap;
     expect(s).toMatchObject({ status: "counted", qty: 3 });
     expect(s.why).toBe(
       "3 straps: 2 within 3 ft of a box + 1 at 10 ft spacing over 25 ft, drops included"
@@ -203,7 +213,7 @@ describe("straps", () => {
   });
 
   it("refuses without a spacing", () => {
-    const s = countFittings([leg("1", "a", "b", 25)], {
+    const s = count([leg("1", "a", "b", 25)], {
       ...EMT,
       strapSpacingFeet: null,
     }).strap;
@@ -214,7 +224,7 @@ describe("straps", () => {
 
 describe("a partial answer says it is partial", () => {
   it("reads 'at least' when a drop has no height", () => {
-    const f = countFittings([leg("1", "a", "b", 31, true)], EMT);
+    const f = count([leg("1", "a", "b", 31, true)], EMT);
     expect(f.coupling).toMatchObject({
       status: "counted",
       qty: 3,
@@ -227,10 +237,7 @@ describe("a partial answer says it is partial", () => {
   });
 
   it("counts what it can and names what it could not", () => {
-    const f = countFittings(
-      [leg("1", "a", "b", 31), leg("2", "c", "d", null)],
-      EMT
-    );
+    const f = count([leg("1", "a", "b", 31), leg("2", "c", "d", null)], EMT);
     expect(f.coupling).toMatchObject({
       status: "counted",
       qty: 3,

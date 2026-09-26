@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **Elbows, field bends, LBs and pull boxes now reach the bid from traced
+  conduit**, through Send like couplings do. Elbows are counted from each
+  corner's angle and each drop, and always read "at least", because plans
+  do not show the kicks and offsets at boxes. Pipe below the company's
+  factory-elbow size (1-1/4" unless changed) is bent in the field instead:
+  a labor-only line priced from a new "hours per field bend" on the pipe,
+  which reads "Not priced" until that is filled in and never picks up the
+  pipe's price. An LB or pull box appears only after you accept one on the
+  drawing, and then its corner's elbow comes off and its connectors go on.
+  Field bends are left off the supplier list, since they are labor, not a
+  part to order.
 - **45° elbows are in the catalog** for EMT, PVC 40, PVC 80, rigid and IMC,
   at every trade size (45 new items, unpriced like the rest). They are there
   for the bend count coming from traced runs, where a corner of about 15–67°

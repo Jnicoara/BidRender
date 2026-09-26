@@ -44,9 +44,12 @@
  */
 import type { PagePoint as Point } from "./takeoffGeometry";
 import {
+  BEND_KINDS,
+  countBends,
   endDropOf,
   placeAnswer,
   type BendLeg,
+  type BendMethod,
   type EndDrop,
   type PullPointAnswer,
 } from "./runBends";
@@ -111,8 +114,38 @@ export type FittingLeg = BendLeg & {
   feetIsFloor: boolean;
 };
 
-export const FITTING_KINDS = ["coupling", "connector", "strap"] as const;
+/**
+ * Every count a run type sends, in the order the screen lists them: the three
+ * counted along the pipe, then the bends and pull points (`runBends.ts`).
+ *
+ * ONE list, so the bend kinds ride the same Send, markup, quantity lock,
+ * Send-again and supplier list as couplings do — a second list would be a
+ * second path, and the second path is the one that lags. The one kind that is
+ * not a part, `fieldBend`, is special-cased where a part would be wrong, and
+ * each of those places says so.
+ */
+export const FITTING_KINDS = [
+  "coupling",
+  "connector",
+  "strap",
+  ...BEND_KINDS,
+] as const;
 export type FittingKind = (typeof FITTING_KINDS)[number];
+
+/** How each kind reads in a sentence: "3 90° elbows", "2 field bends". */
+export const FITTING_KIND_LABELS: Record<
+  FittingKind,
+  { one: string; many: string }
+> = {
+  coupling: { one: "coupling", many: "couplings" },
+  connector: { one: "connector", many: "connectors" },
+  strap: { one: "strap", many: "straps" },
+  elbow90: { one: "90° elbow", many: "90° elbows" },
+  elbow45: { one: "45° elbow", many: "45° elbows" },
+  fieldBend: { one: "field bend", many: "field bends" },
+  lb: { one: "LB", many: "LBs" },
+  pullBox: { one: "pull box", many: "pull boxes" },
+};
 
 /** Whether a bid line's run role is a fitting (a count) rather than footage. */
 export function isFittingRole(
@@ -197,13 +230,17 @@ export function nodeDegrees(legs: readonly FittingLeg[]): Map<string, number> {
  */
 export function countFittings(
   legs: readonly FittingLeg[],
-  raceway: RacewayFittingSpec
+  raceway: RacewayFittingSpec,
+  bends: { method: BendMethod; limit: number }
 ): Record<FittingKind, FittingCount> {
   const pieces = legs.flatMap(splitAtPullPoints);
   return {
     coupling: countCouplings(pieces, raceway),
     connector: countConnectors(pieces, raceway),
     strap: countStraps(pieces, raceway),
+    // Bends read the UNSPLIT legs: a pull point replaces the bend it sits on,
+    // which only the whole leg can see.
+    ...countBends(legs, bends.method, bends.limit).counts,
   };
 }
 

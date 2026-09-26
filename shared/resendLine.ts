@@ -5,7 +5,9 @@
  * Send preview and the send itself cannot disagree:
  *
  *   1. REFILL — a line that reads "Not priced" takes the material's CURRENT
- *      price. A price that is already set is never overwritten.
+ *      price. A price that is already set is never overwritten. A FIELD BEND
+ *      (2026-09-26) is priced by hours on a $0 part, so its refill is of
+ *      HOURS: only while the line's are NULL, never over a set figure.
  *   2. SWAP — a fitting line whose type now names a different part (the
  *      fitting STYLE changed, or an override) becomes the current part on
  *      Send-again, and the preview says so: "set-screw coupling → compression
@@ -33,11 +35,26 @@ export type ResendPart = {
 export type ResendPlan =
   | { kind: "keep" }
   | { kind: "refill"; price: number }
+  /** A field bend sent with no hours, now that its raceway has them. */
+  | { kind: "refillHours"; hours: number }
   | { kind: "swap"; from: string; to: string };
 
 export function resendPlan(input: {
   /** Fitting roles swap; pipe and wire never do (only the style decision). */
   isFitting: boolean;
+  /**
+   * Set only for a FIELD BEND line, which is priced by HOURS on a $0 part.
+   * Without this the money rule below would see its deliberate $0 as "Not
+   * priced" and refill it with the pipe's cost per foot. Required, so a
+   * caller has to say which kind of line it is asking about.
+   *
+   * `lineHours` is the line's frozen hours; `currentHours` the raceway's
+   * `fieldBendLaborHours` now. NULL is "not set" on both — a 0 is an answer.
+   */
+  fieldBend: {
+    lineHours: string | number | null;
+    currentHours: string | number | null;
+  } | null;
   /**
    * What the line holds. NULL when nobody can say (sent before 0083 and not
    * recoverable). For a fitting that means "leave its part alone"; for pipe
@@ -57,6 +74,12 @@ export function resendPlan(input: {
 
   if (isFitting && linePart.key !== currentPart.key) {
     return { kind: "swap", from: linePart.name, to: currentPart.name };
+  }
+  if (input.fieldBend) {
+    const { lineHours, currentHours } = input.fieldBend;
+    return lineHours === null && currentHours !== null
+      ? { kind: "refillHours", hours: Number(currentHours) }
+      : { kind: "keep" };
   }
   if (
     linePart.key === currentPart.key &&

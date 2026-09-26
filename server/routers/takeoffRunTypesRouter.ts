@@ -44,8 +44,8 @@ import { runTypeRows, runRowSendability } from "../../shared/takeoffBridge";
 import {
   EMT_FITTING_STYLES,
   fittingRowSendability,
+  pickIsPriced,
 } from "../../shared/runFittingMaterials";
-import { needsPricing } from "../../shared/materialPricing";
 import { materialItemKey } from "../../shared/materialMarkup";
 import { isFittingRole } from "../../shared/runFittings";
 import { resendPlan, swapText, type ResendPlan } from "../../shared/resendLine";
@@ -104,6 +104,11 @@ const fittingFields = {
   couplingMaterialId: z.number().int().positive().nullable().optional(),
   connectorMaterialId: z.number().int().positive().nullable().optional(),
   strapMaterialId: z.number().int().positive().nullable().optional(),
+  // The bend parts (0084), the same way.
+  elbow90MaterialId: z.number().int().positive().nullable().optional(),
+  elbow45MaterialId: z.number().int().positive().nullable().optional(),
+  lbMaterialId: z.number().int().positive().nullable().optional(),
+  pullBoxMaterialId: z.number().int().positive().nullable().optional(),
 };
 
 /**
@@ -136,6 +141,7 @@ async function resendPlans(
     runMaterialRole: string | null;
     runMaterialId: number | null;
     snapshotMaterialCost: string | null;
+    snapshotLaborHours: string | null;
   }[]
 ): Promise<Map<string, ResendPlan>> {
   const ids = [
@@ -154,6 +160,10 @@ async function resendPlans(
   for (const candidate of candidates) {
     const line = liveLines.find(l => l.runMaterialRole === candidate.role);
     if (!line) continue;
+    const current =
+      candidate.materialId === null
+        ? undefined
+        : resolveMaterial(rows, candidate.materialId);
     plans.set(
       candidate.role,
       resendPlan({
@@ -161,6 +171,14 @@ async function resendPlans(
         linePart: part(line.runMaterialId),
         currentPart: part(candidate.materialId),
         lineCost: line.snapshotMaterialCost,
+        // A field bend is priced by hours on its raceway, never by cost.
+        fieldBend:
+          candidate.role === "fieldBend"
+            ? {
+                lineHours: line.snapshotLaborHours,
+                currentHours: current?.fieldBendLaborHours ?? null,
+              }
+            : null,
       })
     );
   }
@@ -259,6 +277,10 @@ export const takeoffRunTypesRouter = router({
             t.couplingMaterialId,
             t.connectorMaterialId,
             t.strapMaterialId,
+            t.elbow90MaterialId,
+            t.elbow45MaterialId,
+            t.lbMaterialId,
+            t.pullBoxMaterialId,
           ].filter((id): id is number => id !== null)
         ),
         ctx.scope.dataUserId
@@ -310,6 +332,20 @@ export const takeoffRunTypesRouter = router({
         couplingMaterialName: nameOf(type.couplingMaterialId),
         connectorMaterialName: nameOf(type.connectorMaterialId),
         strapMaterialName: nameOf(type.strapMaterialId),
+        elbow90MaterialId: type.elbow90MaterialId,
+        elbow45MaterialId: type.elbow45MaterialId,
+        lbMaterialId: type.lbMaterialId,
+        pullBoxMaterialId: type.pullBoxMaterialId,
+        elbow90MaterialName: nameOf(type.elbow90MaterialId),
+        elbow45MaterialName: nameOf(type.elbow45MaterialId),
+        lbMaterialName: nameOf(type.lbMaterialId),
+        pullBoxMaterialName: nameOf(type.pullBoxMaterialId),
+        /**
+         * Hours per field bend on the raceway (0084). Undefined-safe like the
+         * labor units above: NULL for no raceway and for a raceway with none.
+         */
+        racewayFieldBendLaborHours:
+          materialFor(type.racewayMaterialId)?.fieldBendLaborHours ?? null,
         status: type.status,
         /**
          * The shipped row this forks, so the screen can follow a run's STORED
@@ -376,6 +412,10 @@ export const takeoffRunTypesRouter = router({
         couplingMaterialId: input.couplingMaterialId ?? null,
         connectorMaterialId: input.connectorMaterialId ?? null,
         strapMaterialId: input.strapMaterialId ?? null,
+        elbow90MaterialId: input.elbow90MaterialId ?? null,
+        elbow45MaterialId: input.elbow45MaterialId ?? null,
+        lbMaterialId: input.lbMaterialId ?? null,
+        pullBoxMaterialId: input.pullBoxMaterialId ?? null,
       });
       return { id, label: input.label, pathType: input.pathType };
     }),
@@ -590,12 +630,17 @@ export const takeoffRunTypesRouter = router({
           const resendOf = (role: string, qty: number) => {
             const plan = plans.get(role);
             if (!plan || plan.kind === "keep") return null;
-            return plan.kind === "swap"
-              ? {
+            switch (plan.kind) {
+              case "swap":
+                return {
                   kind: "swap" as const,
                   text: swapText(plan.from, plan.to, qty),
-                }
-              : { kind: "refill" as const, price: plan.price };
+                };
+              case "refill":
+                return { kind: "refill" as const, price: plan.price };
+              case "refillHours":
+                return { kind: "refillHours" as const, hours: plan.hours };
+            }
           };
           return {
             // The id the RUNS use, which is what a bid line records.
@@ -632,7 +677,8 @@ export const takeoffRunTypesRouter = router({
               materialName: row.pick.ok ? row.pick.name : null,
               materialProblem: row.pick.ok ? null : row.pick.why,
               fromOverride: row.pick.ok && row.pick.override,
-              priced: row.pick.ok ? !needsPricing(row.pick.costPerUnit) : null,
+              // A field bend is priced by its HOURS, a part by its cost.
+              priced: pickIsPriced(row.pick),
               onBid: onBid.has(storedId + ":" + row.role),
               sendable: fittingRowSendability(row),
               resend: resendOf(row.role, row.qty),
@@ -824,11 +870,18 @@ export const takeoffRunTypesRouter = router({
               mode: "swap",
               materialId: row.materialId,
               name: runLineName(type.label, row.materialName),
+              role: row.role,
             });
             swapped.push(swapText(plan.from, plan.to, row.qty));
           } else if (plan.kind === "refill" && row.materialId !== null) {
             await db.resnapshotRunTypeLine(live.id, ctx.scope.dataUserId, {
               mode: "refill",
+              materialId: row.materialId,
+            });
+            refilled.push(row.materialName ?? row.role);
+          } else if (plan.kind === "refillHours" && row.materialId !== null) {
+            await db.resnapshotRunTypeLine(live.id, ctx.scope.dataUserId, {
+              mode: "refillHours",
               materialId: row.materialId,
             });
             refilled.push(row.materialName ?? row.role);

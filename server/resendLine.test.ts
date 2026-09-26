@@ -25,6 +25,7 @@ describe("refill", () => {
         linePart: setScrew,
         currentPart: setScrew,
         lineCost: "0.0000",
+        fieldBend: null,
       })
     ).toEqual({ kind: "refill", price: 0.45 });
   });
@@ -36,6 +37,7 @@ describe("refill", () => {
         linePart: setScrew,
         currentPart: setScrew,
         lineCost: "0.3000",
+        fieldBend: null,
       })
     ).toEqual({ kind: "keep" });
   });
@@ -47,6 +49,7 @@ describe("refill", () => {
         linePart: setScrewUnpriced,
         currentPart: setScrewUnpriced,
         lineCost: "0",
+        fieldBend: null,
       })
     ).toEqual({ kind: "keep" });
   });
@@ -59,8 +62,64 @@ describe("refill", () => {
         linePart: null,
         currentPart: emt,
         lineCost: "0",
+        fieldBend: null,
       })
     ).toEqual({ kind: "refill", price: 1.25 });
+  });
+});
+
+describe("a field bend is priced by HOURS on a $0 part", () => {
+  // The line points at the raceway, which HAS a price per foot. The money rule
+  // would read the field bend's deliberate $0 as "Not priced" and refill it
+  // with the pipe's cost — buying pipe once per bend.
+  const pipe = { key: 90, name: '3/4" EMT', costPerUnit: "1.2500" };
+
+  it("never takes the pipe's price", () => {
+    const plan = resendPlan({
+      isFitting: true,
+      linePart: pipe,
+      currentPart: pipe,
+      lineCost: "0.0000",
+      fieldBend: { lineHours: "0.2500", currentHours: "0.2500" },
+    });
+    expect(plan).toEqual({ kind: "keep" });
+  });
+
+  it("fills in hours when it was sent with none and the pipe has them now", () => {
+    expect(
+      resendPlan({
+        isFitting: true,
+        linePart: pipe,
+        currentPart: pipe,
+        lineCost: "0.0000",
+        fieldBend: { lineHours: null, currentHours: "0.2500" },
+      })
+    ).toEqual({ kind: "refillHours", hours: 0.25 });
+  });
+
+  it("never refills over hours already set — a 0 included", () => {
+    expect(
+      resendPlan({
+        isFitting: true,
+        linePart: pipe,
+        currentPart: pipe,
+        lineCost: "0.0000",
+        fieldBend: { lineHours: "0.0000", currentHours: "0.2500" },
+      })
+    ).toEqual({ kind: "keep" });
+  });
+
+  it("swaps when the type's raceway changed, like any fitting", () => {
+    const other = { key: 91, name: '1" EMT', costPerUnit: "2" };
+    expect(
+      resendPlan({
+        isFitting: true,
+        linePart: pipe,
+        currentPart: other,
+        lineCost: "0.0000",
+        fieldBend: { lineHours: null, currentHours: null },
+      })
+    ).toEqual({ kind: "swap", from: pipe.name, to: other.name });
   });
 });
 
@@ -72,6 +131,7 @@ describe("swap", () => {
         linePart: setScrew,
         currentPart: compression,
         lineCost: "0.4500",
+        fieldBend: null,
       })
     ).toEqual({ kind: "swap", from: setScrew.name, to: compression.name });
   });
@@ -83,6 +143,7 @@ describe("swap", () => {
         linePart: null,
         currentPart: compression,
         lineCost: "0",
+        fieldBend: null,
       })
     ).toEqual({ kind: "keep" });
   });
@@ -95,6 +156,7 @@ describe("swap", () => {
         linePart: { key: 90, name: '1/2" EMT', costPerUnit: "1" },
         currentPart: other,
         lineCost: "1",
+        fieldBend: null,
       })
     ).toEqual({ kind: "keep" });
   });

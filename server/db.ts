@@ -163,6 +163,9 @@ import {
   aiUsageDaily,
   pricingProblemReports,
   takeoffHeightDefaults,
+  takeoffBendDefaults,
+  takeoffPullPoints,
+  type TakeoffBendDefaults,
   takeoffMountingHeights,
   bidMountingHeights,
   type TakeoffHeightDefaults,
@@ -212,10 +215,16 @@ import {
   type FittingKind,
   type RacewayFittingSpec,
 } from "../shared/runFittings";
-import { isBendRole, type BendKind } from "../shared/runBends";
+import {
+  placeAnswer,
+  resolveBendSettings,
+  type BendSettings,
+  type PullPointAnswer,
+} from "../shared/runBends";
 import {
   fittingMaterialName,
   fittingRows,
+  bendMethodFor,
   lbHubsTakeConnectors,
   pickFittingMaterial,
   type FittingMaterialPick,
@@ -4894,9 +4903,11 @@ async function withTracedFootage(
     circuitsByRun,
     scales,
     heights,
-    // BENDS BUILD, STEP 1 OF 8: nothing stores a pull-point answer until
-    // `takeoff_pull_points` lands in 0084 (step 3). Step 4 loads them here.
-    pullPointAnswersByRun: new Map(),
+    // An accepted LB is a box: it changes connectors, straps and elbows.
+    pullPointAnswersByRun: await getPullPointAnswersForRuns(
+      runs.map(run => run.id),
+      bid.userId
+    ),
   });
   // Only when a fitting line is actually on the bid: it costs three queries.
   const fittings = rows.some(row => isFittingRole(row.runMaterialRole))
@@ -4920,9 +4931,6 @@ async function withTracedFootage(
         ?.find(r => r.role === role);
       return { ...row, qty: (fitting?.qty ?? 0).toFixed(4) };
     }
-    // BENDS BUILD, STEP 3 OF 8: the roles exist (0084) but nothing counts
-    // them yet, so a bend line keeps what it holds. Step 4 derives it live.
-    if (isBendRole(role)) return row;
     const f = footage.get(row.takeoffRunTypeId);
     /*
       A type with nothing traced under it any more is 0, not the stored number.
@@ -4943,7 +4951,7 @@ function feetForRole(
     insulatedFeet: number;
     groundFeet: number;
   },
-  role: Exclude<RunMaterialRole, FittingKind | BendKind>
+  role: Exclude<RunMaterialRole, FittingKind>
 ): number {
   switch (role) {
     case "raceway":
@@ -10011,6 +10019,207 @@ export async function setCompanyDistributionHeight(
     .where(eq(takeoffHeightDefaults.userId, userId));
 }
 
+// ── Bends and pull points (0084, shared/runBends.ts) ────────────────────────
+
+/**
+ * The company's three bend settings, each resolved to its shipped default.
+ * No row is the ordinary case — every column NULL-means-default, so nothing
+ * is created on read.
+ */
+export async function getBendSettings(userId: number): Promise<BendSettings> {
+  const db = await getDb();
+  if (!db) return resolveBendSettings(null);
+  const rows = await db
+    .select()
+    .from(takeoffBendDefaults)
+    .where(eq(takeoffBendDefaults.userId, userId));
+  return resolveBendSettings(rows[0] ?? null);
+}
+
+/** The stored row itself, so a settings screen can tell "default" from set. */
+export async function getBendDefaultsRow(
+  userId: number
+): Promise<TakeoffBendDefaults | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db
+    .select()
+    .from(takeoffBendDefaults)
+    .where(eq(takeoffBendDefaults.userId, userId));
+  return rows[0];
+}
+
+/**
+ * Set any of the three. An OMITTED field is left alone; an explicit NULL goes
+ * back to the shipped default — the router convention for a patch.
+ */
+export async function setBendDefaults(
+  userId: number,
+  patch: {
+    factoryElbowFromSize?: string | null;
+    pullPointLimitDegrees?: number | null;
+    pullBoxFromSize?: string | null;
+  }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db.insert(takeoffBendDefaults).values({ userId, ...patch });
+    return;
+  } catch (error) {
+    if (!isDuplicateKey(error)) throw error;
+  }
+  if (Object.keys(patch).length === 0) return;
+  await db
+    .update(takeoffBendDefaults)
+    .set(patch)
+    .where(eq(takeoffBendDefaults.userId, userId));
+}
+
+/** Every stored pull-point answer on these runs, by run. */
+export async function getPullPointAnswersForRuns(
+  runIds: readonly number[],
+  userId: number
+): Promise<Map<number, PullPointAnswer[]>> {
+  const out = new Map<number, PullPointAnswer[]>();
+  const db = await getDb();
+  if (!db || runIds.length === 0) return out;
+  const rows = await db
+    .select()
+    .from(takeoffPullPoints)
+    .where(
+      and(
+        inArray(takeoffPullPoints.runId, [...runIds]),
+        eq(takeoffPullPoints.userId, userId)
+      )
+    );
+  for (const row of rows) {
+    const list = out.get(row.runId) ?? [];
+    list.push({
+      id: row.id,
+      place: row.place,
+      x: row.x,
+      y: row.y,
+      kind: row.kind,
+      status: row.status,
+    });
+    out.set(row.runId, list);
+  }
+  return out;
+}
+
+/**
+ * Record a person's answer at one spot on one run. An earlier answer at the
+ * same spot is replaced — changing an LB to a pull box, or accepting what was
+ * dismissed, is one answer changing, not two answers disagreeing.
+ */
+export async function answerPullPoint(
+  userId: number,
+  actorUserId: number,
+  input: {
+    runId: number;
+    place: PullPointAnswer["place"];
+    x: number;
+    y: number;
+    kind: PullPointAnswer["kind"];
+    status: PullPointAnswer["status"];
+  }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.transaction(async tx => {
+    const existing = await tx
+      .select()
+      .from(takeoffPullPoints)
+      .where(
+        and(
+          eq(takeoffPullPoints.runId, input.runId),
+          eq(takeoffPullPoints.userId, userId),
+          eq(takeoffPullPoints.place, input.place)
+        )
+      );
+    const same = existing.filter(
+      row =>
+        Math.abs(row.x - input.x) < 0.01 && Math.abs(row.y - input.y) < 0.01
+    );
+    if (same.length > 0) {
+      await tx.delete(takeoffPullPoints).where(
+        inArray(
+          takeoffPullPoints.id,
+          same.map(row => row.id)
+        )
+      );
+    }
+    await tx.insert(takeoffPullPoints).values({
+      userId,
+      runId: input.runId,
+      place: input.place,
+      x: input.x,
+      y: input.y,
+      kind: input.kind,
+      status: input.status,
+      answeredBy: actorUserId,
+    });
+  });
+}
+
+/** Withdraw one answer, so the spot is proposed afresh. */
+export async function clearPullPointAnswer(
+  userId: number,
+  answerId: number
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .delete(takeoffPullPoints)
+    .where(
+      and(
+        eq(takeoffPullPoints.id, answerId),
+        eq(takeoffPullPoints.userId, userId)
+      )
+    );
+}
+
+/**
+ * After a run's points change, drop answers whose spot is gone — decision 5
+ * (owner, 2026-09-26): keep answers whose corner still exists, re-propose
+ * corners that are new or changed. A corner answer needs an INTERIOR vertex at
+ * its position; an end-drop answer needs the run's last point there. Whether
+ * that end still HAS a drop is not asked here: a drop can come back when a
+ * height is set, and its answer with it.
+ */
+export async function dropOrphanedPullPoints(
+  runId: number,
+  userId: number,
+  points: readonly { x: number; y: number }[]
+): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const answers = (await getPullPointAnswersForRuns([runId], userId)).get(
+    runId
+  );
+  if (!answers || answers.length === 0) return 0;
+  const orphaned = answers.filter(
+    answer =>
+      placeAnswer(
+        {
+          points,
+          // Only the POSITION is being asked about: an end is "present" here.
+          endDrop: { state: "unknown" },
+        },
+        answer
+      ) === null
+  );
+  if (orphaned.length === 0) return 0;
+  await db.delete(takeoffPullPoints).where(
+    inArray(
+      takeoffPullPoints.id,
+      orphaned.map(a => a.id)
+    )
+  );
+  return orphaned.length;
+}
+
 /** Every mounting-height row this company has: overrides, their own, retired. */
 export async function getMountingHeights(
   userId: number
@@ -10235,7 +10444,10 @@ export async function fittingRowsByRunType(
   const db = await getDb();
   if (!db || footage.size === 0) return out;
 
-  const palette = await getRunTypesFor(userId, true);
+  const [palette, bendSettings] = await Promise.all([
+    getRunTypesFor(userId, true),
+    getBendSettings(userId),
+  ]);
   const entries = Array.from(footage.entries())
     .map(([storedId, row]) => ({
       storedId,
@@ -10252,6 +10464,10 @@ export async function fittingRowsByRunType(
         type!.couplingMaterialId,
         type!.connectorMaterialId,
         type!.strapMaterialId,
+        type!.elbow90MaterialId,
+        type!.elbow45MaterialId,
+        type!.lbMaterialId,
+        type!.pullBoxMaterialId,
       ].filter((id): id is number => id !== null)
     ),
     userId
@@ -10348,13 +10564,26 @@ export async function fittingRowsByRunType(
         }
       : null;
     const counts = spec
-      ? countFittings(row.legs, spec)
+      ? countFittings(row.legs, spec, {
+          method: bendMethodFor(
+            racewayBaselineName(raceway),
+            raceway?.name ?? null,
+            bendSettings.factoryElbowFrom
+          ),
+          limit: bendSettings.pullPointLimit,
+        })
       : noRacewayCounts(row.legs.length);
 
     const overrides: Record<FittingKind, number | null> = {
       coupling: t.couplingMaterialId,
       connector: t.connectorMaterialId,
       strap: t.strapMaterialId,
+      elbow90: t.elbow90MaterialId,
+      elbow45: t.elbow45MaterialId,
+      lb: t.lbMaterialId,
+      pullBox: t.pullBoxMaterialId,
+      // No override: a field bend's line is the raceway's, by definition.
+      fieldBend: null,
     };
     const picks = Object.fromEntries(
       FITTING_KINDS.map(kind => {
@@ -10366,6 +10595,15 @@ export async function fittingRowsByRunType(
             override: override ?? null,
             racewayBaselineName: racewayBaselineName(raceway),
             racewayName: raceway?.name ?? null,
+            raceway: raceway
+              ? {
+                  // The STORED id, as every other pick uses; the send
+                  // resolves it to the company's fork.
+                  id: t.racewayMaterialId ?? raceway.id,
+                  name: raceway.name,
+                  fieldBendLaborHours: raceway.fieldBendLaborHours,
+                }
+              : null,
             style: t.fittingStyle,
             found,
           }),
@@ -10454,29 +10692,66 @@ export async function addRunTypeRowToBid(
     bidId,
     takeoffRunTypeId: input.runTypeId,
     runMaterialRole: input.role,
-    // Which part this is, so Send-again can refill or swap it (0083).
+    // Which part this is, so Send-again can refill or swap it (0083). For a
+    // field bend, the raceway — so a changed pipe is seen.
     runMaterialId: input.materialId,
     name: input.name,
     qty: input.qty.toFixed(4),
-    snapshotMaterialCost: Number(material.costPerUnit).toFixed(4),
-    // Hours per unit of sale — per FOOT for pipe and wire, per EACH for a
-    // fitting — so hours scale with the quantity the way material cost does.
-    // D17. A fitting's hours are what retired D17(b)'s per-end interim.
-    snapshotLaborHours: Number(material.laborHours ?? 0).toFixed(4),
+    ...runLinePricing(input.role, material, input.materialId, markupRuleSet),
     // A traced run carries no job-condition modifiers of its own. They describe
     // an operation, and this is a length of pipe.
     snapshotModifierPct: "0.0000",
     snapshotLaborRate: laborRate.toFixed(4),
     snapshotModifierNames: [],
-    // One material, one part: the wire or pipe's own item override, its
-    // category, or the company default, in that order.
-    ...markupSnapshot(
-      [markupPartForMaterial(material, input.materialId)],
-      markupRuleSet
-    ),
     sortOrder: await nextBidSortOrder(bidId),
   });
   return { id: result.insertId };
+}
+
+/**
+ * What a run-type line freezes from its material: cost, hours and markup.
+ * ONE function for the first send and the swap, so the two cannot price the
+ * same part differently.
+ *
+ * ── A FIELD BEND is the exception, and each difference is deliberate ────────
+ *   cost    0 — the line points at the raceway, whose cost per FOOT is
+ *           already on the pipe line. Freezing it here would buy the pipe
+ *           again once per bend.
+ *   hours   the raceway's `fieldBendLaborHours`, and NULL STAYS NULL. Every
+ *           other line flattens a missing unit to 0 h (see below); here that
+ *           would price bending at nothing and read as priced. NULL is what
+ *           `lineNotPriced` reads as "Not priced" (owner, 2026-09-26).
+ *   markup  no parts: there is no material to mark up.
+ *
+ * Every other line: the material's cost; its labor unit per unit of sale
+ * (per FOOT for pipe and wire, per EACH for a fitting — D17), a missing unit
+ * frozen as 0 h because the run panel already flags a type whose materials
+ * have no hours; and its own markup part.
+ */
+function runLinePricing(
+  role: RunMaterialRole,
+  material: Material,
+  storedId: number,
+  markupRuleSet: MarkupRuleSet
+) {
+  if (role === "fieldBend") {
+    return {
+      snapshotMaterialCost: "0.0000",
+      snapshotLaborHours:
+        material.fieldBendLaborHours === null
+          ? null
+          : Number(material.fieldBendLaborHours).toFixed(4),
+      ...markupSnapshot([], markupRuleSet),
+    };
+  }
+  return {
+    snapshotMaterialCost: Number(material.costPerUnit).toFixed(4),
+    snapshotLaborHours: Number(material.laborHours ?? 0).toFixed(4),
+    ...markupSnapshot(
+      [markupPartForMaterial(material, storedId)],
+      markupRuleSet
+    ),
+  };
 }
 
 /** The live bid lines for a run type, by role. */
@@ -10527,7 +10802,21 @@ export async function resnapshotRunTypeLine(
   userId: number,
   input:
     | { mode: "refill"; materialId: number }
-    | { mode: "swap"; materialId: number; name: string }
+    | {
+        /**
+         * A FIELD BEND sent before its raceway had hours: the hours now, and
+         * nothing else. `resendLine.ts` asks for it only while the line's are
+         * NULL; a set figure, 0 included, is never refilled over.
+         */
+        mode: "refillHours";
+        materialId: number;
+      }
+    | {
+        mode: "swap";
+        materialId: number;
+        name: string;
+        role: RunMaterialRole;
+      }
 ): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -10538,26 +10827,42 @@ export async function resnapshotRunTypeLine(
   const material = resolveMaterial(materialRows, input.materialId);
   if (!material) throw new Error("Material not found");
 
-  const priced = {
-    snapshotMaterialCost: Number(material.costPerUnit).toFixed(4),
-    ...markupSnapshot(
-      [markupPartForMaterial(material, input.materialId)],
-      markupRuleSet
-    ),
-    runMaterialId: input.materialId,
-  };
+  if (input.mode === "refillHours") {
+    await db
+      .update(bidLineItems)
+      .set({
+        snapshotLaborHours:
+          material.fieldBendLaborHours === null
+            ? null
+            : Number(material.fieldBendLaborHours).toFixed(4),
+      })
+      .where(eq(bidLineItems.id, lineId));
+    return;
+  }
+  if (input.mode === "refill") {
+    await db
+      .update(bidLineItems)
+      .set({
+        snapshotMaterialCost: Number(material.costPerUnit).toFixed(4),
+        ...markupSnapshot(
+          [markupPartForMaterial(material, input.materialId)],
+          markupRuleSet
+        ),
+        runMaterialId: input.materialId,
+      })
+      .where(eq(bidLineItems.id, lineId));
+    return;
+  }
+  // A swap re-snapshots as if sent fresh — through the same function the
+  // first send uses, so a swapped field bend cannot pick up pipe cost.
   await db
     .update(bidLineItems)
-    .set(
-      input.mode === "refill"
-        ? priced
-        : {
-            ...priced,
-            name: input.name,
-            snapshotLaborHours: Number(material.laborHours ?? 0).toFixed(4),
-            snapshotAt: new Date(),
-          }
-    )
+    .set({
+      ...runLinePricing(input.role, material, input.materialId, markupRuleSet),
+      runMaterialId: input.materialId,
+      name: input.name,
+      snapshotAt: new Date(),
+    })
     .where(eq(bidLineItems.id, lineId));
 }
 

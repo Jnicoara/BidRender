@@ -110,6 +110,11 @@ function answer(
   return { id, place, x: at.x, y: at.y, kind, status };
 }
 
+/** Couplings, connectors and straps, with the bend kinds riding along. */
+function fittings(legs: readonly FittingLeg[], spec: RacewayFittingSpec) {
+  return countFittings(legs, spec, { method: FACTORY, limit: 360 });
+}
+
 const EMT_SPEC: RacewayFittingSpec = {
   name: '1-1/4" EMT',
   stickLengthFeet: 10,
@@ -578,12 +583,12 @@ describe("an accepted pull point is a box — the other fittings follow", () => 
       endDrop: DROP(5),
       answers: [answer(9, pts[1], "accepted")],
     });
-    const emt = countFittings([leg], EMT_SPEC).connector;
+    const emt = fittings([leg], EMT_SPEC).connector;
     expect(emt).toMatchObject({ qty: 4 });
     expect(emt.why).toBe(
       "4 connectors: one per conduit end — 2 line ends, 1 LB (2 each, into the hubs)"
     );
-    const rigid = countFittings([leg], {
+    const rigid = fittings([leg], {
       ...EMT_SPEC,
       name: '1-1/4" rigid conduit',
       lbHubsTakeConnectors: false,
@@ -600,14 +605,14 @@ describe("an accepted pull point is a box — the other fittings follow", () => 
       endDrop: DROP(5),
       answers: [answer(9, pts[1], "accepted", "pullBox")],
     });
-    const f = countFittings([leg], EMT_SPEC);
+    const f = fittings([leg], EMT_SPEC);
     expect(f.connector.why).toMatch(/1 pull box \(2 each\)/);
     expect(f.connector).toMatchObject({ qty: 4 });
     // Unsplit 113 ft: 2 + ceil(107/10)-1 = 12. Split 68 + 45 ft:
     // (2 + ceil(62/10)-1 = 8) + (2 + ceil(39/10)-1 = 5) = 13.
-    expect(
-      countFittings([{ ...leg, answers: [] }], EMT_SPEC).strap
-    ).toMatchObject({ qty: 12 });
+    expect(fittings([{ ...leg, answers: [] }], EMT_SPEC).strap).toMatchObject({
+      qty: 12,
+    });
     expect(f.strap).toMatchObject({ qty: 13 });
   });
 

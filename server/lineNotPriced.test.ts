@@ -9,6 +9,7 @@ const base = {
   qty: "4",
   assemblyId: null as number | null,
   takeoffRunTypeId: null as number | null,
+  runMaterialRole: null as string | null,
   snapshotMaterialCost: null as string | null,
   snapshotLaborHours: null as string | null,
 };
@@ -41,6 +42,28 @@ describe("a line from a run type", () => {
   });
   it("is priced once the snapshot carries a price", () => {
     expect(lineNotPriced({ ...run, snapshotMaterialCost: "0.4500" }, 1.8)).toBe(
+      false
+    );
+  });
+});
+
+describe("a field bend — labor on a part that is $0 by nature", () => {
+  const bend = {
+    ...base,
+    takeoffRunTypeId: 7,
+    runMaterialRole: "fieldBend",
+    snapshotMaterialCost: "0.0000",
+  };
+  it("is NOT PRICED while its hours are unset — never read as a free bend", () => {
+    expect(lineNotPriced({ ...bend, snapshotLaborHours: null }, 0)).toBe(true);
+  });
+  it("is priced once it has hours, though its material is $0", () => {
+    expect(lineNotPriced({ ...bend, snapshotLaborHours: "0.2500" }, 21)).toBe(
+      false
+    );
+  });
+  it("is priced at a SET zero hours — zero is an answer for labor", () => {
+    expect(lineNotPriced({ ...bend, snapshotLaborHours: "0.0000" }, 0)).toBe(
       false
     );
   });

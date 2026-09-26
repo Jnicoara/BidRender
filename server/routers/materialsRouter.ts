@@ -304,6 +304,12 @@ export const materialsRouter = router({
         stickJoint: z.enum(STICK_JOINTS).nullable().optional(),
         strapSpacingFeet: feetSchema.nullable().optional(),
         strapFromBoxFeet: z.number().min(0).max(100).nullable().optional(),
+        /**
+         * Labor hours for ONE field bend of this raceway (0084). Same shape
+         * and rules as `laborHours`: null clears it back to "not set", which
+         * the bid reads as "Not priced" — never as a free bend.
+         */
+        fieldBendLaborHours: laborUnitSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -311,6 +317,7 @@ export const materialsRouter = router({
         id,
         costPerUnit,
         laborHours,
+        fieldBendLaborHours,
         stickLengthFeet,
         strapSpacingFeet,
         strapFromBoxFeet,
@@ -351,6 +358,14 @@ export const materialsRouter = router({
         */
         ...(laborHours !== undefined
           ? { laborHours: laborHours === null ? null : toDecimal(laborHours) }
+          : {}),
+        ...(fieldBendLaborHours !== undefined
+          ? {
+              fieldBendLaborHours:
+                fieldBendLaborHours === null
+                  ? null
+                  : toDecimal(fieldBendLaborHours),
+            }
           : {}),
         ...(stickLengthFeet !== undefined
           ? { stickLengthFeet: feetColumn(stickLengthFeet) }
