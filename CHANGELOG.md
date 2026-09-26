@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **Groundwork for counting conduit fittings from the trace.** New rules work
+  out couplings (from stick length, per leg, drops included), connectors (one
+  per conduit end, so two at an in-and-out box and three where a branch
+  leaves) and straps (one near each box, then at a set spacing). Every count
+  comes with a sentence saying how it was worked out, and reads "at least"
+  when a drop has no height. Not on screen yet.
 - **Fixed a hole in the quantity lock.** On a bid whose quantities were locked,
   pressing "Send to bid" again on a traced run type after tracing more
   overwrote the frozen footage, changing a number that may already have been
