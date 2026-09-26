@@ -372,7 +372,7 @@ describe("both ends of a run", () => {
 
 describe("vertical footage reaches the wire, once per conductor", () => {
   const circuits: RunCircuit[] = [
-    { name: "Ckt 1", conductorCount: 3, groundCount: 0 },
+    { name: "Ckt 1", conductorCount: 3, groundCount: 0, separateGround: false },
   ];
 
   it("adds the drop to conduit ONCE and to wire per conductor", () => {
@@ -457,9 +457,24 @@ describe("vertical footage reaches the wire, once per conductor", () => {
 
   it("ignores a nonsense conductor count instead of producing NaN", () => {
     const result = verticalWireFeetByCircuit(8.5, [
-      { name: "Good", conductorCount: 3, groundCount: 0 },
-      { name: "Bad", conductorCount: Number.NaN, groundCount: 0 },
-      { name: "Negative", conductorCount: -2, groundCount: 0 },
+      {
+        name: "Good",
+        conductorCount: 3,
+        groundCount: 0,
+        separateGround: false,
+      },
+      {
+        name: "Bad",
+        conductorCount: Number.NaN,
+        groundCount: 0,
+        separateGround: false,
+      },
+      {
+        name: "Negative",
+        conductorCount: -2,
+        groundCount: 0,
+        separateGround: false,
+      },
     ]);
     expect(result.totalFeet).toBe(25.5);
     expect(Number.isNaN(result.totalFeet)).toBe(false);
@@ -560,7 +575,10 @@ describe("a vertical belongs to the run or the stamp, never both", () => {
       { startStampId: null, endStampId: 8 },
       { startStampId: null, endStampId: null },
     ]);
-    expect([...claimed].sort()).toEqual([7, 8]);
+    // Array.from rather than spread: tsconfig sets no `target`, so the
+    // compiler's default refuses to iterate a Set, and `target` is not a
+    // test-only setting — Vite and esbuild read it for shipped code.
+    expect(Array.from(claimed).sort()).toEqual([7, 8]);
   });
 
   it("does not double-suppress a stamp two runs both claim", () => {
@@ -595,8 +613,8 @@ describe("a vertical belongs to the run or the stamp, never both", () => {
 
 describe("a bid with no heights set reads exactly as it did before", () => {
   const circuits: RunCircuit[] = [
-    { name: "Ckt 1", conductorCount: 3, groundCount: 0 },
-    { name: "Ckt 2", conductorCount: 2, groundCount: 0 },
+    { name: "Ckt 1", conductorCount: 3, groundCount: 0, separateGround: false },
+    { name: "Ckt 2", conductorCount: 2, groundCount: 0, separateGround: false },
   ];
 
   it("produces the same quantities with verticals omitted", () => {
@@ -1036,8 +1054,14 @@ describe("suggesting that a stamp is this run's own device", () => {
 describe("resolving a stored run's verticals", () => {
   /** Company runs at 10 ft; receptacles at the shipped 18". */
   const COMPANY: HeightContext = {
+    // From the module's own empty context, so a field added to HeightContext
+    // arrives here too. Hand-written, this fixture fell behind when `types`
+    // became part of it — harmlessly, since verticalsForRunRow never reads
+    // `types`, but unseen, because pnpm check skips tests.
+    ...EMPTY_HEIGHT_CONTEXT,
     companyInches: 120,
-    jobInches: null,
+    // Fresh maps rather than the constant's, so no test can write into a
+    // module-level value shared by every other test.
     layers: { company: new Map(), job: new Map() },
   };
 
