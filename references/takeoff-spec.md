@@ -1066,6 +1066,75 @@ inside one run" half of **T10**: a leg that starts off the run is that gap,
 drawn dashed and never measured. The "split one run into two" half is still
 not built. The T table's statuses above are as read on 2026-09-14.
 
+> **2026-09-26 — D21 reuses these legs WITHOUT tees.** A quantity trace is a
+> root plus legs exactly as here, but a leg that starts on another leg is not
+> a tee: no row, no cut, no box. `addLeg` refuses a tee start on a quantity
+> run. Nothing in this entry changes for a route run.
+
+**D21 — Quantity mode: flat footage under a type, drops added afterwards (T4,
+R2, R6). Decided 2026-09-26 by the owner, all seven recommended answers.**
+Specified in `plan-viewer-overhaul.md` § 5o.
+
+A second way to trace. A **route** is what D18–D20 built: a real run with
+ends, drops and circuits. A **quantity** trace is footage of one type — many
+legs into one bucket, no ends to answer, no circuit identity, no D18
+question. "Total footage of 3/4" EMT on this sheet" and nothing else.
+
+- **A mode on the run, not a new object.** `takeoff_runs.traceMode`
+  (`route` | `quantity`, NULL is route — migration 0086, additive). Stored on
+  EVERY row of a run, root and legs alike, and kept equal by the server, so
+  each reader decides from the row in front of it rather than a lookup that
+  could be forgotten. It cannot be derived: a route run with its ends
+  unanswered looks exactly like a quantity trace, and the difference is
+  intent — the reasoning § 5h used for its own bit.
+- **Legs are D20's legs without tees (answer 2).** A quantity leg that starts
+  on another leg counts nothing there: no tee, no box, and no drop proposed.
+- **Flat only, and it says so.** An unanswered end on a quantity trace reads
+  as level — no drop — rather than "unknown", because flat is the answer the
+  mode was chosen for. The totals say in words that no vertical footage is
+  in the quantity figures, and how many drops could be added.
+- **Drops are proposed, marked, and approved (the D19 shape).** One proposal
+  per leg end that is not joined to another leg of the same trace. The type
+  defaults to the trace toolbar's remembered "To" picker (answer 4); the panel
+  shows "12 drops, 8'-6" each = 102 ft" with Approve all, and each marker on
+  the drawing can be tapped to change its type or height, or to dismiss it.
+- **The answer is the END KIND — no new table.** Approving writes the kind
+  onto that leg end; its height resolves live through job → company →
+  shipped exactly as a route end's does; dismissing writes `distribution`,
+  which already means "no drop, and that is an answer". NULL stays
+  "not asked", which is what gets proposed. So every count downstream —
+  verticals, elbows, bid lines, the materials list — reads an approved drop
+  with no rule of its own, and the answer moves with its end when a leg is
+  edited, which answers stored by position (D19 answer 5) cannot.
+- **Fittings (answer 1):** couplings, straps and elbows from the drawing, as
+  on a route leg. Connectors ONLY at a leg end with an approved drop — an
+  unanswered or dismissed end is not a termination anybody said exists. No
+  pull-point proposals, and any stored pull-point answers are ignored while
+  in quantity mode rather than deleted.
+- **Wire comes from the TYPE, read live.** No circuit rows: one circuit of
+  the type's conductor and ground counts is synthesised at read time
+  (`quantityCircuit`), through the same `circuitWire` a route run's rows go
+  through, so there is still one arithmetic. A type with no conductor count
+  pulls no wire and says so, like a route run with no circuits.
+- **One bid line per type (answer 3).** Quantity and route footage of the
+  same type is the same pipe to buy, so it lands on the same run-type line;
+  the panel shows the route / quantity split.
+- **Switching is both ways and deletes nothing (answer 5).** Route →
+  quantity keeps circuits, D18 answers, pull-point answers and tees in their
+  rows, unread while the mode says quantity. Quantity → route creates one
+  circuit from the type when the run has none, and its unanswered ends become
+  ordinary questions again. CLAUDE.md § "a one-way door".
+- **A bid-wide drops readout (answer 6)** lists every vertical on the bid —
+  route rises and drops as well as approved quantity drops — labelled by
+  where each came from, grouped by type with count and footage; clicking one
+  jumps to its sheet and spot.
+
+**This narrows D18 and D20; it reverses neither.** D18's question and D20's
+tees still apply to every route run; a quantity trace simply does not ask the
+one or make the other. **It does not reopen D3**: the type is still chosen
+before tracing and remembered, and quantity mode is one more sticky toolbar
+choice, not a per-run form.
+
 **Smaller calls:**
 
 - Crosshair lines (V14): **skip** — no use on a touchscreen.
