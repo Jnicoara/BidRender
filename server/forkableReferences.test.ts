@@ -111,6 +111,23 @@ const REGISTRY: Record<string, Entry> = {
     resolver: "resolveMaterial",
     readBy: "server/routers/takeoffRunTypesRouter.ts",
   },
+  // The named-fitting overrides (0082). Resolved with the raceway in
+  // fittingRowsByRunType, so a company's fork of the part it named wins.
+  "takeoff_run_types.couplingMaterialId": {
+    kind: "resolver",
+    resolver: "resolveMaterial",
+    readBy: "server/db.ts",
+  },
+  "takeoff_run_types.connectorMaterialId": {
+    kind: "resolver",
+    resolver: "resolveMaterial",
+    readBy: "server/db.ts",
+  },
+  "takeoff_run_types.strapMaterialId": {
+    kind: "resolver",
+    resolver: "resolveMaterial",
+    readBy: "server/db.ts",
+  },
   "takeoff_runs.runTypeId": {
     kind: "resolver",
     resolver: "resolveRunType",

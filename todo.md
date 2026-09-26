@@ -1256,3 +1256,79 @@ path is ever revived, give it the same treatment first.
 - [ ] **The Crew page calls a REVOKED invite "expired".** `TeamPage.tsx` branches on `acceptedAt` then `usable`, so anything unusable and unaccepted reads "expired", including a code revoked a second ago. Seen on the live site 2026-09-26. A false statement rather than a blank; the fix is a `revokedAt` branch, then look at it on screen.
 - [ ] **A billing plan should set `seatLimit` through `db.setSeatLimit`**, so a downgrade hits the same "remove N first" refusal. Nothing else writes the column today except 0081.
 - [ ] **Nobody but a platform admin can add a seat.** "Remove someone or add a seat" names an action an owner cannot yet take themselves; it becomes self-serve with billing.
+
+## Fittings counted from the trace (shared/runFittings.ts, built 2026-09-26)
+
+Couplings (sticks minus one per leg, drops included), connectors (one per
+conduit end, by node degree) and straps (one near each box, then spacing)
+reach the bid through Send, the markup engine and the quantity lock. D17(b)'s
+per-end labour interim is retired — it was never built, so no number moved.
+`scripts/fittingsImpact.mts` reports what a release does to existing bids.
+
+**Before deploying — the rename needs its rehearsal.** This is a catalog
+release: EMT couplings and connectors are renamed in place to "set-screw"
+(`RENAMED_BASELINE_MATERIALS`: 18 new entries, and the 2 older
+`EMT connector 1/2"` spellings re-pointed straight at the final name), and
+63 rows are new — 36 compression/raintight EMT fittings and 27 one-hole
+straps; the catalog is 1,190 rows (counted from `BASELINE_MATERIALS`
+2026-09-26). Check it against a
+restored copy of production with the build that ships, together with the
+other pending rename rounds, per `references/deploying.md` § 5b. And 0082 is
+step 1 (additive): apply it before the push. Then run
+`scripts/fittingsImpact.mts` against production for the fitting counts; it
+refuses to count without 0082. (Run 2026-09-26 without 0082: production has
+2 bids, 2 untyped runs and no bid lines, so nothing there is affected.)
+
+- [ ] **NEXT BUILD: bends and pull points.** Decided by the owner 2026-09-26.
+  - **Bends from the trace geometry, in plain code, no AI:** each corner's
+    measured angle, plus one 90 at each counted vertical drop. Legs already
+    carry `points` and `drops` for this (`FittingLeg`), so it adds an
+    `"elbow"` `FittingKind` rather than reshaping the input.
+  - **A company setting: "factory elbows from this size up"**, default
+    1-1/4". Below it, bends are field-bent — labor only, no fitting. PVC
+    always uses factory elbows or sweeps. The size comes from the raceway's
+    shipped name (`parseRacewayName`) compared through
+    `shared/materialSizeOrder.ts`, never arithmetic on the text.
+  - **Pull points:** add up the degrees of bend along each run. When the
+    total passes the company limit (default 360°, the code max; 270° as an
+    option), PROPOSE an LB or pull box at the spot where it tips over —
+    proposed and marked on the drawing for approval, the same as drops,
+    never added silently.
+  - **Bend counts read "at least N"**, since plans do not show the kicks and
+    offsets at boxes.
+- [ ] **Fitting styles for the other families.** EMT has set-screw /
+      compression / raintight. Still to add: FMC (squeeze vs screw-in), LFMC
+      (straight vs 90, and the style picker for it), PVC (glue vs threaded
+      adapter), and whatever else a family needs. PVC and RMC/IMC already
+      count by their own rules (belled; coupling on each stick) without a
+      picker.
+- [ ] **Locknuts and bushings** at each connector (RMC/IMC, and EMT into a
+      panel). The rows exist (`conduit bushing`, `conduit locknut`); nothing
+      counts them yet.
+- [ ] **PVC expansion fittings** on long exposed PVC runs.
+- [ ] **MC cable connectors and straps.** MC needs the same counting — a
+      connector at each end, straps at 6 ft and within 12 in of a box — and
+      `countFittings` can serve it; the catalog has no MC connector rows by
+      size yet, and cable types have no fitting slot.
+- [ ] **FMC/LFMC straps.** Flex carries a strap spacing (4.5 ft / 1 ft) but
+      `strapFamily` returns null for flex, so flex straps say "No catalog
+      strap" until sized flex straps ship.
+- [ ] **Double counting from a user's own box assembly.** No starter assembly
+      carries a connector or strap, so nothing overlaps today. A company
+      whose own box or device assembly includes an EMT connector will count
+      that connector twice once the run's end connector reaches the bid. No
+      guard, by decision (2026-09-26); worth one if it shows up in practice.
+- [ ] **Decide: does Send-again re-price a line that was sent unpriced?** A
+      run-type line freezes its price at send (R4). A fitting sent while its
+      catalog row was $0 therefore stays "Not priced" on that bid after the
+      row is priced, and the only way out is removing the line and sending
+      again. Re-snapshotting a $0 snapshot on Send-again would fix it without
+      touching any price somebody chose — but it is an exception to R4 and
+      the owner's call.
+- [ ] **Changing a type's fitting style does not change lines already on a
+      bid.** Their material is frozen with their price (R4), the same as
+      changing a type's raceway. The preview shows the new part while the
+      bid line keeps the old name. Same decision as above, really.
+- [ ] **The proposal still prints money per unit/section** without the
+      "Not priced" treatment bid lines now have. Check what a client-facing
+      proposal should say when a line inside it is not priced.

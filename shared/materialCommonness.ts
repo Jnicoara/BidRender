@@ -105,12 +105,13 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   '1/2" liquidtight flexible conduit': "common",
 
   // ── Conduit fittings: the EMT pair that goes with the core pipe ──
-  '1/2" EMT connector': "core",
-  '3/4" EMT connector': "core",
-  '1/2" EMT coupling': "core",
-  '3/4" EMT coupling': "core",
-  '1" EMT connector': "common",
-  '1" EMT coupling': "common",
+  // Set-screw since the 2026-09-26 rename — the same rows, renamed in place.
+  '1/2" EMT set-screw connector': "core",
+  '3/4" EMT set-screw connector': "core",
+  '1/2" EMT set-screw coupling': "core",
+  '3/4" EMT set-screw coupling': "core",
+  '1" EMT set-screw connector': "common",
+  '1" EMT set-screw coupling': "common",
   "EMT strap": "common",
 
   // ── Boxes ──

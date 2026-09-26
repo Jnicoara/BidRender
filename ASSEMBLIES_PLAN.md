@@ -104,6 +104,12 @@ box at a termination — which is an interim standing in for fittings that canno
 carry hours yet, and which retires to zero rather than being deleted when they
 can. See D17(b) and the open fork at D17(c).
 
+> **Retired 2026-09-26.** Fittings are counted from the trace
+> (`shared/runFittings.ts`) and priced as their own lines, each reading its
+> labour off its own material row — the shape this section calls for. The
+> per-end number was never built, so nothing moved; see the retirement note
+> on D17(b) in `references/takeoff-spec.md`.
+
 **BUILT 2026-09-20 — the per-foot half.** `shared/runTypeLabor.ts` turns a run
 type into what ONE FOOT of it is made of, and `laborForRun` prices that from the
 material rows. The palette and the type editor both show the figure, through one

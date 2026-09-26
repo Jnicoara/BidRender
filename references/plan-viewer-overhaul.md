@@ -2906,6 +2906,8 @@ SHIPPED VALUES and nothing at runtime reads `projectType`.
 **THE WHIP IS AN INTERIM AND RETIRES PER DEVICE.** When AI routing between
 fixtures lands, the routed footage replaces the whip for the devices it covers,
 the way D17(b)'s per-end number retires to zero rather than being deleted.
+(D17(b) retired 2026-09-26, when fittings started being counted from the
+trace — see its note in `references/takeoff-spec.md`.)
 **Per device instance, never per assembly** — routing one circuit of six
 troffers must not zero the whip for the other forty on the job. So the whip
 resolves per STAMP against a claim recorded on the stamp, the same shape as

@@ -367,6 +367,10 @@ from now on.
   the per-end labour number on a run goes to zero once a run type can COUNT its
   couplings, connectors and straps. Hours themselves stopped being the blocker
   on 2026-09-20, when materials gained labour units.
+  **Fittings landed 2026-09-26** — couplings, connectors and straps are counted
+  from the trace and reach the bid (`shared/runFittings.ts`). D17(b) is retired;
+  see the note on it. Service loop and pull points remain Missing here; pull
+  points and elbows are the next build (`todo.md`).
   See D15 before bringing any of it back: it is the biggest bloat risk in this
   document.
 - **Watch for double counting before R2 ships — SETTLED 2026-09-20, see D18.**
@@ -795,6 +799,18 @@ its parts. Materials carrying units does not change that — see the cross-check
 rule in `ASSEMBLIES_PLAN.md`.
 
 **D17(b) — The fixed cost at the end of a run. Decided 2026-09-20. INTERIM.**
+
+> **RETIRED 2026-09-26 — and it was never built.** Fittings are now COUNTED
+> from the trace (`shared/runFittings.ts`): couplings from stick length,
+> connectors from how many conduits meet at a point, straps from support
+> spacing, each a catalog material with its own labour unit, on the bid as
+> its own line. That is exactly the retirement this entry describes. Checked
+> before retiring it: no column, constant or function ever implemented the
+> per-end number — a run's bid lines carried only per-foot pipe and wire
+> hours (`addRunTypeRowToBid`) — so retiring it moved no number on any bid.
+> There is therefore no field to set to zero; this note is the zero.
+> `scripts/fittingsImpact.mts` reports what the counted fittings change.
+> Elbows and pull points are the next build (`todo.md`).
 
 - (a) A vertical foot costs the same as a flat foot.
 - (b) Per foot, plus **a fixed amount per counted end**.
