@@ -927,6 +927,14 @@ inherited from whoever's `.env` it happens to run under, and with the flag on,
 a suite that ever forgot a mock would spend real money on every run. Both lines
 are commented where they sit.
 
+> **Not 0 on `bidrender_test_clean` — measured 2026-09-26.** `server/v545.test.ts`
+> fails 8 of its tests there, identically on a clean worktree of HEAD, with
+> `companies_ownerUserId_users_id_fk`: it acts as user id 1 and that scratch
+> database has no user 1. It tests only the retired `master_*` routers. Either
+> create user 1 in its `beforeAll` like every other suite, or delete the file
+> with the legacy model. Until then, a run on this database is 8 known
+> failures, all in that one file — anything else red is new.
+
 **The baseline is now 0 failures.** The last 3 were all in `backup` and needed a
 database grant rather than a flag; granted 2026-09-19, and `server/backup.test.ts`
 now runs 32 passed / 0 failed. See below for what the grant was.
@@ -1222,3 +1230,11 @@ path is ever revived, give it the same treatment first.
 - [ ] **A per-LINE markup override on one bid.** Not in any piece yet. The item override is company-wide; the "one-way door" rule in CLAUDE.md says anything from the library can be overridden on one job. Wants a nullable column beside `snapshotMarkupPct` and a field on the line.
 - [ ] **Re-apply on a line from before markup rules reads its parts from TODAY's links** — its assembly's current recipe, or the material its run type names now — because such a line stored no composition. After one re-apply it stores its parts like any other line. A line priced from a material by hand (bidsRouter `priceLineFrom`) that predates markup has no link to that material at all, and re-applies at the company default.
 - [ ] **Dashboard vs bid screen still differ on a bid whose plan quantities moved since they were sent** (bid 1164558 in the local copy: card $192.58, bid $378.15). Not markup: three of its lines are traced-run lines STORED at 0 ft, which the bid screen resolves live from the drawing (`getBidLineItems` → `withPlanCounts`) and the dashboard's SQL reads as stored. Checked 2026-09-25 against the rows. Found by the same before/after dump that found the marked-up-expense gap. Pre-existing; not fixed.
+
+## Lines that can't be priced (shared/linePricingProblems.ts, shipped 2026-09-26 as 88270df)
+
+- [ ] **Analytics leaves a broken line out and does not say so.** `costSums` gates every per-line figure on `lineIsPriceable`, so analytics agrees with the bid screen, and it returns a `brokenLines` count, but `toBidCostRow` drops it and no analytics screen shows an "incomplete" marker. On production today there are 0 bid lines at all, so nothing is affected. Carry `brokenLines` through `BidCostRow` and mark the affected figures before a real company's history can contain one.
+- [ ] **No screen for `pricingProblems.recent` or `lookup` yet.** Both procedures exist and are tested; an admin reads references with a query today. A small panel beside AI spend would do it.
+- [ ] **A live check of money agreement needs a PRICED fixture on the smoke account (1421).** Its first assembly is an unpriced starter, so the 2026-09-26 live check compared $0 with $0: it proved the bid opens and the card and bid agree, not that they agree on real money. That was proven locally (the suite, and the screen at $800 = $800). Price one assembly on 1421, or have the check create and delete one.
+- [ ] **"Missing reference" is not detected, on purpose.** A line whose takeoff group or run type has vanished cannot happen: both are `RESTRICT` foreign keys, and `resolveLineQty` falls back to the stored quantity rather than zero. If either key is ever relaxed, that fallback becomes a silent wrong quantity and wants to be a problem code here.
+- [ ] **Not a breaker-panel feature.** The request that produced this asked for per-PANEL isolation; there is no panel entity (a panel is a catalog material, an assembly, or a free-text circuit label). Isolation was built one level down, per bid line, where panels already live. A real panel schedule (panels → breakers → circuits) would be a new feature and needs a spec first.
