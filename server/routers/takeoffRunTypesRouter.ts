@@ -169,17 +169,16 @@ async function resendPlans(
       candidate.role,
       resendPlan({
         isFitting: isFittingRole(candidate.role),
+        // A field bend is priced by hours on its raceway, never by cost.
+        laborOnly: candidate.role === "fieldBend",
         linePart: part(line.runMaterialId),
         currentPart: part(candidate.materialId),
         lineCost: line.snapshotMaterialCost,
-        // A field bend is priced by hours on its raceway, never by cost.
-        fieldBend:
-          candidate.role === "fieldBend"
-            ? {
-                lineHours: line.snapshotLaborHours,
-                currentHours: current?.fieldBendLaborHours ?? null,
-              }
-            : null,
+        lineHours: line.snapshotLaborHours,
+        currentHours:
+          (candidate.role === "fieldBend"
+            ? current?.fieldBendLaborHours
+            : current?.laborHours) ?? null,
       })
     );
   }
@@ -638,9 +637,11 @@ export const takeoffRunTypesRouter = router({
                   text: swapText(plan.from, plan.to, qty),
                 };
               case "refill":
-                return { kind: "refill" as const, price: plan.price };
-              case "refillHours":
-                return { kind: "refillHours" as const, hours: plan.hours };
+                return {
+                  kind: "refill" as const,
+                  price: plan.price,
+                  hours: plan.hours,
+                };
             }
           };
           return {
@@ -888,12 +889,9 @@ export const takeoffRunTypesRouter = router({
             await db.resnapshotRunTypeLine(live.id, ctx.scope.dataUserId, {
               mode: "refill",
               materialId: row.materialId,
-            });
-            refilled.push(row.materialName ?? row.role);
-          } else if (plan.kind === "refillHours" && row.materialId !== null) {
-            await db.resnapshotRunTypeLine(live.id, ctx.scope.dataUserId, {
-              mode: "refillHours",
-              materialId: row.materialId,
+              role: row.role,
+              price: plan.price !== null,
+              hours: plan.hours !== null,
             });
             refilled.push(row.materialName ?? row.role);
           }

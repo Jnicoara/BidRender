@@ -66,22 +66,25 @@ export function lineNotPriced(
 }
 
 /**
- * Whether the line's HOURS are unset rather than zero, so its hours cell must
- * not print "0 h".
+ * Whether a TRACED line's labor is unset, so its hours cell says "Not priced"
+ * and never "0 h" (owner, 2026-09-26: the same rule as money).
  *
- * Only a field bend can say so: it is the one run-type line that keeps a NULL
- * in `snapshotLaborHours` (every other flattens a missing unit to 0 at send,
- * and the zero cannot be told apart afterwards). Its hours ARE its price, so
- * "0 h" beside "Not priced" states a number nobody set — seen on the bid
- * screen 2026-09-26.
+ * A traced line freezes its part's labor unit when it is sent. Since
+ * 2026-09-26 a part with no unit freezes as NULL, not 0: a zero there priced
+ * the labor at nothing and printed "0 h" beside it, which reads as a
+ * considered answer. A SET 0 is still an answer (wire nuts made up with the
+ * device) and is shown as 0 h.
+ *
+ * Lines sent before that change froze a missing unit as 0 and cannot be told
+ * apart now; they read 0 h until they are sent again after the part is given
+ * hours. A hand-priced line has its own rule and its own strip
+ * (`shared/handPricedLines.ts`), because the next move there is to type.
  */
 export function lineHoursUnset(line: {
-  runMaterialRole: string | null;
+  takeoffRunTypeId: number | null;
   snapshotLaborHours: string | number | null;
 }): boolean {
-  return (
-    line.runMaterialRole === "fieldBend" && line.snapshotLaborHours === null
-  );
+  return line.takeoffRunTypeId !== null && line.snapshotLaborHours === null;
 }
 
 /** How many lines on a bid the total leaves unpriced. */

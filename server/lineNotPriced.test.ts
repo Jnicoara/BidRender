@@ -8,6 +8,7 @@ import {
   lineHoursUnset,
   lineNotPriced,
 } from "../shared/lineNotPriced";
+import { missingEntryCounts } from "../shared/handPricedLines";
 
 const base = {
   qty: "4",
@@ -76,10 +77,31 @@ describe("a field bend — labor on a part that is $0 by nature", () => {
     expect(lineHoursUnset({ ...bend, snapshotLaborHours: "0.0000" })).toBe(
       false
     );
-    // Every other line flattens a missing unit to 0 at send; nothing to say.
+  });
+});
+
+describe("labor on a traced line — 'Not priced', never 0 h", () => {
+  it("is unset on ANY traced line whose part had no labor unit", () => {
+    // A coupling, a pipe — not only a field bend (owner, 2026-09-26).
     expect(
-      lineHoursUnset({ runMaterialRole: "coupling", snapshotLaborHours: null })
+      lineHoursUnset({ takeoffRunTypeId: 7, snapshotLaborHours: null })
+    ).toBe(true);
+  });
+  it("is an answer at a SET 0 — wire nuts made up with the device", () => {
+    expect(
+      lineHoursUnset({ takeoffRunTypeId: 7, snapshotLaborHours: "0.0000" })
     ).toBe(false);
+  });
+  it("leaves hand-priced lines to their own rule and their own strip", () => {
+    expect(
+      lineHoursUnset({ takeoffRunTypeId: null, snapshotLaborHours: null })
+    ).toBe(false);
+    expect(
+      missingEntryCounts([
+        { ...base, takeoffRunTypeId: 7, snapshotMaterialCost: "0.45" },
+        base,
+      ])
+    ).toEqual({ noPrice: 1, noHours: 1 });
   });
 });
 

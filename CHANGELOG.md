@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **Labor on traced lines now says "Not priced" instead of "0 h" when the
+  part has no labor hours set.** It used to freeze a missing labor unit as
+  zero, which printed "0 h" beside a real cost and quietly left that labor
+  out of the total. The bid now names those lines in its own warning, and
+  pressing Send again on the Plans screen fills in the hours once the part
+  has them, without ever changing hours that are already set. Lines sent
+  before this change keep the "0 h" they were sent with.
 - **Proposed pull points appear on the drawing for you to answer.** When the
   bends along a conduit run add up past the limit (360° unless changed), a
   dashed amber box marked "LB?" or "PB?" sits at the corner where it tips

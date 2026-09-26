@@ -1,6 +1,7 @@
 /**
- * Send-again on a run-type line: refill an unpriced line, swap a fitting to
- * its type's current style, and never overwrite a price that is set.
+ * Send-again on a run-type line: refill what a line was sent without (a price,
+ * a labor unit, or both), swap a fitting to its type's current style, and
+ * never overwrite a price or hours that are set.
  */
 import { describe, expect, it } from "vitest";
 import { resendPlan, swapText } from "../shared/resendLine";
@@ -17,27 +18,32 @@ const compression = {
   costPerUnit: "0.9000",
 };
 
-describe("refill", () => {
+/** A line and its part that both have their hours — only money is at issue. */
+const hoursSet = { lineHours: "0.0500", currentHours: "0.0500" };
+
+describe("refill a price", () => {
   it("fills a 'Not priced' line from the material's current price", () => {
     expect(
       resendPlan({
         isFitting: true,
+        laborOnly: false,
         linePart: setScrew,
         currentPart: setScrew,
         lineCost: "0.0000",
-        fieldBend: null,
+        ...hoursSet,
       })
-    ).toEqual({ kind: "refill", price: 0.45 });
+    ).toEqual({ kind: "refill", price: 0.45, hours: null });
   });
 
   it("never overwrites a price that is already set", () => {
     expect(
       resendPlan({
         isFitting: true,
+        laborOnly: false,
         linePart: setScrew,
         currentPart: setScrew,
         lineCost: "0.3000",
-        fieldBend: null,
+        ...hoursSet,
       })
     ).toEqual({ kind: "keep" });
   });
@@ -46,10 +52,11 @@ describe("refill", () => {
     expect(
       resendPlan({
         isFitting: true,
+        laborOnly: false,
         linePart: setScrewUnpriced,
         currentPart: setScrewUnpriced,
         lineCost: "0",
-        fieldBend: null,
+        ...hoursSet,
       })
     ).toEqual({ kind: "keep" });
   });
@@ -59,12 +66,71 @@ describe("refill", () => {
     expect(
       resendPlan({
         isFitting: false,
+        laborOnly: false,
         linePart: null,
         currentPart: emt,
         lineCost: "0",
-        fieldBend: null,
+        ...hoursSet,
       })
-    ).toEqual({ kind: "refill", price: 1.25 });
+    ).toEqual({ kind: "refill", price: 1.25, hours: null });
+  });
+});
+
+describe("refill labor — a line sent before its part had hours", () => {
+  it("fills in hours when the line has none and the part has them now", () => {
+    expect(
+      resendPlan({
+        isFitting: true,
+        laborOnly: false,
+        linePart: setScrew,
+        currentPart: setScrew,
+        lineCost: "0.4500",
+        lineHours: null,
+        currentHours: "0.0500",
+      })
+    ).toEqual({ kind: "refill", price: null, hours: 0.05 });
+  });
+
+  it("fills in both at once when the line has neither", () => {
+    expect(
+      resendPlan({
+        isFitting: false,
+        laborOnly: false,
+        linePart: setScrew,
+        currentPart: setScrew,
+        lineCost: "0.0000",
+        lineHours: null,
+        currentHours: "0.0500",
+      })
+    ).toEqual({ kind: "refill", price: 0.45, hours: 0.05 });
+  });
+
+  it("never refills over hours already set — a 0 included", () => {
+    expect(
+      resendPlan({
+        isFitting: true,
+        laborOnly: false,
+        linePart: setScrew,
+        currentPart: setScrew,
+        lineCost: "0.4500",
+        lineHours: "0.0000",
+        currentHours: "0.0500",
+      })
+    ).toEqual({ kind: "keep" });
+  });
+
+  it("does nothing while the part still has no hours", () => {
+    expect(
+      resendPlan({
+        isFitting: true,
+        laborOnly: false,
+        linePart: setScrew,
+        currentPart: setScrew,
+        lineCost: "0.4500",
+        lineHours: null,
+        currentHours: null,
+      })
+    ).toEqual({ kind: "keep" });
   });
 });
 
@@ -75,38 +141,31 @@ describe("a field bend is priced by HOURS on a $0 part", () => {
   const pipe = { key: 90, name: '3/4" EMT', costPerUnit: "1.2500" };
 
   it("never takes the pipe's price", () => {
-    const plan = resendPlan({
-      isFitting: true,
-      linePart: pipe,
-      currentPart: pipe,
-      lineCost: "0.0000",
-      fieldBend: { lineHours: "0.2500", currentHours: "0.2500" },
-    });
-    expect(plan).toEqual({ kind: "keep" });
-  });
-
-  it("fills in hours when it was sent with none and the pipe has them now", () => {
     expect(
       resendPlan({
         isFitting: true,
+        laborOnly: true,
         linePart: pipe,
         currentPart: pipe,
         lineCost: "0.0000",
-        fieldBend: { lineHours: null, currentHours: "0.2500" },
-      })
-    ).toEqual({ kind: "refillHours", hours: 0.25 });
-  });
-
-  it("never refills over hours already set — a 0 included", () => {
-    expect(
-      resendPlan({
-        isFitting: true,
-        linePart: pipe,
-        currentPart: pipe,
-        lineCost: "0.0000",
-        fieldBend: { lineHours: "0.0000", currentHours: "0.2500" },
+        lineHours: "0.2500",
+        currentHours: "0.2500",
       })
     ).toEqual({ kind: "keep" });
+  });
+
+  it("fills in hours when it was sent with none — and only hours", () => {
+    expect(
+      resendPlan({
+        isFitting: true,
+        laborOnly: true,
+        linePart: pipe,
+        currentPart: pipe,
+        lineCost: "0.0000",
+        lineHours: null,
+        currentHours: "0.2500",
+      })
+    ).toEqual({ kind: "refill", price: null, hours: 0.25 });
   });
 
   it("swaps when the type's raceway changed, like any fitting", () => {
@@ -114,10 +173,12 @@ describe("a field bend is priced by HOURS on a $0 part", () => {
     expect(
       resendPlan({
         isFitting: true,
+        laborOnly: true,
         linePart: pipe,
         currentPart: other,
         lineCost: "0.0000",
-        fieldBend: { lineHours: null, currentHours: null },
+        lineHours: null,
+        currentHours: null,
       })
     ).toEqual({ kind: "swap", from: pipe.name, to: other.name });
   });
@@ -128,10 +189,11 @@ describe("swap", () => {
     expect(
       resendPlan({
         isFitting: true,
+        laborOnly: false,
         linePart: setScrew,
         currentPart: compression,
         lineCost: "0.4500",
-        fieldBend: null,
+        ...hoursSet,
       })
     ).toEqual({ kind: "swap", from: setScrew.name, to: compression.name });
   });
@@ -140,10 +202,11 @@ describe("swap", () => {
     expect(
       resendPlan({
         isFitting: true,
+        laborOnly: false,
         linePart: null,
         currentPart: compression,
         lineCost: "0",
-        fieldBend: null,
+        ...hoursSet,
       })
     ).toEqual({ kind: "keep" });
   });
@@ -153,10 +216,12 @@ describe("swap", () => {
     expect(
       resendPlan({
         isFitting: false,
+        laborOnly: false,
         linePart: { key: 90, name: '1/2" EMT', costPerUnit: "1" },
         currentPart: other,
         lineCost: "1",
-        fieldBend: null,
+        lineHours: null,
+        currentHours: "0.05",
       })
     ).toEqual({ kind: "keep" });
   });

@@ -345,6 +345,8 @@ withDb("Send-again refills and swaps (owner's decisions, 2026-09-26)", () => {
     expect(preview.fittings.find(f => f.role === "coupling")!.resend).toEqual({
       kind: "refill",
       price: 0.45,
+      // The shipped coupling has no labor unit either, so no hours to fill.
+      hours: null,
     });
 
     const again = await caller().takeoffRunTypes.sendToBid({

@@ -469,6 +469,12 @@ export default function BidsPage({
   const notPricedFromPlans = notPriced.filter(
     l => l.takeoffRunTypeId !== null
   ).length;
+  /**
+   * Traced lines whose part had no labor unit when sent — labor "Not
+   * priced". Their own strip, because the next move is on the Materials
+   * screen and then Send again, not typing on the line.
+   */
+  const laborNotPricedFromPlans = lines.filter(lineHoursUnset).length;
 
   /**
    * Which pricing settings this bid has taken off the company default.
@@ -1014,13 +1020,19 @@ export default function BidsPage({
                             </span>
                           ) : (
                             <>
-                              {/* Unset hours are not zero hours — a field
-                                  bend with none reads "— h", never "0 h". */}
-                              <span className="font-mono text-xs w-24 text-right shrink-0 text-muted-foreground">
-                                {lineHoursUnset(line)
-                                  ? "— h"
-                                  : `${round(line.breakdown.totalLaborHours, 2)} h`}
-                              </span>
+                              {/* Unset labor is not zero labor: a traced line
+                                  whose part has no labor unit reads "Not
+                                  priced", never "0 h" (owner, 2026-09-26) —
+                                  the same words and colour as the cost cell. */}
+                              {lineHoursUnset(line) ? (
+                                <span className="text-xs w-24 text-right shrink-0 text-[#F5C518]">
+                                  Not priced
+                                </span>
+                              ) : (
+                                <span className="font-mono text-xs w-24 text-right shrink-0 text-muted-foreground">
+                                  {round(line.breakdown.totalLaborHours, 2)} h
+                                </span>
+                              )}
                               {/*
                                 "Not priced" rather than $0.00 on a line
                                 nobody priced (owner, 2026-09-26) — see
@@ -1172,6 +1184,26 @@ export default function BidsPage({
                             ? "One is"
                             : `${notPricedFromPlans} are`
                       } from traced runs: price the material on the Materials screen, then press Send again on the Plans screen — it fills in the price on a line that has none, and never changes one that is set.`}
+                  </p>
+                </div>
+              )}
+
+              {laborNotPricedFromPlans > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {laborNotPricedFromPlans} line
+                      {laborNotPricedFromPlans === 1 ? " has" : "s have"} labor
+                      not priced
+                    </span>{" "}
+                    — {laborNotPricedFromPlans === 1 ? "it is" : "they are"}{" "}
+                    from traced runs, and the part had no labor hours when sent,
+                    so no labor for{" "}
+                    {laborNotPricedFromPlans === 1 ? "it" : "them"} is in the
+                    total above. Set the hours on the Materials screen, then
+                    press Send again on the Plans screen — it fills in labor on
+                    a line that has none, and never changes hours that are set.
                   </p>
                 </div>
               )}

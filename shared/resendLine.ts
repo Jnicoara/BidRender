@@ -4,10 +4,12 @@
  * Decided by the owner, 2026-09-26, and written here as ONE function so the
  * Send preview and the send itself cannot disagree:
  *
- *   1. REFILL — a line that reads "Not priced" takes the material's CURRENT
- *      price. A price that is already set is never overwritten. A FIELD BEND
- *      (2026-09-26) is priced by hours on a $0 part, so its refill is of
- *      HOURS: only while the line's are NULL, never over a set figure.
+ *   1. REFILL — a line sent before its part was priced takes the part's
+ *      CURRENT price; a line sent before its part had a labor unit takes its
+ *      CURRENT hours. Each is filled only while the line has none, so a price
+ *      or an hour somebody already has is never overwritten — a set 0 hours
+ *      included, because zero is an answer for labor. One refill can fill
+ *      both. A FIELD BEND is labor on a $0 part, so only its hours refill.
  *   2. SWAP — a fitting line whose type now names a different part (the
  *      fitting STYLE changed, or an override) becomes the current part on
  *      Send-again, and the preview says so: "set-screw coupling → compression
@@ -21,6 +23,10 @@
  * Only these. Quantity is refreshed by the caller as it always was, and
  * nothing here re-prices a line whose price somebody already has — R4, the
  * snapshot freeze, holds for every priced line.
+ *
+ * Hours refill for every traced line since 2026-09-26, when a part with no
+ * labor unit stopped freezing as 0 h. Before that only a field bend kept a
+ * NULL, and this had a field-bend-only branch for it.
  */
 import { needsPricing } from "./materialPricing";
 
@@ -34,27 +40,19 @@ export type ResendPart = {
 
 export type ResendPlan =
   | { kind: "keep" }
-  | { kind: "refill"; price: number }
-  /** A field bend sent with no hours, now that its raceway has them. */
-  | { kind: "refillHours"; hours: number }
+  /** What gets filled in; at least one is non-null. */
+  | { kind: "refill"; price: number | null; hours: number | null }
   | { kind: "swap"; from: string; to: string };
 
 export function resendPlan(input: {
   /** Fitting roles swap; pipe and wire never do (only the style decision). */
   isFitting: boolean;
   /**
-   * Set only for a FIELD BEND line, which is priced by HOURS on a $0 part.
-   * Without this the money rule below would see its deliberate $0 as "Not
-   * priced" and refill it with the pipe's cost per foot. Required, so a
-   * caller has to say which kind of line it is asking about.
-   *
-   * `lineHours` is the line's frozen hours; `currentHours` the raceway's
-   * `fieldBendLaborHours` now. NULL is "not set" on both — a 0 is an answer.
+   * A FIELD BEND: labor on a part that is $0 by nature. Its $0 is not a
+   * missing price, and refilling it would put the pipe's cost per foot on a
+   * labor line — so its price never refills. Required, so a caller has to say.
    */
-  fieldBend: {
-    lineHours: string | number | null;
-    currentHours: string | number | null;
-  } | null;
+  laborOnly: boolean;
   /**
    * What the line holds. NULL when nobody can say (sent before 0083 and not
    * recoverable). For a fitting that means "leave its part alone"; for pipe
@@ -65,6 +63,13 @@ export function resendPlan(input: {
   currentPart: ResendPart | null;
   /** The line's frozen material cost. */
   lineCost: string | number | null;
+  /** The line's frozen hours per unit. NULL is "not set"; a 0 is an answer. */
+  lineHours: string | number | null;
+  /**
+   * The part's labor unit now — its `laborHours`, or for a field bend its
+   * `fieldBendLaborHours`. NULL is "not set".
+   */
+  currentHours: string | number | null;
 }): ResendPlan {
   const { isFitting, currentPart } = input;
   if (currentPart === null) return { kind: "keep" };
@@ -75,20 +80,21 @@ export function resendPlan(input: {
   if (isFitting && linePart.key !== currentPart.key) {
     return { kind: "swap", from: linePart.name, to: currentPart.name };
   }
-  if (input.fieldBend) {
-    const { lineHours, currentHours } = input.fieldBend;
-    return lineHours === null && currentHours !== null
-      ? { kind: "refillHours", hours: Number(currentHours) }
-      : { kind: "keep" };
-  }
-  if (
-    linePart.key === currentPart.key &&
+  if (linePart.key !== currentPart.key) return { kind: "keep" };
+
+  const price =
+    !input.laborOnly &&
     needsPricing(input.lineCost) &&
     !needsPricing(currentPart.costPerUnit)
-  ) {
-    return { kind: "refill", price: Number(currentPart.costPerUnit) };
-  }
-  return { kind: "keep" };
+      ? Number(currentPart.costPerUnit)
+      : null;
+  const hours =
+    input.lineHours === null && input.currentHours !== null
+      ? Number(input.currentHours)
+      : null;
+  return price === null && hours === null
+    ? { kind: "keep" }
+    : { kind: "refill", price, hours };
 }
 
 /**

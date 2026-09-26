@@ -463,9 +463,8 @@ export type RunTypeBridgeRow = {
  */
 export type ResendPreview =
   | { kind: "swap"; text: string }
-  | { kind: "refill"; price: number }
-  /** A field bend sent with no hours, now that its raceway has them. */
-  | { kind: "refillHours"; hours: number }
+  /** What Send fills in on a line that has none: a price, hours, or both. */
+  | { kind: "refill"; price: number | null; hours: number | null }
   | null;
 
 /**
@@ -491,14 +490,12 @@ export type RunTypeBridgeFitting = {
 
 /** The sentence the panel shows for a pending Send-again change. */
 function resendSentence(resend: NonNullable<ResendPreview>): string {
-  switch (resend.kind) {
-    case "swap":
-      return `On Send: ${resend.text}`;
-    case "refill":
-      return `On Send: price filled in at ${money(resend.price)}`;
-    case "refillHours":
-      return `On Send: labor filled in at ${resend.hours} h per bend`;
-  }
+  if (resend.kind === "swap") return `On Send: ${resend.text}`;
+  const parts = [
+    resend.price !== null ? `price filled in at ${money(resend.price)}` : null,
+    resend.hours !== null ? `labor filled in at ${resend.hours} h each` : null,
+  ].filter((part): part is string => part !== null);
+  return `On Send: ${parts.join(", ")}`;
 }
 
 /** "Couplings", "90° elbows" — from the one table the server words with too. */

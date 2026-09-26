@@ -10734,16 +10734,20 @@ export async function addRunTypeRowToBid(
  *   cost    0 — the line points at the raceway, whose cost per FOOT is
  *           already on the pipe line. Freezing it here would buy the pipe
  *           again once per bend.
- *   hours   the raceway's `fieldBendLaborHours`, and NULL STAYS NULL. Every
- *           other line flattens a missing unit to 0 h (see below); here that
- *           would price bending at nothing and read as priced. NULL is what
- *           `lineNotPriced` reads as "Not priced" (owner, 2026-09-26).
+ *   hours   the raceway's `fieldBendLaborHours` rather than its labor unit.
  *   markup  no parts: there is no material to mark up.
  *
  * Every other line: the material's cost; its labor unit per unit of sale
- * (per FOOT for pipe and wire, per EACH for a fitting — D17), a missing unit
- * frozen as 0 h because the run panel already flags a type whose materials
- * have no hours; and its own markup part.
+ * (per FOOT for pipe and wire, per EACH for a fitting — D17); and its own
+ * markup part.
+ *
+ * ── A missing labor unit STAYS NULL, on every line ─────────────────────────
+ * This used to write `laborHours ?? 0`, reasoning that the run panel flags a
+ * type whose materials have no hours. The bid does not: it printed "0 h", a
+ * number nobody set, beside a real cost, and priced the labor at nothing
+ * (owner, 2026-09-26: "Not priced" for labor, never 0 h). NULL is what
+ * `lineHoursUnset` reads; the totals still add it as 0 (COALESCE), and the
+ * bid's strip names the lines so nobody reads the total as complete.
  */
 function runLinePricing(
   role: RunMaterialRole,
@@ -10754,21 +10758,28 @@ function runLinePricing(
   if (role === "fieldBend") {
     return {
       snapshotMaterialCost: "0.0000",
-      snapshotLaborHours:
-        material.fieldBendLaborHours === null
-          ? null
-          : Number(material.fieldBendLaborHours).toFixed(4),
+      snapshotLaborHours: runLineLaborUnit(role, material),
       ...markupSnapshot([], markupRuleSet),
     };
   }
   return {
     snapshotMaterialCost: Number(material.costPerUnit).toFixed(4),
-    snapshotLaborHours: Number(material.laborHours ?? 0).toFixed(4),
+    snapshotLaborHours: runLineLaborUnit(role, material),
     ...markupSnapshot(
       [markupPartForMaterial(material, storedId)],
       markupRuleSet
     ),
   };
+}
+
+/** The labor unit a run-type line of this role reads from its part. */
+function runLineLaborUnit(
+  role: RunMaterialRole,
+  material: Material
+): string | null {
+  const unit =
+    role === "fieldBend" ? material.fieldBendLaborHours : material.laborHours;
+  return unit === null ? null : Number(unit).toFixed(4);
 }
 
 /** The live bid lines for a run type, by role. */
@@ -10802,31 +10813,29 @@ export async function getBidLinesForRunType(
  * Send-again's two price changes to a run-type line — `shared/resendLine.ts`
  * decides WHICH; this only writes it.
  *
- *   refill  the line was sent while its part was unpriced: the material's
- *           price now, and the markup re-resolved against it (a markup band
- *           keyed on price was chosen against $0). Hours are left as sent.
+ *   refill  the line was sent before its part had a price, a labor unit, or
+ *           both: whichever `shared/resendLine.ts` names, from the part now.
+ *           A price comes with its markup re-resolved (a band keyed on price
+ *           was chosen against $0). Anything not named is left as sent.
  *   swap    the type now names a different part (the fitting style changed):
  *           the line becomes that part — name, price, hours and markup, as if
- *           sent fresh. The labour RATE stays as sent; a part change is not a
+ *           sent fresh. The labor RATE stays as sent; a part change is not a
  *           rate change.
  *
- * The caller refuses a locked bid before reaching here, and never asks for a
- * refill over a price that is set. Both are guards in the router; this
- * function trusts them and says so rather than re-checking half of them.
+ * The caller refuses a locked bid before reaching here, and asks for a refill
+ * only of what the line lacks. Both are guards in the router and in
+ * `resendPlan`; this function trusts them and says so.
  */
 export async function resnapshotRunTypeLine(
   lineId: number,
   userId: number,
   input:
-    | { mode: "refill"; materialId: number }
     | {
-        /**
-         * A FIELD BEND sent before its raceway had hours: the hours now, and
-         * nothing else. `resendLine.ts` asks for it only while the line's are
-         * NULL; a set figure, 0 included, is never refilled over.
-         */
-        mode: "refillHours";
+        mode: "refill";
         materialId: number;
+        role: RunMaterialRole;
+        price: boolean;
+        hours: boolean;
       }
     | {
         mode: "swap";
@@ -10844,30 +10853,24 @@ export async function resnapshotRunTypeLine(
   const material = resolveMaterial(materialRows, input.materialId);
   if (!material) throw new Error("Material not found");
 
-  if (input.mode === "refillHours") {
-    await db
-      .update(bidLineItems)
-      .set({
-        snapshotLaborHours:
-          material.fieldBendLaborHours === null
-            ? null
-            : Number(material.fieldBendLaborHours).toFixed(4),
-      })
-      .where(eq(bidLineItems.id, lineId));
-    return;
-  }
   if (input.mode === "refill") {
-    await db
-      .update(bidLineItems)
-      .set({
-        snapshotMaterialCost: Number(material.costPerUnit).toFixed(4),
-        ...markupSnapshot(
-          [markupPartForMaterial(material, input.materialId)],
-          markupRuleSet
-        ),
-        runMaterialId: input.materialId,
-      })
-      .where(eq(bidLineItems.id, lineId));
+    // A field bend is labor only: `resendPlan` never asks for its price.
+    const patch = {
+      ...(input.price && input.role !== "fieldBend"
+        ? {
+            snapshotMaterialCost: Number(material.costPerUnit).toFixed(4),
+            ...markupSnapshot(
+              [markupPartForMaterial(material, input.materialId)],
+              markupRuleSet
+            ),
+          }
+        : {}),
+      ...(input.hours
+        ? { snapshotLaborHours: runLineLaborUnit(input.role, material) }
+        : {}),
+      runMaterialId: input.materialId,
+    };
+    await db.update(bidLineItems).set(patch).where(eq(bidLineItems.id, lineId));
     return;
   }
   // A swap re-snapshots as if sent fresh — through the same function the

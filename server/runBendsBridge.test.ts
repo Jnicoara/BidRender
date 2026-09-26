@@ -29,7 +29,7 @@ import {
   users,
 } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
-import { lineNotPriced } from "../shared/lineNotPriced";
+import { lineHoursUnset, lineNotPriced } from "../shared/lineNotPriced";
 
 const USER = 8795;
 const hasDb = Boolean(process.env.DATABASE_URL);
@@ -223,7 +223,7 @@ withDb("a field bend is labor only", () => {
     });
     expect((await preview(bidId)).get("fieldBend")).toMatchObject({
       priced: true,
-      resend: { kind: "refillHours", hours: 0.25 },
+      resend: { kind: "refill", price: null, hours: 0.25 },
     });
 
     const again = await caller().takeoffRunTypes.sendToBid({
@@ -282,6 +282,40 @@ withDb("a field bend is labor only", () => {
       /belled end/
     );
     expect(result.skipped.map(s => s.role)).not.toContain("fieldBend");
+  });
+
+  it("sends a part with no labor unit as labor NOT PRICED — never 0 h — and Send again fills it in", async () => {
+    // Owner, 2026-09-26: "any traced line whose part has no labor set must
+    // show Not priced for labor, never 0 h". The send used to write
+    // `laborHours ?? 0`, freezing a missing unit as a considered zero.
+    const type = await emtType('1/2"');
+    const { bidId, sheetId } = await aBid("Labor unset");
+    await trace(bidId, sheetId, type.id, L);
+    await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+
+    let lines = (await detail(bidId)).lines;
+    for (const role of ["raceway", "coupling", "connector", "strap"]) {
+      const sent = line(lines, role)!;
+      expect(sent.snapshotLaborHours, role).toBeNull();
+      expect(lineHoursUnset(sent), role).toBe(true);
+    }
+
+    const coupling = await shipped('1/2" EMT set-screw coupling');
+    await caller().materials.update({ id: coupling.id, laborHours: 0.05 });
+    expect((await preview(bidId)).get("coupling")!.resend).toEqual({
+      kind: "refill",
+      price: null,
+      hours: 0.05,
+    });
+    await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+    lines = (await detail(bidId)).lines;
+    expect(Number(line(lines, "coupling")!.snapshotLaborHours)).toBeCloseTo(
+      0.05,
+      4
+    );
+    expect(lineHoursUnset(line(lines, "coupling")!)).toBe(false);
+    // The connector's part still has none: still Not priced.
+    expect(lineHoursUnset(line(lines, "connector")!)).toBe(true);
   });
 
   it("never reaches the supplier list as pipe", async () => {

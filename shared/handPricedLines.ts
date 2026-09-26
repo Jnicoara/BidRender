@@ -75,6 +75,14 @@ export function missingEntryCounts(lines: readonly HandPricedLineLike[]): {
   let noPrice = 0;
   let noHours = 0;
   for (const line of lines) {
+    /*
+      Hand-priced lines ONLY. The advice under these counts is "type it on the
+      line", which a traced or assembly line cannot take. This counted every
+      NULL until 2026-09-26, which was harmless while only hand-priced lines
+      kept a NULL and wrong the day traced lines started keeping theirs — see
+      `lineHoursUnset` in shared/lineNotPriced.ts, which counts those.
+    */
+    if (!canPriceByHand(line)) continue;
     if (lineNeedsPrice(line)) noPrice += 1;
     if (lineNeedsHours(line)) noHours += 1;
   }
