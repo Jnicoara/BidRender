@@ -8,8 +8,9 @@
  * leaves the original behind as an orphan the backfill then skips. The user
  * gets two of everything and no explanation.
  *
- * So a rename is not a text edit — it is an entry in RENAMED below, which is
- * applied to the table before matching. That preserves the row's id, which
+ * So a rename is not a text edit — it is an entry in RENAMED_BASELINE_MATERIALS
+ * (shared/renamedMaterials.ts, re-exported below), which is applied to the
+ * table before matching. That preserves the row's id, which
  * matters more than the name does: assemblies, kits, project items and takeoff
  * stamps all point at material ids, and re-creating a row would silently detach
  * every one of them.
@@ -29,153 +30,14 @@ import {
 } from "./safetyAndSupport";
 import { STRUT } from "./strut";
 import { WIRE_AND_CABLE } from "./wireAndCable";
-import { dropRestatedWords, TRADE_SIZES, type BaselineMaterial } from "./types";
-import { emtStyledFittingName } from "../../../shared/runFittingMaterials";
+import { dropRestatedWords, type BaselineMaterial } from "./types";
 
 export type { BaselineMaterial } from "./types";
 
-/**
- * Baseline rows to rename in place, old name -> new name.
- *
- * Every entry here is a row the shipped catalog already had under a name that
- * no longer fits the family it turned out to belong to. `1/2" PVC` was fine
- * when it was the only PVC in the catalog and ambiguous the moment Schedule 80
- * arrived; the two EMT connectors were named backwards relative to the 224
- * fittings that now surround them.
- *
- * Entries are safe to keep forever — renaming a row that has already been
- * renamed is a no-op, because nothing matches the old name any more. Do not
- * delete one to tidy up: a database that has not booted since before the rename
- * still needs it.
- */
-export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
-  '1/2" PVC': '1/2" PVC Sch 40',
-  // Straight to the set-screw name (2026-09-26, below), not via the
-  // intermediate `1/2" EMT connector`, so no database depends on the pass
-  // walking a chain in order — the same choice the SER entries make.
-  'EMT connector 1/2"': '1/2" EMT set-screw connector',
-  'EMT connector 3/4"': '3/4" EMT set-screw connector',
-  // Written 5"/6" so the leading measurement is a real 5 inches. "5/6" reads
-  // as the fraction five-sixths to anything parsing sizes, which sorted the
-  // wafer below the 4" one.
-  '5/6" wafer LED downlight': '5"/6" wafer LED downlight',
-  // "light" -> "light bar", now that tape light shares the heading and the two
-  // are bought completely differently — per fixture against per foot.
-  '18" under-cabinet light': '18" under-cabinet light bar',
-  '24" under-cabinet light': '24" under-cabinet light bar',
-  '36" under-cabinet light': '36" under-cabinet light bar',
-  // "20/2" is how the trade SAYS it; "20A 2-Pole" is how every supply house
-  // WRITES it, and a catalog is a written thing. The spoken form survives as a
-  // search alias, so anyone typing "20/2" still lands on the same row — which
-  // is the point of renaming in place rather than adding a second one.
-  "20/2 breaker": "20A 2-Pole breaker",
-  "30/2 breaker": "30A 2-Pole breaker",
-  "40/2 breaker": "40A 2-Pole breaker",
-  "50/2 breaker": "50A 2-Pole breaker",
-  "60/2 breaker": "60A 2-Pole breaker",
-  "70/2 breaker": "70A 2-Pole breaker",
-  "100/2 breaker": "100A 2-Pole breaker",
-  // Single-pole now states its pole count as well, so every breaker row reads
-  // the same way (2026-09-24, see power.ts). "Single-Pole", not "1-Pole": it is
-  // what is said and written for a one-pole breaker.
-  "15A breaker": "15A Single-Pole breaker",
-  "20A breaker": "20A Single-Pole breaker",
-  "30A breaker": "30A Single-Pole breaker",
-  "15A AFCI breaker": "15A Single-Pole AFCI breaker",
-  "20A AFCI breaker": "20A Single-Pole AFCI breaker",
-  "15A GFCI breaker": "15A Single-Pole GFCI breaker",
-  "20A GFCI breaker": "20A Single-Pole GFCI breaker",
-  "15A AFCI/GFCI combo breaker": "15A Single-Pole AFCI/GFCI combo breaker",
-  "20A AFCI/GFCI combo breaker": "20A Single-Pole AFCI/GFCI combo breaker",
-  // Disconnects state their enclosure (2026-09-25, power.ts). The shipped
-  // eight already called themselves "nema 3r outdoor" in their aliases, so
-  // they are the 3R rows; the NEMA 1 ones are new.
-  ...Object.fromEntries(
-    ["30", "60", "100", "200"].flatMap(amps => [
-      [`${amps}A fused disconnect`, `${amps}A fused disconnect, NEMA 3R`],
-      [
-        `${amps}A non-fused disconnect`,
-        `${amps}A non-fused disconnect, NEMA 3R`,
-      ],
-    ])
-  ),
-  // GFCI is the spec that makes it a spa disconnect.
-  "50A spa disconnect": "50A GFCI spa disconnect",
-  "60A spa disconnect": "60A GFCI spa disconnect",
-  // Metal written AL / CU, the supply-house short form (owner, 2026-09-25;
-  // wireAndCable.ts header). The full words stay as search aliases.
-  ...Object.fromEntries(
-    [
-      ...["#8", "#6", "#4", "#2", "#1", "#1/0", "#2/0", "#3/0", "#4/0"].map(
-        g => `${g} XHHW`
-      ),
-      ...["250", "300", "350", "400", "500"].map(k => `${k} kcmil XHHW`),
-      ...[
-        "4-4-4-6",
-        "2-2-2-4",
-        "4/0-4/0-2/0",
-        "4/0-4/0-4/0-2/0",
-        "250-250-250",
-      ].map(s => `${s} SER`),
-      "4-4-6 SEU",
-      "2-2-4 SEU",
-      "#4/0 USE-2",
-      "1/0 URD triplex",
-    ].map(stem => [`${stem} aluminum`, `${stem} AL`])
-  ),
-  ...Object.fromEntries([
-    ...["#14", "#12", "#10", "#8"].map(g => [
-      `${g} bare copper, solid`,
-      `${g} bare CU, solid`,
-    ]),
-    ...["#10", "#8", "#6", "#4", "#2", "#1/0", "#2/0"].map(g => [
-      `${g} bare copper, stranded`,
-      `${g} bare CU, stranded`,
-    ]),
-  ]),
-  /*
-    SER shorthand written out as the full conductor set (owner, 2026-09-25;
-    the sets and their sources are in wireAndCable.ts). BOTH older spellings
-    point straight at the final name — the pre-AL/CU one a database that
-    missed the previous release still holds, and the AL/CU one that release
-    wrote — so no database depends on the rename pass walking a chain in
-    order. The shorthand survives as an alias on each row.
-  */
-  ...Object.fromEntries(
-    (
-      [
-        ["8-3", "8-8-8-8", "copper", "CU"],
-        ["6-3", "6-6-6-6", "copper", "CU"],
-        ["4-3", "4-4-4-6", "copper", "CU"],
-        ["2-3", "2-2-2-4", "copper", "CU"],
-        ["1-3", "1-1-1-3", "copper", "CU"],
-        ["1/0-3", "1/0-1/0-1/0-2", "aluminum", "AL"],
-        ["2/0-3", "2/0-2/0-2/0-1", "aluminum", "AL"],
-        ["3/0-3", "3/0-3/0-3/0-1/0", "aluminum", "AL"],
-      ] as const
-    ).flatMap(([short, full, word, abbr]) => [
-      [`${short} SER ${word}`, `${full} SER ${abbr}`],
-      [`${short} SER ${abbr}`, `${full} SER ${abbr}`],
-    ])
-  ),
-  /*
-    EMT couplings and connectors state their style (owner, 2026-09-26): the
-    plain rows ARE the set-screw ones — it is what "EMT coupling" means at the
-    counter — and compression and raintight arrive beside them as new rows.
-    Renamed in place so every assembly and stamp keeps its id. Every word of
-    the old name is still in the new one, so searching the old name finds the
-    row without an alias (and `materialsCatalog.test.ts` refuses aliases that
-    restate the name).
-  */
-  ...Object.fromEntries(
-    TRADE_SIZES.flatMap(size =>
-      (["coupling", "connector"] as const).map(kind => [
-        `${size} EMT ${kind}`,
-        emtStyledFittingName(size, "set-screw", kind),
-      ])
-    )
-  ),
-};
+// The rename map lives in shared/ so search ranking and the supplier price
+// import read the same one the seeder applies. Re-exported so every importer
+// of this module is unchanged.
+export { RENAMED_BASELINE_MATERIALS } from "../../../shared/renamedMaterials";
 
 /**
  * Baseline rows the catalog no longer ships.

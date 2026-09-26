@@ -6,7 +6,7 @@
  * catalog, and that is the displayed name here. It used to be "20/2", which is
  * how the trade SAYS it — and that spelling is kept as a search alias, along
  * with "double pole", "two pole" and "DP", so nothing stopped being findable.
- * The rename went through RENAMED_BASELINE_MATERIALS (see ./index.ts): baseline
+ * The rename went through RENAMED_BASELINE_MATERIALS (shared/renamedMaterials.ts): baseline
  * rows are matched by name, so editing this string alone would have inserted a
  * second row and orphaned every assembly pointing at the first.
  *

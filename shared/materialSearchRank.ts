@@ -74,6 +74,7 @@
 
 import { materialTypeName } from "./materialSizeOrder";
 import { compareMaterials } from "./materialOrder";
+import { renamedTo } from "./renamedMaterials";
 
 /** Words meaning "this joins, terminates or closes a product". */
 const FITTING_NOUNS = [
@@ -556,12 +557,27 @@ export type PhraseTier = (typeof PHRASE)[keyof typeof PHRASE];
  * being described, however rare it is.
  *
  * EXACT has no such limit: typing a row's entire name is never ambiguous.
+ *
+ * ── A row's FORMER name is EXACT too ─────────────────────────────────────────
+ * A shipped row renamed in place (RENAMED_BASELINE_MATERIALS) is still the
+ * row an estimator means when they type what it used to be called. Before
+ * this, "30A breaker" stopped being anybody's exact name the day the row
+ * became "30A Single-Pole breaker", tied with "30A 2-Pole breaker", and lost
+ * on catalog order; "30A fused disconnect" tied between the new NEMA 1 row
+ * and the renamed NEMA 3R one and went to NEMA 1. Only the rename's TARGET
+ * gets this, so those ties now go to the row that carried the old name — for
+ * the disconnects, NEMA 3R (outdoor), as decided 2026-09-26.
+ *
+ * A company's own copy still carrying the old name matches it as a plain
+ * EXACT, so it ties with the renamed shipped row rather than losing to it.
  */
 export function phraseTier(name: string, query: string): PhraseTier {
   const q = norm(query);
   if (!q) return PHRASE.NONE;
   const n = norm(name);
   if (n === q) return PHRASE.EXACT;
+  const renamed = renamedTo(query);
+  if (renamed !== null && norm(renamed) === n) return PHRASE.EXACT;
   if (q.includes(" ") && (n + " ").startsWith(q + " ")) {
     return PHRASE.STARTS_WITH;
   }

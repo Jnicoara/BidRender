@@ -91,25 +91,11 @@ export const UNPRICED = "0.0000";
 
 // ─── Trade sizes ──────────────────────────────────────────────────────────────
 
-/**
- * The nine trade sizes every raceway family ships at, in ascending order.
- *
- * "Trade size" is a name, not a measurement — 1/2" EMT is neither 1/2" inside
- * nor out — so these strings are the identifiers, never numbers to compute on.
- */
-export const TRADE_SIZES = [
-  '1/2"',
-  '3/4"',
-  '1"',
-  '1-1/4"',
-  '1-1/2"',
-  '2"',
-  '2-1/2"',
-  '3"',
-  '4"',
-] as const;
-
-export type TradeSize = (typeof TRADE_SIZES)[number];
+// Defined in shared/tradeSizes.ts, so shared/renamedMaterials.ts can read it.
+// Re-exported here so every generator keeps importing it from ./types.
+import { TRADE_SIZES, type TradeSize } from "../../../shared/tradeSizes";
+export { TRADE_SIZES };
+export type { TradeSize };
 
 /** Flex tops out at 1-1/4" in this catalog — bigger flex is a special order. */
 export const FLEX_SIZES = ['1/2"', '3/4"', '1"', '1-1/4"'] as const;

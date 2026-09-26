@@ -23,11 +23,20 @@ import {
   matchTier,
   materialRole,
   queryRole,
+  rankMaterialHits,
   roleRankFor,
 } from "../shared/materialSearchRank";
 import { compareBySize } from "../shared/materialSizeOrder";
+import { commonnessPoints } from "../shared/materialCommonness";
+import {
+  RENAMED_BASELINE_MATERIALS,
+  renamedTo,
+} from "../shared/renamedMaterials";
 import { BASELINE_MATERIALS } from "../server/seed/baselineMaterials";
-import { smartSearch } from "../client/src/lib/smartSearch";
+import {
+  smartSearch,
+  smartSearchCorrected,
+} from "../client/src/lib/smartSearch";
 
 describe("what a name IS, from its head noun", () => {
   it("reads the phrase the name ends with, not one it contains", () => {
@@ -371,5 +380,85 @@ describe("the searches that must not regress, against the shipped catalog", () =
     expect(top("pvc connector")[0]).toContain("connector");
     expect(top("emt coupling")[0]).toContain("coupling");
     expect(top("emt strap")[0]).toBe("EMT strap");
+  });
+});
+
+/**
+ * Every old spelling of a renamed shipped row finds that row FIRST.
+ *
+ * Through rankMaterialHits with the starter commonness — the function every
+ * material search box calls, so this is what an estimator sees on a fresh
+ * company. Looped over the whole rename map rather than a few picked cases,
+ * because the two that were wrong ("30A breaker", "30A fused disconnect") were
+ * found by a rehearsal script, not by anyone predicting them
+ * (todo.md, "Old disconnect and breaker spellings land on the renamed row
+ * SECOND").
+ */
+describe("an old name finds the row it was renamed to, first", () => {
+  const index = BASELINE_MATERIALS.map((row, i) => ({
+    id: String(i),
+    description: row.name,
+    searchAliases: row.searchAliases,
+  }));
+  const FAMILIES = familySizes(BASELINE_MATERIALS);
+  const NOW = new Date("2026-09-26T12:00:00Z");
+  const ranked = (query: string): string[] => {
+    const { results, searchedQuery } = smartSearchCorrected(index, query, 80);
+    return rankMaterialHits(
+      results.map(hit => ({
+        row: BASELINE_MATERIALS[Number(hit.item.id)],
+        score: hit.score,
+      })),
+      searchedQuery,
+      {
+        families: FAMILIES,
+        commonness: row => commonnessPoints(row.name, undefined, NOW),
+      }
+    ).map(row => row.name);
+  };
+
+  /**
+   * Old spellings that cannot be searched for at all, for a reason that is
+   * not ranking. Each names its own todo.md item; delete the entry when that
+   * is fixed and this test will then hold it to ranking first.
+   */
+  const NOT_A_RANKING_PROBLEM: Record<string, string> = {
+    // Reads as the fraction five-sixths and finds nothing — todo.md,
+    // "5/6" wafer LED downlight (the old spelling) reads as a fraction".
+    '5/6" wafer LED downlight': "size parsing",
+  };
+
+  const shipped = new Set(BASELINE_MATERIALS.map(m => m.name));
+  const entries = Object.entries(RENAMED_BASELINE_MATERIALS).filter(
+    ([from]) => !(from in NOT_A_RANKING_PROBLEM)
+  );
+
+  it("covers the whole map, and every target is a shipped row", () => {
+    // 100 on 2026-09-26. A floor rather than the count, so adding a rename
+    // does not fail here; a map that suddenly came through near-empty does.
+    expect(entries.length).toBeGreaterThanOrEqual(90);
+    for (const [, to] of entries) expect(shipped.has(to), to).toBe(true);
+  });
+
+  it("no old spelling is still some other row's current name", () => {
+    // If it were, typing it would have two honest exact answers and this
+    // rule would be choosing between them by accident.
+    for (const [from] of entries) expect(shipped.has(from), from).toBe(false);
+  });
+
+  it.each(entries)('"%s" ranks "%s" first', (from, to) => {
+    expect(ranked(from)[0]).toBe(to);
+  });
+
+  it('"30A fused disconnect" goes to NEMA 3R, the outdoor row, over NEMA 1', () => {
+    const hits = ranked("30A fused disconnect");
+    expect(hits[0]).toBe("30A fused disconnect, NEMA 3R");
+    expect(hits).toContain("30A fused disconnect, NEMA 1");
+  });
+
+  it("typed loosely — lower case, no inch mark — it still counts", () => {
+    expect(renamedTo("30a BREAKER")).toBe("30A Single-Pole breaker");
+    expect(renamedTo("1/2 pvc")).toBe('1/2" PVC Sch 40');
+    expect(renamedTo("30A breaker extra")).toBeNull();
   });
 });

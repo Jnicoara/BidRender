@@ -1310,11 +1310,15 @@ sentences, every line read "Not priced" and the strip said 4 lines were left
 out; the supplier list itemised the three fittings. The test lines, run and
 sheet scale were removed afterwards — production back to 0 bid lines, 2 runs.
 
-- [ ] **Old disconnect and breaker spellings land on the renamed row SECOND.**
-      "30A fused disconnect" now matches the new NEMA 1 row and the renamed
-      NEMA 3R row equally, and the tie goes to NEMA 1; "30A breaker" ties
-      with "30A 2-Pole breaker". Live since `1c29584`. Whether the old
-      spelling should prefer the renamed row is a ranking decision.
+- [x] **FIXED 2026-09-26 (Track B): old disconnect and breaker spellings
+      landed on the renamed row SECOND.** "30A fused disconnect" matched the
+      new NEMA 1 row and the renamed NEMA 3R row equally, and the tie went to
+      NEMA 1; "30A breaker" tied with "30A 2-Pole breaker". Decided by the
+      owner: yes, an old spelling prefers the renamed row, so the disconnects
+      go to NEMA 3R (outdoor). The rename map moved to
+      `shared/renamedMaterials.ts` and `phraseTier` treats a row's former name
+      as EXACT. `materialSearchRank.test.ts` loops the whole map; with the
+      rule off, exactly those nine fail.
 - [x] **FIXED 2026-09-26 (Track B): a comma in a search found nothing.**
       "#12 bare copper, solid" returned no rows while "#12 bare copper solid"
       found it — the tokenizer kept the comma on the word.
