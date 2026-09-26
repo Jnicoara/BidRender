@@ -163,3 +163,26 @@ describe("the modifiers an assembly actually has switched on", () => {
     expect(appliedModifiers(library, []).applied).toEqual([]);
   });
 });
+
+describe("a live fork before an archived one", () => {
+  // Found 2026-09-26: a company forked a shipped run type, archived that
+  // fork, and edited the shipped row again. The shipped id was answered by
+  // whichever fork came first — the archived one — so the bid bridge
+  // described every run by the copy somebody had put away.
+  const shippedId = 31;
+  const archived = { id: 221, baselineId: shippedId, status: "archived" };
+  const live = { id: 1667, baselineId: shippedId, status: "active" };
+
+  it("answers the shipped id with the live fork, in either order", () => {
+    expect(resolveForkedRow([archived, live], shippedId)).toBe(live);
+    expect(resolveForkedRow([live, archived], shippedId)).toBe(live);
+  });
+
+  it("still answers the archived fork's OWN id with it", () => {
+    expect(resolveForkedRow([archived, live], 221)).toBe(archived);
+  });
+
+  it("falls back to an archived fork when it is the only one", () => {
+    expect(resolveForkedRow([archived], shippedId)).toBe(archived);
+  });
+});

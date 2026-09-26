@@ -48,6 +48,8 @@ export type ForkableRow = {
   id: number;
   /** The shipped row this is a fork OF; null for a baseline or an own row. */
   baselineId: number | null;
+  /** Library lifecycle, where the row has one. See `resolveForkedRow`. */
+  status?: string | null;
 };
 
 /**
@@ -83,7 +85,20 @@ export function resolveForkedRow<T extends ForkableRow>(
 
   // The id points at a shipped row the user has since forked; the fork is what
   // they now mean by it.
-  return rows.find(row => row.baselineId === id);
+  /*
+    A LIVE fork before an archived one. A company can hold both — it forked,
+    archived that fork, then edited the shipped row again — and the list may
+    carry the archived one so a line priced from it still resolves ITS OWN id
+    (the direct hit above). Answering the shipped id with the archived fork
+    instead described every run of the type by the copy somebody had put
+    away: the bridge said "Not said what this is" about a ground the live fork
+    names. Found 2026-09-26 on the fixture bid. Rows with no status (older
+    callers) behave exactly as before.
+  */
+  const forks = rows.filter(row => row.baselineId === id);
+  return (
+    forks.find(row => row.status == null || row.status === "active") ?? forks[0]
+  );
 }
 
 /**
