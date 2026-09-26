@@ -263,6 +263,11 @@ import {
 import { resolveLineQty } from "../shared/takeoffBridge";
 import { followsDrawing } from "../shared/quantityLock";
 import type { PlanRemovalImpact } from "../shared/planRemoval";
+import {
+  traceModeOf,
+  wireCircuitsFor,
+  type WireCircuits,
+} from "../shared/traceMode";
 
 let _db: MySql2Database | null = null;
 
@@ -4897,16 +4902,8 @@ async function withTracedFootage(
     getRunsForBid(bidId, bid.userId),
     getSheetScalesForBid(bidId, bid.userId),
   ]);
-  const circuits = await getCircuitsForRuns(
-    runs.map(run => run.id),
-    bid.userId
-  );
-  const circuitsByRun = new Map<number, typeof circuits>();
-  for (const circuit of circuits) {
-    const list = circuitsByRun.get(circuit.runId) ?? [];
-    list.push(circuit);
-    circuitsByRun.set(circuit.runId, list);
-  }
+  // A quantity trace's wire comes from its type (D21).
+  const circuitsByRun = await getWireCircuitsForRuns(runs, bid.userId);
   const heights = await heightContextForBid(
     bidId,
     bid.userId,
@@ -7526,6 +7523,40 @@ export async function getCircuitsForRuns(
       )
     )
     .orderBy(asc(takeoffRunCircuits.id));
+}
+
+/**
+ * Circuits as the ARITHMETIC reads them, for many runs at once (D21): a route
+ * run's stored rows, a quantity trace's one circuit from its type.
+ *
+ * Every loader that feeds a footage figure goes through this rather than
+ * `getCircuitsForRuns`, so a quantity trace pulls the same wire on the bid,
+ * the takeoff totals and the materials list. The panel still reads stored
+ * rows for EDITING — those have ids, and a synthesised circuit has none.
+ */
+export async function getWireCircuitsForRuns(
+  runs: readonly {
+    id: number;
+    runTypeId: number | null;
+    traceMode: TakeoffRun["traceMode"];
+  }[],
+  userId: number
+): Promise<WireCircuits> {
+  const routeIds = runs
+    .filter(run => traceModeOf(run) === "route")
+    .map(run => run.id);
+  const needsTypes = runs.some(run => traceModeOf(run) === "quantity");
+  const [stored, palette] = await Promise.all([
+    getCircuitsForRuns(routeIds, userId),
+    // Archived included, as the bend context loads them: a trace whose type
+    // was archived still pulls what that type says.
+    needsTypes ? getRunTypesFor(userId, true) : Promise.resolve([]),
+  ]);
+  return wireCircuitsFor({
+    runs,
+    stored,
+    typeFor: id => resolveRunType(palette, id) ?? null,
+  });
 }
 
 export async function createRunCircuit(

@@ -23,6 +23,7 @@ import {
   type RacewayFittingSpec,
 } from "../shared/runFittings";
 import type { EndVertical } from "../shared/takeoffHeights";
+import { countBends } from "../shared/runBends";
 
 const EMT: RacewayFittingSpec = {
   name: '1/2" EMT',
@@ -259,6 +260,10 @@ describe("legs from today's runs", () => {
     parentRunId: null,
     startTee: null,
     endTee: null,
+    // A route run, as every stored run before D21 reads.
+    traceMode: null,
+    startKind: null,
+    endKind: null,
   };
 
   it("gives an unlinked end a node of its own", () => {
@@ -308,5 +313,121 @@ describe("legs from today's runs", () => {
       legFromRun({ ...base, id: 4, startStampId: null, endStampId: null })
         .feetIsFloor
     ).toBe(false);
+  });
+});
+
+describe("a quantity trace's legs (D21, answer 1)", () => {
+  const base = {
+    points: [],
+    conduitFeet: 30,
+    verticals: { start: LEVEL, end: LEVEL },
+    feetPerPoint: null,
+    answers: [],
+    parentRunId: null,
+    startTee: null,
+    endTee: null,
+    startStampId: null,
+    endStampId: null,
+    traceMode: "quantity" as const,
+  };
+  const ACCEPTED_LB = {
+    id: 9,
+    place: "corner" as const,
+    x: 0,
+    y: 0,
+    kind: "lb" as const,
+    status: "accepted" as const,
+  };
+
+  it("takes a connector only where a drop was approved", () => {
+    // Three legs, six ends: one approved drop, one dismissed ("distribution"),
+    // four never answered. The route reading of the same rows would be six.
+    const legs = [
+      legFromRun({ ...base, id: 1, startKind: "receptacle", endKind: null }),
+      legFromRun({ ...base, id: 2, startKind: "distribution", endKind: null }),
+      legFromRun({ ...base, id: 3, startKind: null, endKind: null }),
+    ];
+    const c = count(legs, EMT).connector;
+    expect(c).toMatchObject({ status: "counted", qty: 1 });
+    if (c.status !== "counted") throw new Error();
+    expect(c.why).toBe(
+      "1 connector: one per conduit end — 1 line end, none at 5 quantity-trace ends with no drop approved"
+    );
+    // And the same three rows as a route: every end is a line end.
+    const route = legs.map((_, i) =>
+      legFromRun({
+        ...base,
+        traceMode: null,
+        id: i + 1,
+        startKind: null,
+        endKind: null,
+      })
+    );
+    expect(count(route, EMT).connector).toMatchObject({ qty: 6 });
+  });
+
+  it("still counts couplings and straps over its footage", () => {
+    const legs = [
+      legFromRun({ ...base, id: 1, startKind: null, endKind: null }),
+    ];
+    expect(count(legs, EMT).coupling).toMatchObject({ qty: 2 });
+  });
+
+  it("ignores a stored pull-point answer and proposes none", () => {
+    const q = legFromRun({
+      ...base,
+      id: 1,
+      startKind: null,
+      endKind: null,
+      answers: [ACCEPTED_LB],
+    });
+    expect(q.answers).toEqual([]);
+    expect(q.noPullPoints).toBe(true);
+    // Five 90° corners is 450°, past the 360° limit. A route leg proposes a
+    // pull point; the same path as a quantity leg proposes none and still
+    // counts every elbow.
+    const zigzag = [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 100 },
+      { x: 200, y: 100 },
+      { x: 200, y: 200 },
+      { x: 300, y: 200 },
+      { x: 300, y: 300 },
+    ];
+    const asRoute = legFromRun({
+      ...base,
+      traceMode: "route",
+      id: 5,
+      points: zigzag,
+      feetPerPoint: 1,
+      startKind: null,
+      endKind: null,
+    });
+    const asQuantity = legFromRun({
+      ...base,
+      id: 5,
+      points: zigzag,
+      feetPerPoint: 1,
+      startKind: null,
+      endKind: null,
+    });
+    expect(countBends([asRoute], BENDS.method, 360).unansweredProposals).toBe(
+      1
+    );
+    const q2 = countBends([asQuantity], BENDS.method, 360);
+    expect(q2.unansweredProposals).toBe(0);
+    expect(q2.counts.elbow90).toMatchObject({ qty: 5 });
+    // The same answer on a route leg is kept.
+    expect(
+      legFromRun({
+        ...base,
+        traceMode: "route",
+        id: 1,
+        startKind: null,
+        endKind: null,
+        answers: [ACCEPTED_LB],
+      }).answers
+    ).toHaveLength(1);
   });
 });

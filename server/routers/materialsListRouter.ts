@@ -62,6 +62,7 @@ import { resolveRunType } from "../../shared/runTypeLookup";
 import { FITTING_KIND_LABELS } from "../../shared/runFittings";
 import { isBendRole } from "../../shared/runBends";
 import { isTeeRole, rootOf } from "../../shared/runNetwork";
+import { quantityTraceSummary } from "../../shared/quantityDrops";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -338,16 +339,11 @@ export const materialsListRouter = router({
         input.bidId,
         ctx.scope.dataUserId
       );
-      const circuits = await db.getCircuitsForRuns(
-        runs.map(run => run.id),
+      // A quantity trace's wire comes from its type (D21).
+      const circuitsByRun = await db.getWireCircuitsForRuns(
+        runs,
         ctx.scope.dataUserId
       );
-      const circuitsByRun = new Map<number, typeof circuits>();
-      for (const circuit of circuits) {
-        const list = circuitsByRun.get(circuit.runId) ?? [];
-        list.push(circuit);
-        circuitsByRun.set(circuit.runId, list);
-      }
 
       // A suggested run is not counted, for the same reason it is not counted
       // anywhere else: it is the app's guess until a person accepts it.
@@ -441,6 +437,17 @@ export const materialsListRouter = router({
               : " traced runs are") +
             " counted flat only. Drops and rises come from the mounting " +
             "heights in Settings."
+        );
+      }
+      // Quantity traces are flat by choice (D21); said on its own, since a
+      // total can include route drops and still carry none of these.
+      const quantity = quantityTraceSummary(realRuns);
+      if (quantity.openEnds > 0) {
+        notes.push(
+          `Quantity traces are flat footage only: ${quantity.openEnds} ` +
+            (quantity.openEnds === 1 ? "end has" : "ends have") +
+            " no drop answered, so no vertical footage is included for " +
+            (quantity.openEnds === 1 ? "it." : "them.")
         );
       }
 

@@ -60,6 +60,8 @@ import { EMPTY_HEIGHT_CONTEXT, verticalsForRunRow } from "../runVerticals";
 import { resolveRunType } from "../../shared/runTypeLookup";
 import { resolveMaterial } from "../../shared/materialLookup";
 import { rootOf } from "../../shared/runNetwork";
+import { traceModeOf } from "../../shared/traceMode";
+import { quantityTraceSummary } from "../../shared/quantityDrops";
 import {
   circuitPlan,
   findMatchingRunType,
@@ -206,10 +208,16 @@ export const takeoffRunsRouter = router({
         input.sheetId,
         ctx.scope.dataUserId
       );
-      const circuits = await db.getCircuitsForRuns(
-        runs.map(r => r.id),
-        ctx.scope.dataUserId
-      );
+      // Two reads, for the two mappings below: stored rows for the panel to
+      // edit, and the circuits the ARITHMETIC reads — which on a quantity
+      // trace is one circuit from its type, with no row behind it (D21).
+      const [circuits, wire] = await Promise.all([
+        db.getCircuitsForRuns(
+          runs.map(r => r.id),
+          ctx.scope.dataUserId
+        ),
+        db.getWireCircuitsForRuns(runs, ctx.scope.dataUserId),
+      ]);
 
       // The heights, loaded ONCE for the whole sheet rather than per run. The
       // bid comes from the runs rather than the sheet: a sheet belongs to a
@@ -276,7 +284,7 @@ export const takeoffRunsRouter = router({
           added column reaching the SCREEN silently is clutter nobody chose.
           Display shapes are listed on purpose.
         */
-        const forMaths = rows.map(circuitWire);
+        const forMaths = (wire.get(run.id) ?? []).map(circuitWire);
         const runCircuits = rows.map(c => ({
           id: c.id,
           name: c.name,
@@ -306,6 +314,8 @@ export const takeoffRunsRouter = router({
           parentRunId: run.parentRunId,
           startTee: teeOf(run.startTeeId),
           endTee: teeOf(run.endTeeId),
+          /** Route or quantity (D21), with NULL already read as route. */
+          traceMode: traceModeOf(run),
           /**
            * What this run IS, and what to call it.
            *
@@ -363,6 +373,7 @@ export const takeoffRunsRouter = router({
             endKind: run.endKind,
             startTeeId: run.startTeeId,
             endTeeId: run.endTeeId,
+            traceMode: run.traceMode,
             branchWiring: run.branchWiring,
           }),
           /**
@@ -1125,10 +1136,8 @@ export const takeoffRunsRouter = router({
       const runs = allRuns.filter(
         r => r.status === "committed" && !r.isSuggestion
       );
-      const circuits = await db.getCircuitsForRuns(
-        runs.map(r => r.id),
-        ctx.scope.dataUserId
-      );
+      // A quantity trace's wire comes from its type (D21).
+      const wire = await db.getWireCircuitsForRuns(runs, ctx.scope.dataUserId);
 
       // Each run measures against ITS OWN sheet's scale — a bid can hold a site
       // plan at 1" = 40' and a floor plan at 1/4" = 1'-0".
@@ -1153,19 +1162,20 @@ export const takeoffRunsRouter = router({
         bid.distributionHeightInches
       );
 
-      return totalQuantities(
+      const totals = totalQuantities(
         runs.map(run => ({
           run: {
             pathType: run.pathType as RunPathType,
             points: run.points ?? [],
           },
-          circuits: circuits.filter(c => c.runId === run.id).map(circuitWire),
+          circuits: (wire.get(run.id) ?? []).map(circuitWire),
           ratio: ratioBySheet.get(run.sheetId) ?? null,
           verticals: verticalsForRunRow(run, heights),
           // A branched run is several rows and ONE run in the counts (D20).
           runKey: rootOf(run),
         }))
       );
+      return { ...totals, quantity: quantityTraceSummary(runs) };
     }),
 
   /**

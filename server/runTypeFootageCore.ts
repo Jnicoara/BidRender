@@ -25,7 +25,6 @@ import {
   circuitWire,
   quantitiesForRun,
   type RunPathType,
-  type StoredCircuit,
 } from "../shared/takeoffQuantities";
 import { runWireOwnership } from "../shared/branchWire";
 import { legFromRun, type FittingLeg } from "../shared/runFittings";
@@ -33,6 +32,7 @@ import type { TeeRef } from "../shared/runNetwork";
 import type { PullPointAnswer } from "../shared/runBends";
 import { pointsToRealInches } from "../shared/takeoffGeometry";
 import { verticalsForRunRow, type HeightContext } from "./runVerticals";
+import type { TraceMode, WireCircuits } from "../shared/traceMode";
 
 export type RunTypeFootageRow = {
   runTypeId: number;
@@ -51,6 +51,12 @@ export type RunTypeFootageRow = {
   unansweredCount: number;
   /** Runs of this type excluded because the devices already carry them. */
   branchCount: number;
+  /**
+   * The share of `conduitFeet` / `cableFeet` that came from QUANTITY traces
+   * (D21, answer 3). Already INSIDE those totals — this is the split the
+   * panel shows, never a second amount to add.
+   */
+  quantityFeet: number;
   /**
    * Every counted CONDUIT run of this type as a leg, for the fitting count
    * (`shared/runFittings.ts`). An unmeasurable run is here too with `feet`
@@ -88,6 +94,8 @@ export type GroupableRun = {
   /** The tee each end sits on — the other way legs meet. */
   startTeeId: number | null;
   endTeeId: number | null;
+  /** Route or quantity (D21). */
+  traceMode: TraceMode | null;
 };
 
 export type SheetScale = {
@@ -118,8 +126,11 @@ export function groupRunFootage(input: {
     feeding ARITHMETIC is the trap CLAUDE.md § "Where to be structural"
     describes: a column that never arrives does not leave a gap on a screen,
     it makes a number smaller.
+
+    And `WireCircuits` rather than a plain Map since D21: a quantity trace's
+    wire comes from its type, and only `wireCircuitsFor` knows that.
   */
-  circuitsByRun: ReadonlyMap<number, readonly StoredCircuit[]>;
+  circuitsByRun: WireCircuits;
   scales: ReadonlyMap<number, SheetScale>;
   heights: HeightContext;
   /**
@@ -153,6 +164,7 @@ export function groupRunFootage(input: {
         unmeasurableCount: 0,
         unansweredCount: 0,
         branchCount: 0,
+        quantityFeet: 0,
         legs: [],
         tees: [],
       };
@@ -170,6 +182,7 @@ export function groupRunFootage(input: {
       endKind: run.endKind,
       startTeeId: run.startTeeId,
       endTeeId: run.endTeeId,
+      traceMode: run.traceMode,
       branchWiring: run.branchWiring,
     });
     if (ownership === "branch") {
@@ -224,6 +237,9 @@ export function groupRunFootage(input: {
           verticals,
           feetPerPoint: inchesPerPoint === null ? null : inchesPerPoint / 12,
           answers: input.pullPointAnswersByRun.get(run.id) ?? [],
+          traceMode: run.traceMode,
+          startKind: run.startKind,
+          endKind: run.endKind,
         })
       );
     }
@@ -235,6 +251,9 @@ export function groupRunFootage(input: {
 
     row.conduitFeet += quantities.conduitFeet ?? 0;
     row.cableFeet += quantities.cableFeet ?? 0;
+    if (run.traceMode === "quantity")
+      row.quantityFeet +=
+        (quantities.conduitFeet ?? 0) + (quantities.cableFeet ?? 0);
     /*
       Insulated and ground are a SUBTRACTION, not two additions — the shape
       `totalQuantities` uses for `wireGroundFeet`. `totalWireFeet` is everything
@@ -259,6 +278,7 @@ export function groupRunFootage(input: {
     row.cableFeet = round2(row.cableFeet);
     row.insulatedFeet = round2(row.insulatedFeet);
     row.groundFeet = round2(row.groundFeet);
+    row.quantityFeet = round2(row.quantityFeet);
   }
   return byType;
 }

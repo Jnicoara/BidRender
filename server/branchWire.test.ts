@@ -18,8 +18,11 @@ import {
   PANEL_KIND,
 } from "../shared/branchWire";
 
-/** A run with no end on a tee — every run before branch legs (D20). */
-const PLAIN = { startTeeId: null, endTeeId: null };
+/**
+ * A route run with no end on a tee — every run before branch legs (D20) and
+ * quantity mode (D21). NULL is how every stored route run reads.
+ */
+const PLAIN = { startTeeId: null, endTeeId: null, traceMode: null };
 
 describe("a tee end is never a device end (D20)", () => {
   it("does not ask the branch question about a leg from a tee to a device", () => {
@@ -31,6 +34,7 @@ describe("a tee end is never a device end (D20)", () => {
         endKind: "receptacle",
         startTeeId: 30,
         endTeeId: null,
+        traceMode: null,
       })
     ).toBe("homerun");
     expect(
@@ -39,6 +43,7 @@ describe("a tee end is never a device end (D20)", () => {
         endKind: "receptacle",
         startTeeId: null,
         endTeeId: 31,
+        traceMode: null,
       })
     ).toBe(false);
   });
@@ -50,9 +55,45 @@ describe("a tee end is never a device end (D20)", () => {
         endKind: "receptacle",
         startTeeId: 30,
         endTeeId: null,
+        traceMode: null,
         branchWiring: true,
       })
     ).toBe("branch");
+  });
+});
+
+describe("a quantity trace is never asked whose wire it is (D21)", () => {
+  it("counts, even with devices at both ends and a stored branch answer", () => {
+    // The ambiguous case for a route — and a stored D18 "branch" left over
+    // from before a switch, which must not quietly drop the footage.
+    for (const branchWiring of [null, true, false]) {
+      expect(
+        runWireOwnership({
+          ...PLAIN,
+          traceMode: "quantity",
+          startKind: "receptacle",
+          endKind: "receptacle",
+          branchWiring,
+        })
+      ).toBe("homerun");
+    }
+    expect(
+      shouldAskAboutBranchWiring({
+        ...PLAIN,
+        traceMode: "quantity",
+        startKind: "switch",
+        endKind: "receptacle",
+      })
+    ).toBe(false);
+    // The same run as a route still asks — the rule is the mode, not the ends.
+    expect(
+      shouldAskAboutBranchWiring({
+        ...PLAIN,
+        traceMode: "route",
+        startKind: "switch",
+        endKind: "receptacle",
+      })
+    ).toBe(true);
   });
 });
 

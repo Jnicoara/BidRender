@@ -179,6 +179,33 @@ export function proposeDrops(input: {
     });
 }
 
+/**
+ * Quantity traces among a set of run rows, for the totals: how many traces
+ * (a trace of five legs is one), and how many ends could take a drop.
+ *
+ * The sentence it feeds says plainly that none of their vertical footage is
+ * in the figures (D21) — the flat-only line § 5d asks for, for this mode.
+ */
+export function quantityTraceSummary(
+  rows: readonly (Omit<QuantityLeg, "points"> & {
+    parentRunId: number | null;
+    traceMode: string | null;
+    points: readonly Pt[] | null;
+  })[]
+): { traceCount: number; openEnds: number } {
+  const byRoot = new Map<number, QuantityLeg[]>();
+  for (const row of rows) {
+    if (row.traceMode !== "quantity") continue;
+    const root = row.parentRunId ?? row.id;
+    const list = byRoot.get(root) ?? [];
+    list.push({ ...row, points: row.points ?? [] });
+    byRoot.set(root, list);
+  }
+  let openEnds = 0;
+  byRoot.forEach(legs => (openEnds += openEndCount(legs)));
+  return { traceCount: byRoot.size, openEnds };
+}
+
 /** How many ends of these traces are waiting for an answer. */
 export function openEndCount(legs: readonly QuantityLeg[]): number {
   return quantityEnds(legs).filter(end => end.state === "open").length;

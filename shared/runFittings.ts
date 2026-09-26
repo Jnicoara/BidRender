@@ -61,6 +61,7 @@ import {
   teeFittingCounts,
   type TeeRef,
 } from "./runNetwork";
+import { isApprovedDrop, type TraceMode } from "./traceMode";
 
 /**
  * How one stick of this raceway joins the next.
@@ -497,7 +498,13 @@ function countConnectors(
   let qty = 0;
   let lbs = 0;
   let pullBoxes = 0;
+  let open = 0;
   for (const [node, degree] of Array.from(nodeDegrees(legs).entries())) {
+    // A quantity end with no approved drop: nothing said a box is there (D21).
+    if (node.startsWith(OPEN_NODE)) {
+      open += degree;
+      continue;
+    }
     /*
       A tee is said as a tee, not by its degree here. Legs of different sizes
       are counted in different groups, so a 1/2" branch off a 3/4" main sees
@@ -546,12 +553,20 @@ function countConnectors(
         `${plural(nodes, "branch tee")} (${degree} ${nodes === 1 ? "" : "each "}of this size)`
     );
   parts.push(...teeParts);
+  const openPart =
+    open > 0
+      ? [`none at ${plural(open, "quantity-trace end")} with no drop approved`]
+      : [];
+  const listed = [...parts, ...pullParts, ...openPart].join(", ");
   return {
     kind,
     status: "counted",
     qty,
     atLeast: false,
-    why: `${plural(qty, "connector")}: one per conduit end — ${[...parts, ...pullParts].join(", ")}`,
+    why:
+      qty === 0 && open > 0
+        ? `No connectors: ${listed}`
+        : `${plural(qty, "connector")}: one per conduit end — ${listed}`,
   };
 }
 
@@ -642,23 +657,54 @@ export function legFromRun(run: {
   verticals: { start: EndVertical; end: EndVertical };
   feetPerPoint: number | null;
   answers: readonly PullPointAnswer[];
+  /**
+   * Route or quantity (D21). Required, with the STORED end kinds beside it,
+   * because a quantity leg's ends are only terminations where a drop was
+   * approved — see below.
+   */
+  traceMode: TraceMode | null;
+  startKind: string | null;
+  endKind: string | null;
 }): FittingLeg {
   const startDrop = endDropOf(run.verticals.start);
   const endDrop = endDropOf(run.verticals.end);
+  const quantity = run.traceMode === "quantity";
+  /*
+    A QUANTITY leg (D21, answer 1): a connector only where a drop was
+    approved. Any other end is an `open:` node, which the connector count
+    skips and names — it is where somebody stopped drawing, not a box anybody
+    said is there. Its stored pull-point answers are left in their table and
+    unread, and nothing new is proposed on it.
+  */
+  const nodeAt = (end: "start" | "end"): string => {
+    const stampId = end === "start" ? run.startStampId : run.endStampId;
+    const tee = end === "start" ? run.startTee : run.endTee;
+    const kind = end === "start" ? run.startKind : run.endKind;
+    if (quantity && !isApprovedDrop(kind))
+      return `${OPEN_NODE}${run.id}:${end}`;
+    return endNodeKey(run.id, end, stampId, tee);
+  };
   return {
     id: String(run.id),
     runId: String(run.parentRunId ?? run.id),
-    from: endNodeKey(run.id, "start", run.startStampId, run.startTee),
-    to: endNodeKey(run.id, "end", run.endStampId, run.endTee),
+    from: nodeAt("start"),
+    to: nodeAt("end"),
     feet: run.conduitFeet,
     feetIsFloor: startDrop.state === "unknown" || endDrop.state === "unknown",
     points: run.points,
     feetPerPoint: run.feetPerPoint,
     startDrop,
     endDrop,
-    answers: run.answers,
+    answers: quantity ? [] : run.answers,
+    noPullPoints: quantity,
   };
 }
+
+/**
+ * Node key prefix for an end of a quantity leg with no approved drop (D21).
+ * Takes no connector. Each is its own node, so two never "meet".
+ */
+export const OPEN_NODE = "open:";
 
 // ── Words ────────────────────────────────────────────────────────────────────
 
