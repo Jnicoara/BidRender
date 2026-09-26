@@ -50,6 +50,7 @@ import {
   hasFeature,
   inviteExpiresAt,
   inviteRejection,
+  inviteStatus,
   inviteUsable,
   outranks,
 } from "../shared/permissions";
@@ -196,6 +197,24 @@ describe("invitations expire and cannot be reused", () => {
         now
       )
     ).toBe(false);
+  });
+
+  it("says revoked, not expired, for a revoked code (inviteStatus)", () => {
+    const live = inviteExpiresAt(now);
+    const past = new Date(now.getTime() - 1000);
+    expect(
+      inviteStatus({ ...base, expiresAt: live, revokedAt: now }, now)
+    ).toBe("revoked");
+    // Revoked wins even once the date has also passed.
+    expect(
+      inviteStatus({ ...base, expiresAt: past, revokedAt: now }, now)
+    ).toBe("revoked");
+    expect(inviteStatus({ ...base, expiresAt: past }, now)).toBe("expired");
+    expect(inviteStatus({ ...base, expiresAt: now }, now)).toBe("expired");
+    expect(inviteStatus({ ...base, expiresAt: live }, now)).toBe("pending");
+    expect(
+      inviteStatus({ expiresAt: past, acceptedAt: now, revokedAt: now }, now)
+    ).toBe("joined");
   });
 
   it("does not tell a stranger which company a dead code belonged to", () => {

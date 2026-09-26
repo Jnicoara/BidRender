@@ -395,14 +395,19 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
                     {item.role}
                   </span>
                   <span className="text-xs shrink-0">
-                    {item.acceptedAt ? (
+                    {/* From inviteStatus (shared/permissions.ts). This used
+                        to branch on acceptedAt then usable, so a code revoked
+                        a second ago read "expired". */}
+                    {item.status === "joined" ? (
                       <span className="text-emerald-400 inline-flex items-center gap-1">
                         <Check className="w-3 h-3" /> joined
                       </span>
-                    ) : item.usable ? (
+                    ) : item.status === "pending" ? (
                       <span className="text-muted-foreground">
                         expires {new Date(item.expiresAt).toLocaleDateString()}
                       </span>
+                    ) : item.status === "revoked" ? (
+                      <span className="text-muted-foreground">revoked</span>
                     ) : (
                       <span className="text-muted-foreground">expired</span>
                     )}

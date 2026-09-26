@@ -276,6 +276,34 @@ export function inviteUsable(
   return invite.expiresAt.getTime() > now.getTime();
 }
 
+/** What the Crew page says about an invitation. */
+export type InviteStatus = "joined" | "revoked" | "expired" | "pending";
+
+/**
+ * Which of those an invitation is, in the order that decides a conflict.
+ *
+ * Exists because "not usable" is three different facts, and the Crew page
+ * used to report all three as "expired" — so a code revoked a second ago read
+ * as one that had merely run out, which is false rather than vague. Revoked
+ * outranks expired: an owner who revoked a code did something, and that is
+ * what the list should say, however long ago the date then passed.
+ *
+ * Joined outranks both, matching inviteUsable, which refuses a used code
+ * before it looks at anything else.
+ */
+export function inviteStatus(
+  invite: {
+    expiresAt: Date;
+    acceptedAt: Date | null;
+    revokedAt: Date | null;
+  },
+  now: Date
+): InviteStatus {
+  if (invite.acceptedAt !== null) return "joined";
+  if (invite.revokedAt !== null) return "revoked";
+  return inviteUsable(invite, now) ? "pending" : "expired";
+}
+
 /**
  * Why an invitation cannot be used, in words a person can act on.
  *

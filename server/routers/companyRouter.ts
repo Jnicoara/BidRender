@@ -38,6 +38,7 @@ import {
   INVITABLE_ROLES,
   inviteExpiresAt,
   inviteRejection,
+  inviteStatus,
   inviteUsable,
   outranks,
   type CompanyRole,
@@ -128,6 +129,9 @@ export const companyRouter = router({
       acceptedAt: invite.acceptedAt,
       revokedAt: invite.revokedAt,
       usable: inviteUsable(invite, new Date()),
+      // What the Crew page says. Decided here, from the same clock as
+      // `usable`, so the label and the Revoke button cannot disagree.
+      status: inviteStatus(invite, new Date()),
     }))
   ),
 

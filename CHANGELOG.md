@@ -6,6 +6,9 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **The Crew page now says "revoked" for an invite code you revoked.** It
+  used to call it "expired", which was untrue — a code revoked a second ago
+  had not run out, somebody had cancelled it.
 - **Searching a material by its old name puts that material first again.**
   "30A breaker" now lists the 30A Single-Pole breaker first, not the 2-Pole
   one, and "30A fused disconnect" lists the outdoor NEMA 3R disconnect — the
