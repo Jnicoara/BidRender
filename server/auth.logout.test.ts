@@ -26,6 +26,15 @@ function createAuthContext(): {
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
+    // Columns added after this fixture was written, at the schema's own
+    // defaults, so it is a row that could exist. logout reads nothing off the
+    // user — it clears the cookie — so none of these can move a result.
+    passwordHash: null,
+    emailVerified: false,
+    accessTier: "standard",
+    activeCompanyId: null,
+    onboardingCompletedAt: null,
+    checklistDismissedAt: null,
   };
 
   const ctx: TrpcContext = {
