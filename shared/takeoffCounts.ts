@@ -341,12 +341,7 @@ export function groupStamps(stamps: StampRecord[]): CountedAssembly[] {
   const groups = new Map<string, CountedAssembly>();
 
   for (const stamp of stamps) {
-    const key =
-      stamp.groupId !== null
-        ? `group:${stamp.groupId}`
-        : stamp.assemblyId !== null
-          ? `id:${stamp.assemblyId}`
-          : `name:${stamp.name.trim().toLowerCase()}`;
+    const key = countKey(stamp);
 
     const existing = groups.get(key);
     if (existing) {
@@ -365,6 +360,23 @@ export function groupStamps(stamps: StampRecord[]): CountedAssembly[] {
   }
 
   return Array.from(groups.values());
+}
+
+/**
+ * The identity `groupStamps` groups by — exported so anything matching counts
+ * ACROSS sheets (the takeoff export) uses the same one. Works on a mark or on
+ * a group it produced, since both carry these three fields.
+ */
+export function countKey(thing: {
+  groupId: number | null;
+  assemblyId: number | null;
+  name: string;
+}): string {
+  return thing.groupId !== null
+    ? `group:${thing.groupId}`
+    : thing.assemblyId !== null
+      ? `id:${thing.assemblyId}`
+      : `name:${thing.name.trim().toLowerCase()}`;
 }
 
 /** Runs as list entries, each pointing at its first vertex. */

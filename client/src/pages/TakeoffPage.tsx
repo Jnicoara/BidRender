@@ -51,6 +51,7 @@ import {
 import { createPortal } from "react-dom";
 import { trpc } from "@/lib/trpc";
 import { useCompany } from "@/hooks/useCompany";
+import { useTakeoffExport } from "@/hooks/useTakeoffExport";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -58,6 +59,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  FileSpreadsheet,
   ClipboardList,
   Loader2,
   Plus,
@@ -1820,6 +1822,7 @@ export default function TakeoffPage({
   const uploading = isBusy(uploads);
   const [confirmRemove, setConfirmRemove] = useState<Document | null>(null);
   const [materialsListOpen, setMaterialsListOpen] = useState(false);
+  const takeoffExport = useTakeoffExport(bidId);
   /**
    * Which sheets state NOT TO SCALE, by sheet id.
    *
@@ -4601,6 +4604,24 @@ export default function TakeoffPage({
               title="Materials list — quantities only, for a supplier quote"
             >
               <ClipboardList className="w-3.5 h-3.5" /> Materials list
+            </Button>
+            {/* The takeoff itself, by sheet and type — the door out to a
+                spreadsheet. Beside the materials list because both are files
+                that leave the app; outlined, like it. */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs shrink-0"
+              onClick={() => void takeoffExport.exportCsv()}
+              disabled={takeoffExport.pending}
+              title="Every count and run, by sheet and type — quantities only"
+            >
+              {takeoffExport.pending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+              )}{" "}
+              Export takeoff
             </Button>
             {docs.length > 0 && (
               <Button

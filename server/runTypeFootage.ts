@@ -12,17 +12,31 @@ import { rootOf } from "../shared/runNetwork";
 
 export type { RunTypeFootageRow };
 
-/** Footage per run type for one bid, keyed by the id the RUNS store. */
-export async function footageByRunType(
+type RunRow = Awaited<ReturnType<typeof db.getRunsForBid>>[number];
+
+/** The grouping's input, with the runs kept as full rows (status, sheet). */
+export type RunFootageInput = Omit<
+  Parameters<typeof groupRunFootage>[0],
+  "runs"
+> & { runs: RunRow[] };
+
+/**
+ * Everything `groupRunFootage` needs for one bid, loaded once.
+ *
+ * Its own function since 2026-09-27 so the takeoff export can group the SAME
+ * rows by sheet and status and get footage that adds up to the bid's, rather
+ * than loading them a second way that could drift from this one.
+ */
+export async function loadRunFootageInput(
   bidId: number,
   userId: number,
   distributionHeightInches: number | null
-): Promise<Map<number, RunTypeFootageRow>> {
+): Promise<RunFootageInput | null> {
   const [runs, scales] = await Promise.all([
     db.getRunsForBid(bidId, userId),
     db.getSheetScalesForBid(bidId, userId),
   ]);
-  if (runs.length === 0) return new Map();
+  if (runs.length === 0) return null;
 
   // A quantity trace's wire comes from its type (D21).
   const circuitsByRun = await db.getWireCircuitsForRuns(runs, userId);
@@ -33,7 +47,7 @@ export async function footageByRunType(
     distributionHeightInches
   );
 
-  return groupRunFootage({
+  return {
     runs,
     circuitsByRun,
     scales,
@@ -45,5 +59,19 @@ export async function footageByRunType(
     ),
     // A tee joins three conduit ends and buys a box (D20).
     teesById: await db.getTeesForRuns(runs.map(rootOf), userId),
-  });
+  };
+}
+
+/** Footage per run type for one bid, keyed by the id the RUNS store. */
+export async function footageByRunType(
+  bidId: number,
+  userId: number,
+  distributionHeightInches: number | null
+): Promise<Map<number, RunTypeFootageRow>> {
+  const input = await loadRunFootageInput(
+    bidId,
+    userId,
+    distributionHeightInches
+  );
+  return input ? groupRunFootage(input) : new Map();
 }

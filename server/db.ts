@@ -4703,6 +4703,8 @@ export async function getSheetJumpRows(bidId: number, userId: number) {
   const [sheets, reads] = await Promise.all([
     db
       .select({
+        // What stamps and runs point at; the takeoff export keys on it.
+        id: bidPdfSheets.id,
         bidPdfId: bidPdfSheets.bidPdfId,
         pageNumber: bidPdfSheets.pageNumber,
         name: bidPdfSheets.name,

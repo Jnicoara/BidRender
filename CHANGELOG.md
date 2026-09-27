@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **A takeoff can now leave the app as a spreadsheet.** "Export takeoff" on
+  the Plans screen, and "Takeoff" in a bid's Send menu, download a CSV of
+  every count and every run by type. It is laid out by sheet, then totalled
+  for the whole bid, with each run marked Draft or Finished so the file can be
+  checked against the run totals. It carries quantities only, no prices, and
+  it lists what it leaves out. Anything that was not measured is left blank
+  rather than shown as 0.
 - **The archive can be emptied in one go, and only owners and admins can
   permanently delete a bid.** A "Delete all" button on the Archive screen
   asks for confirmation, naming how many bids and saying it cannot be undone.
