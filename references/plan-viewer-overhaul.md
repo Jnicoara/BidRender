@@ -4331,11 +4331,11 @@ This keeps the 2026-09-18 decision that colour means which TYPE a run is
   have moved away. That was found on screen. It warned of a clash saving would
   remove, and said nothing about the three lines that would recolor.
 
-- **NOT built, and it needs a decision: run types have no "Restore to
-  shipped".** Answer 3 assumed one ("Restore to shipped drops the color along
-  with the other edits"), but only materials have a revert. The one way back
-  today is "Automatic", which keeps the fork. Undoing a fork is its own
-  design question: runs traced after the fork store the FORK's id.
+- **Run types have no "Restore to shipped", and that is DECIDED for now
+  (owner, 2026-09-27).** Answer 3 assumed one, but only materials have a
+  revert. The owner's call: not now. Setting "Automatic" is how a color is
+  undone, and the company's copy stays. It is in `todo.md` for later, with
+  the question it raises: runs traced after the fork store the FORK's id.
 
 ## 7. Settled — answered 2026-09-17
 

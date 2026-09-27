@@ -1390,12 +1390,12 @@ use; a proposed drop read "To: Receptacle · proposed". See
     in the snapshot) and `color` to `takeoffRunTypes.list` (not in it either),
     so the compare should be IDENTICAL with no `--added` needed. **If it is
     not, read every line.**
-- [ ] **Run types have no "Restore to shipped", and the owner's answer 3
-      assumed one.** Only materials have a revert. Today the only way back is
-      "Automatic", which keeps the fork. Undoing a fork needs a decision
-      first: runs traced after the fork store the FORK's id, so deleting it
-      orphans them, and archiving it leaves them resolving to it. Take it
-      back to the owner before building.
+- [ ] **LATER (owner, 2026-09-27): "Restore to shipped" for run types.** Not
+      now. Setting a color back to "Automatic" is how a color is undone; the
+      company's copy stays. Only materials have a revert today. When it is
+      built, one thing needs deciding first: runs traced after the fork store
+      the FORK's id, so deleting it orphans them, and archiving it leaves them
+      resolving to it.
 - [ ] **Six colours wrap.** The seventh type on a bid shares the first type's
       colour. That is accepted for now. Part B is the answer if it turns out
       to matter.
