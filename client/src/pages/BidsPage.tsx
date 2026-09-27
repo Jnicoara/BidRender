@@ -87,6 +87,7 @@ import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { lineHoursUnset, lineNotPriced } from "@shared/lineNotPriced";
+import { bidNotPricedCount } from "@/lib/notPricedTotal";
 
 const STATUSES = ["Draft", "Active", "Won", "Lost"] as const;
 type Status = (typeof STATUSES)[number];
@@ -470,6 +471,12 @@ export default function BidsPage({
   const notPricedFromPlans = notPriced.filter(
     l => l.takeoffRunTypeId !== null
   ).length;
+  /**
+   * What the totals say they leave out: those lines, plus the $0 PARTS inside
+   * lines that are otherwise priced (0087). Through the same rule the server's
+   * cards use, so this screen and the search result for it cannot disagree.
+   */
+  const notPricedTally = bidNotPricedCount(lines);
   /**
    * Traced lines whose part had no labor unit when sent — labor "Not
    * priced". Their own strip, because the next move is on the Materials
@@ -1129,7 +1136,7 @@ export default function BidsPage({
                 <span className="text-xs text-muted-foreground">Materials</span>
                 <NotPricedTotal
                   amount={money(totals.materialCost)}
-                  notPriced={notPriced.length}
+                  notPriced={notPricedTally}
                   className="font-mono text-sm"
                 />
               </div>
@@ -1187,6 +1194,31 @@ export default function BidsPage({
                             ? "One is"
                             : `${notPricedFromPlans} are`
                       } from traced runs: price the material on the Materials screen, then press Send again on the Plans screen — it fills in the price on a line that has none, and never changes one that is set.`}
+                  </p>
+                </div>
+              )}
+
+              {/*
+                $0 PARTS inside lines that are otherwise priced (0087). Their
+                own strip, because the line shows money and nothing else on
+                the screen would say the Materials total is short. The count
+                was frozen with the line's price, so pricing the part in the
+                library does not reach this bid — the advice says how to.
+              */}
+              {notPricedTally.parts > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {notPricedTally.parts} part
+                      {notPricedTally.parts === 1 ? " is" : "s are"} not priced
+                    </span>{" "}
+                    inside assembly lines that are otherwise priced — the
+                    Materials total above leaves{" "}
+                    {notPricedTally.parts === 1 ? "it" : "them"} out. A line
+                    keeps the price it was added with, so price the part on the
+                    Materials screen, then remove the line and add the assembly
+                    again.
                   </p>
                 </div>
               )}
@@ -1352,7 +1384,7 @@ export default function BidsPage({
                 <span className="text-xs font-medium">Direct cost</span>
                 <NotPricedTotal
                   amount={money(totals.directCost)}
-                  notPriced={notPriced.length}
+                  notPriced={notPricedTally}
                   className="font-mono text-sm"
                 />
               </div>
@@ -1442,7 +1474,7 @@ export default function BidsPage({
                     finalPrice here would count it twice. */}
                 <NotPricedTotal
                   amount={money(totals.workPrice)}
-                  notPriced={notPriced.length}
+                  notPriced={notPricedTally}
                   className="font-mono text-base text-[#F5C518]"
                 />
               </div>

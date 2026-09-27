@@ -4017,6 +4017,19 @@ export const bidLineItems = mysqlTable(
     snapshotMarkupSource: json(
       "snapshotMarkupSource"
     ).$type<StoredMarkupSource>(),
+    /**
+     * How many of an ASSEMBLY's parts were $0 when the line was added, frozen
+     * with the material cost they are missing from (migration 0087). The line
+     * reads "$25.00 + 1 part not priced" and the part counts toward the bid's
+     * not-priced total.
+     *
+     * Frozen, not read from the recipe, because the cost is frozen: a lug
+     * priced in the library later still leaves THIS line's total short, and
+     * the line must keep saying so. NULL is a line from before the column, and
+     * reads the recipe live instead (`withUnpricedParts` in server/db.ts) —
+     * never `?? 0`, which would call every old line fully priced.
+     */
+    snapshotUnpricedParts: int("snapshotUnpricedParts"),
     snapshotAt: timestamp("snapshotAt").defaultNow().notNull(),
 
     sortOrder: int("sortOrder").default(0).notNull(),

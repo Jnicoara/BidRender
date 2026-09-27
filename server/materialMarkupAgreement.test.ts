@@ -26,7 +26,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { appRouter } from "./routers";
-import { bidRollup } from "./bidPricing";
+import { bidRollup, type RollupLine } from "./bidPricing";
 import { getDb, seedBaselineLaborRates } from "./db";
 import {
   bids,
@@ -91,7 +91,9 @@ const line = (
     snapshotLaborRate: "50.0000",
     snapshotMarkupPct: markup,
     snapshotMarkupSource: null,
-  }) as unknown as BidLineItem;
+    // No assembly parts on these lines: a real 0, not a stand-in.
+    unpricedParts: 0,
+  }) as unknown as RollupLine;
 
 const LINES = [
   line(1, "100.0000", "1.0000", "3.0000", "0.400000", "Unit 1"),

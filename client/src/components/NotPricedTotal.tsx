@@ -14,6 +14,7 @@
  */
 import { cn } from "@/lib/utils";
 import { notPricedSuffix } from "@/lib/notPricedTotal";
+import type { NotPricedTally } from "@shared/lineNotPriced";
 
 export function NotPricedTotal({
   amount,
@@ -22,8 +23,11 @@ export function NotPricedTotal({
 }: {
   /** Already formatted — `money` or `moneyWhole`, the screen's choice. */
   amount: string;
-  /** From `bidNotPricedCount`. */
-  notPriced: number;
+  /**
+   * From `bidNotPricedCount`, or the server's `notPriced`. Lines AND parts,
+   * as one value, so a caller cannot pass the lines and forget the parts.
+   */
+  notPriced: NotPricedTally;
   /** The figure's own classes (font, size, colour). */
   className?: string;
 }) {
@@ -34,7 +38,7 @@ export function NotPricedTotal({
       {suffix && (
         <span
           className="text-[11px] font-sans text-[#F5C518] whitespace-nowrap"
-          title="Lines nobody has priced add nothing to this total. Each says “Not priced” on the bid."
+          title="Lines and parts nobody has priced add nothing to this total. Each says “not priced” on the bid."
         >
           {suffix}
         </span>

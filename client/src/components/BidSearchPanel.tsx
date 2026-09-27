@@ -371,11 +371,11 @@ export function BidSearchPanel({
                   ).toLocaleDateString()}
                 </span>
                 <span className="shrink-0 w-24 text-right">
-                  {/* The same "+ N lines not priced" as the bid screen, from
-                      the same rule (rollUpBid.notPricedCount). */}
+                  {/* The same "+ N lines, N parts not priced" as the bid
+                      screen, from the same rule (rollUpBid.notPriced). */}
                   <NotPricedTotal
                     amount={moneyWhole(bid.finalPrice)}
-                    notPriced={bid.notPricedCount}
+                    notPriced={bid.notPriced}
                     className="font-mono text-sm"
                   />
                   <IncompletePriceTag show={bid.incomplete} className="block" />

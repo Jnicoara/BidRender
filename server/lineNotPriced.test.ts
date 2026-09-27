@@ -122,14 +122,24 @@ describe("nothing to price", () => {
 });
 
 it("counts the lines a total leaves out", () => {
+  // No assembly parts anywhere, so the part count is a real 0, not a default.
+  const noParts = { unpricedParts: 0 };
   expect(
     countNotPriced([
-      { line: base, directCost: 0 },
-      { line: { ...base, snapshotMaterialCost: "0" }, directCost: 0 },
+      { line: { ...base, ...noParts }, directCost: 0 },
       {
-        line: { ...base, assemblyId: 1, snapshotMaterialCost: "0" },
+        line: { ...base, ...noParts, snapshotMaterialCost: "0" },
+        directCost: 0,
+      },
+      {
+        line: {
+          ...base,
+          ...noParts,
+          assemblyId: 1,
+          snapshotMaterialCost: "0",
+        },
         directCost: 0,
       },
     ])
-  ).toBe(2);
+  ).toEqual({ lines: 2, parts: 0 });
 });

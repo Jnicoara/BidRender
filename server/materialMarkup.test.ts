@@ -24,7 +24,7 @@ import {
   type MarkupRuleSet,
 } from "../shared/materialMarkup";
 import { calculateLineItem } from "../shared/pricing";
-import { bidRollup } from "./bidPricing";
+import { bidRollup, type RollupLine } from "./bidPricing";
 import { buildAccountingExport } from "../shared/accountingExport";
 import type { Bid, BidLineItem, StoredMarkupSource } from "../drizzle/schema";
 
@@ -383,7 +383,9 @@ describe("a bid from before markup rules prices exactly as it did", () => {
       snapshotLaborRate: rate,
       snapshotMarkupPct: null,
       snapshotMarkupSource: null,
-    }) as unknown as BidLineItem;
+      // No assembly parts on these lines: a real 0, not a stand-in.
+      unpricedParts: 0,
+    }) as unknown as RollupLine;
 
   const lines = [
     line(1, "12.3456", "0.4500", "17.0000", "62.5000", "0.1200", "Room A"),

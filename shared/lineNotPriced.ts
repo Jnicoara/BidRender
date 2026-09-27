@@ -87,12 +87,69 @@ export function lineHoursUnset(line: {
   return line.takeoffRunTypeId !== null && line.snapshotLaborHours === null;
 }
 
-/** How many lines on a bid the total leaves unpriced. */
-export function countNotPriced(
-  lines: readonly { line: NotPricedLineLike; directCost: number | null }[]
+// ─── Parts not priced, inside a line that is ─────────────────────────────────
+
+/**
+ * How many of a recipe's parts have no price — frozen onto an assembly line
+ * when it is added (`snapshotUnpricedParts`, migration 0087).
+ *
+ * A RECIPE ROW is a part: two lugs on one row are "1 part not priced", because
+ * pricing the lug once prices both. A row with no quantity puts nothing on the
+ * line, so its price is not missing from anything.
+ */
+export function unpricedPartsIn(
+  recipe: readonly { costPerUnit: string | number; qty: string | number }[]
 ): number {
-  return lines.reduce(
-    (n, { line, directCost }) => (lineNotPriced(line, directCost) ? n + 1 : n),
-    0
+  return recipe.filter(
+    row => Number(row.qty) > 0 && needsPricing(row.costPerUnit)
+  ).length;
+}
+
+/**
+ * A line with its unpriced-part count RESOLVED: the frozen count, or for a
+ * line from before 0087, the recipe read now. Required, so a screen or total
+ * that forgot the old lines cannot compile — `?? 0` there would call every
+ * one of them fully priced.
+ */
+export type PartsLineLike = NotPricedLineLike & { unpricedParts: number };
+
+/**
+ * The unpriced parts a line admits to beside its money — "$25.00 + 1 part
+ * not priced" (owner, 2026-09-26).
+ *
+ * Zero on a line that is already "Not priced" as a whole: its parts are in
+ * that already, and counting both would say the bid is short by more than it
+ * is. Zero on a line with no quantity, for the reason `lineNotPriced` gives.
+ */
+export function linePartsNotPriced(
+  line: PartsLineLike,
+  directCost: number | null
+): number {
+  const qty = Number(line.qty);
+  if (!Number.isFinite(qty) || qty <= 0) return 0;
+  if (line.assemblyId === null) return 0;
+  if (lineNotPriced(line, directCost)) return 0;
+  return Math.max(0, Math.floor(line.unpricedParts));
+}
+
+/**
+ * What a bid total leaves out: whole LINES nobody priced, and PARTS missing
+ * from lines that are otherwise priced. Two numbers, not one, because they
+ * are different things — "+ 2 lines, 3 parts not priced".
+ */
+export type NotPricedTally = { lines: number; parts: number };
+
+export const NOTHING_NOT_PRICED: NotPricedTally = { lines: 0, parts: 0 };
+
+/** How much of a bid the total leaves unpriced. */
+export function countNotPriced(
+  lines: readonly { line: PartsLineLike; directCost: number | null }[]
+): NotPricedTally {
+  return lines.reduce<NotPricedTally>(
+    (tally, { line, directCost }) => ({
+      lines: tally.lines + (lineNotPriced(line, directCost) ? 1 : 0),
+      parts: tally.parts + linePartsNotPriced(line, directCost),
+    }),
+    NOTHING_NOT_PRICED
   );
 }

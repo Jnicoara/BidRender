@@ -46,7 +46,33 @@ left as written rather than rewritten to match the rename.
       supplier found sells a "350-500" span). Renamed the same day to "400
       kcmil crimp lug, single size" to match the 500, through
       `RENAMED_BASELINE_MATERIALS` — same row id, old name still finds it.
-- [ ] **A $0 part inside an assembly that has LABOR is not flagged on the
+- [x] **BUILT 2026-09-26 as option (a), NOT DEPLOYED: a priced assembly
+      line says "$25.00 + 1 part not priced", and the totals count the part
+      apart from lines — "+ 2 lines, 3 parts not priced".** Migration 0087,
+      `bid_line_items.snapshotUnpricedParts` (nullable int), written in
+      `snapshotForAssembly` from the same recipe rows the cost is summed over,
+      so every way an assembly reaches a bid freezes it. NULL (every line from
+      before 0087) reads the recipe live through `withUnpricedParts`. The
+      rollup takes `RollupLine` — the count RESOLVED and required — so a
+      pricing read that forgot the old lines does not compile;
+      `db.getRollupLines` is the one loader. Rule in `shared/lineNotPriced.ts`
+      (`unpricedPartsIn`, `linePartsNotPriced`, `countNotPriced` now returns
+      `{ lines, parts }`); words in `client/src/lib/notPricedTotal.ts`. The
+      bid screen has its own strip for parts (price it, then remove and re-add
+      the line — nothing re-snapshots an assembly line). The sample bid and
+      "Save as assembly" write 0, not NULL. Test:
+      `server/assemblyPartsNotPriced.test.ts`, 7 failing before the change.
+  - **Deploy: three steps, step 3 empty.** 0087 is ADDITIVE — one nullable
+    column, no default, no UPDATE: apply it BEFORE the push. Then
+    `scripts/schemaDrift.mts` should report no drift at 88 — **if it does not,
+    stop and find out why before pushing.**
+  - **One thing moves on existing bids, deliberately:** a line from before
+    0087 whose assembly has a $0 part now says so (read live), and its bid's
+    totals gain "+ N parts not priced". No money changes.
+  - **The dashboard cards still do not count it**, for the reason the
+    dashboard item below gives — they sum in SQL.
+  - Parked question as it stood:
+- [x] **A $0 part inside an assembly that has LABOR is not flagged on the
       bid line.** Checked 2026-09-26 with the new lugs: an assembly line of
       two lugs and 0.5 h reads "$25.00" — the labor — with nothing saying the
       lugs in it are unpriced, because `lineNotPriced` calls an assembly line

@@ -41,6 +41,8 @@ import { ProposalSheet } from "@/components/proposal/ProposalSheet";
 import { ProposalDesignControls } from "@/components/proposal/ProposalDesignControls";
 import { money } from "@/lib/money";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
+import { anyNotPriced, notPricedHeadline } from "@/lib/notPricedTotal";
+import { NOTHING_NOT_PRICED } from "@shared/lineNotPriced";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -189,10 +191,12 @@ export default function ProposalPage({
    * leaves them out, so printing a priced proposal asks first. Scope-only
    * prints no money and asks nothing.
    */
-  const notPriced = mode === "full" ? (data?.notPricedCount ?? 0) : 0;
+  const notPriced =
+    mode === "full" && data ? data.notPriced : NOTHING_NOT_PRICED;
+  const headline = notPricedHeadline(notPriced);
   const [confirmPrint, setConfirmPrint] = useState(false);
   const requestPrint = () => {
-    if (notPriced > 0) setConfirmPrint(true);
+    if (anyNotPriced(notPriced)) setConfirmPrint(true);
     else print();
   };
   // Ctrl+P goes through the same question as the button. A ref, so the
@@ -557,14 +561,11 @@ export default function ProposalPage({
       <AlertDialog open={confirmPrint} onOpenChange={setConfirmPrint}>
         <AlertDialogContent className="bp-no-print">
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {notPriced} line{notPriced === 1 ? " is" : "s are"} not priced
-            </AlertDialogTitle>
+            <AlertDialogTitle>{headline.text}</AlertDialogTitle>
             <AlertDialogDescription>
-              The total on this proposal leaves{" "}
-              {notPriced === 1 ? "it" : "them"} out, so the client will see a
-              price that is short by whatever{" "}
-              {notPriced === 1 ? "it costs" : "they cost"}. The proposal itself
+              The total on this proposal leaves {headline.one ? "it" : "them"}{" "}
+              out, so the client will see a price that is short by whatever{" "}
+              {headline.one ? "it costs" : "they cost"}. The proposal itself
               does not mention it.
             </AlertDialogDescription>
           </AlertDialogHeader>

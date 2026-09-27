@@ -202,6 +202,7 @@ import {
   type SeatUsage,
 } from "../shared/seats";
 import { hourlyCostFor } from "../shared/laborRateLookup";
+import { unpricedPartsIn } from "../shared/lineNotPriced";
 import { appliedModifiers } from "../shared/modifierLookup";
 import { resolveMaterial, materialIdsToFetch } from "../shared/materialLookup";
 import { resolveAssembly } from "../shared/assemblyLookup";
@@ -5411,6 +5412,7 @@ async function snapshotForAssembly(
   snapshotModifierNames: string[];
   snapshotMarkupPct: string;
   snapshotMarkupSource: LineMarkupSource;
+  snapshotUnpricedParts: number;
 }> {
   const [activeModifiers, rates, markupRuleSet] = await Promise.all([
     getLibraryModifiers(userId, "active"),
@@ -5471,7 +5473,53 @@ async function snapshotForAssembly(
     // Resolved per PART, over the same recipe lines the material cost above
     // was summed from, so the blend is weighted by exactly that cost.
     ...markupSnapshot(markupPartsForAssembly(detail), markupRuleSet),
+    // Over the SAME recipe rows the material cost above was summed from, so
+    // the count names exactly the parts missing from that frozen figure.
+    snapshotUnpricedParts: unpricedPartsIn(detail.materials),
   };
+}
+
+/**
+ * Lines with their unpriced-part count resolved, ready for the rollup.
+ *
+ * A line added since 0087 carries its frozen count. A line from before it
+ * (NULL) reads its assembly's recipe NOW, resolved exactly as a fresh add
+ * would resolve it (`getAssemblyForStoredReference`, forks included). That can
+ * be wrong — a part priced since leaves the old total short and this says 0 —
+ * but it is the best answer the row allows, and the reason new lines freeze.
+ *
+ * One recipe read per distinct assembly across ALL the lines passed, so a page
+ * of bids that share assemblies reads each once. The cost shrinks to nothing
+ * as old lines age out; a line with no assembly is 0 without a read.
+ */
+export async function withUnpricedParts<L extends BidLineItem>(
+  lines: readonly L[],
+  userId: number
+): Promise<(L & { unpricedParts: number })[]> {
+  const unfrozen = new Set<number>();
+  for (const line of lines) {
+    if (line.assemblyId !== null && line.snapshotUnpricedParts === null)
+      unfrozen.add(line.assemblyId);
+  }
+  const live = new Map<number, number>();
+  await Promise.all(
+    Array.from(unfrozen, async assemblyId => {
+      const detail = await getAssemblyForStoredReference(assemblyId, userId);
+      // A deleted assembly has no recipe to read: nothing to admit to.
+      live.set(assemblyId, detail ? unpricedPartsIn(detail.materials) : 0);
+    })
+  );
+  return lines.map(line => ({
+    ...line,
+    unpricedParts:
+      line.snapshotUnpricedParts ??
+      (line.assemblyId === null ? 0 : (live.get(line.assemblyId) ?? 0)),
+  }));
+}
+
+/** A bid's lines, resolved for the rollup — what every pricing read loads. */
+export async function getRollupLines(bidId: number, userId: number) {
+  return withUnpricedParts(await getBidLineItems(bidId), userId);
 }
 
 // ─── Material markup: the rules, and what a line freezes ─────────────────────
@@ -5578,6 +5626,8 @@ export function pricingSnapshotOf(
     snapshotModifierNames: line.snapshotModifierNames,
     snapshotMarkupPct: line.snapshotMarkupPct,
     snapshotMarkupSource: line.snapshotMarkupSource,
+    // A copy carries the frozen cost, so it carries what that cost lacks.
+    snapshotUnpricedParts: line.snapshotUnpricedParts,
     snapshotAt: line.snapshotAt,
   };
 }
@@ -5943,6 +5993,9 @@ export async function saveLineAsAssembly(input: {
   await updateBidLineItem(line.id, bidId, {
     assemblyId,
     snapshotLaborRate: input.laborRate.toFixed(4),
+    // Built from this line's typed price, so no part of it is $0 — said
+    // rather than left NULL, which would read the new recipe live for ever.
+    snapshotUnpricedParts: 0,
   });
   return { assemblyId, materialId };
 }
@@ -9863,6 +9916,12 @@ export async function seedSampleProject(
         a sample that re-priced itself from somebody's real markup would stop
         matching the walkthrough written against it.
       */
+      /*
+        Priced by fixture numbers, not by the starter recipe it is linked to,
+        so nothing in it is missing. NULL would read the starter's $0 parts
+        live and tell a new user their sample bid was short.
+      */
+      snapshotUnpricedParts: 0,
       snapshotMarkupPct: "0.000000",
       snapshotMarkupSource: {
         level: "none",

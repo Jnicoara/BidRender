@@ -167,7 +167,7 @@ export default function BidArchivePage({
                     <span className="text-xs text-muted-foreground/50">·</span>
                     <NotPricedTotal
                       amount={moneyWhole(bid.finalPrice)}
-                      notPriced={bid.notPricedCount}
+                      notPriced={bid.notPriced}
                       className="text-xs font-mono text-muted-foreground"
                     />
                     <IncompletePriceTag show={bid.incomplete} />

@@ -37,6 +37,13 @@ import {
 } from "../shared/linePricingProblems";
 import { storedMarkupPct } from "../shared/materialMarkup";
 import { countNotPriced } from "../shared/lineNotPriced";
+
+/**
+ * A bid line as the rollup needs it: the stored row, with its unpriced-part
+ * count resolved (`db.withUnpricedParts`). Required rather than optional so a
+ * caller that loaded lines and forgot the old ones cannot compile.
+ */
+export type RollupLine = BidLineItem & { unpricedParts: number };
 import {
   DEFAULT_TAX_RULES,
   calculateSalesTax,
@@ -297,7 +304,7 @@ export function priceFromDirectCost(
 /** Roll one bid's lines up to a price, at whatever settings apply to it. */
 export function rollUpBid(
   bid: Bid,
-  lines: BidLineItem[],
+  lines: RollupLine[],
   company: CompanyPricingDefaults,
   /** Charges on the bid. Only the marked-up ones affect the direct cost. */
   expenses: readonly ExpenseLine[] = []
@@ -395,12 +402,13 @@ export function rollUpBid(
     /** True when `problems` is not empty: the totals leave something out. */
     incomplete: problems.length > 0,
     /**
-     * Lines nobody has priced, which the totals count as $0 — the lines whose
-     * cost cell says "Not priced". Separate from `incomplete`, which is lines
-     * the engine could not price at all. Through `countNotPriced`, the rule
-     * the bid screen uses, with each line's own row passed whole.
+     * What the totals count as $0 because nobody priced it: whole LINES whose
+     * cost cell says "Not priced", and PARTS missing from lines that are
+     * otherwise priced ("$25.00 + 1 part not priced", 0087). Separate from
+     * `incomplete`, which is lines the engine could not price at all. Through
+     * `countNotPriced`, the rule the bid screen uses.
      */
-    notPricedCount: countNotPriced(
+    notPriced: countNotPriced(
       lines.map((line, index) => ({
         line,
         directCost: breakdowns[index]?.directCost ?? null,
@@ -442,9 +450,9 @@ export function priceLineGuarded(
  * breakdowns — two callers each summing their own way is how a bid's parts stop
  * adding up to its whole.
  */
-export function bidRollup(
+export function bidRollup<L extends RollupLine>(
   bid: Bid,
-  lines: BidLineItem[],
+  lines: L[],
   company: CompanyPricingDefaults,
   /**
    * Sales tax context. Optional so every existing caller and test keeps
@@ -465,7 +473,7 @@ export function bidRollup(
     bidPrice,
     problems,
     incomplete,
-    notPricedCount,
+    notPriced,
   } = rollUpBid(bid, lines, company, expenses);
   /*
     `breakdown` is null for a line that could not be priced. Nullable rather
@@ -597,8 +605,8 @@ export function bidRollup(
     problems,
     /** The totals leave something out. Proposal and export refuse on this. */
     incomplete,
-    /** Lines nobody priced, counted as $0 — see rollUpBid. */
-    notPricedCount,
+    /** Lines and parts nobody priced, counted as $0 — see rollUpBid. */
+    notPriced,
     units: Array.from(unitTotals, ([label, totals]) => ({
       label,
       ...totals,

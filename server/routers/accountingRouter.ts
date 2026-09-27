@@ -59,7 +59,7 @@ export const accountingRouter = router({
 
       const [lines, company, client, taxRules, jurisdictionRows, expenseRows] =
         await Promise.all([
-          db.getBidLineItems(bid.id),
+          db.getRollupLines(bid.id, ctx.scope.dataUserId),
           companyDefaultsFor(ctx.scope.dataUserId),
           bid.clientId
             ? db.getClientById(bid.clientId, ctx.scope.dataUserId)

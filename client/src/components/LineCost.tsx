@@ -12,13 +12,18 @@
  */
 import { money } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { lineNotPriced, type NotPricedLineLike } from "@shared/lineNotPriced";
+import {
+  lineNotPriced,
+  linePartsNotPriced,
+  type PartsLineLike,
+} from "@shared/lineNotPriced";
+import { partsNotPricedWords } from "@/lib/notPricedTotal";
 
 export function LineCost({
   line,
   className,
 }: {
-  line: NotPricedLineLike & {
+  line: PartsLineLike & {
     breakdown: { directCost: number } | null;
     problem?: { message: string; ref?: string | null } | null;
   };
@@ -50,6 +55,31 @@ export function LineCost({
         }
       >
         Not priced
+      </span>
+    );
+  }
+  /*
+    Priced, but with $0 parts inside (0087) — an assembly of two lugs and
+    half an hour shows the labor as money, and says the lugs are missing from
+    it. Same amber as "Not priced", smaller than the figure, and wrapping
+    under it rather than pushing it off a narrow column.
+  */
+  const parts = partsNotPricedWords(linePartsNotPriced(line, cost));
+  if (parts) {
+    return (
+      <span
+        className={cn(
+          "inline-flex flex-wrap items-baseline justify-end gap-x-1",
+          className
+        )}
+      >
+        <span className="font-mono text-sm">{money(cost)}</span>
+        <span
+          className="text-[11px] text-[#F5C518] whitespace-nowrap"
+          title="This line's price was frozen when it was added, and some of the assembly's parts had no price then. They add nothing to it."
+        >
+          + {parts}
+        </span>
       </span>
     );
   }

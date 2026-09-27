@@ -242,9 +242,12 @@ export const bidsRouter = router({
       const company = await companyDefaultsFor(ctx.scope.dataUserId);
       const priced = await Promise.all(
         rows.map(async bid => {
-          const lines = await db.getBidLineItems(bid.id);
-          const { directCost, bidPrice, incomplete, notPricedCount } =
-            rollUpBid(bid, lines, company);
+          const lines = await db.getRollupLines(bid.id, ctx.scope.dataUserId);
+          const { directCost, bidPrice, incomplete, notPriced } = rollUpBid(
+            bid,
+            lines,
+            company
+          );
           return {
             ...bid,
             lineCount: lines.length,
@@ -252,8 +255,8 @@ export const bidsRouter = router({
             finalPrice: bidPrice.finalPrice,
             /** The price leaves something out; show it as incomplete. */
             incomplete,
-            /** Lines nobody priced, counted as $0 in finalPrice. */
-            notPricedCount,
+            /** Lines and parts nobody priced, counted as $0 in finalPrice. */
+            notPriced,
           };
         })
       );
@@ -575,8 +578,8 @@ export const bidsRouter = router({
         // Priced through the same rollUpBid as the dashboard, so a bid's value
         // reads the same whether it is archived or not — someone deciding what to
         // rescue is looking at exactly the number they saw before archiving it.
-        const lines = await db.getBidLineItems(bid.id);
-        const { bidPrice, incomplete, notPricedCount } = rollUpBid(
+        const lines = await db.getRollupLines(bid.id, ctx.scope.dataUserId);
+        const { bidPrice, incomplete, notPriced } = rollUpBid(
           bid,
           lines,
           company
@@ -589,7 +592,7 @@ export const bidsRouter = router({
           lineCount: lines.length,
           finalPrice: bidPrice.finalPrice,
           incomplete,
-          notPricedCount,
+          notPriced,
           purgeDueAt: purgeDueAt(archivedAt),
           daysRemaining: daysRemaining(archivedAt, now),
           urgency: retentionUrgency(archivedAt, now),
@@ -633,7 +636,7 @@ export const bidsRouter = router({
       const bid = await requireBid(input.id, ctx.scope.dataUserId);
       const [lines, company, client, taxRules, jurisdictionRows, expenseRows] =
         await Promise.all([
-          db.getBidLineItems(bid.id),
+          db.getRollupLines(bid.id, ctx.scope.dataUserId),
           companyDefaultsFor(ctx.scope.dataUserId),
           // Null for the great majority of bids, which have no client assigned.
           bid.clientId

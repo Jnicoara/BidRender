@@ -322,7 +322,7 @@ export const proposalsRouter = router({
         expenseRows,
         scopeNoteRows,
       ] = await Promise.all([
-        db.getBidLineItems(bid.id),
+        db.getRollupLines(bid.id, ctx.scope.dataUserId),
         companyDefaultsFor(ctx.scope.dataUserId),
         db.getCompanyBranding(ctx.scope.dataUserId),
         db.getProposalSettings(ctx.scope.dataUserId),
@@ -345,7 +345,7 @@ export const proposalsRouter = router({
         markedUp: row.markedUp,
       }));
 
-      const { priced, units, totals, salesTax, problems, notPricedCount } =
+      const { priced, units, totals, salesTax, problems, notPriced } =
         bidRollup(
           bid,
           lines,
@@ -460,12 +460,12 @@ export const proposalsRouter = router({
           finalPrice: totals.finalPrice,
         },
         /**
-         * Lines nobody priced, which the total counts as $0. Unlike a line
-         * the engine cannot price, this does NOT refuse the proposal (owner,
-         * 2026-09-26): the composer warns before printing and shows the count
-         * in "Your figures", and the client's copy says nothing about it.
+         * Lines and parts nobody priced, which the total counts as $0. Unlike
+         * a line the engine cannot price, this does NOT refuse the proposal
+         * (owner, 2026-09-26): the composer warns before printing and shows
+         * the count in "Your figures", and the client's copy says nothing.
          */
-        notPricedCount,
+        notPriced,
         lineCount: lines.length,
       };
     }),

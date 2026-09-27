@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **An assembly line with an unpriced part in it now says so.** An assembly
+  of two lugs and half an hour used to show only the labor, as if it were
+  fully priced. It now reads "$25.00 + 1 part not priced", and the bid's
+  totals count the part separately from whole lines ("+ 2 lines, 3 parts not
+  priced"). The count is kept with the line when it is added, so pricing the
+  part in your library later does not hide the gap on a bid that was priced
+  without it.
 - **The catalog now has 400 and 500 kcmil lugs**, for the 400 and 500 kcmil
   wire it already shipped. Each is one size rather than a range, because that
   is how supply houses sell lugs that large, and both names say so ("400 kcmil

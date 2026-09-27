@@ -25,7 +25,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
-import { rollUpBid } from "./bidPricing";
+import { rollUpBid, type RollupLine } from "./bidPricing";
 import {
   bidLineItems,
   bids,
@@ -175,7 +175,7 @@ const bidRow = {
 } as unknown as Bid;
 
 let nextId = 1;
-const line = (over: Partial<BidLineItem> = {}) =>
+const line = (over: Partial<RollupLine> = {}) =>
   ({
     id: nextId++,
     qty: "1",
@@ -184,8 +184,9 @@ const line = (over: Partial<BidLineItem> = {}) =>
     snapshotLaborRate: "50",
     snapshotModifierPct: "0",
     snapshotMarkupPct: null,
+    unpricedParts: 0,
     ...over,
-  }) as unknown as BidLineItem;
+  }) as unknown as RollupLine;
 
 describe("rollUpBid isolation", () => {
   it("prices the good lines exactly as it would without the broken one", () => {
@@ -246,9 +247,32 @@ describe("rollUpBid isolation", () => {
       [priced, unpricedAssembly, handBlank, handTypedZero],
       company
     );
-    expect(result.notPricedCount).toBe(2);
+    expect(result.notPriced).toEqual({ lines: 2, parts: 0 });
     expect(result.incomplete).toBe(false);
-    expect(rollUpBid(bidRow, [priced], company).notPricedCount).toBe(0);
+    expect(rollUpBid(bidRow, [priced], company).notPriced).toEqual({
+      lines: 0,
+      parts: 0,
+    });
+  });
+
+  it("counts $0 parts inside a priced assembly line, apart from lines", () => {
+    // "$25.00 + 1 part not priced" (0087): priced, so not a line not priced,
+    // and its part is still missing from the total.
+    const withPart = line({
+      assemblyId: 1,
+      takeoffRunTypeId: null,
+      runMaterialRole: null,
+      unpricedParts: 1,
+    });
+    const handBlank = line({
+      assemblyId: null,
+      takeoffRunTypeId: null,
+      runMaterialRole: null,
+      snapshotMaterialCost: null,
+    });
+    expect(rollUpBid(bidRow, [withPart, handBlank], company).notPriced).toEqual(
+      { lines: 1, parts: 1 }
+    );
   });
 });
 

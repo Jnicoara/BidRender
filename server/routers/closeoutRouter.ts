@@ -58,7 +58,7 @@ async function requireBid(bidId: number, userId: number) {
 async function estimateFor(bidId: number, userId: number) {
   const bid = await requireBid(bidId, userId);
   const [lines, company] = await Promise.all([
-    db.getBidLineItems(bidId),
+    db.getRollupLines(bidId, userId),
     companyDefaultsFor(userId),
   ]);
   const live = lines.filter(line => line.archivedAt === null);
