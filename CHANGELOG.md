@@ -11,6 +11,10 @@ This is the human-readable companion to the git history — read this to see wha
   rows, each priced with its cover and gasket. Searching "tee body",
   "condulet" or the size and pipe type finds them. The plan viewer does not
   offer a T body at a branch tee yet; that comes in a later change.
+- **A password gate for the upcoming staging site.** The practice copy of
+  BidRidge will ask for a staging password before showing anything, and tells
+  search engines not to list it. It only switches on where a staging-only
+  setting exists, so the live site is unchanged.
 - **33 more boxes and box parts in the starter catalog.** The boxes audit
   found common parts nobody could pick: the deep 2-1/8" 1900 and octagon box,
   2-gang mud rings, raised covers for exposed work, a round blank cover,

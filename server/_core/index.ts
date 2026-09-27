@@ -15,6 +15,7 @@ import { purgeArchivedBidsHandler } from "../scheduled/purgeArchivedBids";
 import { BACKUP_PATH, backupToR2Handler } from "../scheduled/backupToR2";
 import { PLAN_UPLOAD_PATH, planUploadHandler } from "../planUpload";
 import { registerDiskStorageUploads } from "../diskStorage";
+import { registerStagingGate } from "../stagingGate";
 import {
   seedBaselineAssemblies,
   seedBaselineKits,
@@ -90,6 +91,14 @@ async function resolvePort(): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // The staging password gate — FIRST, so no route escapes it. Mounts nothing
+  // unless STAGING_PASSWORD is set, which production never has. See
+  // server/stagingGate.ts.
+  if (registerStagingGate(app)) {
+    console.log(
+      "Staging gate is ON: every request needs the staging password."
+    );
+  }
   // The same-origin plan upload, mounted BEFORE the body parsers so the PDF
   // arrives as a stream this handler forwards, rather than something a parser
   // has already tried to read. It is the fallback used when the browser is
