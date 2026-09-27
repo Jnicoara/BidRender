@@ -184,6 +184,13 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   "Octagon box, plastic": "common",
   "Octagon box, metal": "common",
   '4" square mud ring': "common",
+  // Added 2026-09-27 with the rows (boxes audit): the everyday part of each
+  // new family. A raised cover was marked too and dropped the same hour — it
+  // took the lead on a bare "cover" from the blank cover every 1900 junction
+  // gets, which is now marked instead.
+  '4" square box, 2-1/8" deep': "common",
+  '4" square mud ring, 2-gang': "common",
+  '4" square blank cover': "common",
   "Handy box": "common",
   "Weatherproof box, single-gang": "common",
 

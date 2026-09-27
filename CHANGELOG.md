@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **33 more boxes and box parts in the starter catalog.** The boxes audit
+  found common parts nobody could pick: the deep 2-1/8" 1900 and octagon box,
+  2-gang mud rings, raised covers for exposed work, a round blank cover,
+  weatherproof blank covers, a weatherproof round box, PVC pull boxes, outdoor
+  (NEMA 3R) pull boxes, deep device boxes, 2-gang FS boxes and a few more.
+  All are generic and unpriced like the rest. Where an existing part could now
+  be confused with a new one, it says which it is: the plain 1900 is 1-1/2"
+  deep, the plain mud ring is single-gang. Brand names a supply counter uses
+  (Carlon, Raco, Steel City, Red Dot) now find the right boxes in search.
+  The pricing sheet was brought up to date at the same time, which also added
+  about 130 rows from catalog changes since 2026-09-25 that it had missed.
 - **Dashboard cards keep up with the drawing.** On a bid whose quantities
   are not locked, marking more symbols or tracing more after sending used to
   change the bid but not its dashboard card, which kept the old total and the
