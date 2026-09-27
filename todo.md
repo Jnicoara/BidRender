@@ -40,12 +40,20 @@ left as written rather than rewritten to match the rename.
       Needs a way to say "this is our example price, not yours": a column, or
       comparing against the seed value. **Blocks the upload, not the sheet.**
 
-- [ ] **No lug covers 400–500 kcmil.** The range lugs stop at 250-350 kcmil
-      (added 2026-09-25 for the pricing sheet's 350 kcmil lugs), while the
-      catalog ships 400 and 500 kcmil THHN and XHHW AL. The per-size 500 kcmil
-      lug was retired with the move to ranges and nothing replaced it. The
-      next range is an owner's call — which span a supply house sells, e.g.
-      350-500 kcmil — so it is not guessed here.
+- [x] **400 kcmil lug ADDED 2026-09-26 (Track B)** — "400 kcmil crimp lug",
+      a single size, because above 350 kcmil a compression lug is sold per
+      conductor size (Crescent Electric, Platt/Ilsco CLWS-400-38, Graybar
+      Burndy YA32 series; no supplier found sells a "350-500" span).
+- [ ] **500 kcmil lug: a common part, held back by its retired name.** Graybar
+      and Lowe's stock it (Burndy YA34 series). But "500 kcmil crimp lug" is in
+      `RETIRED_BASELINE_MATERIALS`, and `seedBaselineMaterials` never sets
+      `isActive` back to true — so un-retiring the name would leave the old row
+      hidden on any database that has it (production very likely does; local
+      does not) and insert nothing, while the catalog claims to ship it.
+      Options: (a) teach the seeder to re-activate a baseline row whose name is
+      back in the catalog and off the retired list, with a test; (b) ship it
+      under a new name, e.g. "500 kcmil compression lug", which reads unlike
+      its family. Owner's call.
 
 - [ ] Replace fractional resize recentering with true page-box centering in the PDF viewer
 - [ ] Ensure the PDF canvas stays fully within the left pane as the divider moves

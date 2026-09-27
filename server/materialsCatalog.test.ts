@@ -307,6 +307,10 @@ describe("alias hygiene across the whole catalog", () => {
       // Added 2026-09-25: the 350 kcmil lugs from the pricing sheet had no
       // range to fold into once the per-size kcmil lugs were retired.
       "250-350 kcmil crimp lug",
+      // Added 2026-09-26: a single size, because above 350 kcmil that is how
+      // a compression lug is sold (sources in connectors.ts). 500 kcmil is
+      // held back by its retired name — todo.md.
+      "400 kcmil crimp lug",
     ]);
   });
 

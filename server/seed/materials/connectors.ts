@@ -75,8 +75,16 @@ const cableConnectors: BaselineMaterial[] = ['3/8"', '1/2"', '3/4"', '1"'].map(
  * order and, worse, implied a precision that does not exist — an estimator
  * hunting for a "#3 lug" would find nothing while the part they need sits
  * under 4-2. Six ranges cover a device pigtail up to a 350 kcmil feeder.
+ *
+ * Above that, a compression lug is sold per conductor size, so the 400 kcmil
+ * row is a single size with its own description (2026-09-26).
  */
-const LUG_RANGES = [
+const LUG_RANGES: Array<{
+  range: string;
+  slang: string;
+  /** Only where the shared "sized by range" description would be untrue. */
+  description?: string;
+}> = [
   { range: "14-10 AWG", slang: "14 12 10 small device" },
   { range: "8-6 AWG", slang: "8 6 feeder" },
   { range: "4-2 AWG", slang: "4 3 2 feeder" },
@@ -92,19 +100,43 @@ const LUG_RANGES = [
     range: "250-350 kcmil",
     slang: "250 300 350 mcm kcmil feeder service large",
   },
+  /*
+    Added 2026-09-26 for the 400 kcmil THHN and XHHW AL the catalog ships.
+    Above 350 kcmil a compression lug is sold for ONE conductor size, not a
+    span: checked that day, Crescent Electric lists a 1-hole copper 400 kcmil
+    compression lug, Platt an Ilsco CLWS-400-38, and Graybar Burndy's YA32
+    series at 400. So this row is a single size, and says so — no supplier
+    found sells a "350-500" lug, and inventing one is the fault the ranges
+    above were introduced to remove.
+
+    500 kcmil is a common part too (Graybar and Lowe's stock Burndy's YA34
+    series) but is NOT added here: "500 kcmil crimp lug" is in
+    RETIRED_BASELINE_MATERIALS, and a database that already holds that
+    retired row would keep it inactive and insert nothing — the seeder never
+    re-activates a row. See todo.md.
+  */
+  {
+    range: "400 kcmil",
+    slang: "400 mcm kcmil feeder service large",
+    description:
+      "Sized for one conductor, 400 kcmil — sold per size, not by range.",
+  },
 ];
 
-const lugs: BaselineMaterial[] = LUG_RANGES.map(({ range, slang }) => ({
-  ...CONN,
-  name: `${range} crimp lug`,
-  searchAliases: aliases(
-    slang,
-    "gauge compression terminal ring one hole two hole copper barrel mechanical"
-  ),
-  description:
-    "Sized by the conductor range it accepts, not by a single gauge.",
-  defaultQty: 2,
-}));
+const lugs: BaselineMaterial[] = LUG_RANGES.map(
+  ({ range, slang, description }) => ({
+    ...CONN,
+    name: `${range} crimp lug`,
+    searchAliases: aliases(
+      slang,
+      "gauge compression terminal ring one hole two hole copper barrel mechanical"
+    ),
+    description:
+      description ??
+      "Sized by the conductor range it accepts, not by a single gauge.",
+    defaultQty: 2,
+  })
+);
 
 const terminations: BaselineMaterial[] = [
   {
