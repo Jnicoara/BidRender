@@ -892,6 +892,65 @@ hidden tab's timers throttle hard: a script that waited 3.5 s twice timed out
 the tool at 45 s while the trace itself finished fine. Keep waits short and
 read the result in a second call.
 
+**Sixth run — 0087, run colours Part A and Track B's polish, deployed as
+`f1521c5` on 2026-09-27.** **Rollback target: `a64dfbc`.** Both kinds of
+release at once. The schema half was one nullable column,
+`bid_line_items.snapshotUnpricedParts`. The catalog half was B's two new lugs,
+plus the seeder change that brings back a retired name returned to the
+catalog. Merged tree before anything: 172 files / 3,797 passed / 4 skipped,
+typecheck clean. The change set was wider than the request named: it also
+carried Polish B1–B9, merged to `local-dev` earlier.
+
+Backup **`2026-09-27T05-25-00Z`** (62 tables, 3,139 rows, 5 files) was restored
+and verified, and kept with `KEEP_SCRATCH=1`. On the copy, `schemaDrift` named
+exactly `bid_line_items — missing snapshotUnpricedParts` at 87; 0087 applied
+(1 file); a rerun applied nothing; no drift at 88. Production had **0 bid
+lines**, so 0087 had no existing line to read differently.
+
+- **Routers, with `scripts/routerSnapshot.mts`**, its first committed use. The
+  old build before and after 0087 was IDENTICAL. The new build against the old
+  one was IDENTICAL too, except for the one field it adds:
+  `--added card.notPriced` read `{lines: 0, parts: 0}` on both bids. There
+  were no drops, so the added drop fields never appeared. The first try passed
+  bare `runTypeId,pathType` and the compare shifted by 220 lines, because run
+  rows already carry `pathType`; hence the scoped `parent.key` form.
+- **Catalog, with `catalogRehearsal`.** First boot: 1,237 → 1,239, **2 added**
+  (400 and 500 kcmil crimp lug, single size), nothing renamed, retired,
+  un-retired or deleted, no company row touched, every reference identical,
+  CLEAN. Second boot changed nothing. `search`: all 102 old spellings put the
+  renamed row first. Only the known `5/6" wafer LED downlight` is missing,
+  down from 9 second and 12 missing at the fourth run.
+
+Production: the live build's snapshot matched the copy's; `schemaDrift` named
+exactly the one column; `migrate.mts` applied 1; a rerun applied nothing; drift
+clean at 88. The old build on the migrated database was still IDENTICAL.
+`main` was pushed to exactly `f1521c5` at 05:34:18Z (the snapshot script's own
+commit, `a771c5f`, stayed on `local-dev`). The new build (`builtAt`
+05:34:55Z, commit `f1521c5`) was serving on both hosts at 05:36:45Z. Its
+snapshot of production matched the rehearsal byte for byte, and the catalog
+matched it line for line: 1,237 → 1,239, CLEAN.
+
+Live checks on bid 25 as the smoke account, on `www.bidridge.com` with a
+1-hour token (`auth.me` 1421, the loaded bundle equal to the one `/` serves):
+
+- An assembly of a $0 lug ×2, a $3 strap and 0.5 h read
+  **"$3.00 + 1 part not priced"** on the line and on the Materials total, with
+  the parts strip below. The frozen count was 1.
+- Three route runs of types 2, 3 and 4 drew **blue, pink and violet (dashed,
+  cable)**, in order of first use, and the two legs of a later quantity trace
+  of type 2 drew blue. `typeColors` read `[2, 3, 4]`.
+- The quantity trace proposed 4 drops. Opening "Leg 1 start" read **"To:
+  Receptacle · proposed"**. Its finish result read 2 legs, 50 ft.
+
+The setup script first assumed three conduit types and stopped partway
+(production has two). That was swept by what bid 25 holds, since it held none
+before, and rerun with a cable type. Afterwards the lines, runs, library rows,
+sheet 196's scale and the run height were all removed: **bid 25 back to 0
+lines, 0 runs, no run height**. The router snapshot is identical to the
+post-push one except bid 25's `updatedAt` (the check's own edits). Every table
+matches the rehearsal copy: 62 tables, 3,142 rows = the backup + 0087's
+migration row + the 2 lugs.
+
 ## 6. Verifying a deploy actually took
 
 A deploy that silently didn't take looks identical to one that did, so check
