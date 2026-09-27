@@ -57,27 +57,30 @@ async function requireBid(bidId: number, userId: number) {
  */
 async function estimateFor(bidId: number, userId: number) {
   const bid = await requireBid(bidId, userId);
-  const [lines, company] = await Promise.all([
+  const [lines, company, expenses] = await Promise.all([
     db.getRollupLines(bidId, userId),
     companyDefaultsFor(userId),
+    db.getBidExpenseLines(bidId),
   ]);
   const live = lines.filter(line => line.archivedAt === null);
   /*
-    NO CHARGES, and that is a question rather than a decision. Until
-    2026-09-27 this left them out by a default nobody could see; the argument
-    is required now, so the omission is written here. It means a bid with a
-    MARKED-UP charge is closed out against an estimate that charge short of
-    the bid screen — the gap fixed in "Find a bid" and the archive that day.
-    Not changed with them, because this estimate is SNAPSHOTTED into the
-    close-out and feeds profitability, so what it should include is the
-    owner's call (todo.md).
+    WITH the bid's charges, as the bid screen prices it (owner, 2026-09-27:
+    a close-out uses the same full price).
+
+    What that changes is nothing stored, and a note here the day before said
+    otherwise — that a bid with a marked-up charge was closed out against an
+    estimate "that charge short". It was wrong. A close-out freezes HOURS,
+    and a charge has none; the money beside them is the profitability
+    report's revenue, which is priced from the bid with its charges
+    (analytics.ts, `priceBid`). server/closeoutCharges.test.ts pins both
+    halves, and passed before this line changed as well as after.
   */
   const { priced, totals, problems } = bidRollup(
     bid,
     live,
     company,
     undefined,
-    []
+    expenses
   );
 
   return {
