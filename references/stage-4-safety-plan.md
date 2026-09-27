@@ -7,6 +7,28 @@ starts with what already exists, measured against the code on `local-dev` at
 
 ---
 
+## The owner's answers (2026-09-27) — these override anything below
+
+1. **Email provider: Resend.**
+2. **DNS for bidridge.com is at DigitalOcean** (its nameservers point there).
+   Email and staging records go in DigitalOcean → Networking → Domains.
+3. **Staging: yes, and password-protected.**
+4. **The AI log keeps the picture, not just the label.** Save the label and
+   kind, the sheet, the box location, AND a small cut-out image of the symbol,
+   stored in R2. The log cannot be backfilled, and shared symbol learning later
+   needs the picture. Anything identifying the company, job or customer is
+   stripped from what would be shared. **This overrides the "kind, not
+   picture" line in § 3 below.**
+5. **Migrations reach the locked database from the owner's laptop IP.** Home
+   IPs change, so `references/deploying.md` § 10 has the steps to update it and
+   what the error looks like when it is stale.
+6. **Only the BidRidge owner can invite a new company.** Company owners
+   inviting their own staff is unchanged.
+7. **Terms page later, but it must exist before any sharing is turned on.**
+   Recorded in `todo.md` § Pending.
+
+---
+
 ## What already exists
 
 | Piece | Exists today | Missing |

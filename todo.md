@@ -29,6 +29,13 @@ left as written rather than rewritten to match the rename.
 
 ## Pending / Future
 
+- [ ] **A terms page BEFORE any sharing of the AI correction log is turned
+      on.** Decided by the owner 2026-09-27 (Stage 4, question 7). The log
+      (`references/stage-4-safety-plan.md` § 3) records corrections from day
+      one, including a cut-out image of each symbol, so it can be shared for
+      symbol learning later. Nothing may export, pool or share it — even the
+      anonymised half — until users have agreed to terms that say so. Not
+      blocking the log itself; blocking the first read of it.
 - [ ] **Before the priced catalog ships: give "nobody has priced this" its own
       signal.** `shared/materialPricing.ts` and the Materials screen's unpriced
       filter both decide it from `costPerUnit === 0`. That works only while
