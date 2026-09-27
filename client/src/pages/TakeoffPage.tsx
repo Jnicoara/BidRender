@@ -147,6 +147,11 @@ import { JobHeightsChip } from "@/components/takeoff/JobHeightsChip";
 import { RunEndsEditor, TraceEndsPickers } from "@/components/takeoff/runEnds";
 import { TraceModeToggle } from "@/components/takeoff/TraceModeToggle";
 import {
+  QuantityDropsReview,
+  type DropSelection,
+} from "@/components/takeoff/QuantityDropsReview";
+import { quantityEndRows, type QuantityLeg } from "@shared/quantityDrops";
+import {
   DISTRIBUTION_KIND,
   traceEndsLabel,
   SUGGEST_WITHIN_INCHES,
@@ -191,7 +196,7 @@ import {
   type UploadJob,
 } from "@/lib/uploadQueue";
 import { takePendingPlan } from "@/lib/pendingPlanUpload";
-import { TraceLayer } from "@/components/takeoff/TraceLayer";
+import { TraceLayer, type DropMarker } from "@/components/takeoff/TraceLayer";
 import {
   RunsPanel,
   type GroupBridgeState,
@@ -3484,6 +3489,92 @@ export default function TakeoffPage({
     onSettled: refreshRuns,
   });
   /**
+   * An answer to proposed drops on a quantity trace (D21) — one, or all.
+   * Through `refreshRuns`: it moves the markers, the row, the totals, the
+   * drops readout and the Send preview together.
+   */
+  const answerDrops = trpc.takeoffRuns.answerDrops.useMutation({
+    onError: e => toast.error(e.message),
+    onSettled: refreshRuns,
+  });
+  /** The drop opened from its marker or its row — one at a time. */
+  const [selectedDrop, setSelectedDrop] = useState<DropSelection>(null);
+
+  /**
+   * Every quantity trace on this sheet as its legs, root first — what the
+   * review and the drawing's drop markers both read. From the unfiltered
+   * sheet runs: hiding a layer must not change what a trace proposes.
+   */
+  const quantityLegsByRoot = useMemo(() => {
+    const map = new Map<number, QuantityLeg[]>();
+    const ordered = [...runs].sort((a, b) => a.id - b.id);
+    for (const run of ordered) {
+      if (run.traceMode !== "quantity") continue;
+      const root = run.parentRunId ?? run.id;
+      const leg: QuantityLeg = {
+        id: run.id,
+        points: run.points as PagePoint[],
+        startKind: run.ends.startKind,
+        endKind: run.ends.endKind,
+        startHeightInches: run.ends.startHeightInches,
+        endHeightInches: run.ends.endHeightInches,
+        distributionHeightInches: run.ends.distributionHeightInches,
+      };
+      const list = map.get(root) ?? [];
+      if (run.id === root) list.unshift(leg);
+      else list.push(leg);
+      map.set(root, list);
+    }
+    return map;
+  }, [runs]);
+
+  const dropHeightOf = useCallback(
+    (kind: string) =>
+      heightsForBid?.types.find(t => t.typeKey === kind)?.heightInches ?? null,
+    [heightsForBid?.types]
+  );
+
+  /**
+   * One marker per real leg end of every quantity trace on the sheet —
+   * worked out over the whole trace, drawn only for legs the Layers filter
+   * shows, so a hidden layer hides its drops with its lines.
+   */
+  const dropMarkers = useMemo(() => {
+    const out: DropMarker[] = [];
+    const shown = new Set(visibleRuns.map(run => run.id));
+    quantityLegsByRoot.forEach(legs => {
+      for (const row of quantityEndRows({
+        legs,
+        kind: traceEnds.endKind,
+        distributionInches: heightsForBid?.distributionHeight.inches ?? null,
+        heightOf: dropHeightOf,
+      })) {
+        if (row.state === "joined" || !shown.has(row.legId)) continue;
+        out.push({
+          legId: row.legId,
+          end: row.end,
+          x: row.point.x,
+          y: row.point.y,
+          state:
+            row.state === "open"
+              ? "proposed"
+              : row.state === "approved"
+                ? "approved"
+                : "dismissed",
+          feet: row.vertical?.counted ? row.vertical.feet : null,
+        });
+      }
+    });
+    return out;
+  }, [
+    quantityLegsByRoot,
+    visibleRuns,
+    traceEnds.endKind,
+    heightsForBid,
+    dropHeightOf,
+  ]);
+
+  /**
    * Route ↔ quantity for a whole run (D21). Through `refreshRuns`: it changes
    * the row, the wire, the totals, the drops readout and the Send preview.
    */
@@ -5186,6 +5277,16 @@ export default function TakeoffPage({
                       points={tracePoints}
                       onPointsChange={setTracePoints}
                       existingRuns={visibleRuns}
+                      drops={dropMarkers}
+                      onSelectDrop={drop => {
+                        // Open the trace's leg in the panel, with this drop
+                        // expanded — where its type and height are changed.
+                        setSelectedRunId(drop.legId);
+                        setSelectedDrop(drop);
+                        updatePanels(current =>
+                          current.work ? current : togglePanel(current, "work")
+                        );
+                      }}
                       onFinish={finishTrace}
                       onCancel={cancelTrace}
                       selectedRunId={selectedRunId}
@@ -5379,29 +5480,61 @@ export default function TakeoffPage({
                   </div>
                 );
               }}
-              renderRunEnds={run => (
-                <RunEndsEditor
-                  bidId={bidId}
-                  runId={run.id}
-                  ends={
-                    run.ends ?? {
-                      startKind: null,
-                      endKind: null,
-                      startHeightInches: null,
-                      endHeightInches: null,
-                      distributionHeightInches: null,
-                      startStampId: null,
-                      endStampId: null,
+              renderRunEnds={run =>
+                run.traceMode === "quantity" ? (
+                  // A quantity trace has no ends to set — it has drops to
+                  // review, for the whole trace, under whichever leg is open.
+                  <QuantityDropsReview
+                    bidId={bidId}
+                    legs={
+                      quantityLegsByRoot.get(run.parentRunId ?? run.id) ?? []
                     }
-                  }
-                  verticals={run.quantities?.verticals ?? null}
-                  suggestion={suggestionForRun(run.id)}
-                  teeEnds={{
-                    start: Boolean(run.startTee),
-                    end: Boolean(run.endTee),
-                  }}
-                />
-              )}
+                    toKind={traceEnds.endKind}
+                    onToKind={endKind =>
+                      updateTraceEnds({ ...traceEnds, endKind })
+                    }
+                    types={heightsForBid?.types ?? []}
+                    distributionInches={
+                      heightsForBid?.distributionHeight.inches ?? null
+                    }
+                    selected={selectedDrop}
+                    onSelect={setSelectedDrop}
+                    onJumpTo={at => {
+                      setFocusPoint(at);
+                      window.setTimeout(() => setFocusPoint(null), 2200);
+                    }}
+                    onAnswer={answers =>
+                      answerDrops.mutate({
+                        rootRunId: run.parentRunId ?? run.id,
+                        answers,
+                      })
+                    }
+                    busy={answerDrops.isPending}
+                  />
+                ) : (
+                  <RunEndsEditor
+                    bidId={bidId}
+                    runId={run.id}
+                    ends={
+                      run.ends ?? {
+                        startKind: null,
+                        endKind: null,
+                        startHeightInches: null,
+                        endHeightInches: null,
+                        distributionHeightInches: null,
+                        startStampId: null,
+                        endStampId: null,
+                      }
+                    }
+                    verticals={run.quantities?.verticals ?? null}
+                    suggestion={suggestionForRun(run.id)}
+                    teeEnds={{
+                      start: Boolean(run.startTee),
+                      end: Boolean(run.endTee),
+                    }}
+                  />
+                )
+              }
               legend={
                 <>
                   {/* Above the layers and the legend: what the reader found

@@ -93,6 +93,21 @@ export type ExistingRun = {
   endTee?: DrawnTee | null;
 };
 
+/**
+ * A drop on a quantity trace (D21): proposed, approved or dismissed at one
+ * leg end. Positions and state only — the words and buttons are in the run
+ * panel, like a pull point's.
+ */
+export type DropMarker = {
+  legId: number;
+  end: "start" | "end";
+  x: number;
+  y: number;
+  state: "proposed" | "approved" | "dismissed";
+  /** Counted feet, or null when it cannot be measured yet. */
+  feet: number | null;
+};
+
 type DrawnTee = {
   id: number;
   x: number;
@@ -214,9 +229,14 @@ export function TraceLayer({
   focusPoint,
   chromeTarget,
   legs,
+  drops,
+  onSelectDrop,
 }: {
   /** Branch legs while tracing (D20). Omitted, "New leg" does not exist. */
   legs?: TraceLegs;
+  /** Drops on quantity traces (D21). Tapping one opens it in the panel. */
+  drops?: DropMarker[];
+  onSelectDrop?: (drop: { legId: number; end: "start" | "end" }) => void;
   /** Canvas size in device pixels — the overlay matches it exactly. */
   width: number;
   height: number;
@@ -806,6 +826,82 @@ export function TraceLayer({
               )
             ),
           ];
+        })}
+
+        {/*
+          DROPS ON QUANTITY TRACES (D21). The same three states and colours as
+          a pull point — amber dashed is offered, amber solid is counted,
+          slate is a "no" kept visible — but a CIRCLE with a down arrow, so a
+          drop is never read as a box. Tapping one opens it in the run panel,
+          where its type and height are changed.
+        */}
+        {(drops ?? []).map(drop => {
+          const at = toScreen(drop);
+          const r = markRadiusInOverlay(zoom) * 0.75;
+          const stroke = markStrokeInOverlay(zoom) * 0.8;
+          const font = markRadiusInOverlay(zoom) * 1.05;
+          const color = drop.state === "dismissed" ? "#64748B" : "#F5C518";
+          const label =
+            drop.state === "proposed"
+              ? "drop?"
+              : drop.state === "approved"
+                ? "drop"
+                : "no drop";
+          return (
+            <g
+              key={`drop-${drop.legId}-${drop.end}`}
+              className={tracing ? "" : "pointer-events-auto cursor-pointer"}
+              onClick={() =>
+                !tracing && onSelectDrop?.({ legId: drop.legId, end: drop.end })
+              }
+            >
+              <circle
+                cx={at.x}
+                cy={at.y}
+                r={r}
+                fill={drop.state === "approved" ? color : "none"}
+                fillOpacity={drop.state === "approved" ? 0.3 : 0}
+                stroke={color}
+                strokeWidth={stroke}
+                strokeDasharray={
+                  drop.state === "approved"
+                    ? undefined
+                    : `${r * 0.45} ${r * 0.35}`
+                }
+              />
+              {drop.state !== "dismissed" && (
+                <path
+                  d={`M ${at.x} ${at.y - r * 0.55} L ${at.x} ${at.y + r * 0.5} M ${at.x - r * 0.4} ${at.y + r * 0.1} L ${at.x} ${at.y + r * 0.5} L ${at.x + r * 0.4} ${at.y + r * 0.1}`}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={stroke}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
+              <text
+                x={at.x + r * 1.35}
+                y={at.y + font * 0.35}
+                fontSize={font}
+                fontWeight={600}
+                fill={color}
+                stroke={drop.state === "dismissed" ? "#ffffff" : "#0b0b0b"}
+                strokeWidth={font * 0.18}
+                paintOrder="stroke"
+              >
+                {label}
+              </text>
+              <title>
+                {drop.state === "proposed"
+                  ? "Drop proposed — tap to look at it; open the trace to approve"
+                  : drop.state === "approved"
+                    ? drop.feet === null
+                      ? "Drop approved — not measurable yet"
+                      : `Drop approved — ${drop.feet.toFixed(2)} ft`
+                    : "No drop here — answered"}
+              </title>
+            </g>
+          );
         })}
 
         {/* Proposals from the plan reader. Under the focus ring and over the

@@ -12,6 +12,7 @@ import {
   describeProposals,
   openEndCount,
   proposeDrops,
+  quantityEndRows,
   quantityEnds,
   type QuantityLeg,
 } from "../shared/quantityDrops";
@@ -159,5 +160,50 @@ describe("proposeDrops and the proposal line", () => {
       heightOf,
     });
     expect(first.vertical.counted && first.vertical.feet).toBe(10); // 138 − 18
+  });
+});
+
+describe("quantityEndRows — what each end counts, for the list and the markers", () => {
+  const heightOf = (kind: string) =>
+    kind === "receptacle" ? 18 : kind === "switch" ? 48 : null;
+
+  it("an approved end counts its OWN kind; an open one the proposed kind", () => {
+    const rows = quantityEndRows({
+      legs: [leg(3, C.points, { startKind: "switch" })],
+      kind: "receptacle",
+      distributionInches: 120,
+      heightOf,
+    });
+    const by = new Map(rows.map(r => [r.end, r]));
+    // Switch at 4'-0": 72 in = 6 ft. The open end proposes a receptacle.
+    expect(
+      by.get("start")?.vertical?.counted && by.get("start")?.vertical
+    ).toMatchObject({ feet: 6 });
+    expect(by.get("end")?.state).toBe("open");
+    expect(by.get("end")?.vertical).toMatchObject({ counted: true, feet: 8.5 });
+  });
+
+  it("a dismissed or joined end counts nothing, and says so with null", () => {
+    const rows = quantityEndRows({
+      legs: [A, leg(2, B.points, { endKind: "distribution" })],
+      kind: "receptacle",
+      distributionInches: 120,
+      heightOf,
+    });
+    const by = new Map(rows.map(r => [key(r), r]));
+    expect(by.get("2:start")?.state).toBe("joined");
+    expect(by.get("2:start")?.vertical).toBeNull();
+    expect(by.get("2:end")?.state).toBe("dismissed");
+    expect(by.get("2:end")?.vertical).toBeNull();
+  });
+
+  it("an open end with nothing picked shows no footage rather than zero", () => {
+    const rows = quantityEndRows({
+      legs: [C],
+      kind: null,
+      distributionInches: 120,
+      heightOf,
+    });
+    expect(rows.every(r => r.vertical === null)).toBe(true);
   });
 });

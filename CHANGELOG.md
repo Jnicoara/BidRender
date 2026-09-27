@@ -14,6 +14,13 @@ This is the human-readable companion to the git history — read this to see wha
   line as route runs of the same type, and the totals say plainly that its
   drops are not included. Any run can be switched either way from its row,
   and nothing is lost when you do.
+- **Drops on a quantity trace are proposed, then approved.** Open a quantity
+  trace and it offers a drop at every leg end — "12 drops, 8'-6" each =
+  102.00 ft" — marked on the drawing with a dashed arrow. Approve them all at
+  once, say "no drops", or tap one (on the drawing or in the list) to change
+  what it drops to, give it its own height, or take the answer back. A leg
+  that starts on the trace gets no drop there. Nothing counts until you say
+  so, and only an approved drop gets a connector.
 - **A traced run can now have more than one leg — usually a branch.** While
   tracing, press "New leg" (or Shift-click) and the next click starts another
   leg of the same run. Start it on the run and it becomes a branch: a box is

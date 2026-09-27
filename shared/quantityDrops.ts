@@ -206,6 +206,55 @@ export function quantityTraceSummary(
   return { traceCount: byRoot.size, openEnds };
 }
 
+/** One end of a quantity trace as the review and the drawing show it. */
+export type QuantityEndRow = QuantityEnd & {
+  /**
+   * What this end counts, or would count: the STORED kind on an approved
+   * end, the proposed kind on an open one. NULL on a dismissed or joined end
+   * (nothing drops there) and on an open end when nothing is picked to drop
+   * to yet.
+   */
+  vertical: EndVertical | null;
+};
+
+/**
+ * Every end of one trace with what it counts — the list under the proposal
+ * line, and the markers on the drawing. The same resolution `proposeDrops`
+ * uses, so a marker, its row and the line above cannot disagree.
+ */
+export function quantityEndRows(input: {
+  legs: readonly QuantityLeg[];
+  kind: string | null;
+  distributionInches: number | null;
+  heightOf: (kind: string) => number | null;
+}): QuantityEndRow[] {
+  const byId = new Map(input.legs.map(leg => [leg.id, leg]));
+  const proposing =
+    input.kind !== null && input.kind !== DISTRIBUTION_KIND ? input.kind : null;
+  return quantityEnds(input.legs).map(end => {
+    const leg = byId.get(end.legId)!;
+    const kind =
+      end.state === "approved"
+        ? end.kind
+        : end.state === "open"
+          ? proposing
+          : null;
+    if (kind === null) return { ...end, vertical: null };
+    return {
+      ...end,
+      vertical: verticalAtEnd({
+        kind,
+        endInches: usable(end.heightInches)
+          ? end.heightInches
+          : input.heightOf(kind),
+        distributionInches: usable(leg.distributionHeightInches)
+          ? leg.distributionHeightInches
+          : input.distributionInches,
+      }),
+    };
+  });
+}
+
 /** How many ends of these traces are waiting for an answer. */
 export function openEndCount(legs: readonly QuantityLeg[]): number {
   return quantityEnds(legs).filter(end => end.state === "open").length;
