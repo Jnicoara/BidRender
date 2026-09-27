@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **The archive can be emptied in one go, and only owners and admins can
+  permanently delete a bid.** A "Delete all" button on the Archive screen
+  asks for confirmation, naming how many bids and saying it cannot be undone.
+  If the archive changes before you confirm, nothing is deleted and you are
+  asked to look again. Separately, estimators could delete an archived bid
+  permanently, although their role was meant to exclude that. They can still
+  archive and restore, but deleting for good is now owners and admins only,
+  on screen and on the server.
 - **Dashboard cards keep up with the drawing.** On a bid whose quantities
   are not locked, marking more symbols or tracing more after sending used to
   change the bid but not its dashboard card, which kept the old total and the

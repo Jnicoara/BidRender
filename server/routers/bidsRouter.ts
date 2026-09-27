@@ -692,8 +692,14 @@ export const bidsRouter = router({
    * Refuses anything not already archived, mirroring the modifiers pattern:
    * there is no path from the working list straight to destruction. The user
    * archives first, then confirms again from the archive.
+   *
+   * Gated on `bids.delete`, not `bids.edit`. Until 2026-09-27 this sat on the
+   * router's `procedure`, so it needed only `bids.edit` and an estimator could
+   * destroy a bid — while shared/permissions.ts defined `bids.delete` for
+   * exactly this and withheld it from estimators. The capability was declared
+   * and checked nowhere.
    */
-  deleteForever: procedure
+  deleteForever: requireCapability("bids.delete")
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const bid = await requireBid(input.id, ctx.scope.dataUserId);
@@ -706,6 +712,35 @@ export const bidsRouter = router({
       }
       await db.deleteBidForever(input.id, ctx.scope.dataUserId);
       return { success: true };
+    }),
+
+  /**
+   * Empty the archive: every archived bid, now, for good.
+   *
+   * `expectedCount` is the number the confirmation showed. If the archive holds
+   * a different number by the time the click lands — a colleague archived one,
+   * or restored one — nothing is deleted and the caller is told to look again.
+   * The person agreed to destroy N bids; this destroys N bids or none.
+   *
+   * One bid at a time through `deleteBidForever`, the path the nightly purge
+   * uses, so a bulk delete removes exactly what a single delete removes.
+   */
+  deleteAllArchived: requireCapability("bids.delete")
+    .input(z.object({ expectedCount: z.number().int().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const archived = await db.getArchivedBids(ctx.scope.dataUserId);
+      if (archived.length !== input.expectedCount) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `The archive now holds ${archived.length} ${
+            archived.length === 1 ? "bid" : "bids"
+          }, not ${input.expectedCount}. Nothing was deleted — look again before deleting.`,
+        });
+      }
+      for (const bid of archived) {
+        await db.deleteBidForever(bid.id, ctx.scope.dataUserId);
+      }
+      return { deleted: archived.length };
     }),
 
   /**

@@ -35,7 +35,14 @@ import {
   retentionLabel,
   retentionUrgency,
 } from "../shared/retention";
-import { bidPdfs, bids, taxJurisdictions, users } from "../drizzle/schema";
+import {
+  bidPdfs,
+  bids,
+  companies,
+  companyMembers,
+  taxJurisdictions,
+  users,
+} from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 
 const USER = 7373;
@@ -565,5 +572,164 @@ describe.skipIf(!hasDb)("deleting from the archive by hand", () => {
     await expect(
       callerFor(OTHER_USER).bids.deleteForever({ id: bid.id })
     ).rejects.toThrow(/not found/i);
+  });
+});
+
+describe.skipIf(!hasDb)("emptying the archive in one go", () => {
+  it("deletes every archived bid and leaves live bids alone", async () => {
+    const live = await newBid("Still working on this");
+    for (const name of ["Old job A", "Old job B", "Old job C"]) {
+      const bid = await newBid(name);
+      await caller().bids.archive({ id: bid.id });
+    }
+
+    const result = await caller().bids.deleteAllArchived({ expectedCount: 3 });
+
+    expect(result).toEqual({ deleted: 3 });
+    expect(await caller().bids.archived()).toHaveLength(0);
+    const remaining = await caller().bids.list();
+    expect(remaining.map(b => b.id)).toEqual([live.id]);
+  });
+
+  it("never reaches another company's archive", async () => {
+    const mine = await newBid("Mine");
+    await caller().bids.archive({ id: mine.id });
+    const theirs = await callerFor(OTHER_USER).bids.create({
+      name: "Theirs",
+      trades: ["electrical"],
+    });
+    await callerFor(OTHER_USER).bids.archive({ id: theirs!.id });
+
+    await caller().bids.deleteAllArchived({ expectedCount: 1 });
+
+    const theirArchive = await callerFor(OTHER_USER).bids.archived();
+    expect(theirArchive.map(b => b.id)).toEqual([theirs!.id]);
+  });
+
+  it("deletes nothing when the archive no longer holds the confirmed count", async () => {
+    // The dialog said 2. Someone archived a third before the click landed.
+    // Deleting 3 would destroy a bid nobody agreed to destroy.
+    for (const name of ["One", "Two", "Three"]) {
+      const bid = await newBid(name);
+      await caller().bids.archive({ id: bid.id });
+    }
+
+    await expect(
+      caller().bids.deleteAllArchived({ expectedCount: 2 })
+    ).rejects.toThrow(/now holds 3 bids, not 2/);
+    expect(await caller().bids.archived()).toHaveLength(3);
+  });
+
+  it("refuses an empty request rather than reporting zero deleted", async () => {
+    await expect(
+      caller().bids.deleteAllArchived({ expectedCount: 0 })
+    ).rejects.toThrow();
+  });
+});
+
+// ── Who may destroy a bid ────────────────────────────────────────────────────
+// `bids.delete` was declared in shared/permissions.ts, withheld from
+// estimators, and checked nowhere until 2026-09-27: both deletes sat behind
+// `bids.edit`, which estimators hold. These run with real company roles, which
+// the tests above (a lone user, owner of nothing) cannot exercise.
+
+const OWNER = 7375;
+const ESTIMATOR = 7376;
+const VIEWER = 7377;
+
+describe.skipIf(!hasDb)("only a role holding bids.delete may delete", () => {
+  beforeAll(async () => {
+    const database = await getDb();
+    if (!database) return;
+    for (const id of [OWNER, ESTIMATOR, VIEWER]) {
+      const [existing] = await database
+        .select()
+        .from(users)
+        .where(eq(users.id, id))
+        .limit(1);
+      if (!existing) {
+        await database.insert(users).values({
+          id,
+          openId: `test-bid-archive-${id}`,
+          name: `Archive role user ${id}`,
+        });
+      }
+    }
+  });
+
+  beforeEach(async () => {
+    const database = await getDb();
+    if (!database) return;
+    const everyone = [OWNER, ESTIMATOR, VIEWER];
+    await database.delete(bids).where(inArray(bids.userId, everyone));
+    await database
+      .delete(companyMembers)
+      .where(inArray(companyMembers.userId, everyone));
+    await database
+      .delete(companies)
+      .where(inArray(companies.ownerUserId, everyone));
+    const [company] = await database.insert(companies).values({
+      name: `Archive roles ${Date.now()}`,
+      ownerUserId: OWNER,
+    });
+    for (const [userId, role] of [
+      [OWNER, "owner"],
+      [ESTIMATOR, "estimator"],
+      [VIEWER, "viewer"],
+    ] as const) {
+      await database
+        .insert(companyMembers)
+        .values({
+          companyId: company.insertId,
+          userId,
+          role,
+          status: "active",
+        });
+    }
+  });
+
+  async function archivedCompanyBid() {
+    const bid = await callerFor(OWNER).bids.create({
+      name: `Company bid ${Math.random()}`,
+      trades: ["electrical"],
+    });
+    await callerFor(OWNER).bids.archive({ id: bid!.id });
+    return bid!;
+  }
+
+  it("an estimator can archive and restore, but not delete for good", async () => {
+    const bid = await archivedCompanyBid();
+
+    // Archiving is reversible, so bids.edit is enough — and still is.
+    await callerFor(ESTIMATOR).bids.restore({ id: bid.id });
+    await callerFor(ESTIMATOR).bids.archive({ id: bid.id });
+
+    await expect(
+      callerFor(ESTIMATOR).bids.deleteForever({ id: bid.id })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      callerFor(ESTIMATOR).bids.deleteAllArchived({ expectedCount: 1 })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(await callerFor(OWNER).bids.archived()).toHaveLength(1);
+  });
+
+  it("a viewer cannot delete either", async () => {
+    const bid = await archivedCompanyBid();
+    await expect(
+      callerFor(VIEWER).bids.deleteForever({ id: bid.id })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      callerFor(VIEWER).bids.deleteAllArchived({ expectedCount: 1 })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("the owner can, and an estimator's view of the archive empties with it", async () => {
+    await archivedCompanyBid();
+    await archivedCompanyBid();
+    expect(await callerFor(ESTIMATOR).bids.archived()).toHaveLength(2);
+
+    await callerFor(OWNER).bids.deleteAllArchived({ expectedCount: 2 });
+
+    expect(await callerFor(ESTIMATOR).bids.archived()).toHaveLength(0);
   });
 });

@@ -39,6 +39,7 @@ import { moneyWhole } from "@/lib/money";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { TotalDueCaption } from "@/components/TotalDueCaption";
+import { useCompany } from "@/hooks/useCompany";
 
 /** Only a deadline worth acting on gets colour. The rest stays quiet. */
 const URGENCY_STYLE: Record<RetentionUrgency, string> = {
@@ -73,6 +74,13 @@ export default function BidArchivePage({
   const utils = trpc.useUtils();
   const { data: rows = [], isLoading } = trpc.bids.archived.useQuery();
   const [confirmDelete, setConfirmDelete] = useState<ArchivedBid | null>(null);
+  // The count the confirmation showed, held while it is open. It is what the
+  // server is asked to delete: if the archive has changed by the time the
+  // click lands, it refuses rather than deleting a bid nobody saw named here.
+  const [confirmAll, setConfirmAll] = useState<number | null>(null);
+  // Only owners and admins hold this. Estimators and viewers can still see
+  // and restore what is here; they just get no control that would refuse them.
+  const canDelete = useCompany().can("bids.delete");
 
   const invalidate = () => {
     void utils.bids.archived.invalidate();
@@ -97,6 +105,20 @@ export default function BidArchivePage({
     onError: error => toast.error(error.message),
   });
 
+  const deleteAll = trpc.bids.deleteAllArchived.useMutation({
+    onSuccess: ({ deleted }) => {
+      toast.success(
+        `${deleted} ${deleted === 1 ? "bid" : "bids"} deleted permanently.`
+      );
+      invalidate();
+    },
+    onError: error => {
+      toast.error(error.message);
+      // The archive changed under the dialog — show what is there now.
+      invalidate();
+    },
+  });
+
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="border-b border-border px-6 py-4 shrink-0">
@@ -118,6 +140,19 @@ export default function BidArchivePage({
               deleted for good. Restore one any time before its date.
             </p>
           </div>
+          {/* Quiet, like the per-row delete: the loud action on this screen
+              is Restore. Absent when there is nothing to delete. */}
+          {canDelete && rows.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs shrink-0 text-muted-foreground hover:text-destructive hover:border-destructive/50"
+              onClick={() => setConfirmAll(rows.length)}
+              disabled={deleteAll.isPending}
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Delete all
+            </Button>
+          )}
         </div>
       </div>
 
@@ -213,16 +248,18 @@ export default function BidArchivePage({
                 >
                   <RotateCcw className="w-3.5 h-3.5" /> Restore
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8 w-8 p-0 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => setConfirmDelete(bid as ArchivedBid)}
-                  aria-label={`Delete ${bid.name} permanently`}
-                  title="Delete now, without waiting"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
+                {canDelete && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => setConfirmDelete(bid as ArchivedBid)}
+                    aria-label={`Delete ${bid.name} permanently`}
+                    title="Delete now, without waiting"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                )}
               </div>
             ))}
           </div>
@@ -259,6 +296,39 @@ export default function BidArchivePage({
               }}
             >
               Delete permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={confirmAll !== null}
+        onOpenChange={open => !open && setConfirmAll(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete all {confirmAll} archived{" "}
+              {confirmAll === 1 ? "bid" : "bids"} for good?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes every bid in the archive right now, along
+              with every line on them and any plans attached. It cannot be
+              undone. Anything you might still want, restore first.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep them</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (confirmAll !== null)
+                  deleteAll.mutate({ expectedCount: confirmAll });
+                setConfirmAll(null);
+              }}
+            >
+              Delete {confirmAll} {confirmAll === 1 ? "bid" : "bids"}{" "}
+              permanently
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
