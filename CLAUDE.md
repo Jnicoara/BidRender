@@ -1032,7 +1032,12 @@ assembly, kit and takeoff stamp points at the original's id. Add an entry to
 `RENAMED_BASELINE_MATERIALS` instead, which renames in place. **Removing one is
 not a deletion either** — drop it from the catalog and list it in
 `RETIRED_BASELINE_MATERIALS`, which sets `isActive = false` so the row leaves
-every list but still resolves for bids already priced from it. `pnpm tsx
+every list but still resolves for bids already priced from it. **Un-retiring
+works too, since 2026-09-26:** take the name off that list and put it back in
+the catalog, and the next start shows the same row again, same id
+(`reactivateBaselineMaterials`). Before that it stayed hidden forever on any
+database that held it. Only the shared row comes back; a company's own copy is
+never touched (`server/seedReactivatesRetired.test.ts`). `pnpm tsx
 scripts/dropOrphanBaselines.mts` reports rows that fell out of the catalog
 without going through either list; `pnpm tsx scripts/categoryAudit.mts` prints
 the curated shelves with their counts.

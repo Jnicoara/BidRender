@@ -25,6 +25,12 @@ This is the human-readable companion to the git history — read this to see wha
   priced"). The count is kept with the line when it is added, so pricing the
   part in your library later does not hide the gap on a bid that was priced
   without it.
+- **A material we stop shipping and then bring back now actually comes
+  back.** Before, putting a retired material back in the catalog did nothing
+  on any existing database: the row stayed hidden, the catalog claimed to ship
+  it, and nothing said so. It now reappears on the next start, as the same
+  row, so anything that pointed at it still does. A company's own edited,
+  archived or deleted copy is never touched.
 - **The catalog now has 400 and 500 kcmil lugs**, for the 400 and 500 kcmil
   wire it already shipped. Each is one size rather than a range, because that
   is how supply houses sell lugs that large, and both names say so ("400 kcmil

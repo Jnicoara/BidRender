@@ -129,10 +129,12 @@ const LUG_RANGES: Array<{
 
     NAMED WITH A QUALIFIER ON PURPOSE. The pattern above would make it
     "500 kcmil crimp lug", which is in RETIRED_BASELINE_MATERIALS, and the
-    seeder never re-activates a retired row (todo.md): a database that still
-    holds that row would keep it hidden and insert nothing, while this file
-    claimed to ship it. A new name inserts a new row everywhere. Owner,
-    2026-09-26: a new name, same pattern, one size.
+    seeder at the time never re-activated a retired row: a database that
+    still held that row would have kept it hidden and inserted nothing, while
+    this file claimed to ship it. A new name inserts a new row everywhere.
+    Owner, 2026-09-26: a new name, same pattern, one size. The seeder was
+    fixed later that day (reactivateBaselineMaterials, server/db.ts); the
+    name stays, because it is the clearer one and a rename is churn.
   */
   {
     range: "500 kcmil",

@@ -111,7 +111,22 @@ left as written rather than rewritten to match the rename.
       in a full run on a fresh test database with a foreign-key error — the
       order dependence was invisible on any database an older run had left
       user 7373 in.
-- [ ] **SEEDER BUG, needs its own investigation — do not fold into other
+- [x] **FIXED 2026-09-26 (Track B): a retired name put back in the catalog
+      now comes back.** `reactivateBaselineMaterials` (`server/db.ts`) runs
+      after the retire pass and switches on any SHARED row (`userId IS NULL`)
+      whose name the catalog ships. The worry below — a row re-added by
+      mistake — was settled by who writes the flag: on a shared row,
+      `isActive = false` has one writer, the retire pass; a company's edit,
+      archive or delete lands on its own copy, which this never reaches.
+      Production checked read-only the same day: 0 company copies hidden the
+      old way (`isActive = 0`, of 7 copies in all), 2 hidden shared rows, both
+      still retired, so the fix switches nothing on at deploy. Code only, no
+      migration. `server/seedReactivatesRetired.test.ts` retires, un-retires
+      and re-seeds a fixture; verified red before the fix, and it pins that a
+      company's archived $12.50 copy does not move and a second seed changes
+      nothing. The original entry, as found:
+
+      **SEEDER BUG, needs its own investigation — do not fold into other
       work: a retired material name is never re-activated.** Found 2026-09-26.
       `retireBaselineMaterials` sets `isActive = false` on every name in
       `RETIRED_BASELINE_MATERIALS`, and nothing in `seedBaselineMaterials`

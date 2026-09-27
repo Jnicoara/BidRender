@@ -61,10 +61,20 @@ describe("shipped catalog shape", () => {
     // Raised from 700 to 800 on 2026-09-25, when the lighting audit added 49
     // rows on purpose (tubes, lamps, promoted troffers/cans) and took the
     // catalog to ~708. Raised again to 1,250 the same day, when the unblocked
-    // pricing-sheet rows moved in (~410 rows, taking it to ~1,120). Still a
-    // ceiling: a generator that runs away blows through it, and so does
-    // anything that doubles a family.
-    expect(BASELINE_MATERIALS.length).toBeLessThan(1250);
+    // pricing-sheet rows moved in.
+    //
+    // Raised to 1,500 on 2026-09-26 at 1,237 rows, 12 short of the old line.
+    // Measured then: the pricing sheet holds 1,364 generic rows, so this fits
+    // all of them with ~10% spare, and it still trips if the biggest generated
+    // family — Conduit Fittings, 338 rows — doubles (1,237 + 338 = 1,575).
+    // A tripwire against a runaway generator, not a limit on the catalog.
+    //
+    // REVISIT when the 519 brand-variant rows land (panels and breakers,
+    // after the parent/variant work): that takes the catalog to ~1,900. At
+    // that point also measure the library response — `materials.list` and the
+    // bid screens read the whole catalog unpaged (getLibraryMaterials), about
+    // 255 KB of seed data alone at 1,237 rows — before raising this again.
+    expect(BASELINE_MATERIALS.length).toBeLessThan(1500);
   });
 
   it("has no duplicate names", () => {

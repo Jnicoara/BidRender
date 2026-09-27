@@ -1718,8 +1718,28 @@ export async function revertMaterialToBaseline(id: number, userId: number) {
  * and how a rename is done safely.
  */
 export async function seedBaselineMaterials(): Promise<void> {
-  await withSeedLock("helixbid:seed:materials", seedBaselineMaterialsUnlocked);
+  await withSeedLock(BASELINE_MATERIALS_SEED_LOCK, async () => {
+    await seedBaselineMaterialsFrom(
+      BASELINE_MATERIALS,
+      RETIRED_BASELINE_MATERIALS
+    );
+  });
 }
+
+/** Exported so a test can take the same lock the server takes on boot. */
+export const BASELINE_MATERIALS_SEED_LOCK = "helixbid:seed:materials";
+
+/**
+ * What one seed pass changed. Returned rather than logged so a test can tell
+ * "ran and changed nothing" from "never ran" — `withSeedLock` skips the pass
+ * silently when it cannot get the lock, and a second run that did nothing
+ * looks exactly like one that was skipped.
+ */
+export type BaselineSeedReport = {
+  inserted: number;
+  retired: number;
+  reactivated: number;
+};
 
 /**
  * Rename baseline rows whose catalog name has changed, in place.
@@ -1784,10 +1804,22 @@ async function renameBaselineMaterials(): Promise<void> {
  * it is theirs, and the catalog dropping the original says nothing about
  * whether they still buy the part.
  */
-async function retireBaselineMaterials(): Promise<void> {
+async function retireBaselineMaterials(retired: string[]): Promise<number> {
   const db = await getDb();
-  if (!db) return;
-  if (RETIRED_BASELINE_MATERIALS.length === 0) return;
+  if (!db) return 0;
+  if (retired.length === 0) return 0;
+
+  const due = await db
+    .select({ id: materials.id })
+    .from(materials)
+    .where(
+      and(
+        isNull(materials.userId),
+        inArray(materials.name, retired),
+        eq(materials.isActive, true)
+      )
+    );
+  if (due.length === 0) return 0;
 
   await db
     .update(materials)
@@ -1795,19 +1827,89 @@ async function retireBaselineMaterials(): Promise<void> {
     .where(
       and(
         isNull(materials.userId),
-        inArray(materials.name, RETIRED_BASELINE_MATERIALS),
-        eq(materials.isActive, true)
+        inArray(
+          materials.id,
+          due.map(row => row.id)
+        )
       )
     );
+  return due.length;
 }
 
-async function seedBaselineMaterialsUnlocked(): Promise<void> {
+/**
+ * Show a shipped row again when the catalog ships its name again.
+ *
+ * The other half of retireBaselineMaterials, and until 2026-09-26 it did not
+ * exist: take a name off the retired list and put it back in the catalog, and
+ * the old row stayed hidden while the insert pass skipped the name because a
+ * row with it already existed. The catalog claimed a material no screen showed.
+ *
+ * Switching it back on is always right, because on a SHIPPED row
+ * `isActive = false` has exactly one writer — the retire pass above. A company
+ * that edits, archives or deletes a starter does it to its own copy
+ * (archiveLibraryRow forks first), so this reaches `userId IS NULL` rows only
+ * and a company's copy is never in it. Same row, same id, so every assembly,
+ * kit, stamp and priced bid that pointed at it still does.
+ *
+ * Runs after the retire pass. The two lists cannot overlap — "never lists a
+ * retired name as a current material" in materialsCatalog.test.ts — so the
+ * order cannot flicker a row off and on within one start.
+ */
+async function reactivateBaselineMaterials(
+  catalog: BaselineMaterial[]
+): Promise<number> {
   const db = await getDb();
-  if (!db) return;
+  if (!db) return 0;
+
+  const shipping = new Set(catalog.map(m => m.name));
+  const hidden = await db
+    .select({ id: materials.id, name: materials.name })
+    .from(materials)
+    .where(and(isNull(materials.userId), eq(materials.isActive, false)));
+  const due = hidden.filter(row => shipping.has(row.name));
+  if (due.length === 0) return 0;
+
+  await db
+    .update(materials)
+    .set({ isActive: true })
+    .where(
+      and(
+        isNull(materials.userId),
+        inArray(
+          materials.id,
+          due.map(row => row.id)
+        )
+      )
+    );
+  for (const row of due) {
+    console.info(`[seed] baseline material "${row.name}" is shipped again.`);
+  }
+  return due.length;
+}
+
+/**
+ * The seed pass, with the catalog and the retired list as inputs.
+ *
+ * `seedBaselineMaterials` passes the shipped lists; a test passes its own, so
+ * it can retire a name and put it back without editing the catalog. Call it
+ * inside `withSeedLock(BASELINE_MATERIALS_SEED_LOCK, …)`, as the server does.
+ */
+export async function seedBaselineMaterialsFrom(
+  catalog: BaselineMaterial[],
+  retired: string[]
+): Promise<BaselineSeedReport> {
+  const report: BaselineSeedReport = {
+    inserted: 0,
+    retired: 0,
+    reactivated: 0,
+  };
+  const db = await getDb();
+  if (!db) return report;
 
   await dedupeBaselineRows("materials");
   await renameBaselineMaterials();
-  await retireBaselineMaterials();
+  report.retired = await retireBaselineMaterials(retired);
+  report.reactivated = await reactivateBaselineMaterials(catalog);
 
   const existing = await db
     .select({ name: materials.name })
@@ -1815,20 +1917,20 @@ async function seedBaselineMaterialsUnlocked(): Promise<void> {
     .where(isNull(materials.userId));
   const alreadySeeded = new Set(existing.map(row => row.name));
 
-  const missing = BASELINE_MATERIALS.filter(
-    m => !alreadySeeded.has(m.name)
-  ).map(m => ({
-    name: m.name,
-    unitOfSale: m.unitOfSale,
-    costPerUnit: m.costPerUnit,
-    category: m.category,
-    searchAliases: m.searchAliases,
-    description: m.description ?? null,
-    trade: m.trade ?? "electrical",
-    defaultQty: m.defaultQty != null ? m.defaultQty.toFixed(4) : null,
-    ...racewayColumns(m),
-    userId: null,
-  }));
+  const missing = catalog
+    .filter(m => !alreadySeeded.has(m.name))
+    .map(m => ({
+      name: m.name,
+      unitOfSale: m.unitOfSale,
+      costPerUnit: m.costPerUnit,
+      category: m.category,
+      searchAliases: m.searchAliases,
+      description: m.description ?? null,
+      trade: m.trade ?? "electrical",
+      defaultQty: m.defaultQty != null ? m.defaultQty.toFixed(4) : null,
+      ...racewayColumns(m),
+      userId: null,
+    }));
 
   // Chunked: 600 rows of a dozen columns each overflows the default packet on
   // a single INSERT, and the whole seed failing would leave a half-built
@@ -1836,8 +1938,10 @@ async function seedBaselineMaterialsUnlocked(): Promise<void> {
   for (let i = 0; i < missing.length; i += 100) {
     await db.insert(materials).values(missing.slice(i, i + 100));
   }
+  report.inserted = missing.length;
 
-  await backfillMaterialMetadata();
+  await backfillMaterialMetadata(catalog);
+  return report;
 }
 
 /**
@@ -1908,7 +2012,9 @@ const RACEWAY_NUMBER_KEYS = [
   "strapFromBoxFeet",
 ] as const;
 
-async function backfillMaterialMetadata(): Promise<void> {
+async function backfillMaterialMetadata(
+  catalog: BaselineMaterial[]
+): Promise<void> {
   const db = await getDb();
   if (!db) return;
 
@@ -1930,8 +2036,8 @@ async function backfillMaterialMetadata(): Promise<void> {
     .from(materials)
     .where(isNull(materials.userId));
 
-  const seedByName = new Map(BASELINE_MATERIALS.map(m => [m.name, m]));
-  const seedById = new Map<number, (typeof BASELINE_MATERIALS)[number]>();
+  const seedByName = new Map(catalog.map(m => [m.name, m]));
+  const seedById = new Map<number, BaselineMaterial>();
 
   for (const row of baselines) {
     const intended = seedByName.get(row.name);
