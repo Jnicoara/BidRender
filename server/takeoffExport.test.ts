@@ -223,12 +223,27 @@ describe("building the export", () => {
   it("measures the rest of a row and says what it left out", () => {
     const doc = buildTakeoffExport(
       source({
-        runs: [runs({ sheetId: 1, runCount: 3, branchCount: 1 })],
+        runs: [
+          runs({ sheetId: 1, pathType: "cable", runCount: 3, branchCount: 1 }),
+        ],
       })
     );
     expect(doc.bySheet[0].quantity).toBe(50);
     expect(doc.bySheet[0].note).toContain(
       "1 run left out as branch wiring the devices already carry"
+    );
+  });
+
+  it("keeps a branch conduit run's pipe, and says only its wire is left out", () => {
+    // The only run of the type is branch wiring: its pipe is still feet.
+    const doc = buildTakeoffExport(
+      source({
+        runs: [runs({ sheetId: 1, runCount: 1, branchCount: 1, wireFeet: 0 })],
+      })
+    );
+    expect(doc.bySheet[0].quantity).toBe(50);
+    expect(doc.bySheet[0].note).toContain(
+      "1 run is branch wiring — wire left out, the devices carry it; conduit counted"
     );
   });
 

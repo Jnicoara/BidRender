@@ -13,8 +13,10 @@
  *
  * ── Two exclusions, and both are decisions somebody made ─────────────────────
  * A SUGGESTED run is the app's guess until a person accepts it. A run answered
- * BRANCH is wire the devices already carry in their whips (D18), so counting it
- * would be the double count the whole split exists to remove.
+ * BRANCH is wire the devices already carry in their whips (D18), so counting
+ * its WIRE would be the double count the whole split exists to remove. Its
+ * conduit still counts — no device carries pipe. A branch cable run is left out
+ * whole, because the cable is the wire.
  *
  * An UNANSWERED run COUNTS, and the caller is told how many there were. A
  * traced run is measured work somebody drew across a drawing; dropping it over
@@ -50,7 +52,11 @@ export type RunTypeFootageRow = {
   unmeasurableCount: number;
   /** Runs of this type nobody has answered the branch question for. */
   unansweredCount: number;
-  /** Runs of this type excluded because the devices already carry them. */
+  /**
+   * Runs of this type answered branch wiring. Their WIRE is left out because
+   * the devices carry it; on a conduit type their pipe still counts, and on a
+   * cable type the whole run is left out, since the cable is the wire.
+   */
   branchCount: number;
   /**
    * The share of `conduitFeet` / `cableFeet` that came from QUANTITY traces
@@ -190,9 +196,16 @@ export function groupRunFootage(input: {
 
     /*
       The guard, applied before anything is added. A run the estimator called
-      branch wiring is already paid for by the devices' whips, so it contributes
-      nothing — and is COUNTED here, so a screen can say why the footage is
-      smaller than the drawing looks rather than leaving it to be noticed.
+      branch wiring has its WIRE paid for by the devices' whips (D18), so the
+      wire is left out — and the run is COUNTED here, so a screen can say why
+      the footage is smaller than the drawing looks.
+
+      ── The wire, not the pipe ──────────────────────────────────────────────
+      This used to `continue` for every branch run, which left out a conduit
+      run's pipe, fittings and vertical pipe too. D18 moves only the wire: every
+      whip the starters ship is NM-B, and nothing on a device prices EMT, so
+      that pipe was on no line of the bid at all. Fixed 2026-09-27. A CABLE run
+      still goes whole, because on a cable the cable IS the wire the whip owns.
     */
     const ownership = runWireOwnership({
       startKind: run.startKind,
@@ -202,9 +215,10 @@ export function groupRunFootage(input: {
       traceMode: run.traceMode,
       branchWiring: run.branchWiring,
     });
-    if (ownership === "branch") {
+    const wireIsTheDevices = ownership === "branch";
+    if (wireIsTheDevices) {
       row.branchCount++;
-      continue;
+      if (run.pathType === "cable") continue;
     }
     if (ownership === "unanswered") row.unansweredCount++;
 
@@ -295,6 +309,7 @@ export function groupRunFootage(input: {
       by the compiler, because the per-circuit field was renamed rather than
       re-meant.
     */
+    if (wireIsTheDevices) continue;
     const groundShare = quantities.groundFeet;
     row.groundFeet += groundShare;
     row.insulatedFeet += Math.max(0, quantities.totalWireFeet - groundShare);

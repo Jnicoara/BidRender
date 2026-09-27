@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **Conduit marked as branch wiring is back on the bid.** When you told the
+  app a conduit run between two devices was branch wiring, it left out the
+  whole run: the wire (correct, because your devices already include it) but
+  also the pipe, its fittings and its drops, which nothing else on the bid
+  priced. Now only the wire is left out, and the pipe is priced. Unlocked bids
+  pick this up on their own. Cable runs marked as branch wiring are still left
+  out entirely, because there the cable is the wire.
 - **The Performance screen says when its dollar figures are short.** If a
   bid in the chosen range has a line the app can't price, the win-rate and
   finished-jobs sections now show a red "incomplete" line saying how many,

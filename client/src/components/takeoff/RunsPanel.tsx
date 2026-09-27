@@ -530,7 +530,10 @@ export type RunTypeBridgeEntry = {
   fittings: RunTypeBridgeFitting[];
   /** Runs of this type nobody has answered the branch-wiring question for. */
   unansweredCount: number;
-  /** Runs excluded because the devices already carry them. */
+  /**
+   * Runs answered branch wiring. Their wire is left out; on a conduit type
+   * their pipe still counts (runTypeFootageCore.ts).
+   */
   branchCount: number;
   /** Runs on a sheet with no scale, so not in these numbers at all. */
   unmeasurableCount: number;
@@ -1137,13 +1140,22 @@ export function RunsPanel({
                     the devices already carry, a question still open, and a
                     sheet with no scale.
                   */}
+                  {/*
+                    On a conduit type only the WIRE is left out: no device
+                    carries pipe, so the pipe stays (runTypeFootageCore.ts).
+                    Saying "not in this" of the whole run there would be the
+                    old meaning, which dropped the pipe too.
+                  */}
                   {entry.branchCount > 0 && (
                     <p className="mt-1 text-[0.7rem] text-muted-foreground">
                       {entry.branchCount} run
                       {entry.branchCount === 1 ? " is" : "s are"} branch wiring
                       your devices already include, so{" "}
-                      {entry.branchCount === 1 ? "it is" : "they are"} not in
-                      this.
+                      {entry.pathType === "conduit"
+                        ? (entry.branchCount === 1 ? "its" : "their") +
+                          " wire is not in this. The conduit is."
+                        : (entry.branchCount === 1 ? "it is" : "they are") +
+                          " not in this."}
                     </p>
                   )}
                   {entry.unansweredCount > 0 && (
@@ -1570,8 +1582,9 @@ export function RunsPanel({
                   {run.branchWiring === true &&
                     run.traceMode !== "quantity" && (
                       <p className="text-[0.7rem] text-muted-foreground mt-1.5">
-                        Branch wiring — your devices already include this cable,
-                        so it is not counted again.{" "}
+                        {run.pathType === "conduit"
+                          ? "Branch wiring — your devices already include this wire, so it is not counted again. The conduit still is."
+                          : "Branch wiring — your devices already include this cable, so it is not counted again."}{" "}
                         {onAnswerBranchWiring && (
                           <button
                             className="underline hover:text-foreground"

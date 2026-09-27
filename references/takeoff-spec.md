@@ -884,6 +884,15 @@ overlap after the fact.
   function, deciding before anything sums. Same shape as `totalVerticalFeet`,
   which already does this for a drop owned by either a run or a stamp.
 
+**The WIRE, not the pipe — clarified 2026-09-27.** D18 moves the wire between
+devices onto their whips. It never said anything about conduit, and no device
+carries pipe (every starter whip is NM-B). But `groupRunFootage` skipped a
+branch run WHOLE, so a conduit run answered "branch" lost its pipe, fittings
+and vertical pipe from the bid, and nothing else priced them. Now a branch
+conduit run keeps its pipe and loses only its wire; a branch CABLE run is still
+left out whole, because the cable is the wire. `server/runTypeFootageCore.test.ts`
+§ "a run answered branch wiring" pins both halves.
+
 **Three parts, and one thing that was rejected.**
 
 1. **A whip length per ASSEMBLY.** A troffer and a receptacle are not the same

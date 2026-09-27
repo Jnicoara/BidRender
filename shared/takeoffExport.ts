@@ -73,7 +73,10 @@ export type TakeoffExportRuns = {
   groundFeet: number;
   /** On a sheet with no usable scale, so not in the feet above. */
   unmeasurableCount: number;
-  /** Branch wiring the devices' whips carry (D18), so not in the feet. */
+  /**
+   * Branch wiring the devices' whips carry (D18). Its wire is not in the feet;
+   * on a conduit type its pipe is, and on a cable type nothing of it is.
+   */
   branchCount: number;
   /** Nobody has said home run or branch yet — counted anyway. */
   unansweredCount: number;
@@ -134,6 +137,7 @@ const plural = (n: number, one: string, many: string) =>
 
 /** What a run row says about the runs NOT in its feet. */
 function runNote(runs: {
+  pathType: "conduit" | "cable";
   unmeasurableCount: number;
   branchCount: number;
   unansweredCount: number;
@@ -151,9 +155,12 @@ function runNote(runs: {
     parts.push(
       `${plural(runs.unmeasurableCount, "run", "runs")} not measured — no usable scale on the sheet`
     );
+  // On a conduit type only the wire goes to the devices (D18); the pipe stays.
   if (runs.branchCount > 0)
     parts.push(
-      `${plural(runs.branchCount, "run", "runs")} left out as branch wiring the devices already carry`
+      runs.pathType === "conduit"
+        ? `${plural(runs.branchCount, "run is", "runs are")} branch wiring — wire left out, the devices carry it; conduit counted`
+        : `${plural(runs.branchCount, "run", "runs")} left out as branch wiring the devices already carry`
     );
   if (runs.unansweredCount > 0)
     parts.push(
@@ -168,7 +175,12 @@ function runRow(
   runs: RunTotals,
   where: Pick<TakeoffExportRow, "planFile" | "page" | "sheet" | "sheetTitle">
 ): TakeoffExportRow {
-  const measured = runs.runCount - runs.unmeasurableCount - runs.branchCount;
+  // A branch conduit run still has its pipe in the feet; a branch cable run
+  // has nothing in them (runTypeFootageCore.ts).
+  const measured =
+    runs.runCount -
+    runs.unmeasurableCount -
+    (runs.pathType === "cable" ? runs.branchCount : 0);
   const hasFeet = measured > 0;
   return {
     ...where,
