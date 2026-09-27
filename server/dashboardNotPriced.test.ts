@@ -124,7 +124,9 @@ async function screenTally(bidId: number): Promise<NotPricedTally> {
   const db = await getDb();
   const [bid] = await db!.select().from(bids).where(eq(bids.id, bidId));
   const company = await companyDefaultsFor(USER);
-  return rollUpBid(bid, await getRollupLines(bidId, USER), company).notPriced;
+  // No charges: these bids have none, and charges never change the tally.
+  return rollUpBid(bid, await getRollupLines(bidId, USER), company, [])
+    .notPriced;
 }
 
 async function cardTally(bidId: number): Promise<NotPricedTally> {

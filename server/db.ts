@@ -202,6 +202,7 @@ import {
   type SeatUsage,
 } from "../shared/seats";
 import { hourlyCostFor } from "../shared/laborRateLookup";
+import type { ExpenseLine } from "../shared/bidExtras";
 import { unpricedPartsIn, type NotPricedTally } from "../shared/lineNotPriced";
 import { appliedModifiers } from "../shared/modifierLookup";
 import { resolveMaterial, materialIdsToFetch } from "../shared/materialLookup";
@@ -3969,6 +3970,23 @@ export async function getBidExpenses(bidId: number): Promise<BidExpense[]> {
     .from(bidExpenses)
     .where(eq(bidExpenses.bidId, bidId))
     .orderBy(asc(bidExpenses.sortOrder), asc(bidExpenses.id));
+}
+
+/**
+ * A bid's charges as the rollup takes them. Every price of a bid goes through
+ * `rollUpBid`/`bidRollup` WITH these — a marked-up charge is inside the price,
+ * so a surface that leaves them out shows a different number from the bid.
+ */
+export async function getBidExpenseLines(
+  bidId: number
+): Promise<ExpenseLine[]> {
+  const rows = await getBidExpenses(bidId);
+  return rows.map(row => ({
+    name: row.name,
+    amount: Number(row.amount),
+    taxable: row.taxable,
+    markedUp: row.markedUp,
+  }));
 }
 
 export async function createBidExpense(

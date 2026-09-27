@@ -62,7 +62,23 @@ async function estimateFor(bidId: number, userId: number) {
     companyDefaultsFor(userId),
   ]);
   const live = lines.filter(line => line.archivedAt === null);
-  const { priced, totals, problems } = bidRollup(bid, live, company);
+  /*
+    NO CHARGES, and that is a question rather than a decision. Until
+    2026-09-27 this left them out by a default nobody could see; the argument
+    is required now, so the omission is written here. It means a bid with a
+    MARKED-UP charge is closed out against an estimate that charge short of
+    the bid screen — the gap fixed in "Find a bid" and the archive that day.
+    Not changed with them, because this estimate is SNAPSHOTTED into the
+    close-out and feeds profitability, so what it should include is the
+    owner's call (todo.md).
+  */
+  const { priced, totals, problems } = bidRollup(
+    bid,
+    live,
+    company,
+    undefined,
+    []
+  );
 
   return {
     bid,

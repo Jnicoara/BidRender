@@ -192,8 +192,8 @@ describe("rollUpBid isolation", () => {
   it("prices the good lines exactly as it would without the broken one", () => {
     const good = [line(), line({ qty: "3" })];
     const broken = line({ qty: "-2" });
-    const alone = rollUpBid(bidRow, good, company);
-    const mixed = rollUpBid(bidRow, [good[0], broken, good[1]], company);
+    const alone = rollUpBid(bidRow, good, company, []);
+    const mixed = rollUpBid(bidRow, [good[0], broken, good[1]], company, []);
 
     expect(mixed.directCost).toBe(alone.directCost);
     expect(mixed.bidPrice.finalPrice).toBe(alone.bidPrice.finalPrice);
@@ -207,7 +207,7 @@ describe("rollUpBid isolation", () => {
 
   it("does not throw on settings with no finite price", () => {
     const badBid = { ...bidRow, profitMethod: "margin", profitValue: "1.5" };
-    const result = rollUpBid(badBid as Bid, [line()], company);
+    const result = rollUpBid(badBid as Bid, [line()], company, []);
     expect(result.incomplete).toBe(true);
     expect(result.problems[0]).toMatchObject({
       lineId: null,
@@ -245,11 +245,12 @@ describe("rollUpBid isolation", () => {
     const result = rollUpBid(
       bidRow,
       [priced, unpricedAssembly, handBlank, handTypedZero],
-      company
+      company,
+      []
     );
     expect(result.notPriced).toEqual({ lines: 2, parts: 0 });
     expect(result.incomplete).toBe(false);
-    expect(rollUpBid(bidRow, [priced], company).notPriced).toEqual({
+    expect(rollUpBid(bidRow, [priced], company, []).notPriced).toEqual({
       lines: 0,
       parts: 0,
     });
@@ -270,9 +271,9 @@ describe("rollUpBid isolation", () => {
       runMaterialRole: null,
       snapshotMaterialCost: null,
     });
-    expect(rollUpBid(bidRow, [withPart, handBlank], company).notPriced).toEqual(
-      { lines: 1, parts: 1 }
-    );
+    expect(
+      rollUpBid(bidRow, [withPart, handBlank], company, []).notPriced
+    ).toEqual({ lines: 1, parts: 1 });
   });
 });
 

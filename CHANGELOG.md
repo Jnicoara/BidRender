@@ -4,6 +4,13 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-27]
+
+- **"Find a bid" and the archive now show the same price as the bid.** A bid
+  with a marked-up charge (a permit that takes overhead and profit) read that
+  charge short in search and in the archive — "Markup check" showed $302.57
+  there and $452.57 on the bid itself. All of them now show $452.57.
+
 ## [2026-09-26]
 
 - **Dashboard cards now say what they leave out.** A bid with unpriced lines
