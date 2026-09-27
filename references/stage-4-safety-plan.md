@@ -7,6 +7,28 @@ starts with what already exists, measured against the code on `local-dev` at
 
 ---
 
+## The owner's answers (2026-09-27) — these override anything below
+
+1. **Email provider: Resend.**
+2. **DNS for bidridge.com is at DigitalOcean** (its nameservers point there).
+   Email and staging records go in DigitalOcean → Networking → Domains.
+3. **Staging: yes, and password-protected.**
+4. **The AI log keeps the picture, not just the label.** Save the label and
+   kind, the sheet, the box location, AND a small cut-out image of the symbol,
+   stored in R2. The log cannot be backfilled, and shared symbol learning later
+   needs the picture. Anything identifying the company, job or customer is
+   stripped from what would be shared. **This overrides the "kind, not
+   picture" line in § 3 below.**
+5. **Migrations reach the locked database from the owner's laptop IP.** Home
+   IPs change, so `references/deploying.md` § 10 has the steps to update it and
+   what the error looks like when it is stale.
+6. **Only the BidRidge owner can invite a new company.** Company owners
+   inviting their own staff is unchanged.
+7. **Terms page later, but it must exist before any sharing is turned on.**
+   Recorded in `todo.md` § Pending.
+
+---
+
 ## What already exists
 
 | Piece | Exists today | Missing |
@@ -111,7 +133,9 @@ Plain steps. Each says where to click and what "done" looks like.
 
 1. Log in to **cloud.digitalocean.com**.
 2. Left menu: **Databases** → click the MySQL cluster.
-3. Open the **Settings** tab. Find **Trusted Sources**.
+3. Open the **Network Access** tab. Find **Trusted Sources**. (Before the
+   lockdown it read "Right now, your database is open to all incoming
+   connections" — confirmed 2026-09-27.)
 4. If it says anything like "all IPv4" or is empty, click **Edit**, and add the
    app: start typing the app's name and pick it from the list.
 5. Also add **your own computer's internet address** — the page offers "add my
@@ -120,6 +144,18 @@ Plain steps. Each says where to click and what "done" looks like.
 6. Save. **Done looks like:** Trusted Sources lists exactly the app and your
    address, and bidridge.com still loads and shows your bids afterwards. If
    the site stops loading, remove the change you just made and tell me.
+
+> **Tried 2026-09-27 and it took the site down — the steps above are wrong as
+> written.** With the app `bidrender` as the only trusted source, the live
+> site stopped working; removing the entry brought it back. The app reaches the
+> database over the **public** hostname, and outbound traffic from App Platform
+> leaves from shared addresses that the "app" trusted-source entry does not
+> match. DigitalOcean's documented route for an app is the **VPC**: enable it
+> on the app, point `DATABASE_URL` at the database's **private** hostname, and
+> trust the app's **VPC egress private IP**
+> (docs.digitalocean.com/products/app-platform/how-to/enable-vpc/). The build
+> is not the cause — `scripts/build.mts` never connects to the database.
+> Revised steps are being walked through with the owner one at a time.
 
 ### B. Check each setting's scope (piece 4) — about 10 minutes
 

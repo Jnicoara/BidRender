@@ -460,6 +460,11 @@ holds the R2 secrets, so it is the right home; it is also a file full of
 credentials, so do not paste its contents anywhere, and consider blanking
 `DATABASE_URL` again when you are done.
 
+**Your laptop must also be on the database's trusted list** — see § 10. If a
+command below cannot connect while the site itself loads fine, your home
+address has probably changed; § 10 says what the error looks like and how to
+fix it in about two minutes.
+
 Everything below assumes those two values are in place. Every command names the
 file explicitly rather than relying on the shell, because a migration that runs
 against the wrong database is the one mistake here with no undo.
@@ -1295,3 +1300,44 @@ an override that works silently is one nobody notices they left on.
 
 **It refuses when it cannot tell**, too — a missing or unparseable URL is not
 the same as a safe one, and only one of those should let a `DROP` proceed.
+
+## 10. The database only answers addresses on its trusted list
+
+**From Stage 4 (2026-09-27).** The DigitalOcean database refuses every
+connection except from the addresses on its **Trusted Sources** list: the app
+itself, and the owner's laptop. That laptop entry is what lets a migration
+(§ 5a) or `scripts/schemaDrift.mts` run from here.
+
+**A home internet address changes** — after a router restart, an outage, or
+whenever the internet company decides. When it does, the laptop is no longer
+on the list, and every command that talks to production fails. **The live site
+is not affected** — the app has its own entry — so nothing is wrong except
+that this laptop cannot get in.
+
+### What it looks like when the address is stale
+
+_To be filled in with the real text, measured during the Stage 4 lockdown._
+
+If a production command fails to connect and the site itself still loads,
+this is the first thing to check — before suspecting the password, the
+certificate or the database.
+
+### How to put your current address back on the list
+
+1. Log in to **cloud.digitalocean.com**.
+2. Left menu: **Databases**. Click the MySQL database.
+3. Open the **Network Access** tab (not Settings — it moved there). Find
+   **Trusted Sources**.
+4. Click **Edit** next to it.
+5. You will see the old laptop entry — an address made of four numbers with
+   dots. Click the **X** or trash icon next to it to remove it. **Do not
+   remove the entry that names the app.** Removing that one takes the live
+   site down.
+6. Click **Add**, and choose your current address — the page offers it
+   ("my current IP" or similar), so there is nothing to look up or type.
+7. Click **Save**. It takes effect within about a minute.
+8. Run the command again. It should now connect.
+
+**If the live site stops working right after step 7**, the app entry was
+removed by mistake. Go back to the same box, click **Add**, start typing the
+app's name, pick it, and save. The site comes back within a minute or two.
