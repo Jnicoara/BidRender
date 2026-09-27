@@ -60,6 +60,7 @@ import {
   ChevronRight,
   FileText,
   FileSpreadsheet,
+  TextSelect,
   ClipboardList,
   Loader2,
   Plus,
@@ -182,6 +183,8 @@ import {
   shouldUseMultipart,
 } from "@shared/multipartPlan";
 import { uploadInParts } from "@/lib/multipartUpload";
+import type { PageTextLayer } from "@/lib/textSelection";
+import { TextSelectLayer } from "@/components/takeoff/TextSelect";
 import { useUploadSpeeds } from "@/lib/useUploadSpeeds";
 import {
   findResumableUpload,
@@ -337,6 +340,11 @@ function usePdfWorker() {
         pending.current.delete(msg.reqId);
         return;
       }
+      if (msg.type === "textItems") {
+        pending.current.get(msg.reqId)?.resolve(msg.layer);
+        pending.current.delete(msg.reqId);
+        return;
+      }
       if (msg.type === "error") {
         const waiter = pending.current.get(msg.reqId);
         if (waiter) {
@@ -475,6 +483,8 @@ function usePdfWorker() {
         ask<{ pageNumber: number; title: string }[]>({ type: "outline", hash }),
       pageText: (pageNum: number, hash: string) =>
         ask<string>({ type: "text", pageNum, hash }),
+      pageTextLayer: (pageNum: number, hash: string) =>
+        ask<PageTextLayer>({ type: "textItems", pageNum, hash }),
     }),
     [load, loadUrl, ask]
   );
@@ -646,6 +656,12 @@ function PlanPane({
      * it here instead: this layer sits over the viewport, untransformed.
      */
     chromeTarget: HTMLElement | null;
+    /**
+     * This page's text with positions, read from the open document when
+     * asked — for "Select text". A function rather than data, so a sheet
+     * nobody selects text on is never read for it.
+     */
+    loadTextLayer: () => Promise<PageTextLayer>;
   }) => React.ReactNode;
   /**
    * Ask the server for a fresh URL for this document, and return it.
@@ -708,7 +724,8 @@ function PlanPane({
   const pendingSharp = useRef<ImageBitmap | null>(null);
 
   const dpr = useDevicePixelRatio();
-  const { load, loadUrl, render, outline, pageText } = usePdfWorker();
+  const { load, loadUrl, render, outline, pageText, pageTextLayer } =
+    usePdfWorker();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   /** State, not a ref: the overlay has to re-render once this layer exists. */
@@ -1709,6 +1726,7 @@ function PlanPane({
                   renderScale: drawnScale,
                   canvas: canvasRef.current,
                   chromeTarget: chromeLayer,
+                  loadTextLayer: () => pageTextLayer(page, hash),
                 })}
             </div>
           </div>
@@ -1962,6 +1980,7 @@ export default function TakeoffPage({
     setCalibrateSession(n => n + 1);
     setCalibrating(true);
     setArmedGroup(null);
+    setSelectingText(false);
   };
   const [calibratePoints, setCalibratePoints] = useState<PagePoint[]>([]);
 
@@ -2129,6 +2148,23 @@ export default function TakeoffPage({
     null
   );
   const [capturingSymbol, setCapturingSymbol] = useState(false);
+  /**
+   * "Select text" is picked up. ONE tool at a time, and it is kept that way in
+   * two places rather than by a comment: picking this up puts the others down
+   * (`startSelectingText`), picking any of them up puts this down (their own
+   * arm functions), and the layer itself is not rendered while another tool is
+   * active — so even a state that slipped through cannot put two layers on
+   * the sheet listening to the same drag.
+   */
+  const [selectingText, setSelectingText] = useState(false);
+  const startSelectingText = useCallback(() => {
+    // The stamp queue flushes on the armed group changing (see flushStamps),
+    // so putting the count down here cannot strand a click.
+    setArmedGroup(null);
+    setCapturingSymbol(false);
+    setCalibrating(false);
+    setSelectingText(true);
+  }, []);
   /** The crop taken from the page, awaiting a name. */
   const [pendingCapture, setPendingCapture] = useState<{
     thumbnail: string | null;
@@ -2799,6 +2835,7 @@ export default function TakeoffPage({
   /** Pick the tool up. One function, so both doors leave the same state. */
   const armGroup = useCallback(
     (group: { id: number; label: string }, assemblyId: number | null) => {
+      setSelectingText(false);
       setArmedGroup({
         groupId: group.id,
         label: group.label,
@@ -3274,6 +3311,32 @@ export default function TakeoffPage({
         // deletion. The next visit to this sheet tries again.
       });
   }, [activeSheet?.id]);
+
+  /**
+   * T picks "Select text" up or puts it down. Not while tracing — the button
+   * is hidden then too — and never while typing, or a T in a search box would
+   * change tools.
+   */
+  useEffect(() => {
+    if (!activeSheet || tracing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "t" && e.key !== "T") return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.isContentEditable)
+      )
+        return;
+      e.preventDefault();
+      if (selectingText) setSelectingText(false);
+      else startSelectingText();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeSheet, tracing, selectingText, startSelectingText]);
 
   /** Escape puts the stamp tool down. */
   useEffect(() => {
@@ -3846,6 +3909,7 @@ export default function TakeoffPage({
       draftRunId.current = null;
       savedPointCount.current = 0;
       resetLegs();
+      setSelectingText(false);
       setTracing(true);
       setSelectedRunId(null);
     },
@@ -4030,6 +4094,7 @@ export default function TakeoffPage({
       setLegRootMode(run.traceMode);
       setLegPrevEnd(null);
       setLegStart(null);
+      setSelectingText(false);
       setTracing(true);
       setSelectedRunId(null);
     },
@@ -4890,6 +4955,33 @@ export default function TakeoffPage({
             </>
           )}
 
+          {/*
+            ── SELECT TEXT ──────────────────────────────────────────────────
+            Its own group, after Measure: it reads the sheet rather than
+            counting or measuring it, and it needs no scale, so it is never
+            dimmed with the Measure tools. Hidden while tracing, like Count and
+            Measure, rather than cancelling a trace somebody is halfway through.
+          */}
+          {activeSheet && !tracing && (
+            <>
+              <div className="w-px h-4 bg-border" />
+              <Button
+                size="sm"
+                variant={selectingText ? "default" : "outline"}
+                className="h-7 gap-1.5 text-xs"
+                onClick={() =>
+                  selectingText ? setSelectingText(false) : startSelectingText()
+                }
+                aria-pressed={selectingText}
+                title="Drag a box to copy part numbers and notes (T)"
+              >
+                <TextSelect className="w-3.5 h-3.5" />
+                Select text
+                {selectingText && <X className="w-3 h-3" />}
+              </Button>
+            </>
+          )}
+
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {/*
               ── CALIBRATE — beside the thing it changes, not among the tools ─
@@ -5283,6 +5375,25 @@ export default function TakeoffPage({
                         }}
                       />
                     )}
+                    {/* Rendered only while no other tool holds the sheet —
+                        the structural half of "one tool at a time". */}
+                    {selectingText &&
+                      activeSheet &&
+                      !tracing &&
+                      !calibrating &&
+                      !capturingSymbol &&
+                      !pendingCapture && (
+                        <TextSelectLayer
+                          width={size.width}
+                          height={size.height}
+                          renderScale={size.renderScale}
+                          sheetKey={`${activeSheet.id}`}
+                          loadTextLayer={size.loadTextLayer}
+                          chromeTarget={size.chromeTarget}
+                          catalog={allMaterials}
+                          onClose={() => setSelectingText(false)}
+                        />
+                      )}
                     {capturingSymbol && (
                       <SymbolCaptureLayer
                         width={size.width}
@@ -5704,7 +5815,10 @@ export default function TakeoffPage({
                     }))}
                     activeAssemblyId={armedGroup?.assemblyId ?? null}
                     capturing={capturingSymbol}
-                    onStartCapture={() => setCapturingSymbol(true)}
+                    onStartCapture={() => {
+                      setSelectingText(false);
+                      setCapturingSymbol(true);
+                    }}
                     onCancelCapture={() => setCapturingSymbol(false)}
                     onLink={(symbolId, assemblyId) =>
                       linkSymbol.mutate({ id: symbolId, assemblyId })

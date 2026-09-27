@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **Copy words straight off a plan.** A new "Select text" tool on the Plans
+  screen (or press T): drag a box around a part number or a note, and the
+  words inside appear in a box ready to copy. From there, one click searches
+  the materials catalog for them. It is its own tool, so a drag never pans the
+  sheet or places a mark by accident. On a scanned sheet, which has no text,
+  it says so as soon as you pick it up. Text read from a scan's text layer can
+  be wrong, so the box is editable and asks you to check it against the
+  drawing.
 - **A takeoff can now leave the app as a spreadsheet.** "Export takeoff" on
   the Plans screen, and "Takeoff" in a bid's Send menu, download a CSV of
   every count and every run by type. It is laid out by sheet, then totalled
