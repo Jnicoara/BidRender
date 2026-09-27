@@ -59,6 +59,18 @@ const caller = () => callerFor(USER);
 const uniq = () => `${Date.now()}${Math.random()}`;
 
 /**
+ * A plain run type, so a traced run is on the bid. Since 2026-09-27 the list
+ * measures what the BID prices (shared/runOnBid.ts), and a run with no type is
+ * not on the bid; the footage fixtures below were untyped until then.
+ */
+async function plainType() {
+  return caller().takeoffRunTypes.create({
+    label: `List plain ${uniq()}`,
+    pathType: "conduit",
+  });
+}
+
+/**
  * Every material here is priced at $0 — the shipped default.
  *
  * Deliberate: if the list is correct for materials that cost nothing, no part
@@ -559,6 +571,7 @@ describeDb("building the list from a real bid", () => {
       sheetId,
       name: "Panel A feeder",
       pathType: "conduit",
+      runTypeId: (await plainType()).id,
       points: [
         { x: 0, y: 0 },
         { x: 720, y: 0 },
@@ -591,6 +604,7 @@ describeDb("building the list from a real bid", () => {
       sheetId,
       name: "Lighting homerun",
       pathType: "conduit",
+      runTypeId: (await plainType()).id,
       points: [
         { x: 0, y: 0 },
         { x: 720, y: 0 },
@@ -622,6 +636,7 @@ describeDb("building the list from a real bid", () => {
       sheetId,
       name: "Unscaled",
       pathType: "conduit",
+      runTypeId: (await plainType()).id,
       points: [
         { x: 0, y: 0 },
         { x: 500, y: 0 },
@@ -631,6 +646,54 @@ describeDb("building the list from a real bid", () => {
     const doc = await caller().materialsList.get({ bidId });
     expect(doc.measured).toHaveLength(0);
     expect(doc.notes.some(n => /no usable scale/i.test(n))).toBe(true);
+  });
+
+  it("leaves out a run with no type, and says so", async () => {
+    const bidId = await newBid();
+    const sheetId = await newSheet(bidId, 48);
+    await caller().takeoffRuns.save({
+      bidId,
+      sheetId,
+      name: "Untyped",
+      pathType: "conduit",
+      points: [
+        { x: 0, y: 0 },
+        { x: 720, y: 0 },
+      ],
+    });
+
+    const doc = await caller().materialsList.get({ bidId });
+    expect(doc.measured).toHaveLength(0);
+    expect(doc.notes.some(n => /1 traced run has no run type/.test(n))).toBe(
+      true
+    );
+  });
+
+  it("leaves out a branch-wiring run's wire, and keeps its conduit", async () => {
+    const bidId = await newBid();
+    const sheetId = await newSheet(bidId, 48);
+    const saved = await caller().takeoffRuns.save({
+      bidId,
+      sheetId,
+      name: "Between receptacles",
+      pathType: "conduit",
+      runTypeId: (await plainType()).id,
+      points: [
+        { x: 0, y: 0 },
+        { x: 720, y: 0 },
+      ],
+    });
+    await caller().takeoffRuns.addCircuit({
+      runId: saved.id,
+      name: "Ckt 1",
+      conductorCount: 2,
+    });
+    await caller().takeoffRuns.setEnds({ id: saved.id, branchWiring: true });
+
+    const doc = await caller().materialsList.get({ bidId });
+    expect(doc.measured.find(m => m.label === "Conduit")?.feet).toBe(40);
+    // The devices' whips carry this wire, and this same list itemises them.
+    expect(doc.measured.some(m => m.label === "Wire, insulated")).toBe(false);
   });
 
   it("leaves a suggested run out until a person accepts it", async () => {

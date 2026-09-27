@@ -18,9 +18,11 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { appRouter } from "./routers";
-import { getDb } from "./db";
+import { getBidById, getDb } from "./db";
 import { bidPdfSheets, bidPdfs, bids, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { footageByRunType } from "./runTypeFootage";
+import type { RunTypeFootageRow } from "./runTypeFootageCore";
 
 const USER = 8383;
 const OTHER_USER = 8384;
@@ -88,6 +90,14 @@ async function scenario(
   }
 
   return { bidId: bid.id, sheetId: sheet.id };
+}
+
+/** A run type of this company's own, so a run can be on the bid. */
+async function aType(pathType: "conduit" | "cable") {
+  return caller().takeoffRunTypes.create({
+    label: `Test ${pathType} ${Date.now()}${Math.random()}`,
+    pathType,
+  });
 }
 
 beforeAll(async () => {
@@ -394,17 +404,26 @@ describe.skipIf(!hasDb)("saving trace work", () => {
 // ── Conduit vs wire, through the API ─────────────────────────────────────────
 
 describe.skipIf(!hasDb)("shared runs", () => {
+  /*
+    Typed, because the totals count what the BID prices (shared/runOnBid.ts,
+    2026-09-27) and a run with no type is not on the bid. These fixtures were
+    untyped until then, which was fine while the totals counted any finished
+    run; the arithmetic they pin — conduit once, wire per circuit — is
+    unchanged, and so is every assertion below.
+  */
   async function committedRun(pathType: "conduit" | "cable" = "conduit") {
     const { bidId, sheetId } = await scenario({ scaleText: `1/4" = 1'-0"` });
+    const type = await aType(pathType);
     const saved = await caller().takeoffRuns.save({
       bidId,
       sheetId,
       name: "Feeder",
       pathType,
+      runTypeId: type.id,
       points: RUN_100FT,
     });
     await caller().takeoffRuns.commit({ id: saved.id });
-    return { bidId, sheetId, runId: saved.id };
+    return { bidId, sheetId, runId: saved.id, runTypeId: type.id };
   }
 
   it("counts the conduit once and the wire per circuit", async () => {
@@ -501,15 +520,21 @@ describe.skipIf(!hasDb)("shared runs", () => {
     expect(after.conduitFeet).toBe(100);
   });
 
-  it("excludes drafts and suggestions from the bid total", async () => {
-    // Provisional footage must not reach a number the user reads as their
-    // quantity.
+  /*
+    THE TWO TESTS BELOW WERE REWRITTEN 2026-09-27, NOT DELETED. They asserted
+    that a draft was left out of the totals (T5) while the bid priced it — the
+    very disagreement the owner asked to remove. They now assert the new rule:
+    the totals count what the bid prices, drafts included, and SAY so.
+  */
+  it("counts a draft, as the bid does, and still leaves out a suggestion", async () => {
     const { bidId, sheetId } = await scenario({ scaleText: `1/4" = 1'-0"` });
+    const type = await aType("conduit");
     await caller().takeoffRuns.save({
       bidId,
       sheetId,
       name: "Still drawing",
       pathType: "conduit",
+      runTypeId: type.id,
       points: RUN_100FT,
       status: "draft",
     });
@@ -518,31 +543,151 @@ describe.skipIf(!hasDb)("shared runs", () => {
       sheetId,
       name: "AI idea",
       pathType: "conduit",
+      runTypeId: type.id,
       points: RUN_100FT,
       status: "committed",
       isSuggestion: true,
     });
 
     const totals = await caller().takeoffRuns.totals({ bidId });
-    expect(totals.conduitFeet).toBe(0);
+    expect(totals.conduitFeet).toBe(100);
+    expect(totals.leftOut.draftCount).toBe(1);
   });
 
-  it("counts a run only after it is committed", async () => {
+  it("reads the same before and after a draft is finished", async () => {
     const { bidId, sheetId } = await scenario({ scaleText: `1/4" = 1'-0"` });
+    const type = await aType("conduit");
     const saved = await caller().takeoffRuns.save({
       bidId,
       sheetId,
       name: "Feeder",
       pathType: "conduit",
+      runTypeId: type.id,
       points: RUN_100FT,
       status: "draft",
     });
-    expect((await caller().takeoffRuns.totals({ bidId })).conduitFeet).toBe(0);
+    const draft = await caller().takeoffRuns.totals({ bidId });
+    expect(draft.conduitFeet).toBe(100);
+    expect(draft.leftOut.draftCount).toBe(1);
 
     await caller().takeoffRuns.commit({ id: saved.id });
-    expect((await caller().takeoffRuns.totals({ bidId })).conduitFeet).toBe(
-      100
+    const finished = await caller().takeoffRuns.totals({ bidId });
+    expect(finished.conduitFeet).toBe(100);
+    expect(finished.leftOut.draftCount).toBe(0);
+  });
+
+  it("leaves out a run with no type, and says how many feet", async () => {
+    const { bidId, sheetId } = await scenario({ scaleText: `1/4" = 1'-0"` });
+    const saved = await caller().takeoffRuns.save({
+      bidId,
+      sheetId,
+      name: "Untyped",
+      pathType: "conduit",
+      points: RUN_100FT,
+    });
+    await caller().takeoffRuns.commit({ id: saved.id });
+
+    const totals = await caller().takeoffRuns.totals({ bidId });
+    expect(totals.conduitFeet).toBe(0);
+    expect(totals.leftOut.noType).toEqual({
+      count: 1,
+      conduitFeet: 100,
+      cableFeet: 0,
+    });
+  });
+
+  it("keeps a branch-wiring conduit run's pipe and leaves out its wire", async () => {
+    const { bidId, runId } = await committedRun();
+    await caller().takeoffRuns.addCircuit({
+      runId,
+      name: "Ckt 1",
+      conductorCount: 3,
+    });
+    await caller().takeoffRuns.setEnds({ id: runId, branchWiring: true });
+
+    const totals = await caller().takeoffRuns.totals({ bidId });
+    expect(totals.conduitFeet).toBe(100);
+    expect(totals.wireFeet).toBe(0);
+    expect(totals.leftOut.branch.count).toBe(1);
+  });
+
+  /*
+    THE FORCING TEST. One bid holding every kind of run the rule sorts — a
+    finished typed run, a draft, a run with no type, a branch-wiring run and a
+    suggestion — and the totals must equal what the bid's own lines are built
+    from, EXACTLY. This cannot pass while the two readings use different
+    filters, which is how they drifted apart in the first place.
+  */
+  it("equals the footage the bid prices, run for run", async () => {
+    const { bidId, sheetId, runId } = await committedRun();
+    await caller().takeoffRuns.addCircuit({
+      runId,
+      name: "Ckt 1",
+      conductorCount: 3,
+    });
+    const type = await aType("conduit");
+    const draft = await caller().takeoffRuns.save({
+      bidId,
+      sheetId,
+      name: "Draft",
+      pathType: "conduit",
+      runTypeId: type.id,
+      points: RUN_100FT.map(p => ({ x: p.x / 2, y: p.y + 100 })),
+      status: "draft",
+    });
+    await caller().takeoffRuns.addCircuit({
+      runId: draft.id,
+      name: "D1",
+      conductorCount: 2,
+    });
+    const branch = await caller().takeoffRuns.save({
+      bidId,
+      sheetId,
+      name: "Branch",
+      pathType: "conduit",
+      runTypeId: type.id,
+      points: RUN_100FT.map(p => ({ x: p.x / 4, y: p.y + 200 })),
+    });
+    await caller().takeoffRuns.addCircuit({
+      runId: branch.id,
+      name: "B1",
+      conductorCount: 2,
+    });
+    await caller().takeoffRuns.setEnds({ id: branch.id, branchWiring: true });
+    await caller().takeoffRuns.save({
+      bidId,
+      sheetId,
+      name: "No type",
+      pathType: "conduit",
+      points: RUN_100FT,
+    });
+    await caller().takeoffRuns.save({
+      bidId,
+      sheetId,
+      name: "Suggested",
+      pathType: "conduit",
+      runTypeId: type.id,
+      points: RUN_100FT,
+      isSuggestion: true,
+    });
+
+    const totals = await caller().takeoffRuns.totals({ bidId });
+    const bid = await getBidById(bidId, USER);
+    const priced = await footageByRunType(
+      bidId,
+      USER,
+      bid?.distributionHeightInches ?? null
     );
+    const sum = (pick: (r: RunTypeFootageRow) => number) =>
+      Math.round(
+        Array.from(priced.values()).reduce((s, r) => s + pick(r), 0) * 100
+      ) / 100;
+
+    expect(totals.conduitFeet).toBe(sum(r => r.conduitFeet));
+    expect(totals.cableFeet).toBe(sum(r => r.cableFeet));
+    expect(totals.wireFeet).toBe(sum(r => r.insulatedFeet + r.groundFeet));
+    // And the sum is not trivially zero: 100 + 50 + 25 ft of pipe.
+    expect(totals.conduitFeet).toBe(175);
   });
 });
 
@@ -551,11 +696,13 @@ describe.skipIf(!hasDb)("shared runs", () => {
 describe.skipIf(!hasDb)("a suggested home run", () => {
   it("is never counted until the user accepts it", async () => {
     const { bidId, sheetId } = await scenario({ scaleText: `1/4" = 1'-0"` });
+    const type = await aType("conduit");
     const saved = await caller().takeoffRuns.save({
       bidId,
       sheetId,
       name: "Suggested home run",
       pathType: "conduit",
+      runTypeId: type.id,
       points: RUN_100FT,
       status: "committed",
       isSuggestion: true,
@@ -563,8 +710,9 @@ describe.skipIf(!hasDb)("a suggested home run", () => {
 
     expect((await caller().takeoffRuns.totals({ bidId })).conduitFeet).toBe(0);
 
+    // Accepting makes it a draft, and a draft is on the bid — so it counts
+    // from here, not only once finished (2026-09-27).
     await caller().takeoffRuns.acceptSuggestion({ id: saved.id });
-    await caller().takeoffRuns.commit({ id: saved.id });
     expect((await caller().takeoffRuns.totals({ bidId })).conduitFeet).toBe(
       100
     );

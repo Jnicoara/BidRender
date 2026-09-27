@@ -482,18 +482,22 @@ describe.skipIf(!hasDb)("the export against a real bid", () => {
     );
     expect(emtOnE1.map(r => r.status)).toEqual(["Finished", "Draft"]);
 
-    // The run totals screen counts Finished only, so the Finished rows here
-    // are what it counts — with ONE difference, and it is a finding rather
-    // than a fudge: the totals also count a run with NO TYPE, which cannot be
-    // a row here (there is nothing to group it under). The fixture's untyped
-    // run is 190 points on the 1/4" sheet: 190 / 72 × 48 / 12 = 10.56 ft.
+    /*
+      Until 2026-09-27 this reconciled by hand: the totals counted Finished
+      runs only AND a run with no type, so Finished rows plus the untyped
+      run's 10.56 ft had to be added up to meet them. Now the totals count
+      what the bid prices — drafts in, no type out — so Finished plus Draft
+      equals them directly, and the untyped run's feet are reported beside
+      them instead of inside. 190 points on the 1/4" sheet: 190/72 × 48/12.
+    */
     const totals = await caller().takeoffRuns.totals({ bidId });
-    const finishedConduit = doc.wholeBid
-      .filter(r => r.item === emt.label && r.status === "Finished")
+    const everyConduit = doc.wholeBid
+      .filter(r => r.item === emt.label)
       .reduce((sum, r) => sum + (r.quantity ?? 0), 0);
-    const untypedFeet = (190 / 72) * (48 / 12);
+    expect(Math.abs(everyConduit - totals.conduitFeet)).toBeLessThan(0.05);
+    expect(totals.leftOut.noType.count).toBe(1);
     expect(
-      Math.abs(finishedConduit + untypedFeet - totals.conduitFeet)
+      Math.abs(totals.leftOut.noType.conduitFeet - (190 / 72) * (48 / 12))
     ).toBeLessThan(0.05);
   });
 

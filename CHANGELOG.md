@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **The run totals on the Plans screen now match the bid.** The "This bid,
+  all sheets" block used to count finished runs only, while the bid also
+  priced runs still being drawn, so the two could show different footage for
+  the same runs. Now the block shows exactly what the bid prices, says how
+  many unfinished runs that includes, and says what it leaves out: runs with
+  no type (with how many feet, so you can tell whether it matters) and
+  branch wiring. The materials list follows the same rule and says when a run
+  has no type.
 - **Deleting a bid now deletes its drawings.** Before, deleting a bid (by
   hand, with "Delete all", or by the 30-day clean-out) removed it from the app
   but left its plan PDFs sitting in storage, even though the screen said the

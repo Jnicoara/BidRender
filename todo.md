@@ -1357,7 +1357,18 @@ path is ever revived, give it the same treatment first.
       and a one-off sweep for the files already orphaned (`pnpm r2:ls`
       against the `bid_pdfs` keys). Decided by the owner 2026-09-27: a
       separate piece after the Stage 5 Track B batch.
-- [ ] **The run totals and the bid can report different footage for the same
+- [x] **BUILT 2026-09-27 (Track B), owner's answer: the totals and the
+      materials list show what the bid prices.** One rule,
+      `shared/runOnBid.ts`, asked by `groupRunFootage`, `takeoffRuns.totals`,
+      `takeoffRuns.drops` and the materials list. Drafts count; runs with no
+      type are left out and reported with their feet; branch wiring's wire is
+      left out (its conduit counts — see the branch-wiring fix the same day).
+      `takeoffRuns.test.ts` "equals the footage the bid prices" is the forcing
+      test: one bid with every kind of run, totals equal to the bid's own
+      footage exactly. Against the old router it read 100 ft to the bid's 175.
+      T5 in `references/takeoff-spec.md` records the override. **Not done:
+      measuring how many drafts exist on production — Track A.**
+      The request as it stood: **The run totals and the bid can report different footage for the same
       runs. Look into it after the Stage 5 Track B batch** (owner,
       2026-09-27). Two differences are known, both read from the code and
       the second one measured: (1) **Draft runs.**

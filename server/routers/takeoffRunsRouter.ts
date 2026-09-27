@@ -52,6 +52,7 @@ import {
   type RunPathType,
 } from "../../shared/takeoffQuantities";
 import { runWireOwnership } from "../../shared/branchWire";
+import { runOnBid, type RunTotalsLeftOut } from "../../shared/runOnBid";
 import {
   runDisplayName,
   runName,
@@ -1161,12 +1162,18 @@ export const takeoffRunsRouter = router({
     }),
 
   /**
-   * The bill of materials for a whole bid: conduit once per run, wire per
-   * circuit, cable separate, and a count of what could NOT be measured.
+   * The run footage THE BID PRICES, for the whole bid, and what it leaves out.
    *
-   * Drafts and suggestions are excluded — neither is finished work, and
-   * counting either would put provisional footage into a total the user reads
-   * as their quantity.
+   * Conduit once per run, wire per circuit, cable separate, and a count of
+   * what could not be measured. Which runs count is `runOnBid`, the same rule
+   * the bid's own lines use, so this block and the bid cannot disagree.
+   *
+   * ── Changed 2026-09-27 (owner's decision) ───────────────────────────────
+   * This used to count FINISHED runs only (T5), while the bid priced drafts —
+   * so the two read different footage for the same runs, and neither said
+   * why. Now drafts count here as they do on the bid, and `leftOut` says how
+   * many runs have no type (with their feet, which is what somebody would go
+   * hunting for), how many are branch wiring, and how many drafts are in.
    */
   totals: procedure
     .input(z.object({ bidId: z.number().int().positive() }))
@@ -1176,15 +1183,25 @@ export const takeoffRunsRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
 
       const allRuns = await db.getRunsForBid(input.bidId, ctx.scope.dataUserId);
-      const runs = allRuns.filter(
-        r => r.status === "committed" && !r.isSuggestion
+      const judged = allRuns.map(run => ({ run, on: runOnBid(run) }));
+      const runs = judged.filter(j => j.on.footage).map(j => j.run);
+      const noType = judged
+        .filter(j => j.on.leftOut === "noType")
+        .map(j => j.run);
+      const wireCounts = new Set(
+        judged.filter(j => j.on.wire).map(j => j.run.id)
       );
       // A quantity trace's wire comes from its type (D21).
-      const wire = await db.getWireCircuitsForRuns(runs, ctx.scope.dataUserId);
+      const wire = await db.getWireCircuitsForRuns(
+        [...runs, ...noType],
+        ctx.scope.dataUserId
+      );
 
       // Each run measures against ITS OWN sheet's scale — a bid can hold a site
       // plan at 1" = 40' and a floor plan at 1/4" = 1'-0".
-      const sheetIds = Array.from(new Set(runs.map(r => r.sheetId)));
+      const sheetIds = Array.from(
+        new Set([...runs, ...noType].map(r => r.sheetId))
+      );
       const ratioBySheet = new Map<number, number | null>();
       for (const sheetId of sheetIds) {
         const sheet = await db.getBidPdfSheet(sheetId, ctx.scope.dataUserId);
@@ -1205,20 +1222,42 @@ export const takeoffRunsRouter = router({
         bid.distributionHeightInches
       );
 
-      const totals = totalQuantities(
-        runs.map(run => ({
-          run: {
-            pathType: run.pathType as RunPathType,
-            points: run.points ?? [],
-          },
-          circuits: (wire.get(run.id) ?? []).map(circuitWire),
-          ratio: ratioBySheet.get(run.sheetId) ?? null,
-          verticals: verticalsForRunRow(run, heights),
-          // A branched run is several rows and ONE run in the counts (D20).
-          runKey: rootOf(run),
-        }))
-      );
-      return { ...totals, quantity: quantityTraceSummary(runs) };
+      const measure = (rows: typeof runs, withWire: (id: number) => boolean) =>
+        totalQuantities(
+          rows.map(run => ({
+            run: {
+              pathType: run.pathType as RunPathType,
+              points: run.points ?? [],
+            },
+            // A branch run's wire belongs to the devices (D18): its pipe is
+            // measured and its wire is not.
+            circuits: withWire(run.id)
+              ? (wire.get(run.id) ?? []).map(circuitWire)
+              : [],
+            ratio: ratioBySheet.get(run.sheetId) ?? null,
+            verticals: verticalsForRunRow(run, heights),
+            // A branched run is several rows and ONE run in the counts (D20).
+            runKey: rootOf(run),
+          }))
+        );
+
+      const totals = measure(runs, id => wireCounts.has(id));
+      const untyped = measure(noType, () => true);
+      const roots = (rows: typeof allRuns) => new Set(rows.map(rootOf)).size;
+      const leftOut: RunTotalsLeftOut = {
+        noType: {
+          count: roots(noType),
+          conduitFeet: untyped.conduitFeet,
+          cableFeet: untyped.cableFeet,
+        },
+        branch: {
+          count: roots(
+            judged.filter(j => j.on.leftOut === "branch").map(j => j.run)
+          ),
+        },
+        draftCount: roots(runs.filter(r => r.status === "draft")),
+      };
+      return { ...totals, quantity: quantityTraceSummary(runs), leftOut };
     }),
 
   /**
@@ -1468,10 +1507,11 @@ export const takeoffRunsRouter = router({
    * route runs and the approved drops of quantity traces, each labelled by
    * where it came from, with where it is so a row can jump to it.
    *
-   * Counted the way `totals` counts — committed, not suggested, and not on a
-   * sheet that cannot be measured — so the readout and the totals above it
-   * give the same vertical footage. What is left out is COUNTED and returned,
-   * never dropped in silence.
+   * Counted the way `totals` counts — by `runOnBid`, drafts included, and not
+   * on a sheet that cannot be measured — so the readout and the totals above
+   * it give the same vertical footage. (Until 2026-09-27 both counted finished
+   * runs only; they moved together, which is the point of this sentence.) What
+   * is left out is COUNTED and returned, never dropped in silence.
    */
   drops: procedure
     .input(z.object({ bidId: z.number().int().positive() }))
@@ -1490,9 +1530,7 @@ export const takeoffRunsRouter = router({
           bid.distributionHeightInches
         ),
       ]);
-      const runs = allRuns.filter(
-        r => r.status === "committed" && !r.isSuggestion
-      );
+      const runs = allRuns.filter(r => runOnBid(r).footage);
 
       const drops: {
         runId: number;

@@ -45,6 +45,7 @@ import { verticalsNotice } from "@shared/takeoffHeights";
 import { FITTING_KIND_LABELS, type FittingKind } from "@shared/runFittings";
 import { fittingRowSpeaks } from "@shared/runFittingMaterials";
 import type { TraceMode } from "@shared/traceMode";
+import type { RunTotalsLeftOut } from "@shared/runOnBid";
 
 /**
  * One run's bends and pull points, as the server works them out
@@ -350,6 +351,22 @@ const exact = (value: number) =>
  * 87.40` is noise standing where a number goes. A run counting nothing
  * vertical says so in its own line instead — see the row below.
  */
+/** "2 runs have no type — 48.0 ft of conduit is not on the bid. …" */
+function noTypeSentence(noType: RunTotalsLeftOut["noType"]): string {
+  const runs = `${noType.count} run${noType.count === 1 ? " has" : "s have"} no type`;
+  const parts = [
+    noType.conduitFeet > 0
+      ? `${exact(noType.conduitFeet)} ft of conduit`
+      : null,
+    noType.cableFeet > 0 ? `${exact(noType.cableFeet)} ft of cable` : null,
+  ].filter(Boolean);
+  const what =
+    parts.length > 0
+      ? `${parts.join(" and ")} ${parts.length === 1 ? "is" : "are"} not on the bid`
+      : `${noType.count === 1 ? "it is" : "they are"} not on the bid`;
+  return `${runs} — ${what}. Give each run a type to price it.`;
+}
+
 function Footage({
   label,
   flat,
@@ -677,6 +694,8 @@ export function RunsPanel({
     | (ReturnType<typeof totalQuantities> & {
         /** Quantity traces on the bid (D21): how many, and ends with no drop. */
         quantity?: { traceCount: number; openEnds: number };
+        /** What the bid does not price, said under the figures. */
+        leftOut?: RunTotalsLeftOut;
       })
     | undefined;
   /** Switch a run between route and quantity (D21) — root and legs. */
@@ -2237,8 +2256,37 @@ export function RunsPanel({
               totals — their sheets have no usable scale.
             </p>
           )}
+          {/*
+            WHAT THE BID PRICES, AND WHAT IT DOES NOT (owner, 2026-09-27).
+
+            These figures used to be finished runs only while the bid priced
+            drafts too, so the two disagreed and the caption was the only
+            thing saying so. Now both come from shared/runOnBid.ts. What is
+            left out is said here with its FEET where it has any: "2 runs
+            have no type" sends somebody hunting; the footage tells them
+            whether it matters. Amber for no type, because it is footage
+            missing from a bid; plain for branch wiring, because that one is
+            the estimator's own answer working as intended.
+          */}
+          {(totals.leftOut?.noType.count ?? 0) > 0 && (
+            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+              {noTypeSentence(totals.leftOut!.noType)}
+            </p>
+          )}
+          {(totals.leftOut?.branch.count ?? 0) > 0 && (
+            <p className="text-[0.7rem] text-muted-foreground pt-1">
+              {totals.leftOut!.branch.count} run
+              {totals.leftOut!.branch.count === 1 ? " is" : "s are"} branch
+              wiring — the devices already include that wire, so it is not
+              counted here. Conduit still is.
+            </p>
+          )}
           <p className="text-[0.7rem] text-muted-foreground/70 pt-1">
-            Finished runs only. Drafts and suggestions are not counted.
+            What the bid prices, all sheets.
+            {(totals.leftOut?.draftCount ?? 0) > 0 &&
+              ` Includes ${totals.leftOut!.draftCount} run${totals.leftOut!.draftCount === 1 ? "" : "s"} not finished yet.`}{" "}
+            Suggestions are not counted.
           </p>
         </div>
       )}

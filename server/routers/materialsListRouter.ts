@@ -62,6 +62,7 @@ import { resolveRunType } from "../../shared/runTypeLookup";
 import { FITTING_KIND_LABELS } from "../../shared/runFittings";
 import { isBendRole } from "../../shared/runBends";
 import { isTeeRole, rootOf } from "../../shared/runNetwork";
+import { runOnBid } from "../../shared/runOnBid";
 import { quantityTraceSummary } from "../../shared/quantityDrops";
 
 /**
@@ -345,9 +346,19 @@ export const materialsListRouter = router({
         ctx.scope.dataUserId
       );
 
-      // A suggested run is not counted, for the same reason it is not counted
-      // anywhere else: it is the app's guess until a person accepts it.
-      const realRuns = runs.filter(run => !run.isSuggestion);
+      // The runs THE BID prices, by the one rule every reading asks
+      // (shared/runOnBid.ts; owner, 2026-09-27). Until then this counted every
+      // run that was not a suggestion — runs with no type, which the bid
+      // cannot price, and branch wiring's wire, which the devices' whips
+      // already carry and this same list already itemises from the devices.
+      const judged = runs.map(run => ({ run, on: runOnBid(run) }));
+      const realRuns = judged.filter(j => j.on.footage).map(j => j.run);
+      const wireCounts = new Set(
+        judged.filter(j => j.on.wire).map(j => j.run.id)
+      );
+      const untypedRuns = new Set(
+        judged.filter(j => j.on.leftOut === "noType").map(j => rootOf(j.run))
+      ).size;
       // Verticals reach the bill of materials through the same resolver the
       // takeoff panel uses, so the two cannot report different footage.
       const heights = await db.heightContextForBid(
@@ -364,7 +375,9 @@ export const materialsListRouter = router({
               : null;
           return {
             run: { pathType: run.pathType, points: run.points },
-            circuits: (circuitsByRun.get(run.id) ?? []).map(circuitWire),
+            circuits: wireCounts.has(run.id)
+              ? (circuitsByRun.get(run.id) ?? []).map(circuitWire)
+              : [],
             ratio: usable,
             verticals: verticalsForRunRow(run, heights),
             // A branched run is several rows and ONE run in the notes (D20).
@@ -375,6 +388,17 @@ export const materialsListRouter = router({
 
       // ── Notes: everything the reader needs to read the list correctly ──────
       const notes: string[] = [];
+      if (untypedRuns > 0) {
+        notes.push(
+          `${untypedRuns} traced ${
+            untypedRuns === 1 ? "run has" : "runs have"
+          } no run type, so ${
+            untypedRuns === 1 ? "it is" : "they are"
+          } not in this list or on the bid. Give ${
+            untypedRuns === 1 ? "it" : "each"
+          } a type on the Plans screen.`
+        );
+      }
       if (totals.unmeasurableCount > 0) {
         notes.push(
           `${totals.unmeasurableCount} traced ${

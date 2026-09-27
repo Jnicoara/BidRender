@@ -28,7 +28,7 @@ import {
   quantitiesForRun,
   type RunPathType,
 } from "../shared/takeoffQuantities";
-import { runWireOwnership } from "../shared/branchWire";
+import { runOnBid } from "../shared/runOnBid";
 import { legFromRun, type FittingLeg } from "../shared/runFittings";
 import type { TeeRef } from "../shared/runNetwork";
 import type { PullPointAnswer } from "../shared/runBends";
@@ -169,9 +169,12 @@ export function groupRunFootage(input: {
   const byType = new Map<number, RunTypeFootageRow>();
 
   for (const run of input.runs) {
-    if (run.isSuggestion) continue;
+    // What is on the bid is decided in ONE place for every reading — the
+    // totals and the materials list ask the same function (shared/runOnBid.ts).
+    const on = runOnBid(run);
+    if (on.leftOut === "suggestion" || on.leftOut === "noType") continue;
     const runTypeId = run.runTypeId;
-    if (runTypeId === null) continue;
+    if (runTypeId === null) continue; // runOnBid said noType; this narrows it.
 
     let row = byType.get(runTypeId);
     if (!row) {
@@ -207,20 +210,9 @@ export function groupRunFootage(input: {
       that pipe was on no line of the bid at all. Fixed 2026-09-27. A CABLE run
       still goes whole, because on a cable the cable IS the wire the whip owns.
     */
-    const ownership = runWireOwnership({
-      startKind: run.startKind,
-      endKind: run.endKind,
-      startTeeId: run.startTeeId,
-      endTeeId: run.endTeeId,
-      traceMode: run.traceMode,
-      branchWiring: run.branchWiring,
-    });
-    const wireIsTheDevices = ownership === "branch";
-    if (wireIsTheDevices) {
-      row.branchCount++;
-      if (run.pathType === "cable") continue;
-    }
-    if (ownership === "unanswered") row.unansweredCount++;
+    if (on.leftOut === "branch") row.branchCount++;
+    if (on.unanswered) row.unansweredCount++;
+    if (!on.footage) continue;
 
     const sheet = input.scales.get(run.sheetId);
     const ratio =
@@ -309,7 +301,7 @@ export function groupRunFootage(input: {
       by the compiler, because the per-circuit field was renamed rather than
       re-meant.
     */
-    if (wireIsTheDevices) continue;
+    if (!on.wire) continue;
     const groundShare = quantities.groundFeet;
     row.groundFeet += groundShare;
     row.insulatedFeet += Math.max(0, quantities.totalWireFeet - groundShare);

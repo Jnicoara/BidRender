@@ -322,7 +322,9 @@ export function buildTakeoffExport(
   // ── Notes: what the numbers mean, and what is not in them ──────────────────
   const notes: string[] = [
     "Run Quantity is raceway or cable in feet: Traced ft plus Vertical ft (the drops and rises at run ends). Wire ft is insulated conductors across every circuit; Ground ft is bare or green ground. A cable's conductors are inside its jacket, so a cable run has no Wire or Ground ft.",
-    "Status: Finished runs are done; Draft runs are still being traced. The bid prices both. The run totals on the Takeoff screen count Finished runs only, so they will read lower while any run is a Draft.",
+    // Until 2026-09-27 this said the run totals count Finished runs only and
+    // read lower while a run is a Draft. They now count what the bid prices.
+    "Status: Finished runs are done; Draft runs are still being traced. The bid prices both, and so do the run totals on the Plans screen.",
     "No extra is included — no waste, makeup or allowance is added to any footage.",
     "Fittings counted from the runs (couplings, connectors, straps, elbows) are not in this file. They are on the Materials list.",
     "Runs the app suggested and nobody accepted are not included.",
