@@ -24,8 +24,9 @@ import { mintToken } from "./devsession.mjs";
 /**
  * Which ports to try. PORT from .env comes first — and ALONE.
  *
- * Two checkouts run side by side (Track A on 3000, the Track B worktree on
- * 3002), and both .env files carry the same JWT_SECRET. So with a plain
+ * Checkouts run side by side (Track A on 3000, the Track B worktree on 3002,
+ * the Track C worktree on 3004), and their .env files carry the same
+ * JWT_SECRET. So with a plain
  * 3000-first probe, B's smoke run authenticated against A's server and drove
  * A's database, passing throughout. When PORT is set, only that port counts:
  * if nothing answers there, fail and say so rather than finding someone
