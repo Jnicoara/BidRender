@@ -1316,10 +1316,31 @@ that this laptop cannot get in.
 
 ### What it looks like when the address is stale
 
-_To be filled in with the real text, measured during the Stage 4 lockdown._
+Measured 2026-09-27, with the laptop deliberately off the list. The command
+**hangs for about 20 seconds**, then fails with a long error whose last lines
+are:
 
-If a production command fails to connect and the site itself still loads,
-this is the first thing to check — before suspecting the password, the
+```
+    errorno: 'ETIMEDOUT',
+    code: 'ETIMEDOUT',
+    syscall: 'connect',
+    fatal: true
+```
+
+**`ETIMEDOUT` on `connect`, after a pause, is the stale-address signature.** A
+wrong password answers at once with `Access denied`; a stale address never
+answers at all.
+
+> **And `scripts/schemaDrift.mts` LIES first.** Before the timeout it prints
+> **"No \_\_drizzle_migrations table — this database has never been
+> migrated."** That is false — production had 89 applied at the time. The
+> script read a failed connection as an empty answer. **Never act on that line
+> without a successful connection**: running every migration against a live
+> database because of it is the one outcome here worse than the lockout. See
+> `todo.md`.
+
+If a production command fails like this and the site itself still loads,
+the address is the first thing to check — before suspecting the password, the
 certificate or the database.
 
 ### How to put your current address back on the list

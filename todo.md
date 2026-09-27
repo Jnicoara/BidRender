@@ -29,6 +29,14 @@ left as written rather than rewritten to match the rename.
 
 ## Pending / Future
 
+- [ ] **`scripts/schemaDrift.mts` says "this database has never been migrated"
+      when it simply cannot connect.** Measured 2026-09-27 against production
+      with the laptop off the database's trusted list: that line printed, then
+      `ETIMEDOUT` on `connect` ~20 s later. Production had 89 migrations. The
+      migrations-table read must fail as a connection error, not be reported
+      as an empty database — a false "never migrated" is an invitation to
+      re-run every migration against live data. `references/deploying.md`
+      § 10 warns about it until fixed.
 - [ ] **A terms page BEFORE any sharing of the AI correction log is turned
       on.** Decided by the owner 2026-09-27 (Stage 4, question 7). The log
       (`references/stage-4-safety-plan.md` § 3) records corrections from day
