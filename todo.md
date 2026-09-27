@@ -44,16 +44,26 @@ left as written rather than rewritten to match the rename.
       a single size, because above 350 kcmil a compression lug is sold per
       conductor size (Crescent Electric, Platt/Ilsco CLWS-400-38, Graybar
       Burndy YA32 series; no supplier found sells a "350-500" span).
-- [ ] **500 kcmil lug: a common part, held back by its retired name.** Graybar
-      and Lowe's stock it (Burndy YA34 series). But "500 kcmil crimp lug" is in
-      `RETIRED_BASELINE_MATERIALS`, and `seedBaselineMaterials` never sets
-      `isActive` back to true — so un-retiring the name would leave the old row
-      hidden on any database that has it (production very likely does; local
-      does not) and insert nothing, while the catalog claims to ship it.
-      Options: (a) teach the seeder to re-activate a baseline row whose name is
-      back in the catalog and off the retired list, with a test; (b) ship it
-      under a new name, e.g. "500 kcmil compression lug", which reads unlike
-      its family. Owner's call.
+- [x] **500 kcmil lug ADDED 2026-09-26 (Track B) as "500 kcmil crimp lug,
+      single size".** A common part (Graybar and Lowe's stock Burndy's YA34
+      series). Owner's decision: a NEW name, same pattern, one size — because
+      the plain "500 kcmil crimp lug" is retired and hits the seeder bug below.
+      Checked on a freshly seeded database, not only on one that already had
+      rows.
+- [ ] **SEEDER BUG, needs its own investigation — do not fold into other
+      work: a retired material name is never re-activated.** Found 2026-09-26.
+      `retireBaselineMaterials` sets `isActive = false` on every name in
+      `RETIRED_BASELINE_MATERIALS`, and nothing in `seedBaselineMaterials`
+      (`server/db.ts`) ever sets it back to true. So taking a name OFF the
+      retired list and putting it back in the catalog does nothing on a
+      database that still holds the old row: the row stays hidden, and the
+      insert pass skips the name because a row with it exists. The catalog then
+      claims to ship a material no screen shows, with no error anywhere. A
+      fresh database hides it, which is why a test run cannot see it. Worked
+      around once (the 500 kcmil lug took a new name). Before fixing: decide
+      whether re-activating is always right (a row retired for a reason and
+      then re-added by mistake would come back), and write the test that
+      seeds, retires, un-retires and re-seeds the same name.
 
 - [ ] Replace fractional resize recentering with true page-box centering in the PDF viewer
 - [ ] Ensure the PDF canvas stays fully within the left pane as the divider moves

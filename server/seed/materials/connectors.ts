@@ -76,11 +76,13 @@ const cableConnectors: BaselineMaterial[] = ['3/8"', '1/2"', '3/4"', '1"'].map(
  * hunting for a "#3 lug" would find nothing while the part they need sits
  * under 4-2. Six ranges cover a device pigtail up to a 350 kcmil feeder.
  *
- * Above that, a compression lug is sold per conductor size, so the 400 kcmil
- * row is a single size with its own description (2026-09-26).
+ * Above that, a compression lug is sold per conductor size, so the 400 and
+ * 500 kcmil rows are single sizes with their own description (2026-09-26).
  */
 const LUG_RANGES: Array<{
   range: string;
+  /** After a comma in the name — only where the plain name is unusable. */
+  qualifier?: string;
   slang: string;
   /** Only where the shared "sized by range" description would be untrue. */
   description?: string;
@@ -94,7 +96,8 @@ const LUG_RANGES: Array<{
     Added 2026-09-25, when the pricing sheet's 350 kcmil lugs needed a range
     to fold into and there was none: the per-size 250/350/500 kcmil lugs were
     retired when lugs moved to ranges (index.ts), and nothing covered kcmil
-    after them. 500 kcmil is still not covered — see todo.md.
+    after them. 400 and 500 kcmil were added as single sizes on 2026-09-26,
+    below.
   */
   {
     range: "250-350 kcmil",
@@ -109,11 +112,6 @@ const LUG_RANGES: Array<{
     found sells a "350-500" lug, and inventing one is the fault the ranges
     above were introduced to remove.
 
-    500 kcmil is a common part too (Graybar and Lowe's stock Burndy's YA34
-    series) but is NOT added here: "500 kcmil crimp lug" is in
-    RETIRED_BASELINE_MATERIALS, and a database that already holds that
-    retired row would keep it inactive and insert nothing — the seeder never
-    re-activates a row. See todo.md.
   */
   {
     range: "400 kcmil",
@@ -121,12 +119,30 @@ const LUG_RANGES: Array<{
     description:
       "Sized for one conductor, 400 kcmil — sold per size, not by range.",
   },
+  /*
+    Added 2026-09-26 for the 500 kcmil THHN and XHHW AL: a common part —
+    Graybar and Lowe's both stock Burndy's YA34 series at 500 kcmil.
+
+    NAMED WITH A QUALIFIER ON PURPOSE. The pattern above would make it
+    "500 kcmil crimp lug", which is in RETIRED_BASELINE_MATERIALS, and the
+    seeder never re-activates a retired row (todo.md): a database that still
+    holds that row would keep it hidden and insert nothing, while this file
+    claimed to ship it. A new name inserts a new row everywhere. Owner,
+    2026-09-26: a new name, same pattern, one size.
+  */
+  {
+    range: "500 kcmil",
+    qualifier: "single size",
+    slang: "500 mcm kcmil feeder service large",
+    description:
+      "Sized for one conductor, 500 kcmil — sold per size, not by range.",
+  },
 ];
 
 const lugs: BaselineMaterial[] = LUG_RANGES.map(
-  ({ range, slang, description }) => ({
+  ({ range, qualifier, slang, description }) => ({
     ...CONN,
-    name: `${range} crimp lug`,
+    name: `${range} crimp lug${qualifier ? `, ${qualifier}` : ""}`,
     searchAliases: aliases(
       slang,
       "gauge compression terminal ring one hole two hole copper barrel mechanical"

@@ -295,8 +295,11 @@ describe("alias hygiene across the whole catalog", () => {
   });
 
   it("sizes crimp lugs by conductor range, not per gauge", () => {
+    // "includes", not "endsWith": the 500 kcmil lug carries a qualifier after
+    // a comma (connectors.ts), and a filter it slipped past would let this
+    // list look complete without it.
     const lugs = BASELINE_MATERIALS.filter(m =>
-      m.name.endsWith("crimp lug")
+      m.name.includes("crimp lug")
     ).map(m => m.name);
     expect(lugs).toEqual([
       "14-10 AWG crimp lug",
@@ -307,10 +310,11 @@ describe("alias hygiene across the whole catalog", () => {
       // Added 2026-09-25: the 350 kcmil lugs from the pricing sheet had no
       // range to fold into once the per-size kcmil lugs were retired.
       "250-350 kcmil crimp lug",
-      // Added 2026-09-26: a single size, because above 350 kcmil that is how
-      // a compression lug is sold (sources in connectors.ts). 500 kcmil is
-      // held back by its retired name — todo.md.
+      // Added 2026-09-26: single sizes, because above 350 kcmil that is how
+      // a compression lug is sold (sources in connectors.ts). The 500 has a
+      // qualifier because "500 kcmil crimp lug" is a retired name.
       "400 kcmil crimp lug",
+      "500 kcmil crimp lug, single size",
     ]);
   });
 
