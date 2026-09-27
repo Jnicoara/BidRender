@@ -236,17 +236,23 @@ export const bidsRouter = router({
         pageSize
       );
 
-      // Priced through the same rollup the dashboard uses, so a search result
-      // and the card it corresponds to cannot show different money. Only the
-      // page's rows are priced — this is why the page is bounded.
+      // Priced through the same rollup the bid screen uses, WITH the bid's
+      // charges, so a search result and the bid it opens show the same money.
+      // Without them a marked-up permit dropped out of the price here until
+      // 2026-09-27 (server/bidPriceSurfaces.test.ts). Only the page's rows are
+      // priced — this is why the page is bounded.
       const company = await companyDefaultsFor(ctx.scope.dataUserId);
       const priced = await Promise.all(
         rows.map(async bid => {
-          const lines = await db.getRollupLines(bid.id, ctx.scope.dataUserId);
+          const [lines, expenses] = await Promise.all([
+            db.getRollupLines(bid.id, ctx.scope.dataUserId),
+            db.getBidExpenseLines(bid.id),
+          ]);
           const { directCost, bidPrice, incomplete, notPriced } = rollUpBid(
             bid,
             lines,
-            company
+            company,
+            expenses
           );
           return {
             ...bid,
@@ -314,6 +320,7 @@ export const bidsRouter = router({
         markedUpExpenses,
         totalHours,
         brokenLines,
+        notPriced,
         ...bid
       } = row;
       // The card's direct cost is the bid screen's: lines plus marked-up
@@ -337,6 +344,11 @@ export const bidsRouter = router({
          * no finite price. The card says so instead of showing a clean total.
          */
         incomplete: brokenLines > 0 || !priced,
+        /**
+         * "+ 3 lines, 1 part not priced" — what the price counts as $0
+         * because nobody priced it, the same tally the bid screen shows.
+         */
+        notPriced,
       };
     });
   }),
@@ -575,14 +587,20 @@ export const bidsRouter = router({
 
     return Promise.all(
       rows.map(async bid => {
-        // Priced through the same rollUpBid as the dashboard, so a bid's value
-        // reads the same whether it is archived or not — someone deciding what to
-        // rescue is looking at exactly the number they saw before archiving it.
-        const lines = await db.getRollupLines(bid.id, ctx.scope.dataUserId);
+        // Priced through the same rollUpBid as the bid screen, WITH the bid's
+        // charges, so a bid's value reads the same whether it is archived or
+        // not — someone deciding what to rescue is looking at exactly the
+        // number they saw before archiving it. (It was a marked-up charge
+        // short until 2026-09-27.)
+        const [lines, expenses] = await Promise.all([
+          db.getRollupLines(bid.id, ctx.scope.dataUserId),
+          db.getBidExpenseLines(bid.id),
+        ]);
         const { bidPrice, incomplete, notPriced } = rollUpBid(
           bid,
           lines,
-          company
+          company,
+          expenses
         );
         // Non-null by construction: getArchivedBids filters on archivedAt.
         const archivedAt = bid.archivedAt as Date;

@@ -10,8 +10,17 @@ This is the human-readable companion to the git history — read this to see wha
   spelling. The proposal's accent-color setting, the run-type swatches' hover
   text and a few messages said "colour"; a check now keeps the British
   spelling out of anything a person reads.
+- **"Find a bid" and the archive now show the same price as the bid.** A bid
+  with a marked-up charge (a permit that takes overhead and profit) read that
+  charge short in search and in the archive — "Markup check" showed $302.57
+  there and $452.57 on the bid itself. All of them now show $452.57.
 
 ## [2026-09-26]
+
+- **Dashboard cards now say what they leave out.** A bid with unpriced lines
+  or parts reads "$378 + 3 lines not priced" on its dashboard card, the same
+  as the bid screen and "Find a bid" — before, the card showed a bare "$378"
+  directly under a search result admitting three lines were missing.
 
 - **Run types on a bid no longer share a colour.** Each bid now gives its run
   types colours in the order they were first used, so the first six on a job

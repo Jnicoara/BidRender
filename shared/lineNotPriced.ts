@@ -24,6 +24,12 @@
  * $0 for nothing is true.
  *
  * Pure, so the screen and the suite read one rule.
+ *
+ * ── There is a SQL copy, and it must change with this one ────────────────────
+ * The dashboard counts in SQL (`lineNotPricedSql` and `linePartsCountSql` in
+ * server/db.ts) so its cards never load line rows. Changing a branch here
+ * without changing it there turns `server/dashboardNotPriced.test.ts` red —
+ * one bid per branch, counted both ways.
  */
 import { needsPricing } from "./materialPricing";
 import { canPriceByHand, lineNeedsPrice } from "./handPricedLines";

@@ -60,6 +60,7 @@ import {
 } from "@/lib/bidDashboard";
 import { moneyWhole } from "@/lib/money";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
+import { NotPricedTotal } from "@/components/NotPricedTotal";
 
 /** Deadlines read as a weekday and date — "Fri 14 Aug" scans faster than a slashed number. */
 const formatDue = (value: string | Date | null) => {
@@ -572,8 +573,15 @@ export default function DashboardPage({
                                   </span>
                                 )}
                               </span>
-                              <span className="font-mono text-sm shrink-0 text-right">
-                                {moneyWhole(bid.finalPrice)}
+                              <span className="shrink-0 text-right">
+                                {/* The same "+ N lines, N parts not priced"
+                                    as the bid it opens, counted in SQL by
+                                    the same rule (getDashboardBids). */}
+                                <NotPricedTotal
+                                  amount={moneyWhole(bid.finalPrice)}
+                                  notPriced={bid.notPriced}
+                                  className="font-mono text-sm"
+                                />
                                 <IncompletePriceTag
                                   show={bid.incomplete}
                                   className="block"

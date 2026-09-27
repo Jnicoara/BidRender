@@ -306,8 +306,17 @@ export function rollUpBid(
   bid: Bid,
   lines: RollupLine[],
   company: CompanyPricingDefaults,
-  /** Charges on the bid. Only the marked-up ones affect the direct cost. */
-  expenses: readonly ExpenseLine[] = []
+  /**
+   * Charges on the bid. Only the marked-up ones affect the direct cost.
+   *
+   * REQUIRED, and it was not until 2026-09-27. With a `= []` default, leaving
+   * it out compiled and priced the bid as if it had no charges — which is how
+   * "Find a bid" and the archive read "Markup check" at $302.57 while the bid
+   * screen and its card read $452.57, a marked-up permit short. A caller with
+   * genuinely no charges passes `[]`, where it can be seen.
+   * `server/bidPriceSurfaces.test.ts` checks the four surfaces agree.
+   */
+  expenses: readonly ExpenseLine[]
 ) {
   const settings = resolveBidPricingSettings(company, {
     overheadEnabled: bid.overheadEnabled,
@@ -455,16 +464,16 @@ export function bidRollup<L extends RollupLine>(
   lines: L[],
   company: CompanyPricingDefaults,
   /**
-   * Sales tax context. Optional so every existing caller and test keeps
-   * working unchanged — omit it and the bid prices exactly as it did before
+   * Sales tax context. `undefined` prices the bid exactly as it did before
    * tax existed, which is also what a user who never switched tax on gets.
    */
-  tax?: { rules: TaxRules; jurisdictions: TaxJurisdiction[] },
+  tax: { rules: TaxRules; jurisdictions: TaxJurisdiction[] } | undefined,
   /**
-   * Flat charges on the bid — permits, inspections, dispatch. Optional for the
-   * same reason: a bid with none prices exactly as it did before they existed.
+   * Flat charges on the bid — permits, inspections, dispatch. REQUIRED since
+   * 2026-09-27, for the reason `rollUpBid` gives: a marked-up charge moves the
+   * price, so a caller that forgot it showed a different number from the bid.
    */
-  expenses: readonly ExpenseLine[] = []
+  expenses: readonly ExpenseLine[]
 ) {
   const {
     settings,
