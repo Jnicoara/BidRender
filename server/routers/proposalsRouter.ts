@@ -453,6 +453,8 @@ export const proposalsRouter = router({
         internalTotals: {
           materialCost: totals.materialCost,
           laborCost: totals.laborCost,
+          /** At cost — the row that makes Direct cost add up. */
+          markedUpCharges: totals.markedUpCharges,
           directCost: totals.directCost,
           materialMarkup: totals.materialMarkup,
           overheadAmount: totals.overheadAmount,

@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **Direct cost now adds up on screen.** A charge set to take overhead and
+  profit (a permit, say) is part of the direct cost at what it costs, but
+  there was no line for it — so Materials plus Labor did not visibly add up
+  to Direct cost. The bid screen and the proposal's "Your figures" now show
+  it as "Marked-up charges (at cost)". No number changed; its markup was
+  always in Overhead and Profit, never counted twice.
 - **Every list of bids now shows the Total due, and says so.** The dashboard
   cards, "Out for bid", "Find a bid" and the archive used to show an
   unlabeled figure that was neither the bid's "Bid price" nor its "Total due"

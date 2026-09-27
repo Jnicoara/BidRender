@@ -1148,6 +1148,26 @@ export default function BidsPage({
                   {money(totals.laborCost)}
                 </span>
               </div>
+              {/*
+                The third part of Direct cost, named so the rows add up. A
+                marked-up charge joins the direct cost AT COST and takes
+                overhead and profit with the work; until 2026-09-27 it was
+                inside Direct cost with no row, so Materials + Labor visibly
+                did not sum to it. Only when there is one.
+              */}
+              {totals.markedUpCharges > 0 && (
+                <div className="flex items-baseline justify-between gap-3 py-1">
+                  <span
+                    className="text-xs text-muted-foreground"
+                    title="Charges set to take overhead and profit, at their cost. Their overhead and profit are in the rows below."
+                  >
+                    Marked-up charges (at cost)
+                  </span>
+                  <span className="font-mono text-sm">
+                    {money(totals.markedUpCharges)}
+                  </span>
+                </div>
+              )}
 
               {/*
                 Lines with a price or hours NOBODY HAS TYPED — a free count sent

@@ -479,6 +479,16 @@ export default function ProposalPage({
               [
                 ["Materials", internalTotals.materialCost],
                 ["Labor", internalTotals.laborCost],
+                // At cost, so Materials + Labor + this = Direct cost, as on
+                // the bid screen. Only when there is one.
+                ...(internalTotals.markedUpCharges > 0
+                  ? [
+                      [
+                        "Marked-up charges (at cost)",
+                        internalTotals.markedUpCharges,
+                      ],
+                    ]
+                  : []),
                 ["Direct cost", internalTotals.directCost],
                 // Between direct cost and overhead, where it is applied —
                 // without it these rows would not add up to the bid price.

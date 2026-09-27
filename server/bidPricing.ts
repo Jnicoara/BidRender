@@ -623,6 +623,15 @@ export function bidRollup<L extends RollupLine>(
       ),
       materialCost,
       laborCost,
+      /**
+       * The marked-up charges AT COST — the third part of Direct cost, beside
+       * Materials and Labor, so the screen can name it and the rows add up
+       * (2026-09-27: "$210 unnamed"). At cost, by the same function that put
+       * them into `directCost`; their overhead and profit are in the Overhead
+       * and Profit rows with the work's, so the billed amount here would
+       * count that twice. server/directCostAddsUp.test.ts.
+       */
+      markedUpCharges: sumMarkedUpExpenses(expenses),
       // `materialMarkup` and `costWithMarkup` arrive with the ...bidPrice
       // spread above, from the engine that computed them.
       /**
