@@ -266,7 +266,7 @@ export const proposalsRouter = router({
         if (!isValidAccent(input.accentColor)) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: `“${input.accentColor}” is not a colour. Use a hex value like #1F4E79.`,
+            message: `“${input.accentColor}” is not a color. Use a hex value like #1F4E79.`,
           });
         }
         patch.accentColor = input.accentColor;

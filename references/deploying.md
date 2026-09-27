@@ -951,6 +951,66 @@ post-push one except bid 25's `updatedAt` (the check's own edits). Every table
 matches the rehearsal copy: 62 tables, 3,142 rows = the backup + 0087's
 migration row + the 2 lugs.
 
+**Seventh run — 0088, run colors Part B, B10–B12, deployed as `45ada57` on
+2026-09-27.** **Rollback target: `f1521c5`.** A schema release: one
+nullable column, `takeoff_run_types.color`, where NULL means automatic. It is
+also a one-alias catalog change: "Wall plate screws" says "matching color".
+It carried B10–B12 as well (dashboard "not priced", and charges counted in
+search, the archive and close-out) and the spelling pass. `local-dev`
+included B's `8327ee9`, and the full suite was green (177 files / 3,834
+passed) once B's seeder test got a 60 s limit. It had been failing on
+"timed out in 5000ms" while finishing in 3.4–4.5 s.
+
+Backup **`2026-09-27T17-35-23Z`** (62 tables, 3,142 rows) was restored and
+verified, and kept with `KEEP_SCRATCH=1`. On the copy, `schemaDrift` named
+exactly `takeoff_run_types — missing color` at 88. **Close-outs saved on bids
+with charges: 0**, the number B12 could have repriced. There are no close-outs
+at all and no bid carries a charge. 0088 applied (1 file); a rerun applied
+nothing; no drift at 89. The old build (`f1521c5`) before and after 0088 was
+IDENTICAL. The new build against the old one was also IDENTICAL, with no
+`--added` needed: `chosen` and the type list's `color` are not in the snapshot,
+and B11's price-with-charges moves nothing with no charges. Catalog: first
+boot 1,239 → 1,239, nothing added, renamed, retired or deleted, CLEAN, with
+the alias applied in place on row 60215. The second boot changed nothing, and
+`search` was unchanged (102 old spellings, the same one known miss).
+
+Production: the live build's snapshot matched the copy's; `schemaDrift` named
+exactly `color`; `migrate.mts` applied 1; a rerun applied nothing; drift clean
+at 89; the old build on the migrated database was still IDENTICAL.
+
+**The first push did not happen, and nothing said so loudly.** It was chained
+behind `git rev-parse --short HEAD origin/local-dev`. `--short` takes ONE
+revision, so that step failed, `&&` skipped the push, and a ten-minute wait
+watched for a build nobody had started. Production was safe throughout, with
+the old build on an additive column. **Push `main` in a command of its own,
+and read the `a..b  x -> main` line before waiting.** Pushed at 17:52:27Z;
+the new build (`builtAt` 17:53:10Z, commit `45ada57`) was serving on both
+hosts at 17:55:13Z. Its snapshot of production matched the rehearsal byte for
+byte, and the catalog matched it line for line: CLEAN.
+
+Live checks on bid 25 as the smoke account (`auth.me` 1421, the loaded bundle
+equal to the served one, sheet 196 given 1/4" = 1'-0", runs of shipped types
+2, 3 and 4):
+
+- The starting colors were blue, pink and violet, in first-use order.
+- Choosing **Pink on 1/2" EMT** (shipped) showed the shipped-type notice, no
+  "also used by" (3/4" wore pink only automatically), and "On this bid, 3/4"
+  EMT … changes to blue". Saved without a reload: 1/2" pink, 3/4" blue, 12-2
+  violet. That made fork 7, which covered shipped id 2 through `sameAs`.
+- In **3/4" EMT's** editor, Pink read "also used by 1/2" EMT, 2 #12 + ground
+  on this bid". Violet was not marked, because 12-2 is automatic and would
+  move ("12-2 MC cable changes to blue"). Cancelled, and nothing was saved.
+- With the editor open, **no "colour" anywhere** on screen, in a tooltip or in
+  an aria-label; "color" appeared 10 times.
+
+Then the runs and the scale were removed, and fork 7 was set back to
+Automatic and ARCHIVED. Run types are never deleted, so the shipped row
+leads again. **Bid 25 back to 0 lines, 0 runs, no run height**; the router
+snapshot is identical to the post-push one. Every table matches the copy
+(backup + 0088's migration row) except `takeoff_run_types`, **+1**: the
+smoke account's archived fork 7, beside the archived type 6 an earlier check
+left the same way.
+
 ## 6. Verifying a deploy actually took
 
 A deploy that silently didn't take looks identical to one that did, so check

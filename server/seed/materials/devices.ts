@@ -563,7 +563,7 @@ export const COVER_PLATES: BaselineMaterial[] = [
   {
     ...device("Wall Plates & Misc"),
     name: "Wall plate screws",
-    searchAliases: aliases("6-32 oval head cover faceplate matching colour"),
+    searchAliases: aliases("6-32 oval head cover faceplate matching color"),
   },
   {
     ...device("Wall Plates & Misc"),

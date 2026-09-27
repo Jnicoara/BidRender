@@ -67,7 +67,7 @@ export const PROPOSAL_LAYOUT_INFO: Record<
   modern: {
     label: "Modern",
     description:
-      "A colour band across the head of the page, the total called out in a panel, generous spacing.",
+      "A color band across the head of the page, the total called out in a panel, generous spacing.",
   },
   minimal: {
     label: "Minimal",

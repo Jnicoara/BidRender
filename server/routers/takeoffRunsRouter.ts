@@ -1599,9 +1599,18 @@ export const takeoffRunsRouter = router({
         const resolved = resolveRunType(types, id);
         if (resolved && resolved.id !== id) sameAs[id] = resolved.id;
       }
+      /*
+        Every CHOSEN color the company has (Part B, 0088) — not only for types
+        on this bid, because a chosen color follows its type everywhere and
+        the picker shows it before the type is traced here. Keyed by the row's
+        own id, which is the resolved id a fork's runs map to through sameAs.
+      */
+      const chosen: Record<number, string> = {};
+      for (const type of types) if (type.color) chosen[type.id] = type.color;
       return {
         order: runTypeColorOrder(runs, id => sameAs[id] ?? id),
         sameAs,
+        chosen,
       };
     }),
 });

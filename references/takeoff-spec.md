@@ -1169,8 +1169,11 @@ Checked against the deleted `PlanPanel.tsx`. These may have been forgotten.
   > bid gives its types colours in the order they were first used, and
   > selecting a run dims the others, with a switch to hide them. There are no
   > per-run colours and no favourites. A colour the user picks per type is
-  > "Part B", and it is not built. The decisions and Part B's settled answers
-  > are in `plan-viewer-overhaul.md` § 6, "RUN COLOURS (T14)".
+  > "Part B", **built 2026-09-27** (migration 0088): chosen in the type
+  > editor, it follows the type to every bid, and the automatic types step
+  > around it. The decisions are in `plan-viewer-overhaul.md` § 6, "RUN
+  > COLOURS (T14)", with the one gap left open (no "Restore to shipped" for
+  > run types).
 - Footage labels on each segment, shown once zoomed in enough (T13).
 - Lifting the pen mid-run by double-click, right-click, or pressing both mouse
   buttons (T10).

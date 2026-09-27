@@ -171,7 +171,7 @@ export function ProposalDesignControls({
       // Reverts rather than errors — an inline field has nowhere to put a
       // message, and a bad draft left on screen reads as saved.
       setAccentDraft(settings.accentColor);
-      toast.error("Use a hex colour like #1F4E79.");
+      toast.error("Use a hex color like #1F4E79.");
       return;
     }
     save.mutate({ accentColor: next });
@@ -228,7 +228,7 @@ export function ProposalDesignControls({
       {/* ── Accent colour ──────────────────────────────────────────────────── */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div>
-          <Label className="text-sm">Accent colour</Label>
+          <Label className="text-sm">Accent color</Label>
           <p className="text-xs text-muted-foreground mt-0.5">
             Rules, headings and the total panel. Everything else stays black on
             white so it photocopies and faxes cleanly.
@@ -263,7 +263,7 @@ export function ProposalDesignControls({
                 e.currentTarget.blur();
               }
             }}
-            aria-label="Accent colour hex value"
+            aria-label="Accent color hex value"
             className="h-8 w-28 text-sm font-mono"
           />
         </div>

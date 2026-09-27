@@ -1362,7 +1362,7 @@ path is ever revived, give it the same treatment first.
 - [ ] **A billing plan should set `seatLimit` through `db.setSeatLimit`**, so a downgrade hits the same "remove N first" refusal. Nothing else writes the column today except 0081.
 - [ ] **Nobody but a platform admin can add a seat.** "Remove someone or add a seat" names an action an owner cannot yet take themselves; it becomes self-serve with billing.
 
-## Run colours (T14) — Part A built 2026-09-26, deployed 2026-09-27
+## Run colours (T14) — Part A and Part B deployed 2026-09-27
 
 Decisions and the reasons for them are in `plan-viewer-overhaul.md` § 6,
 "RUN COLOURS (T14)". **No migration.** It ships as a code push and nothing
@@ -1378,12 +1378,31 @@ use; a proposed drop read "To: Receptacle · proposed". See
       use, so most runs change colour on the first load after the deploy. No
       number moves. On the fixture bid the five types moved one slot each.
       Shipped; production had 2 runs, on bid 23.
-- [ ] **Part B: a colour the user picks for a type.** It needs a nullable
-      `color` column on `takeoff_run_types`, which is a migration and has its
-      own prompt. The owner has already answered: only the six count colours;
-      it follows the type to every bid; editing a shipped starter type's
-      colour forks it. `runTypeColor` is the one place a stored colour would
-      win over the per-bid slot.
+- [x] **Part B DEPLOYED 2026-09-27 as `45ada57`** (rollback target
+      `f1521c5`; 0088 applied before the push, drift clean at 89; live-checked
+      on bid 25 — `references/deploying.md` § 5b "Seventh run"). **A color the
+      user picks for a type.** It shipped with B10–B12. Migration 0088,
+      `takeoff_run_types.color`. The owner's five answers and the reasoning
+      are in `plan-viewer-overhaul.md` § 6. Tests:
+      `client/src/lib/runAppearance.test.ts` (rules) and
+      `server/runTypeColor.test.ts` (routes). Checked on "Bar layout check":
+      violet on 1/2" EMT, then Automatic, then red on shipped 3/4" EMT (fork
+      1669, removed from the local database afterwards).
+  - **Deploy: three steps, step 3 empty.** 0088 is ADDITIVE: one nullable
+    varchar, no default, no UPDATE, so apply it BEFORE the push. Afterwards
+    `scripts/schemaDrift.mts` should report no drift at 89. **If it does
+    not, stop and find out why before pushing.** Nothing existing changes
+    color: every type starts automatic.
+  - `routerSnapshot.mts`: the new build adds `chosen` to `typeColors` (not
+    in the snapshot) and `color` to `takeoffRunTypes.list` (not in it either),
+    so the compare should be IDENTICAL with no `--added` needed. **If it is
+    not, read every line.**
+- [ ] **LATER (owner, 2026-09-27): "Restore to shipped" for run types.** Not
+      now. Setting a color back to "Automatic" is how a color is undone; the
+      company's copy stays. Only materials have a revert today. When it is
+      built, one thing needs deciding first: runs traced after the fork store
+      the FORK's id, so deleting it orphans them, and archiving it leaves them
+      resolving to it.
 - [ ] **Six colours wrap.** The seventh type on a bid shares the first type's
       colour. That is accepted for now. Part B is the answer if it turns out
       to matter.

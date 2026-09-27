@@ -25,7 +25,15 @@
  * Fixture ids are distinct from every other suite — vitest runs files in
  * parallel and shared ids delete each other's rows mid-run.
  */
-import { describe, it, expect, afterAll, beforeAll, beforeEach } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  afterAll,
+  beforeAll,
+  beforeEach,
+  vi,
+} from "vitest";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import {
   archiveMaterial,
@@ -50,6 +58,16 @@ const USER = 7404;
 const OTHER = 7405;
 const COMPANIES = [USER, OTHER];
 const hasDb = Boolean(process.env.DATABASE_URL);
+
+/*
+  A 60 s limit for this file, because every case runs the whole catalog seed
+  (1,239 rows) once or twice. Measured 2026-09-27 with the limit lifted: 3.4 s,
+  4.5 s and 3.6 s — finishing, not hanging — against vitest's default 5 s, so
+  the suite passed or failed on how busy the machine was. The other seeding
+  suites take a long limit for the same reason (backup.test.ts,
+  bidSearch.test.ts). Set per FILE so no test body had to be re-indented.
+*/
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 
 /** A shipped row only this suite knows about, so it can come and go freely. */
 const FIXTURE: BaselineMaterial = {
