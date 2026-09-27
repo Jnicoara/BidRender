@@ -185,8 +185,8 @@ export function RunTypeSwatch({
       className="inline-flex shrink-0"
       title={
         onBid
-          ? "This type's colour on this bid"
-          : "Not on this bid yet — it takes the next free colour when traced"
+          ? "This type's color on this bid"
+          : "Not on this bid yet — it takes the next free color when traced"
       }
     >
       <Icon

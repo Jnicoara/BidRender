@@ -4,6 +4,13 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-27]
+
+- **"Colour" is now "color" everywhere on screen.** The app uses American
+  spelling. The proposal's accent-color setting, the run-type swatches' hover
+  text and a few messages said "colour"; a check now keeps the British
+  spelling out of anything a person reads.
+
 ## [2026-09-26]
 
 - **Run types on a bid no longer share a colour.** Each bid now gives its run

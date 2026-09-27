@@ -182,7 +182,7 @@ export const NAVIGATION_TARGETS: NavigationTarget[] = [
     label: "Proposal design",
     path: "#/settings/proposal",
     purpose:
-      "How a proposal looks — layout, accent colour, which sections print, your standard terms and how long a price stands.",
+      "How a proposal looks — layout, accent color, which sections print, your standard terms and how long a price stands.",
   },
   {
     id: "display",
