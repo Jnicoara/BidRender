@@ -1357,7 +1357,7 @@ path is ever revived, give it the same treatment first.
 - [ ] **A billing plan should set `seatLimit` through `db.setSeatLimit`**, so a downgrade hits the same "remove N first" refusal. Nothing else writes the column today except 0081.
 - [ ] **Nobody but a platform admin can add a seat.** "Remove someone or add a seat" names an action an owner cannot yet take themselves; it becomes self-serve with billing.
 
-## Run colours (T14) — Part A deployed 2026-09-27; Part B built 2026-09-27, not deployed
+## Run colours (T14) — Part A and Part B deployed 2026-09-27
 
 Decisions and the reasons for them are in `plan-viewer-overhaul.md` § 6,
 "RUN COLOURS (T14)". **No migration.** It ships as a code push and nothing
@@ -1373,8 +1373,10 @@ use; a proposed drop read "To: Receptacle · proposed". See
       use, so most runs change colour on the first load after the deploy. No
       number moves. On the fixture bid the five types moved one slot each.
       Shipped; production had 2 runs, on bid 23.
-- [x] **Part B BUILT 2026-09-27, NOT DEPLOYED: a color the user picks for
-      a type.** It deploys with Track B's markup fix. Migration 0088,
+- [x] **Part B DEPLOYED 2026-09-27 as `45ada57`** (rollback target
+      `f1521c5`; 0088 applied before the push, drift clean at 89; live-checked
+      on bid 25 — `references/deploying.md` § 5b "Seventh run"). **A color the
+      user picks for a type.** It shipped with B10–B12. Migration 0088,
       `takeoff_run_types.color`. The owner's five answers and the reasoning
       are in `plan-viewer-overhaul.md` § 6. Tests:
       `client/src/lib/runAppearance.test.ts` (rules) and
