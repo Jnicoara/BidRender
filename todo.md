@@ -46,7 +46,10 @@ left as written rather than rewritten to match the rename.
       supplier found sells a "350-500" span). Renamed the same day to "400
       kcmil crimp lug, single size" to match the 500, through
       `RENAMED_BASELINE_MATERIALS` — same row id, old name still finds it.
-- [x] **BUILT 2026-09-26 as option (a), NOT DEPLOYED: a priced assembly
+- [x] **DEPLOYED 2026-09-27 as `f1521c5`** (rollback target `a64dfbc`; 0087
+      applied before the push, drift clean at 88, live-checked on bid 25 —
+      `references/deploying.md` § 5b "Sixth run"). **Built 2026-09-26 as
+      option (a): a priced assembly
       line says "$25.00 + 1 part not priced", and the totals count the part
       apart from lines — "+ 2 lines, 3 parts not priced".** Migration 0087,
       `bid_line_items.snapshotUnpricedParts` (nullable int), written in
@@ -1352,16 +1355,22 @@ path is ever revived, give it the same treatment first.
 - [ ] **A billing plan should set `seatLimit` through `db.setSeatLimit`**, so a downgrade hits the same "remove N first" refusal. Nothing else writes the column today except 0081.
 - [ ] **Nobody but a platform admin can add a seat.** "Remove someone or add a seat" names an action an owner cannot yet take themselves; it becomes self-serve with billing.
 
-## Run colours (T14) — Part A built 2026-09-26, NOT DEPLOYED
+## Run colours (T14) — Part A built 2026-09-26, deployed 2026-09-27
 
 Decisions and the reasons for them are in `plan-viewer-overhaul.md` § 6,
 "RUN COLOURS (T14)". **No migration.** It ships as a code push and nothing
 else. It rides the same deploy as 0087, and 0087 still goes first.
 
-- [ ] **Every existing drawing changes colour once, on purpose.** Types used
+**DEPLOYED 2026-09-27 as `f1521c5`** with 0087 (rollback target `a64dfbc`).
+Live-checked on bid 25: types coloured blue, pink, violet in order of first
+use; a proposed drop read "To: Receptacle · proposed". See
+`references/deploying.md` § 5b "Sixth run".
+
+- [x] **Every existing drawing changes colour once, on purpose.** Types used
       to be hashed from their id and are now given colours in order of first
       use, so most runs change colour on the first load after the deploy. No
       number moves. On the fixture bid the five types moved one slot each.
+      Shipped; production had 2 runs, on bid 23.
 - [ ] **Part B: a colour the user picks for a type.** It needs a nullable
       `color` column on `takeoff_run_types`, which is a migration and has its
       own prompt. The owner has already answered: only the six count colours;
@@ -1416,13 +1425,16 @@ ends and approved AS END KINDS — no table of answers. Modules:
 - [ ] **No AI path yet.** The reader cannot propose a quantity trace; when it
       can, it goes through `save` + `addLeg` like the hand path, so the counts
       agree by construction.
-- [ ] **Commit the router snapshot as a script.** Two deploys running now have
-      proved existing data unchanged by calling `takeoffRuns.totals`,
-      `takeoffRunTypes.bridgeForBid` and `takeoffRuns.listForSheet` for every
-      bid and comparing files — and both times the script was a throwaway, so
-      the second deploy had to rewrite it. It belongs in `scripts/` beside
-      `catalogRehearsal.mts`, with a way to name the fields a release ADDS so
-      they are asserted rather than diffed. Found 2026-09-27.
+- [x] **DONE 2026-09-27: `scripts/routerSnapshot.mts`.** Read only.
+      `snapshot <file> [--added card.notPriced,drops.runTypeId]` calls
+      `totals`, `drops`, `bridgeForBid`, `listForSheet` and the `bids.search`
+      card for every bid as its owner, and `compare` diffs two files. `--added`
+      takes a field a release adds out of the compare and lists its values.
+      Use the `parent.key` form whenever the name exists elsewhere: a bare
+      `pathType` stripped it from run rows too, and the compare shifted by 220
+      lines. `bids.get` is left out because it records pricing problems as it
+      reads. First used for the 0087 deploy. Run it from a worktree of the old
+      build as well as the new one.
 
 ## Branch legs on a traced run (D20, built 2026-09-26)
 
