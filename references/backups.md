@@ -367,6 +367,13 @@ Files restore by uploading `files/<key>` back to whatever storage the app is
 using, at the same key. The keys in the database are unchanged by a restore, so
 they line up as long as the object keys are preserved.
 
+**A restore undoes every delete made after the backup was taken.** A bid a
+contractor deleted — and its drawings — comes back with the rows and files of
+any backup older than the delete. After restoring, re-delete those bids by
+hand; there is no log of deletes to replay (a Track A option, not built). Tell
+anyone affected. This is the one place the 30-day promise in § 9 depends on a
+person rather than on code.
+
 ## 8. The failure this design is most afraid of
 
 A backup nobody finds out is broken until the day the original is gone.
@@ -391,8 +398,22 @@ If you change anything in `server/backup/`, run that test.
 
 ## 9. Not built yet
 
-- **Retention.** Nothing deletes old backups. For now that is the safe
-  direction; revisit before the bucket becomes expensive.
+- ~~**Retention.** Nothing deletes old backups.~~ **BUILT 2026-09-27 — and it
+  is a promise, not a cost setting.** Deleting a bid deletes its plan files at
+  once (`server/storedFiles.ts`); the backups kept a copy of every drawing
+  forever, so the promise was hollow until they expire too. Owner's decision:
+  a backup run is deleted **30 days** after it was taken, **except that the
+  newest 7 good runs are always kept**, whatever their age, so a month of
+  failed nights can never remove the last one that worked. It runs inside the
+  nightly job **only after that night's own backup got the database in**
+  (`completed` or `partial`); a failed night prunes nothing. The outcome and
+  the log line say how many runs were removed, and a pruning failure is
+  reported beside a backup that otherwise succeeded rather than hidden.
+  Rule: `server/backup/retention.ts`; tests: `server/backupRetention.test.ts`.
+  Uses the `R2_*` backup token, which already writes `bidsoftware` — the plan
+  tokens gain nothing. Customer wording: "Deleted drawings are removed from
+  BidRidge straight away and from our backups within 30 days." For a bid left
+  in the archive, that is 30 days after the nightly purge removes it.
 - **Restore automation.** Restoring is the documented manual sequence in § 7.
   Verifying that a backup _can_ be restored is automated (§ 5); actually
   putting one back is deliberately a human decision.

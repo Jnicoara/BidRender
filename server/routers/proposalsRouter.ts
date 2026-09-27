@@ -46,6 +46,7 @@ import { resolveBidClient } from "../../shared/bidClient";
 import { explainTaxStatus } from "../../shared/salesTax";
 import { storagePresignPut } from "../storage";
 import * as db from "../db";
+import { setLogoReleasingOld } from "../storedFiles";
 import { storageUrl } from "../storageTokens";
 
 /**
@@ -200,7 +201,7 @@ export const proposalsRouter = router({
           message: "That upload does not belong to this account.",
         });
       }
-      await db.updateCompanyBranding(ctx.scope.dataUserId, {
+      await setLogoReleasingOld(ctx.scope.dataUserId, {
         logoKey: input.storageKey,
         /**
          * Kept for the rows that already have it, and for anything reading the
@@ -218,7 +219,7 @@ export const proposalsRouter = router({
 
   /** Remove the logo. The document goes back to prompting for one. */
   clearLogo: procedure.mutation(async ({ ctx }) => {
-    await db.updateCompanyBranding(ctx.scope.dataUserId, {
+    await setLogoReleasingOld(ctx.scope.dataUserId, {
       logoKey: null,
       logoUrl: null,
     });

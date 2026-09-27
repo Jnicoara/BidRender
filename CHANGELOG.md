@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **Deleting a bid now deletes its drawings.** Before, deleting a bid (by
+  hand, with "Delete all", or by the 30-day clean-out) removed it from the app
+  but left its plan PDFs sitting in storage, even though the screen said the
+  plans went with it. Now the files go too. The same is true when you remove
+  one plan set from a bid, or replace or remove your company logo. The nightly
+  backups now keep 30 days of history (and always the last 7 good ones), so a
+  deleted drawing is gone from the backups within 30 days as well. A tool for
+  clearing out files left behind before this change is ready to run by hand.
 - **Conduit marked as branch wiring is back on the bid.** When you told the
   app a conduit run between two devices was branch wiring, it left out the
   whole run: the wire (correct, because your devices already include it) but

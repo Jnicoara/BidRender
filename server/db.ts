@@ -177,6 +177,7 @@ import {
   type RunMaterialRole,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { FILE_SOURCES } from "./backup/collectFiles";
 import {
   problemDedupeKey,
   type LineProblemCode,
@@ -4425,8 +4426,11 @@ export async function getArchivedBids(userId: number): Promise<Bid[]> {
  * Destroy a bid and everything hanging off it. There is no undo past here.
  *
  * Line items and PDF rows go by `onDelete: "cascade"`, so this is one DELETE.
- * The S3 objects behind those PDF rows are NOT removed — see
- * server/scheduled/purgeArchivedBids.ts for why, and what it costs.
+ * It does NOT remove the plan files, and must not be called on its own: call
+ * `deleteBidWithFiles` (server/storedFiles.ts), which reads the keys first and
+ * releases the files after. `server/storedFiles.test.ts` fails on any other
+ * caller. This comment used to blame the Manus storage API for the files being
+ * left behind, long after that stopped being the reason.
  */
 export async function deleteBidForever(id: number, userId: number) {
   const db = await getDb();
@@ -4519,6 +4523,56 @@ export async function setBidPdfPageCount(
     .update(bidPdfs)
     .set({ pageCount, updatedAt: new Date() })
     .where(and(eq(bidPdfs.id, id), eq(bidPdfs.userId, userId)));
+}
+
+/**
+ * The storage key of every plan set on a bid. Read BEFORE the bid is deleted,
+ * because the cascade takes the rows that know them.
+ */
+export async function getBidStorageKeys(
+  bidId: number,
+  userId: number
+): Promise<string[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({ key: bidPdfs.storageKey })
+    .from(bidPdfs)
+    .where(and(eq(bidPdfs.bidId, bidId), eq(bidPdfs.userId, userId)));
+  return rows.map(r => r.key);
+}
+
+/**
+ * Which of these keys some row, in ANY account, still names.
+ *
+ * Deliberately not scoped to a user. The question is "may this object be
+ * deleted?", and the answer is no if anything anywhere still points at it — two
+ * rows can name one object (`bid_pdfs.storageKey` is not unique, and a legacy
+ * `projects.pdfKey` can share a plan's object). The columns come from
+ * `FILE_SOURCES`, the list the backup keeps and `server/backup.test.ts`
+ * enforces against the schema, so a new file column cannot be missed here
+ * without that test going red first.
+ */
+export async function storageKeysInUse(
+  keys: readonly string[]
+): Promise<Set<string>> {
+  const inUse = new Set<string>();
+  if (keys.length === 0) return inUse;
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const list = sql.join(
+    keys.map(k => sql`${k}`),
+    sql`, `
+  );
+  for (const source of FILE_SOURCES) {
+    const column = sql.identifier(source.column);
+    const [rows] = (await db.execute(sql`
+      SELECT ${column} AS k FROM ${sql.identifier(source.table)}
+       WHERE ${column} IN (${list})
+    `)) as unknown as [Array<{ k: string }>];
+    for (const row of rows) inUse.add(String(row.k));
+  }
+  return inUse;
 }
 
 export async function deleteBidPdf(id: number, userId: number) {

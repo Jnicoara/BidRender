@@ -1320,7 +1320,24 @@ path is ever revived, give it the same treatment first.
 
 ## Stage 5 follow-ups (references/stage-5-track-b-plan.md, 2026-09-27)
 
-- [ ] **Leftover plan PDFs after delete — MUST BE FIXED BEFORE THE BETA: these
+- [x] **BUILT 2026-09-27 (Track B), owner's answers as recommended in
+      `references/track-b-beta-plan.md` § 1.** `storageDelete` on both
+      backends (asks the disk folder too when R2 is live, and drops the R2
+      existence cache); every delete path goes through `server/storedFiles.ts`
+      — rows first, then any file no row in any account names — and
+      `server/storedFiles.test.ts` fails on a raw call. Also covers removing
+      one plan set, the sample bid, logo replace/clear and the legacy project
+      PDF. `scripts/sweepOrphanPlans.mts` for what is already left behind: dry
+      run by default, by hand for the first month, refuses an empty database
+      and (unless `--allow-majority`) a majority of orphans. Backups: 30 days,
+      newest 7 good always kept, only after a good night
+      (`references/backups.md` § 9). Probed on the real plan bucket with a
+      key of our own: put, delete, gone. **Still to do: run the sweep against
+      production** — dry run first, read the list. _Seen on the local dry run:_
+      `.local-storage` holds a folder named `bid-plans/1/` + ANSI colour codes
+      around `1728349` — some script wrote a coloured number into a storage
+      key. Local only, found not chased.
+      The request as it stood: **Leftover plan PDFs after delete — MUST BE FIXED BEFORE THE BETA: these
       are customer drawings.** Deleting a bid, whether by hand, with the
       archive's "Delete all", or by the nightly 30-day purge, removes only
       DATABASE rows. The `bid_pdfs` rows cascade away, but the files behind

@@ -77,6 +77,7 @@ import { needsPricing } from "../../shared/materialPricing";
 import { isFittingRole } from "../../shared/runFittings";
 import { footageByRunType } from "../runTypeFootage";
 import * as db from "../db";
+import { deleteBidWithFiles } from "../storedFiles";
 
 /**
  * The three things a takeoff can be telling a bid that its money does not say.
@@ -710,7 +711,7 @@ export const bidsRouter = router({
             "Only archived bids can be deleted permanently. Archive it first.",
         });
       }
-      await db.deleteBidForever(input.id, ctx.scope.dataUserId);
+      await deleteBidWithFiles(input.id, ctx.scope.dataUserId);
       return { success: true };
     }),
 
@@ -722,8 +723,9 @@ export const bidsRouter = router({
    * or restored one — nothing is deleted and the caller is told to look again.
    * The person agreed to destroy N bids; this destroys N bids or none.
    *
-   * One bid at a time through `deleteBidForever`, the path the nightly purge
-   * uses, so a bulk delete removes exactly what a single delete removes.
+   * One bid at a time through `deleteBidWithFiles`, the path the nightly purge
+   * uses, so a bulk delete removes exactly what a single delete removes —
+   * plan files included.
    */
   deleteAllArchived: requireCapability("bids.delete")
     .input(z.object({ expectedCount: z.number().int().min(1) }))
@@ -738,7 +740,7 @@ export const bidsRouter = router({
         });
       }
       for (const bid of archived) {
-        await db.deleteBidForever(bid.id, ctx.scope.dataUserId);
+        await deleteBidWithFiles(bid.id, ctx.scope.dataUserId);
       }
       return { deleted: archived.length };
     }),
