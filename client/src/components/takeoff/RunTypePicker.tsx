@@ -73,6 +73,8 @@ export const CONDUIT_SHELF = ["Conduit"];
 export const CABLE_SHELF = ["Wire & Cable"];
 import { runTypeSpec } from "@shared/takeoffCounts";
 import { laborPerFootSentence } from "@shared/runTypeLabor";
+import type { RunTypeColors } from "@shared/takeoffMarks";
+import { RunTypeSwatch } from "@/components/takeoff/runIcons";
 import {
   EMT_FITTING_STYLES,
   EMT_FITTING_STYLE_LABELS,
@@ -387,9 +389,17 @@ export function RunTypePicker({
   onSave,
   disabled,
   children,
+  runColors,
 }: {
   pathType: "conduit" | "cable";
   types: PickableRunType[];
+  /**
+   * Which colour each type has on this bid — `takeoffRuns.typeColors`. Each
+   * row wears it, so choosing a type shows which lines on the drawing are
+   * already that type. A type not yet used here shows no colour (see
+   * RunTypeSwatch).
+   */
+  runColors: RunTypeColors;
   /** The materials catalog, so a run needs no type defined first. */
   catalog?: PickableRunMaterial[];
   armedId: number | null;
@@ -933,6 +943,12 @@ export function RunTypePicker({
                         "w-3 h-3 mt-0.5 shrink-0",
                         type.id === armedId ? "opacity-100" : "opacity-0"
                       )}
+                    />
+                    <RunTypeSwatch
+                      runTypeId={type.id}
+                      pathType={pathType}
+                      colors={runColors}
+                      className="mt-px"
                     />
                     <span className="flex-1 min-w-0">
                       <span className="block truncate">{type.label}</span>

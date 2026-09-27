@@ -270,7 +270,7 @@ from now on.
 | T11 | **Rename a run.**                                                                                                                                                 | **Missing**    | Old screen, Your request        | Nice-to-have |
 | T12 | Delete a run.                                                                                                                                                     | **Works**      | Current code                    | Essential    |
 | T13 | Footage labels on the drawing, on each segment.                                                                                                                   | **Missing**    | Old screen                      | Nice-to-have |
-| T14 | Colour each run, and hide the other runs while working on one.                                                                                                    | **Missing**    | Old screen                      | Nice-to-have |
+| T14 | Colour each run, and hide the other runs while working on one. Built per TYPE, not per run — see the note in section 10.                                          | **Works**      | Old screen                      | Nice-to-have |
 | T15 | Lengths do not depend on zoom level.                                                                                                                              | **Works**      | Current code                    | Essential    |
 | T16 | **Routing waste factor:** an adjustable percentage added to traced length for offsets and obstructions a flat plan does not show, always visible with its amount. | **Missing**    | Decided 2026-09-14 (section 13) | Essential    |
 | T17 | **Vertical rise per device:** the pipe and wire that run up to the ceiling space or down to the slab from each device, which a flat plan does not show.           | **Missing**    | Proposed (section 14)           | Essential    |
@@ -1164,6 +1164,13 @@ Checked against the deleted `PlanPanel.tsx`. These may have been forgotten.
 - "Clear page": removed every run and pin on a page, with a confirmation (D6).
 - "Hide other runs" while working on one (T14).
 - Run colours, with saved favourite colours (T14).
+  > **T14 built 2026-09-26, and not as the old screen had it.** Colour belongs
+  > to the run TYPE (decided 2026-09-18), so runs of one type share one. Each
+  > bid gives its types colours in the order they were first used, and
+  > selecting a run dims the others, with a switch to hide them. There are no
+  > per-run colours and no favourites. A colour the user picks per type is
+  > "Part B", and it is not built. The decisions and Part B's settled answers
+  > are in `plan-viewer-overhaul.md` § 6, "RUN COLOURS (T14)".
 - Footage labels on each segment, shown once zoomed in enough (T13).
 - Lifting the pen mid-run by double-click, right-click, or pressing both mouse
   buttons (T10).

@@ -272,16 +272,34 @@ function DropEditor({
       ref={ref}
       className="ml-1 mt-1 mb-1.5 space-y-1.5 border-l border-border/60 pl-2"
     >
+      {/*
+        A PROPOSED drop shows the kind it is proposed as, and says it is
+        proposed. It used to show "Not set" — true of what is stored, and
+        contradicting the row above, which names the proposal and prices its
+        footage. Nothing is written until Approve, or until a different kind
+        is picked here (picking IS approving). A dismissed drop has no kind.
+      */}
       <div className="flex items-center gap-1.5">
         <span className="text-[0.7rem] text-muted-foreground w-10">To</span>
         <EndKindSelect
           bidId={bidId}
-          value={row.state === "approved" ? row.kind : null}
+          value={
+            row.state === "approved"
+              ? row.kind
+              : row.state === "open"
+                ? toKind
+                : null
+          }
           // Picking a device here IS approving it; "Not set" takes it back.
           onChange={next => onAnswer({ kind: next })}
           ariaLabel="What this drop goes to"
           className="h-6 flex-1 text-xs"
         />
+        {row.state === "open" && toKind !== null && (
+          <span className="text-[0.65rem] text-[#F5C518] shrink-0">
+            proposed
+          </span>
+        )}
       </div>
       {kind !== null && row.state !== "dismissed" && (
         <div className="flex items-center justify-between gap-2">

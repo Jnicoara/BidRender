@@ -36,6 +36,7 @@ import {
   runAppearance,
   runStrokeInOverlay,
   runWidthInOverlay,
+  type RunTypeColors,
 } from "@shared/takeoffMarks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -233,7 +234,10 @@ export function TraceLayer({
   legs,
   drops,
   onSelectDrop,
+  runColors,
 }: {
+  /** Which colour each run type gets on this bid — `takeoffRuns.typeColors`. */
+  runColors: RunTypeColors;
   /** Branch legs while tracing (D20). Omitted, "New leg" does not exist. */
   legs?: TraceLegs;
   /** Drops on quantity traces (D21). Tapping one opens it in the panel. */
@@ -312,6 +316,25 @@ export function TraceLayer({
 
   /** A leg can be finished with nothing traced yet: the run's legs are saved. */
   const canFinish = points.length >= 2 || Boolean(legs?.active);
+
+  /**
+   * The ROOT of the selected run, so every leg of it is picked out together.
+   * Null when nothing is selected, or while tracing — the pen needs the whole
+   * drawing at full strength to aim by.
+   */
+  const selectedRoot = useMemo(() => {
+    if (tracing || selectedRunId === null) return null;
+    const row = existingRuns.find(r => r.id === selectedRunId);
+    return row ? (row.parentRunId ?? row.id) : null;
+  }, [tracing, selectedRunId, existingRuns]);
+  /**
+   * Whether a row belongs to a run OTHER than the selected one. Its pipe,
+   * its leg jumps and its tees all dim together — found looking at the
+   * finished screen: dimming only the pipe left another run's grey jumps and
+   * coloured tees at full strength, louder than the lines they belong to.
+   */
+  const dimmedRow = (run: { id: number; parentRunId?: number | null }) =>
+    selectedRoot !== null && (run.parentRunId ?? run.id) !== selectedRoot;
 
   /**
    * The snap reach in PAGE points: a fixed distance on SCREEN, whatever the
@@ -542,6 +565,18 @@ export function TraceLayer({
           const screen = run.points.map(toScreen);
           if (screen.length < 2) return null;
           const isSelected = run.id === selectedRunId;
+          /*
+            Selecting ANY leg picks out the whole run (T14): its legs are one
+            run in every count (D20), so lighting one and leaving its
+            siblings looking like strangers would contradict the totals. The
+            rest dim rather than vanish — "Hide other runs" in the panel is
+            the switch that takes them away.
+          */
+          const inSelected =
+            selectedRoot !== null &&
+            (run.parentRunId ?? run.id) === selectedRoot;
+          const dimmed = dimmedRow(run);
+          const appearance = runAppearance(runColors, run);
           return (
             <g
               key={run.id}
@@ -550,14 +585,16 @@ export function TraceLayer({
               <polyline
                 points={screen.map(p => `${p.x},${p.y}`).join(" ")}
                 fill="none"
-                stroke={runAppearance(run).color}
+                stroke={appearance.color}
                 /*
                   Clamped to a readable band on screen — see runScreenWidth.
                   Selection keeps the old 5:3 ratio rather than a fixed number,
                   so a selected run stays proportionally heavier at every zoom.
+                  Every leg of the selected run gets it, not only the row
+                  that was clicked.
                 */
-                strokeWidth={runStroke * (isSelected ? 5 / 3 : 1)}
-                strokeOpacity={run.isSuggestion ? 0.55 : 1}
+                strokeWidth={runStroke * (inSelected || isSelected ? 5 / 3 : 1)}
+                strokeOpacity={dimmed ? 0.25 : run.isSuggestion ? 0.55 : 1}
                 /*
                   One dash pattern, two meanings kept apart by which wins.
 
@@ -567,9 +604,7 @@ export function TraceLayer({
                   suggestion is accepted it becomes an ordinary run and takes
                   its type's style, which is cable dashed and conduit solid.
                 */
-                strokeDasharray={
-                  run.isSuggestion ? "10 6" : runAppearance(run).dash
-                }
+                strokeDasharray={run.isSuggestion ? "10 6" : appearance.dash}
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 onClick={() =>
@@ -643,7 +678,7 @@ export function TraceLayer({
                   stroke="#94A3B8"
                   strokeWidth={runStroke * 0.6}
                   strokeDasharray={`${runStroke * 2} ${runStroke * 2}`}
-                  strokeOpacity={0.9}
+                  strokeOpacity={dimmedRow(leg) ? 0.25 : 0.9}
                 >
                   <title>Jump between legs — not pipe, not measured</title>
                 </line>
@@ -654,16 +689,23 @@ export function TraceLayer({
         })()}
         {(() => {
           // One square per tee, however many legs meet there.
-          const tees = new Map<number, { tee: DrawnTee; color: string }>();
+          const tees = new Map<
+            number,
+            { tee: DrawnTee; color: string; dim: boolean }
+          >();
           for (const run of existingRuns) {
             for (const tee of [run.startTee, run.endTee]) {
               if (tee && !tees.has(tee.id))
-                tees.set(tee.id, { tee, color: runAppearance(run).color });
+                tees.set(tee.id, {
+                  tee,
+                  color: runAppearance(runColors, run).color,
+                  dim: dimmedRow(run),
+                });
             }
           }
           const half = markRadiusInOverlay(zoom) * 0.55;
           const stroke = markStrokeInOverlay(zoom);
-          return Array.from(tees.values()).map(({ tee, color }) => {
+          return Array.from(tees.values()).map(({ tee, color, dim }) => {
             // A tee on a mark is that mark's box: the mark already shows it.
             if (tee.fitting === "mark") return null;
             const at = toScreen(tee);
@@ -678,6 +720,7 @@ export function TraceLayer({
                 fill={answered ? color : "none"}
                 fillOpacity={answered ? 0.85 : 0}
                 stroke={answered ? "#0b0b0b" : color}
+                opacity={dim ? 0.3 : 1}
                 strokeWidth={stroke}
                 strokeDasharray={
                   answered ? undefined : `${half * 0.5} ${half * 0.4}`
@@ -779,6 +822,8 @@ export function TraceLayer({
             return (
               <g
                 key={key}
+                // Dims with its run when another run is selected — see dimmedRow.
+                opacity={dimmedRow(run) ? 0.3 : 1}
                 className={tracing ? "" : "pointer-events-auto cursor-pointer"}
                 onClick={select}
               >
@@ -864,9 +909,12 @@ export function TraceLayer({
               : drop.state === "approved"
                 ? "drop"
                 : "no drop";
+          // Dims with its run when another run is selected — see dimmedRow.
+          const legRow = existingRuns.find(r => r.id === drop.legId);
           return (
             <g
               key={`drop-${drop.legId}-${drop.end}`}
+              opacity={legRow && dimmedRow(legRow) ? 0.3 : 1}
               className={tracing ? "" : "pointer-events-auto cursor-pointer"}
               onClick={() =>
                 !tracing && onSelectDrop?.({ legId: drop.legId, end: drop.end })

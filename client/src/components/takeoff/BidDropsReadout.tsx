@@ -18,6 +18,8 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { groupDrops, sourceSplit } from "@/lib/dropsReadout";
+import { RunTypeSwatch } from "@/components/takeoff/runIcons";
+import type { RunTypeColors } from "@shared/takeoffMarks";
 
 export type DropJump = {
   runId: number;
@@ -30,9 +32,12 @@ export type DropJump = {
 export function BidDropsReadout({
   bidId,
   onJump,
+  runColors,
 }: {
   bidId: number;
   onJump: (to: DropJump) => void;
+  /** Which colour each run type gets on this bid — `takeoffRuns.typeColors`. */
+  runColors: RunTypeColors;
 }) {
   const { data } = trpc.takeoffRuns.drops.useQuery({ bidId });
   const [open, setOpen] = useState(false);
@@ -108,10 +113,20 @@ export function BidDropsReadout({
                         }
                         title="Show this one on the drawing"
                       >
-                        <span className="text-[0.7rem] text-muted-foreground truncate">
-                          {item.sheetName} ·{" "}
-                          {item.direction === "rise" ? "rise" : "drop"},{" "}
-                          {item.source}
+                        {/* The swatch of the run it drops from, in the
+                            colour that run is drawn — the jump lands on it. */}
+                        <span className="flex items-center gap-1.5 min-w-0 text-[0.7rem] text-muted-foreground">
+                          <RunTypeSwatch
+                            runTypeId={item.runTypeId}
+                            pathType={item.pathType}
+                            colors={runColors}
+                            className="self-center"
+                          />
+                          <span className="truncate">
+                            {item.sheetName} ·{" "}
+                            {item.direction === "rise" ? "rise" : "drop"},{" "}
+                            {item.source}
+                          </span>
                         </span>
                         <span className="text-[0.7rem] font-mono tabular-nums shrink-0">
                           {item.feet.toFixed(2)} ft

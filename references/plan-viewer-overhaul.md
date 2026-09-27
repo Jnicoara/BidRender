@@ -4280,6 +4280,42 @@ five-estimator company read 750 sheets a month inside one $99 fee, or stops a
 solo estimator at 150 a day when they had bought 500.** If the shared number is
 confusing, change the brake's number. Never the price.
 
+**RUN COLOURS (T14) — decided by the owner and built 2026-09-26 (Part A).**
+This keeps the 2026-09-18 decision that colour means which TYPE a run is
+(`runAppearance` in `shared/takeoffMarks.ts`); it does not reopen it.
+
+- **Colour is per TYPE, never per run.** Runs of one type share a colour. A
+  leg normally takes its run's type, and a leg given its own type is drawn in
+  that type's colour.
+- **Per BID, in order of first use.** `takeoffRuns.typeColors` orders a bid's
+  types by their lowest run id, and `runTypeColor` gives out the six count
+  colours in that order, so the first six types on a bid never share one.
+  The seventh wraps round to the first. The trade-offs are accepted: a type can
+  be a different colour on another bid, and deleting every run of the earliest
+  type moves the others up one.
+- **Keyed by the RESOLVED type.** A fork and the shipped row it replaced are
+  one type and one colour (`sameAs`). Keyed by raw id, the picker called the
+  company's fork "not on this bid" beside blue lines of that very type. This
+  was found on screen during the build.
+- **One function, one component.** The drawing, the runs panel, the Layers
+  swatch, the drops readout, the route/quantity split and the type picker all
+  read `runTypeColor`. Anything that draws a type uses `RunTypeSwatch`
+  (`runIcons.tsx`). A type not yet used on the bid shows a muted swatch
+  rather than the "next" colour, because two unused types would show the
+  same colour. The toolbar's conduit/cable icons stay plain, for the reason
+  given in `runIcons.tsx`.
+- **Selecting any leg selects the whole run.** Its legs thicken and every
+  other run dims: its pipe, leg jumps, tees, drops and pull points together.
+  "Hide other runs on the drawing" on the selected run removes the others
+  from the drawing only. The panel keeps listing every run. With nothing
+  selected, or while tracing, the whole drawing is shown.
+- **Part B, a colour the user picks, is NOT built.** It needs a nullable
+  `color` column on `takeoff_run_types`. The owner's answers for when it is
+  built: only the six count colours; a chosen colour follows the type to
+  EVERY bid, and only types with no chosen colour take a per-bid slot;
+  changing a shipped starter type's colour forks it, like editing a shipped
+  material.
+
 ## 7. Settled — answered 2026-09-17
 
 - **Makeup applies to WIRE ONLY.** Pipe is cut to fit and has no tail.

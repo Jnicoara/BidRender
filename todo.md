@@ -1336,6 +1336,26 @@ path is ever revived, give it the same treatment first.
 - [ ] **A billing plan should set `seatLimit` through `db.setSeatLimit`**, so a downgrade hits the same "remove N first" refusal. Nothing else writes the column today except 0081.
 - [ ] **Nobody but a platform admin can add a seat.** "Remove someone or add a seat" names an action an owner cannot yet take themselves; it becomes self-serve with billing.
 
+## Run colours (T14) — Part A built 2026-09-26, NOT DEPLOYED
+
+Decisions and the reasons for them are in `plan-viewer-overhaul.md` § 6,
+"RUN COLOURS (T14)". **No migration.** It ships as a code push and nothing
+else. It rides the same deploy as 0087, and 0087 still goes first.
+
+- [ ] **Every existing drawing changes colour once, on purpose.** Types used
+      to be hashed from their id and are now given colours in order of first
+      use, so most runs change colour on the first load after the deploy. No
+      number moves. On the fixture bid the five types moved one slot each.
+- [ ] **Part B: a colour the user picks for a type.** It needs a nullable
+      `color` column on `takeoff_run_types`, which is a migration and has its
+      own prompt. The owner has already answered: only the six count colours;
+      it follows the type to every bid; editing a shipped starter type's
+      colour forks it. `runTypeColor` is the one place a stored colour would
+      win over the per-bid slot.
+- [ ] **Six colours wrap.** The seventh type on a bid shares the first type's
+      colour. That is accepted for now. Part B is the answer if it turns out
+      to matter.
+
 ## Quantity mode — flat footage under a type (D21, built 2026-09-26)
 
 **DEPLOYED 2026-09-27 as `a64dfbc`** (rollback target `b69c35d`). 0086 applied
@@ -1368,12 +1388,15 @@ ends and approved AS END KINDS — no table of answers. Modules:
     run level at BOTH ends on a job with no run height stops being called
     "counted flat only" (`verticalAtEnd` answers "level" before the gate).
     No number moves; a warning about a run with nothing missing goes away.
-- [ ] **The finish toast names the ROOT's length only** ("Run finished — 57.6
-      ft traced" for a three-leg, 121 ft trace). Same for branch legs since
-      D20. The panel's leg header has the true total.
-- [ ] **An open drop's editor shows "To: Not set"** while the row above says
-      "proposed" with the proposed kind's footage — true (nothing stored) but
-      could read oddly. Approve uses the proposal. Watch for confusion.
+- [x] **FIXED 2026-09-26: the finish toast names the whole run.** `commit`
+      returns `runFeet` and `legCount`, summed the way the leg header sums
+      them, and the toast reads "Run finished — 2 legs, 96.3 ft traced". The
+      old toast named only the root leg ("Run finished — 57.6 ft traced" for a
+      three-leg, 121 ft trace), and had done since D20. Checked against the
+      header on the fixture bid. Asserted in `server/branchLegs.test.ts`.
+- [x] **FIXED 2026-09-26: an open drop's editor shows the proposed kind**,
+      tagged "proposed", instead of "To: Not set", which contradicted the row
+      above it. Nothing is written until Approve.
 - [ ] **No AI path yet.** The reader cannot propose a quantity trace; when it
       can, it goes through `save` + `addLeg` like the hand path, so the counts
       agree by construction.

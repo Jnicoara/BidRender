@@ -6,6 +6,18 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **Run types on a bid no longer share a colour.** Each bid now gives its run
+  types colours in the order they were first used, so the first six on a job
+  are always different. Existing drawings will change colour once because of
+  this. The same colour now appears beside the type in the type picker, the
+  drops list and the traced-footage list, so a swatch always matches its
+  lines.
+- **Selecting a run picks out the whole run.** Clicking any leg makes all of
+  its legs stand out and fades every other run. A new "Hide other runs on the
+  drawing" switch on the selected run hides the rest while you work on it.
+- **Two small fixes on traced runs.** The "Run finished" message now gives
+  the whole run's length and how many legs it has, not just the first leg's.
+  A proposed drop now shows the type it is proposed as instead of "Not set".
 - **An assembly line with an unpriced part in it now says so.** An assembly
   of two lugs and half an hour used to show only the labor, as if it were
   fully priced. It now reads "$25.00 + 1 part not priced", and the bid's

@@ -419,10 +419,16 @@ withDb("the whole run moves together", () => {
       start: branchAt15(draft.id),
       endKind: null,
     });
-    await caller().takeoffRuns.commit({ id: draft.id });
+    const done = await caller().takeoffRuns.commit({ id: draft.id });
     const all = await rows(draft.id);
     expect(all).toHaveLength(3);
     expect(all.every(r => r.status === "committed")).toBe(true);
+    // The finish message names the WHOLE run: 70 ft of main (cut at the tee
+    // into 15 + 55) and a 20 ft branch — not the 15 ft first leg it named
+    // before, which the panel's leg header contradicted.
+    expect(done.legCount).toBe(3);
+    expect(done.runFeet).toBeCloseTo(90, 2);
+    expect(done.lengthFeet).toBeLessThan(done.runFeet);
   });
 
   it("deletes legs and tees with the run", async () => {

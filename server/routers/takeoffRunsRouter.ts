@@ -64,6 +64,7 @@ import { resolveMaterial } from "../../shared/materialLookup";
 import { rootOf } from "../../shared/runNetwork";
 import { traceModeOf } from "../../shared/traceMode";
 import { quantityTraceSummary } from "../../shared/quantityDrops";
+import { runTypeColorOrder } from "../../shared/takeoffMarks";
 import {
   circuitPlan,
   findMatchingRunType,
@@ -635,9 +636,18 @@ export const takeoffRunsRouter = router({
         run.parentRunId ?? run.id,
         ctx.scope.dataUserId
       );
+      /*
+        The WHOLE run's length for the finish message, summed the way the
+        panel's leg header sums it (each leg's billable feet, then rounded —
+        client/src/lib/runLegs.ts), so the toast and the header cannot show
+        two numbers for one run. It used to name only the leg being
+        committed: "57.6 ft traced" for a three-leg, 121 ft run (D20).
+      */
+      let runFeet = 0;
       for (const row of group) {
         const rowInches =
           row.id === run.id ? inches : pathRealInches(row.points ?? [], ratio);
+        if (rowInches !== null) runFeet += toBillableFeet(rowInches);
         await db.updateRun(row.id, ctx.scope.dataUserId, {
           status: "committed",
           isSuggestion: false,
@@ -645,7 +655,14 @@ export const takeoffRunsRouter = router({
           scaleRatioUsed: String(ratio),
         });
       }
-      return { id: input.id, lengthFeet: toBillableFeet(inches) };
+      return {
+        id: input.id,
+        /** This row alone. */
+        lengthFeet: toBillableFeet(inches),
+        /** Every leg of the run, and how many there are. */
+        runFeet: Math.round(runFeet * 100) / 100,
+        legCount: Math.max(group.length, 1),
+      };
     }),
 
   /**
@@ -1493,6 +1510,9 @@ export const takeoffRunsRouter = router({
         direction: "rise" | "drop";
         feet: number;
         source: "route" | "quantity";
+        /** The run's type and style, for the readout's swatch (T14). */
+        runTypeId: number | null;
+        pathType: RunPathType;
       }[] = [];
       let notMeasurable = 0;
       let noRunHeight = 0;
@@ -1544,9 +1564,44 @@ export const takeoffRunsRouter = router({
             direction: v.direction,
             feet: v.feet,
             source: traceModeOf(run),
+            // For the readout's swatch — the colour of the run it drops from.
+            runTypeId: run.runTypeId,
+            pathType: run.pathType as RunPathType,
           });
         }
       }
       return { drops, notMeasurable, noRunHeight };
+    }),
+
+  /**
+   * Which colour each run type gets on this bid: the order the types were
+   * first used (`runTypeColorOrder`, T14). Per BID, not per sheet, so a type
+   * is one colour on every sheet of the job. Invalidated by `refreshRuns`
+   * with every other run query, so a new type's first run takes its slot as
+   * soon as it is saved.
+   */
+  typeColors: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const [runs, types] = await Promise.all([
+        db.getRunsForBid(input.bidId, userId),
+        // The list the bridge resolves against, archived forks and all.
+        db.getRunTypesFor(userId, true),
+      ]);
+      /*
+        A fork and the shipped row it replaced are ONE type, so they are one
+        colour: runs keep the shipped id, the picker lists the fork.
+      */
+      const sameAs: Record<number, number> = {};
+      for (const id of Array.from(new Set(runs.map(r => r.runTypeId)))) {
+        if (id === null) continue;
+        const resolved = resolveRunType(types, id);
+        if (resolved && resolved.id !== id) sameAs[id] = resolved.id;
+      }
+      return {
+        order: runTypeColorOrder(runs, id => sameAs[id] ?? id),
+        sameAs,
+      };
     }),
 });

@@ -206,10 +206,103 @@ export const LEGACY_RUN_COLOR: Record<"conduit" | "cable", string> = {
   cable: "#4ADE80",
 };
 
-export function runAppearance(run: {
-  runTypeId: number | null;
-  pathType: "conduit" | "cable";
-}): { color: string; dash: string | undefined } {
+/**
+ * Which colour each run type gets ON ONE BID: the types in the order they
+ * were first used there (T14, 2026-09-26).
+ *
+ * ── Why per bid, and not hashed from the id ─────────────────────────────────
+ * Hashing the id into six colours put types 1 and 7 on the same colour, so
+ * two types on one sheet could be drawn identically — the "which line is
+ * which" fault colour-by-type exists to remove. Handing colours out in order
+ * of first use means the first six types on a bid never share one.
+ *
+ * ── What it costs ────────────────────────────────────────────────────────────
+ * A type can be a different colour on another bid, and deleting every run of
+ * the earliest type moves the others up one. Both are accepted: colour has to
+ * separate the lines on THIS drawing, and there is no stored colour to keep
+ * stable yet. When a type carries a chosen colour (Part B, not built), that
+ * colour follows it to every bid and only unchosen types take a slot here.
+ *
+ * Returned by `takeoffRuns.typeColors`, which `refreshRuns` invalidates, so a
+ * new type's first run moves it from "next colour" to its own slot.
+ *
+ * ── Keyed by the RESOLVED type, and `sameAs` is why ─────────────────────────
+ * Editing a shipped type forks it, and runs keep the shipped id while the
+ * picker lists the fork (`shared/runTypeLookup.ts`). Keyed by raw id, the
+ * picker called the fork "not on this bid" beside blue lines of that very
+ * type — seen on screen 2026-09-26. So `order` holds resolved ids, and
+ * `sameAs` maps each stored id that resolves elsewhere to the id it means.
+ */
+export type RunTypeColors = {
+  order: readonly number[];
+  sameAs: Readonly<Record<number, number>>;
+};
+
+/** Nothing on the bid yet: every type would take the first colour. */
+export const NO_RUN_TYPE_COLORS: RunTypeColors = { order: [], sameAs: {} };
+
+/** The colour key of a type id: what it resolves to, or itself. */
+export function runTypeColorKey(
+  runTypeId: number,
+  colors: Pick<RunTypeColors, "sameAs">
+): number {
+  return colors.sameAs[runTypeId] ?? runTypeId;
+}
+
+/**
+ * The order types were first used, from a bid's run rows. Ids increase with
+ * creation, so a type's first use is its lowest run id. A suggestion nobody
+ * accepted is not a use; an untyped run has no type to order. `keyOf` turns a
+ * stored id into the type it means, so a fork and its shipped row are one.
+ */
+export function runTypeColorOrder(
+  runs: readonly {
+    id: number;
+    runTypeId: number | null;
+    isSuggestion: boolean;
+  }[],
+  keyOf: (runTypeId: number) => number = id => id
+): number[] {
+  const first = new Map<number, number>();
+  for (const run of runs) {
+    if (run.runTypeId === null || run.isSuggestion) continue;
+    const key = keyOf(run.runTypeId);
+    const seen = first.get(key);
+    if (seen === undefined || run.id < seen) first.set(key, run.id);
+  }
+  return Array.from(first.entries())
+    .sort((a, b) => a[1] - b[1])
+    .map(([typeId]) => typeId);
+}
+
+/**
+ * THE colour of a run type on this bid — the one function the drawing, the
+ * runs panel, the drops readout, the route/quantity split and the type
+ * picker all read, so a swatch cannot disagree with its line.
+ *
+ * A type not used on the bid yet gets the colour it WILL get: the next slot.
+ * The seventh type wraps onto the first colour; six is the palette.
+ */
+export function runTypeColor(
+  runTypeId: number,
+  colors: RunTypeColors
+): MarkColor {
+  const at = colors.order.indexOf(runTypeColorKey(runTypeId, colors));
+  const slot = at === -1 ? colors.order.length : at;
+  return MARK_COLORS[slot % MARK_COLORS.length];
+}
+
+/**
+ * How a run is drawn. Takes the bid's colours FIRST and required, so no
+ * caller can draw a run without saying which bid it is on.
+ */
+export function runAppearance(
+  colors: RunTypeColors,
+  run: {
+    runTypeId: number | null;
+    pathType: "conduit" | "cable";
+  }
+): { color: string; dash: string | undefined } {
   return {
     /*
       Keyed on the type, and NOT kept apart from the counted groups.
@@ -229,7 +322,7 @@ export function runAppearance(run: {
     color:
       run.runTypeId === null
         ? LEGACY_RUN_COLOR[run.pathType]
-        : colorFor({ id: run.runTypeId }),
+        : runTypeColor(run.runTypeId, colors),
     dash: RUN_DASH[run.pathType],
   };
 }

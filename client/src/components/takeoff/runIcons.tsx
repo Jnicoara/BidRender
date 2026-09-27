@@ -48,6 +48,13 @@
  * same mistake in the opposite direction.
  */
 import type { SVGProps } from "react";
+import {
+  LEGACY_RUN_COLOR,
+  runTypeColor,
+  runTypeColorKey,
+  type RunTypeColors,
+} from "@shared/takeoffMarks";
+import { cn } from "@/lib/utils";
 
 /** Lucide's own, so a hand-drawn icon cannot drift from a library one. */
 const base = {
@@ -134,3 +141,63 @@ export function CableIcon(props: SVGProps<SVGSVGElement>) {
  * Do not reintroduce a shared constant to "tidy this up". One colour cannot
  * answer both, and the last one that tried is what this comment is about.
  */
+
+/**
+ * A run TYPE's swatch: its line style in its colour on this bid (T14).
+ *
+ * The one component the runs panel, the route/quantity split, the drops
+ * readout and the type picker draw a type with, reading the one function the
+ * drawing reads (`runTypeColor`) — so a swatch cannot name a colour its lines
+ * are not drawn in. A row that has a RUN in hand uses the same function
+ * through `runAppearance`.
+ *
+ * A type with no run on this bid yet has no colour on it yet. It is drawn in
+ * plain foreground, dimmed, rather than in the colour it would get next: two
+ * unused types would otherwise show the same "next" colour side by side, and
+ * a picker full of swatches that are not true yet teaches nothing.
+ */
+export function RunTypeSwatch({
+  runTypeId,
+  pathType,
+  colors,
+  className,
+}: {
+  /** Null for a run traced before types — it keeps its legacy colour. */
+  runTypeId: number | null;
+  pathType: "conduit" | "cable";
+  colors: RunTypeColors;
+  className?: string;
+}) {
+  const Icon = pathType === "cable" ? CableIcon : ConduitIcon;
+  if (runTypeId === null) {
+    return (
+      <Icon
+        className={cn("w-3.5 h-3.5 shrink-0", className)}
+        style={{ color: LEGACY_RUN_COLOR[pathType] }}
+        aria-hidden
+      />
+    );
+  }
+  // Through the colour key, so a fork counts as its shipped row's runs.
+  const onBid = colors.order.includes(runTypeColorKey(runTypeId, colors));
+  return (
+    <span
+      className="inline-flex shrink-0"
+      title={
+        onBid
+          ? "This type's colour on this bid"
+          : "Not on this bid yet — it takes the next free colour when traced"
+      }
+    >
+      <Icon
+        className={cn(
+          "w-3.5 h-3.5",
+          !onBid && "text-muted-foreground/60",
+          className
+        )}
+        style={onBid ? { color: runTypeColor(runTypeId, colors) } : undefined}
+        aria-hidden
+      />
+    </span>
+  );
+}

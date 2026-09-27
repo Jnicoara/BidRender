@@ -14,7 +14,98 @@ import {
   MARK_COLORS,
   RUN_DASH,
   runAppearance,
+  runTypeColor,
+  runTypeColorOrder,
+  type RunTypeColors,
 } from "@shared/takeoffMarks";
+
+/** A bid on which types 1–6 were used, in that order. */
+const ON_BID: RunTypeColors = { order: [1, 2, 3, 4, 5, 6], sameAs: {} };
+
+describe("colours on ONE bid, by when each type was first used", () => {
+  it("never repeats a colour among the first six types", () => {
+    // 1 and 7 landed on the same colour when colour was hashed from the id —
+    // two types on one sheet, drawn identically, is the fault this fixes.
+    const colors: RunTypeColors = {
+      order: [1, 7, 13, 19, 25, 31],
+      sameAs: {},
+    };
+    const drawn = colors.order.map(id => runTypeColor(id, colors));
+    expect(new Set(drawn).size).toBe(6);
+  });
+
+  it("hands them out in the order the types were first used", () => {
+    const colors: RunTypeColors = { order: [42, 9], sameAs: {} };
+    expect(runTypeColor(42, colors)).toBe(MARK_COLORS[0]);
+    expect(runTypeColor(9, colors)).toBe(MARK_COLORS[1]);
+  });
+
+  it("gives a type not yet on the bid the next colour it would get", () => {
+    // What a run being traced with a new type is drawn in before its first
+    // save reaches the order — the same colour it keeps afterwards.
+    expect(runTypeColor(99, { order: [42, 9], sameAs: {} })).toBe(
+      MARK_COLORS[2]
+    );
+  });
+
+  it("wraps after six, and says so rather than inventing a seventh", () => {
+    const colors = { order: [1, 2, 3, 4, 5, 6, 7], sameAs: {} };
+    expect(runTypeColor(7, colors)).toBe(runTypeColor(1, colors));
+  });
+
+  it("orders types by the first run of each, not by type id", () => {
+    expect(
+      runTypeColorOrder([
+        { id: 30, runTypeId: 5, isSuggestion: false },
+        { id: 10, runTypeId: 8, isSuggestion: false },
+        { id: 20, runTypeId: 5, isSuggestion: false },
+        { id: 40, runTypeId: 2, isSuggestion: false },
+      ])
+    ).toEqual([8, 5, 2]);
+  });
+
+  it("does not let a suggestion or an untyped run take a colour", () => {
+    // A suggestion nobody accepted is not a use of the type; an untyped run
+    // keeps its legacy colour and has no type to order.
+    expect(
+      runTypeColorOrder([
+        { id: 1, runTypeId: 4, isSuggestion: true },
+        { id: 2, runTypeId: null, isSuggestion: false },
+        { id: 3, runTypeId: 6, isSuggestion: false },
+      ])
+    ).toEqual([6]);
+  });
+
+  it("colours a leg by ITS type, which is usually the run's", () => {
+    // A leg follows the leg it leaves unless it is given a type of its own
+    // (addLeg), so legs usually match — and a leg that differs is a different
+    // thing to buy, drawn as one. Selection lights the whole run either way.
+    const colors = { order: [9, 4], sameAs: {} };
+    const leg = { runTypeId: 9, pathType: "conduit" as const };
+    const other = { runTypeId: 4, pathType: "conduit" as const };
+    expect(runAppearance(colors, leg).color).toBe(MARK_COLORS[0]);
+    expect(runAppearance(colors, other).color).toBe(MARK_COLORS[1]);
+  });
+
+  it("gives a fork the colour of the shipped type its runs still name", () => {
+    // Runs store shipped id 31; the company edited it, so the picker lists
+    // fork 1667. Keyed by raw id the picker called 1667 "not on this bid"
+    // beside blue lines of that type — seen on screen 2026-09-26.
+    const colors: RunTypeColors = { order: [1667, 32], sameAs: { 31: 1667 } };
+    expect(runTypeColor(31, colors)).toBe(MARK_COLORS[0]);
+    expect(runTypeColor(1667, colors)).toBe(MARK_COLORS[0]);
+    expect(
+      runTypeColorOrder(
+        [
+          { id: 1, runTypeId: 31, isSuggestion: false },
+          { id: 2, runTypeId: 32, isSuggestion: false },
+          { id: 3, runTypeId: 1667, isSuggestion: false },
+        ],
+        id => colors.sameAs[id] ?? id
+      )
+    ).toEqual([1667, 32]);
+  });
+});
 
 describe("what a run is called", () => {
   it("names it by its type and its two ends", () => {
@@ -77,25 +168,25 @@ describe("what a run looks like", () => {
     // belongs in a channel that cannot be reassigned.
     expect(RUN_DASH.conduit).toBeUndefined();
     expect(RUN_DASH.cable).toBeTruthy();
-    expect(runAppearance({ runTypeId: 5, pathType: "conduit" }).dash).toBe(
-      RUN_DASH.conduit
-    );
-    expect(runAppearance({ runTypeId: 5, pathType: "cable" }).dash).toBe(
-      RUN_DASH.cable
-    );
+    expect(
+      runAppearance(ON_BID, { runTypeId: 5, pathType: "conduit" }).dash
+    ).toBe(RUN_DASH.conduit);
+    expect(
+      runAppearance(ON_BID, { runTypeId: 5, pathType: "cable" }).dash
+    ).toBe(RUN_DASH.cable);
   });
 
   it("gives runs of ONE type one colour, whatever kind they are", () => {
     // Six homeruns sharing a colour is the useful fact. The colour comes from
     // the type, so it cannot vary run to run.
-    const a = runAppearance({ runTypeId: 12, pathType: "conduit" });
-    const b = runAppearance({ runTypeId: 12, pathType: "conduit" });
+    const a = runAppearance(ON_BID, { runTypeId: 12, pathType: "conduit" });
+    const b = runAppearance(ON_BID, { runTypeId: 12, pathType: "conduit" });
     expect(b.color).toBe(a.color);
   });
 
   it("gives different types different colours", () => {
     const colors = [1, 2, 3, 4, 5, 6].map(
-      id => runAppearance({ runTypeId: id, pathType: "conduit" }).color
+      id => runAppearance(ON_BID, { runTypeId: id, pathType: "conduit" }).color
     );
     expect(new Set(colors).size).toBe(6);
   });
@@ -111,7 +202,7 @@ describe("what a run looks like", () => {
     // been a guarantee that was true five times in six.
     for (const id of [1, 5, 12, 40]) {
       expect(MARK_COLORS).toContain(
-        runAppearance({ runTypeId: id, pathType: "conduit" }).color
+        runAppearance(ON_BID, { runTypeId: id, pathType: "conduit" }).color
       );
     }
   });
@@ -119,19 +210,22 @@ describe("what a run looks like", () => {
   it("leaves an untyped run the colour it has always been", () => {
     // Nothing to group it by, so inventing a group colour would assert a
     // relationship that does not exist.
-    expect(runAppearance({ runTypeId: null, pathType: "conduit" }).color).toBe(
-      LEGACY_RUN_COLOR.conduit
-    );
-    expect(runAppearance({ runTypeId: null, pathType: "cable" }).color).toBe(
-      LEGACY_RUN_COLOR.cable
-    );
+    expect(
+      runAppearance(ON_BID, { runTypeId: null, pathType: "conduit" }).color
+    ).toBe(LEGACY_RUN_COLOR.conduit);
+    expect(
+      runAppearance(ON_BID, { runTypeId: null, pathType: "cable" }).color
+    ).toBe(LEGACY_RUN_COLOR.cable);
   });
 
   it("never colours a TYPED run in the old type colours", () => {
     // Those two now mean "this run has no type", so a typed run wearing one
     // would say something false.
     for (let id = 1; id <= 40; id++) {
-      const { color } = runAppearance({ runTypeId: id, pathType: "conduit" });
+      const { color } = runAppearance(ON_BID, {
+        runTypeId: id,
+        pathType: "conduit",
+      });
       expect(color).not.toBe(LEGACY_RUN_COLOR.conduit);
       expect(color).not.toBe(LEGACY_RUN_COLOR.cable);
       expect(MARK_COLORS).toContain(color);

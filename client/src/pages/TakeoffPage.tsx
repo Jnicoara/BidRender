@@ -242,7 +242,7 @@ import {
   systemKeyForStamp,
   type LayerState,
 } from "@shared/takeoffLayers";
-import { runAppearance } from "@shared/takeoffMarks";
+import { NO_RUN_TYPE_COLORS, runAppearance } from "@shared/takeoffMarks";
 import type { PageRect } from "@shared/planRegion";
 import type { PagePoint } from "@shared/takeoffGeometry";
 import type { RunPathType } from "@shared/takeoffQuantities";
@@ -2488,6 +2488,15 @@ export default function TakeoffPage({
     { enabled: Boolean(activeSheet) }
   );
   const { data: totals } = trpc.takeoffRuns.totals.useQuery({ bidId });
+  /*
+    Which colour each run type gets on THIS bid (T14): first used, first
+    coloured, so the first six never collide. Handed to everything that draws
+    or names a type — the drawing, the panel, the drops readout and the
+    picker — as a required prop, so none of them can fall back to a colour of
+    its own. In `refreshRuns` with every other run query.
+  */
+  const { data: runColors = NO_RUN_TYPE_COLORS } =
+    trpc.takeoffRuns.typeColors.useQuery({ bidId });
 
   /**
    * Why tracing is off, in the words a disabled button needs.
@@ -2528,6 +2537,8 @@ export default function TakeoffPage({
       drop mutation, for the reason above.
     */
     void utils.takeoffRuns.drops.invalidate({ bidId });
+    // Per BID: a type's first run on any sheet decides its colour on all.
+    void utils.takeoffRuns.typeColors.invalidate({ bidId });
   }, [utils, activeSheet?.id, bidId]);
 
   const { data: stamps = [] } = trpc.takeoffStamps.listForSheet.useQuery(
@@ -3302,13 +3313,13 @@ export default function TakeoffPage({
         ),
         // The colour it is already drawn in. A swatch that disagreed with the
         // line would be a legend teaching a code the drawing does not use.
-        systemColor: runAppearance({
+        systemColor: runAppearance(runColors, {
           runTypeId: run.runTypeId,
           pathType: run.pathType as "conduit" | "cable",
         }).color,
         location: run.location ?? null,
       })),
-    [runs]
+    [runs, runColors]
   );
 
   const present = useMemo(
@@ -3377,6 +3388,23 @@ export default function TakeoffPage({
     layeredStamps.length -
     visibleStamps.length +
     (layeredRuns.length - visibleRuns.length);
+
+  /**
+   * "Hide other runs" (T14): while a run is selected, the DRAWING shows only
+   * it — every leg, and its drops and tees with it. The panel keeps listing
+   * every run, so picking another is one click and the switch follows it.
+   * Nothing selected, or tracing, and everything is drawn: a switch that
+   * could leave the sheet blank with no run to explain why would read as
+   * lost work.
+   */
+  const [hideOtherRuns, setHideOtherRuns] = useState(false);
+  const drawnRuns = useMemo(() => {
+    if (!hideOtherRuns || tracing || selectedRunId === null) return visibleRuns;
+    const row = visibleRuns.find(r => r.id === selectedRunId);
+    if (!row) return visibleRuns;
+    const root = row.parentRunId ?? row.id;
+    return visibleRuns.filter(r => (r.parentRunId ?? r.id) === root);
+  }, [hideOtherRuns, tracing, selectedRunId, visibleRuns]);
 
   const stampGroups = useMemo(
     () =>
@@ -3465,8 +3493,14 @@ export default function TakeoffPage({
       // "traced", because this is the FLAT length and the panel two inches
       // away may already be showing a larger number with the drops added.
       // Two figures for the same run in the same second, one of them
-      // unlabelled, is the confusion this phase exists to remove.
-      toast.success(`Run finished — ${result.lengthFeet} ft traced.`),
+      // unlabelled, is the confusion this phase exists to remove. The WHOLE
+      // run's length, with its legs counted — the figure the panel's leg
+      // header shows (D20); it named only one leg until 2026-09-26.
+      toast.success(
+        result.legCount > 1
+          ? `Run finished — ${result.legCount} legs, ${result.runFeet} ft traced.`
+          : `Run finished — ${result.runFeet} ft traced.`
+      ),
     onSettled: refreshRuns,
   });
   const removeRun = trpc.takeoffRuns.remove.useMutation({
@@ -3543,7 +3577,8 @@ export default function TakeoffPage({
    */
   const dropMarkers = useMemo(() => {
     const out: DropMarker[] = [];
-    const shown = new Set(visibleRuns.map(run => run.id));
+    // What the drawing shows — so "Hide other runs" takes their drops too.
+    const shown = new Set(drawnRuns.map(run => run.id));
     quantityLegsByRoot.forEach(legs => {
       for (const row of quantityEndRows({
         legs,
@@ -3570,7 +3605,7 @@ export default function TakeoffPage({
     return out;
   }, [
     quantityLegsByRoot,
-    visibleRuns,
+    drawnRuns,
     traceEnds.endKind,
     heightsForBid,
     dropHeightOf,
@@ -4752,6 +4787,7 @@ export default function TakeoffPage({
               */}
               <RunTypePicker
                 pathType="conduit"
+                runColors={runColors}
                 types={runTypes.data ?? []}
                 armedId={armedRunType.conduit?.id ?? null}
                 onPick={type => armRunType("conduit", type, false)}
@@ -4805,6 +4841,7 @@ export default function TakeoffPage({
               </Button>
               <RunTypePicker
                 pathType="cable"
+                runColors={runColors}
                 types={runTypes.data ?? []}
                 armedId={armedRunType.cable?.id ?? null}
                 onPick={type => armRunType("cable", type, false)}
@@ -5284,7 +5321,8 @@ export default function TakeoffPage({
                       }
                       points={tracePoints}
                       onPointsChange={setTracePoints}
-                      existingRuns={visibleRuns}
+                      existingRuns={drawnRuns}
+                      runColors={runColors}
                       drops={dropMarkers}
                       onSelectDrop={drop => {
                         // Open the trace's leg in the panel, with this drop
@@ -5376,6 +5414,9 @@ export default function TakeoffPage({
             }
           >
             <RunsPanel
+              runColors={runColors}
+              hideOtherRuns={hideOtherRuns}
+              onToggleHideOtherRuns={() => setHideOtherRuns(on => !on)}
               onAddLeg={run => {
                 if (measurability?.ok === false) return;
                 addLegTo({ ...run, parentRunId: run.parentRunId ?? null });
@@ -5434,6 +5475,7 @@ export default function TakeoffPage({
                       </span>
                       <RunTypePicker
                         pathType={run.pathType}
+                        runColors={runColors}
                         types={runTypes.data ?? []}
                         armedId={run.runTypeId}
                         onPick={type =>
@@ -5682,6 +5724,7 @@ export default function TakeoffPage({
               dropsReadout={
                 <BidDropsReadout
                   bidId={bidId}
+                  runColors={runColors}
                   onJump={to => {
                     // Another sheet, maybe on another plan: open it first.
                     if (to.bidPdfId !== null && to.bidPdfId !== doc?.id)

@@ -24,7 +24,11 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CableIcon, ConduitIcon } from "@/components/takeoff/runIcons";
+import {
+  CableIcon,
+  ConduitIcon,
+  RunTypeSwatch,
+} from "@/components/takeoff/runIcons";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { InlineNumberField } from "@/components/InlineNumberField";
@@ -35,7 +39,7 @@ import {
   nextCircuitName,
   suggestAfter,
 } from "@/lib/runCircuits";
-import { runAppearance } from "@shared/takeoffMarks";
+import { runAppearance, type RunTypeColors } from "@shared/takeoffMarks";
 import type { RunQuantities, totalQuantities } from "@shared/takeoffQuantities";
 import { verticalsNotice } from "@shared/takeoffHeights";
 import { FITTING_KIND_LABELS, type FittingKind } from "@shared/runFittings";
@@ -519,6 +523,8 @@ function fittingLabel(role: FittingKind): string {
 export type RunTypeBridgeEntry = {
   runTypeId: number;
   label: string;
+  /** For the swatch: the line style this type is drawn in. */
+  pathType: "conduit" | "cable";
   rows: RunTypeBridgeRow[];
   /** Conduit types only; empty on a cable type. */
   fittings: RunTypeBridgeFitting[];
@@ -568,8 +574,19 @@ export function RunsPanel({
   onUndoPullPoint,
   pullPointBusy = false,
   onAddLeg,
+  runColors,
+  hideOtherRuns,
+  onToggleHideOtherRuns,
 }: {
   runs: PanelRun[];
+  /** Which colour each run type gets on this bid — `takeoffRuns.typeColors`. */
+  runColors: RunTypeColors;
+  /**
+   * "Hide other runs" (T14) — the drawing shows only the selected run. The
+   * switch sits on the selected run, because that is what it is about.
+   */
+  hideOtherRuns: boolean;
+  onToggleHideOtherRuns: () => void;
   /**
    * Start tracing another leg of this run (D20) — a branch off it, or a
    * separate stretch of it. Optional: without it the panel offers none.
@@ -963,7 +980,16 @@ export function RunsPanel({
               const busy = sendingRunTypeId === entry.runTypeId;
               return (
                 <div key={entry.runTypeId} className="px-3 pb-2.5">
-                  <p className="text-xs font-medium truncate">{entry.label}</p>
+                  {/* The type's swatch, so this block — and the route /
+                      quantity split under it — names its lines on sight. */}
+                  <p className="flex items-center gap-1.5 text-xs font-medium min-w-0">
+                    <RunTypeSwatch
+                      runTypeId={entry.runTypeId}
+                      pathType={entry.pathType}
+                      colors={runColors}
+                    />
+                    <span className="truncate">{entry.label}</span>
+                  </p>
                   <div className="mt-1 space-y-0.5">
                     {entry.rows.map(row => (
                       <div key={row.role}>
@@ -1277,12 +1303,12 @@ export function RunsPanel({
                     {run.pathType === "conduit" ? (
                       <ConduitIcon
                         className="w-3.5 h-3.5 mt-0.5 shrink-0"
-                        style={{ color: runAppearance(run).color }}
+                        style={{ color: runAppearance(runColors, run).color }}
                       />
                     ) : (
                       <CableIcon
                         className="w-3.5 h-3.5 mt-0.5 shrink-0"
-                        style={{ color: runAppearance(run).color }}
+                        style={{ color: runAppearance(runColors, run).color }}
                       />
                     )}
                     <div className="flex-1 min-w-0">
@@ -1769,6 +1795,33 @@ export function RunsPanel({
                   only on the open run: nine controls on every row is a panel
                   people stop reading.
                 */}
+                  {/*
+                    HIDE OTHER RUNS (T14). On the open run, because the
+                    switch is about it; it stays on as you pick another run,
+                    and the drawing shows everything again the moment nothing
+                    is selected. Only offered when there IS another run.
+                  */}
+                  {isSelected &&
+                    runs.some(
+                      other =>
+                        (other.parentRunId ?? other.id) !==
+                        (run.parentRunId ?? run.id)
+                    ) && (
+                      <button
+                        type="button"
+                        className="mt-1.5 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                        aria-pressed={hideOtherRuns}
+                        onClick={e => {
+                          e.stopPropagation();
+                          onToggleHideOtherRuns();
+                        }}
+                      >
+                        {hideOtherRuns
+                          ? "Show all runs on the drawing"
+                          : "Hide other runs on the drawing"}
+                      </button>
+                    )}
+
                   {isSelected && renderRunType && !run.isSuggestion && (
                     <div
                       className="mt-2 pt-2 border-t border-border/60"
