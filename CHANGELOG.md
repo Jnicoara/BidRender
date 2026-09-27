@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **A second way to trace: Quantity.** While tracing, a Route | Quantity
+  switch sits beside the ends pickers. A quantity trace is just footage of
+  the armed type — "how much 3/4" EMT is on this sheet" — in as many legs as
+  you like, with no ends to answer, no circuits to set and no branch-wiring
+  question. Its wire comes straight from the type. It lands on the same bid
+  line as route runs of the same type, and the totals say plainly that its
+  drops are not included. Any run can be switched either way from its row,
+  and nothing is lost when you do.
 - **A traced run can now have more than one leg — usually a branch.** While
   tracing, press "New leg" (or Shift-click) and the next click starts another
   leg of the same run. Start it on the run and it becomes a branch: a box is

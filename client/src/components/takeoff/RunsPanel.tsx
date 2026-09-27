@@ -40,6 +40,7 @@ import type { RunQuantities, totalQuantities } from "@shared/takeoffQuantities";
 import { verticalsNotice } from "@shared/takeoffHeights";
 import { FITTING_KIND_LABELS, type FittingKind } from "@shared/runFittings";
 import { fittingRowSpeaks } from "@shared/runFittingMaterials";
+import type { TraceMode } from "@shared/traceMode";
 
 /**
  * One run's bends and pull points, as the server works them out
@@ -310,6 +311,11 @@ export type PanelRun = {
   /** The tee each end sits on, if any. */
   startTee?: { id: number } | null;
   endTee?: { id: number } | null;
+  /**
+   * Route or quantity (D21). A quantity trace shows no circuits, no ends and
+   * no D18 question; its wire comes from the type and its drops are proposed.
+   */
+  traceMode: TraceMode;
 };
 
 const feet = (value: number) =>
@@ -527,6 +533,7 @@ export type RunTypeBridgeEntry = {
 export function RunsPanel({
   runs,
   totals,
+  onSetTraceMode,
   selectedRunId,
   onSelectRun,
   onRemoveRun,
@@ -640,7 +647,14 @@ export function RunsPanel({
    * screen CHOOSES to render, and this component still chooses. It is about
    * what it is allowed to see.
    */
-  totals: ReturnType<typeof totalQuantities> | undefined;
+  totals:
+    | (ReturnType<typeof totalQuantities> & {
+        /** Quantity traces on the bid (D21): how many, and ends with no drop. */
+        quantity?: { traceCount: number; openEnds: number };
+      })
+    | undefined;
+  /** Switch a run between route and quantity (D21) — root and legs. */
+  onSetTraceMode?: (runId: number, mode: TraceMode) => void;
   selectedRunId: number | null;
   onSelectRun: (id: number | null) => void;
   onRemoveRun: (id: number) => void;
@@ -1250,7 +1264,18 @@ export function RunsPanel({
                           {run.endsName}
                         </p>
                       )}
-                      {multi && (
+                      {/*
+                        A quantity trace's legs have no tees and no circuits
+                        of their own (D21), so the route wording — "from a
+                        tee", "circuits differ" — would describe things that
+                        are not there. Just the leg.
+                      */}
+                      {multi && run.traceMode === "quantity" && (
+                        <p className="text-[0.7rem] text-muted-foreground truncate">
+                          Leg {place.index}
+                        </p>
+                      )}
+                      {multi && run.traceMode !== "quantity" && (
                         <p className="text-[0.7rem] text-muted-foreground truncate">
                           Leg {place.index}
                           {place.startsAs === "branch"
@@ -1313,6 +1338,20 @@ export function RunsPanel({
                         );
                       })()}
                       <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        {/*
+                          Said on the row, once per run, because it changes how
+                          every number under it is read: flat, one bucket, no
+                          ends. On the first leg only, like the leg header.
+                        */}
+                        {run.traceMode === "quantity" && place.index === 1 && (
+                          <Badge
+                            variant="outline"
+                            className="text-[0.65rem] px-1.5 py-0 text-muted-foreground"
+                            title="Flat footage of this type — no ends, no circuits. Drops are proposed, never assumed."
+                          >
+                            Quantity
+                          </Badge>
+                        )}
                         {run.isSuggestion && (
                           <Badge
                             variant="outline"
@@ -1460,23 +1499,24 @@ export function RunsPanel({
                   than the row quietly showing less, and reversible in one tap —
                   an answer nobody can change is a trap, not a decision.
                 */}
-                  {run.branchWiring === true && (
-                    <p className="text-[0.7rem] text-muted-foreground mt-1.5">
-                      Branch wiring — your devices already include this cable,
-                      so it is not counted again.{" "}
-                      {onAnswerBranchWiring && (
-                        <button
-                          className="underline hover:text-foreground"
-                          onClick={e => {
-                            e.stopPropagation();
-                            onAnswerBranchWiring(run.id, null);
-                          }}
-                        >
-                          Change
-                        </button>
-                      )}
-                    </p>
-                  )}
+                  {run.branchWiring === true &&
+                    run.traceMode !== "quantity" && (
+                      <p className="text-[0.7rem] text-muted-foreground mt-1.5">
+                        Branch wiring — your devices already include this cable,
+                        so it is not counted again.{" "}
+                        {onAnswerBranchWiring && (
+                          <button
+                            className="underline hover:text-foreground"
+                            onClick={e => {
+                              e.stopPropagation();
+                              onAnswerBranchWiring(run.id, null);
+                            }}
+                          >
+                            Change
+                          </button>
+                        )}
+                      </p>
+                    )}
 
                   {/* A run that cannot be measured says so instead of showing 0 */}
                   {run.quantities === null ? (
@@ -1525,7 +1565,42 @@ export function RunsPanel({
                       work, which the branch-wiring guard above refuses to do
                       for the same reason.
                     */}
+                      {/*
+                        A QUANTITY trace's wire is its TYPE's (D21): one
+                        circuit of the type's conductors, read live, with no
+                        circuit rows to add or edit. So no "Add wires" — the
+                        way to change it is the type — and a type that says
+                        no wire says so rather than showing a zero.
+                      */}
                       {run.pathType === "conduit" &&
+                        run.traceMode === "quantity" &&
+                        (run.quantities.totalWireFeet > 0 ? (
+                          <Footage
+                            label={
+                              <>
+                                Wire
+                                <span className="text-muted-foreground/60">
+                                  {" "}
+                                  (from the type)
+                                </span>
+                              </>
+                            }
+                            flat={wireFlat(run)}
+                            vertical={wireVertical(run)}
+                            total={run.quantities.totalWireFeet}
+                          />
+                        ) : (
+                          <div className="flex items-baseline justify-between text-xs gap-2">
+                            <span className="text-muted-foreground shrink-0">
+                              Wires in this pipe
+                            </span>
+                            <span className="font-mono text-muted-foreground/70">
+                              none — the type says no wire
+                            </span>
+                          </div>
+                        ))}
+                      {run.pathType === "conduit" &&
+                        run.traceMode !== "quantity" &&
                         (run.circuits.length === 0 ? (
                           <div className="flex items-baseline justify-between text-xs gap-2">
                             <span className="text-muted-foreground shrink-0">
@@ -1661,6 +1736,42 @@ export function RunsPanel({
                     </div>
                   )}
 
+                  {/*
+                    ROUTE OR QUANTITY, and the way across (D21, answer 5).
+                    Both directions, nothing deleted — so the sentence says
+                    what the other side will do rather than warning about a
+                    loss that does not happen.
+                  */}
+                  {isSelected && onSetTraceMode && !run.isSuggestion && (
+                    <p
+                      className="mt-2 text-[0.7rem] text-muted-foreground"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {run.traceMode === "quantity"
+                        ? "Quantity trace — flat footage of this type, no ends or circuits. "
+                        : "Route — ends, drops and circuits. "}
+                      <button
+                        type="button"
+                        className="underline hover:text-foreground"
+                        onClick={() =>
+                          onSetTraceMode(
+                            run.id,
+                            run.traceMode === "quantity" ? "route" : "quantity"
+                          )
+                        }
+                        title={
+                          run.traceMode === "quantity"
+                            ? "Its ends become questions again, and each leg gets the type's wires as a circuit. Nothing is deleted."
+                            : "Its ends, circuits and answers are kept and set aside, and come back if you switch again."
+                        }
+                      >
+                        {run.traceMode === "quantity"
+                          ? "Make it a route"
+                          : "Count as quantity"}
+                      </button>
+                    </p>
+                  )}
+
                   {isSelected && renderRunEnds && !run.isSuggestion && (
                     <div onClick={e => e.stopPropagation()}>
                       {renderRunEnds(run)}
@@ -1685,35 +1796,38 @@ export function RunsPanel({
                       </div>
                     )}
 
-                  {/* Circuits, only for conduit and only when this run is open */}
-                  {isSelected && run.pathType === "conduit" && (
-                    <div
-                      className="mt-2 pt-2 border-t border-border/60 space-y-1.5"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      {run.circuits.map(circuit => (
-                        <div
-                          key={circuit.id}
-                          className="flex items-center gap-1.5"
-                        >
-                          <span className="text-xs flex-1 min-w-0 truncate">
-                            {circuit.name}
-                          </span>
-                          <InlineNumberField
-                            value={circuit.conductorCount}
-                            onSave={next =>
-                              onUpdateCircuit(circuit.id, {
-                                conductorCount: next,
-                              })
-                            }
-                            rules={{ min: 1, max: 60 }}
-                            className="h-6 w-12 text-xs"
-                            ariaLabel={`Conductors for ${circuit.name}`}
-                          />
-                          <span className="text-[0.7rem] text-muted-foreground">
-                            cond.
-                          </span>
-                          {/*
+                  {/* Circuits, only for conduit and only when this run is open.
+                    Not on a quantity trace, whose wire is its type's (D21). */}
+                  {isSelected &&
+                    run.pathType === "conduit" &&
+                    run.traceMode !== "quantity" && (
+                      <div
+                        className="mt-2 pt-2 border-t border-border/60 space-y-1.5"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {run.circuits.map(circuit => (
+                          <div
+                            key={circuit.id}
+                            className="flex items-center gap-1.5"
+                          >
+                            <span className="text-xs flex-1 min-w-0 truncate">
+                              {circuit.name}
+                            </span>
+                            <InlineNumberField
+                              value={circuit.conductorCount}
+                              onSave={next =>
+                                onUpdateCircuit(circuit.id, {
+                                  conductorCount: next,
+                                })
+                              }
+                              rules={{ min: 1, max: 60 }}
+                              className="h-6 w-12 text-xs"
+                              ariaLabel={`Conductors for ${circuit.name}`}
+                            />
+                            <span className="text-[0.7rem] text-muted-foreground">
+                              cond.
+                            </span>
+                            {/*
                           The ground, and the reason it is nullable here.
 
                           This is the first place a person types a ground on a
@@ -1725,17 +1839,19 @@ export function RunsPanel({
                           for, in the field that decides how much bare copper
                           gets bought.
                         */}
-                          <InlineNumberField
-                            value={circuit.groundCount}
-                            whenUnset={{ placeholder: "?" }}
-                            onSave={next =>
-                              onUpdateCircuit(circuit.id, { groundCount: next })
-                            }
-                            rules={{ min: 0, max: 10 }}
-                            className="h-6 w-10 text-xs"
-                            ariaLabel={`Grounds for ${circuit.name}`}
-                          />
-                          {/*
+                            <InlineNumberField
+                              value={circuit.groundCount}
+                              whenUnset={{ placeholder: "?" }}
+                              onSave={next =>
+                                onUpdateCircuit(circuit.id, {
+                                  groundCount: next,
+                                })
+                              }
+                              rules={{ min: 0, max: 10 }}
+                              className="h-6 w-10 text-xs"
+                              ariaLabel={`Grounds for ${circuit.name}`}
+                            />
+                            {/*
                           SHARED OR ITS OWN — a toggle, not a checkbox buried
                           in a dialog, because it moves a wire quantity.
 
@@ -1744,105 +1860,105 @@ export function RunsPanel({
                           the exception and says so, in the accent colour, at
                           the point where the run's ground line will change.
                         */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              onUpdateCircuit(circuit.id, {
-                                separateGround: !circuit.separateGround,
-                              })
-                            }
-                            className={cn(
-                              "text-[0.7rem] rounded px-1 py-0.5 border transition-colors",
-                              circuit.separateGround
-                                ? "border-[#F5C518]/60 text-[#F5C518]"
-                                : // Dotted underline at rest, because at 11px a
-                                  // bare word beside "cond." reads as a label
-                                  // and nobody would find the isolated-ground
-                                  // option. It changes a wire quantity, so it
-                                  // has to look like something you can press.
-                                  "border-transparent text-muted-foreground underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 hover:text-foreground hover:border-border"
-                            )}
-                            title={
-                              circuit.separateGround
-                                ? "This circuit pulls its own ground. Click to share the run's."
-                                : "This circuit shares the run's ground. Click to give it its own."
-                            }
-                            aria-pressed={circuit.separateGround}
-                            aria-label={`Ground for ${circuit.name}: ${
-                              circuit.separateGround ? "its own" : "shared"
-                            }`}
-                          >
-                            {circuit.separateGround ? "own gnd." : "gnd."}
-                          </button>
-                          <span className="text-[0.7rem] font-mono text-muted-foreground w-16 text-right">
-                            {run.quantities
-                              ? feet(
-                                  run.quantities.wireByCircuit.find(
-                                    w => w.name === circuit.name
-                                  )?.feet ?? 0
-                                )
-                              : "—"}
-                          </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onUpdateCircuit(circuit.id, {
+                                  separateGround: !circuit.separateGround,
+                                })
+                              }
+                              className={cn(
+                                "text-[0.7rem] rounded px-1 py-0.5 border transition-colors",
+                                circuit.separateGround
+                                  ? "border-[#F5C518]/60 text-[#F5C518]"
+                                  : // Dotted underline at rest, because at 11px a
+                                    // bare word beside "cond." reads as a label
+                                    // and nobody would find the isolated-ground
+                                    // option. It changes a wire quantity, so it
+                                    // has to look like something you can press.
+                                    "border-transparent text-muted-foreground underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 hover:text-foreground hover:border-border"
+                              )}
+                              title={
+                                circuit.separateGround
+                                  ? "This circuit pulls its own ground. Click to share the run's."
+                                  : "This circuit shares the run's ground. Click to give it its own."
+                              }
+                              aria-pressed={circuit.separateGround}
+                              aria-label={`Ground for ${circuit.name}: ${
+                                circuit.separateGround ? "its own" : "shared"
+                              }`}
+                            >
+                              {circuit.separateGround ? "own gnd." : "gnd."}
+                            </button>
+                            <span className="text-[0.7rem] font-mono text-muted-foreground w-16 text-right">
+                              {run.quantities
+                                ? feet(
+                                    run.quantities.wireByCircuit.find(
+                                      w => w.name === circuit.name
+                                    )?.feet ?? 0
+                                  )
+                                : "—"}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+                              onClick={() => onRemoveCircuit(circuit.id)}
+                              aria-label={`Remove ${circuit.name}`}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ))}
+
+                        {addingTo === run.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              value={circuitName}
+                              onChange={e => setCircuitName(e.target.value)}
+                              onFocus={selectOnFocus}
+                              onKeyDown={e => {
+                                if (e.key === "Enter" && circuitName.trim()) {
+                                  addOneCircuit(run, circuitName.trim());
+                                }
+                                if (e.key === "Escape") {
+                                  setAddingTo(null);
+                                  setCircuitName("");
+                                }
+                              }}
+                              placeholder="Ckt 12"
+                              className="h-6 text-xs flex-1"
+                              autoFocus
+                            />
+                            <Button
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => {
+                                if (!circuitName.trim()) return;
+                                addOneCircuit(run, circuitName.trim());
+                              }}
+                            >
+                              Add
+                            </Button>
+                          </div>
+                        ) : (
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-                            onClick={() => onRemoveCircuit(circuit.id)}
-                            aria-label={`Remove ${circuit.name}`}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      ))}
-
-                      {addingTo === run.id ? (
-                        <div className="flex items-center gap-1.5">
-                          <Input
-                            value={circuitName}
-                            onChange={e => setCircuitName(e.target.value)}
-                            onFocus={selectOnFocus}
-                            onKeyDown={e => {
-                              if (e.key === "Enter" && circuitName.trim()) {
-                                addOneCircuit(run, circuitName.trim());
-                              }
-                              if (e.key === "Escape") {
-                                setAddingTo(null);
-                                setCircuitName("");
-                              }
-                            }}
-                            placeholder="Ckt 12"
-                            className="h-6 text-xs flex-1"
-                            autoFocus
-                          />
-                          <Button
-                            size="sm"
-                            className="h-6 px-2 text-xs"
+                            className="h-6 gap-1 text-xs text-muted-foreground"
                             onClick={() => {
-                              if (!circuitName.trim()) return;
-                              addOneCircuit(run, circuitName.trim());
+                              setAddingTo(run.id);
+                              setCircuitName(nextCircuitName(run.circuits));
                             }}
                           >
-                            Add
+                            <Plus className="w-3 h-3" />{" "}
+                            {run.circuits.length === 0
+                              ? "Add wires to this run"
+                              : "Add another circuit"}
                           </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 gap-1 text-xs text-muted-foreground"
-                          onClick={() => {
-                            setAddingTo(run.id);
-                            setCircuitName(nextCircuitName(run.circuits));
-                          }}
-                        >
-                          <Plus className="w-3 h-3" />{" "}
-                          {run.circuits.length === 0
-                            ? "Add wires to this run"
-                            : "Add another circuit"}
-                        </Button>
-                      )}
+                        )}
 
-                      {/*
+                        {/*
                       WHAT THE GROUND ACTUALLY COMES TO, said out loud.
 
                       The sharing rule is invisible from the circuit rows: two
@@ -1856,22 +1972,23 @@ export function RunsPanel({
                       the bid takes — not recomputed here, so the line and the
                       bid cannot disagree.
                     */}
-                      {run.circuits.length > 0 && run.quantities && (
-                        <div className="flex items-baseline justify-between text-[0.7rem] gap-2 pt-0.5">
-                          <span className="text-muted-foreground/70">
-                            {groundSentence(
-                              run.quantities.grounds,
-                              run.circuits.filter(c => !c.separateGround).length
-                            )}
-                          </span>
-                          <span className="font-mono text-muted-foreground/70 shrink-0">
-                            {feet(run.quantities.groundFeet)}
-                          </span>
-                        </div>
-                      )}
+                        {run.circuits.length > 0 && run.quantities && (
+                          <div className="flex items-baseline justify-between text-[0.7rem] gap-2 pt-0.5">
+                            <span className="text-muted-foreground/70">
+                              {groundSentence(
+                                run.quantities.grounds,
+                                run.circuits.filter(c => !c.separateGround)
+                                  .length
+                              )}
+                            </span>
+                            <span className="font-mono text-muted-foreground/70 shrink-0">
+                              {feet(run.quantities.groundFeet)}
+                            </span>
+                          </div>
+                        )}
 
-                      <p className="text-[0.7rem] text-muted-foreground/70">
-                        {/*
+                        <p className="text-[0.7rem] text-muted-foreground/70">
+                          {/*
                         BOTH RULES, because they are now different and the
                         line above states the one that surprises people.
 
@@ -1881,12 +1998,12 @@ export function RunsPanel({
                         "1 ground shared by 2 circuits" it reads as a
                         contradiction — so it says which is which.
                       */}
-                        {run.circuits.length === 0
-                          ? "No wires in this pipe yet — an empty conduit counts pipe and no wire."
-                          : "Each circuit pulls its own wire down this one conduit. They share one ground, sized to the largest — unless you give one its own."}
-                      </p>
-                    </div>
-                  )}
+                          {run.circuits.length === 0
+                            ? "No wires in this pipe yet — an empty conduit counts pipe and no wire."
+                            : "Each circuit pulls its own wire down this one conduit. They share one ground, sized to the largest — unless you give one its own."}
+                        </p>
+                      </div>
+                    )}
 
                   {isSelected &&
                     (run.status === "draft" || run.isSuggestion) && (
@@ -1971,6 +2088,18 @@ export function RunsPanel({
               totals.wireVerticalFeet === 0
                 ? `No vertical footage is in these numbers. ${totals.flatOnlyCount} run${totals.flatOnlyCount === 1 ? " is" : "s are"} counted flat only.`
                 : `${totals.flatOnlyCount} run${totals.flatOnlyCount === 1 ? " is" : "s are"} counted flat only — no drop or rise on ${totals.flatOnlyCount === 1 ? "it" : "them"}.`}
+            </p>
+          )}
+          {/*
+            QUANTITY TRACES (D21) — flat by choice, so not in the line above,
+            and said here in its own words: none of their drops are in these
+            numbers until approved. Only while ends are waiting; once every
+            end is answered there is nothing left out to say.
+          */}
+          {(totals.quantity?.openEnds ?? 0) > 0 && (
+            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+              {`Quantity traces are flat footage only — no drops are in these numbers for ${totals.quantity!.openEnds} leg end${totals.quantity!.openEnds === 1 ? "" : "s"}. Open a quantity trace to add them.`}
             </p>
           )}
           {/*

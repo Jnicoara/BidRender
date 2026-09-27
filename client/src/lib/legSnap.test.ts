@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { legSnapLabel, resolveLegStart } from "./legSnap";
+import { legSnapLabel, quantitySnap, resolveLegStart } from "./legSnap";
 
 // A main east along y=0, then south. Tolerance 5 page points.
 const MAIN = {
@@ -102,5 +102,26 @@ describe("where a new leg starts", () => {
     expect(legSnapLabel(snap({ x: 150, y: 40 }))).toBe(
       "New start — not joined to the run"
     );
+  });
+});
+
+describe("the same snap on a quantity trace (D21)", () => {
+  it("joins the trace with no tee, at the same snapped point", () => {
+    const joined = quantitySnap(snap({ x: 150, y: 3 }));
+    expect(joined).toEqual({
+      kind: "free",
+      point: { x: 150, y: 0 },
+      joined: true,
+    });
+    expect(legSnapLabel(joined)).toBe("Joins the trace here — no box, no drop");
+  });
+
+  it("does not claim a mark, and leaves a free start alone", () => {
+    const onMark = quantitySnap(
+      snap({ x: 700, y: 700 }, { stamps: [{ id: 5, x: 701, y: 700 }] })
+    );
+    expect(onMark).toEqual({ kind: "free", point: { x: 701, y: 700 } });
+    const free = snap({ x: 900, y: 900 });
+    expect(quantitySnap(free)).toBe(free);
   });
 });

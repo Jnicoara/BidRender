@@ -129,6 +129,7 @@ export function TraceEndsPickers({
   bidId,
   value,
   onChange,
+  quantity = false,
 }: {
   bidId: number;
   value: { startKind: string | null; endKind: string | null };
@@ -136,7 +137,26 @@ export function TraceEndsPickers({
     startKind: string | null;
     endKind: string | null;
   }) => void;
+  /**
+   * A quantity trace (D21) has no ends to answer. The "to" picker stays,
+   * relabelled, because it is what a proposed drop defaults to (answer 4) —
+   * the same remembered value, so switching modes changes nothing about it.
+   */
+  quantity?: boolean;
 }) {
+  if (quantity)
+    return (
+      <div className="flex items-center gap-1.5 text-xs">
+        <span className="text-muted-foreground">Drops to</span>
+        <EndKindSelect
+          bidId={bidId}
+          value={value.endKind}
+          onChange={endKind => onChange({ ...value, endKind })}
+          ariaLabel="What a proposed drop goes to"
+          className="h-7 w-36 text-xs"
+        />
+      </div>
+    );
   return (
     <div className="flex items-center gap-1.5 text-xs">
       <span className="text-muted-foreground">From</span>
