@@ -312,8 +312,9 @@ describe("alias hygiene across the whole catalog", () => {
       "250-350 kcmil crimp lug",
       // Added 2026-09-26: single sizes, because above 350 kcmil that is how
       // a compression lug is sold (sources in connectors.ts). The 500 has a
-      // qualifier because "500 kcmil crimp lug" is a retired name.
-      "400 kcmil crimp lug",
+      // qualifier because "500 kcmil crimp lug" is a retired name, and the
+      // 400 was renamed to match it.
+      "400 kcmil crimp lug, single size",
       "500 kcmil crimp lug, single size",
     ]);
   });

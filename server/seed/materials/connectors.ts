@@ -112,9 +112,13 @@ const LUG_RANGES: Array<{
     found sells a "350-500" lug, and inventing one is the fault the ranges
     above were introduced to remove.
 
+    Renamed the same day from "400 kcmil crimp lug" to carry ", single size"
+    like the 500 below (owner). Through RENAMED_BASELINE_MATERIALS, so the
+    row keeps its id and the old name still finds it.
   */
   {
     range: "400 kcmil",
+    qualifier: "single size",
     slang: "400 mcm kcmil feeder service large",
     description:
       "Sized for one conductor, 400 kcmil — sold per size, not by range.",

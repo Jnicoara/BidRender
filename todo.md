@@ -40,10 +40,23 @@ left as written rather than rewritten to match the rename.
       Needs a way to say "this is our example price, not yours": a column, or
       comparing against the seed value. **Blocks the upload, not the sheet.**
 
-- [x] **400 kcmil lug ADDED 2026-09-26 (Track B)** — "400 kcmil crimp lug",
-      a single size, because above 350 kcmil a compression lug is sold per
-      conductor size (Crescent Electric, Platt/Ilsco CLWS-400-38, Graybar
-      Burndy YA32 series; no supplier found sells a "350-500" span).
+- [x] **400 kcmil lug ADDED 2026-09-26 (Track B)** — a single size, because
+      above 350 kcmil a compression lug is sold per conductor size (Crescent
+      Electric, Platt/Ilsco CLWS-400-38, Graybar Burndy YA32 series; no
+      supplier found sells a "350-500" span). Renamed the same day to "400
+      kcmil crimp lug, single size" to match the 500, through
+      `RENAMED_BASELINE_MATERIALS` — same row id, old name still finds it.
+- [ ] **A $0 part inside an assembly that has LABOR is not flagged on the
+      bid line.** Checked 2026-09-26 with the new lugs: an assembly line of
+      two lugs and 0.5 h reads "$25.00" — the labor — with nothing saying the
+      lugs in it are unpriced, because `lineNotPriced` calls an assembly line
+      unpriced only when its WHOLE cost is $0 (so a labor-only assembly is
+      not flagged). True of every $0 catalog part, not only lugs. The
+      catalog itself storing $0 is right (`costPerUnit` is NOT NULL DEFAULT 0
+      and CLAUDE.md § Materials ships $0 on purpose); the open question is
+      only what the bid LINE says. Owner's call: e.g. flag an assembly line
+      whose snapshot material cost is $0 while its recipe has materials, which
+      needs the recipe's material count on the line.
 - [x] **500 kcmil lug ADDED 2026-09-26 (Track B) as "500 kcmil crimp lug,
       single size".** A common part (Graybar and Lowe's stock Burndy's YA34
       series). Owner's decision: a NEW name, same pattern, one size — because

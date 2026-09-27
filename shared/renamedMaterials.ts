@@ -153,6 +153,11 @@ export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
       ])
     )
   ),
+  // Single-size lugs name their size as such (owner, 2026-09-26), matching
+  // "500 kcmil crimp lug, single size" — which took the qualifier because the
+  // plain 500 name is retired. Never deployed under the old name, but local
+  // and test databases hold the row, and a rename here keeps its id there.
+  "400 kcmil crimp lug": "400 kcmil crimp lug, single size",
 };
 
 /** An old spelling, normalised the way search ranking compares names. */

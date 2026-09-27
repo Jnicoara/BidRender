@@ -8,8 +8,8 @@ This is the human-readable companion to the git history — read this to see wha
 
 - **The catalog now has 400 and 500 kcmil lugs**, for the 400 and 500 kcmil
   wire it already shipped. Each is one size rather than a range, because that
-  is how supply houses sell lugs that large. The 500 is listed as "500 kcmil
-  crimp lug, single size".
+  is how supply houses sell lugs that large, and both names say so ("400 kcmil
+  crimp lug, single size"). Searching the shorter name still finds them.
 - **Bid totals now say how many lines they leave out.** Where a total used to
   show a bare figure, it now reads like "$4,210.00 + 4 lines not priced" — on
   Materials, Direct cost and Bid price, on the bid screen and the Count screen
