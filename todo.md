@@ -1332,7 +1332,8 @@ path is ever revived, give it the same treatment first.
 - [ ] **Pieces 4 and 5 — route A/B, the combined number, the blended markup.** Not started. The bid screen shows a "Material markup" row and "Profit 15% markup = 13% margin"; the combined effective margin and the blended material markup are still to come.
 - [ ] **A per-LINE markup override on one bid.** Not in any piece yet. The item override is company-wide; the "one-way door" rule in CLAUDE.md says anything from the library can be overridden on one job. Wants a nullable column beside `snapshotMarkupPct` and a field on the line.
 - [ ] **Re-apply on a line from before markup rules reads its parts from TODAY's links** — its assembly's current recipe, or the material its run type names now — because such a line stored no composition. After one re-apply it stores its parts like any other line. A line priced from a material by hand (bidsRouter `priceLineFrom`) that predates markup has no link to that material at all, and re-applies at the company default.
-- [ ] **Dashboard vs bid screen still differ on a bid whose plan quantities moved since they were sent** (bid 1164558 in the local copy: card $192.58, bid $378.15). Not markup: three of its lines are traced-run lines STORED at 0 ft, which the bid screen resolves live from the drawing (`getBidLineItems` → `withPlanCounts`) and the dashboard's SQL reads as stored. Checked 2026-09-25 against the rows. Found by the same before/after dump that found the marked-up-expense gap. Pre-existing; not fixed.
+- [ ] **Dashboard vs bid screen still differ on a bid whose plan quantities moved since they were sent** (bid 1164558 in the local copy: card $192.58, bid $378.15). Not markup: three of its lines are traced-run lines STORED at 0 ft, which the bid screen resolves live from the drawing (`getBidLineItems` → `withPlanCounts`) and the dashboard's SQL reads as stored. Checked 2026-09-25 against the rows. Found by the same before/after dump that found the marked-up-expense gap. Pre-existing; not fixed. **Since 2026-09-26 it also moves the card's "N lines not priced"** — the SQL decides with the stored qty (see `server/dashboardNotPriced.test.ts`, which locks its bids to test the rule apart from this).
+- [ ] **"Find a bid" and the archive read a bid's price SHORT by its marked-up charges.** Found 2026-09-26 comparing every local bid's card with its search row: "Markup check" is $452.57 on the dashboard card and the bid screen, $302.57 in search. `bids.search` and `bids.archived` call `rollUpBid(bid, lines, company)` without the 4th `expenses` argument, so a marked-up permit is left out — the same gap fixed on the dashboard on 2026-09-25. The search comment says it prices "through the same rollup the dashboard uses, so ... cannot show different money", which is exactly what it does not do. Not fixed (outside the not-priced task).
 
 ## Lines that can't be priced (shared/linePricingProblems.ts, shipped 2026-09-26 as 88270df)
 
@@ -1648,7 +1649,22 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       `client/src/lib/notPricedTotal.ts`; the server count is
       `rollUpBid().notPricedCount`, through `countNotPriced`. Total due and
       Labor carry no suffix — not asked for.
-- [ ] **The DASHBOARD cards do not say it yet, and it needs a decision.**
+- [x] **BUILT 2026-09-26 (Track B), option (a): the dashboard cards say it
+      too** — "$378 + 3 lines not priced", lines and parts, through
+      `NotPricedTotal`. `lineNotPricedSql` in `server/db.ts` is the SQL copy,
+      and `server/dashboardNotPriced.test.ts` is the parity test: one bid per
+      branch of `lineNotPriced`, each counted both by the SQL and by
+      `rollUpBid` over `getRollupLines`, which must agree with each other and
+      with the written-out tally. Breaking the field-bend branch turns
+      exactly that case red. Parts: frozen counts are summed in the same
+      query; lines from before 0087 go through a second GROUP BY (bid,
+      assembly) and `liveUnpricedParts`, the reader the rollup uses too.
+      Looked at locally: all six of user 1's bids agree with "Find a bid".
+      **Still open, from "Dashboard vs bid screen still differ" above:** on an UNLOCKED bid whose traced
+      footage has moved since it was sent, the card reads run-type lines at
+      their stored qty, so it can count one as not priced that the bid screen
+      calls qty 0 (and the reverse). The suite locks its bids for that reason.
+      The question as it stood:
       `bids.dashboard` sums lines in SQL (`getDashboardBids`) rather than
       running `rollUpBid`, so counting unpriced lines there means writing
       `lineNotPriced` a second time in SQL — hand-priced blank vs typed 0,

@@ -314,6 +314,7 @@ export const bidsRouter = router({
         markedUpExpenses,
         totalHours,
         brokenLines,
+        notPriced,
         ...bid
       } = row;
       // The card's direct cost is the bid screen's: lines plus marked-up
@@ -337,6 +338,11 @@ export const bidsRouter = router({
          * no finite price. The card says so instead of showing a clean total.
          */
         incomplete: brokenLines > 0 || !priced,
+        /**
+         * "+ 3 lines, 1 part not priced" — what the price counts as $0
+         * because nobody priced it, the same tally the bid screen shows.
+         */
+        notPriced,
       };
     });
   }),

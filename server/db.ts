@@ -202,7 +202,7 @@ import {
   type SeatUsage,
 } from "../shared/seats";
 import { hourlyCostFor } from "../shared/laborRateLookup";
-import { unpricedPartsIn } from "../shared/lineNotPriced";
+import { unpricedPartsIn, type NotPricedTally } from "../shared/lineNotPriced";
 import { appliedModifiers } from "../shared/modifierLookup";
 import { resolveMaterial, materialIdsToFetch } from "../shared/materialLookup";
 import { resolveAssembly } from "../shared/assemblyLookup";
@@ -5607,20 +5607,34 @@ export async function withUnpricedParts<L extends BidLineItem>(
     if (line.assemblyId !== null && line.snapshotUnpricedParts === null)
       unfrozen.add(line.assemblyId);
   }
-  const live = new Map<number, number>();
-  await Promise.all(
-    Array.from(unfrozen, async assemblyId => {
-      const detail = await getAssemblyForStoredReference(assemblyId, userId);
-      // A deleted assembly has no recipe to read: nothing to admit to.
-      live.set(assemblyId, detail ? unpricedPartsIn(detail.materials) : 0);
-    })
-  );
+  const live = await liveUnpricedParts(unfrozen, userId);
   return lines.map(line => ({
     ...line,
     unpricedParts:
       line.snapshotUnpricedParts ??
       (line.assemblyId === null ? 0 : (live.get(line.assemblyId) ?? 0)),
   }));
+}
+
+/**
+ * How many $0 parts each of these assemblies' recipes holds NOW, for lines
+ * from before 0087. One read per assembly, resolved as a fresh add would
+ * resolve it. Shared by the rollup (`withUnpricedParts`) and the dashboard
+ * (`getDashboardBids`), so an old line cannot be read two different ways.
+ */
+async function liveUnpricedParts(
+  assemblyIds: Iterable<number>,
+  userId: number
+): Promise<Map<number, number>> {
+  const live = new Map<number, number>();
+  await Promise.all(
+    Array.from(new Set(assemblyIds), async assemblyId => {
+      const detail = await getAssemblyForStoredReference(assemblyId, userId);
+      // A deleted assembly has no recipe to read: nothing to admit to.
+      live.set(assemblyId, detail ? unpricedPartsIn(detail.materials) : 0);
+    })
+  );
+  return live;
 }
 
 /** A bid's lines, resolved for the rollup — what every pricing read loads. */
@@ -10189,20 +10203,73 @@ function lineHoursSql(productivityPct: number) {
  */
 const lineIsPriceable = sql`(${bidLineItems.qty} >= 0 AND ${bidLineItems.snapshotLaborRate} >= 0 AND COALESCE(${bidLineItems.snapshotLaborHours}, 0) >= 0 AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) >= 0 AND COALESCE(${bidLineItems.snapshotMarkupPct}, 0) >= 0)`;
 
+/**
+ * One line's material and labor, in cents, NOT gated on `lineIsPriceable` —
+ * the engine's per-line arithmetic. `costSums` gates them; the not-priced
+ * rule below needs them bare, because it asks about a priceable line's cost.
+ */
+function lineCentsSql(productivityPct: number) {
+  const hours = lineHoursSql(productivityPct);
+  // COALESCE for the reason lineHoursSql gives: an untyped price (drizzle/0074)
+  // must total as 0, not turn the whole line NULL and drop it from the sum.
+  return {
+    hours,
+    materialCents: sql`ROUND(COALESCE(${bidLineItems.snapshotMaterialCost}, 0) * 100) * ${bidLineItems.qty}`,
+    laborCents: sql`ROUND(${hours} * ${bidLineItems.qty} * ${bidLineItems.snapshotLaborRate} * 100)`,
+  };
+}
+
+/**
+ * Whether a line reads "Not priced" — `lineNotPriced` in
+ * shared/lineNotPriced.ts, as SQL, branch for branch:
+ *
+ *   • no quantity           → never
+ *   • priced by hand        → the price is blank (a typed 0 is an answer)
+ *   • from a run type       → a field bend: its hours are blank;
+ *                             anything else: its frozen material is $0
+ *   • from an assembly      → the engine can price it and its WHOLE direct
+ *                             cost is $0 (a labor-only assembly is priced)
+ *
+ * The same kind of duplication `costSums` is, kept honest the same way:
+ * `server/dashboardNotPriced.test.ts` counts one bid per branch both ways and
+ * asserts they agree. Change the rule there without changing it here and that
+ * suite goes red.
+ *
+ * FALSE, never NULL, for every row including the empty one a LEFT JOIN makes
+ * for a bid with no lines, so `NOT` of it is safe.
+ */
+function lineNotPricedSql(productivityPct: number) {
+  const { materialCents, laborCents } = lineCentsSql(productivityPct);
+  return sql`COALESCE(${bidLineItems.id} IS NOT NULL AND ${bidLineItems.qty} > 0 AND CASE
+    WHEN ${bidLineItems.assemblyId} IS NULL AND ${bidLineItems.takeoffRunTypeId} IS NULL
+      THEN ${bidLineItems.snapshotMaterialCost} IS NULL
+    WHEN ${bidLineItems.takeoffRunTypeId} IS NOT NULL THEN
+      CASE WHEN ${bidLineItems.runMaterialRole} <=> 'fieldBend'
+        THEN ${bidLineItems.snapshotLaborHours} IS NULL
+        ELSE ${bidLineItems.snapshotMaterialCost} IS NULL OR ${bidLineItems.snapshotMaterialCost} = 0
+      END
+    ELSE ${lineIsPriceable} AND ROUND(${materialCents} + ${laborCents}) = 0
+  END, FALSE)`;
+}
+
+/**
+ * Whether a line's unpriced PARTS count toward the total —
+ * `linePartsNotPriced`: an assembly line with a quantity that is not already
+ * "Not priced" as a whole (its parts are in that already).
+ */
+function linePartsCountSql(productivityPct: number) {
+  return sql`(${bidLineItems.id} IS NOT NULL AND ${bidLineItems.qty} > 0 AND ${bidLineItems.assemblyId} IS NOT NULL AND NOT ${lineNotPricedSql(productivityPct)})`;
+}
+
 function costSums(productivityPct: number) {
   // Every per-line figure is gated on lineIsPriceable, so a broken line adds
   // nothing — the same as the rollup, which prices it as null.
   const ok = (value: ReturnType<typeof sql>) =>
     sql`CASE WHEN ${lineIsPriceable} THEN ${value} ELSE 0 END`;
-  const hours = lineHoursSql(productivityPct);
-  // COALESCE for the reason lineHoursSql gives: an untyped price (drizzle/0074)
-  // must total as 0, not turn the whole line NULL and drop it from the sum.
-  const materialCents = ok(
-    sql`ROUND(COALESCE(${bidLineItems.snapshotMaterialCost}, 0) * 100) * ${bidLineItems.qty}`
-  );
-  const laborCents = ok(
-    sql`ROUND(${hours} * ${bidLineItems.qty} * ${bidLineItems.snapshotLaborRate} * 100)`
-  );
+  const cents = lineCentsSql(productivityPct);
+  const hours = cents.hours;
+  const materialCents = ok(cents.materialCents);
+  const laborCents = ok(cents.laborCents);
   /*
     MATERIAL MARKUP, per line, rounded exactly as the engine rounds it.
 
@@ -10576,6 +10643,11 @@ export type DashboardBidRow = Bid & {
   totalHours: number;
   /** Lines the sums above leave out because they cannot be priced. */
   brokenLines: number;
+  /**
+   * Lines and parts the sums count as $0 because nobody priced them — the
+   * bid screen's `rollUpBid().notPriced`, counted in SQL.
+   */
+  notPriced: NotPricedTally;
 };
 
 /**
@@ -10595,6 +10667,14 @@ export type DashboardBidRow = Bid & {
  * is the opposite case: it must SHOW the sample — badged, and left out of the
  * "Out for bid" total by the client — so it cannot share that filter. The cost
  * arithmetic is shared through `costSums`; only the WHERE differs.
+ *
+ * ── What the card leaves out, counted here too ───────────────────────────────
+ * "+ 3 lines, 1 part not priced", the same as the bid it opens. Lines and
+ * FROZEN parts are summed in this query (`lineNotPricedSql`). A line from
+ * before 0087 has no frozen count and reads its recipe now, exactly as the
+ * rollup does: a second grouped query names (bid, assembly, how many lines),
+ * and `liveUnpricedParts` reads each distinct assembly once. No line rows
+ * leave the database, and the second query empties as old lines age out.
  */
 export async function getDashboardBids(
   userId: number,
@@ -10604,20 +10684,55 @@ export async function getDashboardBids(
   if (!db) return [];
 
   const sums = costSums(companyProductivityPct);
-  const rows = await db
-    .select({
-      bid: bids,
-      lineCount: sql<string>`COUNT(${bidLineItems.id})`,
-      ...sums,
-    })
-    .from(bids)
-    .leftJoin(
-      bidLineItems,
-      and(eq(bidLineItems.bidId, bids.id), isNull(bidLineItems.archivedAt))
-    )
-    .where(and(eq(bids.userId, userId), isNull(bids.archivedAt)))
-    .groupBy(bids.id)
-    .orderBy(desc(bids.updatedAt));
+  const notPricedLine = lineNotPricedSql(companyProductivityPct);
+  const partsCount = linePartsCountSql(companyProductivityPct);
+  const liveBids = and(eq(bids.userId, userId), isNull(bids.archivedAt));
+  const liveLines = and(
+    eq(bidLineItems.bidId, bids.id),
+    isNull(bidLineItems.archivedAt)
+  );
+  const [rows, unfrozen] = await Promise.all([
+    db
+      .select({
+        bid: bids,
+        lineCount: sql<string>`COUNT(${bidLineItems.id})`,
+        ...sums,
+        notPricedLines: sql<string>`COALESCE(SUM(CASE WHEN ${notPricedLine} THEN 1 ELSE 0 END), 0)`,
+        frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${partsCount} AND ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}) ELSE 0 END), 0)`,
+      })
+      .from(bids)
+      .leftJoin(bidLineItems, liveLines)
+      .where(liveBids)
+      .groupBy(bids.id)
+      .orderBy(desc(bids.updatedAt)),
+    db
+      .select({
+        bidId: bids.id,
+        assemblyId: bidLineItems.assemblyId,
+        lines: sql<string>`COUNT(*)`,
+      })
+      .from(bids)
+      .innerJoin(bidLineItems, liveLines)
+      .where(
+        and(
+          liveBids,
+          isNull(bidLineItems.snapshotUnpricedParts),
+          sql`${partsCount}`
+        )
+      )
+      .groupBy(bids.id, bidLineItems.assemblyId),
+  ]);
+
+  const live = await liveUnpricedParts(
+    unfrozen.flatMap(row => (row.assemblyId === null ? [] : [row.assemblyId])),
+    userId
+  );
+  const liveParts = new Map<number, number>();
+  for (const row of unfrozen) {
+    if (row.assemblyId === null) continue;
+    const parts = Number(row.lines) * (live.get(row.assemblyId) ?? 0);
+    liveParts.set(row.bidId, (liveParts.get(row.bidId) ?? 0) + parts);
+  }
 
   return rows.map(row => ({
     ...row.bid,
@@ -10629,6 +10744,10 @@ export async function getDashboardBids(
     markedUpExpenses: Number(row.markedUpExpenseCents) / 100,
     totalHours: Number(row.totalHours),
     brokenLines: Number(row.brokenLines),
+    notPriced: {
+      lines: Number(row.notPricedLines),
+      parts: Number(row.frozenParts) + (liveParts.get(row.bid.id) ?? 0),
+    },
   }));
 }
 

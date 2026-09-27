@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **Dashboard cards now say what they leave out.** A bid with unpriced lines
+  or parts reads "$378 + 3 lines not priced" on its dashboard card, the same
+  as the bid screen and "Find a bid" — before, the card showed a bare "$378"
+  directly under a search result admitting three lines were missing.
+
 - **Run types on a bid no longer share a colour.** Each bid now gives its run
   types colours in the order they were first used, so the first six on a job
   are always different. Existing drawings will change colour once because of
