@@ -195,6 +195,12 @@ describe("safeNextPath — the redirect after the password", () => {
     expect(safeNextPath("/")).toBe("/");
     expect(safeNextPath("/settings/pricing#top")).toBe("/settings/pricing#top");
   });
+  it("never sends you back to the gate itself", () => {
+    // After a wrong try the address bar shows the gate's own path, and the
+    // form reports that as where you were going. Found on screen, 2026-09-27.
+    expect(safeNextPath(GATE_PATH)).toBe("/");
+    expect(safeNextPath(`${GATE_PATH}?x=1`)).toBe("/");
+  });
   it("refuses anything that would leave the site", () => {
     expect(safeNextPath("https://evil.example")).toBe("/");
     expect(safeNextPath("//evil.example")).toBe("/");

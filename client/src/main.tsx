@@ -7,6 +7,8 @@ import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
 import { registerServiceWorker } from "@/lib/registerServiceWorker";
+import { markStagingEnvironment } from "@/lib/appEnvironment";
+import StagingBand from "@/components/StagingBand";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -78,10 +80,16 @@ const trpcClient = trpc.createClient({
 // see the module for why neither is incidental.
 registerServiceWorker();
 
+// Before the first render, so no screen is ever drawn without room for the band.
+const isStaging = markStagingEnvironment(document);
+
 createRoot(document.getElementById("root")!).render(
-  <trpc.Provider client={trpcClient} queryClient={queryClient}>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </trpc.Provider>
+  <>
+    {isStaging && <StagingBand />}
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </trpc.Provider>
+  </>
 );

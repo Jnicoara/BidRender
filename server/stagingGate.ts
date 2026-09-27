@@ -113,6 +113,10 @@ function hasValidGateCookie(
 export function safeNextPath(next: unknown): string {
   if (typeof next !== "string" || !next.startsWith("/")) return "/";
   if (next.startsWith("//") || next.startsWith("/\\")) return "/";
+  // After a wrong try the address bar reads GATE_PATH, and the form reports
+  // that as where you were going — which would land you on the gate's own
+  // address, outside the app.
+  if (next === GATE_PATH || next.startsWith(`${GATE_PATH}?`)) return "/";
   return next;
 }
 

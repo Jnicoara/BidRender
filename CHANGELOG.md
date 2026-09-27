@@ -10,6 +10,9 @@ This is the human-readable companion to the git history — read this to see wha
   BidRidge will ask for a staging password before showing anything, and tells
   search engines not to list it. It only switches on where a staging-only
   setting exists, so the live site is unchanged.
+- **A yellow "STAGING" band across the top of every screen on the practice
+  copy**, so nobody mistakes it for the live site. The screens shrink to make
+  room for it, so nothing at the bottom of a page is pushed out of view.
 - **33 more boxes and box parts in the starter catalog.** The boxes audit
   found common parts nobody could pick: the deep 2-1/8" 1900 and octagon box,
   2-gang mud rings, raised covers for exposed work, a round blank cover,
