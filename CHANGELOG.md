@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **Dashboard cards keep up with the drawing.** On a bid whose quantities
+  are not locked, marking more symbols or tracing more after sending used to
+  change the bid but not its dashboard card, which kept the old total and the
+  old "not priced" count. The card now matches the bid. A locked bid keeps its
+  locked numbers everywhere, as before.
 - **Direct cost now adds up on screen.** A charge set to take overhead and
   profit (a permit, say) is part of the direct cost at what it costs, but
   there was no line for it — so Materials plus Labor did not visibly add up

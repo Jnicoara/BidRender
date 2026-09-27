@@ -10696,6 +10696,13 @@ export type DashboardBidRow = Bid & {
    * bid screen's `rollUpBid().notPriced`, counted in SQL.
    */
   notPriced: NotPricedTally;
+  /**
+   * Lines that follow the drawing (a counted group or a traced run type).
+   * On an UNLOCKED bid their stored qty can be stale — the bid screen
+   * re-derives it on every read — so `bids.dashboard` prices such a bid the
+   * bid screen's way instead of trusting the sums above.
+   */
+  planLines: number;
 };
 
 /**
@@ -10745,6 +10752,7 @@ export async function getDashboardBids(
         bid: bids,
         lineCount: sql<string>`COUNT(${bidLineItems.id})`,
         ...sums,
+        planLines: sql<string>`COALESCE(SUM(CASE WHEN ${bidLineItems.takeoffGroupId} IS NOT NULL OR ${bidLineItems.takeoffRunTypeId} IS NOT NULL THEN 1 ELSE 0 END), 0)`,
         notPricedLines: sql<string>`COALESCE(SUM(CASE WHEN ${notPricedLine} THEN 1 ELSE 0 END), 0)`,
         frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${partsCount} AND ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}) ELSE 0 END), 0)`,
       })
@@ -10796,6 +10804,7 @@ export async function getDashboardBids(
       lines: Number(row.notPricedLines),
       parts: Number(row.frozenParts) + (liveParts.get(row.bid.id) ?? 0),
     },
+    planLines: Number(row.planLines),
   }));
 }
 

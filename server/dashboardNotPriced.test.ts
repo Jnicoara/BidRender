@@ -167,13 +167,17 @@ beforeAll(async () => {
   const pipe2 = await runType(USER, "Dashboard probe EMT 2");
 
   /*
-    Every fixture bid is LOCKED. A run-type line's quantity is otherwise
-    re-read from the drawing by the bid screen and read as stored by the SQL,
-    and these bids have no drawing — so unlocked, the bid screen would call
-    each run-type line qty 0 and "priced". That drift is real and separate
-    (todo.md, "Dashboard vs bid screen still differ on a bid whose plan
-    quantities moved"); locked, both read the stored number, which is what
-    lets this suite test the RULE.
+    Every fixture bid is LOCKED, and since 2026-09-27 that is what keeps this
+    suite testing the SQL at all. The dashboard now prices an UNLOCKED bid
+    with plan lines through the bid screen's rollup instead of the SQL
+    (server/dashboardFollowsDrawing.test.ts), so an unlocked run-type bid here
+    would compare the rollup with itself and prove nothing about
+    `lineNotPricedSql`. Locked, the stored qty is the number, the SQL path
+    prices it, and both sides read the same quantity.
+
+    (The reason given here before was the drift itself — the SQL reading a
+    stale stored qty on an unlocked bid. That is fixed by the rollup path;
+    the lock stays for the reason above.)
   */
   const add = async (
     name: string,

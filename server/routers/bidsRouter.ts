@@ -350,63 +350,88 @@ export const bidsRouter = router({
       db.getLiveBidExpenseLines(ctx.scope.dataUserId),
     ]);
 
-    return rows.map(row => {
-      const {
-        lineCount,
-        materialCost,
-        laborCost,
-        directCost,
-        materialMarkup,
-        markedUpExpenses,
-        totalHours,
-        brokenLines,
-        notPriced,
-        ...bid
-      } = row;
-      // The card's direct cost is the bid screen's: lines plus marked-up
-      // charges (rollUpBid). Leaving the charges out read a bid carrying a
-      // marked-up permit short by that permit until 2026-09-25.
-      const fullDirect = roundMoney(directCost + markedUpExpenses);
-      const { price, priced, bidPrice } = priceFromDirectCost(
-        bid,
-        fullDirect,
-        materialMarkup,
-        company
-      );
-      /*
+    return Promise.all(
+      rows.map(async row => {
+        const {
+          lineCount,
+          materialCost,
+          laborCost,
+          directCost,
+          materialMarkup,
+          markedUpExpenses,
+          totalHours,
+          brokenLines,
+          notPriced,
+          planLines,
+          ...bid
+        } = row;
+        /*
+        AN UNLOCKED BID THAT FOLLOWS THE DRAWING is priced the bid screen's
+        way (owner, 2026-09-27, todo.md option 2). Its plan lines store the
+        quantity from when they were SENT; the bid screen re-derives it from
+        the marks and runs on every read, so the SQL sums below would be
+        yesterday's number in today's voice. `priceForList` resolves the lines
+        through `getRollupLines` and prices them with `bidRollup` — the same
+        call "Find a bid" makes — so the card cannot disagree with the bid.
+
+        Every other bid (no plan lines, or LOCKED, where the stored qty IS the
+        number) keeps the one-query SQL path, which is what keeps a 3,000-bid
+        dashboard fast. server/dashboardFollowsDrawing.test.ts.
+      */
+        if (planLines > 0 && bid.quantitiesLockedAt === null) {
+          return {
+            ...bid,
+            ...(await priceForList(bid, ctx.scope.dataUserId, {
+              company,
+              tax,
+            })),
+          };
+        }
+        // The card's direct cost is the bid screen's: lines plus marked-up
+        // charges (rollUpBid). Leaving the charges out read a bid carrying a
+        // marked-up permit short by that permit until 2026-09-25.
+        const fullDirect = roundMoney(directCost + markedUpExpenses);
+        const { price, priced, bidPrice } = priceFromDirectCost(
+          bid,
+          fullDirect,
+          materialMarkup,
+          company
+        );
+        /*
         TOTAL DUE, which is what the card shows and says (owner, 2026-09-27):
         from the price to every charge and sales tax, through `billTheBid` —
         the bid screen's own last step, fed the sums instead of the lines.
       */
-      const { totalDue } = billTheBid({
-        bid,
-        bidPrice,
-        materialCost,
-        laborCost,
-        materialMarkup,
-        expenses: chargesByBid.get(bid.id) ?? [],
-        tax,
-      });
-      return {
-        ...bid,
-        lineCount,
-        directCost: fullDirect,
-        finalPrice: price,
-        /** What the card shows, as "Total due". See `priceForList`. */
-        totalDue,
-        /**
-         * The card's price leaves something out: a line the SQL skipped as
-         * unpriceable (the same lines the bid screen flags), or settings with
-         * no finite price. The card says so instead of showing a clean total.
-         */
-        incomplete: brokenLines > 0 || !priced,
-        /**
-         * "+ 3 lines, 1 part not priced" — what the price counts as $0
-         * because nobody priced it, the same tally the bid screen shows.
-         */
-        notPriced,
-      };
-    });
+        const { totalDue } = billTheBid({
+          bid,
+          bidPrice,
+          materialCost,
+          laborCost,
+          materialMarkup,
+          expenses: chargesByBid.get(bid.id) ?? [],
+          tax,
+        });
+        return {
+          ...bid,
+          lineCount,
+          directCost: fullDirect,
+          finalPrice: price,
+          /** What the card shows, as "Total due". See `priceForList`. */
+          totalDue,
+          /**
+           * The card's price leaves something out: a line the SQL skipped as
+           * unpriceable (the same lines the bid screen flags), or settings with
+           * no finite price. The card says so instead of showing a clean total.
+           */
+          incomplete: brokenLines > 0 || !priced,
+          /**
+           * "+ 3 lines, 1 part not priced" — what the price counts as $0
+           * because nobody priced it, the same tally the bid screen shows.
+           */
+          notPriced,
+        };
+      })
+    );
   }),
 
   create: procedure
