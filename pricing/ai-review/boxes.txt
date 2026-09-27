@@ -1,11 +1,13 @@
 Category: Boxes
-Items: 52
+Items: 85
 
 Category | Name | Size
 Boxes | 4-gang box | -
 Boxes | 5-gang box | -
+Boxes | Box support bracket | -
 Boxes | Ceiling fan brace box | -
 Boxes | Double-gang box | -
+Boxes | Double-gang box, deep | -
 Boxes | Double-gang metal box | -
 Boxes | Double-gang old-work box | -
 Boxes | Drywall repair ring | -
@@ -14,17 +16,22 @@ Boxes | 1/2" FD cast box | 1/2"
 Boxes | 3/4" FD cast box | 3/4"
 Boxes | 1" FD cast box | 1"
 Boxes | Floor box | -
+Boxes | Floor box cover | -
 Boxes | 1/2" FS cast box | 1/2"
 Boxes | 3/4" FS cast box | 3/4"
 Boxes | 1" FS cast box | 1"
+Boxes | 1/2" FS cast box, 2-gang | 1/2"
+Boxes | 3/4" FS cast box, 2-gang | 3/4"
 Boxes | Handy box | -
 Boxes | Low-voltage mud ring | -
 Boxes | Masonry box, double-gang | -
 Boxes | Masonry box, single-gang | -
+Boxes | Masonry box, triple-gang | -
 Boxes | 1-1/2" nail plate | 1-1/2"
 Boxes | 3" nail plate | 3"
 Boxes | 5" nail plate | 5"
 Boxes | Octagon box, metal | -
+Boxes | Octagon box, metal, 2-1/8" deep | 2-1/8"
 Boxes | Octagon box, plastic | -
 Boxes | Old-work ceiling box | -
 Boxes | Panel knockout seal | -
@@ -34,23 +41,49 @@ Boxes | 8x8 pull box | 8x8
 Boxes | 12x12 pull box | 12x12
 Boxes | 16x16 pull box | 16x16
 Boxes | 24x24 pull box | 24x24
+Boxes | 6x6 pull box, NEMA 3R | 6x6
+Boxes | 8x8 pull box, NEMA 3R | 8x8
+Boxes | 12x12 pull box, NEMA 3R | 12x12
+Boxes | 4x4 PVC pull box | 4x4
+Boxes | 6x6 PVC pull box | 6x6
+Boxes | 8x8 PVC pull box | 8x8
+Boxes | 12x12 PVC pull box | 12x12
 Boxes | Retrofit bar hanger | -
+Boxes | 4" round blank cover | 4"
+Boxes | 4" round extension ring | 4"
 Boxes | Shallow round box | -
 Boxes | Single-gang box | -
 Boxes | Single-gang box extender | -
+Boxes | Single-gang box, deep | -
 Boxes | Single-gang metal box | -
 Boxes | Single-gang old-work box | -
 Boxes | 4" square blank cover | 4"
 Boxes | 4-11/16" square blank cover | 4-11/16"
 Boxes | 4" square box | 4"
 Boxes | 4-11/16" square box | 4-11/16"
+Boxes | 4" square box, 2-1/8" deep | 4"
 Boxes | 4" square extension ring | 4"
+Boxes | 4-11/16" square extension ring | 4-11/16"
 Boxes | 4" square mud ring | 4"
 Boxes | 4-11/16" square mud ring | 4-11/16"
+Boxes | 4" square mud ring, 2-gang | 4"
+Boxes | 4-11/16" square mud ring, 2-gang | 4-11/16"
+Boxes | 4" square mud ring, fixture | 4"
+Boxes | 4-11/16" square raised cover, 2-gang decorator | 4-11/16"
+Boxes | 4" square raised cover, decorator | 4"
+Boxes | 4" square raised cover, duplex | 4"
+Boxes | 4" square raised cover, single toggle | 4"
+Boxes | 4-11/16" square raised cover, two duplex | 4-11/16"
+Boxes | 4" square raised cover, two toggle | 4"
 Boxes | Steel stud grommet | -
 Boxes | Triple-gang box | -
 Boxes | Triple-gang metal box | -
 Boxes | Triple-gang old-work box | -
+Boxes | Weatherproof blank cover, double-gang | -
+Boxes | Weatherproof blank cover, single-gang | -
 Boxes | Weatherproof box, double-gang | -
 Boxes | Weatherproof box, single-gang | -
+Boxes | Weatherproof box, single-gang, PVC | -
 Boxes | Weatherproof box, triple-gang | -
+Boxes | Weatherproof lampholder cover | -
+Boxes | Weatherproof round box | -
