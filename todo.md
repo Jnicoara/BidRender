@@ -29,6 +29,12 @@ left as written rather than rewritten to match the rename.
 
 ## Pending / Future
 
+- [ ] **`server/seedPreservesUserPrices.test.ts` "keeps the fork's price…"
+      flakes on the 5 s default timeout.** 2026-09-27: failed in a full run
+      (5010 ms), then run alone it passed once and failed once — it seeds the
+      whole catalog and sits right at the limit. Not a wrong answer, a slow
+      one; 45ada57 gave the seeder test a 60 s limit for the same reason, and
+      this one wants the same.
 - [ ] **`scripts/schemaDrift.mts` says "this database has never been migrated"
       when it simply cannot connect.** Measured 2026-09-27 against production
       with the laptop off the database's trusted list: that line printed, then
