@@ -127,6 +127,15 @@ function isHttps(req: Request): boolean {
   return (proto ?? "").split(",")[0].trim() === "https";
 }
 
+function cookieOptions(req: Request) {
+  return {
+    path: "/",
+    sameSite: "lax" as const,
+    secure: isHttps(req),
+    maxAge: COOKIE_MAX_AGE_MS,
+  };
+}
+
 function formPage(error: boolean): string {
   // Self-contained: no stylesheet, font or script from anywhere, because
   // nothing else on this server is reachable until the password is given.
@@ -205,24 +214,27 @@ export function registerStagingGate(
         refuse(req, res, true);
         return;
       }
-      const common = {
-        path: "/",
-        sameSite: "lax" as const,
-        secure: isHttps(req),
-        maxAge: COOKIE_MAX_AGE_MS,
-      };
       res.cookie(GATE_COOKIE, stagingGateToken(password), {
-        ...common,
+        ...cookieOptions(req),
         httpOnly: true,
       });
-      res.cookie(ENV_COOKIE, "staging", common);
+      res.cookie(ENV_COOKIE, "staging", cookieOptions(req));
       res.redirect(303, safeNextPath(req.body?.next));
     }
   );
 
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.method === "GET" && req.path === "/api/version") return next();
-    if (hasValidGateCookie(req.headers.cookie, password)) return next();
+    if (hasValidGateCookie(req.headers.cookie, password)) {
+      // The band cookie can be lost on its own — cleared by hand, or expired a
+      // moment before the gate's. Then staging opens with no STAGING band,
+      // which is the one thing the band exists to prevent (found on screen,
+      // 2026-09-27). So anything let through gets it back.
+      if (!parseCookieHeader(req.headers.cookie ?? "")[ENV_COOKIE]) {
+        res.cookie(ENV_COOKIE, "staging", cookieOptions(req));
+      }
+      return next();
+    }
     refuse(req, res);
   });
 
