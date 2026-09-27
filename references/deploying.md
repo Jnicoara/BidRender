@@ -1326,7 +1326,8 @@ certificate or the database.
 
 1. Log in to **cloud.digitalocean.com**.
 2. Left menu: **Databases**. Click the MySQL database.
-3. Open the **Settings** tab. Find the box called **Trusted Sources**.
+3. Open the **Network Access** tab (not Settings — it moved there). Find
+   **Trusted Sources**.
 4. Click **Edit** next to it.
 5. You will see the old laptop entry — an address made of four numbers with
    dots. Click the **X** or trash icon next to it to remove it. **Do not
