@@ -3535,6 +3535,10 @@ smallest of them. Building them does not open the gate.
 > rest stands: a leg is a row, the tee end contributes no vertical, circuits
 > are seeded from the parent and owned by the leg, the snap is shown and
 > never assumed.
+>
+> **2026-09-26 — quantity mode (§ 5o, D21) reuses legs without tees.** A leg
+> of a quantity trace that starts on another leg is not a split; it makes no
+> tee and no box.
 
 **The ask:** while tracing conduit, start a new line but keep it on the same run
 — a branch off the main route, or a second leg belonging to the same circuit.
@@ -4120,6 +4124,97 @@ worth less than it looks until this exists.
 **It does not open the § 5f.2 gate either.** A fully specified type still
 reaches a bid as footage at material cost with no hours behind it. This makes
 the runs describable; labour is what makes them priceable.
+
+## 5o. Quantity mode — flat footage under a type. DECIDED 2026-09-26
+
+**The decision is D21 in `references/takeoff-spec.md`**, with the owner's seven
+answers; this section is how it is built. It builds on § 5d (verticals), § 5k
+and D20 (legs) and D19 (propose → look → approve), and changes none of them for
+a route run.
+
+### The one idea: an approved drop IS an end kind
+
+The whole feature rests on § 5d's model already having the right shape. A run
+end stores a KIND, the height is resolved live, NULL is "nobody said" and
+`distribution` is "no drop, and that is an answer". A quantity trace uses those
+same two columns on each leg:
+
+| Stored `startKind`/`endKind` | Route run reads it as              | Quantity trace reads it as           |
+| ---------------------------- | ---------------------------------- | ------------------------------------ |
+| NULL                         | unanswered — counted flat, flagged | level — flat, and a drop is PROPOSED |
+| `distribution`               | carries on at run height           | a dismissed proposal                 |
+| a device kind                | a drop to that device              | an approved drop to that device      |
+
+Only the first row differs, and it differs in ONE function: `verticalsForRunRow`
+maps a quantity trace's NULL to `distribution` the way `kindAtEnd` maps a tee
+end — so the flat-only warning, the "at least" on couplings and the unknown-drop
+bend note all see a finished flat run, not an unfinished route.
+
+### What each count does on a quantity leg
+
+- **Pipe:** traced, plus approved drops. **Wire:** the type's conductor and
+  ground counts over the same footage (`quantityCircuit`).
+- **Couplings, straps, elbows:** as a route leg.
+- **Connectors:** only at an end with an approved drop. Every other end is an
+  `open:` node, which the connector count skips and says so.
+- **Pull points:** none proposed; stored answers ignored, not deleted.
+- **D18:** not asked; a quantity trace always counts.
+- **Tees:** never made. `addLeg` refuses one on a quantity run.
+
+### On the screen
+
+- A **Route | Quantity** switch on the trace toolbar, remembered per bid like
+  the ends pickers. In quantity mode the ends pickers hide except "To", which is
+  what a proposed drop defaults to.
+- A quantity run's row in the panel: flat footage, legs, and the proposal
+  line — `12 drops proposed, 8'-6" each = 102.00 ft` — with **Approve all**.
+  No circuits, no ends, no D18 chip.
+- Proposed drops drawn as hollow markers at each leg end; tap one to pick a
+  type, set a height or dismiss it. Approved drops draw solid.
+- The totals: ONE added line, in the same place the flat-only line already
+  sits, so a later change to that block has one thing to merge around.
+- A **Drops** readout for the whole bid: every rise and drop, route and
+  quantity, labelled by source, grouped by type with count and feet; a row
+  jumps to its sheet and centres on the spot. Its query is in `refreshRuns`.
+
+### The traps
+
+1. **A proposal is geometry, an answer is a row.** "Joined to another leg" is
+   decided by distance, which D20 refuses for COUNTING. It is fine here because
+   it only decides what to PROPOSE; nothing is counted until a kind is written.
+2. **Mode lives on every row.** A leg added later copies the root's mode; a
+   mode switch writes the root and all its legs in one statement. A reader that
+   looked the root up instead would work until the first leg added from the
+   panel.
+3. **Switching back must not lose anything.** Route-only rows (circuits, pull
+   point answers, tees) are left in place and ignored, so a switch is always
+   reversible.
+4. **Anything that reads STORED circuits to describe wire is wrong on a
+   quantity trace.** Found on screen: the spec editor said "none pulled yet"
+   beside 230 ft of the type's wire. Hand such a reader what the arithmetic
+   reads (one circuit of the type), never the rows.
+
+### BUILT 2026-09-26 — and looked at
+
+On "Bar layout check", sheet E0.01, a three-leg quantity trace of 3/4" EMT (one
+leg starting on the main): 5 drops proposed, none at the joined end;
+"5 drops, 8'-6" each = 42.50 ft" at a 10'-0" run height; one changed to a
+switch (+6.00 ft), the rest approved (+34.00 ft); the readout went 4 · 25.00 →
+5 · 31.00 → 9 · 65.00 ft and matched the totals' vertical conduit + cable;
+3/4" EMT connectors 2 → 7; a jump from sheet 2 opened sheet 1 on the drop;
+route and back left the wire at 964.14 ft. What the look found and fixed:
+
+- **Level before the gate.** With no run height, `verticalAtEnd` read the gate
+  before the "distribution" answer, so every quantity trace was called
+  "counted flat only". Now level wins; a route run level at both ends stops
+  being warned about too, which was always a false warning.
+- The spec editor's "none pulled yet" (trap 4 above).
+- A dashed "jump" drawn over pipe where a leg joined the trace mid-way.
+- A drop opened from its marker opened below the fold.
+- The switch and "Drops to" squashed at a narrow window; the toolbar group
+  wraps now.
+- The pill over the drawing named route ends on a quantity trace.
+- The route / quantity split (answer 3) was computed and not shown.
 
 ## 6. Decisions already made — do not re-open without saying why
 

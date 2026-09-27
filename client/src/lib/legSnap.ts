@@ -22,7 +22,16 @@ import { projectOntoPath } from "@shared/runNetwork";
 import type { PagePoint } from "@shared/takeoffGeometry";
 
 export type LegSnap =
-  | { kind: "free"; point: PagePoint }
+  | {
+      kind: "free";
+      point: PagePoint;
+      /**
+       * On a QUANTITY trace (D21): the start landed on the trace itself. It
+       * is still a free start — no tee, no box — but the ring says it joins,
+       * and no drop is proposed there.
+       */
+      joined?: true;
+    }
   | { kind: "stamp"; stampId: number; point: PagePoint }
   | {
       kind: "tee";
@@ -136,10 +145,25 @@ export function resolveLegStart(input: {
 }
 
 /** What the pill says the next click will do, in the estimator's words. */
+/**
+ * The same snap on a QUANTITY trace (D21, answer 2): a leg that starts on the
+ * trace joins it with no tee and no box, and one that starts on a mark does
+ * not claim the mark — a quantity trace has no end identity to link. Both
+ * become free starts at the snapped point, so the drawing still lines up.
+ */
+export function quantitySnap(snap: LegSnap): LegSnap {
+  if (snap.kind === "free") return snap;
+  if (snap.kind === "tee")
+    return { kind: "free", point: { ...snap.point }, joined: true };
+  return { kind: "free", point: { ...snap.point } };
+}
+
 export function legSnapLabel(snap: LegSnap): string {
   switch (snap.kind) {
     case "free":
-      return "New start — not joined to the run";
+      return snap.joined
+        ? "Joins the trace here — no box, no drop"
+        : "New start — not joined to the run";
     case "stamp":
       return "Starts at this mark";
     case "tee":

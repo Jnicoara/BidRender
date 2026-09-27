@@ -41,6 +41,7 @@
 
 import { DISTRIBUTION_KIND } from "./takeoffHeights";
 import { kindAtEnd } from "./runNetwork";
+import type { TraceMode } from "./traceMode";
 
 /** Feet of whip, as the column stores it or as tRPC hands it over. */
 export type WhipFeet = string | number | null | undefined;
@@ -126,9 +127,20 @@ export function runWireOwnership(run: {
    */
   startTeeId: number | null | undefined;
   endTeeId: number | null | undefined;
+  /**
+   * Route or quantity (D21). Required: a quantity trace is never asked, and a
+   * caller that could omit this would put the question on one.
+   */
+  traceMode: TraceMode | null | undefined;
   /** What the estimator answered when asked. NULL = never asked or skipped. */
   branchWiring?: boolean | null;
 }): RunWireOwnership {
+  /*
+    A quantity trace is footage of a type and nothing more (D21): no circuit
+    identity, so no question of whose wire it is. It always counts. A stored
+    D18 answer from when it was a route is kept, unread, for switching back.
+  */
+  if (run.traceMode === "quantity") return "homerun";
   if (run.branchWiring === true) return "branch";
   if (run.branchWiring === false) return "homerun";
   const start = kindAtEnd(run.startKind, run.startTeeId);
@@ -153,13 +165,9 @@ function isDevice(kind: string | null | undefined): boolean {
 }
 
 /** Should the app ask whose wire this run is? Sugar, so a screen reads right. */
-export function shouldAskAboutBranchWiring(run: {
-  startKind: string | null | undefined;
-  endKind: string | null | undefined;
-  startTeeId: number | null | undefined;
-  endTeeId: number | null | undefined;
-  branchWiring?: boolean | null;
-}): boolean {
+export function shouldAskAboutBranchWiring(
+  run: Parameters<typeof runWireOwnership>[0]
+): boolean {
   return runWireOwnership(run) === "unanswered";
 }
 

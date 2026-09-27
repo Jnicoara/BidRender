@@ -26,6 +26,7 @@ import {
 import { resolveMaterial } from "../shared/materialLookup";
 import { resolveRunType } from "../shared/runTypeLookup";
 import type { RunVerticals } from "../shared/takeoffHeights";
+import type { TraceMode } from "../shared/traceMode";
 import * as db from "./db";
 
 export type BendContext = {
@@ -101,22 +102,27 @@ export function runBendsFor(
     id: number;
     runTypeId: number | null;
     points: { x: number; y: number }[] | null;
+    /** A quantity trace proposes no pull points (D21, answer 1). */
+    traceMode: TraceMode | null;
   },
   verticals: RunVerticals,
   feetPerPoint: number | null,
   context: BendContext
 ) {
+  const quantity = run.traceMode === "quantity";
   const leg = {
     id: String(run.id),
     points: run.points ?? [],
     feetPerPoint,
     startDrop: endDropOf(verticals.start),
     endDrop: endDropOf(verticals.end),
-    answers: context.answers.get(run.id) ?? [],
+    // Kept in their table while in quantity mode, and read again on a switch
+    // back to route — never deleted (D21, answer 5).
+    answers: quantity ? [] : (context.answers.get(run.id) ?? []),
   };
   const limit = context.settings.pullPointLimit;
   const bends = legBends(leg);
-  const walk = walkPullPoints(leg, limit, bends.bends);
+  const walk = walkPullPoints(leg, quantity ? Infinity : limit, bends.bends);
   const type =
     run.runTypeId === null ? undefined : context.byType.get(run.runTypeId);
   // An untyped run, or one whose raceway cannot be read, is offered a box:

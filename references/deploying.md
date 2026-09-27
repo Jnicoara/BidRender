@@ -766,6 +766,56 @@ each, into the hubs)"), LB 0 → 1, and straps stayed ≥ 20 but redistributed
 (4 near a box + 16 spaced → 6 + 14) — the two beside the LB replace two
 spacing straps on those lengths.
 
+**Fourth run — branch legs (D20), deployed as `b69c35d` on 2026-09-26.**
+**Rollback target: `e07f1e4`.** A schema release, not a catalog one. Backup
+**`2026-09-26T23-08-29Z`** (61 tables, 3,137 rows, 5 files) restored and
+verified, kept with `KEEP_SCRATCH=1`. On the copy: `schemaDrift` named exactly
+0085's three items at 85 recorded; 0085 applied (1 file), a second run applied
+nothing, no drift. The built release booted on the copy twice —
+`catalogRehearsal` CLEAN both times (1,237 → 1,237, nothing added, renamed,
+retired or deleted, no company row touched, every reference identical).
+
+**"Existing totals unchanged" was checked by the ROUTERS, not by eye.** A
+throwaway read-only script called `takeoffRuns.totals`,
+`takeoffRunTypes.bridgeForBid` and `takeoffRuns.listForSheet` (quantities,
+wire ownership, bends) for every bid as its owner, and wrote the result to a
+file. Run from a worktree at `e07f1e4` on the copy BEFORE 0085, and again
+from the old build AFTER it, and from the new build after it: **all three
+byte-identical.** Production has 2 bids and 2 runs, both on bid 23 (the
+owner's; bid 25 had none). The same script against production itself: the
+old build on the migrated database, and the new build after the push, both
+byte-identical to the backup. Worth repeating for any release that touches a
+read path: it compares everything the screens are built from, and it cannot
+pass on a figure nobody looked at.
+
+Production: `schemaDrift` named exactly 0085's three items; `migrate.mts`
+applied 1, a second run applied nothing, drift clean. `fittingsImpact`:
+**0 leg rows, 0 tees**, no fittings to add, no line to read "Not priced".
+Pushed 23:15:46Z; the new build (`builtAt` 23:16:35Z) was serving at
+23:18:43Z on both hosts.
+
+Live checks on bid 25 as the smoke account (sheet 196 given 1/4" = 1'-0" for
+the check): a 1/2" EMT main of 75.08 ft (one corner) with a branch
+Shift-clicked off it 30.80 ft along, 13.48 ft long. Stored as three legs
+(30.80 + 44.28 + 13.48) meeting at one tee, all committed; the tee drawn as a
+box at the split. With a run height on each leg, every tee end read level —
+no drop — and `setEnds` refused a kind on a tee end. Counts: **6 connectors
+("3 line ends, 1 branch tee (3 of this size)")**, 1 tee box (`4" square box`)
+and 1 blank cover, 1 field bend (the main's corner — none at the split), 8
+couplings, 11 straps; raceway 88.56 ft = main + branch, so the jump back to
+the tee was not counted. "Send 7 lines to bid" put the tee box on the bid at
+qty 1 with its sentence ($0: the shipped box is unpriced). Deleting leg 3 in
+the panel joined the main back into one 75.08 ft leg with no tee, the header
+went, and the sent lines followed on their own: tee box 1 → 0, connectors
+6 → 2, raceway 88.56 → 75.08. Then the 7 lines, the run and sheet 196's scale
+were removed; bid 25 back to 0 lines, 0 runs, no sheet scaled, and the
+router snapshot of production byte-identical to the backup again.
+
+**Driving the live viewer from the extension:** in the hidden tab, clicks by
+coordinate landed nowhere until a screenshot had been taken (the click frame
+was not the CSS one). Pointer events dispatched on the overlay `<svg>` at
+CSS coordinates, with `shiftKey` for the branch, drove the real handlers.
+
 **`search` caught a real regression before production did.** The old name
 `2-1/2" EMT coupling` matched all three new EMT styles equally and the tie fell
 to the alphabet — compression first, the renamed set-screw row third. Fixed
@@ -777,6 +827,70 @@ row match the old words equally), and 12 old spellings find nothing — the
 11 bare-copper names, only because a typed comma defeats the tokenizer
 ("#12 bare copper solid" and "12 bare copper" both find the row), and
 `5/6" wafer LED downlight`. See `todo.md`.
+
+**Fifth run — quantity mode (D21), deployed as `a64dfbc` on 2026-09-27.**
+**Rollback target: `b69c35d`.** A schema release, not a catalog one: one
+nullable column, `takeoff_runs.traceMode`, NULL meaning route. Backup
+**`2026-09-27T00-41-48Z`** (62 tables, 3,138 rows, 5 files) restored and
+verified, kept with `KEEP_SCRATCH=1`. On the copy: `schemaDrift` named exactly
+`takeoff_runs — missing traceMode` at 86 recorded; 0086 applied (1 file), a
+second run applied nothing, no drift at 87. The built release booted on the
+copy twice — `catalogRehearsal` CLEAN both times (1,237 → 1,237, nothing added,
+renamed, retired or deleted, no company row touched, every reference
+identical). Every existing run read `traceMode` NULL (2 of 2).
+
+**Existing data, by the routers again** — `takeoffRuns.totals`,
+`takeoffRunTypes.bridgeForBid` (the Send preview) and `takeoffRuns.listForSheet`
+for every bid as its owner, with the three fields the new build ADDS
+(`traceMode`, `quantity`, `quantityFeet`) taken out of the compared file and
+collected separately, so they could be asserted rather than ignored: every
+`traceMode` read `route`, every `quantity` read `{traceCount: 0, openEnds: 0}`.
+Old build before 0086 and old build after it: **byte-identical**. New build
+after it: identical **except two lines, both the deliberate change** recorded
+in `todo.md` — run 37 on bid 23 starts at "carries on at run height" on a job
+with no run height, so its start now reads `level` rather than
+`no-distribution-height`, and its bend sentence says "1 drop not counted yet"
+instead of "2". No number moved, including that run's flat-only count, because
+its other end is unanswered. **The snapshot script from the fourth run had not
+been kept** and was rewritten; see `todo.md` on committing it.
+
+Production: the old build read byte-identical to the backup before 0086;
+`schemaDrift` named exactly `traceMode`; `migrate.mts` applied 1, a second run
+applied nothing, drift clean at 87; the old build on the migrated database
+still byte-identical (the "must be boring" step); `fittingsImpact` **0 quantity
+rows, 0 leg rows, 0 tees**. Pushed 00:48:56Z; the new build (`builtAt`
+00:49:39Z, commit `a64dfbc`) was serving on both hosts at 00:51:42Z, and its
+snapshot of production matched the rehearsal's byte for byte.
+
+Live checks on bid 25 as the smoke account (sheet 196 given 1/4" = 1'-0" and the
+job a 10'-0" run height for the check). A three-leg quantity trace of 1/2" EMT
+— 43.20 ft, an 11.52 ft leg Shift-clicked off its middle, a separate 36.00 ft
+leg — stored as three `quantity` rows with no tee, no circuit and no end kind.
+The panel proposed **5 drops, none at the joined end**, marked on the drawing;
+"Drops to: Receptacle" read "5 drops, 8'-6" each = 42.50 ft"; wire came from the
+type (43.2 × 3 = 129.6 ft on leg 1). Approve all: conduit 90.72 → 133.22 ft,
+wire +127.50 ft (42.50 × 3), "Drops on this bid" 5 · 42.50 ft, the quantity
+warning gone, 5 connectors ("none at 1 quantity-trace end"). Route and back:
+totals, wire (399.66 ft), readout and markers identical at every step; going to
+route gave the three legs a circuit each and kept the drops. A 43.20 ft route
+run of the same type with an 8.50 ft drop was added, and **"Send 7 lines to
+bid" put ONE raceway line at 184.92 ft = 133.22 quantity + 51.70 route**, with
+conductor 266.44 (the type's 2 × 133.22; the route run had no circuits) and
+7 connectors (5 approved drops + 2 route ends). Taking back one drop moved the
+bid's raceway line to 176.42 on its own. Then the 7 lines, both runs, sheet
+196's scale and the job's run height were removed through the app's own API as
+the smoke account: **bid 25 back to 0 lines (none archived), 0 runs, no sheet
+scaled, no run height**; the router snapshot of production byte-identical to
+the post-push one, and every table's row count identical to the restored
+backup plus 0086's own migration row (62 tables, 3,139 rows).
+
+**Driving it, two notes for next time.** Two pointer events dispatched in the
+SAME script land in one React tick, and the second replaces the first (the
+handler appends to the points it last rendered) — so a route "trace" of two
+points came out as one point twice, zero length. One click per call. And the
+hidden tab's timers throttle hard: a script that waited 3.5 s twice timed out
+the tool at 45 s while the trace itself finished fine. Keep waits short and
+read the result in a second call.
 
 ## 6. Verifying a deploy actually took
 

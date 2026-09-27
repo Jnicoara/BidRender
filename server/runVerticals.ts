@@ -28,6 +28,7 @@ import {
   type RunVerticals,
 } from "../shared/takeoffHeights";
 import { heightAtEnd, kindAtEnd } from "../shared/runNetwork";
+import { kindForMode, type TraceMode } from "../shared/traceMode";
 /*
   NO DATABASE IMPORT, DELIBERATELY.
 
@@ -126,6 +127,12 @@ export type RunEnds = {
    */
   startTeeId: number | null;
   endTeeId: number | null;
+  /**
+   * Route or quantity (D21). REQUIRED for the same reason: on a quantity
+   * trace an unanswered end is level, and a caller that could leave this out
+   * would warn "flat only" about every one. See `kindForMode`.
+   */
+  traceMode: TraceMode | null;
 };
 
 /**
@@ -145,9 +152,16 @@ export function verticalsForRunRow(
     run: run.distributionHeightInches,
   });
 
-  // A tee end carries straight on at run height — no drop (D20).
-  const startKind = kindAtEnd(run.startKind, run.startTeeId);
-  const endKind = kindAtEnd(run.endKind, run.endTeeId);
+  // A tee end carries straight on at run height — no drop (D20). So does an
+  // unanswered end of a quantity trace, which is flat by choice (D21).
+  const startKind = kindAtEnd(
+    kindForMode(run.startKind, run.traceMode),
+    run.startTeeId
+  );
+  const endKind = kindAtEnd(
+    kindForMode(run.endKind, run.traceMode),
+    run.endTeeId
+  );
   const startHeight = resolveMountingHeight(
     startKind,
     context.layers,

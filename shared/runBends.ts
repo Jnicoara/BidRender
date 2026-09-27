@@ -160,6 +160,13 @@ export type BendLeg = {
   startDrop: EndDrop;
   endDrop: EndDrop;
   answers: readonly PullPointAnswer[];
+  /**
+   * True on a leg of a QUANTITY trace (D21, answer 1): its bends are counted
+   * but no pull point is ever proposed on it. Absent is a route leg — every
+   * hand-built leg in a test, and every leg before D21. The real producer,
+   * `legFromRun`, requires the mode, so no traced leg can leave it out.
+   */
+  noPullPoints?: boolean;
 };
 
 /** Stored coordinates are the trace's own floats; an edit that did not move a
@@ -559,7 +566,13 @@ export function countBends(
     return {
       legId: leg.id,
       bends,
-      pullPoints: walkPullPoints(leg, limit, bends.bends),
+      // No limit on a quantity leg: nothing can tip over it, so nothing is
+      // proposed — and its elbows are still every one of them counted.
+      pullPoints: walkPullPoints(
+        leg,
+        leg.noPullPoints ? Infinity : limit,
+        bends.bends
+      ),
     };
   });
 

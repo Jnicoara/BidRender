@@ -145,9 +145,17 @@ import { CalibrateLayer } from "@/components/takeoff/CalibrateLayer";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
 import { JobHeightsChip } from "@/components/takeoff/JobHeightsChip";
 import { RunEndsEditor, TraceEndsPickers } from "@/components/takeoff/runEnds";
+import { TraceModeToggle } from "@/components/takeoff/TraceModeToggle";
+import {
+  QuantityDropsReview,
+  type DropSelection,
+} from "@/components/takeoff/QuantityDropsReview";
+import { quantityEndRows, type QuantityLeg } from "@shared/quantityDrops";
+import { BidDropsReadout } from "@/components/takeoff/BidDropsReadout";
 import {
   DISTRIBUTION_KIND,
   traceEndsLabel,
+  endKindLabel,
   SUGGEST_WITHIN_INCHES,
   shouldSuggestStampLink,
 } from "@shared/takeoffHeights";
@@ -190,7 +198,7 @@ import {
   type UploadJob,
 } from "@/lib/uploadQueue";
 import { takePendingPlan } from "@/lib/pendingPlanUpload";
-import { TraceLayer } from "@/components/takeoff/TraceLayer";
+import { TraceLayer, type DropMarker } from "@/components/takeoff/TraceLayer";
 import {
   RunsPanel,
   type GroupBridgeState,
@@ -204,7 +212,13 @@ import {
   saveDraft,
   saveStampQueue,
 } from "@/lib/traceDraft";
-import { legSnapLabel, resolveLegStart, type LegSnap } from "@/lib/legSnap";
+import {
+  legSnapLabel,
+  quantitySnap,
+  resolveLegStart,
+  type LegSnap,
+} from "@/lib/legSnap";
+import type { TraceMode } from "@shared/traceMode";
 import { LegendPanel } from "@/components/takeoff/LegendPanel";
 import { CoPilotPanel } from "@/components/takeoff/CoPilotPanel";
 import { snapshotPage } from "@/lib/planSnapshot";
@@ -1734,6 +1748,14 @@ function PlanPane({
  */
 const traceEndsKey = (bidId: number) => `helixbid:trace-ends:${bidId}`;
 
+/**
+ * Route or quantity for the NEXT trace (D21), sticky per bid for the same
+ * reason as the ends: a sheet of quantity traces is one decision, not forty.
+ * Same machine-only prefix as its siblings. A run's own mode lives on the
+ * run; this only decides what a new trace starts as.
+ */
+const traceModeKey = (bidId: number) => `helixbid:trace-mode:${bidId}`;
+
 // ── The page ─────────────────────────────────────────────────────────────────
 
 /**
@@ -2005,6 +2027,28 @@ export default function TakeoffPage({
     },
     [bidId]
   );
+
+  /** Route or quantity for the next trace (D21). Route until chosen. */
+  const [traceMode, setTraceMode] = useState<TraceMode>(() => {
+    try {
+      return window.localStorage.getItem(traceModeKey(bidId)) === "quantity"
+        ? "quantity"
+        : "route";
+    } catch {
+      return "route";
+    }
+  });
+  const updateTraceMode = useCallback(
+    (next: TraceMode) => {
+      setTraceMode(next);
+      try {
+        window.localStorage.setItem(traceModeKey(bidId), next);
+      } catch {
+        // A convenience, as above.
+      }
+    },
+    [bidId]
+  );
   /**
    * A gated measuring tool is under the pointer or holds focus.
    *
@@ -2038,6 +2082,14 @@ export default function TakeoffPage({
   const [legStart, setLegStart] = useState<LegSnap | null>(null);
   /** A leg is being saved; clicks wait rather than snapping to a stale run. */
   const [legBusy, setLegBusy] = useState(false);
+  /**
+   * The mode of the run legs are being added to (D21). A leg added from the
+   * panel belongs to THAT run, whatever the toolbar says for the next one.
+   */
+  const [legRootMode, setLegRootMode] = useState<TraceMode>("route");
+  /** The mode the trace in progress is being drawn in. */
+  const activeTraceMode: TraceMode =
+    legRootId !== null ? legRootMode : traceMode;
 
   // ── Stamping (phase 2c, on groups since phase 6) ──────────────────────────
   /**
@@ -2470,6 +2522,12 @@ export default function TakeoffPage({
       traced on another sheet changes what this type would send.
     */
     void utils.takeoffRunTypes.bridgeForBid.invalidate({ bidId });
+    /*
+      The bid's drops readout (D21) — per BID like the bridge, because an
+      approved drop on another sheet moves its totals too. Here, not on the
+      drop mutation, for the reason above.
+    */
+    void utils.takeoffRuns.drops.invalidate({ bidId });
   }, [utils, activeSheet?.id, bidId]);
 
   const { data: stamps = [] } = trpc.takeoffStamps.listForSheet.useQuery(
@@ -3432,6 +3490,108 @@ export default function TakeoffPage({
     onError: e => toast.error(e.message),
     onSettled: refreshRuns,
   });
+  /**
+   * An answer to proposed drops on a quantity trace (D21) — one, or all.
+   * Through `refreshRuns`: it moves the markers, the row, the totals, the
+   * drops readout and the Send preview together.
+   */
+  const answerDrops = trpc.takeoffRuns.answerDrops.useMutation({
+    onError: e => toast.error(e.message),
+    onSettled: refreshRuns,
+  });
+  /** The drop opened from its marker or its row — one at a time. */
+  const [selectedDrop, setSelectedDrop] = useState<DropSelection>(null);
+
+  /**
+   * Every quantity trace on this sheet as its legs, root first — what the
+   * review and the drawing's drop markers both read. From the unfiltered
+   * sheet runs: hiding a layer must not change what a trace proposes.
+   */
+  const quantityLegsByRoot = useMemo(() => {
+    const map = new Map<number, QuantityLeg[]>();
+    const ordered = [...runs].sort((a, b) => a.id - b.id);
+    for (const run of ordered) {
+      if (run.traceMode !== "quantity") continue;
+      const root = run.parentRunId ?? run.id;
+      const leg: QuantityLeg = {
+        id: run.id,
+        points: run.points as PagePoint[],
+        startKind: run.ends.startKind,
+        endKind: run.ends.endKind,
+        startHeightInches: run.ends.startHeightInches,
+        endHeightInches: run.ends.endHeightInches,
+        distributionHeightInches: run.ends.distributionHeightInches,
+      };
+      const list = map.get(root) ?? [];
+      if (run.id === root) list.unshift(leg);
+      else list.push(leg);
+      map.set(root, list);
+    }
+    return map;
+  }, [runs]);
+
+  const dropHeightOf = useCallback(
+    (kind: string) =>
+      heightsForBid?.types.find(t => t.typeKey === kind)?.heightInches ?? null,
+    [heightsForBid?.types]
+  );
+
+  /**
+   * One marker per real leg end of every quantity trace on the sheet —
+   * worked out over the whole trace, drawn only for legs the Layers filter
+   * shows, so a hidden layer hides its drops with its lines.
+   */
+  const dropMarkers = useMemo(() => {
+    const out: DropMarker[] = [];
+    const shown = new Set(visibleRuns.map(run => run.id));
+    quantityLegsByRoot.forEach(legs => {
+      for (const row of quantityEndRows({
+        legs,
+        kind: traceEnds.endKind,
+        distributionInches: heightsForBid?.distributionHeight.inches ?? null,
+        heightOf: dropHeightOf,
+      })) {
+        if (row.state === "joined" || !shown.has(row.legId)) continue;
+        out.push({
+          legId: row.legId,
+          end: row.end,
+          x: row.point.x,
+          y: row.point.y,
+          state:
+            row.state === "open"
+              ? "proposed"
+              : row.state === "approved"
+                ? "approved"
+                : "dismissed",
+          feet: row.vertical?.counted ? row.vertical.feet : null,
+        });
+      }
+    });
+    return out;
+  }, [
+    quantityLegsByRoot,
+    visibleRuns,
+    traceEnds.endKind,
+    heightsForBid,
+    dropHeightOf,
+  ]);
+
+  /**
+   * Route ↔ quantity for a whole run (D21). Through `refreshRuns`: it changes
+   * the row, the wire, the totals, the drops readout and the Send preview.
+   */
+  const setRunTraceMode = trpc.takeoffRuns.setTraceMode.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: (result, variables) =>
+      toast.success(
+        variables.mode === "quantity"
+          ? "Counted as quantity now — flat footage, drops proposed."
+          : result.circuitsAdded > 0
+            ? `A route now. ${result.circuitsAdded} leg${result.circuitsAdded === 1 ? "" : "s"} got the type's wires as a circuit.`
+            : "A route now — its ends are questions again."
+      ),
+    onSettled: refreshRuns,
+  });
   const acceptSuggestion = trpc.takeoffRuns.acceptSuggestion.useMutation({
     onError: e => toast.error(e.message),
     onSuccess: () => toast.success("Route accepted — finish it to count it."),
@@ -3574,6 +3734,8 @@ export default function TakeoffPage({
           pathType: tracePathType,
           points: tracePoints,
           status: "draft",
+          // Read on create only, so the first autosave fixes the mode (D21).
+          traceMode,
         },
         {
           onSuccess: result => {
@@ -3585,7 +3747,15 @@ export default function TakeoffPage({
       );
     }, 4000);
     return () => window.clearInterval(timer);
-  }, [tracing, activeSheet?.id, tracePoints, tracePathType, bidId, legRootId]);
+  }, [
+    tracing,
+    activeSheet?.id,
+    tracePoints,
+    tracePathType,
+    bidId,
+    legRootId,
+    traceMode,
+  ]);
 
   /** The crash mat: mirrored locally on every change, which is nearly free. */
   useEffect(() => {
@@ -3673,6 +3843,9 @@ export default function TakeoffPage({
   const persistLeg = useCallback(async (): Promise<number | null> => {
     if (!activeSheet || tracePoints.length < 2) return legRootId;
     let rootId = legRootId;
+    // A quantity trace has no ends to answer (D21): its drops are proposed
+    // afterwards, so nothing from the ends pickers is written onto it.
+    const quantity = activeTraceMode === "quantity";
     if (rootId === null) {
       const saved = await saveRun.mutateAsync({
         bidId,
@@ -3682,11 +3855,13 @@ export default function TakeoffPage({
         pathType: tracePathType,
         points: tracePoints,
         status: "draft",
-        startKind: traceEnds.startKind,
-        endKind: traceEnds.endKind,
+        startKind: quantity ? null : traceEnds.startKind,
+        endKind: quantity ? null : traceEnds.endKind,
         runTypeId: armedRunType[tracePathType]?.id ?? null,
+        traceMode,
       });
       rootId = saved.id;
+      setLegRootMode(traceMode);
     } else {
       const start = legStart ?? {
         kind: "free" as const,
@@ -3710,7 +3885,7 @@ export default function TakeoffPage({
             : start.kind === "stamp"
               ? { kind: "stamp", stampId: start.stampId, startKind: null }
               : { kind: "free", startKind: null },
-        endKind: traceEnds.endKind,
+        endKind: quantity ? null : traceEnds.endKind,
         ...(armedRunType[tracePathType]
           ? { runTypeId: armedRunType[tracePathType]!.id }
           : {}),
@@ -3729,6 +3904,8 @@ export default function TakeoffPage({
     tracePathType,
     traceEnds,
     armedRunType,
+    activeTraceMode,
+    traceMode,
   ]);
 
   /**
@@ -3771,7 +3948,7 @@ export default function TakeoffPage({
             sheetId: activeSheet.id,
           })) ||
         runs;
-      return resolveLegStart({
+      const snap = resolveLegStart({
         at: at.point,
         tolerance: at.tolerance,
         free: at.free,
@@ -3780,8 +3957,10 @@ export default function TakeoffPage({
           .map(r => ({ id: r.id, points: r.points as PagePoint[] })),
         stamps: visibleStamps.map(s => ({ id: s.id, x: s.x, y: s.y })),
       });
+      // A quantity trace joins without a tee (D21, answer 2).
+      return activeTraceMode === "quantity" ? quantitySnap(snap) : snap;
     },
-    [activeSheet, utils, runs, legRootId, visibleStamps]
+    [activeSheet, utils, runs, legRootId, visibleStamps, activeTraceMode]
   );
 
   /** The first click of a leg: snapped, then the leg's first point. */
@@ -3803,12 +3982,14 @@ export default function TakeoffPage({
       id: number;
       parentRunId: number | null;
       pathType: RunPathType;
+      traceMode: TraceMode;
     }) => {
       setTracePathType(run.pathType);
       setTracePoints([]);
       draftRunId.current = null;
       savedPointCount.current = 0;
       setLegRootId(run.parentRunId ?? run.id);
+      setLegRootMode(run.traceMode);
       setLegPrevEnd(null);
       setLegStart(null);
       setTracing(true);
@@ -3850,15 +4031,17 @@ export default function TakeoffPage({
         points: tracePoints,
         status: "draft",
         // What the pickers said at the moment this run was finished. The
-        // KIND is copied down; the HEIGHT stays a live setting.
-        startKind: traceEnds.startKind,
-        endKind: traceEnds.endKind,
+        // KIND is copied down; the HEIGHT stays a live setting. A quantity
+        // trace takes neither: its drops are proposed afterwards (D21).
+        startKind: traceMode === "quantity" ? null : traceEnds.startKind,
+        endKind: traceMode === "quantity" ? null : traceEnds.endKind,
         /*
           What this run IS. The server reads the label off the type rather than
           taking one from here, so a run cannot be saved claiming to be
           something its type does not say.
         */
         runTypeId: armedRunType[tracePathType]?.id ?? null,
+        traceMode,
       },
       {
         onSuccess: result => {
@@ -3885,6 +4068,7 @@ export default function TakeoffPage({
     legBusy,
     persistLeg,
     resetLegs,
+    traceMode,
   ]);
 
   const cancelTrace = useCallback(() => {
@@ -4648,7 +4832,7 @@ export default function TakeoffPage({
             </>
           )}
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             {/*
               ── CALIBRATE — beside the thing it changes, not among the tools ─
 
@@ -4690,10 +4874,19 @@ export default function TakeoffPage({
             */}
             {tracing && (
               <>
+                {/* Legs added to a run from the panel follow THAT run's mode. */}
+                {legRootId === null && (
+                  <TraceModeToggle
+                    value={traceMode}
+                    onChange={updateTraceMode}
+                    locked={tracePoints.length > 0}
+                  />
+                )}
                 <TraceEndsPickers
                   bidId={bidId}
                   value={traceEnds}
                   onChange={updateTraceEnds}
+                  quantity={activeTraceMode === "quantity"}
                 />
                 <div className="w-px h-4 bg-border" />
               </>
@@ -5082,10 +5275,26 @@ export default function TakeoffPage({
                       measurability={measurability}
                       tracing={tracing}
                       pathType={tracePathType}
-                      endsLabel={armedEndsLabel}
+                      // A quantity trace has no ends; the pill says what it
+                      // counts instead, and what a drop will be proposed as.
+                      endsLabel={
+                        activeTraceMode === "quantity"
+                          ? `Quantity — drops to ${endKindLabel(traceEnds.endKind, heightsForBid?.types)}`
+                          : armedEndsLabel
+                      }
                       points={tracePoints}
                       onPointsChange={setTracePoints}
                       existingRuns={visibleRuns}
+                      drops={dropMarkers}
+                      onSelectDrop={drop => {
+                        // Open the trace's leg in the panel, with this drop
+                        // expanded — where its type and height are changed.
+                        setSelectedRunId(drop.legId);
+                        setSelectedDrop(drop);
+                        updatePanels(current =>
+                          current.work ? current : togglePanel(current, "work")
+                        );
+                      }}
                       onFinish={finishTrace}
                       onCancel={cancelTrace}
                       selectedRunId={selectedRunId}
@@ -5270,7 +5479,25 @@ export default function TakeoffPage({
                         runTypes.data ?? [],
                         run.runTypeId
                       )}
-                      circuits={run.circuits}
+                      /*
+                        What the ARITHMETIC reads, not what is stored. A
+                        quantity trace pulls one circuit of its type (D21) and
+                        has no rows — handed its stored ones, this said "none
+                        pulled yet" beside 230 ft of wire on the row above.
+                        Seen on screen 2026-09-26.
+                      */
+                      circuits={
+                        run.traceMode === "quantity"
+                          ? run.typeDefaults?.conductorCount
+                            ? [
+                                {
+                                  conductorCount:
+                                    run.typeDefaults.conductorCount,
+                                },
+                              ]
+                            : []
+                          : run.circuits
+                      }
                       locked={quantitiesLocked}
                       onSave={patch =>
                         respecifyRun.mutateAsync({ id: run.id, ...patch })
@@ -5279,29 +5506,61 @@ export default function TakeoffPage({
                   </div>
                 );
               }}
-              renderRunEnds={run => (
-                <RunEndsEditor
-                  bidId={bidId}
-                  runId={run.id}
-                  ends={
-                    run.ends ?? {
-                      startKind: null,
-                      endKind: null,
-                      startHeightInches: null,
-                      endHeightInches: null,
-                      distributionHeightInches: null,
-                      startStampId: null,
-                      endStampId: null,
+              renderRunEnds={run =>
+                run.traceMode === "quantity" ? (
+                  // A quantity trace has no ends to set — it has drops to
+                  // review, for the whole trace, under whichever leg is open.
+                  <QuantityDropsReview
+                    bidId={bidId}
+                    legs={
+                      quantityLegsByRoot.get(run.parentRunId ?? run.id) ?? []
                     }
-                  }
-                  verticals={run.quantities?.verticals ?? null}
-                  suggestion={suggestionForRun(run.id)}
-                  teeEnds={{
-                    start: Boolean(run.startTee),
-                    end: Boolean(run.endTee),
-                  }}
-                />
-              )}
+                    toKind={traceEnds.endKind}
+                    onToKind={endKind =>
+                      updateTraceEnds({ ...traceEnds, endKind })
+                    }
+                    types={heightsForBid?.types ?? []}
+                    distributionInches={
+                      heightsForBid?.distributionHeight.inches ?? null
+                    }
+                    selected={selectedDrop}
+                    onSelect={setSelectedDrop}
+                    onJumpTo={at => {
+                      setFocusPoint(at);
+                      window.setTimeout(() => setFocusPoint(null), 2200);
+                    }}
+                    onAnswer={answers =>
+                      answerDrops.mutate({
+                        rootRunId: run.parentRunId ?? run.id,
+                        answers,
+                      })
+                    }
+                    busy={answerDrops.isPending}
+                  />
+                ) : (
+                  <RunEndsEditor
+                    bidId={bidId}
+                    runId={run.id}
+                    ends={
+                      run.ends ?? {
+                        startKind: null,
+                        endKind: null,
+                        startHeightInches: null,
+                        endHeightInches: null,
+                        distributionHeightInches: null,
+                        startStampId: null,
+                        endStampId: null,
+                      }
+                    }
+                    verticals={run.quantities?.verticals ?? null}
+                    suggestion={suggestionForRun(run.id)}
+                    teeEnds={{
+                      start: Boolean(run.startTee),
+                      end: Boolean(run.endTee),
+                    }}
+                  />
+                )
+              }
               legend={
                 <>
                   {/* Above the layers and the legend: what the reader found
@@ -5417,6 +5676,23 @@ export default function TakeoffPage({
                 updateCircuit.mutate({ id, ...patch })
               }
               onRemoveCircuit={id => removeCircuit.mutate({ id })}
+              onSetTraceMode={(runId, mode) =>
+                setRunTraceMode.mutate({ runId, mode })
+              }
+              dropsReadout={
+                <BidDropsReadout
+                  bidId={bidId}
+                  onJump={to => {
+                    // Another sheet, maybe on another plan: open it first.
+                    if (to.bidPdfId !== null && to.bidPdfId !== doc?.id)
+                      setSelectedDocId(to.bidPdfId);
+                    if (to.pageNumber !== null) setPage(to.pageNumber);
+                    setSelectedRunId(to.runId);
+                    setFocusPoint({ x: to.x, y: to.y });
+                    window.setTimeout(() => setFocusPoint(null), 2200);
+                  }}
+                />
+              }
             />
           </SidePanel>
         </div>

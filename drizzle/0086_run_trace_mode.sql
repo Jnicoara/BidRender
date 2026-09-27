@@ -1,0 +1,22 @@
+-- Quantity mode on a traced run (D21 in references/takeoff-spec.md,
+-- plan-viewer-overhaul.md § 5o).
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- One nullable column, no default, no UPDATE. NULL is "route", which is what
+-- every run already is, so no existing row changes meaning. Old code ignores
+-- the column; new code against an old database would die on a bare select().
+-- CLAUDE.md § "THREE STEPS, NOT TWO". Step 3 is empty.
+--
+-- Hand-written, not generated, for the reason 0065 and 0067 give.
+--
+-- ── Why NULL rather than NOT NULL DEFAULT 'route' ───────────────────────────
+-- Nothing reads the difference today, and a default would write a value onto
+-- every existing row for no reader. NULL-means-route is the same shape as
+-- parentRunId (NULL is a root) and needs no backfill.
+--
+-- ── Stored on EVERY row of a run ────────────────────────────────────────────
+-- Root and legs alike, kept equal by the server (addLeg copies it, a switch
+-- writes the root and its legs together), so each reader decides from the row
+-- in front of it rather than a root lookup a new caller could forget.
+ALTER TABLE `takeoff_runs`
+	ADD `traceMode` enum('route','quantity');

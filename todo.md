@@ -1295,14 +1295,69 @@ path is ever revived, give it the same treatment first.
 - [ ] **A billing plan should set `seatLimit` through `db.setSeatLimit`**, so a downgrade hits the same "remove N first" refusal. Nothing else writes the column today except 0081.
 - [ ] **Nobody but a platform admin can add a seat.** "Remove someone or add a seat" names an action an owner cannot yet take themselves; it becomes self-serve with billing.
 
-## Branch legs on a traced run (D20, built 2026-09-26, NOT deployed)
+## Quantity mode — flat footage under a type (D21, built 2026-09-26)
+
+**DEPLOYED 2026-09-27 as `a64dfbc`** (rollback target `b69c35d`). 0086 applied
+to production before the push; drift clean at 87; `fittingsImpact` 0 quantity
+rows. Rehearsed on backup `2026-09-27T00-41-48Z`; results and the live checks
+on bid 25 in `references/deploying.md` § 5b "Fifth run". Bid 25 back to 0
+lines, 0 runs, no scaled sheet afterwards.
+
+On `local-dev` as the ten "Quantity mode step N" commits.
+A run carries `traceMode` (`route` | `quantity`, NULL is route) on every row;
+a quantity trace is D20's legs without tees, its wire is its type's
+(`quantityCircuit`, through `circuitWire`), and its drops are proposed at leg
+ends and approved AS END KINDS — no table of answers. Modules:
+`shared/traceMode.ts`, `shared/quantityDrops.ts`. Spec:
+`plan-viewer-overhaul.md` § 5o.
+
+- [x] **Deploy — three steps, and step 3 is empty.** Done as below.
+  1. **0086 is step 1 (additive): apply it BEFORE the push.** One nullable
+     enum column on `takeoff_runs`, no default, no UPDATE. Applied to
+     `bidrender_local` and `bidrender_test_clean`; a second run applies
+     nothing. Afterwards `scripts/schemaDrift.mts` should report no drift at
+     87 — **if it does not, stop and find out why before pushing.**
+  2. Push. **Not a catalog release** — no seed rows change.
+  3. Nothing.
+  - `scripts/fittingsImpact.mts` now needs 0086 too, and prints the
+    quantity-trace row count: **0 on the day 0086 is applied**. Any other
+    number means rows were written by a build that should not have been
+    running — stop.
+  - **One route-run wording changes with this release, deliberately:** a
+    run level at BOTH ends on a job with no run height stops being called
+    "counted flat only" (`verticalAtEnd` answers "level" before the gate).
+    No number moves; a warning about a run with nothing missing goes away.
+- [ ] **The finish toast names the ROOT's length only** ("Run finished — 57.6
+      ft traced" for a three-leg, 121 ft trace). Same for branch legs since
+      D20. The panel's leg header has the true total.
+- [ ] **An open drop's editor shows "To: Not set"** while the row above says
+      "proposed" with the proposed kind's footage — true (nothing stored) but
+      could read oddly. Approve uses the proposal. Watch for confusion.
+- [ ] **No AI path yet.** The reader cannot propose a quantity trace; when it
+      can, it goes through `save` + `addLeg` like the hand path, so the counts
+      agree by construction.
+- [ ] **Commit the router snapshot as a script.** Two deploys running now have
+      proved existing data unchanged by calling `takeoffRuns.totals`,
+      `takeoffRunTypes.bridgeForBid` and `takeoffRuns.listForSheet` for every
+      bid and comparing files — and both times the script was a throwaway, so
+      the second deploy had to rewrite it. It belongs in `scripts/` beside
+      `catalogRehearsal.mts`, with a way to name the fields a release ADDS so
+      they are asserted rather than diffed. Found 2026-09-27.
+
+## Branch legs on a traced run (D20, built 2026-09-26)
+
+**DEPLOYED 2026-09-26 as `b69c35d`** (rollback target `e07f1e4`). 0085 applied
+to production before the push; drift clean at 86; `fittingsImpact` 0 leg rows,
+0 tees. Rehearsed on backup `2026-09-26T23-08-29Z`; results and the live
+checks on bid 25 in `references/deploying.md` § 5b "Fourth run". Bid 25 back
+to 0 lines and 0 runs afterwards.
 
 On `local-dev` as the ten "Branch legs step N" commits. A run is a root row
 plus leg rows (`parentRunId`); a tee (`takeoff_run_tees`) cuts the leg it
 lands on, so every row is a leg between two nodes and the fitting and bend
 counts need no rule of their own. `shared/runNetwork.ts` is the module.
 
-- [ ] **Deploy — three steps, and step 3 is empty.**
+- [x] **Deploy — three steps, and step 3 is empty.** Done as below.
   1. **0085 is step 1 (additive): apply it BEFORE the push.** One new table
      (named `utf8mb4_unicode_ci`), three nullable columns on `takeoff_runs`,
      and `teeBox`/`teeCover` appended to `bid_line_items.runMaterialRole`. No

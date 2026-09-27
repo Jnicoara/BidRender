@@ -24,16 +24,8 @@ export async function footageByRunType(
   ]);
   if (runs.length === 0) return new Map();
 
-  const circuits = await db.getCircuitsForRuns(
-    runs.map(run => run.id),
-    userId
-  );
-  const circuitsByRun = new Map<number, typeof circuits>();
-  for (const circuit of circuits) {
-    const list = circuitsByRun.get(circuit.runId) ?? [];
-    list.push(circuit);
-    circuitsByRun.set(circuit.runId, list);
-  }
+  // A quantity trace's wire comes from its type (D21).
+  const circuitsByRun = await db.getWireCircuitsForRuns(runs, userId);
 
   const heights = await db.heightContextForBid(
     bidId,

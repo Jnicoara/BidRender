@@ -31,6 +31,7 @@ import {
   RUN_PATH_TYPES,
   RUN_STATUSES,
   TAKEOFF_LOCATIONS,
+  TRACE_MODES,
 } from "../../drizzle/schema";
 import {
   pathRealInches,
@@ -40,6 +41,7 @@ import {
 import { bendContextForRuns, runBendsFor } from "../runBendDetail";
 import {
   DISTRIBUTION_KIND,
+  heightTypeLabel,
   shippedHeightType,
 } from "../../shared/takeoffHeights";
 import {
@@ -60,6 +62,8 @@ import { EMPTY_HEIGHT_CONTEXT, verticalsForRunRow } from "../runVerticals";
 import { resolveRunType } from "../../shared/runTypeLookup";
 import { resolveMaterial } from "../../shared/materialLookup";
 import { rootOf } from "../../shared/runNetwork";
+import { traceModeOf } from "../../shared/traceMode";
+import { quantityTraceSummary } from "../../shared/quantityDrops";
 import {
   circuitPlan,
   findMatchingRunType,
@@ -206,10 +210,16 @@ export const takeoffRunsRouter = router({
         input.sheetId,
         ctx.scope.dataUserId
       );
-      const circuits = await db.getCircuitsForRuns(
-        runs.map(r => r.id),
-        ctx.scope.dataUserId
-      );
+      // Two reads, for the two mappings below: stored rows for the panel to
+      // edit, and the circuits the ARITHMETIC reads — which on a quantity
+      // trace is one circuit from its type, with no row behind it (D21).
+      const [circuits, wire] = await Promise.all([
+        db.getCircuitsForRuns(
+          runs.map(r => r.id),
+          ctx.scope.dataUserId
+        ),
+        db.getWireCircuitsForRuns(runs, ctx.scope.dataUserId),
+      ]);
 
       // The heights, loaded ONCE for the whole sheet rather than per run. The
       // bid comes from the runs rather than the sheet: a sheet belongs to a
@@ -276,7 +286,7 @@ export const takeoffRunsRouter = router({
           added column reaching the SCREEN silently is clutter nobody chose.
           Display shapes are listed on purpose.
         */
-        const forMaths = rows.map(circuitWire);
+        const forMaths = (wire.get(run.id) ?? []).map(circuitWire);
         const runCircuits = rows.map(c => ({
           id: c.id,
           name: c.name,
@@ -306,6 +316,8 @@ export const takeoffRunsRouter = router({
           parentRunId: run.parentRunId,
           startTee: teeOf(run.startTeeId),
           endTee: teeOf(run.endTeeId),
+          /** Route or quantity (D21), with NULL already read as route. */
+          traceMode: traceModeOf(run),
           /**
            * What this run IS, and what to call it.
            *
@@ -363,6 +375,7 @@ export const takeoffRunsRouter = router({
             endKind: run.endKind,
             startTeeId: run.startTeeId,
             endTeeId: run.endTeeId,
+            traceMode: run.traceMode,
             branchWiring: run.branchWiring,
           }),
           /**
@@ -440,6 +453,13 @@ export const takeoffRunsRouter = router({
          */
         startKind: kindSchema.optional(),
         endKind: kindSchema.optional(),
+        /**
+         * Route or quantity (D21). Read on CREATE only: the trace toolbar's
+         * choice when the run began. Changing it afterwards is
+         * `setTraceMode`, which moves the root and every leg together — a
+         * save that could flip one row would leave a run half of each.
+         */
+        traceMode: z.enum(TRACE_MODES).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -562,7 +582,11 @@ export const takeoffRunsRouter = router({
         };
       }
 
-      const id = await db.createRun(values);
+      const id = await db.createRun({
+        ...values,
+        // NULL is route — the same as every run before 0086.
+        traceMode: input.traceMode === "quantity" ? "quantity" : null,
+      });
       return {
         id,
         measured: inches !== null,
@@ -939,6 +963,19 @@ export const takeoffRunsRouter = router({
       const group = await db.getRunGroup(root.id, userId);
 
       const start = input.start;
+      /*
+        A GUARD: a quantity trace makes no tees (D21, answer 2). A leg that
+        starts on another leg is simply a leg that starts there — no box, no
+        cut, and no drop proposed at that end. The screen sends "free" for
+        it; this refuses anything else, so no caller can buy a box here.
+      */
+      if (start.kind === "tee" && root.traceMode === "quantity") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "A quantity trace has no branch tees — start the leg as a free leg.",
+        });
+      }
       if (start.kind === "tee" && !group.some(r => r.id === start.hostRunId)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -1125,10 +1162,8 @@ export const takeoffRunsRouter = router({
       const runs = allRuns.filter(
         r => r.status === "committed" && !r.isSuggestion
       );
-      const circuits = await db.getCircuitsForRuns(
-        runs.map(r => r.id),
-        ctx.scope.dataUserId
-      );
+      // A quantity trace's wire comes from its type (D21).
+      const wire = await db.getWireCircuitsForRuns(runs, ctx.scope.dataUserId);
 
       // Each run measures against ITS OWN sheet's scale — a bid can hold a site
       // plan at 1" = 40' and a floor plan at 1/4" = 1'-0".
@@ -1153,19 +1188,20 @@ export const takeoffRunsRouter = router({
         bid.distributionHeightInches
       );
 
-      return totalQuantities(
+      const totals = totalQuantities(
         runs.map(run => ({
           run: {
             pathType: run.pathType as RunPathType,
             points: run.points ?? [],
           },
-          circuits: circuits.filter(c => c.runId === run.id).map(circuitWire),
+          circuits: (wire.get(run.id) ?? []).map(circuitWire),
           ratio: ratioBySheet.get(run.sheetId) ?? null,
           verticals: verticalsForRunRow(run, heights),
           // A branched run is several rows and ONE run in the counts (D20).
           runKey: rootOf(run),
         }))
       );
+      return { ...totals, quantity: quantityTraceSummary(runs) };
     }),
 
   /**
@@ -1324,5 +1360,193 @@ export const takeoffRunsRouter = router({
     .mutation(async ({ input, ctx }) => {
       await db.clearPullPointAnswer(ctx.scope.dataUserId, input.id);
       return { ok: true };
+    }),
+
+  // ── Quantity mode (D21) ────────────────────────────────────────────────────
+
+  /**
+   * Switch a run between route and quantity — the root and every leg.
+   *
+   * Both directions, nothing deleted (answer 5); see `db.setRunTraceMode`.
+   * Refused on a quantity-locked bid, like retyping a run: it changes what
+   * the run's wire is made of, which is what the lock holds still.
+   */
+  setTraceMode: procedure
+    .input(
+      z.object({
+        /** Any row of the run: the root or one of its legs. */
+        runId: z.number().int().positive(),
+        mode: z.enum(TRACE_MODES),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const run = await requireRun(input.runId, userId);
+      await refuseIfLocked(run.bidId, userId);
+      return db.setRunTraceMode(rootOf(run), userId, input.mode);
+    }),
+
+  /**
+   * Answer proposed drops on a quantity trace — one, or "Approve all".
+   *
+   * Each answer is written as the END KIND (D21): a device kind approves, the
+   * distribution kind dismisses, NULL takes the answer back so the end is
+   * proposed again. That is the whole store; nothing else remembers a
+   * proposal, so nothing can disagree with it.
+   *
+   * Every leg must belong to ONE quantity trace, and no end may sit on a tee
+   * — the same guard `setEnds` makes, for the same reason.
+   */
+  answerDrops: procedure
+    .input(
+      z.object({
+        rootRunId: z.number().int().positive(),
+        answers: z
+          .array(
+            z.object({
+              runId: z.number().int().positive(),
+              end: z.enum(["start", "end"]),
+              kind: kindSchema,
+              heightInches: runInchesSchema.optional(),
+            })
+          )
+          .min(1)
+          .max(2000),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const group = await db.getRunGroup(input.rootRunId, userId);
+      const root = group.find(r => r.id === input.rootRunId);
+      if (!root || root.parentRunId !== null)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Run not found." });
+      if (traceModeOf(root) !== "quantity")
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Drops are proposed on quantity traces only — a route run's ends are set on the run.",
+        });
+      const byId = new Map(group.map(r => [r.id, r]));
+      for (const a of input.answers) {
+        const row = byId.get(a.runId);
+        if (!row)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "That leg is not part of this trace.",
+          });
+        if ((a.end === "start" ? row.startTeeId : row.endTeeId) !== null)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "That end is a branch tee — it has no drop.",
+          });
+      }
+      for (const kind of Array.from(new Set(input.answers.map(a => a.kind))))
+        await requireKnownKind(kind, userId);
+      await db.answerQuantityDrops(userId, input.answers);
+      return { answered: input.answers.length };
+    }),
+
+  /**
+   * Every rise and drop on the bid, in one list (D21, answer 6): the ends of
+   * route runs and the approved drops of quantity traces, each labelled by
+   * where it came from, with where it is so a row can jump to it.
+   *
+   * Counted the way `totals` counts — committed, not suggested, and not on a
+   * sheet that cannot be measured — so the readout and the totals above it
+   * give the same vertical footage. What is left out is COUNTED and returned,
+   * never dropped in silence.
+   */
+  drops: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const bid = await db.getBidById(input.bidId, userId);
+      if (!bid)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
+      const [allRuns, scales, places, heights] = await Promise.all([
+        db.getRunsForBid(input.bidId, userId),
+        db.getSheetScalesForBid(input.bidId, userId),
+        db.getSheetPlacesForBid(input.bidId, userId),
+        db.heightContextForBid(
+          input.bidId,
+          userId,
+          bid.distributionHeightInches
+        ),
+      ]);
+      const runs = allRuns.filter(
+        r => r.status === "committed" && !r.isSuggestion
+      );
+
+      const drops: {
+        runId: number;
+        rootRunId: number;
+        sheetId: number;
+        sheetName: string;
+        /** Where the sheet is, so a row can open it: plan and page. */
+        bidPdfId: number | null;
+        pageNumber: number | null;
+        end: "start" | "end";
+        x: number;
+        y: number;
+        kind: string;
+        label: string;
+        direction: "rise" | "drop";
+        feet: number;
+        source: "route" | "quantity";
+      }[] = [];
+      let notMeasurable = 0;
+      let noRunHeight = 0;
+      for (const run of runs) {
+        const sheet = scales.get(run.sheetId);
+        const measurable =
+          !!sheet &&
+          sheet.scaleRatio !== null &&
+          !(sheet.notToScale && sheet.scaleSource !== "manual");
+        const verticals = verticalsForRunRow(run, heights);
+        const points = run.points ?? [];
+        for (const end of ["start", "end"] as const) {
+          const v = end === "start" ? verticals.start : verticals.end;
+          if (!v.counted) {
+            /*
+              A device end with the gate shut: the job has no run height, so
+              no drop anywhere can be counted. Said with a count, so an empty
+              list is never read as a job with no drops. A panel with no
+              height is NOT counted here — panels ship with no vertical on
+              purpose (§ 5d answer 2), and warning about every one would teach
+              people to read past the line.
+            */
+            if (
+              v.reason === "no-distribution-height" &&
+              v.kind !== DISTRIBUTION_KIND
+            )
+              noRunHeight++;
+            continue;
+          }
+          if (!measurable) {
+            notMeasurable++;
+            continue;
+          }
+          const at = end === "start" ? points[0] : points[points.length - 1];
+          if (!at) continue;
+          const place = places.get(run.sheetId);
+          drops.push({
+            runId: run.id,
+            rootRunId: rootOf(run),
+            sheetId: run.sheetId,
+            sheetName: place?.name ?? "Sheet",
+            bidPdfId: place?.bidPdfId ?? null,
+            pageNumber: place?.pageNumber ?? null,
+            end,
+            x: at.x,
+            y: at.y,
+            kind: v.kind,
+            label: heightTypeLabel(v.kind, heights.types) ?? v.kind,
+            direction: v.direction,
+            feet: v.feet,
+            source: traceModeOf(run),
+          });
+        }
+      }
+      return { drops, notMeasurable, noRunHeight };
     }),
 });

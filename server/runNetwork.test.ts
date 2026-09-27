@@ -82,6 +82,10 @@ function row(input: {
     verticals: { start: LEVEL, end: LEVEL },
     feetPerPoint: FT,
     answers: [],
+    // Branch legs are route runs (D20); quantity traces make no tees (D21).
+    traceMode: null,
+    startKind: null,
+    endKind: null,
   });
 }
 

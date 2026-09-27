@@ -298,6 +298,18 @@ describe("the vertical at one end of a run", () => {
     expect(!vertical.counted && vertical.reason).toBe("no-distribution-height");
   });
 
+  it("reads 'carries on at run height' as level even while the gate is shut", () => {
+    // Nothing is missing at a level end, known run height or not. Read as the
+    // gate first, a run level at both ends — and every unanswered end of a
+    // quantity trace (D21) — was warned about as "counted flat only".
+    const vertical = verticalAtEnd({
+      kind: "distribution",
+      endInches: null,
+      distributionInches: null,
+    });
+    expect(!vertical.counted && vertical.reason).toBe("level");
+  });
+
   it("refuses a type whose height nobody has set, and says which problem it is", () => {
     const vertical = verticalAtEnd({
       kind: "panel",
@@ -1101,6 +1113,7 @@ describe("resolving a stored run's verticals", () => {
     distributionHeightInches: null,
     startTeeId: null,
     endTeeId: null,
+    traceMode: null,
   };
 
   it("drops to a receptacle from the company's run height", () => {
@@ -1179,6 +1192,30 @@ describe("resolving a stored run's verticals", () => {
     );
     expect(verticals.feet).toBe(0);
     expect(verticals.end.counted).toBe(false);
+  });
+
+  it("reads an unanswered end of a QUANTITY trace as level, not unset (D21)", () => {
+    // Same row, same NULL. A route end is "no-kind" — an open question, which
+    // is what makes the totals say "counted flat only". A quantity end is flat
+    // by choice, so it must NOT say that; its drops are proposed instead.
+    const route = verticalsForRunRow(
+      { ...PANEL_TO_RECEPTACLE, endKind: null },
+      COMPANY
+    );
+    const quantity = verticalsForRunRow(
+      { ...PANEL_TO_RECEPTACLE, endKind: null, traceMode: "quantity" },
+      COMPANY
+    );
+    expect(!route.end.counted && route.end.reason).toBe("no-kind");
+    expect(!quantity.end.counted && quantity.end.reason).toBe("level");
+    expect(quantity.feet).toBe(0);
+    // An APPROVED drop on a quantity trace counts exactly as a route end does.
+    expect(
+      verticalsForRunRow(
+        { ...PANEL_TO_RECEPTACLE, traceMode: "quantity" },
+        COMPANY
+      ).feet
+    ).toBe(8.5);
   });
 
   it("adds nothing at a junction box the run passes through", () => {

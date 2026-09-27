@@ -2621,6 +2621,18 @@ export type RunMaterialRole = (typeof RUN_MATERIAL_ROLES)[number];
 export const RUN_STATUSES = ["draft", "committed"] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
 
+/**
+ * How a run was traced (D21, 0086).
+ *
+ *   route     a real run: ends, drops, circuits, the D18 question, tees
+ *   quantity  flat footage under a type — many legs into one bucket, no ends
+ *             to answer, wire from the type, drops proposed afterwards
+ *
+ * NULL on the column is route. See `shared/traceMode.ts`, the one reader.
+ */
+export const TRACE_MODES = ["route", "quantity"] as const;
+export type TraceMode = (typeof TRACE_MODES)[number];
+
 export const takeoffRuns = mysqlTable(
   "takeoff_runs",
   {
@@ -2657,6 +2669,16 @@ export const takeoffRuns = mysqlTable(
     scaleRatioUsed: decimal("scaleRatioUsed", { precision: 14, scale: 6 }),
 
     status: mysqlEnum("status", RUN_STATUSES).default("draft").notNull(),
+
+    /**
+     * Route or quantity (D21, 0086). NULL is route — every run before 0086.
+     *
+     * On EVERY row of a run, root and legs alike, kept equal by the server,
+     * so a reader decides from the row it has. Never read it directly: go
+     * through `traceModeOf` in shared/traceMode.ts, which is where NULL
+     * becomes route.
+     */
+    traceMode: mysqlEnum("traceMode", TRACE_MODES),
 
     /** WHERE the raceway sits. Same axis as a stamp's; see TAKEOFF_LOCATIONS. */
     location: mysqlEnum("location", TAKEOFF_LOCATIONS),
