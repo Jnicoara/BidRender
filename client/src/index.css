@@ -441,3 +441,35 @@
     size: letter portrait;
   }
 }
+
+/* ============================================================
+   Staging band — see components/StagingBand.tsx.
+   Unlayered on purpose: it must beat Tailwind's `h-dvh` / `min-h-dvh`
+   utilities, which live in a cascade layer. Every full-height container in
+   the app uses one of those two (CLAUDE.md § Responsiveness, rule 4), so
+   shrinking them by the band's height is what keeps the bottom of each
+   screen on screen instead of under the window edge.
+   ============================================================ */
+html[data-env="staging"] {
+  --staging-band-h: 22px;
+}
+.staging-band {
+  height: var(--staging-band-h, 22px);
+}
+html[data-env="staging"] body {
+  padding-top: var(--staging-band-h);
+}
+html[data-env="staging"] .h-dvh {
+  height: calc(100dvh - var(--staging-band-h));
+}
+html[data-env="staging"] .min-h-dvh {
+  min-height: calc(100dvh - var(--staging-band-h));
+}
+@media print {
+  .staging-band {
+    display: none;
+  }
+  html[data-env="staging"] body {
+    padding-top: 0;
+  }
+}

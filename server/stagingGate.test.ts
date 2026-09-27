@@ -171,6 +171,27 @@ describe("with STAGING_PASSWORD set — staging", () => {
     expect(api.status).toBe(200);
   });
 
+  it("re-issues the band cookie when a let-in browser has lost it", async () => {
+    // Found on screen 2026-09-27: with only the gate cookie left, the app
+    // opened with no STAGING band. The band must follow the gate, always.
+    const { base } = await start(env);
+    const res = await fetch(`${base}/`, {
+      headers: { cookie: `${GATE_COOKIE}=${stagingGateToken(PASSWORD)}` },
+    });
+    expect(res.status).toBe(200);
+    expect(cookiesOf(res).join("\n")).toContain(`${ENV_COOKIE}=staging`);
+  });
+
+  it("does not re-send the band cookie when the browser already has it", async () => {
+    const { base } = await start(env);
+    const res = await fetch(`${base}/`, {
+      headers: {
+        cookie: `${GATE_COOKIE}=${stagingGateToken(PASSWORD)}; ${ENV_COOKIE}=staging`,
+      },
+    });
+    expect(cookiesOf(res)).toEqual([]);
+  });
+
   it("a cookie minted for a different password does not open it", async () => {
     const { base } = await start(env);
     const res = await fetch(`${base}/`, {
@@ -194,6 +215,12 @@ describe("safeNextPath — the redirect after the password", () => {
   it("keeps a path on this site", () => {
     expect(safeNextPath("/")).toBe("/");
     expect(safeNextPath("/settings/pricing#top")).toBe("/settings/pricing#top");
+  });
+  it("never sends you back to the gate itself", () => {
+    // After a wrong try the address bar shows the gate's own path, and the
+    // form reports that as where you were going. Found on screen, 2026-09-27.
+    expect(safeNextPath(GATE_PATH)).toBe("/");
+    expect(safeNextPath(`${GATE_PATH}?x=1`)).toBe("/");
   });
   it("refuses anything that would leave the site", () => {
     expect(safeNextPath("https://evil.example")).toBe("/");
