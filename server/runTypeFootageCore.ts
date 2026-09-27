@@ -31,6 +31,7 @@ import { legFromRun, type FittingLeg } from "../shared/runFittings";
 import type { TeeRef } from "../shared/runNetwork";
 import type { PullPointAnswer } from "../shared/runBends";
 import { pointsToRealInches } from "../shared/takeoffGeometry";
+import { uncountedEnds } from "../shared/takeoffHeights";
 import { verticalsForRunRow, type HeightContext } from "./runVerticals";
 import type { TraceMode, WireCircuits } from "../shared/traceMode";
 
@@ -57,6 +58,20 @@ export type RunTypeFootageRow = {
    * panel shows, never a second amount to add.
    */
   quantityFeet: number;
+  /**
+   * The share of `conduitFeet` / `cableFeet` that is VERTICAL — drops and
+   * rises at run ends. Already INSIDE those totals, like `quantityFeet`; the
+   * traced share is the total minus this. Added 2026-09-27 for the takeoff
+   * export, which shows the two apart.
+   */
+  verticalFeet: number;
+  /**
+   * Measured runs with at least one end whose drop was NOT counted — no
+   * mounting height answered. Asked of the ENDS, through `uncountedEnds`, the
+   * same question `totalQuantities` asks, so a vertical figure of 0 can be told
+   * apart from "not counted": a run through boxes at run height really is 0.
+   */
+  endsNotCountedCount: number;
   /**
    * Every counted CONDUIT run of this type as a leg, for the fitting count
    * (`shared/runFittings.ts`). An unmeasurable run is here too with `feet`
@@ -165,6 +180,8 @@ export function groupRunFootage(input: {
         unansweredCount: 0,
         branchCount: 0,
         quantityFeet: 0,
+        verticalFeet: 0,
+        endsNotCountedCount: 0,
         legs: [],
         tees: [],
       };
@@ -256,6 +273,11 @@ export function groupRunFootage(input: {
 
     row.conduitFeet += quantities.conduitFeet ?? 0;
     row.cableFeet += quantities.cableFeet ?? 0;
+    row.verticalFeet += quantities.verticalFeet;
+    const notCounted = quantities.verticals
+      ? uncountedEnds(quantities.verticals).length
+      : 2;
+    if (notCounted > 0) row.endsNotCountedCount++;
     if (run.traceMode === "quantity")
       row.quantityFeet +=
         (quantities.conduitFeet ?? 0) + (quantities.cableFeet ?? 0);
@@ -284,6 +306,7 @@ export function groupRunFootage(input: {
     row.insulatedFeet = round2(row.insulatedFeet);
     row.groundFeet = round2(row.groundFeet);
     row.quantityFeet = round2(row.quantityFeet);
+    row.verticalFeet = round2(row.verticalFeet);
   }
   return byType;
 }

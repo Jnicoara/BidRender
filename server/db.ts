@@ -4703,6 +4703,8 @@ export async function getSheetJumpRows(bidId: number, userId: number) {
   const [sheets, reads] = await Promise.all([
     db
       .select({
+        // What stamps and runs point at; the takeoff export keys on it.
+        id: bidPdfSheets.id,
         bidPdfId: bidPdfSheets.bidPdfId,
         pageNumber: bidPdfSheets.pageNumber,
         name: bidPdfSheets.name,
@@ -10453,6 +10455,13 @@ export type BidCostRow = {
   /** Charges that join the direct cost before overhead and profit. */
   markedUpExpenses: number;
   totalHours: number;
+  /**
+   * Lines left out of every sum above because the engine cannot price them
+   * (`costSums`). Non-zero means this bid's figures are SHORT. Carried since
+   * 2026-09-27 — it was computed and then dropped here, so analytics agreed
+   * with the bid screen's arithmetic and never said it was leaving lines out.
+   */
+  brokenLines: number;
 };
 
 function toBidCostRow(row: Record<string, unknown>): BidCostRow {
@@ -10479,6 +10488,7 @@ function toBidCostRow(row: Record<string, unknown>): BidCostRow {
     materialMarkup: Number(row.markupCents) / 100,
     markedUpExpenses: Number(row.markedUpExpenseCents) / 100,
     totalHours: Number(row.totalHours),
+    brokenLines: Number(row.brokenLines),
   };
 }
 

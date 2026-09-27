@@ -133,7 +133,9 @@ Plain steps. Each says where to click and what "done" looks like.
 
 1. Log in to **cloud.digitalocean.com**.
 2. Left menu: **Databases** → click the MySQL cluster.
-3. Open the **Settings** tab. Find **Trusted Sources**.
+3. Open the **Network Access** tab. Find **Trusted Sources**. (Before the
+   lockdown it read "Right now, your database is open to all incoming
+   connections" — confirmed 2026-09-27.)
 4. If it says anything like "all IPv4" or is empty, click **Edit**, and add the
    app: start typing the app's name and pick it from the list.
 5. Also add **your own computer's internet address** — the page offers "add my
@@ -142,6 +144,18 @@ Plain steps. Each says where to click and what "done" looks like.
 6. Save. **Done looks like:** Trusted Sources lists exactly the app and your
    address, and bidridge.com still loads and shows your bids afterwards. If
    the site stops loading, remove the change you just made and tell me.
+
+> **Tried 2026-09-27 and it took the site down — the steps above are wrong as
+> written.** With the app `bidrender` as the only trusted source, the live
+> site stopped working; removing the entry brought it back. The app reaches the
+> database over the **public** hostname, and outbound traffic from App Platform
+> leaves from shared addresses that the "app" trusted-source entry does not
+> match. DigitalOcean's documented route for an app is the **VPC**: enable it
+> on the app, point `DATABASE_URL` at the database's **private** hostname, and
+> trust the app's **VPC egress private IP**
+> (docs.digitalocean.com/products/app-platform/how-to/enable-vpc/). The build
+> is not the cause — `scripts/build.mts` never connects to the database.
+> Revised steps are being walked through with the owner one at a time.
 
 ### B. Check each setting's scope (piece 4) — about 10 minutes
 

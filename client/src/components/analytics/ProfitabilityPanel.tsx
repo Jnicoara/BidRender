@@ -22,6 +22,8 @@ import { AlertTriangle, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatTile } from "./StatTile";
 import { Legend } from "./OutcomesPanel";
+import { IncompleteFiguresNote } from "./IncompleteFiguresNote";
+import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import {
   OUTCOME_COLORS,
   hours,
@@ -59,6 +61,8 @@ type Job = {
   actualMargin: number | null;
   estimatedHours: number;
   actualHours: number;
+  /** Its revenue leaves out a line that can't be priced. */
+  incomplete: boolean;
 };
 
 type Report = {
@@ -66,6 +70,7 @@ type Report = {
   byTrade: Group[];
   multiTradeJobs: number;
   worstJobs: Job[];
+  incompleteJobs: number;
   truncated: boolean;
   jobsInRange: number;
 };
@@ -100,6 +105,10 @@ export function ProfitabilityPanel({
   return (
     <div className="space-y-4">
       <BasisNote overall={overall} report={report} />
+      <IncompleteFiguresNote
+        count={report.incompleteJobs}
+        noun={["job", "jobs"]}
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
@@ -253,6 +262,10 @@ export function ProfitabilityPanel({
                       <td className="py-1.5 pr-3 font-sans">{job.name}</td>
                       <td className="py-1.5 pr-3 text-right">
                         {moneyWhole(job.revenue)}
+                        <IncompletePriceTag
+                          show={job.incomplete}
+                          className="ml-1.5"
+                        />
                       </td>
                       <td className="py-1.5 pr-3 text-right">
                         {job.actualHours} / {job.estimatedHours}

@@ -29,6 +29,7 @@ import {
   CalendarDays,
   Check,
   ClipboardList,
+  FileSpreadsheet,
   Lock,
   Receipt,
   FileSignature,
@@ -64,6 +65,7 @@ import { UnitLinkBadge } from "@/components/UnitLinkBadge";
 import { UnitTemplateActions } from "@/components/UnitTemplateActions";
 import { MaterialsListDialog } from "@/components/MaterialsListDialog";
 import { useCompany } from "@/hooks/useCompany";
+import { useTakeoffExport } from "@/hooks/useTakeoffExport";
 import { AccountingExportDialog } from "@/components/AccountingExportDialog";
 import { ClientLinkField } from "@/components/ClientLinkField";
 import { BidTaxControls } from "@/components/BidTaxControls";
@@ -213,6 +215,7 @@ export default function BidsPage({
   const [materialsListOpen, setMaterialsListOpen] = useState(false);
   const [accountingOpen, setAccountingOpen] = useState(false);
   const access = useCompany();
+  const takeoffExport = useTakeoffExport(bidId);
 
   const utils = trpc.useUtils();
   const detailQuery = trpc.bids.get.useQuery({ id: bidId });
@@ -646,6 +649,22 @@ export default function BidsPage({
                   Materials list
                   <span className="block text-xs text-muted-foreground">
                     For the supplier — quantities, no prices
+                  </span>
+                </span>
+              </DropdownMenuItem>
+
+              {/* The takeoff itself rather than the parts it needs: every
+                  count and run, by sheet and type. A download, not a dialog —
+                  it is read in the spreadsheet it lands in. */}
+              <DropdownMenuItem
+                onSelect={() => void takeoffExport.exportCsv()}
+                disabled={takeoffExport.pending}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span className="flex-1">
+                  Takeoff
+                  <span className="block text-xs text-muted-foreground">
+                    For a spreadsheet — counts and runs by sheet, CSV
                   </span>
                 </span>
               </DropdownMenuItem>

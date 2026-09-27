@@ -205,6 +205,13 @@ export type OutcomesReport = {
     lostValue: number;
     pendingValue: number;
     totalValue: number;
+    /**
+     * Bids in the range carrying a line the engine cannot price. Every dollar
+     * figure in this report leaves those lines out, so the screen must say
+     * so whenever this is above zero — a short total that reads as a whole
+     * one is the fault the bid screen's "incomplete" tag exists to prevent.
+     */
+    incompleteBids: number;
   };
   timeline: OutcomePeriod[];
   /**
@@ -327,6 +334,7 @@ export async function outcomesReport(
       lostValue: roundMoney(timeline.reduce((s, p) => s + p.lostValue, 0)),
       pendingValue: roundMoney(pendingValue),
       totalValue: roundMoney(timeline.reduce((s, p) => s + p.totalValue, 0)),
+      incompleteBids: costs.filter(row => row.brokenLines > 0).length,
     },
     timeline,
     earliestBid: earliest ? asDateString(earliest) : null,
@@ -357,7 +365,13 @@ export type ProfitabilityReport = {
    * The jobs that moved furthest from their estimate, worst first. Capped —
    * this is a "look at these" list, not a report.
    */
-  worstJobs: JobProfit[];
+  worstJobs: ClosedJob[];
+  /**
+   * Closed jobs carrying a line the engine cannot price, so their revenue
+   * (and everything taken from it) is short. See OutcomesReport's
+   * `incompleteBids`, which is the same fact for the other report.
+   */
+  incompleteJobs: number;
   /** True when more jobs closed in the range than one call will value. */
   truncated: boolean;
   /** How many jobs there really are, when truncated. */
@@ -389,10 +403,13 @@ const WORST_JOBS_SHOWN = 10;
  * the line snapshots — because a rate is stable even when hours are not, and
  * because it is the rate the job was actually quoted at rather than today's.
  */
+/** A job as the report returns it: its figures, and whether they are short. */
+export type ClosedJob = JobProfit & { incomplete: boolean };
+
 function toClosedJob(
   row: ClosedJobRow,
   company: CompanyPricingDefaults
-): JobProfit {
+): ClosedJob {
   const actualHours = closeoutActualHours(
     row.mode,
     row.totalActualHours,
@@ -414,7 +431,7 @@ function toClosedJob(
   const rate = row.totalHours > 0 ? row.laborCost / row.totalHours : null;
   const estimatedHours = row.closeoutEstimatedHours;
 
-  return jobProfitability({
+  const job = jobProfitability({
     bidId: row.id,
     name: row.name,
     trades: row.trades ?? [],
@@ -427,6 +444,7 @@ function toClosedJob(
     estimatedHours,
     actualHours,
   });
+  return { ...job, incomplete: row.brokenLines > 0 };
 }
 
 /**
@@ -503,6 +521,7 @@ export async function profitabilityReport(
     multiTradeJobs,
     timeline,
     worstJobs,
+    incompleteJobs: jobs.filter(job => job.incomplete).length,
     truncated: jobsInRange > rows.length,
     jobsInRange,
   };

@@ -17,6 +17,7 @@ import { clientsRouter } from "./routers/clientsRouter";
 import { salesTaxRouter } from "./routers/salesTaxRouter";
 import { bidExtrasRouter } from "./routers/bidExtrasRouter";
 import { materialsListRouter } from "./routers/materialsListRouter";
+import { takeoffExportRouter } from "./routers/takeoffExportRouter";
 import { accountingRouter } from "./routers/accountingRouter";
 import { companyRouter } from "./routers/companyRouter";
 import { closeoutRouter } from "./routers/closeoutRouter";
@@ -65,6 +66,7 @@ export const appRouter = router({
   // to a bid. Both snapshot onto the bid, as every library in this app does.
   bidExtras: bidExtrasRouter,
   materialsList: materialsListRouter,
+  takeoffExport: takeoffExportRouter,
   accounting: accountingRouter,
   // Access control: who is in the company and what they may do. Every route
   // acts on ctx.scope.companyId — none of them take a company id.

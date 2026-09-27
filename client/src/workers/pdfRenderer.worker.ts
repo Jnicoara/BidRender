@@ -355,6 +355,49 @@ self.onmessage = async (e: MessageEvent) => {
   }
 
   /**
+   * The text on one page WITH where each item is drawn, for "Select text".
+   *
+   * Raw items plus the scale-1 viewport's transform; the boxes are worked out
+   * in client/src/lib/textSelection.ts, where the tests can reach them. Asked
+   * only when the tool is picked up on a sheet — § 17.6's rule: nothing
+   * positional is stored, the page is re-read in the worker when it is needed.
+   */
+  if (msg.type === "textItems") {
+    const { pageNum, hash, reqId } = msg;
+    if (!pdfDoc || loadedHash !== hash) {
+      self.postMessage({
+        type: "error",
+        reqId,
+        message: "PDF not loaded for this hash",
+      });
+      return;
+    }
+    try {
+      const page = await pdfDoc.getPage(pageNum);
+      const content = await page.getTextContent();
+      const items: { str: string; transform: number[]; width: number }[] = [];
+      for (const item of content.items) {
+        if (!("str" in item) || !item.str) continue;
+        items.push({
+          str: item.str,
+          transform: item.transform,
+          width: item.width,
+        });
+      }
+      const viewportTransform = page.getViewport({ scale: 1 }).transform;
+      self.postMessage({
+        type: "textItems",
+        reqId,
+        pageNum,
+        layer: { items, viewportTransform },
+      });
+    } catch (err) {
+      self.postMessage({ type: "error", reqId, message: String(err) });
+    }
+    return;
+  }
+
+  /**
    * A message this worker does not understand.
    *
    * Unreachable today — every type the page sends has a branch above. It exists

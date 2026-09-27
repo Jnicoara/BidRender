@@ -1173,6 +1173,71 @@ describeDb("a company with a bid history", () => {
     });
   });
 
+  // ── Figures that leave a line out say so ──────────────────────────────────
+  // `costSums` counted the lines it left out and `toBidCostRow` dropped the
+  // count, so analytics was short with nothing on screen to say it. A
+  // negative snapshot is one way a line becomes unpriceable (lineIsPriceable).
+
+  describe("a bid with a line that can't be priced", () => {
+    const broken = { qty: 1, materialCost: -5, laborHours: 0, laborRate: 0 };
+    const fine = { qty: 2, materialCost: 10, laborHours: 0, laborRate: 0 };
+
+    it("is counted as incomplete in the outcomes report, and a whole one is not", async () => {
+      await seedBid({
+        userId: OWNER,
+        status: "Won",
+        createdAt: "2026-03-10",
+        lines: [fine, broken],
+      });
+      await seedBid({
+        userId: OWNER,
+        status: "Won",
+        createdAt: "2026-03-11",
+        lines: [fine],
+      });
+
+      const report = await callerFor(OWNER).analytics.outcomes(YEAR);
+      expect(report.totals.incompleteBids).toBe(1);
+    });
+
+    it("marks the closed job and counts it in the profitability report", async () => {
+      const bidId = await seedBid({
+        userId: OWNER,
+        name: "Short job",
+        status: "Won",
+        createdAt: "2026-03-10",
+        lines: [
+          { qty: 1, materialCost: 100, laborHours: 10, laborRate: 50 },
+          broken,
+        ],
+      });
+      await closeOut({
+        bidId,
+        userId: OWNER,
+        estimatedHours: 10,
+        actualHours: 12,
+        closedAt: "2026-04-01",
+      });
+
+      const report = await callerFor(OWNER).analytics.profitability(YEAR);
+      expect(report.incompleteJobs).toBe(1);
+      expect(report.worstJobs.find(j => j.bidId === bidId)?.incomplete).toBe(
+        true
+      );
+    });
+
+    it("reports nothing incomplete when every line prices", async () => {
+      await seedBid({
+        userId: OWNER,
+        status: "Won",
+        createdAt: "2026-03-10",
+        lines: [fine],
+      });
+      const outcomes = await callerFor(OWNER).analytics.outcomes(YEAR);
+      expect(outcomes.totals.incompleteBids).toBe(0);
+    });
+  });
+
   // ── Permission ────────────────────────────────────────────────────────────
 
   describe("who may look at this", () => {

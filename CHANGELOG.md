@@ -17,6 +17,34 @@ This is the human-readable companion to the git history — read this to see wha
   (Carlon, Raco, Steel City, Red Dot) now find the right boxes in search.
   The pricing sheet was brought up to date at the same time, which also added
   about 130 rows from catalog changes since 2026-09-25 that it had missed.
+- **The Performance screen says when its dollar figures are short.** If a
+  bid in the chosen range has a line the app can't price, the win-rate and
+  finished-jobs sections now show a red "incomplete" line saying how many,
+  and the job appears as "incomplete" in the "Worth a look" list. Before,
+  those lines were quietly left out of the totals.
+- **Copy words straight off a plan.** A new "Select text" tool on the Plans
+  screen (or press T): drag a box around a part number or a note, and the
+  words inside appear in a box ready to copy. From there, one click searches
+  the materials catalog for them. It is its own tool, so a drag never pans the
+  sheet or places a mark by accident. On a scanned sheet, which has no text,
+  it says so as soon as you pick it up. Text read from a scan's text layer can
+  be wrong, so the box is editable and asks you to check it against the
+  drawing.
+- **A takeoff can now leave the app as a spreadsheet.** "Export takeoff" on
+  the Plans screen, and "Takeoff" in a bid's Send menu, download a CSV of
+  every count and every run by type. It is laid out by sheet, then totalled
+  for the whole bid, with each run marked Draft or Finished so the file can be
+  checked against the run totals. It carries quantities only, no prices, and
+  it lists what it leaves out. Anything that was not measured is left blank
+  rather than shown as 0.
+- **The archive can be emptied in one go, and only owners and admins can
+  permanently delete a bid.** A "Delete all" button on the Archive screen
+  asks for confirmation, naming how many bids and saying it cannot be undone.
+  If the archive changes before you confirm, nothing is deleted and you are
+  asked to look again. Separately, estimators could delete an archived bid
+  permanently, although their role was meant to exclude that. They can still
+  archive and restore, but deleting for good is now owners and admins only,
+  on screen and on the server.
 - **Dashboard cards keep up with the drawing.** On a bid whose quantities
   are not locked, marking more symbols or tracing more after sending used to
   change the bid but not its dashboard card, which kept the old total and the
