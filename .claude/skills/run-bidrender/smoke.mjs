@@ -13,6 +13,7 @@
  *
  * Env:
  *   BASE_URL    skip port probing, e.g. http://localhost:3002
+ *   PORT        from .env (or the shell): probe ONLY this port — see PORTS
  *   JWT_SECRET  must match the running server. Default: local-dev-secret
  *   OPEN_ID     which user to act as. Default: test-open-id
  *
@@ -20,7 +21,25 @@
  */
 import { mintToken } from "./devsession.mjs";
 
-const PORTS = [3000, 3001, 3002, 3003, 3004, 3005];
+/**
+ * Which ports to try. PORT from .env comes first — and ALONE.
+ *
+ * Two checkouts run side by side (Track A on 3000, the Track B worktree on
+ * 3002), and both .env files carry the same JWT_SECRET. So with a plain
+ * 3000-first probe, B's smoke run authenticated against A's server and drove
+ * A's database, passing throughout. When PORT is set, only that port counts:
+ * if nothing answers there, fail and say so rather than finding someone
+ * else's server. devsession.mjs loads .env on import, so PORT is visible here.
+ * BASE_URL still overrides everything.
+ */
+const DEFAULT_PORTS = [3000, 3001, 3002, 3003, 3004, 3005];
+const CONFIGURED_PORT = Number.parseInt(process.env.PORT ?? "", 10);
+const PORTS =
+  Number.isInteger(CONFIGURED_PORT) &&
+  CONFIGURED_PORT > 0 &&
+  CONFIGURED_PORT <= 65535
+    ? [CONFIGURED_PORT]
+    : DEFAULT_PORTS;
 const OPEN_ID = process.env.OPEN_ID || "test-open-id";
 
 let pass = 0;
@@ -69,7 +88,13 @@ async function findBaseUrl(token) {
     );
   }
   throw new Error(
-    `No dev server found on ports ${PORTS.join(", ")}. Start it first (see SKILL.md).`
+    PORTS === DEFAULT_PORTS
+      ? `No dev server found on ports ${PORTS.join(", ")}. Start it first (see SKILL.md).`
+      : `No dev server found on port ${CONFIGURED_PORT} (PORT in .env). ` +
+        `Start it first — and read its "Server running on" line: if that ` +
+        `port was busy it took the next one, and BASE_URL=http://localhost:<port> ` +
+        `points this script there. Other ports are not tried, so this cannot ` +
+        `drive another checkout's server by accident.`
   );
 }
 
@@ -128,7 +153,9 @@ const token = await mintToken(OPEN_ID);
 const baseUrl = await findBaseUrl(token);
 console.log(`\nServer:  ${baseUrl}`);
 console.log(`Acting as: ${OPEN_ID}`);
-console.log(`User id:   ${(await makeClient(baseUrl, token).query("auth.me"))?.id}\n`);
+console.log(
+  `User id:   ${(await makeClient(baseUrl, token).query("auth.me"))?.id}\n`
+);
 
 const api = makeClient(baseUrl, token);
 

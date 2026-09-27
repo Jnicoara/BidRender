@@ -50,6 +50,13 @@ left as written rather than rewritten to match the rename.
       the plain "500 kcmil crimp lug" is retired and hits the seeder bug below.
       Checked on a freshly seeded database, not only on one that already had
       rows.
+- [x] **server/materialsCatalog.test.ts depends on user 7373 created by
+      bidArchive.test.ts - make it create its own user.** FIXED 2026-09-26 on
+      track-b (`a871424`, "Polish B6"): it now uses its own id, 7393, and
+      creates the user in the seeding block's beforeAll. Passed alone, failed
+      in a full run on a fresh test database with a foreign-key error — the
+      order dependence was invisible on any database an older run had left
+      user 7373 in.
 - [ ] **SEEDER BUG, needs its own investigation — do not fold into other
       work: a retired material name is never re-activated.** Found 2026-09-26.
       `retireBaselineMaterials` sets `isActive = false` on every name in

@@ -95,7 +95,9 @@ The baseline material library (28 rows) seeds itself on startup, idempotently.
 JWT_SECRET=local-dev-secret node .claude/skills/run-bidrender/smoke.mjs
 ```
 
-Finds the server (probing ports 3000–3005), authenticates, and exercises the
+Finds the server (probing ports 3000–3005 — or, when `.env` sets `PORT`, that
+port ONLY, so a second checkout on 3002 never drives the one on 3000; added
+2026-09-26), authenticates, and exercises the
 Materials library end to end: listing, create, fork-on-edit, revert, and the
 refusals. Prints something like `31 passed, 0 failed` / `Smoke OK` and exits 0.
 
