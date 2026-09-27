@@ -21,6 +21,13 @@ This is the human-readable companion to the git history — read this to see wha
   what it drops to, give it its own height, or take the answer back. A leg
   that starts on the trace gets no drop there. Nothing counts until you say
   so, and only an approved drop gets a connector.
+- **"Drops on this bid" — every drop in one list.** A new line in the runs
+  panel totals up every rise and drop on the job, from ordinary runs and
+  quantity traces alike: how many, of what type, how many feet, and which
+  kind of trace each came from. Open a type to see each drop and its sheet;
+  click one to jump straight to it, even on another sheet. Drops it cannot
+  count yet — no run height set, or no scale — are counted and said, not
+  left out quietly.
 - **A traced run can now have more than one leg — usually a branch.** While
   tracing, press "New leg" (or Shift-click) and the next click starts another
   leg of the same run. Start it on the run and it becomes a branch: a box is

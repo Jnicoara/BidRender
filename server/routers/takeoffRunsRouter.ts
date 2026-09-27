@@ -1463,10 +1463,10 @@ export const takeoffRunsRouter = router({
       const bid = await db.getBidById(input.bidId, userId);
       if (!bid)
         throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
-      const [allRuns, scales, sheetNames, heights] = await Promise.all([
+      const [allRuns, scales, places, heights] = await Promise.all([
         db.getRunsForBid(input.bidId, userId),
         db.getSheetScalesForBid(input.bidId, userId),
-        db.getSheetNamesForBid(input.bidId, userId),
+        db.getSheetPlacesForBid(input.bidId, userId),
         db.heightContextForBid(
           input.bidId,
           userId,
@@ -1482,6 +1482,9 @@ export const takeoffRunsRouter = router({
         rootRunId: number;
         sheetId: number;
         sheetName: string;
+        /** Where the sheet is, so a row can open it: plan and page. */
+        bidPdfId: number | null;
+        pageNumber: number | null;
         end: "start" | "end";
         x: number;
         y: number;
@@ -1525,11 +1528,14 @@ export const takeoffRunsRouter = router({
           }
           const at = end === "start" ? points[0] : points[points.length - 1];
           if (!at) continue;
+          const place = places.get(run.sheetId);
           drops.push({
             runId: run.id,
             rootRunId: rootOf(run),
             sheetId: run.sheetId,
-            sheetName: sheetNames.get(run.sheetId) ?? "Sheet",
+            sheetName: place?.name ?? "Sheet",
+            bidPdfId: place?.bidPdfId ?? null,
+            pageNumber: place?.pageNumber ?? null,
             end,
             x: at.x,
             y: at.y,

@@ -534,6 +534,7 @@ export function RunsPanel({
   runs,
   totals,
   onSetTraceMode,
+  dropsReadout,
   selectedRunId,
   onSelectRun,
   onRemoveRun,
@@ -655,6 +656,12 @@ export function RunsPanel({
     | undefined;
   /** Switch a run between route and quantity (D21) — root and legs. */
   onSetTraceMode?: (runId: number, mode: TraceMode) => void;
+  /**
+   * The bid's drops readout (D21, answer 6), placed after the traced footage
+   * it explains. A slot rather than a query here: this panel is per SHEET and
+   * the readout is per BID.
+   */
+  dropsReadout?: React.ReactNode;
   selectedRunId: number | null;
   onSelectRun: (id: number | null) => void;
   onRemoveRun: (id: number) => void;
@@ -1154,6 +1161,8 @@ export function RunsPanel({
             })}
           </div>
         )}
+
+        {dropsReadout}
 
         {runs.length === 0 && stampGroups.length === 0 ? (
           <div className="p-6 text-center">

@@ -8607,19 +8607,34 @@ export async function getAssemblyMaterialQuantities(
  * a footage without that sheet's scale. Fetched for the whole bid in one query
  * because a run list spans sheets and documents.
  */
-/** What each of a bid's sheets is called, for a list that names where. */
-export async function getSheetNamesForBid(
+/**
+ * What each of a bid's sheets is called and where it is — plan and page — for
+ * a list that names a place and can jump to it.
+ */
+export async function getSheetPlacesForBid(
   bidId: number,
   userId: number
-): Promise<Map<number, string>> {
+): Promise<
+  Map<number, { name: string; bidPdfId: number; pageNumber: number }>
+> {
   const db = await getDb();
   if (!db) return new Map();
   const rows = await db
-    .select({ id: bidPdfSheets.id, name: bidPdfSheets.name })
+    .select({
+      id: bidPdfSheets.id,
+      name: bidPdfSheets.name,
+      bidPdfId: bidPdfSheets.bidPdfId,
+      pageNumber: bidPdfSheets.pageNumber,
+    })
     .from(bidPdfSheets)
     .innerJoin(bidPdfs, eq(bidPdfSheets.bidPdfId, bidPdfs.id))
     .where(and(eq(bidPdfs.bidId, bidId), eq(bidPdfSheets.userId, userId)));
-  return new Map(rows.map(row => [row.id, row.name]));
+  return new Map(
+    rows.map(row => [
+      row.id,
+      { name: row.name, bidPdfId: row.bidPdfId, pageNumber: row.pageNumber },
+    ])
+  );
 }
 
 export async function getSheetScalesForBid(

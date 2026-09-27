@@ -151,6 +151,7 @@ import {
   type DropSelection,
 } from "@/components/takeoff/QuantityDropsReview";
 import { quantityEndRows, type QuantityLeg } from "@shared/quantityDrops";
+import { BidDropsReadout } from "@/components/takeoff/BidDropsReadout";
 import {
   DISTRIBUTION_KIND,
   traceEndsLabel,
@@ -5652,6 +5653,20 @@ export default function TakeoffPage({
               onRemoveCircuit={id => removeCircuit.mutate({ id })}
               onSetTraceMode={(runId, mode) =>
                 setRunTraceMode.mutate({ runId, mode })
+              }
+              dropsReadout={
+                <BidDropsReadout
+                  bidId={bidId}
+                  onJump={to => {
+                    // Another sheet, maybe on another plan: open it first.
+                    if (to.bidPdfId !== null && to.bidPdfId !== doc?.id)
+                      setSelectedDocId(to.bidPdfId);
+                    if (to.pageNumber !== null) setPage(to.pageNumber);
+                    setSelectedRunId(to.runId);
+                    setFocusPoint({ x: to.x, y: to.y });
+                    window.setTimeout(() => setFocusPoint(null), 2200);
+                  }}
+                />
               }
             />
           </SidePanel>
