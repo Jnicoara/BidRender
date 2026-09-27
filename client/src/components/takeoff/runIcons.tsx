@@ -52,6 +52,7 @@ import {
   LEGACY_RUN_COLOR,
   runTypeColor,
   runTypeColorKey,
+  chosenRunTypeColor,
   type RunTypeColors,
 } from "@shared/takeoffMarks";
 import { cn } from "@/lib/utils";
@@ -180,22 +181,28 @@ export function RunTypeSwatch({
   }
   // Through the colour key, so a fork counts as its shipped row's runs.
   const onBid = colors.order.includes(runTypeColorKey(runTypeId, colors));
+  // A CHOSEN color is already decided, so it shows even before the type is
+  // traced here (Part B) — only an automatic type waits for its slot.
+  const chosen = chosenRunTypeColor(runTypeId, colors) !== null;
+  const known = onBid || chosen;
   return (
     <span
       className="inline-flex shrink-0"
       title={
-        onBid
-          ? "This type's color on this bid"
-          : "Not on this bid yet — it takes the next free color when traced"
+        chosen
+          ? "This type's chosen color, on every bid"
+          : onBid
+            ? "This type's color on this bid"
+            : "Not on this bid yet — it takes the next free color when traced"
       }
     >
       <Icon
         className={cn(
           "w-3.5 h-3.5",
-          !onBid && "text-muted-foreground/60",
+          !known && "text-muted-foreground/60",
           className
         )}
-        style={onBid ? { color: runTypeColor(runTypeId, colors) } : undefined}
+        style={known ? { color: runTypeColor(runTypeId, colors) } : undefined}
         aria-hidden
       />
     </span>

@@ -73,7 +73,15 @@ export const CONDUIT_SHELF = ["Conduit"];
 export const CABLE_SHELF = ["Wire & Cable"];
 import { runTypeSpec } from "@shared/takeoffCounts";
 import { laborPerFootSentence } from "@shared/runTypeLabor";
-import type { RunTypeColors } from "@shared/takeoffMarks";
+import {
+  isMarkColor,
+  MARK_COLOR_NAMES,
+  MARK_COLORS,
+  runTypeColor,
+  runTypeColorsInUse,
+  type MarkColor,
+  type RunTypeColors,
+} from "@shared/takeoffMarks";
 import { RunTypeSwatch } from "@/components/takeoff/runIcons";
 import {
   EMT_FITTING_STYLES,
@@ -88,6 +96,8 @@ export type PickableRunType = {
   id: number;
   label: string;
   pathType: "conduit" | "cable";
+  /** A chosen color (Part B, 0088), or null for automatic. */
+  color: string | null;
   /** Null on a cable type by design — the cable IS the raceway. */
   racewayMaterialId: number | null;
   conductorMaterialId: number | null;
@@ -123,6 +133,8 @@ export type PickableRunType = {
 /** What the editor is holding, before it is saved. */
 type Draft = {
   label: string;
+  /** Null is automatic. A stored value outside the palette opens as automatic. */
+  color: MarkColor | null;
   racewayMaterialId: number | null;
   racewayMaterialName: string | null;
   /*
@@ -155,6 +167,8 @@ type Draft = {
 
 export type RunTypePatch = {
   label: string;
+  /** Null is automatic. Sent every save, from a draft opened on the stored value. */
+  color: MarkColor | null;
   racewayMaterialId: number | null;
   conductorMaterialId: number | null;
   conductorCount: number | null;
@@ -183,6 +197,7 @@ function isEmt(racewayName: string | null): boolean {
 
 const draftOf = (type: PickableRunType): Draft => ({
   label: type.label,
+  color: isMarkColor(type.color) ? type.color : null,
   racewayMaterialId: type.racewayMaterialId,
   racewayMaterialName: type.racewayMaterialName,
   racewayLaborHours: type.racewayLaborHours,
@@ -568,6 +583,105 @@ export function RunTypePicker({
             />
 
             {/*
+              COLOR (Part B, owner 2026-09-27). The ONE place a type's color is
+              chosen: everywhere else only shows it. Automatic first, because
+              it is the default and the common case; the six after it.
+
+              A swatch another type on this bid already wears says so ("also
+              used by …") and is still pickable — two types may share a color
+              (answer 2). Automatic shows the color it would be on this bid
+              right now, so choosing it is not a guess.
+            */}
+            {(() => {
+              const labels = new Map(types.map(t => [t.id, t.label]));
+              const inUse = runTypeColorsInUse(runColors, labels, editing.id);
+              const automatic = runTypeColor(editing.id, {
+                ...runColors,
+                chosen: Object.fromEntries(
+                  Object.entries(runColors.chosen).filter(
+                    ([id]) => Number(id) !== editing.id
+                  )
+                ),
+              });
+              return (
+                <div className="mt-2">
+                  <p className="text-[0.7rem] font-medium">Color</p>
+                  <div
+                    className="mt-1 flex flex-wrap items-center gap-1.5"
+                    role="radiogroup"
+                    aria-label="Run type color"
+                  >
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={draft.color === null}
+                      onClick={() => setDraft({ ...draft, color: null })}
+                      className={cn(
+                        "h-6 px-2 rounded border text-[0.7rem] flex items-center gap-1.5",
+                        draft.color === null
+                          ? "border-foreground text-foreground"
+                          : "border-border text-muted-foreground hover:text-foreground"
+                      )}
+                      title={`Automatic — ${MARK_COLOR_NAMES[automatic].toLowerCase()} on this bid now, and whatever color is free on another`}
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ background: automatic }}
+                        aria-hidden
+                      />
+                      Automatic
+                    </button>
+                    {MARK_COLORS.map(color => {
+                      const others = inUse.get(color) ?? [];
+                      const name = MARK_COLOR_NAMES[color];
+                      const said =
+                        others.length > 0
+                          ? `${name} — also used by ${others.join(", ")} on this bid`
+                          : name;
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          role="radio"
+                          aria-checked={draft.color === color}
+                          aria-label={said}
+                          title={said}
+                          onClick={() => setDraft({ ...draft, color })}
+                          className={cn(
+                            "relative w-6 h-6 rounded-full border-2 transition-transform",
+                            draft.color === color
+                              ? "border-foreground scale-110"
+                              : "border-transparent hover:scale-110"
+                          )}
+                          style={{ background: color }}
+                        >
+                          {others.length > 0 && (
+                            <span
+                              className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-background border border-foreground/70"
+                              aria-hidden
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {draft.color !== null &&
+                    (inUse.get(draft.color)?.length ?? 0) > 0 && (
+                      <p className="mt-1 text-[0.7rem] text-muted-foreground leading-snug">
+                        Also used by {inUse.get(draft.color)!.join(", ")} on
+                        this bid.
+                      </p>
+                    )}
+                  {draft.color !== null && (
+                    <p className="mt-1 text-[0.7rem] text-muted-foreground leading-snug">
+                      This color follows the type to every bid.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/*
               A cable type has no raceway slot at all, rather than an empty one.
               The cable IS the raceway and the conductor link holds it — see
               drizzle/schema.ts on takeoff_run_types — so offering a pipe to put
@@ -846,6 +960,7 @@ export function RunTypePicker({
                   try {
                     await onSave(editing.id, {
                       label: draft.label.trim(),
+                      color: draft.color,
                       racewayMaterialId:
                         pathType === "cable" ? null : draft.racewayMaterialId,
                       conductorMaterialId: draft.conductorMaterialId,

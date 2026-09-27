@@ -16,11 +16,16 @@ import {
   runAppearance,
   runTypeColor,
   runTypeColorOrder,
+  runTypeColorsInUse,
   type RunTypeColors,
 } from "@shared/takeoffMarks";
 
 /** A bid on which types 1–6 were used, in that order. */
-const ON_BID: RunTypeColors = { order: [1, 2, 3, 4, 5, 6], sameAs: {} };
+const ON_BID: RunTypeColors = {
+  order: [1, 2, 3, 4, 5, 6],
+  sameAs: {},
+  chosen: {},
+};
 
 describe("colours on ONE bid, by when each type was first used", () => {
   it("never repeats a colour among the first six types", () => {
@@ -29,13 +34,14 @@ describe("colours on ONE bid, by when each type was first used", () => {
     const colors: RunTypeColors = {
       order: [1, 7, 13, 19, 25, 31],
       sameAs: {},
+      chosen: {},
     };
     const drawn = colors.order.map(id => runTypeColor(id, colors));
     expect(new Set(drawn).size).toBe(6);
   });
 
   it("hands them out in the order the types were first used", () => {
-    const colors: RunTypeColors = { order: [42, 9], sameAs: {} };
+    const colors: RunTypeColors = { order: [42, 9], sameAs: {}, chosen: {} };
     expect(runTypeColor(42, colors)).toBe(MARK_COLORS[0]);
     expect(runTypeColor(9, colors)).toBe(MARK_COLORS[1]);
   });
@@ -43,13 +49,13 @@ describe("colours on ONE bid, by when each type was first used", () => {
   it("gives a type not yet on the bid the next colour it would get", () => {
     // What a run being traced with a new type is drawn in before its first
     // save reaches the order — the same colour it keeps afterwards.
-    expect(runTypeColor(99, { order: [42, 9], sameAs: {} })).toBe(
+    expect(runTypeColor(99, { order: [42, 9], sameAs: {}, chosen: {} })).toBe(
       MARK_COLORS[2]
     );
   });
 
   it("wraps after six, and says so rather than inventing a seventh", () => {
-    const colors = { order: [1, 2, 3, 4, 5, 6, 7], sameAs: {} };
+    const colors = { order: [1, 2, 3, 4, 5, 6, 7], sameAs: {}, chosen: {} };
     expect(runTypeColor(7, colors)).toBe(runTypeColor(1, colors));
   });
 
@@ -80,7 +86,7 @@ describe("colours on ONE bid, by when each type was first used", () => {
     // A leg follows the leg it leaves unless it is given a type of its own
     // (addLeg), so legs usually match — and a leg that differs is a different
     // thing to buy, drawn as one. Selection lights the whole run either way.
-    const colors = { order: [9, 4], sameAs: {} };
+    const colors = { order: [9, 4], sameAs: {}, chosen: {} };
     const leg = { runTypeId: 9, pathType: "conduit" as const };
     const other = { runTypeId: 4, pathType: "conduit" as const };
     expect(runAppearance(colors, leg).color).toBe(MARK_COLORS[0]);
@@ -91,7 +97,11 @@ describe("colours on ONE bid, by when each type was first used", () => {
     // Runs store shipped id 31; the company edited it, so the picker lists
     // fork 1667. Keyed by raw id the picker called 1667 "not on this bid"
     // beside blue lines of that type — seen on screen 2026-09-26.
-    const colors: RunTypeColors = { order: [1667, 32], sameAs: { 31: 1667 } };
+    const colors: RunTypeColors = {
+      order: [1667, 32],
+      sameAs: { 31: 1667 },
+      chosen: {},
+    };
     expect(runTypeColor(31, colors)).toBe(MARK_COLORS[0]);
     expect(runTypeColor(1667, colors)).toBe(MARK_COLORS[0]);
     expect(
@@ -104,6 +114,121 @@ describe("colours on ONE bid, by when each type was first used", () => {
         id => colors.sameAs[id] ?? id
       )
     ).toEqual([1667, 32]);
+  });
+});
+
+describe("a color somebody CHOSE for a type (Part B, owner 2026-09-27)", () => {
+  const [blue, pink, violet, orange, cyan, red] = MARK_COLORS;
+
+  it("wins over the automatic slot, on every bid", () => {
+    const colors: RunTypeColors = {
+      order: [1, 2],
+      sameAs: {},
+      chosen: { 1: cyan },
+    };
+    expect(runTypeColor(1, colors)).toBe(cyan);
+  });
+
+  it("follows the type even to a bid it has not been traced on", () => {
+    // It is already decided, so the picker shows it — no "next free" guess.
+    expect(runTypeColor(9, { order: [], sameAs: {}, chosen: { 9: red } })).toBe(
+      red
+    );
+  });
+
+  it("is skipped by the AUTOMATIC types on the same bid (answer 1)", () => {
+    // Type 2 chose blue — the first slot. Types 1 and 3 are automatic, so they
+    // take the colors left, in first-use order: pink, then violet.
+    const colors: RunTypeColors = {
+      order: [1, 2, 3],
+      sameAs: {},
+      chosen: { 2: blue },
+    };
+    expect(runTypeColor(2, colors)).toBe(blue);
+    expect(runTypeColor(1, colors)).toBe(pink);
+    expect(runTypeColor(3, colors)).toBe(violet);
+    // And a type not yet on the bid would take the next one left.
+    expect(runTypeColor(99, colors)).toBe(orange);
+  });
+
+  it("reserves nothing on a bid the choosing type is not on", () => {
+    // "Other types on THAT bid" — a choice made for a type elsewhere does not
+    // push this bid's automatic types around.
+    const colors: RunTypeColors = {
+      order: [1],
+      sameAs: {},
+      chosen: { 9: blue },
+    };
+    expect(runTypeColor(1, colors)).toBe(blue);
+  });
+
+  it("lets two types choose the same color (answer 2)", () => {
+    const colors: RunTypeColors = {
+      order: [1, 2],
+      sameAs: {},
+      chosen: { 1: pink, 2: pink },
+    };
+    expect(runTypeColor(1, colors)).toBe(pink);
+    expect(runTypeColor(2, colors)).toBe(pink);
+  });
+
+  it("wraps over what is left, and over all six only when nothing is", () => {
+    const allChosen: RunTypeColors = {
+      order: [1, 2, 3, 4, 5, 6, 7],
+      sameAs: {},
+      chosen: { 1: blue, 2: pink, 3: violet, 4: orange, 5: cyan, 6: red },
+    };
+    // Every color is somebody's choice; the automatic seventh still gets one.
+    expect(MARK_COLORS).toContain(runTypeColor(7, allChosen));
+    const oneLeft: RunTypeColors = {
+      order: [1, 2, 3, 4, 5, 6, 7],
+      sameAs: {},
+      chosen: { 1: blue, 2: pink, 3: violet, 4: orange, 5: cyan },
+    };
+    expect(runTypeColor(6, oneLeft)).toBe(red);
+    expect(runTypeColor(7, oneLeft)).toBe(red);
+  });
+
+  it("falls back to automatic for a stored value outside the palette", () => {
+    // A color the palette no longer holds is not drawn: nobody approved it.
+    const colors: RunTypeColors = {
+      order: [1],
+      sameAs: {},
+      chosen: { 1: "#123456" },
+    };
+    expect(runTypeColor(1, colors)).toBe(blue);
+  });
+
+  it("reaches runs that still name the shipped type, through the fork", () => {
+    // Picking a color on shipped type 31 forks it to 1667; runs keep 31.
+    const colors: RunTypeColors = {
+      order: [1667],
+      sameAs: { 31: 1667 },
+      chosen: { 1667: orange },
+    };
+    expect(runTypeColor(31, colors)).toBe(orange);
+    expect(runTypeColor(1667, colors)).toBe(orange);
+  });
+});
+
+describe("which types on the bid wear each color, for 'also used by'", () => {
+  it("names every OTHER type on the bid drawn in a color", () => {
+    const [blue, pink] = MARK_COLORS;
+    const colors: RunTypeColors = {
+      order: [1, 2, 3],
+      sameAs: { 30: 3 },
+      chosen: { 1: pink, 2: pink },
+    };
+    const labels = new Map([
+      [1, "Homerun A"],
+      [2, "Homerun B"],
+      [3, "Branch"],
+    ]);
+    const used = runTypeColorsInUse(colors, labels, 1);
+    // Type 1 is the one being edited, so only 2 is named against pink.
+    expect(used.get(pink)).toEqual(["Homerun B"]);
+    // Type 3 is automatic and skips pink, so it takes blue.
+    expect(used.get(blue)).toEqual(["Branch"]);
   });
 });
 

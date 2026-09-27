@@ -2451,6 +2451,19 @@ export const takeoffRunTypes = mysqlTable(
     label: varchar("label", { length: 255 }).notNull(),
     /** Which tool arms it, and which line style the drawing gives it. */
     pathType: mysqlEnum("pathType", RUN_PATH_TYPES).notNull(),
+    /**
+     * A color somebody CHOSE for this type (run colors Part B, migration
+     * 0088): one of the six `MARK_COLORS`, stored as its value rather than a
+     * position so a reordered palette cannot silently recolor anything. It
+     * follows the type to every bid.
+     *
+     * NULL is automatic — the type's first-use slot on each bid, and the
+     * automatic types skip the colors chosen by other types on that bid
+     * (`runTypeColor` in shared/takeoffMarks.ts). A stored value the palette
+     * no longer holds reads as automatic rather than being drawn. Choosing one
+     * on a shipped type forks it, like any other edit (`forkRunType`).
+     */
+    color: varchar("color", { length: 7 }),
 
     /**
      * Which trade's palette this belongs to.

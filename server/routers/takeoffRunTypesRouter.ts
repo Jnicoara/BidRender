@@ -51,6 +51,7 @@ import { materialItemKey } from "../../shared/materialMarkup";
 import { isFittingRole } from "../../shared/runFittings";
 import { resendPlan, swapText, type ResendPlan } from "../../shared/resendLine";
 import { footageByRunType } from "../runTypeFootage";
+import { MARK_COLORS } from "../../shared/takeoffMarks";
 import { RUN_MATERIAL_ROLES } from "../../drizzle/schema";
 import * as db from "../db";
 
@@ -305,6 +306,9 @@ export const takeoffRunTypesRouter = router({
         id: type.id,
         label: type.label,
         pathType: type.pathType,
+        // The chosen color, for the editor to open on (Part B). What is DRAWN
+        // comes from takeoffRuns.typeColors, which reads the same column.
+        color: type.color,
         racewayMaterialId: type.racewayMaterialId,
         conductorMaterialId: type.conductorMaterialId,
         groundMaterialId: type.groundMaterialId,
@@ -439,6 +443,13 @@ export const takeoffRunTypesRouter = router({
         groundMaterialId: z.number().int().positive().nullable().optional(),
         groundCount: groundCountSchema.optional(),
         ...fittingFields,
+        /**
+         * A chosen color (Part B), or null for automatic. Only the six count
+         * colors: anything else is refused here rather than stored and then
+         * quietly not drawn. On a shipped type this forks it, like every
+         * other field (owner, 2026-09-27).
+         */
+        color: z.enum(MARK_COLORS).nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {

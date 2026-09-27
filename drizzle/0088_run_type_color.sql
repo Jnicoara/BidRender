@@ -1,0 +1,22 @@
+-- A color somebody chose for a run type (run colors Part B, owner 2026-09-27;
+-- plan-viewer-overhaul.md § 6 "RUN COLOURS (T14)").
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- One nullable column, no default, no UPDATE. NULL is "automatic", the
+-- first-use color every type already has, so no existing row changes
+-- meaning. Old code ignores the column; new code against an old database
+-- would die on a bare select(). CLAUDE.md § "THREE STEPS, NOT TWO". Step 3 is
+-- empty.
+--
+-- Hand-written, not generated, for the reason 0065 and 0067 give.
+--
+-- ── Why NULL rather than a default ──────────────────────────────────────────
+-- Any default would be a color nobody chose, written onto every type, and
+-- "automatic" would stop being something a row could say.
+--
+-- ── Collation ───────────────────────────────────────────────────────────────
+-- A column added to an existing table takes the table's own collation, so it
+-- lands on whatever `takeoff_run_types` already has — utf8mb4_unicode_ci on
+-- production. See deploying.md § "A new table lands on the WRONG collation".
+ALTER TABLE `takeoff_run_types`
+	ADD `color` varchar(7);

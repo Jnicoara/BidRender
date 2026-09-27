@@ -94,6 +94,20 @@ export const MARK_COLORS = [
 ] as const;
 export type MarkColor = (typeof MARK_COLORS)[number];
 
+/**
+ * What each color is CALLED, for a label or a screen reader — American
+ * spelling on screen (owner, 2026-09-27). Typed as a Record over the palette,
+ * so a color added above without a name does not compile.
+ */
+export const MARK_COLOR_NAMES: Record<MarkColor, string> = {
+  "#60A5FA": "Blue",
+  "#F472B6": "Pink",
+  "#A78BFA": "Violet",
+  "#FB923C": "Orange",
+  "#22D3EE": "Cyan",
+  "#F87171": "Red",
+};
+
 /** Colours this drawing has already given a meaning to. Never in the palette. */
 export const RESERVED_COLORS = ["#F5C518", "#4ADE80", "#34D399"] as const;
 
@@ -232,14 +246,39 @@ export const LEGACY_RUN_COLOR: Record<"conduit" | "cable", string> = {
  * picker called the fork "not on this bid" beside blue lines of that very
  * type — seen on screen 2026-09-26. So `order` holds resolved ids, and
  * `sameAs` maps each stored id that resolves elsewhere to the id it means.
+ *
+ * ── `chosen`: a color somebody picked (Part B, owner 2026-09-27) ────────────
+ * `takeoff_run_types.color` (0088), keyed by resolved id, for every type the
+ * company has — not only the ones on this bid, because a chosen color follows
+ * its type everywhere and the picker shows it before the type is traced.
+ * NULL (absent here) is automatic: the first-use slot above.
  */
 export type RunTypeColors = {
   order: readonly number[];
   sameAs: Readonly<Record<number, number>>;
+  chosen: Readonly<Record<number, string>>;
 };
 
 /** Nothing on the bid yet: every type would take the first colour. */
-export const NO_RUN_TYPE_COLORS: RunTypeColors = { order: [], sameAs: {} };
+export const NO_RUN_TYPE_COLORS: RunTypeColors = {
+  order: [],
+  sameAs: {},
+  chosen: {},
+};
+
+/** Whether a stored value is one of the six — anything else is not drawn. */
+export function isMarkColor(value: unknown): value is MarkColor {
+  return (MARK_COLORS as readonly unknown[]).includes(value);
+}
+
+/** The color a type CHOSE, if it chose one the palette still holds. */
+export function chosenRunTypeColor(
+  runTypeId: number,
+  colors: Pick<RunTypeColors, "sameAs" | "chosen">
+): MarkColor | null {
+  const value = colors.chosen[runTypeColorKey(runTypeId, colors)];
+  return isMarkColor(value) ? value : null;
+}
 
 /** The colour key of a type id: what it resolves to, or itself. */
 export function runTypeColorKey(
@@ -282,14 +321,59 @@ export function runTypeColorOrder(
  *
  * A type not used on the bid yet gets the colour it WILL get: the next slot.
  * The seventh type wraps onto the first colour; six is the palette.
+ *
+ * ── A chosen color wins, and the automatic types step around it ─────────────
+ * Owner, 2026-09-27: a type with a chosen color is that color on every bid;
+ * the AUTOMATIC types take the colors left over by the chosen colors of types
+ * on THIS bid, in first-use order. A choice made for a type that is not on
+ * the bid reserves nothing here. Two types may choose the same color. When
+ * every color is somebody's choice, the automatic types wrap over all six —
+ * six is the palette (answer 5), and that is the one case that can collide.
  */
 export function runTypeColor(
   runTypeId: number,
   colors: RunTypeColors
 ): MarkColor {
-  const at = colors.order.indexOf(runTypeColorKey(runTypeId, colors));
-  const slot = at === -1 ? colors.order.length : at;
-  return MARK_COLORS[slot % MARK_COLORS.length];
+  const chosen = chosenRunTypeColor(runTypeId, colors);
+  if (chosen) return chosen;
+
+  const taken = new Set<MarkColor>();
+  const automatic: number[] = [];
+  for (const typeId of colors.order) {
+    const c = chosenRunTypeColor(typeId, colors);
+    if (c) taken.add(c);
+    else automatic.push(typeId);
+  }
+  const left = MARK_COLORS.filter(c => !taken.has(c));
+  const palette = left.length > 0 ? left : MARK_COLORS;
+
+  const at = automatic.indexOf(runTypeColorKey(runTypeId, colors));
+  const slot = at === -1 ? automatic.length : at;
+  return palette[slot % palette.length];
+}
+
+/**
+ * Every color drawn on this bid, and which types wear it — for the editor's
+ * "also used by X". Leaves out `exceptTypeId`, the type being edited, so a
+ * swatch does not warn that a type is using its own color.
+ */
+export function runTypeColorsInUse(
+  colors: RunTypeColors,
+  labels: ReadonlyMap<number, string>,
+  exceptTypeId: number | null
+): Map<MarkColor, string[]> {
+  const except =
+    exceptTypeId === null ? null : runTypeColorKey(exceptTypeId, colors);
+  const out = new Map<MarkColor, string[]>();
+  for (const typeId of colors.order) {
+    if (typeId === except) continue;
+    const color = runTypeColor(typeId, colors);
+    out.set(color, [
+      ...(out.get(color) ?? []),
+      labels.get(typeId) ?? "another type",
+    ]);
+  }
+  return out;
 }
 
 /**
