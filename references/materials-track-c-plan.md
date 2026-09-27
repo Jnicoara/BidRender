@@ -60,6 +60,32 @@ the live site, which Track C does not do.
 
 ## 3. Boxes catalog audit
 
+> **BUILT 2026-09-27, Tiers 1 + 2, on `track-c`.** The owner accepted all
+> eight recommendations (A–H). Catalog 1,237 → **1,270**, Boxes shelf 52 →
+> **85**. Tier 3 is held. Four things changed from the plan below, and each
+> was a measurement rather than a preference:
+>
+> - **The PVC boxes are named `4x4 PVC pull box` etc., not
+>   `PVC junction box, 4x4`.** With "junction box" in the name, the standard
+>   search sweep put all four PVC rows ahead of the steel 1900 for "j box".
+>   Named like the steel pull boxes, they tie on the alias and sort in beside
+>   them by size. Still their own rows, so question D's answer holds:
+>   `pullBoxFor` proposes steel.
+> - **Commonness: `4" square blank cover`, not the decorator raised cover.**
+>   Marking the raised cover moved it to the top of a bare "cover" search,
+>   ahead of the blank cover every 1900 junction gets.
+> - **The PVC FS box is `Weatherproof box, single-gang, PVC`**, not
+>   `PVC weatherproof box, single-gang`. Led by "PVC", it took the top of a
+>   bare "pvc" search from the conduit, and `materialSearchRank.test.ts` went
+>   red. It now also sorts beside its steel sibling.
+> - **"brass" moved from `Floor box` to the new `Floor box cover`**, and the
+>   box now says "The box only. The cover is a separate item."
+>
+> The pricing sheet was regenerated in the same change. The committed copy had
+> been stale since 2026-09-25, so it also picked up ~130 rows from catalog
+> changes made since then (1,252 → 1,397 generic rows; 0 typed prices in the
+> old copy, checked before overwriting).
+
 ### What exists (52 rows on the Boxes shelf, `server/seed/materials/boxes.ts`)
 
 | Family                 | Rows                                                                                                                                              |
@@ -207,3 +233,138 @@ Expected count after tiers 1+2: **1,237 + 33 = 1,270**.
   LB generator's 5 raceways × 9 sizes is **180 rows → ~1,450, within 50 of
   the 1,500 tripwire.** T alone is 45.
 - **H. Scope: Tiers 1 + 2 now, Tier 3 held?** _Recommend yes_ (~33 rows).
+
+---
+
+## 4. T conduit bodies at a branch tee — PLAN (2026-09-27, not built)
+
+Owner's direction: separate from the boxes job, T first (§ 3 question G).
+
+### What already exists, and what is already decided
+
+- **The tee model reserves it.** `TEE_FITTINGS = ["box", "body", "mark"]`
+  (`shared/runNetwork.ts`). `body` is described there as "RESERVED: the
+  catalog ships none yet", so nothing offers it and a stored one counts as
+  unanswered ("At least N tee boxes … no box chosen — not counted").
+- **takeoff-spec.md, D20 answer 3:** the fitting at a split is "a sticky
+  toolbar choice, remembered like D3's run type", and "T bodies wait for
+  catalog rows". This plan builds that. It does not reopen D20.
+- **todo.md:** "T bodies at a tee … Add the rows (with slang: 'tee body',
+  'T condulet') and offer it in the snap". And separately, "LB covers and
+  gaskets, LL/LR/T/C bodies and PVC sweeps are not in the catalog".
+- **The LB is the template.** `lbName(size, family)` builds
+  `1/2" EMT LB conduit body`; the conduit generator ships one per family ×
+  trade size (5 × 9 = 45); `materialsCatalog.test.ts` fails if any name the
+  lookup can ask for is missing. `lbHubsTakeConnectors` (EMT yes; rigid, IMC
+  and PVC no) decides whether pipe into the hubs takes a connector.
+- **What the snap does today:** `client/src/lib/legSnap.ts` always answers
+  `fitting: "box"` for a tee (or `mark` on a counted mark). There is no
+  toolbar choice between box and body yet.
+- **Bid lines are keyed by run type + role** (`runMaterialRole`), and the
+  roles are a DATABASE ENUM (`RUN_MATERIAL_ROLES`, extended by 0084 and 0085).
+  A run type with some box tees and some body tees needs two lines, so a body
+  cannot ride on the `teeBox` role. **This part is a schema change, so it
+  belongs to Track A.**
+
+### Which rows (catalog — Track C)
+
+Where T bodies are commonly used, by raceway:
+
+| Raceway      | Common sizes | Notes                                                                                        |
+| ------------ | ------------ | -------------------------------------------------------------------------------------------- |
+| EMT          | 1/2" – 2"    | Set-screw or compression hubs are also sold; the lookup, like the LB, prices one body per size. |
+| Rigid        | 1/2" – 4"    | Threaded, Form 7/8. The full range is common.                                                |
+| IMC          | 1/2" – 4"    | Uses the same threaded bodies as rigid; own row to match the LB lookup.                      |
+| PVC Sch 40   | 1/2" – 4"    | Solvent-weld. Sch 80 pipe glues into the same bodies.                                        |
+| PVC Sch 80   | 1/2" – 4"    | Own row to match the LB lookup, as above.                                                    |
+| Flex / LFMC  | none         | Flex turns itself and has no LB today (`pullPointKindFor`); a tee on flex stays a box.       |
+
+**Recommended: match the LB exactly, 5 families × 9 sizes = 45 rows**, named
+by a new `tBodyName(size, family)` → `1/2" EMT T conduit body`. The case for
+all nine sizes rather than only the common ones is the lookup. Every size a
+raceway comes in resolves to a row, so choosing "body" never lands on a size
+that cannot be priced. The rare large EMT sizes cost a few catalog rows and
+nothing else. Catalog: 1,270 → **1,315**, well inside the 1,500 tripwire.
+
+Slang (per `server/seed/materials/types.ts`): "tee body", "t body",
+"condulet", "access fitting", "pull", plus the family and size slang the LB
+already uses, and the § 3 brand aliases where they fit ("crouse hinds" on
+rigid/IMC, "carlon" on PVC). The search sweep must still lead "lb" with the LB
+rows and "tee" with the T bodies. Run `scripts/searchSpotCheck.mts` before and
+after, and `server/materialSearchRank.test.ts`, which caught a name-order
+fault in § 3.
+
+### How the branch-leg takeoff uses them
+
+1. **The choice.** A sticky toolbar choice, "Tee: box / T body", remembered
+   like D3's run type (D20 answer 3). The snap stops hard-coding `"box"`: it
+   returns the current choice. Default stays **box**. Snapping onto a counted
+   mark still wins as `mark`, whatever the choice.
+2. **What it buys.** One T body per tee, owned by the same run type
+   `teeBoxOwners` already picks. `materialNameFor(raceway, "teeBody")` →
+   `tBodyName(size, family)`; flex → null, and the tee says so.
+3. **No cover line for a body tee.** The body is priced with its cover and
+   gasket, the way the LB row is today (question T3). `teeCover` counts only
+   box tees.
+4. **Connectors follow the hub rule, not the box rule.** At a body tee, each
+   leg end takes a connector only when `lbHubsTakeConnectors` says so (EMT
+   yes; rigid, IMC and PVC no), the same rule an LB already follows.
+   `countConnectors` needs to know WHICH fitting stands at a tee node, not just
+   that it is a tee. Pass the tee's fitting through with the node, not a
+   second lookup, and say it in the sentence: "1 T body (3 into the hubs)" or
+   "(none — the pipe goes straight into the hubs)".
+5. **A mismatched tee.** A T body is one size and one kind each way. When the
+   legs meeting at a tee differ in size or family, the snap offers **box**
+   only, and says why in the tee's own sentence. A tee already stored as a
+   `body` that later becomes mismatched (a leg's run type changed) counts as
+   **unanswered**, "at least", never as a quiet box nobody chose. Same rule
+   as `countTeeBoxes` today.
+6. **Elbows.** Unchanged: the tee is a node, so the corner the fitting turns
+   is not also an elbow. This already holds for a box tee.
+7. **Box fill.** Not checked, the same stance as the tee box and conduit fill
+   (`teeBoxFor`: "never").
+
+### Order of work (three deploy steps, per CLAUDE.md)
+
+1. **Track A: additive migration**, appending `teeBody` to
+   `bid_line_items.runMaterialRole`. Appended, so every stored value keeps its
+   index, like 0084/0085. No UPDATE. It goes out BEFORE the code.
+2. **Track C: catalog rows**: the 45 bodies, `tBodyName` in
+   `shared/runFittingMaterials.ts`, and a test asserting every raceway the
+   lookup reads has its body (the "ships a 90, a 45 and an LB" test grows a T).
+   Rows alone are inert, so this can ship ahead of step 3.
+3. **Code** (owner to assign the track): the `teeBody` kind in `TEE_KINDS` /
+   `FITTING_WORDS`, `teeFittingCounts` splitting box / body / mark, the
+   connector rule, the toolbar choice and the snap, the mismatch sentence.
+   Tests in `server/branchLegs.test.ts` / `runFittings` for: a body tee on
+   EMT (3 connectors), on rigid (0), no cover line, a mismatched tee refused,
+   and a mixed run type (2 box tees + 1 body tee → two lines).
+4. **Step 3 of the deploy is empty**: nothing rewrites an existing meaning.
+   Every stored `body` today is already "unanswered", and after the change it
+   is counted, which is the fix rather than a silent re-price. **Before
+   deploying, count stored `fitting = 'body'` rows in production.** If any
+   exist, their bids will gain a line, so the owner decides whether that is
+   wanted. Expected: 0, because nothing offers `body` today. If the count is
+   not 0, stop and find out why before going on.
+
+### Questions for the owner (recommended answer first)
+
+- **T1. Which sizes?** _Recommend all nine sizes × five families (45)_, to
+  match the LB so every choice prices. The alternative, 1/2"–2" only (30),
+  leaves "body" unpriceable on larger pipe.
+- **T2. One row per family, or share bodies (rigid = IMC, PVC 40 = PVC 80)?**
+  _Recommend one per family_, like the LB. Sharing means teaching the lookup
+  an alias table to save a handful of rows.
+- **T3. Cover and gasket: in the body's price, or their own rows?**
+  _Recommend in the body's price for now_ (description: "Priced with its
+  cover and gasket"), matching how the LB row is used today, and decide LB
+  and T covers together under the open todo item. Separate cover rows are
+  per size and shared across LB/LL/LR/T/C, so they belong in that job.
+- **T4. Default choice for a new tee: box or body?** _Recommend box_, as
+  today. It is what D20 specified, and body stays one click away and sticky.
+- **T5. Mismatched tee: refuse body, or allow it with a warning?**
+  _Recommend refuse_ (box only, with the reason shown). Reducing T bodies are
+  not a stocked item, so an estimate built on one is a part nobody can buy.
+- **T6. LL, LR and C bodies: same job or later?** _Recommend later._ Nothing
+  in the takeoff proposes them yet, so they would be rows nothing uses.
+  Adding them later is +135 rows (~1,450).
