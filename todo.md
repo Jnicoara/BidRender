@@ -54,9 +54,24 @@ left as written rather than rewritten to match the rename.
       not flagged). True of every $0 catalog part, not only lugs. The
       catalog itself storing $0 is right (`costPerUnit` is NOT NULL DEFAULT 0
       and CLAUDE.md § Materials ships $0 on purpose); the open question is
-      only what the bid LINE says. Owner's call: e.g. flag an assembly line
-      whose snapshot material cost is $0 while its recipe has materials, which
-      needs the recipe's material count on the line.
+      only what the bid LINE says.
+
+      **Wanted (owner, 2026-09-26): the line reads "$X + 1 part not priced"
+      and counts toward the not-priced totals. PARKED the same day, before
+      building,** because a line does not record which parts its frozen
+      material cost contained — there is no per-part snapshot on
+      `bid_line_items`. Two ways, owner to choose:
+      (a) **freeze the count** — migration 0087, one nullable int on
+      `bid_line_items` (how many $0 parts the recipe had when the line was
+      added), additive, deploy step 1; lines from before it (NULL) fall back
+      to (b). Cannot drift: a lug priced in the library later still leaves the
+      frozen total short, and the line keeps saying so.
+      (b) **read the recipe now** — no migration, but it states a wrong number
+      once a part is priced in the library after the line was added (the
+      warning disappears while the frozen total still lacks the part), and it
+      misses parts since removed from the recipe.
+      Recommended: (a).
+
 - [x] **500 kcmil lug ADDED 2026-09-26 (Track B) as "500 kcmil crimp lug,
       single size".** A common part (Graybar and Lowe's stock Burndy's YA34
       series). Owner's decision: a NEW name, same pattern, one size — because
