@@ -97,6 +97,32 @@ if (!has0085) {
       " Zero on the day 0085 is applied — nothing existing changes."
   );
 }
+/*
+  AND 0086 (quantity mode, D21): the same loader selects `traceMode` on every
+  run, so without it the count dies on "Unknown column". Additive — NULL is
+  route — so the counts should not move when it lands, and there should be no
+  quantity rows until a build that can make them has run.
+*/
+const [modeCol] = (await db.execute(
+  sql`SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'takeoff_runs'
+        AND COLUMN_NAME = 'traceMode'`
+)) as unknown as [{ n: number }[]];
+const has0086 = Number(modeCol[0]?.n ?? 0) > 0;
+if (!has0086) {
+  console.log(
+    "\nThis database does not have migration 0086 yet (takeoff_runs.traceMode)." +
+      "\nFittings cannot be COUNTED until it is applied (additive, step 1)."
+  );
+} else {
+  const [quantity] = (await db.execute(
+    sql`SELECT COUNT(*) AS n FROM takeoff_runs WHERE traceMode = 'quantity'`
+  )) as unknown as [{ n: number }[]];
+  console.log(
+    `\nQuantity traces: ${quantity[0]?.n ?? 0} rows.` +
+      " Zero on the day 0086 is applied — nothing existing changes."
+  );
+}
 if (!has0082) {
   console.log(
     "\nThis database does not have migration 0082 yet (materials.stickLengthFeet)." +
@@ -139,7 +165,7 @@ console.log(
   "\n── 1. Fittings a Send would add (also what the supplier list gains) ──"
 );
 for (const bid of allBids.filter(b => bidIds.includes(b.id))) {
-  if (!has0082 || !has0085) {
+  if (!has0082 || !has0085 || !has0086) {
     bidsWithFittings++;
     if (bid.status.toLowerCase() !== "draft") bidsOut++;
     console.log(
@@ -147,7 +173,7 @@ for (const bid of allBids.filter(b => bidIds.includes(b.id))) {
         `, locked ${bid.quantitiesLockedAt === null ? "no" : "YES"}` +
         `, sample ${bid.isSample}, archived ${bid.archivedAt === null ? "no" : "yes"}` +
         `, owner ${bid.userId} <${emailOf.get(bid.userId) ?? "?"}>` +
-        " — has typed traced runs; counts need 0082 and 0085"
+        " — has typed traced runs; counts need 0082, 0085 and 0086"
     );
     continue;
   }

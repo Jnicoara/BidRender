@@ -4189,6 +4189,32 @@ bend note all see a finished flat run, not an unfinished route.
 3. **Switching back must not lose anything.** Route-only rows (circuits, pull
    point answers, tees) are left in place and ignored, so a switch is always
    reversible.
+4. **Anything that reads STORED circuits to describe wire is wrong on a
+   quantity trace.** Found on screen: the spec editor said "none pulled yet"
+   beside 230 ft of the type's wire. Hand such a reader what the arithmetic
+   reads (one circuit of the type), never the rows.
+
+### BUILT 2026-09-26 — and looked at
+
+On "Bar layout check", sheet E0.01, a three-leg quantity trace of 3/4" EMT (one
+leg starting on the main): 5 drops proposed, none at the joined end;
+"5 drops, 8'-6" each = 42.50 ft" at a 10'-0" run height; one changed to a
+switch (+6.00 ft), the rest approved (+34.00 ft); the readout went 4 · 25.00 →
+5 · 31.00 → 9 · 65.00 ft and matched the totals' vertical conduit + cable;
+3/4" EMT connectors 2 → 7; a jump from sheet 2 opened sheet 1 on the drop;
+route and back left the wire at 964.14 ft. What the look found and fixed:
+
+- **Level before the gate.** With no run height, `verticalAtEnd` read the gate
+  before the "distribution" answer, so every quantity trace was called
+  "counted flat only". Now level wins; a route run level at both ends stops
+  being warned about too, which was always a false warning.
+- The spec editor's "none pulled yet" (trap 4 above).
+- A dashed "jump" drawn over pipe where a leg joined the trace mid-way.
+- A drop opened from its marker opened below the fold.
+- The switch and "Drops to" squashed at a narrow window; the toolbar group
+  wraps now.
+- The pill over the drawing named route ends on a quantity trace.
+- The route / quantity split (answer 3) was computed and not shown.
 
 ## 6. Decisions already made — do not re-open without saying why
 

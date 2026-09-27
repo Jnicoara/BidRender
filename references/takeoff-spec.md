@@ -1129,6 +1129,11 @@ question. "Total footage of 3/4" EMT on this sheet" and nothing else.
   where each came from, grouped by type with count and footage; clicking one
   jumps to its sheet and spot.
 
+**Built 2026-09-26** (`shared/traceMode.ts`, `shared/quantityDrops.ts`,
+migration 0086; not yet deployed — see `todo.md` § "Quantity mode"). Checked
+on screen on the fixture bid; the seven things that check found are in the
+step 9 commit and § 5o.
+
 **This narrows D18 and D20; it reverses neither.** D18's question and D20's
 tees still apply to every route run; a quantity trace simply does not ask the
 one or make the other. **It does not reopen D3**: the type is still chosen

@@ -28,6 +28,11 @@ This is the human-readable companion to the git history — read this to see wha
   click one to jump straight to it, even on another sheet. Drops it cannot
   count yet — no run height set, or no scale — are counted and said, not
   left out quietly.
+- **Fewer false "counted flat only" warnings.** A run that carries on at run
+  height at both ends has no drop to count, so on a job with no run height
+  set it is no longer listed as missing its drops. No number changes.
+- **The plan toolbar wraps instead of overlapping** on a narrow window, so
+  the scale and the heights chip no longer sit on top of each other.
 - **A traced run can now have more than one leg — usually a branch.** While
   tracing, press "New leg" (or Shift-click) and the next click starts another
   leg of the same run. Start it on the run and it becomes a branch: a box is
