@@ -28,6 +28,11 @@ app-platform-settings.txt
 # (Stage 4, 2026-09-27). Holds the database password. Delete it after use.
 new-db-url.txt
 
+# Staging (references/deploying.md § 11). The laptop's staging DATABASE_URL and
+# the one-off settings file pasted into the staging app. Both hold passwords.
+.env.staging.local
+staging-app-settings.txt
+
 # Personal working notes. Kept on the machine, never in a public repo: they name
 # real email addresses, local file paths and the state of one laptop, and they
 # go stale fast. Anything durable belongs in references/ instead.

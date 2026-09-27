@@ -13,6 +13,10 @@ This is the human-readable companion to the git history — read this to see wha
 - **A yellow "STAGING" band across the top of every screen on the practice
   copy**, so nobody mistakes it for the live site. The screens shrink to make
   room for it, so nothing at the bottom of a page is pushed out of view.
+- **The staging site has its own empty database, walled off from real data.**
+  It was built from the setup files, not copied from the live site, and its
+  login was checked by trying to read, change or borrow live data and the live
+  login — all twelve attempts were refused.
 - **33 more boxes and box parts in the starter catalog.** The boxes audit
   found common parts nobody could pick: the deep 2-1/8" 1900 and octagon box,
   2-gang mud rings, raised covers for exposed work, a round blank cover,
