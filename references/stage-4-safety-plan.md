@@ -129,6 +129,34 @@ screen's waitlist gets an "Invite" button that sends the email and stamps
 
 Plain steps. Each says where to click and what "done" looks like.
 
+### Step (a) — DONE 2026-09-27. What actually worked
+
+A, B and C below are the ORIGINAL plan and A was wrong; this is what was done.
+
+1. **App joined the database's VPC.** App and database are both in SFO3.
+   Apps → bidrender → Networking → VPC network → Edit network → `default-sfo3`
+   equivalent. Redeployed, no downtime.
+2. **`DATABASE_URL` switched to the private host** — `private-` inserted after
+   the `@`, nothing else. The database certificate lists that name, checked
+   with `openssl s_client -starttls mysql` before the switch. Redeployed.
+3. **Trusted Sources = `10.124.0.3` (the app's VPC egress IP) + `97.94.233.209`
+   (the owner's laptop).** Entered as IP addresses, NOT by picking the app from
+   the list — picking the app is what failed. The nightly backup is unaffected:
+   the cron Worker only calls `https://bidridge.com/api/scheduled/…`, and the
+   app runs the dump over its own `DATABASE_URL`.
+4. **The 11 SECRET settings moved to Run Time**; the 8 plain ones
+   (`VITE_APP_ID`, `NODE_ENV`, `PLAN_STORAGE`, the R2 account/bucket/endpoint
+   names) stay Run and Build Time. Read from a downloaded App Spec, names and
+   scopes only, file deleted. `scripts/build.mts` reads no setting but the
+   `VITE_` ones.
+5. **`app-platform-settings.txt`**: not on disk under the user folder, never in
+   any commit. Nothing to rotate.
+
+Checked after every change: `/api/version` served a fresh build, a
+wrong-password login answered 401 (so sign-in reaches the database), the owner
+signed in and opened a bid, and the laptop's `schemaDrift` connected (89).
+The laptop-locked-out error is in `references/deploying.md` § 10.
+
 ### A. Lock down the database (piece 4) — about 15 minutes
 
 1. Log in to **cloud.digitalocean.com**.
@@ -206,6 +234,86 @@ Before it ships: send me the list of people who should be able to get in the
 day it goes live, so nobody already using the app is locked out.
 
 ---
+
+## Step (b) — staging, the detailed plan (2026-09-27, PLAN ONLY)
+
+Supersedes § D above where they differ.
+
+**What it is.** A second copy of the site at `staging.bidridge.com`, deployed
+from a `staging` branch, with its own empty database, its own plans bucket, no
+nightly jobs, and a password in front of every page. The flow becomes
+`local-dev → staging → main`: a change is pushed to `staging`, checked there,
+then fast-forwarded to `main`.
+
+**Monthly cost — about $10.** Prices from digitalocean.com/pricing/app-platform,
+read 2026-09-27; check the create screen.
+
+| Item | Cost | Why |
+| --- | --- | --- |
+| Staging app, 1 vCPU / 1 GiB fixed | **$10/mo** | Same size as production (`apps-s-1vcpu-1gb-fixed`), so a practice run means something. The 512 MiB size is $5 but is a different machine from the one that ships. |
+| Database | $0 | A second database on the existing cluster. |
+| R2 bucket | ~$0 | Inside Cloudflare's free storage allowance at staging volumes. |
+| `staging.bidridge.com` | $0 | DNS is already at DigitalOcean. |
+| Email (later) | $0 | Resend's free tier. |
+
+**The one real risk of the free database option:** staging shares the
+production cluster's CPU and memory. A heavy test on staging can slow the live
+site. At today's traffic that is acceptable; a separate cluster removes it for
+roughly $15/mo more (question S1).
+
+### What the owner clicks (about 30 minutes, one step at a time when we do it)
+
+1. **Databases → cluster → Users & Databases:** add database
+   `bidrender_staging` and user `bidrender_staging_app`.
+2. **Apps → Create App**, same GitHub repo, branch `staging`, SFO3, 1 GiB
+   fixed, same run command and an EMPTY build command (see memory: a custom
+   build command breaks the build).
+3. **Networking → VPC** on the new app, same VPC as the database. Then read
+   its `10.x` egress IP.
+4. **Database → Network Access:** add that `10.x` address. Without this the
+   staging app is locked out on its first start — the lock from step (a)
+   applies to it too.
+5. **Cloudflare → R2:** create bucket `bidrender-plans-staging`, an API token
+   scoped to that bucket only, and the same CORS rule as production
+   (deploying.md § 9) with the staging origin.
+6. **Staging app settings:** pasted from a file I prepare the same way as
+   `new-db-url.txt` — secrets Run Time and encrypted from the start.
+7. **Networking → Domains:** add `staging.bidridge.com` to the staging app.
+
+### What I build
+
+1. **A password gate**, because App Platform has no built-in way to put a
+   password on an app. Express middleware asking for a username and password
+   (HTTP basic auth) on every request, turned on only when `STAGING_PASSWORD`
+   is set — so production, which never has it, is untouched. Plus a
+   `noindex` header so search engines never list staging. Tested.
+2. **A "STAGING" band across the top of every screen**, from a build-time
+   `VITE_APP_ENV=staging`, so nobody mistakes it for the live site.
+3. **The staging database's permissions**, run from the laptop as `doadmin`:
+   `bidrender_staging_app` gets `ALL` on `bidrender_staging` and nothing on
+   `bidrender` — the same shape as `database-digitalocean.md` § 6. DigitalOcean
+   creates users with wider rights, so this step is what stops staging from
+   being able to touch production data. Checked by trying, and failing, to
+   read `bidrender` as the staging login.
+4. **The staging database built from the migrations** (never a copy of
+   production — it holds real contractors' bids). Seeded catalog, empty
+   otherwise.
+5. **Settings file** for step 6, with fresh `JWT_SECRET` and no
+   `CRON_SECRET` (no cron on staging), `DISABLE_SCHEDULED_JOBS=true`.
+6. **Docs:** `deploying.md` gets the staging step in the deploy sequence, and a
+   `.env.staging.local` for running migrations against staging first.
+
+**No migrations.** Staging's database is built from the existing files.
+
+### Questions for the owner — staging
+
+- **S1.** Staging database on the production cluster (free, shares its
+  capacity) or its own cluster (about $15/mo more, fully separate)?
+  Recommendation: shared, for now.
+- **S2.** AI on staging: off (`DISABLE_AI_FEATURES=true`), or on with its own
+  Anthropic key so staging spend is visible separately? Recommendation: off
+  until something AI needs testing.
+- **S3.** App size: $10 (matches production) or $5? Recommendation: $10.
 
 ## Questions for the owner
 
