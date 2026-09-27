@@ -352,26 +352,70 @@ export function runTypeColor(
   return palette[slot % palette.length];
 }
 
+/** The bid's colors as they would be if `typeId` chose `color` (null: automatic). */
+export function withRunTypeChoice(
+  colors: RunTypeColors,
+  typeId: number,
+  color: MarkColor | null
+): RunTypeColors {
+  const key = runTypeColorKey(typeId, colors);
+  const chosen: Record<number, string> = { ...colors.chosen };
+  if (color === null) delete chosen[key];
+  else chosen[key] = color;
+  return { ...colors, chosen };
+}
+
 /**
- * Every color drawn on this bid, and which types wear it — for the editor's
- * "also used by X". Leaves out `exceptTypeId`, the type being edited, so a
- * swatch does not warn that a type is using its own color.
+ * For each of the six, the OTHER types on this bid that would wear it if the
+ * edited type chose it — the editor's "also used by X".
+ *
+ * ── Computed as if the choice were made, never from today's drawing ─────────
+ * Found on screen 2026-09-27: picking violet said "also used by 12-2 MC
+ * cable", which wore violet only because it was automatic, and rule 1 moves
+ * an automatic type off a chosen color. A warning read off the current state
+ * named a clash that saving would remove. So a type is named against a color
+ * only if it would still be that color afterwards: one that chose it too, or
+ * an automatic one when every color is taken.
  */
 export function runTypeColorsInUse(
   colors: RunTypeColors,
   labels: ReadonlyMap<number, string>,
-  exceptTypeId: number | null
+  editingTypeId: number
 ): Map<MarkColor, string[]> {
-  const except =
-    exceptTypeId === null ? null : runTypeColorKey(exceptTypeId, colors);
+  const editing = runTypeColorKey(editingTypeId, colors);
   const out = new Map<MarkColor, string[]>();
-  for (const typeId of colors.order) {
-    if (typeId === except) continue;
-    const color = runTypeColor(typeId, colors);
-    out.set(color, [
-      ...(out.get(color) ?? []),
-      labels.get(typeId) ?? "another type",
-    ]);
+  for (const candidate of MARK_COLORS) {
+    const after = withRunTypeChoice(colors, editingTypeId, candidate);
+    out.set(
+      candidate,
+      colors.order
+        .filter(t => t !== editing && runTypeColor(t, after) === candidate)
+        .map(t => labels.get(t) ?? "another type")
+    );
+  }
+  return out;
+}
+
+/**
+ * The types on this bid whose color would CHANGE if the edited type chose
+ * `choice` — so the editor can say it, rather than the drawing quietly
+ * recoloring three lines on Save. The edited type itself is left out.
+ */
+export function runTypeColorShiftsIf(
+  colors: RunTypeColors,
+  labels: ReadonlyMap<number, string>,
+  editingTypeId: number,
+  choice: MarkColor | null
+): { label: string; from: MarkColor; to: MarkColor }[] {
+  const editing = runTypeColorKey(editingTypeId, colors);
+  const after = withRunTypeChoice(colors, editingTypeId, choice);
+  const out: { label: string; from: MarkColor; to: MarkColor }[] = [];
+  for (const t of colors.order) {
+    if (t === editing) continue;
+    const from = runTypeColor(t, colors);
+    const to = runTypeColor(t, after);
+    if (from !== to)
+      out.push({ label: labels.get(t) ?? "another type", from, to });
   }
   return out;
 }

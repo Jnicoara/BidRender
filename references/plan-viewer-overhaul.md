@@ -4309,12 +4309,33 @@ This keeps the 2026-09-18 decision that colour means which TYPE a run is
   "Hide other runs on the drawing" on the selected run removes the others
   from the drawing only. The panel keeps listing every run. With nothing
   selected, or while tracing, the whole drawing is shown.
-- **Part B, a colour the user picks, is NOT built.** It needs a nullable
-  `color` column on `takeoff_run_types`. The owner's answers for when it is
-  built: only the six count colours; a chosen colour follows the type to
-  EVERY bid, and only types with no chosen colour take a per-bid slot;
-  changing a shipped starter type's colour forks it, like editing a shipped
-  material.
+- **Part B, a color the user picks: BUILT 2026-09-27, not yet deployed.**
+  `takeoff_run_types.color` (migration 0088), nullable, holding one of the
+  six count colors by value. NULL means automatic. The owner's answers:
+  1. **Automatic types skip colors other types on THAT bid have chosen.**
+     They take what is left, in first-use order. A type chosen elsewhere
+     reserves nothing here.
+  2. **Two types may choose the same color.** The swatch says "also used
+     by X".
+  3. **Choosing on a shipped type forks it**, like any edit (`forkRunType`
+     copies the column), and the fork's color reaches runs that still name
+     the shipped id, through `sameAs`.
+  4. **The same permission as editing run types today.**
+  5. **Six colors, no more**, until a real job needs them.
+
+  The one place a color is chosen is the type editor. It has an "Automatic"
+  button showing what automatic would be on this bid, and six swatches.
+  **"Also used by X" and "changes to" are computed as if the choice were
+  already made** (`runTypeColorsInUse`, `runTypeColorShiftsIf`). Read off the
+  current drawing, choosing violet named an AUTOMATIC type that rule 1 would
+  have moved away. That was found on screen. It warned of a clash saving would
+  remove, and said nothing about the three lines that would recolor.
+
+- **NOT built, and it needs a decision: run types have no "Restore to
+  shipped".** Answer 3 assumed one ("Restore to shipped drops the color along
+  with the other edits"), but only materials have a revert. The one way back
+  today is "Automatic", which keeps the fork. Undoing a fork is its own
+  design question: runs traced after the fork store the FORK's id.
 
 ## 7. Settled — answered 2026-09-17
 

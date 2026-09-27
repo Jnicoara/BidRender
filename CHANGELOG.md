@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **You can pick a color for a run type.** In the type editor (the pencil in
+  the conduit or cable picker) there is a Color row: "Automatic", which is
+  how every type starts, or one of six colors. A picked color follows the
+  type to every bid. The automatic types on a bid step around it, and the
+  editor says which lines will change color before you save. Two types can
+  share a color, and the swatch says who else uses it. Picking a color on a
+  type BidRidge ships makes your own copy of it, like any other edit.
 - **"Colour" is now "color" everywhere on screen.** The app uses American
   spelling. The proposal's accent-color setting, the run-type swatches' hover
   text and a few messages said "colour"; a check now keeps the British

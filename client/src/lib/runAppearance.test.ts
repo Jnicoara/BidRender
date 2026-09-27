@@ -17,6 +17,7 @@ import {
   runTypeColor,
   runTypeColorOrder,
   runTypeColorsInUse,
+  runTypeColorShiftsIf,
   type RunTypeColors,
 } from "@shared/takeoffMarks";
 
@@ -211,24 +212,56 @@ describe("a color somebody CHOSE for a type (Part B, owner 2026-09-27)", () => {
   });
 });
 
-describe("which types on the bid wear each color, for 'also used by'", () => {
-  it("names every OTHER type on the bid drawn in a color", () => {
-    const [blue, pink] = MARK_COLORS;
+describe("'also used by' says who would share the color AFTER choosing it", () => {
+  /*
+    Found on screen 2026-09-27: picking violet for 1/2" EMT said "also used by
+    12-2 MC cable" — which wore violet only because it was automatic, and
+    rule 1 moves an automatic type off a chosen color. The warning described
+    a clash that saving would remove. So the answer is computed as if the
+    choice were already made.
+  */
+  const [blue, pink, violet] = MARK_COLORS;
+  const labels = new Map([
+    [1, "Homerun A"],
+    [2, "Homerun B"],
+    [3, "Branch"],
+  ]);
+
+  it("names a type that CHOSE the same color", () => {
     const colors: RunTypeColors = {
       order: [1, 2, 3],
-      sameAs: { 30: 3 },
-      chosen: { 1: pink, 2: pink },
+      sameAs: {},
+      chosen: { 2: pink },
     };
-    const labels = new Map([
-      [1, "Homerun A"],
-      [2, "Homerun B"],
-      [3, "Branch"],
+    expect(runTypeColorsInUse(colors, labels, 1).get(pink)).toEqual([
+      "Homerun B",
     ]);
-    const used = runTypeColorsInUse(colors, labels, 1);
-    // Type 1 is the one being edited, so only 2 is named against pink.
-    expect(used.get(pink)).toEqual(["Homerun B"]);
-    // Type 3 is automatic and skips pink, so it takes blue.
-    expect(used.get(blue)).toEqual(["Branch"]);
+  });
+
+  it("does not name an automatic type, because it would step aside", () => {
+    // Today 3 (automatic) is violet. Choosing violet for 1 moves 3 on.
+    const colors: RunTypeColors = {
+      order: [1, 2, 3],
+      sameAs: {},
+      chosen: { 2: pink },
+    };
+    expect(runTypeColor(3, colors)).toBe(violet);
+    expect(runTypeColorsInUse(colors, labels, 1).get(violet)).toEqual([]);
+  });
+
+  it("says which automatic types would change color, and to what", () => {
+    const colors: RunTypeColors = {
+      order: [1, 2, 3],
+      sameAs: {},
+      chosen: {},
+    };
+    // 1 is blue, 2 pink, 3 violet. Choosing pink for 1 leaves blue free:
+    // 2 (automatic, first left) takes blue, 3 takes violet — unchanged.
+    expect(runTypeColorShiftsIf(colors, labels, 1, pink)).toEqual([
+      { label: "Homerun B", from: pink, to: blue },
+    ]);
+    // Automatic moves nobody that is not already where automatic puts them.
+    expect(runTypeColorShiftsIf(colors, labels, 1, null)).toEqual([]);
   });
 });
 

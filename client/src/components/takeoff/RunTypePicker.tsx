@@ -79,6 +79,8 @@ import {
   MARK_COLORS,
   runTypeColor,
   runTypeColorsInUse,
+  runTypeColorShiftsIf,
+  withRunTypeChoice,
   type MarkColor,
   type RunTypeColors,
 } from "@shared/takeoffMarks";
@@ -595,14 +597,17 @@ export function RunTypePicker({
             {(() => {
               const labels = new Map(types.map(t => [t.id, t.label]));
               const inUse = runTypeColorsInUse(runColors, labels, editing.id);
-              const automatic = runTypeColor(editing.id, {
-                ...runColors,
-                chosen: Object.fromEntries(
-                  Object.entries(runColors.chosen).filter(
-                    ([id]) => Number(id) !== editing.id
-                  )
-                ),
-              });
+              const automatic = runTypeColor(
+                editing.id,
+                withRunTypeChoice(runColors, editing.id, null)
+              );
+              // Said before Save, so three lines do not recolor unannounced.
+              const shifts = runTypeColorShiftsIf(
+                runColors,
+                labels,
+                editing.id,
+                draft.color
+              );
               return (
                 <div className="mt-2">
                   <p className="text-[0.7rem] font-medium">Color</p>
@@ -675,6 +680,18 @@ export function RunTypePicker({
                   {draft.color !== null && (
                     <p className="mt-1 text-[0.7rem] text-muted-foreground leading-snug">
                       This color follows the type to every bid.
+                    </p>
+                  )}
+                  {shifts.length > 0 && (
+                    <p className="mt-1 text-[0.7rem] text-muted-foreground leading-snug">
+                      On this bid,{" "}
+                      {shifts
+                        .map(
+                          s =>
+                            `${s.label} changes to ${MARK_COLOR_NAMES[s.to].toLowerCase()}`
+                        )
+                        .join(", ")}
+                      .
                     </p>
                   )}
                 </div>
