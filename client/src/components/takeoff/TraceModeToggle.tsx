@@ -40,7 +40,9 @@ export function TraceModeToggle({
     <div
       role="radiogroup"
       aria-label="How this trace counts"
-      className="flex items-center rounded-md border border-border p-0.5 text-xs"
+      // shrink-0: squeezed by a crowded toolbar it overlapped its neighbour
+      // (seen at 655px, 2026-09-26). It wraps with the bar instead.
+      className="flex shrink-0 items-center rounded-md border border-border p-0.5 text-xs whitespace-nowrap"
     >
       {OPTIONS.map(option => {
         const on = option.mode === value;

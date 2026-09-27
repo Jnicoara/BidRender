@@ -653,6 +653,12 @@ export const takeoffRunTypesRouter = router({
             unmeasurableCount: f.unmeasurableCount,
             unansweredCount: f.unansweredCount,
             branchCount: f.branchCount,
+            /**
+             * The pipe (or cable) from QUANTITY traces, already inside the
+             * rows' feet — the split the panel shows beside one bid line
+             * (D21, answer 3), never a second amount.
+             */
+            quantityFeet: f.quantityFeet,
             rows: rows.map(row => ({
               role: row.role,
               materialId: row.materialId,

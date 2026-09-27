@@ -342,10 +342,19 @@ export function verticalAtEnd(end: {
 }): EndVertical {
   const { kind } = end;
   if (kind === null) return { counted: false, kind: null, reason: "no-kind" };
-  if (!usableInches(end.distributionInches))
-    return { counted: false, kind, reason: "no-distribution-height" };
+  /*
+    LEVEL BEFORE THE GATE. An end that carries on at run height has no
+    vertical whatever the run height turns out to be, so it is an answer even
+    while that height is unset. This read the gate first until 2026-09-26, and
+    a run level at both ends was then reported "counted flat only" on a job
+    with no run height — a warning about a run with nothing missing. Found on
+    screen with a quantity trace (D21), whose unanswered ends read as level:
+    it was called an unfinished route.
+  */
   if (kind === DISTRIBUTION_KIND)
     return { counted: false, kind, reason: "level" };
+  if (!usableInches(end.distributionInches))
+    return { counted: false, kind, reason: "no-distribution-height" };
   if (!usableInches(end.endInches))
     return { counted: false, kind, reason: "height-not-set" };
 

@@ -155,6 +155,7 @@ import { BidDropsReadout } from "@/components/takeoff/BidDropsReadout";
 import {
   DISTRIBUTION_KIND,
   traceEndsLabel,
+  endKindLabel,
   SUGGEST_WITHIN_INCHES,
   shouldSuggestStampLink,
 } from "@shared/takeoffHeights";
@@ -4831,7 +4832,7 @@ export default function TakeoffPage({
             </>
           )}
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             {/*
               ── CALIBRATE — beside the thing it changes, not among the tools ─
 
@@ -5274,7 +5275,13 @@ export default function TakeoffPage({
                       measurability={measurability}
                       tracing={tracing}
                       pathType={tracePathType}
-                      endsLabel={armedEndsLabel}
+                      // A quantity trace has no ends; the pill says what it
+                      // counts instead, and what a drop will be proposed as.
+                      endsLabel={
+                        activeTraceMode === "quantity"
+                          ? `Quantity — drops to ${endKindLabel(traceEnds.endKind, heightsForBid?.types)}`
+                          : armedEndsLabel
+                      }
                       points={tracePoints}
                       onPointsChange={setTracePoints}
                       existingRuns={visibleRuns}
@@ -5472,7 +5479,25 @@ export default function TakeoffPage({
                         runTypes.data ?? [],
                         run.runTypeId
                       )}
-                      circuits={run.circuits}
+                      /*
+                        What the ARITHMETIC reads, not what is stored. A
+                        quantity trace pulls one circuit of its type (D21) and
+                        has no rows — handed its stored ones, this said "none
+                        pulled yet" beside 230 ft of wire on the row above.
+                        Seen on screen 2026-09-26.
+                      */
+                      circuits={
+                        run.traceMode === "quantity"
+                          ? run.typeDefaults?.conductorCount
+                            ? [
+                                {
+                                  conductorCount:
+                                    run.typeDefaults.conductorCount,
+                                },
+                              ]
+                            : []
+                          : run.circuits
+                      }
                       locked={quantitiesLocked}
                       onSave={patch =>
                         respecifyRun.mutateAsync({ id: run.id, ...patch })

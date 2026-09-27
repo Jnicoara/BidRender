@@ -53,6 +53,8 @@ import {
 } from "@shared/takeoffGeometry";
 import type { Measurability, RunPathType } from "@shared/takeoffQuantities";
 import { legSnapLabel, type LegSnap } from "@/lib/legSnap";
+import { projectOntoPath } from "@shared/runNetwork";
+import { JOINED_WITHIN_POINTS } from "@shared/quantityDrops";
 
 /**
  * How wide a run's invisible click target is, in SCREEN pixels.
@@ -612,6 +614,21 @@ export function TraceLayer({
             const ordered = [...group].sort((a, b) => a.id - b.id);
             ordered.forEach((leg, i) => {
               if (i === 0 || leg.parentRunId == null || leg.startTee) return;
+              /*
+                A quantity leg that starts ON the trace joins it with no tee
+                (D21) — like a branch, there is no gap to draw. Decided the
+                way the drop proposals decide "joined", so the two agree.
+              */
+              const start = leg.points[0];
+              if (
+                start &&
+                ordered.some(other => {
+                  if (other.id === leg.id) return false;
+                  const hit = projectOntoPath(other.points, start);
+                  return hit !== null && hit.distance <= JOINED_WITHIN_POINTS;
+                })
+              )
+                return;
               const prev = ordered[i - 1].points;
               if (prev.length === 0 || leg.points.length === 0) return;
               const a = toScreen(prev[prev.length - 1]);

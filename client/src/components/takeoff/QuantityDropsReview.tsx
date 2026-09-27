@@ -11,6 +11,7 @@
  * worked out from the rows every render, by the same function the drawing's
  * markers use (`quantityEndRows`).
  */
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { HeightFields } from "@/components/HeightFields";
@@ -257,8 +258,20 @@ function DropEditor({
 }) {
   // What a height typed here applies to: the stored kind, else the proposal.
   const kind = row.state === "approved" ? row.kind : toKind;
+  /*
+    Opened from its MARKER, this sits somewhere down a long panel — and an
+    editor that opens off-screen reads as a tap that did nothing. Seen on
+    screen 2026-09-26. "nearest" moves nothing when it is already in view.
+  */
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: "nearest" });
+  }, []);
   return (
-    <div className="ml-1 mt-1 mb-1.5 space-y-1.5 border-l border-border/60 pl-2">
+    <div
+      ref={ref}
+      className="ml-1 mt-1 mb-1.5 space-y-1.5 border-l border-border/60 pl-2"
+    >
       <div className="flex items-center gap-1.5">
         <span className="text-[0.7rem] text-muted-foreground w-10">To</span>
         <EndKindSelect

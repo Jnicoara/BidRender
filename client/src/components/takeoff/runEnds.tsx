@@ -146,8 +146,10 @@ export function TraceEndsPickers({
 }) {
   if (quantity)
     return (
-      <div className="flex items-center gap-1.5 text-xs">
-        <span className="text-muted-foreground">Drops to</span>
+      <div className="flex shrink-0 items-center gap-1.5 text-xs">
+        <span className="text-muted-foreground whitespace-nowrap">
+          Drops to
+        </span>
         <EndKindSelect
           bidId={bidId}
           value={value.endKind}

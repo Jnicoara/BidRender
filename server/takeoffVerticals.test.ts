@@ -298,6 +298,18 @@ describe("the vertical at one end of a run", () => {
     expect(!vertical.counted && vertical.reason).toBe("no-distribution-height");
   });
 
+  it("reads 'carries on at run height' as level even while the gate is shut", () => {
+    // Nothing is missing at a level end, known run height or not. Read as the
+    // gate first, a run level at both ends — and every unanswered end of a
+    // quantity trace (D21) — was warned about as "counted flat only".
+    const vertical = verticalAtEnd({
+      kind: "distribution",
+      endInches: null,
+      distributionInches: null,
+    });
+    expect(!vertical.counted && vertical.reason).toBe("level");
+  });
+
   it("refuses a type whose height nobody has set, and says which problem it is", () => {
     const vertical = verticalAtEnd({
       kind: "panel",

@@ -528,6 +528,11 @@ export type RunTypeBridgeEntry = {
   branchCount: number;
   /** Runs on a sheet with no scale, so not in these numbers at all. */
   unmeasurableCount: number;
+  /**
+   * Of the pipe (or cable) above, the feet from QUANTITY traces (D21). One
+   * bid line either way; this is the split, never a second amount.
+   */
+  quantityFeet: number;
 };
 
 export function RunsPanel({
@@ -994,6 +999,34 @@ export function RunsPanel({
                     one nobody has priced, and a zero here would read as a
                     fitting that costs nothing.
                   */}
+                  {/*
+                    ROUTE AND QUANTITY, ONE LINE (D21, answer 3). The same pipe
+                    to buy, so one bid line — and said how it splits, so a
+                    reader checking a quantity trace can find its share. Only
+                    when there is one: a type traced only as routes has
+                    nothing to split.
+                  */}
+                  {entry.quantityFeet > 0 &&
+                    (() => {
+                      // The pipe; on a cable type, the cable — its only row.
+                      const pipe =
+                        entry.rows.find(r => r.role === "raceway") ??
+                        entry.rows[0];
+                      const total = pipe?.feet ?? entry.quantityFeet;
+                      const route =
+                        Math.round((total - entry.quantityFeet) * 100) / 100;
+                      // NAMED: under the last wire row, an unnamed split read
+                      // as that row's (seen on screen 2026-09-26).
+                      const what = pipe?.materialName ?? "Footage";
+                      return (
+                        <p className="mt-0.5 text-[0.65rem] text-muted-foreground leading-snug">
+                          {route > 0
+                            ? `${what}: ${feet(route)} from routes + ${feet(entry.quantityFeet)} from quantity traces`
+                            : `${what}: all ${feet(entry.quantityFeet)} from quantity traces`}
+                        </p>
+                      );
+                    })()}
+
                   {entry.fittings.length > 0 && (
                     <div className="mt-1.5 space-y-1">
                       {/* Bend rows with nothing to say are left out — the same
