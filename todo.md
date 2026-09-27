@@ -1259,7 +1259,13 @@ path is ever revived, give it the same treatment first.
 
 ## Quantity mode — flat footage under a type (D21, built 2026-09-26)
 
-**NOT DEPLOYED.** On `local-dev` as the ten "Quantity mode step N" commits.
+**DEPLOYED 2026-09-27 as `a64dfbc`** (rollback target `b69c35d`). 0086 applied
+to production before the push; drift clean at 87; `fittingsImpact` 0 quantity
+rows. Rehearsed on backup `2026-09-27T00-41-48Z`; results and the live checks
+on bid 25 in `references/deploying.md` § 5b "Fifth run". Bid 25 back to 0
+lines, 0 runs, no scaled sheet afterwards.
+
+On `local-dev` as the ten "Quantity mode step N" commits.
 A run carries `traceMode` (`route` | `quantity`, NULL is route) on every row;
 a quantity trace is D20's legs without tees, its wire is its type's
 (`quantityCircuit`, through `circuitWire`), and its drops are proposed at leg
@@ -1267,7 +1273,7 @@ ends and approved AS END KINDS — no table of answers. Modules:
 `shared/traceMode.ts`, `shared/quantityDrops.ts`. Spec:
 `plan-viewer-overhaul.md` § 5o.
 
-- [ ] **Deploy — three steps, and step 3 is empty.**
+- [x] **Deploy — three steps, and step 3 is empty.** Done as below.
   1. **0086 is step 1 (additive): apply it BEFORE the push.** One nullable
      enum column on `takeoff_runs`, no default, no UPDATE. Applied to
      `bidrender_local` and `bidrender_test_clean`; a second run applies
@@ -1292,6 +1298,13 @@ ends and approved AS END KINDS — no table of answers. Modules:
 - [ ] **No AI path yet.** The reader cannot propose a quantity trace; when it
       can, it goes through `save` + `addLeg` like the hand path, so the counts
       agree by construction.
+- [ ] **Commit the router snapshot as a script.** Two deploys running now have
+      proved existing data unchanged by calling `takeoffRuns.totals`,
+      `takeoffRunTypes.bridgeForBid` and `takeoffRuns.listForSheet` for every
+      bid and comparing files — and both times the script was a throwaway, so
+      the second deploy had to rewrite it. It belongs in `scripts/` beside
+      `catalogRehearsal.mts`, with a way to name the fields a release ADDS so
+      they are asserted rather than diffed. Found 2026-09-27.
 
 ## Branch legs on a traced run (D20, built 2026-09-26)
 
