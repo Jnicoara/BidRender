@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **T conduit bodies in the catalog.** A T body for EMT, rigid, IMC and both
+  PVC schedules, at every trade size from 1/2" to 4": 45 generic, unpriced
+  rows, each priced with its cover and gasket. Searching "tee body",
+  "condulet" or the size and pipe type finds them. The plan viewer does not
+  offer a T body at a branch tee yet; that comes in a later change.
 - **33 more boxes and box parts in the starter catalog.** The boxes audit
   found common parts nobody could pick: the deep 2-1/8" 1900 and octagon box,
   2-gang mud rings, raised covers for exposed work, a round blank cover,

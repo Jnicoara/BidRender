@@ -1543,10 +1543,29 @@ counts need no rule of their own. `shared/runNetwork.ts` is the module.
     the leg and tee counts: **0 leg rows and 0 tees on the day 0085 is
     applied**, because no existing run changes. Any other number means rows
     were written by a build that should not have been running — stop.
-- [ ] **T bodies at a tee.** `takeoff_run_tees.fitting` reserves `body`, but
-      the catalog has no T conduit bodies (see the LL/LR/T/C item below), so
-      nothing offers it and a stored one counts as unanswered. Add the rows
-      (with slang: "tee body", "T condulet") and offer it in the snap.
+- [ ] **T bodies at a tee — the catalog half is DONE, the takeoff half waits
+      on Track A.** `takeoff_run_tees.fitting` reserves `body`. The 45 rows
+      shipped 2026-09-27 on `track-c` (`tBodyName`, 5 rigid families × 9
+      sizes, priced with cover and gasket). Nothing offers `body` yet, and a
+      stored one still counts as unanswered. The owner's answers T1–T6 and the
+      full design are in `references/materials-track-c-plan.md` § 4. In order:
+  - [ ] **Track A — additive migration:** append `teeBody` to
+        `bid_line_items.runMaterialRole` (like 0084/0085, no UPDATE). It
+        goes out BEFORE the code. Needed because bid lines are keyed by run
+        type + role, so a run type with box tees and body tees needs two lines.
+  - [ ] **The wiring** (after the migration): `teeBody` in `TEE_KINDS` /
+        `FITTING_WORDS` / `materialNameFor`; `teeFittingCounts` counting box,
+        body and mark apart, with no cover line for a body; connectors at a
+        body tee by `lbHubsTakeConnectors` (EMT yes; rigid, IMC, PVC no); a
+        sticky "Tee: box / T body" toolbar choice, default box (T4), with
+        `legSnap.ts` returning it instead of hard-coding `"box"`; a
+        mismatched tee (legs differ in size or family) offers box only and
+        says why (T5), and a stored mismatched body counts as unanswered.
+        Tests: EMT body tee 3 connectors, rigid 0, no cover line, mismatch
+        refused, 2 box + 1 body tees → two lines.
+  - [ ] **Before that deploy:** count stored `fitting = 'body'` tees in
+        production. Expected 0, because nothing offers it. If it is not 0,
+        stop and find out why before going on: those bids would gain a line.
 - [ ] **A cable run's tee buys nothing.** Cable types have no fitting slot
       (the MC item below), so a branch on a cable run counts its footage and
       drops but no junction box at the split. Same fix as MC connectors.
@@ -1652,8 +1671,13 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       missing unit as 0 and read "0 h" — they cannot be told apart from a
       set zero. Production had no bid lines at deploy time, so no live bid
       carries any.
-- [ ] **LB covers and gaskets, LL/LR/T/C bodies and PVC sweeps are not in the
-      catalog.** Sweeps wait for an Underground category (answer 2).
+- [ ] **LB covers and gaskets, LL/LR/C bodies and PVC sweeps are not in the
+      catalog.** Sweeps wait for an Underground category (answer 2). T bodies
+      shipped 2026-09-27 (see "T bodies at a tee" above). LL/LR/C are held by
+      the owner (T6) until the takeoff proposes them, +135 rows when they come.
+      Covers: the T rows say they are priced with cover and gasket (T3). The
+      LB rows say nothing either way, so decide covers for all body shapes
+      together, per size, and word the LB to match.
 - [ ] **Three local tables are on the wrong collation** —
       `ai_usage_daily`, `bid_mounting_heights`, `takeoff_mounting_heights`
       (reported by `scripts/schemaDrift.mts` on `bidrender_local`, 2026-09-26).

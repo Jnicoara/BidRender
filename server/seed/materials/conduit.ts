@@ -116,22 +116,49 @@ const FAMILIES: Family[] = [
 ];
 
 /**
- * The five fittings every family ships at every size.
+ * The six fittings every family ships at every size.
  *
  * The 45 was added 2026-09-26 for the bend count (`shared/runBends.ts`): a
  * traced corner of 15–67° takes one, and without the row every such corner
  * had nothing to price against. Its name comes from `elbowName`, the same
  * function the lookup builds with; `materialsCatalog.test.ts` checks every
- * elbow and LB the lookup can ask for exists here. Sweeps (large-radius, for
- * underground) are NOT here, by decision — no Underground category yet.
+ * elbow, LB and T body the lookup can ask for exists here. Sweeps
+ * (large-radius, for underground) are NOT here, by decision — no Underground
+ * category yet.
+ *
+ * The T body was added 2026-09-27 (references/materials-track-c-plan.md § 4,
+ * owner's answers T1–T6): all nine sizes, one row per family, matching the LB
+ * so a body chosen at any tee has a row to price against. Its name comes from
+ * `tBodyName`. Priced WITH its cover and gasket (T3), which the description
+ * says, because the catalog ships no separate cover. LL, LR and C bodies are
+ * held (T6): nothing in the takeoff proposes them.
  */
-const FITTINGS = [
+const FITTINGS: { suffix: string; slang: string; description?: string }[] = [
   { suffix: "connector", slang: "fitting terminal adapter male box" },
   { suffix: "coupling", slang: "coupler splice join" },
   { suffix: "90-degree elbow", slang: "ell bend sweep factory" },
   { suffix: "45-degree elbow", slang: "ell bend factory forty five" },
   { suffix: "LB conduit body", slang: "condulet access fitting pull" },
+  {
+    // Not "tee body": "body" is in the name, so the phrase is "tee" + name.
+    suffix: "T conduit body",
+    slang: "tee condulet access fitting pull branch split",
+    description: "Priced with its cover and gasket.",
+  },
 ];
+
+/**
+ * Brand names as aliases on the T body, the owner's choice for the boxes
+ * audit carried over (§ 4). The LB rows were left as they were, so this
+ * change moves no existing search. Keyed by family label; EMT has no counter
+ * brand everyone calls it by.
+ */
+const T_BODY_BRANDS: Record<string, string> = {
+  "rigid conduit": "crouse hinds",
+  IMC: "crouse hinds",
+  "PVC Sch 40": "carlon",
+  "PVC Sch 80": "carlon",
+};
 
 /**
  * EMT's couplings and connectors come in three styles, so EMT does not take
@@ -191,7 +218,15 @@ const rigidFamilies: BaselineMaterial[] = FAMILIES.flatMap(family => [
       unitOfSale: "each" as const,
       costPerUnit: UNPRICED,
       category: "Conduit Fittings" as const,
-      searchAliases: aliases(sizeAliases(size), family.slang, fitting.slang),
+      searchAliases: aliases(
+        sizeAliases(size),
+        family.slang,
+        fitting.slang,
+        fitting.suffix === "T conduit body"
+          ? T_BODY_BRANDS[family.label]
+          : undefined
+      ),
+      ...(fitting.description ? { description: fitting.description } : {}),
     })),
     ...(family.label === "EMT" ? emtStyledFittings(size) : []),
   ]),

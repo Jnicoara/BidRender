@@ -236,9 +236,21 @@ Expected count after tiers 1+2: **1,237 + 33 = 1,270**.
 
 ---
 
-## 4. T conduit bodies at a branch tee — PLAN (2026-09-27, not built)
+## 4. T conduit bodies at a branch tee — ROWS BUILT, wiring waits on Track A
 
 Owner's direction: separate from the boxes job, T first (§ 3 question G).
+
+> **2026-09-27: the owner accepted T1–T6.** The 45 catalog rows are built on
+> `track-c` (1,270 → **1,315**), named by `tBodyName` in
+> `shared/runFittingMaterials.ts`, with the description "Priced with its cover
+> and gasket." The takeoff wiring is NOT built. It needs Track A's `teeBody`
+> role first, and it is itemised in `todo.md` under "T bodies at a tee".
+> The search sweep was unchanged by the rows.
+>
+> **One correction to T3 below:** it says the body is priced with its cover
+> "the way the LB row is today". The LB rows do not actually say that either
+> way; nothing records it. The T rows now say it. The LB wording is left for
+> the covers decision (todo.md, "LB covers and gaskets").
 
 ### What already exists, and what is already decided
 
@@ -270,14 +282,14 @@ Owner's direction: separate from the boxes job, T first (§ 3 question G).
 
 Where T bodies are commonly used, by raceway:
 
-| Raceway      | Common sizes | Notes                                                                                        |
-| ------------ | ------------ | -------------------------------------------------------------------------------------------- |
-| EMT          | 1/2" – 2"    | Set-screw or compression hubs are also sold; the lookup, like the LB, prices one body per size. |
-| Rigid        | 1/2" – 4"    | Threaded, Form 7/8. The full range is common.                                                |
-| IMC          | 1/2" – 4"    | Uses the same threaded bodies as rigid; own row to match the LB lookup.                      |
-| PVC Sch 40   | 1/2" – 4"    | Solvent-weld. Sch 80 pipe glues into the same bodies.                                        |
-| PVC Sch 80   | 1/2" – 4"    | Own row to match the LB lookup, as above.                                                    |
-| Flex / LFMC  | none         | Flex turns itself and has no LB today (`pullPointKindFor`); a tee on flex stays a box.       |
+| Raceway     | Common sizes | Notes                                                                                           |
+| ----------- | ------------ | ----------------------------------------------------------------------------------------------- |
+| EMT         | 1/2" – 2"    | Set-screw or compression hubs are also sold; the lookup, like the LB, prices one body per size. |
+| Rigid       | 1/2" – 4"    | Threaded, Form 7/8. The full range is common.                                                   |
+| IMC         | 1/2" – 4"    | Uses the same threaded bodies as rigid; own row to match the LB lookup.                         |
+| PVC Sch 40  | 1/2" – 4"    | Solvent-weld. Sch 80 pipe glues into the same bodies.                                           |
+| PVC Sch 80  | 1/2" – 4"    | Own row to match the LB lookup, as above.                                                       |
+| Flex / LFMC | none         | Flex turns itself and has no LB today (`pullPointKindFor`); a tee on flex stays a box.          |
 
 **Recommended: match the LB exactly, 5 families × 9 sizes = 45 rows**, named
 by a new `tBodyName(size, family)` → `1/2" EMT T conduit body`. The case for

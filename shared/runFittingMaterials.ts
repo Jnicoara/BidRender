@@ -298,6 +298,16 @@ export function lbName(size: string, family: string): string {
 }
 
 /**
+ * `1/2" EMT T conduit body` — the body at a branch tee. The catalog ships one
+ * per rigid family and trade size, like the LB (2026-09-27). Nothing in the
+ * takeoff asks for it yet: a body tee needs its own `teeBody` bid-line role,
+ * which is a schema change (todo.md, "T bodies at a tee").
+ */
+export function tBodyName(size: string, family: string): string {
+  return `${size} ${family} T conduit body`;
+}
+
+/**
  * The strap a family is held with. PVC 40 and 80 share an outside diameter,
  * as do rigid and IMC, so each pair shares a strap. Flex has none yet.
  */

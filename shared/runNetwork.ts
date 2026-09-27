@@ -32,8 +32,11 @@ import { placeAnswer, type PullPointAnswer } from "./runBends";
  * What stands at a split.
  *
  *   box   a junction box and its blank cover, sized to the pipe (`teeBoxFor`)
- *   body  a T conduit body — RESERVED: the catalog ships none yet (todo.md),
- *         so nothing offers it and a stored one counts as unanswered
+ *   body  a T conduit body — RESERVED. This said "the catalog ships none
+ *         yet" until 2026-09-27, when the rows landed (`tBodyName`). Still
+ *         reserved, because a body needs its own `teeBody` bid-line role,
+ *         a schema change (todo.md): nothing offers it, and a stored one
+ *         counts as unanswered
  *   mark  a box that is already on the drawing as a counted mark; nothing new
  *         is bought, and the tee joins that mark's node
  *
@@ -394,7 +397,8 @@ export function teeFittingCounts(
  * The tee boxes one run type buys, from the tees it owns.
  *
  * A tee on a MARK buys nothing — the box is already counted as that mark. An
- * unanswered tee (or a T body, which the catalog cannot supply yet) is not
+ * unanswered tee (or a T body, which nothing can buy until the `teeBody`
+ * role exists — the catalog rows do, since 2026-09-27) is not
  * counted and says so: never a quiet box nobody chose, never a quiet zero.
  */
 export function countTeeBoxes(owned: readonly TeeRef[]): {

@@ -35,6 +35,7 @@ import {
   lbName,
   parseRacewayName,
   pullBoxFor,
+  tBodyName,
 } from "../shared/runFittingMaterials";
 
 const hasDb = !!process.env.DATABASE_URL;
@@ -150,7 +151,7 @@ describe("every part the bend count can ask for is shipped", () => {
     expect(raceways).toHaveLength(53);
   });
 
-  it("ships a 90, a 45 and an LB for every rigid raceway", () => {
+  it("ships a 90, a 45, an LB and a T body for every rigid raceway", () => {
     const missing: string[] = [];
     for (const { size, family } of raceways) {
       if (family.includes("flexible")) continue;
@@ -158,6 +159,7 @@ describe("every part the bend count can ask for is shipped", () => {
         elbowName(size, family, 90),
         elbowName(size, family, 45),
         lbName(size, family),
+        tBodyName(size, family),
       ]) {
         if (!names.has(want)) missing.push(want);
       }
@@ -400,6 +402,12 @@ describe("searching the enlarged catalog", () => {
     expectHit("greenfield", '1/2" flexible metal conduit');
     expectHit("sealtite", '1/2" liquidtight flexible conduit');
     expectHit("condulet", '1/2" EMT LB conduit body');
+    // The T body, 2026-09-27: found as a tee, and never ahead of the LB for
+    // a query that names the LB.
+    expectHit("tee body", '1/2" EMT T conduit body');
+    expectHit("3/4 rigid tee", '3/4" rigid conduit T conduit body', 3);
+    expectHit("crouse hinds tee", '1/2" rigid conduit T conduit body');
+    expect(search("lb", 1)[0]).toMatch(/LB conduit body$/);
     expectHit("mcm", "500 kcmil THHN");
     // The 5"/6" wafer covers both trim openings, so "6 inch wafer" has to
     // reach it — there is deliberately no standalone 6" row to find.
