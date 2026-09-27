@@ -69,6 +69,8 @@ git log --oneline -1 origin/main
 
 ## 4. Deploy sequence
 
+0. **Try it on staging first** — § 11: `git push origin local-dev:staging`,
+   migrations against `.env.staging.local` first, check the screens there.
 1. **Pre-flight** — § 3 above.
 2. **Sort the migrations, if there are any** — § 5, "Which goes first". Each
    **file** is either additive or a meaning change; a release normally has
@@ -1362,3 +1364,102 @@ certificate or the database.
 **If the live site stops working right after step 7**, the app entry was
 removed by mistake. Go back to the same box, click **Add**, start typing the
 app's name, pick it, and save. The site comes back within a minute or two.
+
+## 11. Staging — the practice copy at staging.bidridge.com
+
+**Built 2026-09-27** (Stage 4, `references/stage-4-safety-plan.md`). A second
+copy of the site, deployed from the **`staging`** branch, that nobody outside
+can see and that cannot touch a single live row.
+
+|                        | Live                               | Staging                                                                   |
+| ---------------------- | ---------------------------------- | ------------------------------------------------------------------------- |
+| Address                | `bidridge.com`                     | `staging.bidridge.com`                                                    |
+| Branch that deploys it | `main`                             | `staging`                                                                 |
+| Database               | `bidrender`, login `bidrender_app` | `bidrender_staging`, login `bidrender_staging_app` — same cluster         |
+| Plans bucket           | `bidrender-plans`                  | `bidrender-plans-staging`                                                 |
+| Password page          | none                               | yes — `STAGING_PASSWORD`                                                  |
+| AI features            | on                                 | **off**, and no Anthropic key at all                                      |
+| Nightly backup / purge | yes                                | **no** — `DISABLE_SCHEDULED_JOBS=true`, no `CRON_SECRET`                  |
+| Cost                   | —                                  | $10/mo app (1 vCPU / 1 GiB fixed, same as live); database and bucket free |
+
+### How to reach it
+
+Open **https://staging.bidridge.com**. A yellow page asks for the **staging
+password** (kept in the owner's password manager, and in `.env.staging.local`
+on the laptop). After that, the site is the ordinary app with a yellow
+**STAGING** band across the top of every screen. Sign in with a staging
+account — **live accounts do not exist there**; create one with "Create
+account". The browser stays let in for 30 days; changing `STAGING_PASSWORD`
+in the app's settings locks every browser out again.
+
+`curl -s https://staging.bidridge.com/api/version` works without the password
+(the one open path), so § 6's deploy check works on staging unchanged.
+
+### The flow
+
+```
+local-dev  →  staging  →  main
+```
+
+1. `git push origin local-dev` — as always, deploys nothing.
+2. **To try it on staging:** `git push origin local-dev:staging`. The staging
+   app rebuilds in 3–6 minutes. Check it there.
+3. **Migrations go to staging FIRST**, with the same three steps as § 5:
+
+   ```bash
+   ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.staging.local pnpm tsx scripts/migrate.mts
+   DOTENV_CONFIG_PATH=.env.staging.local pnpm tsx scripts/schemaDrift.mts
+   ```
+
+   `.env.staging.local` reaches the staging database over the public host,
+   so the laptop's address must be on the database's trusted list (§ 10) —
+   the same entry production uses.
+
+4. Then the ordinary production deploy, § 4.
+
+### What keeps it away from live data — and how to check it still does
+
+Staging shares the production database **cluster** (free, and fine at today's
+traffic; a heavy test there can slow the live site, so do not load-test on
+staging). What keeps it off live data is the **login**, not the cluster:
+`bidrender_staging_app` has rights on `bidrender_staging` and nothing else.
+
+```bash
+pnpm tsx scripts/stagingDatabase.mts prove
+```
+
+connects **as the staging login** and tries to read live bids and users, list
+and switch to the live database, write to it, read the login table, see or
+change `bidrender_app`, grant itself the live database, create a role, and log
+in as `bidrender_app` with the staging password. **Every line must say `ok
+refused`.** It printed twelve `ok` lines on 2026-09-27. If any line says
+`FAIL`, or the count of `ok` lines differs, **stop and find out why** — either
+this doc is stale or staging can reach live data, and those want opposite
+responses.
+
+Run it after anything that touches database users. It is also how you check a
+new staging login if the database is ever rebuilt:
+`ALLOW_REMOTE_DATABASE=yes pnpm tsx scripts/stagingDatabase.mts provision`
+(as `doadmin`, from `.env.digitalocean`) creates the database and login,
+narrowed; `prove` then checks the outcome.
+
+**Never copy live data into staging.** It holds real contractors' bids and
+prices. Staging was built from the migrations and the seeded catalog, and
+started with zero users and zero bids.
+
+### Its settings
+
+Made by script into the gitignored `staging-app-settings.txt` (delete it once
+pasted). Secrets — `DATABASE_URL`, `DATABASE_CA_CERT`, `JWT_SECRET`,
+`STAGING_PASSWORD`, `R2_PLANS_ACCESS_KEY_ID`, `R2_PLANS_SECRET_ACCESS_KEY` —
+are **Run Time and encrypted**. `VITE_APP_ID` stays **Run and Build Time**.
+Staging's `JWT_SECRET` is its own, so a live session cookie means nothing
+there and the reverse.
+
+### The staging app's database access
+
+The staging app is on the same VPC as the database, uses the `private-`
+host, and its VPC egress IP is on the database's Trusted Sources — exactly
+like live (§ 10). **Without that entry the staging app cannot reach its
+database** — every screen fails to load: the lock from Stage 4 applies to it
+too.

@@ -31,13 +31,13 @@ starts with what already exists, measured against the code on `local-dev` at
 
 ## What already exists
 
-| Piece | Exists today | Missing |
-| --- | --- | --- |
-| 1. Email | Nothing. No mail library, no provider, no sender anywhere in `server/`. `authRouter` has signup, login, logout and change-password only. `todo.md` line 155 has "Password reset via email" open. | Everything. |
-| 2. Staging | Nothing. One App Platform app, one database, `main` deploys straight to users. `references/deploying.md` mentions a staging site once, hypothetically. | Everything. |
-| 3. AI correction log | **Half.** `plan_copilot_findings` keeps what the AI proposed and whether it ended `confirmed` / `dismissed`, and `stampId` links a confirmed finding to the mark it became. `plan_copilot_corrections` remembers "this label is really that symbol" per plan set. | A **log**. The corrections table is a lookup that overwrites itself (`timesApplied` goes up, the history does not), and nothing records a confirmed AI mark being deleted or re-tagged afterwards. No anonymised fields anywhere. |
-| 4. Security basics | `app-platform-settings.txt` is gitignored, **not on disk** in either `C:\dev\BidPhase` or the old OneDrive folder, and **never committed** (checked every commit on every branch by filename). A history scan for real-looking secrets (`sk-ant-`, database URLs, `JWT_SECRET=`, R2 secrets) found only test placeholders. The two R2 read-only keys were already confirmed Run-time scope on 2026-09-16 (`todo.md`). | Database network lockdown is undocumented, so assume it is not done. Scope of the other settings is unchecked. |
-| 5. Invite gate | **Half.** Company invitations are built and solid: `company_invites`, a hashed code shown once, expiry, seat limits, revoke (`companyRouter.invite` / `acceptInvite`). The early-access waitlist is stored and has `notifiedAt`. | `auth.signup` is a `publicProcedure` that lets **anyone** create an account. An invite code is accepted only by someone already signed in, so it gates joining a company, not creating an account. |
+| Piece                | Exists today                                                                                                                                                                                                                                                                                                                                                                                                          | Missing                                                                                                                                                                                                                           |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Email             | Nothing. No mail library, no provider, no sender anywhere in `server/`. `authRouter` has signup, login, logout and change-password only. `todo.md` line 155 has "Password reset via email" open.                                                                                                                                                                                                                      | Everything.                                                                                                                                                                                                                       |
+| 2. Staging           | Nothing. One App Platform app, one database, `main` deploys straight to users. `references/deploying.md` mentions a staging site once, hypothetically.                                                                                                                                                                                                                                                                | Everything.                                                                                                                                                                                                                       |
+| 3. AI correction log | **Half.** `plan_copilot_findings` keeps what the AI proposed and whether it ended `confirmed` / `dismissed`, and `stampId` links a confirmed finding to the mark it became. `plan_copilot_corrections` remembers "this label is really that symbol" per plan set.                                                                                                                                                     | A **log**. The corrections table is a lookup that overwrites itself (`timesApplied` goes up, the history does not), and nothing records a confirmed AI mark being deleted or re-tagged afterwards. No anonymised fields anywhere. |
+| 4. Security basics   | `app-platform-settings.txt` is gitignored, **not on disk** in either `C:\dev\BidPhase` or the old OneDrive folder, and **never committed** (checked every commit on every branch by filename). A history scan for real-looking secrets (`sk-ant-`, database URLs, `JWT_SECRET=`, R2 secrets) found only test placeholders. The two R2 read-only keys were already confirmed Run-time scope on 2026-09-16 (`todo.md`). | Database network lockdown is undocumented, so assume it is not done. Scope of the other settings is unchecked.                                                                                                                    |
+| 5. Invite gate       | **Half.** Company invitations are built and solid: `company_invites`, a hashed code shown once, expiry, seat limits, revoke (`companyRouter.invite` / `acceptInvite`). The early-access waitlist is stored and has `notifiedAt`.                                                                                                                                                                                      | `auth.signup` is a `publicProcedure` that lets **anyone** create an account. An invite code is accepted only by someone already signed in, so it gates joining a company, not creating an account.                                |
 
 One finding that is not on the list but belongs to piece 1: **a session lasts a
 year and cannot be revoked** (`ONE_YEAR_MS` in `server/_core/sdk.ts`, a plain
@@ -72,13 +72,13 @@ All three are **additive** (new tables, new nullable columns, no `UPDATE` to an
 existing column), so each goes **step 1, before the push**, and step 3 is empty.
 Still classify each file when written, per CLAUDE.md.
 
-| Piece | Migration | What |
-| --- | --- | --- |
-| 1. Email | Yes | `password_reset_tokens` (hashed token, userId, expiresAt, usedAt). `users.sessionsValidAfter` timestamp, NULL = no reset yet — a session issued before it is refused. |
-| 2. Staging | No new file | Staging's database is built by running every existing migration from zero (the same rule as `database-digitalocean.md` § 2). |
-| 3. AI log | Yes | One new table, `ai_correction_log`. See below. |
-| 4. Security | No | |
-| 5. Invite gate | Yes | Signup invitations for a **new company** (issued by the admin, e.g. from the waitlist), separate from company invitations. Either a new table or a nullable `companyId` on `company_invites` — decide when building; a new table is the safer read because every existing reader of `company_invites` assumes a company. |
+| Piece          | Migration   | What                                                                                                                                                                                                                                                                                                                     |
+| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1. Email       | Yes         | `password_reset_tokens` (hashed token, userId, expiresAt, usedAt). `users.sessionsValidAfter` timestamp, NULL = no reset yet — a session issued before it is refused.                                                                                                                                                    |
+| 2. Staging     | No new file | Staging's database is built by running every existing migration from zero (the same rule as `database-digitalocean.md` § 2).                                                                                                                                                                                             |
+| 3. AI log      | Yes         | One new table, `ai_correction_log`. See below.                                                                                                                                                                                                                                                                           |
+| 4. Security    | No          |                                                                                                                                                                                                                                                                                                                          |
+| 5. Invite gate | Yes         | Signup invitations for a **new company** (issued by the admin, e.g. from the waitlist), separate from company invitations. Either a new table or a nullable `companyId` on `company_invites` — decide when building; a new table is the safer read because every existing reader of `company_invites` assumes a company. |
 
 ## Shape of each code piece
 
@@ -235,9 +235,17 @@ day it goes live, so nobody already using the app is locked out.
 
 ---
 
-## Step (b) — staging, the detailed plan (2026-09-27, PLAN ONLY)
+## Step (b) — staging, the detailed plan (2026-09-27)
 
 Supersedes § D above where they differ.
+
+> **Code side BUILT 2026-09-27**; the DigitalOcean/Cloudflare clicks remain.
+> Owner's answers: shared cluster, AI off, $10 app. Built: the password gate
+> (`server/stagingGate.ts`), the STAGING band (`StagingBand.tsx`), the
+> database and a login proven unable to reach live data
+> (`scripts/stagingDatabase.mts`), and `staging-app-settings.txt`. The owner's
+> step 1 below (create database and user) was done by script instead. How it
+> runs now: `references/deploying.md` § 11.
 
 **What it is.** A second copy of the site at `staging.bidridge.com`, deployed
 from a `staging` branch, with its own empty database, its own plans bucket, no
@@ -248,13 +256,13 @@ then fast-forwarded to `main`.
 **Monthly cost — about $10.** Prices from digitalocean.com/pricing/app-platform,
 read 2026-09-27; check the create screen.
 
-| Item | Cost | Why |
-| --- | --- | --- |
+| Item                              | Cost       | Why                                                                                                                                                               |
+| --------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Staging app, 1 vCPU / 1 GiB fixed | **$10/mo** | Same size as production (`apps-s-1vcpu-1gb-fixed`), so a practice run means something. The 512 MiB size is $5 but is a different machine from the one that ships. |
-| Database | $0 | A second database on the existing cluster. |
-| R2 bucket | ~$0 | Inside Cloudflare's free storage allowance at staging volumes. |
-| `staging.bidridge.com` | $0 | DNS is already at DigitalOcean. |
-| Email (later) | $0 | Resend's free tier. |
+| Database                          | $0         | A second database on the existing cluster.                                                                                                                        |
+| R2 bucket                         | ~$0        | Inside Cloudflare's free storage allowance at staging volumes.                                                                                                    |
+| `staging.bidridge.com`            | $0         | DNS is already at DigitalOcean.                                                                                                                                   |
+| Email (later)                     | $0         | Resend's free tier.                                                                                                                                               |
 
 **The one real risk of the free database option:** staging shares the
 production cluster's CPU and memory. A heavy test on staging can slow the live
