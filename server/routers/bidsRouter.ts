@@ -243,11 +243,8 @@ export const bidsRouter = router({
       const priced = await Promise.all(
         rows.map(async bid => {
           const lines = await db.getBidLineItems(bid.id);
-          const { directCost, bidPrice, incomplete } = rollUpBid(
-            bid,
-            lines,
-            company
-          );
+          const { directCost, bidPrice, incomplete, notPricedCount } =
+            rollUpBid(bid, lines, company);
           return {
             ...bid,
             lineCount: lines.length,
@@ -255,6 +252,8 @@ export const bidsRouter = router({
             finalPrice: bidPrice.finalPrice,
             /** The price leaves something out; show it as incomplete. */
             incomplete,
+            /** Lines nobody priced, counted as $0 in finalPrice. */
+            notPricedCount,
           };
         })
       );
@@ -577,7 +576,11 @@ export const bidsRouter = router({
         // reads the same whether it is archived or not — someone deciding what to
         // rescue is looking at exactly the number they saw before archiving it.
         const lines = await db.getBidLineItems(bid.id);
-        const { bidPrice, incomplete } = rollUpBid(bid, lines, company);
+        const { bidPrice, incomplete, notPricedCount } = rollUpBid(
+          bid,
+          lines,
+          company
+        );
         // Non-null by construction: getArchivedBids filters on archivedAt.
         const archivedAt = bid.archivedAt as Date;
         return {
@@ -586,6 +589,7 @@ export const bidsRouter = router({
           lineCount: lines.length,
           finalPrice: bidPrice.finalPrice,
           incomplete,
+          notPricedCount,
           purgeDueAt: purgeDueAt(archivedAt),
           daysRemaining: daysRemaining(archivedAt, now),
           urgency: retentionUrgency(archivedAt, now),

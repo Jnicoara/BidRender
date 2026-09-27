@@ -49,6 +49,7 @@ import {
 import { moneyWhole } from "@/lib/money";
 import { useDebounced } from "@/hooks/useDebounced";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
+import { NotPricedTotal } from "@/components/NotPricedTotal";
 
 const ANY = "__any__";
 
@@ -369,8 +370,14 @@ export function BidSearchPanel({
                     sort === "created" ? bid.createdAt : bid.updatedAt
                   ).toLocaleDateString()}
                 </span>
-                <span className="font-mono text-sm shrink-0 w-24 text-right">
-                  {moneyWhole(bid.finalPrice)}
+                <span className="shrink-0 w-24 text-right">
+                  {/* The same "+ N lines not priced" as the bid screen, from
+                      the same rule (rollUpBid.notPricedCount). */}
+                  <NotPricedTotal
+                    amount={moneyWhole(bid.finalPrice)}
+                    notPriced={bid.notPricedCount}
+                    className="font-mono text-sm"
+                  />
                   <IncompletePriceTag show={bid.incomplete} className="block" />
                 </span>
               </button>

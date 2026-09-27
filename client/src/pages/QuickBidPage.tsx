@@ -37,6 +37,8 @@ import { smartSearch } from "@/lib/smartSearch";
 import { addAssemblyOverheadHours } from "@shared/pricing";
 import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
+import { NotPricedTotal } from "@/components/NotPricedTotal";
+import { bidNotPricedCount } from "@/lib/notPricedTotal";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { otherPercentCaption } from "@/lib/percentKind";
 
@@ -233,6 +235,8 @@ export default function QuickBidPage({
 
   const detail = detailQuery.data;
   const lines = detail?.lines ?? [];
+  /** Lines the totals leave out — the rule the line cells use. */
+  const notPriced = bidNotPricedCount(lines);
   // Newest first: what you just counted is what you want to check.
   const recent = [...lines].reverse();
 
@@ -262,8 +266,16 @@ export default function QuickBidPage({
               Bid price{" "}
               <IncompletePriceTag show={detail?.incomplete ?? false} />
             </div>
-            <div className="font-mono text-base text-[#F5C518]">
-              {detail ? money(detail.totals.finalPrice) : "—"}
+            <div>
+              {detail ? (
+                <NotPricedTotal
+                  amount={money(detail.totals.finalPrice)}
+                  notPriced={notPriced}
+                  className="font-mono text-base text-[#F5C518]"
+                />
+              ) : (
+                <span className="font-mono text-base text-[#F5C518]">—</span>
+              )}
             </div>
           </div>
         </div>
@@ -489,11 +501,25 @@ export default function QuickBidPage({
 
           {detail && lines.length > 0 && (
             <div className="rounded-xl border border-border bg-card p-4 flex flex-wrap items-baseline gap-x-6 gap-y-2">
+              {/* Materials, direct cost and bid price each say how many lines
+                  they leave out, as on the bid screen (owner, 2026-09-26).
+                  Materials is here for that reason: it is the total an
+                  unpriced part is missing from first. */}
+              <div>
+                <div className="text-xs text-muted-foreground">Materials</div>
+                <NotPricedTotal
+                  amount={money(detail.totals.materialCost)}
+                  notPriced={notPriced}
+                  className="font-mono text-sm"
+                />
+              </div>
               <div>
                 <div className="text-xs text-muted-foreground">Direct cost</div>
-                <div className="font-mono text-sm">
-                  {money(detail.totals.directCost)}
-                </div>
+                <NotPricedTotal
+                  amount={money(detail.totals.directCost)}
+                  notPriced={notPriced}
+                  className="font-mono text-sm"
+                />
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">
@@ -540,9 +566,11 @@ export default function QuickBidPage({
                 <div className="text-xs text-muted-foreground">
                   Bid price <IncompletePriceTag show={detail.incomplete} />
                 </div>
-                <div className="font-mono text-lg text-[#F5C518]">
-                  {money(detail.totals.finalPrice)}
-                </div>
+                <NotPricedTotal
+                  amount={money(detail.totals.finalPrice)}
+                  notPriced={notPriced}
+                  className="font-mono text-lg text-[#F5C518]"
+                />
               </div>
             </div>
           )}

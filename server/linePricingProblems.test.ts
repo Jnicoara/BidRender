@@ -215,6 +215,41 @@ describe("rollUpBid isolation", () => {
     // Cost with markup — never presented as a price, since it is flagged.
     expect(result.bidPrice.finalPrice).toBe(result.directCost);
   });
+
+  it("counts lines nobody priced, apart from lines it could not price", () => {
+    // What the search and archive cards show as "+ N lines not priced".
+    const kinds = {
+      assemblyId: 1,
+      takeoffRunTypeId: null,
+      runMaterialRole: null,
+    };
+    const priced = line(kinds);
+    const unpricedAssembly = line({
+      ...kinds,
+      snapshotMaterialCost: "0",
+      snapshotLaborHours: "0",
+    });
+    const handBlank = line({
+      assemblyId: null,
+      takeoffRunTypeId: null,
+      runMaterialRole: null,
+      snapshotMaterialCost: null,
+    });
+    const handTypedZero = line({
+      assemblyId: null,
+      takeoffRunTypeId: null,
+      runMaterialRole: null,
+      snapshotMaterialCost: "0",
+    });
+    const result = rollUpBid(
+      bidRow,
+      [priced, unpricedAssembly, handBlank, handTypedZero],
+      company
+    );
+    expect(result.notPricedCount).toBe(2);
+    expect(result.incomplete).toBe(false);
+    expect(rollUpBid(bidRow, [priced], company).notPricedCount).toBe(0);
+  });
 });
 
 // ─── Through the routers ─────────────────────────────────────────────────────

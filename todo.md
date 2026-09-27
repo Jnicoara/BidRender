@@ -1460,6 +1460,32 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       now swaps them. The original note: Their material is frozen with their price (R4), the same as
       changing a type's raceway. The preview shows the new part while the
       bid line keeps the old name. Same decision as above, really.
-- [ ] **The proposal still prints money per unit/section** without the
-      "Not priced" treatment bid lines now have. Check what a client-facing
-      proposal should say when a line inside it is not priced.
+- [x] **DECIDED AND BUILT 2026-09-26 (Track B): what a proposal says when a
+      line inside it is not priced.** Owner: nothing, on the client's copy —
+      no "not priced" text on the document. Unpriced lines do NOT block it
+      (unlike a line the engine cannot price, which still refuses). Instead
+      Print / Save PDF and Ctrl+P ask first ("N lines are not priced — Print
+      anyway / Back to the bid"), and "Your figures" shows the count beside
+      Materials, Direct cost and Bid price. Scope-only prints no money and
+      asks nothing.
+- [x] **BUILT 2026-09-26 (Track B): bid totals say how many lines they leave
+      out** — "$4,210.00 + 4 lines not priced", "$0.00 + 4 …" when every line
+      is unpriced. Materials, Direct cost and Bid price on the bid screen and
+      the Count screen (which gained a Materials total for it), the search
+      results and the archive. One component, `NotPricedTotal`; the words in
+      `client/src/lib/notPricedTotal.ts`; the server count is
+      `rollUpBid().notPricedCount`, through `countNotPriced`. Total due and
+      Labor carry no suffix — not asked for.
+- [ ] **The DASHBOARD cards do not say it yet, and it needs a decision.**
+      `bids.dashboard` sums lines in SQL (`getDashboardBids`) rather than
+      running `rollUpBid`, so counting unpriced lines there means writing
+      `lineNotPriced` a second time in SQL — hand-priced blank vs typed 0,
+      run-type lines off a $0 catalog row, a field bend decided by its HOURS,
+      and an assembly line whose whole cost is $0. Two copies of that rule
+      will drift. Options: (a) the SQL copy plus a parity test running both
+      over the same fixture lines; (b) a stored per-line flag written when a
+      line is added or re-priced (a migration — Track A territory); (c)
+      price the dashboard in JS again, which is what took it from ~100ms to
+      ~600ms at 1,149 bids. **Visible now:** "Find a bid" shows
+      "$378 + 3 lines not priced" directly above the dashboard card for the
+      same bid reading a bare "$378".

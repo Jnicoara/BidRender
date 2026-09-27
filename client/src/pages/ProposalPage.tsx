@@ -22,7 +22,7 @@
  * that would have to be kept in step with three layouts. `bp-print-area` in
  * index.css is what hides the app around it.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,17 @@ import { Label } from "@/components/ui/label";
 import { ProposalSheet } from "@/components/proposal/ProposalSheet";
 import { ProposalDesignControls } from "@/components/proposal/ProposalDesignControls";
 import { money } from "@/lib/money";
+import { NotPricedTotal } from "@/components/NotPricedTotal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 /** A per-bid text field for the proposal: client, site address, opening note. */
 function BidField({
@@ -172,11 +183,28 @@ export default function ProposalPage({
     }
   };
 
+  /**
+   * Unpriced lines do NOT block the proposal (owner, 2026-09-26) — unlike a
+   * line the engine cannot price, which the server refuses on. But the total
+   * leaves them out, so printing a priced proposal asks first. Scope-only
+   * prints no money and asks nothing.
+   */
+  const notPriced = mode === "full" ? (data?.notPricedCount ?? 0) : 0;
+  const [confirmPrint, setConfirmPrint] = useState(false);
+  const requestPrint = () => {
+    if (notPriced > 0) setConfirmPrint(true);
+    else print();
+  };
+  // Ctrl+P goes through the same question as the button. A ref, so the
+  // listener registered once still reads this render's count and mode.
+  const requestPrintRef = useRef(requestPrint);
+  requestPrintRef.current = requestPrint;
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "p") {
         e.preventDefault();
-        print();
+        requestPrintRef.current();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -311,7 +339,7 @@ export default function ProposalPage({
         <Button
           size="sm"
           className="h-8 gap-1.5 text-xs bg-[#F5C518] text-black hover:bg-[#e0b315]"
-          onClick={print}
+          onClick={requestPrint}
         >
           <Printer className="w-3.5 h-3.5" />
           Print / Save PDF
@@ -463,17 +491,29 @@ export default function ProposalPage({
                 className="flex items-baseline justify-between gap-3"
               >
                 <span className="text-xs text-muted-foreground">{label}</span>
-                <span className="font-mono text-xs">
-                  {money(value as number)}
-                </span>
+                {/* Materials and Direct cost say what they leave out, as on
+                    the bid screen. The client's copy never does. */}
+                {label === "Materials" || label === "Direct cost" ? (
+                  <NotPricedTotal
+                    amount={money(value as number)}
+                    notPriced={notPriced}
+                    className="font-mono text-xs"
+                  />
+                ) : (
+                  <span className="font-mono text-xs">
+                    {money(value as number)}
+                  </span>
+                )}
               </div>
             ))}
             <div className="border-t border-border my-1.5" />
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-xs font-medium">Bid price</span>
-              <span className="font-mono text-sm text-[#F5C518]">
-                {money(internalTotals.finalPrice)}
-              </span>
+              <NotPricedTotal
+                amount={money(internalTotals.finalPrice)}
+                notPriced={notPriced}
+                className="font-mono text-sm text-[#F5C518]"
+              />
             </div>
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-xs font-medium">On the proposal</span>
@@ -510,6 +550,40 @@ export default function ProposalPage({
           </aside>
         )}
       </div>
+
+      {/* Asked before printing a priced proposal with unpriced lines — never
+          a block (owner, 2026-09-26). The client's copy carries no "not
+          priced" text, so this is the last place the estimator hears it. */}
+      <AlertDialog open={confirmPrint} onOpenChange={setConfirmPrint}>
+        <AlertDialogContent className="bp-no-print">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {notPriced} line{notPriced === 1 ? " is" : "s are"} not priced
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The total on this proposal leaves{" "}
+              {notPriced === 1 ? "it" : "them"} out, so the client will see a
+              price that is short by whatever{" "}
+              {notPriced === 1 ? "it costs" : "they cost"}. The proposal itself
+              does not mention it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={onBack}>
+              Back to the bid
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmPrint(false);
+                // After the dialog has closed, so it is not in the print.
+                setTimeout(print, 0);
+              }}
+            >
+              Print anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

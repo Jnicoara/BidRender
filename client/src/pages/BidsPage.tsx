@@ -85,6 +85,7 @@ import { describeLineMarkup } from "@shared/materialMarkup";
 import { otherPercentCaption } from "@/lib/percentKind";
 import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
+import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { lineHoursUnset, lineNotPriced } from "@shared/lineNotPriced";
 
 const STATUSES = ["Draft", "Active", "Won", "Lost"] as const;
@@ -1126,9 +1127,11 @@ export default function BidsPage({
               )}
               <div className="flex items-baseline justify-between gap-3 py-1">
                 <span className="text-xs text-muted-foreground">Materials</span>
-                <span className="font-mono text-sm">
-                  {money(totals.materialCost)}
-                </span>
+                <NotPricedTotal
+                  amount={money(totals.materialCost)}
+                  notPriced={notPriced.length}
+                  className="font-mono text-sm"
+                />
               </div>
               <div className="flex items-baseline justify-between gap-3 py-1">
                 <span className="text-xs text-muted-foreground">
@@ -1347,9 +1350,11 @@ export default function BidsPage({
               <div className="border-t border-border my-2" />
               <div className="flex items-baseline justify-between gap-3 py-1">
                 <span className="text-xs font-medium">Direct cost</span>
-                <span className="font-mono text-sm">
-                  {money(totals.directCost)}
-                </span>
+                <NotPricedTotal
+                  amount={money(totals.directCost)}
+                  notPriced={notPriced.length}
+                  className="font-mono text-sm"
+                />
               </div>
               {/*
                 MATERIAL MARKUP, as its own step between direct cost and
@@ -1432,12 +1437,14 @@ export default function BidsPage({
                       read without reading anything else on the card. */}
                   <IncompletePriceTag show={incomplete} className="ml-1.5" />
                 </span>
-                <span className="font-mono text-base text-[#F5C518]">
-                  {/* The work alone. A marked-up charge is inside finalPrice
-                      but is billed on its own line below, so showing
-                      finalPrice here would count it twice. */}
-                  {money(totals.workPrice)}
-                </span>
+                {/* The work alone. A marked-up charge is inside finalPrice
+                    but is billed on its own line below, so showing
+                    finalPrice here would count it twice. */}
+                <NotPricedTotal
+                  amount={money(totals.workPrice)}
+                  notPriced={notPriced.length}
+                  className="font-mono text-base text-[#F5C518]"
+                />
               </div>
 
               {totals.expensesTotal > 0 && (

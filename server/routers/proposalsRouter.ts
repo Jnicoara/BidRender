@@ -345,16 +345,17 @@ export const proposalsRouter = router({
         markedUp: row.markedUp,
       }));
 
-      const { priced, units, totals, salesTax, problems } = bidRollup(
-        bid,
-        lines,
-        company,
-        {
-          rules: taxRules,
-          jurisdictions: jurisdictionRows.map(toTaxJurisdiction),
-        },
-        expenses
-      );
+      const { priced, units, totals, salesTax, problems, notPricedCount } =
+        bidRollup(
+          bid,
+          lines,
+          company,
+          {
+            rules: taxRules,
+            jurisdictions: jurisdictionRows.map(toTaxJurisdiction),
+          },
+          expenses
+        );
 
       // A proposal built on a total that leaves a line out is a wrong price
       // sent to a client. Refuse, with the references. See pricingProblems.ts.
@@ -458,6 +459,13 @@ export const proposalsRouter = router({
           profitAmount: totals.profitAmount,
           finalPrice: totals.finalPrice,
         },
+        /**
+         * Lines nobody priced, which the total counts as $0. Unlike a line
+         * the engine cannot price, this does NOT refuse the proposal (owner,
+         * 2026-09-26): the composer warns before printing and shows the count
+         * in "Your figures", and the client's copy says nothing about it.
+         */
+        notPricedCount,
         lineCount: lines.length,
       };
     }),

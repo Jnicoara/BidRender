@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-26]
 
+- **Bid totals now say how many lines they leave out.** Where a total used to
+  show a bare figure, it now reads like "$4,210.00 + 4 lines not priced" — on
+  Materials, Direct cost and Bid price, on the bid screen and the Count screen
+  (which also gets a Materials total, and now really does say it — an earlier
+  entry claimed so too soon), and in bid search results and the archive. The
+  dashboard cards do not yet; that needs a decision (see todo.md).
+- **Printing a proposal with unpriced lines asks first.** It is never
+  blocked, but you are told how many lines the total leaves out before the
+  print window opens, and your own "Your figures" panel shows the count. The
+  client's copy says nothing about it.
 - **A supplier price list that uses an old material name now prices the
   material.** A sheet still saying "20A breaker" prices the 20A Single-Pole
   breaker, and the import says so ("priced as …"). A material you kept under

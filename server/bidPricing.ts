@@ -36,6 +36,7 @@ import {
   type LineProblem,
 } from "../shared/linePricingProblems";
 import { storedMarkupPct } from "../shared/materialMarkup";
+import { countNotPriced } from "../shared/lineNotPriced";
 import {
   DEFAULT_TAX_RULES,
   calculateSalesTax,
@@ -393,6 +394,18 @@ export function rollUpBid(
     problems,
     /** True when `problems` is not empty: the totals leave something out. */
     incomplete: problems.length > 0,
+    /**
+     * Lines nobody has priced, which the totals count as $0 — the lines whose
+     * cost cell says "Not priced". Separate from `incomplete`, which is lines
+     * the engine could not price at all. Through `countNotPriced`, the rule
+     * the bid screen uses, with each line's own row passed whole.
+     */
+    notPricedCount: countNotPriced(
+      lines.map((line, index) => ({
+        line,
+        directCost: breakdowns[index]?.directCost ?? null,
+      }))
+    ),
   };
 }
 
@@ -445,8 +458,15 @@ export function bidRollup(
    */
   expenses: readonly ExpenseLine[] = []
 ) {
-  const { settings, breakdowns, directCost, bidPrice, problems, incomplete } =
-    rollUpBid(bid, lines, company, expenses);
+  const {
+    settings,
+    breakdowns,
+    directCost,
+    bidPrice,
+    problems,
+    incomplete,
+    notPricedCount,
+  } = rollUpBid(bid, lines, company, expenses);
   /*
     `breakdown` is null for a line that could not be priced. Nullable rather
     than a zero breakdown on purpose: a zero is exactly the false $0 this is
@@ -577,6 +597,8 @@ export function bidRollup(
     problems,
     /** The totals leave something out. Proposal and export refuse on this. */
     incomplete,
+    /** Lines nobody priced, counted as $0 — see rollUpBid. */
+    notPricedCount,
     units: Array.from(unitTotals, ([label, totals]) => ({
       label,
       ...totals,
