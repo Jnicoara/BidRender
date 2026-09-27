@@ -1415,13 +1415,16 @@ ends and approved AS END KINDS — no table of answers. Modules:
 - [ ] **No AI path yet.** The reader cannot propose a quantity trace; when it
       can, it goes through `save` + `addLeg` like the hand path, so the counts
       agree by construction.
-- [ ] **Commit the router snapshot as a script.** Two deploys running now have
-      proved existing data unchanged by calling `takeoffRuns.totals`,
-      `takeoffRunTypes.bridgeForBid` and `takeoffRuns.listForSheet` for every
-      bid and comparing files — and both times the script was a throwaway, so
-      the second deploy had to rewrite it. It belongs in `scripts/` beside
-      `catalogRehearsal.mts`, with a way to name the fields a release ADDS so
-      they are asserted rather than diffed. Found 2026-09-27.
+- [x] **DONE 2026-09-27: `scripts/routerSnapshot.mts`.** Read only.
+      `snapshot <file> [--added card.notPriced,drops.runTypeId]` calls
+      `totals`, `drops`, `bridgeForBid`, `listForSheet` and the `bids.search`
+      card for every bid as its owner, and `compare` diffs two files. `--added`
+      takes a field a release adds out of the compare and lists its values.
+      Use the `parent.key` form whenever the name exists elsewhere: a bare
+      `pathType` stripped it from run rows too, and the compare shifted by 220
+      lines. `bids.get` is left out because it records pricing problems as it
+      reads. First used for the 0087 deploy. Run it from a worktree of the old
+      build as well as the new one.
 
 ## Branch legs on a traced run (D20, built 2026-09-26)
 
