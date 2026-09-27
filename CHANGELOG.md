@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **The Performance screen says when its dollar figures are short.** If a
+  bid in the chosen range has a line the app can't price, the win-rate and
+  finished-jobs sections now show a red "incomplete" line saying how many,
+  and the job appears as "incomplete" in the "Worth a look" list. Before,
+  those lines were quietly left out of the totals.
 - **Copy words straight off a plan.** A new "Select text" tool on the Plans
   screen (or press T): drag a box around a part number or a note, and the
   words inside appear in a box ready to copy. From there, one click searches

@@ -38,6 +38,7 @@ import {
   percent,
 } from "@/lib/analyticsChart";
 import { moneyWhole } from "@/lib/money";
+import { IncompleteFiguresNote } from "./IncompleteFiguresNote";
 
 type Period = {
   bucket: string;
@@ -63,6 +64,8 @@ type Report = {
     lostValue: number;
     pendingValue: number;
     totalValue: number;
+    /** Bids whose figures leave out a line that can't be priced. */
+    incompleteBids: number;
   };
   timeline: Period[];
 };
@@ -192,6 +195,10 @@ export function OutcomesPanel({ report }: { report: Report }) {
           hint="drafted or active — not in the rate"
         />
       </div>
+      <IncompleteFiguresNote
+        count={totals.incompleteBids}
+        noun={["bid", "bids"]}
+      />
 
       <ChartCard
         title="Win rate over time"

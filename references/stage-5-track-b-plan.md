@@ -1,6 +1,21 @@
 # Stage 5, Track B: plan for the next batch
 
-**PLANNED 2026-09-27. Nothing here is built yet.**
+**PLANNED 2026-09-27, and BUILT the same day on `track-b`, one commit per
+piece. Not merged into local-dev.** The plan below is kept as written; what
+changed while building is recorded here, so the plan is not read as a
+description of the code.
+
+| Piece                    | Commit    | What differs from the plan below                                                                                                                                                                                                                                                                                                            |
+| ------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2. Delete all + the gate | `d4ed22c` | As planned. `bids.delete` now gates `deleteForever` and `deleteAllArchived`.                                                                                                                                                                                                                                                                |
+| 1. Takeoff CSV           | `f66fc10` | Adds a **Status** column (Draft / Finished), at the owner's request. Leaves wire and ground blank on a cable, and leaves Vertical ft blank where no drop was counted. `endsNotCountedCount` on the per-type row is what tells the two apart.                                                                                                |
+| 3. Select text           | `7f198b8` | Word boxes are computed from each item's raw transform, not from `positionedItems`, which records that text is sideways but not which way it runs. A word is picked when its middle is in the box. There is no OCR detection: every result says it came from the text layer. The button hides while tracing rather than cancelling a trace. |
+| 4. Analytics + tidy      | this file | As planned. The two new todo items are in `todo.md` § "Stage 5 follow-ups".                                                                                                                                                                                                                                                                 |
+
+**The owner's answers (2026-09-27), all six as recommended below, plus:** the
+CSV carries a Status column. The run-totals mismatch and the leftover plan
+files are todo items after this batch, and the files are marked "must be fixed
+before the beta — customer drawings".
 
 This lane covers Stage 5 work that needs **no migration**, and does not touch
 login, signup or email (Track A) or the materials catalog seed (Track C). Every
@@ -263,23 +278,23 @@ must disarm the last, and none may pan the sheet during a drag.
 
 ## Questions for the owner, each with a recommendation
 
-1. **Should the CSV carry prices?** *Recommended: no, not in v1.* Ship
+1. **Should the CSV carry prices?** _Recommended: no, not in v1._ Ship
    quantities first, since that is the "door out". Add prices later as an
    explicit "Include my prices" choice in the dialog, off by default. That
    avoids a spreadsheet being forwarded to a supply house with margins in it.
 2. **Should `bids.delete` be enforced, stopping estimators deleting bids
-   permanently?** *Recommended: yes, on both the per-bid delete and Delete
-   all.* The permission table already promises it; the code just never
+   permanently?** _Recommended: yes, on both the per-bid delete and Delete
+   all._ The permission table already promises it; the code just never
    checked. It changes what estimators can do today.
-3. **Where should "Search catalog" go?** *Recommended: show matches inline in
-   the select-text popover.* The alternatives are to pre-fill the Count
+3. **Where should "Search catalog" go?** _Recommended: show matches inline in
+   the select-text popover._ The alternatives are to pre-fill the Count
    picker, which searches assemblies rather than the catalog, or to jump to
    the Materials screen, which leaves the sheet.
-4. **Should Select text have a keyboard shortcut?** *Recommended: `T`,* which
+4. **Should Select text have a keyboard shortcut?** _Recommended: `T`,_ which
    is free. Or none, if you'd rather keep the keyboard for counting.
 5. **Orphaned plan files in storage** after a delete or the purge.
-   *Recommended: a separate piece, after this batch.* It needs a storage
+   _Recommended: a separate piece, after this batch._ It needs a storage
    delete operation and a decision about backups.
-6. **Should the CSV include draft runs?** *Recommended: follow the bid, which
-   includes drafts,* and measure the mismatch with `takeoffRuns.totals` as its
+6. **Should the CSV include draft runs?** _Recommended: follow the bid, which
+   includes drafts,_ and measure the mismatch with `takeoffRuns.totals` as its
    own item.
