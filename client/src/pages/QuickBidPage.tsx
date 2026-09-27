@@ -268,8 +268,11 @@ export default function QuickBidPage({
             </div>
             <div>
               {detail ? (
+                // workPrice, the bid screen's "Bid price" — the work alone.
+                // finalPrice until 2026-09-27, which on a bid with a
+                // marked-up charge is a different number under the same name.
                 <NotPricedTotal
-                  amount={money(detail.totals.finalPrice)}
+                  amount={money(detail.totals.workPrice)}
                   notPriced={notPriced}
                   className="font-mono text-base text-[#F5C518]"
                 />
@@ -566,8 +569,9 @@ export default function QuickBidPage({
                 <div className="text-xs text-muted-foreground">
                   Bid price <IncompletePriceTag show={detail.incomplete} />
                 </div>
+                {/* The bid screen's "Bid price": workPrice. See the header. */}
                 <NotPricedTotal
-                  amount={money(detail.totals.finalPrice)}
+                  amount={money(detail.totals.workPrice)}
                   notPriced={notPriced}
                   className="font-mono text-lg text-[#F5C518]"
                 />

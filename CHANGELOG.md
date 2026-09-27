@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **Every list of bids now shows the Total due, and says so.** The dashboard
+  cards, "Out for bid", "Find a bid" and the archive used to show an
+  unlabeled figure that was neither the bid's "Bid price" nor its "Total due"
+  — on a bid with a dump fee or sales tax it was short of what the customer
+  owes. They now show the bid screen's Total due, labeled "Total due". The
+  proposal's "Your figures" and the Count screen use "Bid price" for the same
+  number the bid screen does (the work alone), and "Your figures" now shows
+  the Total due that the proposal's total is checked against.
 - **"Find a bid" and the archive now show the same price as the bid.** A bid
   with a marked-up charge (a permit that takes overhead and profit) read that
   charge short in search and in the archive — "Markup check" showed $302.57

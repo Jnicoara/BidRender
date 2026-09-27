@@ -458,6 +458,17 @@ export const proposalsRouter = router({
           overheadAmount: totals.overheadAmount,
           profitAmount: totals.profitAmount,
           finalPrice: totals.finalPrice,
+          /**
+           * The bid screen's own "Bid price", "Additional expenses", "Sales
+           * tax" and "Total due", so "Your figures" can use the same words
+           * for the same numbers (2026-09-27). It showed `finalPrice` as "Bid
+           * price" before, which on a bid with a marked-up charge is not the
+           * bid screen's Bid price.
+           */
+          workPrice: totals.workPrice,
+          expensesTotal: totals.expensesTotal,
+          salesTaxAmount: totals.salesTaxAmount,
+          totalDue: totals.totalDue,
         },
         /**
          * Lines and parts nobody priced, which the total counts as $0. Unlike

@@ -273,7 +273,13 @@ export function priceFromDirectCost(
    */
   materialMarkup: number,
   company: CompanyPricingDefaults
-): { price: number; priced: boolean; settings: ResolvedPricingSettings } {
+): {
+  price: number;
+  priced: boolean;
+  settings: ResolvedPricingSettings;
+  /** The whole breakdown, for `billTheBid`. `finalPrice` is `price`. */
+  bidPrice: BidPriceBreakdown;
+} {
   const settings = resolveBidPricingSettings(company, {
     overheadEnabled: bid.overheadEnabled,
     overheadMode: bid.overheadMode,
@@ -284,19 +290,55 @@ export function priceFromDirectCost(
     productivityPct:
       bid.productivityPct === null ? null : Number(bid.productivityPct),
   });
+  const { bidPrice, error } = bidPriceOrFallback(
+    settings,
+    directCost,
+    materialMarkup
+  );
+  return {
+    price: bidPrice.finalPrice,
+    priced: error === null,
+    settings,
+    bidPrice,
+  };
+}
+
+/**
+ * The engine's price for a cost, or — for settings with no finite price (a
+ * margin at or past 100%, a negative overhead) — the cost with markup and no
+ * overhead or profit, with the error beside it so the caller can flag it.
+ * One copy, shared by the rollup and the SQL-summed lists, so the fallback
+ * cannot differ between a card and the bid it opens.
+ */
+export function bidPriceOrFallback(
+  settings: ResolvedPricingSettings,
+  directCost: number,
+  materialMarkup: number
+): { bidPrice: BidPriceBreakdown; error: unknown } {
   try {
-    const priced = calculateBidPrice({
-      directCost,
-      materialMarkup,
-      overhead: settings.overhead,
-      profit: settings.profit,
-    });
-    return { price: priced.finalPrice, priced: true, settings };
-  } catch {
     return {
-      price: roundMoney(directCost + materialMarkup),
-      priced: false,
-      settings,
+      bidPrice: calculateBidPrice({
+        directCost,
+        materialMarkup,
+        overhead: settings.overhead,
+        profit: settings.profit,
+      }),
+      error: null,
+    };
+  } catch (error) {
+    const costWithMarkup = roundMoney(directCost + materialMarkup);
+    return {
+      bidPrice: {
+        directCost,
+        materialMarkup,
+        costWithMarkup,
+        overheadAmount: 0,
+        costWithOverhead: costWithMarkup,
+        profitAmount: 0,
+        finalPrice: costWithMarkup,
+        profitMethod: settings.profit.method,
+      },
+      error: error ?? new Error("no finite price"),
     };
   }
 }
@@ -366,20 +408,17 @@ export function rollUpBid(
     the direct cost above and so takes overhead and profit, but it is not
     material and no markup rule ever reaches it.
   */
-  let bidPrice: BidPriceBreakdown;
-  try {
-    bidPrice = calculateBidPrice({
-      directCost,
-      materialMarkup: lineSums.materialMarkup,
-      overhead: settings.overhead,
-      profit: settings.profit,
-    });
-  } catch (error) {
+  const { bidPrice, error } = bidPriceOrFallback(
+    settings,
+    directCost,
+    lineSums.materialMarkup
+  );
+  if (error !== null) {
     /*
       Settings with no finite price — a margin at or past 100%, a negative
       overhead. Inputs refuse both, so this is stored data nothing validated.
-      The bid prices at cost with markup, which is what `priceFromDirectCost`
-      already does for the dashboard card, and is flagged incomplete so that
+      The bid prices at cost with markup (`bidPriceOrFallback`, the same
+      fallback the dashboard card takes), and is flagged incomplete so that
       number is never read as a price.
     */
     problems.push({
@@ -387,17 +426,6 @@ export function rollUpBid(
       code: "bid-settings-invalid",
       detail: thrownDetail(error),
     });
-    const costWithMarkup = roundMoney(directCost + lineSums.materialMarkup);
-    bidPrice = {
-      directCost,
-      materialMarkup: lineSums.materialMarkup,
-      costWithMarkup,
-      overheadAmount: 0,
-      costWithOverhead: costWithMarkup,
-      profitAmount: 0,
-      finalPrice: costWithMarkup,
-      profitMethod: settings.profit.method,
-    };
   }
 
   return {
@@ -538,6 +566,132 @@ export function bidRollup<L extends RollupLine>(
     pricedOnly.map(p => p.breakdown)
   );
 
+  const {
+    rate,
+    pricedExpenses,
+    workPrice,
+    salesTax,
+    expensesTotal,
+    subtotal,
+    totalDue,
+  } = billTheBid({
+    bid,
+    bidPrice,
+    materialCost,
+    laborCost,
+    materialMarkup,
+    expenses,
+    tax,
+  });
+
+  return {
+    settings,
+    priced,
+    /** What could not be priced; see rollUpBid. Empty on a sound bid. */
+    problems,
+    /** The totals leave something out. Proposal and export refuse on this. */
+    incomplete,
+    /** Lines and parts nobody priced, counted as $0 — see rollUpBid. */
+    notPriced,
+    units: Array.from(unitTotals, ([label, totals]) => ({
+      label,
+      ...totals,
+    })),
+    /** Where the rate came from, so the number can be traced and defended. */
+    taxRate: rate,
+    salesTax,
+    totals: {
+      // bidPrice carries its own directCost (identical, rounded through the
+      // engine) — spread it first so the authoritative one wins.
+      ...bidPrice,
+      totalLaborHours: pricedOnly.reduce(
+        (sum, p) => sum + p.breakdown.totalLaborHours,
+        0
+      ),
+      /**
+       * The same hours BEFORE the productivity factor, at quantity.
+       *
+       * Sent so the breakdown can show the adjustment as its own step rather
+       * than as a total that silently differs from the hours on the assemblies.
+       * hoursAfterModifiers is per-unit, so it scales by qty here exactly as
+       * totalLaborHours does — comparing one to the other is the whole point,
+       * and they have to be on the same footing.
+       */
+      laborHoursBeforeProductivity: pricedOnly.reduce(
+        (sum, p) => sum + p.breakdown.hoursAfterModifiers * Number(p.line.qty),
+        0
+      ),
+      materialCost,
+      laborCost,
+      // `materialMarkup` and `costWithMarkup` arrive with the ...bidPrice
+      // spread above, from the engine that computed them.
+      /**
+       * Tax, and the price with it. Kept as their own fields beside
+       * `finalPrice` rather than folded into it — a bid total that silently
+       * includes tax is one nobody can check, and every screen that shows a
+       * price needs to be able to show the two apart.
+       *
+       * `totalWithTax` is price + tax and excludes expenses; it is kept
+       * because the tax engine returns it and the tests pin it. `totalDue` is
+       * the number a customer actually owes.
+       */
+      salesTaxAmount: salesTax.amount,
+      totalWithTax: salesTax.totalWithTax,
+      /** Charges as billed, summed. Zero when the bid has none. */
+      expensesTotal,
+      /**
+       * The marked-up materials and labor alone — what every screen labels
+       * "Bid price".
+       *
+       * Differs from `finalPrice` only when a charge is marked up: that charge
+       * is inside finalPrice (it ran through overhead and profit with
+       * everything else) but is billed on its own line, so the screen shows
+       * this to avoid counting it twice.
+       */
+      workPrice,
+      /** Every charge with what it is billed at, for itemising. */
+      expenseLines: pricedExpenses.lines,
+      /**
+       * workPrice + every charge as billed, before tax. (This said
+       * "finalPrice + expenses" until 2026-09-27, which counts a marked-up
+       * charge twice — the same confusion between the two prices that the
+       * lists' labels had.)
+       */
+      subtotal,
+      /**
+       * workPrice + every charge + tax: what the customer owes, and the
+       * number every list shows as "Total due".
+       */
+      totalDue,
+    },
+  };
+}
+
+/**
+ * From a bid's PRICE to what the customer is billed: its charges, the work
+ * price, sales tax and the total due.
+ *
+ * Lifted out of `bidRollup` on 2026-09-27 so the lists that sum a bid in SQL
+ * — the dashboard card — reach "Total due" through the same code as the bid
+ * screen rather than a second copy of it. It needs only sums, never lines.
+ */
+export function billTheBid({
+  bid,
+  bidPrice,
+  materialCost,
+  laborCost,
+  materialMarkup,
+  expenses,
+  tax,
+}: {
+  bid: Bid;
+  bidPrice: BidPriceBreakdown;
+  materialCost: number;
+  laborCost: number;
+  materialMarkup: number;
+  expenses: readonly ExpenseLine[];
+  tax: { rules: TaxRules; jurisdictions: TaxJurisdiction[] } | undefined;
+}) {
   /**
    * Sales tax, computed here so the bid screen and the proposal cannot differ.
    *
@@ -608,75 +762,12 @@ export function bidRollup<L extends RollupLine>(
   const totalDue = roundMoney(subtotal + salesTax.amount);
 
   return {
-    settings,
-    priced,
-    /** What could not be priced; see rollUpBid. Empty on a sound bid. */
-    problems,
-    /** The totals leave something out. Proposal and export refuse on this. */
-    incomplete,
-    /** Lines and parts nobody priced, counted as $0 — see rollUpBid. */
-    notPriced,
-    units: Array.from(unitTotals, ([label, totals]) => ({
-      label,
-      ...totals,
-    })),
-    /** Where the rate came from, so the number can be traced and defended. */
-    taxRate: rate,
+    rate,
+    pricedExpenses,
+    workPrice,
     salesTax,
-    totals: {
-      // bidPrice carries its own directCost (identical, rounded through the
-      // engine) — spread it first so the authoritative one wins.
-      ...bidPrice,
-      totalLaborHours: pricedOnly.reduce(
-        (sum, p) => sum + p.breakdown.totalLaborHours,
-        0
-      ),
-      /**
-       * The same hours BEFORE the productivity factor, at quantity.
-       *
-       * Sent so the breakdown can show the adjustment as its own step rather
-       * than as a total that silently differs from the hours on the assemblies.
-       * hoursAfterModifiers is per-unit, so it scales by qty here exactly as
-       * totalLaborHours does — comparing one to the other is the whole point,
-       * and they have to be on the same footing.
-       */
-      laborHoursBeforeProductivity: pricedOnly.reduce(
-        (sum, p) => sum + p.breakdown.hoursAfterModifiers * Number(p.line.qty),
-        0
-      ),
-      materialCost,
-      laborCost,
-      // `materialMarkup` and `costWithMarkup` arrive with the ...bidPrice
-      // spread above, from the engine that computed them.
-      /**
-       * Tax, and the price with it. Kept as their own fields beside
-       * `finalPrice` rather than folded into it — a bid total that silently
-       * includes tax is one nobody can check, and every screen that shows a
-       * price needs to be able to show the two apart.
-       *
-       * `totalWithTax` is price + tax and excludes expenses; it is kept
-       * because the tax engine returns it and the tests pin it. `totalDue` is
-       * the number a customer actually owes.
-       */
-      salesTaxAmount: salesTax.amount,
-      totalWithTax: salesTax.totalWithTax,
-      /** Charges as billed, summed. Zero when the bid has none. */
-      expensesTotal,
-      /**
-       * The marked-up materials and labor alone.
-       *
-       * Differs from `finalPrice` only when a charge is marked up: that charge
-       * is inside finalPrice (it ran through overhead and profit with
-       * everything else) but is billed on its own line, so the screen shows
-       * this to avoid counting it twice.
-       */
-      workPrice,
-      /** Every charge with what it is billed at, for itemising. */
-      expenseLines: pricedExpenses.lines,
-      /** finalPrice + expenses, before tax. */
-      subtotal,
-      /** finalPrice + expenses + tax. The bottom line. */
-      totalDue,
-    },
+    expensesTotal,
+    subtotal,
+    totalDue,
   };
 }

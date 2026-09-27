@@ -61,6 +61,7 @@ import {
 import { moneyWhole } from "@/lib/money";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
+import { TotalDueCaption } from "@/components/TotalDueCaption";
 
 /** Deadlines read as a weekday and date — "Fri 14 Aug" scans faster than a slashed number. */
 const formatDue = (value: string | Date | null) => {
@@ -296,7 +297,8 @@ export default function DashboardPage({
         g.status,
         {
           count: g.bids.length,
-          value: g.bids.reduce((sum, b) => sum + b.finalPrice, 0),
+          // Total due, the same figure each card in the column shows.
+          value: g.bids.reduce((sum, b) => sum + b.totalDue, 0),
         },
       ])
     ) as Record<string, { count: number; value: number }>;
@@ -307,7 +309,7 @@ export default function DashboardPage({
     // for bid" is worse than an unlabelled row, because nobody checks it.
     const open = realBidValue(
       bids.filter(b => b.status === "Draft" || b.status === "Active"),
-      b => b.finalPrice
+      b => b.totalDue
     );
     return {
       perStatus,
@@ -341,7 +343,7 @@ export default function DashboardPage({
           </div>
           <div className="text-right shrink-0 mr-2">
             <div className="text-xs text-muted-foreground">
-              Out for bid ({summary.openCount}){" "}
+              Out for bid ({summary.openCount}) · total due{" "}
               <IncompletePriceTag
                 show={bids.some(
                   b =>
@@ -524,7 +526,10 @@ export default function DashboardPage({
                     <span className="text-xs text-muted-foreground/70">
                       {stats.count}
                     </span>
-                    <span className="ml-auto font-mono text-xs text-muted-foreground">
+                    <span
+                      className="ml-auto font-mono text-xs text-muted-foreground"
+                      title={`Total due of the ${group.status} bids`}
+                    >
                       {/* A column summing a short bid is short too. */}
                       <IncompletePriceTag
                         show={group.bids.some(b => b.incomplete)}
@@ -574,11 +579,14 @@ export default function DashboardPage({
                                 )}
                               </span>
                               <span className="shrink-0 text-right">
-                                {/* The same "+ N lines, N parts not priced"
+                                {/* TOTAL DUE, and it says so — the bid
+                                    screen's own line, not its "Bid price".
+                                    The same "+ N lines, N parts not priced"
                                     as the bid it opens, counted in SQL by
                                     the same rule (getDashboardBids). */}
+                                <TotalDueCaption className="block" />
                                 <NotPricedTotal
-                                  amount={moneyWhole(bid.finalPrice)}
+                                  amount={moneyWhole(bid.totalDue)}
                                   notPriced={bid.notPriced}
                                   className="font-mono text-sm"
                                 />

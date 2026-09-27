@@ -50,6 +50,7 @@ import { moneyWhole } from "@/lib/money";
 import { useDebounced } from "@/hooks/useDebounced";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
+import { TotalDueCaption } from "@/components/TotalDueCaption";
 
 const ANY = "__any__";
 
@@ -371,10 +372,12 @@ export function BidSearchPanel({
                   ).toLocaleDateString()}
                 </span>
                 <span className="shrink-0 w-24 text-right">
-                  {/* The same "+ N lines, N parts not priced" as the bid
+                  {/* TOTAL DUE, labelled — the bid screen's own line. The
+                      same "+ N lines, N parts not priced" as the bid
                       screen, from the same rule (rollUpBid.notPriced). */}
+                  <TotalDueCaption className="block" />
                   <NotPricedTotal
-                    amount={moneyWhole(bid.finalPrice)}
+                    amount={moneyWhole(bid.totalDue)}
                     notPriced={bid.notPriced}
                     className="font-mono text-sm"
                   />

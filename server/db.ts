@@ -3989,6 +3989,36 @@ export async function getBidExpenseLines(
   }));
 }
 
+/**
+ * Every LIVE bid's charges for one company, grouped by bid — in one query,
+ * for the dashboard, which prices every card from sums and must not read
+ * per bid. Same shape as `getBidExpenseLines`, same order.
+ */
+export async function getLiveBidExpenseLines(
+  userId: number
+): Promise<Map<number, ExpenseLine[]>> {
+  const db = await getDb();
+  const byBid = new Map<number, ExpenseLine[]>();
+  if (!db) return byBid;
+  const rows = await db
+    .select({ expense: bidExpenses })
+    .from(bidExpenses)
+    .innerJoin(bids, eq(bids.id, bidExpenses.bidId))
+    .where(and(eq(bids.userId, userId), isNull(bids.archivedAt)))
+    .orderBy(asc(bidExpenses.sortOrder), asc(bidExpenses.id));
+  for (const { expense } of rows) {
+    const list = byBid.get(expense.bidId) ?? [];
+    list.push({
+      name: expense.name,
+      amount: Number(expense.amount),
+      taxable: expense.taxable,
+      markedUp: expense.markedUp,
+    });
+    byBid.set(expense.bidId, list);
+  }
+  return byBid;
+}
+
 export async function createBidExpense(
   data: InsertBidExpense
 ): Promise<number> {

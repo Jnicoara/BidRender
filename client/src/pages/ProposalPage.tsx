@@ -473,7 +473,7 @@ export default function ProposalPage({
             </div>
             <p className="text-[11px] text-muted-foreground">
               Not on the document — here so you can see the client-facing total
-              is the bid price you approved.
+              is the total due you approved.
             </p>
             {(
               [
@@ -511,10 +511,42 @@ export default function ProposalPage({
               </div>
             ))}
             <div className="border-t border-border my-1.5" />
+            {/* The bid screen's own words for its own numbers: "Bid price"
+                is the work alone, "Total due" is what the client owes, and
+                the proposal's total is checked against Total due. This read
+                `finalPrice` as "Bid price" until 2026-09-27 — on a bid with a
+                marked-up charge, not the number the bid screen gives that
+                name. */}
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-xs font-medium">Bid price</span>
               <NotPricedTotal
-                amount={money(internalTotals.finalPrice)}
+                amount={money(internalTotals.workPrice)}
+                notPriced={notPriced}
+                className="font-mono text-sm"
+              />
+            </div>
+            {internalTotals.expensesTotal > 0 && (
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-xs text-muted-foreground">
+                  Additional expenses
+                </span>
+                <span className="font-mono text-xs">
+                  {money(internalTotals.expensesTotal)}
+                </span>
+              </div>
+            )}
+            {internalTotals.salesTaxAmount > 0 && (
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-xs text-muted-foreground">Sales tax</span>
+                <span className="font-mono text-xs">
+                  {money(internalTotals.salesTaxAmount)}
+                </span>
+              </div>
+            )}
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-xs font-medium">Total due</span>
+              <NotPricedTotal
+                amount={money(internalTotals.totalDue)}
                 notPriced={notPriced}
                 className="font-mono text-sm text-[#F5C518]"
               />

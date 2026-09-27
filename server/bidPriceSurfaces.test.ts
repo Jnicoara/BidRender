@@ -1,21 +1,23 @@
 /**
- * One bid, one price — on the bid screen, the dashboard card, "Find a bid"
- * and the archive.
+ * One bid, one TOTAL DUE — on the bid screen, the dashboard card, "Find a
+ * bid" and the archive.
  *
- * ── The fault this pins ──────────────────────────────────────────────────────
- * "Markup check" read $452.57 on the bid screen and its dashboard card and
- * $302.57 in "Find a bid" and the archive (found 2026-09-26, todo.md). The
- * bid carries a MARKED-UP charge — a permit that runs through overhead and
- * profit with the work (server/bidPricing.ts, rollUpBid) — and the two list
- * endpoints priced the bid without its charges, because `rollUpBid` took them
- * as an optional argument and leaving it out compiled. Their comment said
- * they priced "through the same rollup the dashboard uses, so ... cannot show
- * different money".
+ * ── Two faults, one day apart ────────────────────────────────────────────────
+ * 2026-09-26: "Markup check" read $452.57 on the bid screen and its card and
+ * $302.57 in "Find a bid" and the archive — the lists priced the bid without
+ * its marked-up charge.
  *
- * Material markup was never the gap: it is frozen on each line and every
- * surface already priced it the same. It is in the fixture anyway, so a bid
- * "marked up" either way is covered, and so is a plain charge, which is
- * billed on its own line and must stay OUT of the price on every surface.
+ * 2026-09-27: with that fixed, every list agreed on `finalPrice` — and
+ * `finalPrice` is neither number the bid screen names. The bid screen says
+ * "Bid price" for the WORK alone (`workPrice`) and "Total due" for everything
+ * the customer owes (`totalDue`: the work, every charge, and sales tax). The
+ * lists showed the work plus MARKED-UP charges only, which matches "Total due"
+ * on a bid with no plain charge and no tax, and nothing on any other. The
+ * owner's decision: the lists say "Total due", and show it.
+ *
+ * So each bid here is counted on every surface against the bid screen's
+ * `totals.totalDue`, including bids with a plain charge, a taxable charge and
+ * a taxed site — the cases where the old number and the right one part.
  *
  * Fixture ids 9871 are distinct from every other suite.
  */
@@ -23,7 +25,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
-import { bidLineItems, bids, users } from "../drizzle/schema";
+import { bidLineItems, bids, taxJurisdictions, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 
 const USER = 9871;
@@ -37,7 +39,9 @@ const caller = () =>
 
 async function clean() {
   const db = await getDb();
-  if (db) await db.delete(bids).where(eq(bids.userId, USER));
+  if (!db) return;
+  await db.delete(bids).where(eq(bids.userId, USER));
+  await db.delete(taxJurisdictions).where(eq(taxJurisdictions.userId, USER));
 }
 
 /** A priced hand line: 2 × $50 material at 25% markup, 1 h × $80 labor. */
@@ -56,17 +60,35 @@ async function pricedLine(bidId: number) {
   });
 }
 
-type Charge = { name: string; amount: number; markedUp?: boolean };
+type Charge = {
+  name: string;
+  amount: number;
+  markedUp?: boolean;
+  taxable?: boolean;
+};
+type Shape = { charges: Charge[]; taxed: boolean };
 
-const SHAPES: Record<string, Charge[]> = {
-  "no charges": [],
-  "a marked-up charge": [{ name: "Permit", amount: 150, markedUp: true }],
-  "a plain charge": [{ name: "Dump fee", amount: 40 }],
-  "both kinds": [
-    { name: "Permit", amount: 150, markedUp: true },
-    { name: "Inspection", amount: 75, markedUp: true },
-    { name: "Dump fee", amount: 40 },
-  ],
+const PERMIT: Charge = { name: "Permit", amount: 150, markedUp: true };
+const DUMP: Charge = { name: "Dump fee", amount: 40 };
+
+const SHAPES: Record<string, Shape> = {
+  "no charges": { charges: [], taxed: false },
+  "a marked-up charge": { charges: [PERMIT], taxed: false },
+  "a plain charge": { charges: [DUMP], taxed: false },
+  "both kinds": {
+    charges: [PERMIT, { name: "Inspection", amount: 75, markedUp: true }, DUMP],
+    taxed: false,
+  },
+  "taxed, no charges": { charges: [], taxed: true },
+  "taxed, every kind of charge": {
+    charges: [
+      PERMIT,
+      DUMP,
+      { name: "Lift rental", amount: 60, taxable: true },
+      { name: "Engineering", amount: 90, taxable: true, markedUp: true },
+    ],
+    taxed: true,
+  },
 };
 
 const ids: Record<string, number> = {};
@@ -87,13 +109,34 @@ beforeAll(async () => {
     });
   }
   await clean();
-  for (const [shape, charges] of Object.entries(SHAPES)) {
+
+  // Tax on, materials and labor taxable, 10% in Illinois. A bid is taxed
+  // only when its site address resolves to the jurisdiction.
+  await caller().salesTax.setRules({
+    enabled: true,
+    taxMaterials: true,
+    taxLabor: true,
+    applyTo: "price",
+  });
+  await caller().salesTax.create({
+    name: "Price surfaces ten",
+    state: "IL",
+    components: [{ label: "State", ratePct: 10 }],
+  });
+
+  for (const [shape, { charges, taxed }] of Object.entries(SHAPES)) {
     const bid = (await caller().bids.create({
       name: `Price surfaces: ${shape}`,
     }))!;
     await pricedLine(bid.id);
     for (const charge of charges) {
       await caller().bidExtras.expenses.addToBid({ bidId: bid.id, ...charge });
+    }
+    if (taxed) {
+      await caller().bids.update({
+        id: bid.id,
+        siteAddress: "Springfield, IL",
+      });
     }
     ids[shape] = bid.id;
   }
@@ -103,26 +146,27 @@ afterAll(async () => {
   if (hasDb) await clean();
 });
 
-/** What the bid screen shows as the price. The number the others must match. */
+/** The bid screen's totals. The numbers everything else must match. */
 async function bidScreen(bidId: number) {
-  return (await caller().bids.get({ id: bidId })).totals.finalPrice;
+  const full = await caller().bids.get({ id: bidId });
+  return { ...full.totals, tax: full.salesTax.amount };
 }
 
 async function searchRow(bidId: number, archive: "live" | "archived") {
   const page = await caller().bids.search({ text: "Price surfaces", archive });
   const row = page.items.find(b => b.id === bidId);
   if (!row) throw new Error(`bid ${bidId} not in "Find a bid" (${archive})`);
-  return row.finalPrice;
+  return row;
 }
 
-withDb("a bid's price is the same number everywhere it is shown", () => {
+withDb("a bid's total due is the same number everywhere it is shown", () => {
   it.each(Object.keys(SHAPES))("%s", async shape => {
     const bidId = ids[shape];
-    const price = await bidScreen(bidId);
+    const { totalDue } = await bidScreen(bidId);
 
     const card = (await caller().bids.dashboard()).find(b => b.id === bidId)!;
-    expect(card.finalPrice).toBeCloseTo(price, 2);
-    expect(await searchRow(bidId, "live")).toBeCloseTo(price, 2);
+    expect(card.totalDue).toBeCloseTo(totalDue, 2);
+    expect((await searchRow(bidId, "live")).totalDue).toBeCloseTo(totalDue, 2);
 
     // And once archived: the archive list, and "Find a bid" over archived bids.
     await caller().bids.archive({ id: bidId });
@@ -130,20 +174,31 @@ withDb("a bid's price is the same number everywhere it is shown", () => {
       const archived = (await caller().bids.archived()).find(
         b => b.id === bidId
       )!;
-      expect(archived.finalPrice).toBeCloseTo(price, 2);
-      expect(await searchRow(bidId, "archived")).toBeCloseTo(price, 2);
+      expect(archived.totalDue).toBeCloseTo(totalDue, 2);
+      expect((await searchRow(bidId, "archived")).totalDue).toBeCloseTo(
+        totalDue,
+        2
+      );
     } finally {
       await caller().bids.restore({ id: bidId });
     }
   });
 
-  it("puts a marked-up charge inside the price and a plain one outside it", async () => {
-    // Guards the comparison above from passing because every surface is wrong
-    // the same way: the charge has to move the bid screen's own number.
+  it("is a number the old one was not, wherever a plain charge or tax is on the bid", async () => {
+    // Guards the comparison above from passing on fixtures where total due
+    // and the old `finalPrice` happen to coincide.
+    const plain = await bidScreen(ids["a plain charge"]);
+    expect(plain.totalDue).toBeCloseTo(plain.finalPrice + 40, 2);
+
+    const taxed = await bidScreen(ids["taxed, no charges"]);
+    expect(taxed.tax).toBeGreaterThan(0);
+    expect(taxed.totalDue).toBeCloseTo(taxed.finalPrice + taxed.tax, 2);
+
+    // A marked-up charge is inside the price and billed on its own line;
+    // with nothing else on the bid, total due is that price exactly.
+    const marked = await bidScreen(ids["a marked-up charge"]);
     const none = await bidScreen(ids["no charges"]);
-    expect(await bidScreen(ids["a marked-up charge"])).toBeGreaterThan(
-      none + 150 - 0.01
-    );
-    expect(await bidScreen(ids["a plain charge"])).toBeCloseTo(none, 2);
+    expect(marked.totalDue).toBeGreaterThan(none.totalDue + 150 - 0.01);
+    expect(marked.totalDue).toBeCloseTo(marked.finalPrice, 2);
   });
 });

@@ -17,12 +17,16 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { requireCapability, router, scoped } from "../_core/trpc";
-import { ASSEMBLY_CATEGORIES, BID_STATUSES } from "../../drizzle/schema";
+import {
+  ASSEMBLY_CATEGORIES,
+  BID_STATUSES,
+  type Bid,
+} from "../../drizzle/schema";
 import {
   bidRollup,
+  billTheBid,
   companyDefaultsFor,
   priceFromDirectCost,
-  rollUpBid,
   taxRulesFor,
   toTaxJurisdiction,
 } from "../bidPricing";
@@ -179,6 +183,64 @@ async function requireBid(id: number, userId: number) {
   return bid;
 }
 
+/**
+ * What pricing a LIST of bids needs once, however many bids it holds: the
+ * company's defaults and its tax context. Tax is here because a list shows
+ * "Total due", and total due includes sales tax.
+ */
+async function listPricingContext(userId: number) {
+  const [company, rules, jurisdictions] = await Promise.all([
+    companyDefaultsFor(userId),
+    taxRulesFor(userId),
+    db.getTaxJurisdictions(userId),
+  ]);
+  return {
+    company,
+    tax: { rules, jurisdictions: jurisdictions.map(toTaxJurisdiction) },
+  };
+}
+
+/**
+ * One bid priced for "Find a bid" and the archive — through `bidRollup`, the
+ * bid screen's own function, with the same charges and the same tax.
+ *
+ * ── Which number, and why it is named ────────────────────────────────────────
+ * `totalDue` is what those lists show, labelled "Total due", matching the bid
+ * screen's line of that name (owner, 2026-09-27). Until that day they showed
+ * `finalPrice` with no label: the work plus MARKED-UP charges only, which is
+ * neither the bid screen's "Bid price" (`workPrice`) nor its "Total due", and
+ * reads like both. `finalPrice` is still returned for callers that want the
+ * price before plain charges and tax. server/bidPriceSurfaces.test.ts.
+ */
+async function priceForList(
+  bid: Bid,
+  userId: number,
+  context: Awaited<ReturnType<typeof listPricingContext>>
+) {
+  const [lines, expenses] = await Promise.all([
+    db.getRollupLines(bid.id, userId),
+    db.getBidExpenseLines(bid.id),
+  ]);
+  const { totals, incomplete, notPriced } = bidRollup(
+    bid,
+    lines,
+    context.company,
+    context.tax,
+    expenses
+  );
+  return {
+    lineCount: lines.length,
+    directCost: totals.directCost,
+    finalPrice: totals.finalPrice,
+    /** What the list shows, as "Total due". */
+    totalDue: totals.totalDue,
+    /** The price leaves something out; show it as incomplete. */
+    incomplete,
+    /** Lines and parts nobody priced, counted as $0 in the totals. */
+    notPriced,
+  };
+}
+
 export const bidsRouter = router({
   /**
    * Historical search: find a bid out of thousands, by who it was for, what
@@ -236,35 +298,13 @@ export const bidsRouter = router({
         pageSize
       );
 
-      // Priced through the same rollup the bid screen uses, WITH the bid's
-      // charges, so a search result and the bid it opens show the same money.
-      // Without them a marked-up permit dropped out of the price here until
-      // 2026-09-27 (server/bidPriceSurfaces.test.ts). Only the page's rows are
-      // priced — this is why the page is bounded.
-      const company = await companyDefaultsFor(ctx.scope.dataUserId);
+      // Only the page's rows are priced — this is why the page is bounded.
+      const context = await listPricingContext(ctx.scope.dataUserId);
       const priced = await Promise.all(
-        rows.map(async bid => {
-          const [lines, expenses] = await Promise.all([
-            db.getRollupLines(bid.id, ctx.scope.dataUserId),
-            db.getBidExpenseLines(bid.id),
-          ]);
-          const { directCost, bidPrice, incomplete, notPriced } = rollUpBid(
-            bid,
-            lines,
-            company,
-            expenses
-          );
-          return {
-            ...bid,
-            lineCount: lines.length,
-            directCost,
-            finalPrice: bidPrice.finalPrice,
-            /** The price leaves something out; show it as incomplete. */
-            incomplete,
-            /** Lines and parts nobody priced, counted as $0 in finalPrice. */
-            notPriced,
-          };
-        })
+        rows.map(async bid => ({
+          ...bid,
+          ...(await priceForList(bid, ctx.scope.dataUserId, context)),
+        }))
       );
 
       const page = toPage(priced, pageSize, row =>
@@ -304,11 +344,11 @@ export const bidsRouter = router({
    * are tested there.
    */
   dashboard: procedure.query(async ({ ctx }) => {
-    const company = await companyDefaultsFor(ctx.scope.dataUserId);
-    const rows = await db.getDashboardBids(
-      ctx.scope.dataUserId,
-      company.productivityPct
-    );
+    const { company, tax } = await listPricingContext(ctx.scope.dataUserId);
+    const [rows, chargesByBid] = await Promise.all([
+      db.getDashboardBids(ctx.scope.dataUserId, company.productivityPct),
+      db.getLiveBidExpenseLines(ctx.scope.dataUserId),
+    ]);
 
     return rows.map(row => {
       const {
@@ -327,17 +367,33 @@ export const bidsRouter = router({
       // charges (rollUpBid). Leaving the charges out read a bid carrying a
       // marked-up permit short by that permit until 2026-09-25.
       const fullDirect = roundMoney(directCost + markedUpExpenses);
-      const { price, priced } = priceFromDirectCost(
+      const { price, priced, bidPrice } = priceFromDirectCost(
         bid,
         fullDirect,
         materialMarkup,
         company
       );
+      /*
+        TOTAL DUE, which is what the card shows and says (owner, 2026-09-27):
+        from the price to every charge and sales tax, through `billTheBid` —
+        the bid screen's own last step, fed the sums instead of the lines.
+      */
+      const { totalDue } = billTheBid({
+        bid,
+        bidPrice,
+        materialCost,
+        laborCost,
+        materialMarkup,
+        expenses: chargesByBid.get(bid.id) ?? [],
+        tax,
+      });
       return {
         ...bid,
         lineCount,
         directCost: fullDirect,
         finalPrice: price,
+        /** What the card shows, as "Total due". See `priceForList`. */
+        totalDue,
         /**
          * The card's price leaves something out: a line the SQL skipped as
          * unpriceable (the same lines the bid screen flags), or settings with
@@ -580,37 +636,23 @@ export const bidsRouter = router({
    */
   archived: procedure.query(async ({ ctx }) => {
     const now = new Date();
-    const [rows, company] = await Promise.all([
+    const [rows, context] = await Promise.all([
       db.getArchivedBids(ctx.scope.dataUserId),
-      companyDefaultsFor(ctx.scope.dataUserId),
+      listPricingContext(ctx.scope.dataUserId),
     ]);
 
     return Promise.all(
       rows.map(async bid => {
-        // Priced through the same rollUpBid as the bid screen, WITH the bid's
-        // charges, so a bid's value reads the same whether it is archived or
-        // not — someone deciding what to rescue is looking at exactly the
-        // number they saw before archiving it. (It was a marked-up charge
-        // short until 2026-09-27.)
-        const [lines, expenses] = await Promise.all([
-          db.getRollupLines(bid.id, ctx.scope.dataUserId),
-          db.getBidExpenseLines(bid.id),
-        ]);
-        const { bidPrice, incomplete, notPriced } = rollUpBid(
-          bid,
-          lines,
-          company,
-          expenses
-        );
+        // Priced exactly as "Find a bid" prices it, so a bid's total due reads
+        // the same whether it is archived or not — someone deciding what to
+        // rescue is looking at the number they saw before archiving it.
+        const priced = await priceForList(bid, ctx.scope.dataUserId, context);
         // Non-null by construction: getArchivedBids filters on archivedAt.
         const archivedAt = bid.archivedAt as Date;
         return {
           ...bid,
           archivedAt,
-          lineCount: lines.length,
-          finalPrice: bidPrice.finalPrice,
-          incomplete,
-          notPriced,
+          ...priced,
           purgeDueAt: purgeDueAt(archivedAt),
           daysRemaining: daysRemaining(archivedAt, now),
           urgency: retentionUrgency(archivedAt, now),

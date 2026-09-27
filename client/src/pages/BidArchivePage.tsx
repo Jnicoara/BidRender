@@ -38,6 +38,7 @@ import { RETENTION_DAYS, type RetentionUrgency } from "@shared/retention";
 import { moneyWhole } from "@/lib/money";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
+import { TotalDueCaption } from "@/components/TotalDueCaption";
 
 /** Only a deadline worth acting on gets colour. The rest stays quiet. */
 const URGENCY_STYLE: Record<RetentionUrgency, string> = {
@@ -156,20 +157,29 @@ export default function BidArchivePage({
                   >
                     {bid.name}
                   </button>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-muted-foreground">
+                  {/* Wraps BETWEEN items, never inside one: at phone width the
+                      countdown leaves this column ~65px, and "Total due"
+                      broke onto two lines before it was grouped. */}
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
                       {bid.status}
                     </span>
                     <span className="text-xs text-muted-foreground/50">·</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
                       {bid.lineCount} {bid.lineCount === 1 ? "line" : "lines"}
                     </span>
                     <span className="text-xs text-muted-foreground/50">·</span>
-                    <NotPricedTotal
-                      amount={moneyWhole(bid.finalPrice)}
-                      notPriced={bid.notPriced}
-                      className="text-xs font-mono text-muted-foreground"
-                    />
+                    {/* Total due, and says so: the bid screen's own line. One
+                        unit, so the label never sits on a line apart from
+                        the number it names. */}
+                    <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
+                      <TotalDueCaption className="normal-case tracking-normal text-xs" />
+                      <NotPricedTotal
+                        amount={moneyWhole(bid.totalDue)}
+                        notPriced={bid.notPriced}
+                        className="text-xs font-mono text-muted-foreground"
+                      />
+                    </span>
                     <IncompletePriceTag show={bid.incomplete} />
                   </div>
                 </div>
