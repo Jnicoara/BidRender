@@ -195,12 +195,20 @@ describe("a bare amp size leads with the two-pole, not the 3-pole", () => {
 describe("this company's own use settles ties", () => {
   it("a part used on many bids rises above the shipped guess", () => {
     // 20A AFCI is only "common"; five bids of it outweigh the plain row's
-    // "core" rank among the equally matching 20A breakers.
+    // "core" rank among the equally matching 20A single-pole breakers.
+    //
+    // The query was "20A breaker" until 2026-09-26, when it stopped being a
+    // tie: it is the plain row's FORMER NAME, and a former name now counts as
+    // an exact match (shared/materialSearchRank.ts, phraseTier). "20a single
+    // pole" is what both rows' names begin with, so it still ties.
     const usage = new Map<string, MaterialUsage>([
       ["20A Single-Pole AFCI breaker", { bids: 5, lastUsedAt: NOW }],
     ]);
-    expect(searcher(byName, usage)("20A breaker")[0]).toBe(
-      "20A Single-Pole AFCI breaker"
+    const search = searcher(byName, usage);
+    expect(search("20a single pole")[0]).toBe("20A Single-Pole AFCI breaker");
+    // And the tie is real: without the usage, the plain row leads.
+    expect(searcher(byName)("20a single pole")[0]).toBe(
+      "20A Single-Pole breaker"
     );
   });
 
@@ -210,6 +218,14 @@ describe("this company's own use settles ties", () => {
     ]);
     // Named outright: the single-pole row, however much 2-pole is used.
     expect(searcher(byName, usage)("20a single-pole breaker")[0]).toBe(
+      "20A Single-Pole breaker"
+    );
+    // Named by what it USED to be called counts the same (owner,
+    // 2026-09-26): usage of the AFCI does not lift it over "20A breaker".
+    const afci = new Map<string, MaterialUsage>([
+      ["20A Single-Pole AFCI breaker", { bids: 500, lastUsedAt: NOW }],
+    ]);
+    expect(searcher(byName, afci)("20A breaker")[0]).toBe(
       "20A Single-Pole breaker"
     );
   });
