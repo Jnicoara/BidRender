@@ -184,6 +184,11 @@ import {
   shouldUseMultipart,
 } from "@shared/multipartPlan";
 import { uploadInParts } from "@/lib/multipartUpload";
+import {
+  QUERIES_MOVED_BY,
+  type TakeoffChange,
+  type TakeoffQuery,
+} from "@/lib/takeoffRefresh";
 import type { PageTextLayer } from "@/lib/textSelection";
 import { TextSelectLayer } from "@/components/takeoff/TextSelect";
 import { useUploadSpeeds } from "@/lib/useUploadSpeeds";
@@ -2244,28 +2249,82 @@ export default function TakeoffPage({
    * the scale and the app still said they had not.
    *
    * Anything else deriving from a sheet belongs here too.
+   *
+   * A sheet's SCALE is what every traced length on it is worked out from, so
+   * a sheet refresh is also a runs refresh. Found 2026-09-25: after a scale
+   * changed and changed back, the traced-footage panel kept showing lengths
+   * at the in-between scale — 115.74 ft of 1/2" EMT against the true
+   * 111.12 ft — until the page was reloaded.
+   *
+   * WHICH queries each change moves is decided in @/lib/takeoffRefresh, where
+   * a test can go red. This only carries it out.
    */
-  const refreshSheets = () => {
-    if (doc) void utils.bidPdfs.sheets.invalidate({ bidPdfId: doc.id });
-    // What the list SHOWS for a sheet is its row AND its read number/title.
-    if (doc)
-      void utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId: doc.id });
-    // …and "go to sheet" matches on both, for every plan on the bid, as does
-    // the drawing-text search, whose hits carry the same numbers and titles.
-    void utils.bidPdfs.sheetJumpList.invalidate({ bidId });
-    void utils.bidPdfs.searchText.invalidate();
-    void utils.takeoffRuns.measurability.invalidate();
-    /*
-      A sheet's SCALE is what every traced length on it is worked out from,
-      so a sheet refresh is also a runs refresh. Found 2026-09-25: after a
-      scale changed and changed back, the traced-footage panel kept showing
-      lengths at the in-between scale — 115.74 ft of 1/2" EMT against the
-      true 111.12 ft — until the page was reloaded. Same class as the
-      counted-items panel in CLAUDE.md: a derived number in a query the
-      mutation never told to let go.
-    */
-    refreshRuns();
-  };
+  const invalidateQuery = useCallback(
+    (query: TakeoffQuery) => {
+      const sheetId = activeSheet?.id;
+      const bidPdfId = doc?.id;
+      switch (query) {
+        case "takeoffRuns.listForSheet":
+          if (sheetId)
+            void utils.takeoffRuns.listForSheet.invalidate({ sheetId });
+          return;
+        case "takeoffStamps.listForSheet":
+          if (sheetId)
+            void utils.takeoffStamps.listForSheet.invalidate({ sheetId });
+          return;
+        case "bidPdfs.sheets":
+          if (bidPdfId) void utils.bidPdfs.sheets.invalidate({ bidPdfId });
+          return;
+        case "bidPdfs.sheetIdentities":
+          if (bidPdfId)
+            void utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId });
+          return;
+        case "takeoffRuns.totals":
+          void utils.takeoffRuns.totals.invalidate({ bidId });
+          return;
+        case "takeoffRuns.drops":
+          void utils.takeoffRuns.drops.invalidate({ bidId });
+          return;
+        case "takeoffRuns.typeColors":
+          void utils.takeoffRuns.typeColors.invalidate({ bidId });
+          return;
+        case "takeoffRunTypes.bridgeForBid":
+          void utils.takeoffRunTypes.bridgeForBid.invalidate({ bidId });
+          return;
+        case "takeoffGroups.list":
+          void utils.takeoffGroups.list.invalidate({ bidId });
+          return;
+        case "takeoffHeights.forBid":
+          void utils.takeoffHeights.forBid.invalidate({ bidId });
+          return;
+        case "bidPdfs.list":
+          void utils.bidPdfs.list.invalidate({ bidId });
+          return;
+        case "bidPdfs.sheetJumpList":
+          void utils.bidPdfs.sheetJumpList.invalidate({ bidId });
+          return;
+        case "bidPdfs.searchText":
+          void utils.bidPdfs.searchText.invalidate();
+          return;
+        case "takeoffRuns.measurability":
+          void utils.takeoffRuns.measurability.invalidate();
+          return;
+        default: {
+          // A query added to TakeoffQuery with no line here fails to compile.
+          const unhandled: never = query;
+          return unhandled;
+        }
+      }
+    },
+    [utils, activeSheet?.id, doc?.id, bidId]
+  );
+  const refreshFor = useCallback(
+    (change: TakeoffChange) => {
+      for (const query of QUERIES_MOVED_BY[change]) invalidateQuery(query);
+    },
+    [invalidateQuery]
+  );
+  const refreshSheets = () => refreshFor("sheet");
 
   const createTicket = trpc.bidPdfs.createUploadTicket.useMutation();
   const confirmAttach = trpc.bidPdfs.confirmAttach.useMutation();
@@ -2285,7 +2344,9 @@ export default function TakeoffPage({
       toast.success("Plan removed from this bid.");
       setSelectedDocId(null);
       setPage(1);
-      void utils.bidPdfs.list.invalidate({ bidId });
+      // Its sheets, marks and runs went with it, so every bid-wide figure
+      // moves — not only the list of plans. See @/lib/takeoffRefresh.
+      refreshFor("planRemoved");
     },
     onError: error => toast.error(error.message),
   });
@@ -2553,33 +2614,17 @@ export default function TakeoffPage({
       : "No scale set for this sheet — set one to trace on it";
   }, [measurability]);
 
-  const refreshRuns = useCallback(() => {
-    if (activeSheet)
-      void utils.takeoffRuns.listForSheet.invalidate({
-        sheetId: activeSheet.id,
-      });
-    void utils.takeoffRuns.totals.invalidate({ bidId });
-    /*
-      The bridge counts RUNS, so it goes stale on anything that touches one —
-      tracing, deleting, or answering the branch-wiring question.
+  /*
+    Anything that touches a run: tracing, deleting, answering the
+    branch-wiring question. The bridge, the drops readout and the colours are
+    keyed by BID while the panel is per SHEET, deliberately — a run on another
+    sheet moves them too.
 
-      It belongs HERE rather than on the one mutation that came to mind, which
-      is the lesson CLAUDE.md draws from the counted-items panel: a query added
-      to a screen that already has mutations goes into the screen s single
-      refresh helper, or it confidently shows the drawing as it was a minute
-      ago. Keyed by BID while the panel is per SHEET, deliberately — a run
-      traced on another sheet changes what this type would send.
-    */
-    void utils.takeoffRunTypes.bridgeForBid.invalidate({ bidId });
-    /*
-      The bid's drops readout (D21) — per BID like the bridge, because an
-      approved drop on another sheet moves its totals too. Here, not on the
-      drop mutation, for the reason above.
-    */
-    void utils.takeoffRuns.drops.invalidate({ bidId });
-    // Per BID: a type's first run on any sheet decides its colour on all.
-    void utils.takeoffRuns.typeColors.invalidate({ bidId });
-  }, [utils, activeSheet?.id, bidId]);
+    A query added to this screen goes into @/lib/takeoffRefresh, not onto the
+    one mutation that came to mind — the lesson CLAUDE.md draws from the
+    counted-items panel.
+  */
+  const refreshRuns = useCallback(() => refreshFor("run"), [refreshFor]);
 
   const { data: stamps = [] } = trpc.takeoffStamps.listForSheet.useQuery(
     { sheetId: activeSheet?.id ?? 0 },
@@ -2597,34 +2642,24 @@ export default function TakeoffPage({
    */
   const { data: allMaterials = [] } = trpc.materials.list.useQuery();
 
-  const refreshStamps = useCallback(() => {
-    if (activeSheet) {
-      void utils.takeoffStamps.listForSheet.invalidate({
-        sheetId: activeSheet.id,
-      });
-      void utils.takeoffStamps.countedItems.invalidate({
-        sheetId: activeSheet.id,
-      });
-    }
-    /*
-      The bridge reads a count's whole-bid tally, so it goes stale on a mark.
+  /*
+    Marks PLACED. The count list is bid-wide and refreshed on every batch,
+    because the number in "Send 14 to bid" has to be the number that will
+    actually go over — without it the send control kept offering the number
+    it saw when the page loaded (found by looking at the running app; the
+    tests call the router and never see a stale cache).
 
-      Not optional, and the symptom is quiet: without this, the send control
-      keeps offering the number it saw when the page loaded, and the line under
-      the list goes on saying "every priced count is on the bid" while a count
-      sits there waiting. Both are confidently wrong rather than blank, which is
-      the worse kind.
+    Removing a mark is a different change and has its own entry: a run that
+    ended on it loses that end. See `removeStamp` and @/lib/takeoffRefresh.
 
-      It is invalidated on EVERY mark change rather than only on the first,
-      because the number in "Send 14 to bid" has to be the number that will
-      actually go over. Bid-wide, so it is keyed by bid rather than by sheet —
-      marks on another sheet move it too.
-
-      Found by looking at the running app: the tests call the router directly
-      and so never see a stale cache.
-    */
-    void utils.takeoffGroups.list.invalidate({ bidId });
-  }, [utils, activeSheet?.id, bidId]);
+    `takeoffStamps.countedItems` used to be invalidated here. No component has
+    queried it since the counted-items panel moved to the count list, so it
+    was a line that looked like coverage and refreshed nothing.
+  */
+  const refreshStamps = useCallback(
+    () => refreshFor("marksPlaced"),
+    [refreshFor]
+  );
 
   const dropStamps = trpc.takeoffStamps.drop.useMutation({
     onError: e => toast.error(e.message),
@@ -2783,10 +2818,15 @@ export default function TakeoffPage({
    * Whether this bid's quantities are frozen (shared/quantityLock.ts).
    *
    * Read off the count list rather than from a query of its own, because that
-   * one is already invalidated on every mark change (`refreshStamps`) and on
-   * every run change (`refreshRuns`). A second query would be a second thing to
-   * remember to invalidate, and the one that got forgotten would leave this
-   * screen promising that marks move a bid somebody has just locked.
+   * one is invalidated on every mark change and every run change. A second
+   * query would be a second thing to remember to invalidate, and the one that
+   * got forgotten would leave this screen promising that marks move a bid
+   * somebody has just locked.
+   *
+   * **This said the same thing until 2026-09-27 and half of it was false:**
+   * `refreshRuns` never touched the count list. It does now, because the rule
+   * lives in @/lib/takeoffRefresh and its test asserts "run" moves
+   * `takeoffGroups.list` — the claim is a guard rather than a sentence.
    */
   const quantitiesLocked = bidCounts.data?.quantitiesLockedAt != null;
 
@@ -2848,7 +2888,9 @@ export default function TakeoffPage({
   );
   const removeStamp = trpc.takeoffStamps.remove.useMutation({
     onError: e => toast.error(e.message),
-    onSettled: refreshStamps,
+    // Not `refreshStamps`: a run that ended on this mark loses that end
+    // (ON DELETE SET NULL), so its drops, connectors and Send preview move.
+    onSettled: () => refreshFor("markRemoved"),
   });
   const captureSymbol = trpc.takeoffStamps.captureSymbol.useMutation({
     onError: e => toast.error(e.message),
@@ -5120,7 +5162,10 @@ export default function TakeoffPage({
               makes flat distance measurable, the other makes vertical distance
               measurable, and neither of them counts anything until it is set.
             */}
-            <JobHeightsChip bidId={bidId} />
+            <JobHeightsChip
+              bidId={bidId}
+              onChanged={() => refreshFor("heights")}
+            />
 
             <div className="w-px h-4 bg-border" />
 

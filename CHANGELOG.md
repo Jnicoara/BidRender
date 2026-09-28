@@ -4,6 +4,14 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-28]
+
+- **Figures on the Plans screen now update straight away in three places
+  where they didn't.** Removing a mark at the end of a run, removing a whole
+  plan set, and changing a job height each left some run totals, drops or the
+  "Send to bid" preview showing the old number until the page was reloaded.
+  Each now updates as soon as the change saves.
+
 ## [2026-09-27]
 
 - **The plan viewer warns when a sheet is a shrunk print.** A 24×36 set
