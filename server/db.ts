@@ -10398,6 +10398,20 @@ function costSums(productivityPct: number) {
      * them must say so rather than present them as the bid's value.
      */
     brokenLines: sql<string>`COALESCE(SUM(CASE WHEN ${bidLineItems.id} IS NOT NULL AND NOT ${lineIsPriceable} THEN 1 ELSE 0 END), 0)`,
+    /*
+      Lines nobody priced, which the sums below count as $0 — a different
+      fact from `brokenLines`, and the one a total states as "+ 4 lines not
+      priced" (owner, 2026-09-26). Here rather than in the Dashboard's own
+      select since 2026-09-27, so analytics reads the same count: it summed
+      these lines at $0 and flagged only the broken ones.
+    */
+    notPricedLines: sql<string>`COALESCE(SUM(CASE WHEN ${lineNotPricedSql(productivityPct)} THEN 1 ELSE 0 END), 0)`,
+    /*
+      Parts missing from otherwise-priced lines, as frozen on the line (0087).
+      A line from before 0087 has no frozen count; the Dashboard reads its
+      recipe live (`liveUnpricedParts`), analytics does not — see BidCostRow.
+    */
+    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} AND ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}) ELSE 0 END), 0)`,
     materialCents: sql<string>`COALESCE(SUM(${materialCents}), 0)`,
     laborCents: sql<string>`COALESCE(SUM(${laborCents}), 0)`,
     directCents: sql<string>`COALESCE(SUM(ROUND(${materialCents} + ${laborCents})), 0)`,
@@ -10517,6 +10531,16 @@ export type BidCostRow = {
    * with the bid screen's arithmetic and never said it was leaving lines out.
    */
   brokenLines: number;
+  /**
+   * Lines and parts nobody priced, counted as $0 in every sum above — the
+   * "+ 4 lines not priced" a bid total states. Carried since 2026-09-27.
+   *
+   * Parts are the FROZEN count only. A line added before 0087 stored no
+   * count, and the Dashboard reads its recipe live for it; analytics does
+   * not, so on such a line an unpriced part is not counted here. Lines are
+   * exact either way.
+   */
+  notPriced: NotPricedTally;
 };
 
 function toBidCostRow(row: Record<string, unknown>): BidCostRow {
@@ -10544,6 +10568,10 @@ function toBidCostRow(row: Record<string, unknown>): BidCostRow {
     markedUpExpenses: Number(row.markedUpExpenseCents) / 100,
     totalHours: Number(row.totalHours),
     brokenLines: Number(row.brokenLines),
+    notPriced: {
+      lines: Number(row.notPricedLines),
+      parts: Number(row.frozenParts),
+    },
   };
 }
 
@@ -10806,7 +10834,6 @@ export async function getDashboardBids(
   if (!db) return [];
 
   const sums = costSums(companyProductivityPct);
-  const notPricedLine = lineNotPricedSql(companyProductivityPct);
   const partsCount = linePartsCountSql(companyProductivityPct);
   const liveBids = and(eq(bids.userId, userId), isNull(bids.archivedAt));
   const liveLines = and(
@@ -10834,8 +10861,7 @@ export async function getDashboardBids(
         lastPlanAt: sql<
           string | null
         >`(SELECT DATE_FORMAT(MAX(p.createdAt), '%Y-%m-%dT%H:%i:%sZ') FROM bid_pdfs p WHERE p.bidId = ${bids.id})`,
-        notPricedLines: sql<string>`COALESCE(SUM(CASE WHEN ${notPricedLine} THEN 1 ELSE 0 END), 0)`,
-        frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${partsCount} AND ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}) ELSE 0 END), 0)`,
+        // notPricedLines and frozenParts come with `sums`.
       })
       .from(bids)
       .leftJoin(bidLineItems, liveLines)

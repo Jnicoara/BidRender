@@ -11,6 +11,12 @@ This is the human-readable companion to the git history — read this to see wha
   plan set, and changing a job height each left some run totals, drops or the
   "Send to bid" preview showing the old number until the page was reloaded.
   Each now updates as soon as the change saves.
+- **Dashboard and analytics totals now say when they include unpriced
+  lines.** Each bid card already said "+ 3 lines not priced", but the "Out
+  for bid" headline, each column's total and the analytics reports added
+  those lines in at $0 without a word. They now say how many lines and parts
+  nobody has priced. The column totals also stop including the sample bid,
+  which the headline already left out.
 
 ## [2026-09-27]
 

@@ -43,7 +43,7 @@ import { NavigationHelper } from "@/components/NavigationHelper";
 import { BidSearchPanel } from "@/components/BidSearchPanel";
 import { NewBidMenu, StartBidCards } from "@/components/StartBidCards";
 import { SampleBidCard } from "@/components/SampleBidCard";
-import { realBidValue } from "@shared/sampleProject";
+import { sumBidTotals, type BidTotal } from "@shared/bidTotals";
 import { isChecklistComplete } from "@shared/onboarding";
 import {
   bidNameFromFilename,
@@ -295,31 +295,30 @@ export default function DashboardPage({
 
   /** One number per column, plus the headline: what is still in play. */
   const summary = useMemo(() => {
+    /*
+      Every figure here comes from `sumBidTotals`, which leaves the sample out
+      and adds up what the cards leave out. A row on a list gets inspected; a
+      total does not — a fictional $15,000 folded into a column, or four
+      unpriced lines folded in as $0, is worse than an unlabelled row, because
+      nobody checks it. The column figures included the sample until
+      2026-09-27; see @shared/bidTotals.
+    */
     const perStatus = Object.fromEntries(
       groups.map(g => [
         g.status,
         {
           count: g.bids.length,
           // Total due, the same figure each card in the column shows.
-          value: g.bids.reduce((sum, b) => sum + b.totalDue, 0),
+          sum: sumBidTotals(g.bids, b => b.totalDue),
         },
       ])
-    ) as Record<string, { count: number; value: number }>;
+    ) as Record<string, { count: number; sum: BidTotal }>;
 
-    // The sample is excluded from the headline figure, and that exclusion is
-    // the whole "never confusable with a real bid" guarantee. A row on a list
-    // gets inspected; a total does not — a fictional $15,000 folded into "Out
-    // for bid" is worse than an unlabelled row, because nobody checks it.
-    const open = realBidValue(
+    const open = sumBidTotals(
       bids.filter(b => b.status === "Draft" || b.status === "Active"),
       b => b.totalDue
     );
-    return {
-      perStatus,
-      openValue: open.total,
-      openCount: open.count,
-      sampleExcluded: open.sampleExcluded,
-    };
+    return { perStatus, open };
   }, [groups]);
 
   const start = () => {
@@ -346,19 +345,16 @@ export default function DashboardPage({
           </div>
           <div className="text-right shrink-0 mr-2">
             <div className="text-xs text-muted-foreground">
-              Out for bid ({summary.openCount}) · total due{" "}
-              <IncompletePriceTag
-                show={bids.some(
-                  b =>
-                    b.incomplete &&
-                    !b.isSample &&
-                    (b.status === "Draft" || b.status === "Active")
-                )}
-              />
+              Out for bid ({summary.open.count}) · total due{" "}
+              <IncompletePriceTag show={summary.open.incomplete} />
             </div>
-            <div className="font-mono text-base text-[#F5C518]">
-              {moneyWhole(summary.openValue)}
-            </div>
+            {/* The same "+ 4 lines not priced" the cards carry, summed — a
+                headline quietly short by four parts reads as a whole one. */}
+            <NotPricedTotal
+              amount={moneyWhole(summary.open.total)}
+              notPriced={summary.open.notPriced}
+              className="font-mono text-base text-[#F5C518]"
+            />
           </div>
           {/* Only offered once there is something in it — an always-visible
               empty Archive is a door to a blank room. */}
@@ -548,7 +544,7 @@ export default function DashboardPage({
             {groups.map(group => {
               const stats = summary.perStatus[group.status] ?? {
                 count: 0,
-                value: 0,
+                sum: sumBidTotals([], () => 0),
               };
               return (
                 <div key={group.status} className="min-w-0">
@@ -568,12 +564,16 @@ export default function DashboardPage({
                       className="ml-auto font-mono text-xs text-muted-foreground"
                       title={`Total due of the ${group.status} bids`}
                     >
-                      {/* A column summing a short bid is short too. */}
+                      {/* A column summing a short bid is short too, and says
+                          which way: can't be priced, or not priced yet. */}
                       <IncompletePriceTag
-                        show={group.bids.some(b => b.incomplete)}
+                        show={stats.sum.incomplete}
                         className="mr-1.5"
                       />
-                      {moneyWhole(stats.value)}
+                      <NotPricedTotal
+                        amount={moneyWhole(stats.sum.total)}
+                        notPriced={stats.sum.notPriced}
+                      />
                     </span>
                   </div>
 

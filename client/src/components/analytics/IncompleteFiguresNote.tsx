@@ -7,23 +7,46 @@
  * (IncompletePriceTag): a total with a line missing is short, and a short
  * total that reads as a whole one gets believed. Absent when nothing is
  * missing, so it never becomes wallpaper.
+ *
+ * ── Two facts, two sentences (2026-09-27) ────────────────────────────────────
+ * A line that CAN'T be priced is left out of the figures (red, "incomplete").
+ * A line nobody has priced YET is in them at $0 (amber, the colour of the
+ * "not priced" the bid and the Dashboard use). Until this date the second
+ * one was not said at all, so a range full of unpriced lines read as a
+ * finished set of numbers.
  */
 export function IncompleteFiguresNote({
   count,
+  notPricedCount = 0,
   noun,
 }: {
+  /** Bids or jobs carrying a line that can't be priced. */
   count: number;
+  /** Bids or jobs carrying lines or parts nobody has priced. */
+  notPricedCount?: number;
   noun: [one: string, many: string];
 }) {
-  if (count <= 0) return null;
+  if (count <= 0 && notPricedCount <= 0) return null;
   return (
-    <p className="text-xs text-red-500" role="status">
-      <span className="font-medium">incomplete</span> — {count}{" "}
-      {count === 1 ? noun[0] : noun[1]} in this range{" "}
-      {count === 1 ? "has" : "have"} a line that can&apos;t be priced, so the
-      dollar figures here leave {count === 1 ? "it" : "those lines"} out. On the
-      dashboard, {count === 1 ? "the bid is" : "the bids are"} marked
-      “incomplete”.
-    </p>
+    <div className="space-y-1" role="status">
+      {count > 0 && (
+        <p className="text-xs text-red-500">
+          <span className="font-medium">incomplete</span> — {count}{" "}
+          {count === 1 ? noun[0] : noun[1]} in this range{" "}
+          {count === 1 ? "has" : "have"} a line that can&apos;t be priced, so
+          the dollar figures here leave {count === 1 ? "it" : "those lines"}{" "}
+          out. On the dashboard, {count === 1 ? "the bid is" : "the bids are"}{" "}
+          marked “incomplete”.
+        </p>
+      )}
+      {notPricedCount > 0 && (
+        <p className="text-xs text-[#F5C518]">
+          <span className="font-medium">not priced</span> — {notPricedCount}{" "}
+          {notPricedCount === 1 ? noun[0] : noun[1]} in this range{" "}
+          {notPricedCount === 1 ? "has" : "have"} lines or parts nobody has
+          priced. The dollar figures here count them as $0.
+        </p>
+      )}
+    </div>
   );
 }
