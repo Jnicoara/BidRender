@@ -1306,9 +1306,18 @@ the same as a safe one, and only one of those should let a `DROP` proceed.
 ## 10. The database only answers addresses on its trusted list
 
 **From Stage 4 (2026-09-27).** The DigitalOcean database refuses every
-connection except from the addresses on its **Trusted Sources** list: the app
-itself, and the owner's laptop. That laptop entry is what lets a migration
-(§ 5a) or `scripts/schemaDrift.mts` run from here.
+connection except from the addresses on its **Trusted Sources** list. Three
+entries, all entered as IP addresses (picking the app by name from the list
+does NOT work — it took the site down on the first try):
+
+| Entry           | What it is                                                              |
+| --------------- | ----------------------------------------------------------------------- |
+| `10.124.0.3`    | the live app's VPC egress IP — **removing it takes the live site down** |
+| `10.124.0.4`    | the staging app's VPC egress IP (§ 11)                                  |
+| `97.94.233.209` | the owner's laptop — changes with the home connection                   |
+
+That laptop entry is what lets a migration (§ 5a) or
+`scripts/schemaDrift.mts` run from here.
 
 **A home internet address changes** — after a router restart, an outage, or
 whenever the internet company decides. When it does, the laptop is no longer
@@ -1467,8 +1476,50 @@ App Platform would have been handed a broken certificate.
 
 ### The staging app's database access
 
-The staging app is on the same VPC as the database, uses the `private-`
-host, and its VPC egress IP is on the database's Trusted Sources — exactly
-like live (§ 10). **Without that entry the staging app cannot reach its
-database** — every screen fails to load: the lock from Stage 4 applies to it
-too.
+The staging app is on the same VPC as the database (`default-sfo3`), uses the
+`private-` host, and its VPC egress IP **`10.124.0.4`** is on the database's
+Trusted Sources — exactly like live (§ 10). **Without that entry the staging
+app cannot reach its database** — every screen fails to load: the lock from
+Stage 4 applies to it too. (Seen on creation, 2026-09-27: the app showed
+"Degraded" until the entry went in, then Healthy.)
+
+### How it was created, 2026-09-27 — for the next time
+
+App `bidrender-staging`, SFO3, 1 vCPU / 1 GiB fixed ($10), branch `staging`,
+autodeploy on, **build command empty**, **run command `node dist/index.js`**
+(the wizard proposes `pnpm start`; live uses `node dist/index.js`), "Connect
+app to VPC network" → `default-sfo3`. Settings were added on the COMPONENT
+with "Add from .env". Default address:
+`https://bidrender-staging-t9gxx.ondigitalocean.app`.
+
+### The domain — and the warning that looks worse than it is
+
+`staging.bidridge.com` was added with **"You manage your domain"**, then ONE
+record created by hand in Networking → Domains → `bidridge.com`:
+
+```
+CNAME  staging  →  bidrender-staging-t9gxx.ondigitalocean.app
+```
+
+**Adding the domain shows a yellow warning** — "This domain is already being
+used by another app. Adding it again will overwrite existing DNS records" —
+with BOTH options, because the live app owns the `bidridge.com` zone. With
+"You manage" it wrote nothing: every record for `bidridge.com` and
+`www.bidridge.com` was snapshotted from public DNS before the click and was
+identical after it, and DigitalOcean's own nameserver still had no `staging`
+record until the CNAME was added by hand. **"We manage your domain" was NOT
+tried** on the live zone and should not be. HTTPS came up about two minutes
+after the CNAME.
+
+The live zone, for recovery, as it stood 2026-09-27: `A @ 162.159.140.98`,
+`A @ 172.66.0.96`, `AAAA @ 2a06:98c1:58::60`, `AAAA @ 2606:4700:7::60`,
+`CNAME www → bidrender-hulvy.ondigitalocean.app`, `NS ns1–3.digitalocean.com`,
+plus the staging CNAME above.
+
+### The plans bucket
+
+`bidrender-plans-staging`, with its own R2 token (Object Read & Write on that
+bucket only) and a CORS rule allowing `PUT` from `https://staging.bidridge.com`
+with `ETag` exposed — the same shape as § 9. Checked: a preflight from
+`staging.bidridge.com` is allowed; from `bidridge.com` or anywhere else it is
+refused; the token is refused on `bidrender-plans` and `bidsoftware`.
