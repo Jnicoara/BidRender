@@ -178,6 +178,7 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { FILE_SOURCES } from "./backup/collectFiles";
+import type { PlanCounts } from "../shared/planCounts";
 import {
   problemDedupeKey,
   type LineProblemCode,
@@ -10767,6 +10768,8 @@ export type DashboardBidRow = Bid & {
    * bid screen's way instead of trusting the sums above.
    */
   planLines: number;
+  /** The plan sets on this bid. See `PlanCounts` in shared/planCounts.ts. */
+  plans: PlanCounts;
 };
 
 /**
@@ -10817,6 +10820,20 @@ export async function getDashboardBids(
         lineCount: sql<string>`COUNT(${bidLineItems.id})`,
         ...sums,
         planLines: sql<string>`COALESCE(SUM(CASE WHEN ${bidLineItems.takeoffGroupId} IS NOT NULL OR ${bidLineItems.takeoffRunTypeId} IS NOT NULL THEN 1 ELSE 0 END), 0)`,
+        // The bid's plan sets, for the card's Plans chip and "Recent plans".
+        // Correlated rather than joined: joining bid_pdfs would multiply the
+        // line sums above by the number of plan sets.
+        planSets: sql<string>`(SELECT COUNT(*) FROM bid_pdfs p WHERE p.bidId = ${bids.id})`,
+        planPages: sql<string>`(SELECT COALESCE(SUM(p.pageCount), 0) FROM bid_pdfs p WHERE p.bidId = ${bids.id})`,
+        planSetsUncounted: sql<string>`(SELECT COUNT(*) FROM bid_pdfs p WHERE p.bidId = ${bids.id} AND p.pageCount IS NULL)`,
+        // Formatted in SQL with an explicit Z. A raw MAX() came back as a
+        // zone-less "2026-09-22 10:00:00", which `new Date()` read as LOCAL
+        // time — seven hours out on a Pacific laptop, caught by
+        // dashboardPlans.test.ts. Drizzle reads its own timestamp columns as
+        // UTC, so this says the same instant they do.
+        lastPlanAt: sql<
+          string | null
+        >`(SELECT DATE_FORMAT(MAX(p.createdAt), '%Y-%m-%dT%H:%i:%sZ') FROM bid_pdfs p WHERE p.bidId = ${bids.id})`,
         notPricedLines: sql<string>`COALESCE(SUM(CASE WHEN ${notPricedLine} THEN 1 ELSE 0 END), 0)`,
         frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${partsCount} AND ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}) ELSE 0 END), 0)`,
       })
@@ -10869,6 +10886,12 @@ export async function getDashboardBids(
       parts: Number(row.frozenParts) + (liveParts.get(row.bid.id) ?? 0),
     },
     planLines: Number(row.planLines),
+    plans: {
+      sets: Number(row.planSets),
+      pages: Number(row.planPages),
+      setsUncounted: Number(row.planSetsUncounted),
+      lastUploadedAt: row.lastPlanAt === null ? null : new Date(row.lastPlanAt),
+    },
   }));
 }
 

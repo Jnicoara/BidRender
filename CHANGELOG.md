@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **Plans are easier to get back to.** The Dashboard has a "Recent plans"
+  row: the jobs whose drawings were added most recently, one click from their
+  plans. Every bid card that has drawings shows a "Plans · 5 sheets" button
+  that goes straight to them. On a bid, Plans is now the main button when the
+  bid has drawings, and says how many; a bid with none shows "Add plans". The
+  bid's notes that say "on the Plans screen" are now links to it.
 - **The run totals on the Plans screen now match the bid.** The "This bid,
   all sheets" block used to count finished runs only, while the bid also
   priced runs still being drawn, so the two could show different footage for
