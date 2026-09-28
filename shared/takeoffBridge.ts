@@ -233,28 +233,51 @@ export function resolveLineQty(
  *
  * Returns the assembly names involved, in first-appearance order, because a
  * warning that cannot name what it found is one nobody can act on.
+ *
+ * ── Matched by FAMILY, not by stored id (2026-09-27) ─────────────────────────
+ * A company that prices a shipped assembly gets a fork: a new row, a new id.
+ * A count made with the shipped row and a line added by hand from the priced
+ * fork are the same assembly twice, and the literal id match saw two
+ * different things. `families` maps each id to the shipped row it came from
+ * (`db.getAssemblyFamilies`). It is required, so no caller can go back to
+ * matching ids by accident.
  */
 export function doubleCountedAssemblies(
-  lines: readonly BridgeLine[]
+  lines: readonly BridgeLine[],
+  families: AssemblyFamilies
 ): string[] {
   const fromPlans = new Set<number>();
   const byHand = new Set<number>();
 
   for (const line of lines) {
     if (line.assemblyId === null) continue;
-    if (line.takeoffGroupId === null) byHand.add(line.assemblyId);
-    else fromPlans.add(line.assemblyId);
+    const family = assemblyFamily(families, line.assemblyId);
+    if (line.takeoffGroupId === null) byHand.add(family);
+    else fromPlans.add(family);
   }
 
   const names: string[] = [];
   for (const line of lines) {
     if (line.assemblyId === null) continue;
-    if (!fromPlans.has(line.assemblyId) || !byHand.has(line.assemblyId)) {
-      continue;
-    }
+    const family = assemblyFamily(families, line.assemblyId);
+    if (!fromPlans.has(family) || !byHand.has(family)) continue;
     if (!names.includes(line.name)) names.push(line.name);
   }
   return names;
+}
+
+/**
+ * Each assembly id → the id of the shipped row it was forked from, or itself.
+ * From `db.getAssemblyFamilies`. An id missing from the map is its own family.
+ */
+export type AssemblyFamilies = ReadonlyMap<number, number>;
+
+/** The family an assembly id belongs to. */
+export function assemblyFamily(
+  families: AssemblyFamilies,
+  assemblyId: number
+): number {
+  return families.get(assemblyId) ?? assemblyId;
 }
 
 /**
@@ -266,14 +289,22 @@ export function doubleCountedAssemblies(
  *
  * It does not REFUSE. Sending is still what the estimator asked for and may
  * well be right; what they get is the fact, in time to change their mind.
+ *
+ * Matched by family, like `doubleCountedAssemblies`, so a count on the shipped
+ * row and a hand line on the company's fork of it are seen as the same.
  */
 export function sendWarning(
   group: BridgeGroup,
-  lines: readonly BridgeLine[]
+  lines: readonly BridgeLine[],
+  families: AssemblyFamilies
 ): string | null {
   if (group.assemblyId === null) return null;
+  const family = assemblyFamily(families, group.assemblyId);
   const clash = lines.find(
-    line => line.takeoffGroupId === null && line.assemblyId === group.assemblyId
+    line =>
+      line.takeoffGroupId === null &&
+      line.assemblyId !== null &&
+      assemblyFamily(families, line.assemblyId) === family
   );
   if (!clash) return null;
   return (

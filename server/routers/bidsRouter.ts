@@ -115,7 +115,13 @@ async function planAttentionFor(
     assemblyId: line.assemblyId,
   }));
 
-  const doubleCounted = doubleCountedAssemblies(bridgeLines);
+  const families = await db.getAssemblyFamilies(
+    bridgeLines.flatMap(line =>
+      line.assemblyId === null ? [] : [line.assemblyId]
+    ),
+    userId
+  );
+  const doubleCounted = doubleCountedAssemblies(bridgeLines, families);
 
   const [groups, counts] = await Promise.all([
     db.getGroupsForBid(bidId, userId),

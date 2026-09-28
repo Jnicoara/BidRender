@@ -19,11 +19,20 @@ import {
   resolveLineQty,
   sendWarning,
   sendability,
+  type AssemblyFamilies,
   type BridgeGroup,
   type BridgeLine,
   runTypeRows,
   runRowSendability,
 } from "../shared/takeoffBridge";
+
+/** No assembly on these bids has been forked. */
+const NO_FORKS: AssemblyFamilies = new Map();
+/** Shipped assembly 5, and 105: the company's priced copy of it. */
+const FORKED_5: AssemblyFamilies = new Map([
+  [5, 5],
+  [105, 5],
+]);
 
 function group(over: Partial<BridgeGroup> = {}): BridgeGroup {
   return {
@@ -215,7 +224,9 @@ describe("R3 — the same assembly on the bid twice", () => {
       }),
       line({ id: 2, name: "Duplex receptacle", assemblyId: 5 }),
     ];
-    expect(doubleCountedAssemblies(lines)).toEqual(["Duplex receptacle"]);
+    expect(doubleCountedAssemblies(lines, NO_FORKS)).toEqual([
+      "Duplex receptacle",
+    ]);
   });
 
   it("says nothing when both lines came from the plans", () => {
@@ -223,7 +234,7 @@ describe("R3 — the same assembly on the bid twice", () => {
       line({ id: 1, takeoffGroupId: 3, assemblyId: 5 }),
       line({ id: 2, takeoffGroupId: 4, assemblyId: 5 }),
     ];
-    expect(doubleCountedAssemblies(lines)).toEqual([]);
+    expect(doubleCountedAssemblies(lines, NO_FORKS)).toEqual([]);
   });
 
   it("says nothing when both were added by hand — that is ordinary work", () => {
@@ -231,7 +242,7 @@ describe("R3 — the same assembly on the bid twice", () => {
       line({ id: 1, assemblyId: 5 }),
       line({ id: 2, assemblyId: 5 }),
     ];
-    expect(doubleCountedAssemblies(lines)).toEqual([]);
+    expect(doubleCountedAssemblies(lines, NO_FORKS)).toEqual([]);
   });
 
   it("ignores lines with nothing behind them, which cannot be compared", () => {
@@ -239,7 +250,7 @@ describe("R3 — the same assembly on the bid twice", () => {
       line({ id: 1, takeoffGroupId: 3, assemblyId: null }),
       line({ id: 2, assemblyId: null }),
     ];
-    expect(doubleCountedAssemblies(lines)).toEqual([]);
+    expect(doubleCountedAssemblies(lines, NO_FORKS)).toEqual([]);
   });
 
   it("CATCHES THE HAND-ADDED LINE THAT ARRIVES AFTER THE SEND", () => {
@@ -248,41 +259,94 @@ describe("R3 — the same assembly on the bid twice", () => {
     const afterSend = [
       line({ id: 1, name: "Exit sign LED", takeoffGroupId: 3, assemblyId: 5 }),
     ];
-    expect(doubleCountedAssemblies(afterSend)).toEqual([]);
+    expect(doubleCountedAssemblies(afterSend, NO_FORKS)).toEqual([]);
 
     const thenSomebodyTypedOne = [
       ...afterSend,
       line({ id: 2, name: "Exit sign LED", assemblyId: 5 }),
     ];
-    expect(doubleCountedAssemblies(thenSomebodyTypedOne)).toEqual([
+    expect(doubleCountedAssemblies(thenSomebodyTypedOne, NO_FORKS)).toEqual([
       "Exit sign LED",
     ]);
+  });
+
+  // ── Forks (2026-09-27) ─────────────────────────────────────────────────────
+  // Pricing a shipped assembly forks it: assembly 5 (shipped) becomes 105
+  // (the company's copy). Counted on the plans with one and added by hand
+  // with the other, it is the same work twice under two ids — which the
+  // literal id match did not see.
+
+  it("CATCHES A COUNT ON THE SHIPPED ROW AND A HAND LINE ON ITS FORK", () => {
+    const lines = [
+      line({
+        id: 1,
+        name: "Duplex receptacle",
+        takeoffGroupId: 3,
+        assemblyId: 5,
+      }),
+      line({ id: 2, name: "Duplex receptacle", assemblyId: 105 }),
+    ];
+    expect(doubleCountedAssemblies(lines, FORKED_5)).toEqual([
+      "Duplex receptacle",
+    ]);
+  });
+
+  it("and the other way round: a count on the fork, a hand line on the shipped row", () => {
+    const lines = [
+      line({
+        id: 1,
+        name: "Duplex receptacle",
+        takeoffGroupId: 3,
+        assemblyId: 105,
+      }),
+      line({ id: 2, name: "Duplex receptacle", assemblyId: 5 }),
+    ];
+    expect(doubleCountedAssemblies(lines, FORKED_5)).toEqual([
+      "Duplex receptacle",
+    ]);
+  });
+
+  it("does not join two genuinely different assemblies", () => {
+    const lines = [
+      line({ id: 1, takeoffGroupId: 3, assemblyId: 105 }),
+      line({ id: 2, assemblyId: 6 }),
+    ];
+    expect(doubleCountedAssemblies(lines, FORKED_5)).toEqual([]);
   });
 });
 
 describe("what is said at the moment of sending", () => {
   it("warns when the bid already carries a hand-added line for the assembly", () => {
     const lines = [line({ name: "Duplex receptacle", assemblyId: 90 })];
-    const warning = sendWarning(group(), lines);
+    const warning = sendWarning(group(), lines, NO_FORKS);
     expect(warning).toContain("Duplex receptacle");
     expect(warning).toContain("added by hand");
   });
 
   it("says nothing when the existing line also came from the plans", () => {
     const lines = [line({ takeoffGroupId: 2, assemblyId: 90 })];
-    expect(sendWarning(group(), lines)).toBeNull();
+    expect(sendWarning(group(), lines, NO_FORKS)).toBeNull();
   });
 
   it("says nothing for a count with no assembly to collide on", () => {
-    expect(sendWarning(group({ assemblyId: null }), [])).toBeNull();
+    expect(sendWarning(group({ assemblyId: null }), [], NO_FORKS)).toBeNull();
   });
 
   it("does not refuse — it is a fact in time to change your mind", () => {
     // sendWarning returns a string; sendability is what decides. A group that
     // warns is still sendable.
     const lines = [line({ name: "Duplex receptacle", assemblyId: 90 })];
-    expect(sendWarning(group(), lines)).not.toBeNull();
+    expect(sendWarning(group(), lines, NO_FORKS)).not.toBeNull();
     expect(sendability(group(), lines)).toEqual({ sendable: true });
+  });
+
+  it("warns when the hand line is on the company's fork of the counted assembly", () => {
+    // group() counts assembly 90; 190 is the company's priced copy of it.
+    const lines = [line({ name: "Duplex receptacle", assemblyId: 190 })];
+    expect(sendWarning(group(), lines, new Map([[190, 90]]))).toContain(
+      "Duplex receptacle"
+    );
+    expect(sendWarning(group(), lines, NO_FORKS)).toBeNull();
   });
 });
 

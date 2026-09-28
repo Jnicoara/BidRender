@@ -17,6 +17,11 @@ This is the human-readable companion to the git history — read this to see wha
   those lines in at $0 without a word. They now say how many lines and parts
   nobody has priced. The column totals also stop including the sample bid,
   which the headline already left out.
+- **The "on this bid twice" warning now spots your own priced copy of an
+  assembly.** Pricing a shipped assembly makes a company copy of it. A count
+  from the plans and a line added by hand were only flagged as the same work
+  when both used the same copy, so the same receptacles could sit on a bid
+  twice without the warning.
 
 ## [2026-09-27]
 

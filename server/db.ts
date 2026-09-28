@@ -3007,6 +3007,41 @@ export async function getAssemblyForStoredReference(
   return getAssemblyDetail(resolved.id, userId);
 }
 
+/**
+ * Which assemblies are the SAME assembly: each id mapped to its family — the
+ * shipped row it was forked from (`baselineId`), or itself when it has none.
+ *
+ * For R3's double-count check (`doubleCountedAssemblies`, `sendWarning`),
+ * which matched stored ids literally: a plan line on the shipped Duplex
+ * receptacle and a hand-added line on the company's priced copy of it are the
+ * same work twice, under two ids, and were not flagged. The registry in
+ * `server/forkableReferences.test.ts` had it as unreviewed since 2026-09-21.
+ *
+ * Only rows this company can see: the shipped rows and its own. An id not
+ * found is left out of the map and reads as its own family.
+ */
+export async function getAssemblyFamilies(
+  ids: readonly number[],
+  userId: number
+): Promise<Map<number, number>> {
+  const families = new Map<number, number>();
+  const wanted = Array.from(new Set(ids));
+  if (wanted.length === 0) return families;
+  const db = await getDb();
+  if (!db) return families;
+  const rows = await db
+    .select({ id: assemblies.id, baselineId: assemblies.baselineId })
+    .from(assemblies)
+    .where(
+      and(
+        inArray(assemblies.id, wanted),
+        or(isNull(assemblies.userId), eq(assemblies.userId, userId))
+      )
+    );
+  for (const row of rows) families.set(row.id, row.baselineId ?? row.id);
+  return families;
+}
+
 export async function getAssemblyDetail(
   id: number,
   userId: number
