@@ -15,6 +15,7 @@
  * to work when things are going wrong.
  */
 import {
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
   ListObjectsV2Command,
@@ -75,6 +76,12 @@ export type BackupTarget = {
   get(key: string): Promise<Buffer>;
   /** Object keys under a prefix, so the verifier can find the newest run. */
   list(prefix: string): Promise<string[]>;
+  /**
+   * Delete these keys. Only retention calls it (`retention.ts`), to keep the
+   * promise that a deleted drawing leaves the backups within 30 days. Throws if
+   * any key is refused, so a half-pruned night is reported, not assumed.
+   */
+  deleteMany(keys: readonly string[]): Promise<void>;
 };
 
 export function createR2Target(config: R2Config): BackupTarget {
@@ -138,6 +145,30 @@ export function createR2Target(config: R2Config): BackupTarget {
       const stream = response.Body as AsyncIterable<Uint8Array>;
       for await (const chunk of stream) chunks.push(Buffer.from(chunk));
       return Buffer.concat(chunks);
+    },
+
+    async deleteMany(keys) {
+      // DeleteObjects takes at most 1,000 keys a call.
+      for (let i = 0; i < keys.length; i += 1000) {
+        const batch = keys.slice(i, i + 1000);
+        const response = await client.send(
+          new DeleteObjectsCommand({
+            Bucket: config.bucket,
+            Delete: {
+              Objects: batch.map(key => ({
+                Key: `${config.prefix}/${key}`.replace(/\/+/g, "/"),
+              })),
+              Quiet: true,
+            },
+          })
+        );
+        const refused = response.Errors ?? [];
+        if (refused.length > 0) {
+          throw new Error(
+            `${refused.length} backup object(s) could not be deleted, first: ${refused[0].Key} (${refused[0].Code})`
+          );
+        }
+      }
     },
 
     async list(prefix) {

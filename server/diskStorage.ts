@@ -87,6 +87,28 @@ export async function diskObjectExists(key: string): Promise<boolean> {
   }
 }
 
+/**
+ * Delete one stored file. A file that is already gone is not an error, so a
+ * retry is safe. A key that could escape the folder names no file this store
+ * could hold, so there is nothing to delete and it returns quietly — the same
+ * answer `diskObjectExists` gives it.
+ */
+export async function deleteDiskObject(key: string): Promise<void> {
+  if (!diskStorageRoot()) return;
+  let full: string;
+  try {
+    full = absolutePath(key);
+  } catch {
+    return;
+  }
+  try {
+    await unlink(full);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw error;
+  }
+}
+
 /** Write a whole object at once — the server-side `storagePut` path. */
 export async function writeDiskObject(
   key: string,

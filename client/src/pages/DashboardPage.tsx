@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import {
   Archive,
   CalendarDays,
+  FileText,
   Search,
   LayoutDashboard,
   Plus,
@@ -62,6 +63,7 @@ import { moneyWhole } from "@/lib/money";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { TotalDueCaption } from "@/components/TotalDueCaption";
+import { planCountLabel, recentPlanBids } from "@shared/planCounts";
 
 /** Deadlines read as a weekday and date — "Fri 14 Aug" scans faster than a slashed number. */
 const formatDue = (value: string | Date | null) => {
@@ -134,6 +136,7 @@ export default function DashboardPage({
 
   const utils = trpc.useUtils();
   const { data: bids = [], isLoading } = trpc.bids.dashboard.useQuery();
+  const recentPlans = useMemo(() => recentPlanBids(bids), [bids]);
   const { data: archived = [] } = trpc.bids.archived.useQuery();
 
   const createBid = trpc.bids.create.useMutation({
@@ -497,6 +500,41 @@ export default function DashboardPage({
           )}
         </div>
 
+        {/*
+          RECENT PLANS — back to the drawings in one click (2026-09-27).
+          The bids whose plans were attached most recently, from the same
+          query as the board, so a card's chip and this row cannot disagree.
+          Shown only when there is something in it: an empty "Recent plans"
+          heading is a door to nowhere.
+        */}
+        {recentPlans.length > 0 && (
+          <div className="mb-4">
+            <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1.5 px-1">
+              Recent plans
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {recentPlans.map(bid => (
+                <button
+                  key={bid.id}
+                  onClick={() => onOpenPlans(bid.id)}
+                  className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left hover:bg-muted/20 hover:border-[#F5C518]/60 transition-colors min-w-0 max-w-full sm:max-w-[16rem]"
+                  title={`Open the plans for ${bid.name}`}
+                >
+                  <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block text-xs font-medium truncate">
+                      {bid.name}
+                    </span>
+                    <span className="block text-[0.7rem] text-muted-foreground">
+                      {planCountLabel(bid.plans)}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="py-16 text-center text-sm text-muted-foreground">
             Loading bids…
@@ -634,6 +672,29 @@ export default function DashboardPage({
                                 {bid.lineCount === 1 ? "" : "s"}
                               </span>
                             </div>
+
+                            {/*
+                              STRAIGHT TO THE DRAWINGS (2026-09-27). Plans were
+                              reachable only from inside the bid, one small
+                              button among three. A chip on the card goes there
+                              in one click. Only on a bid that HAS plans: a bid
+                              without drawings is a legitimate bid, and a chip
+                              asking for them on every card would be nagging.
+                            */}
+                            {planCountLabel(bid.plans) && (
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  onOpenPlans(bid.id);
+                                }}
+                                onKeyDown={e => e.stopPropagation()}
+                                className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[0.7rem] text-muted-foreground hover:text-foreground hover:border-[#F5C518]/60 transition-colors"
+                                title="Open this bid's plans"
+                              >
+                                <FileText className="w-3 h-3" />
+                                Plans · {planCountLabel(bid.plans)}
+                              </button>
+                            )}
 
                             {bid.trades?.length ? (
                               <div className="mt-1 flex flex-wrap gap-1">

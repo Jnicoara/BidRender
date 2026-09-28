@@ -20,6 +20,7 @@
  * the backup target. No new dependency.
  */
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -224,8 +225,11 @@ export async function r2ViewerUrl(key: string, now: Date): Promise<string> {
  * cost a HEAD against R2, which is both slow and billable, to re-learn
  * something that cannot have changed.
  *
- * A "yes" is kept for the life of the process: the app never deletes or moves a
- * stored object, so an object that is in R2 stays in R2. A "no" is kept only
+ * A "yes" is kept for the life of the process, and `r2DeleteObject` below is
+ * the one thing that takes it back. Until 2026-09-27 this said "the app never
+ * deletes or moves a stored object" — true then, and the reason no forgetting
+ * was needed. Deleting a bid now deletes its plans, so the delete forgets the
+ * key in the same call rather than trusting this comment. A "no" is kept only
  * briefly, because a "no" CAN become a "yes" — that is exactly what an upload
  * does — and an over-long negative is how a plan somebody just attached comes
  * back as missing.
@@ -269,6 +273,23 @@ export async function r2ObjectExists(key: string): Promise<boolean> {
     // it was would silently route a live plan to a store that never had it.
     throw error;
   }
+}
+
+/**
+ * Delete one object. Deleting a key that is not there is not an error — R2
+ * answers 204 either way — so a retry, or a sweep after a partial failure, is
+ * safe.
+ *
+ * Forgets the key BEFORE asking R2, so a read racing this delete re-asks the
+ * bucket rather than being handed a signed link to a file that is going.
+ */
+export async function r2DeleteObject(key: string): Promise<void> {
+  existence.delete(key);
+  const { client, config } = r2();
+  await client.send(
+    new DeleteObjectCommand({ Bucket: config.bucket, Key: key })
+  );
+  existence.delete(key);
 }
 
 /** Drop the client and everything remembered. For tests that change the env. */

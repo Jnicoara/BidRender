@@ -283,11 +283,15 @@ withDb("drops on a quantity trace", () => {
 
   it("lists route drops too, labelled as route", async () => {
     const { bidId, sheetId } = await aBid();
+    // Typed: the readout counts what the bid prices (2026-09-27), and a run
+    // with no type is not on the bid.
+    const type = await aType();
     await caller().takeoffRuns.save({
       bidId,
       sheetId,
       name: "Homerun",
       pathType: "conduit",
+      runTypeId: type.id,
       status: "committed",
       points: [
         { x: 0, y: 0 },

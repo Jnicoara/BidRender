@@ -48,6 +48,7 @@ import {
 import { readR2Config } from "../backup/config";
 import { createR2Target, type BackupTarget } from "../backup/target";
 import { dayKey, findSuccessfulRunForDay } from "../backup/history";
+import { pruneOldBackups } from "../backup/retention";
 import {
   runBackup,
   summarise,
@@ -74,10 +75,26 @@ export const BACKUP_CRON = "0 9 * * *";
 /** The path the platform POSTs to. Mounted in server/_core/index.ts. */
 export const BACKUP_PATH = "/api/scheduled/backupToR2";
 
+/**
+ * What retention did after a good night. `error` is set when pruning failed:
+ * the backup itself still succeeded, but the 30-day promise did not hold
+ * tonight, and that has to be visible rather than assumed.
+ */
+export type RetentionOutcome = {
+  pruned: string[];
+  objectsDeleted: number;
+  error?: string;
+};
+
 export type ScheduledBackupOutcome =
-  | { status: "completed"; report: BackupReport }
+  | { status: "completed"; report: BackupReport; retention: RetentionOutcome }
   /** Database safe, some stored files unreadable. Not retried — see below. */
-  | { status: "partial"; reason: string; report: BackupReport }
+  | {
+      status: "partial";
+      reason: string;
+      report: BackupReport;
+      retention: RetentionOutcome;
+    }
   | { status: "skipped"; runId: string; reason: string }
   | { status: "failed"; reason: string; report: BackupReport | null };
 
@@ -157,6 +174,11 @@ export async function runScheduledBackup(options: {
     };
   }
 
+  // Only after a night that itself got the database in: a broken job must
+  // never prune the history it is failing to add to. `partial` counts, as it
+  // does for the retry guard — its database dump is whole.
+  const retention = await applyRetention(target, options.now);
+
   if (report.status === "partial") {
     return {
       status: "partial",
@@ -165,10 +187,23 @@ export async function runScheduledBackup(options: {
         .map(f => f.key)
         .join(", ")}${report.files.failed.length > 3 ? ", …" : ""}`,
       report,
+      retention,
     };
   }
 
-  return { status: "completed", report };
+  return { status: "completed", report, retention };
+}
+
+async function applyRetention(
+  target: BackupTarget,
+  now: Date
+): Promise<RetentionOutcome> {
+  try {
+    return await pruneOldBackups(target, now);
+  } catch (error) {
+    console.error(`[BackupToR2] retention failed: ${message(error)}`);
+    return { pruned: [], objectsDeleted: 0, error: message(error) };
+  }
 }
 
 /**
@@ -235,7 +270,11 @@ export async function backupToR2Handler(req: Request, res: Response) {
       });
     }
 
-    console.log(`[BackupToR2]\n${summarise(outcome.report)}`);
+    console.log(
+      `[BackupToR2]\n${summarise(outcome.report)}\n` +
+        `Retention: ${outcome.retention.pruned.length} old run(s) removed` +
+        (outcome.retention.error ? ` — FAILED: ${outcome.retention.error}` : "")
+    );
     return res.json({ ok: true, ...outcome });
   } catch (err) {
     // JSON-encoded so the platform's Investigate flow surfaces it verbatim

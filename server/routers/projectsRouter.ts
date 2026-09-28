@@ -2,6 +2,10 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import * as db from "../db";
+import {
+  deleteProjectWithFile,
+  setProjectPdfReleasingOld,
+} from "../storedFiles";
 import { storagePut } from "../storage";
 import { storageUrl } from "../storageTokens";
 
@@ -111,7 +115,7 @@ export const projectsRouter = router({
   delete: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
-      await db.deleteProject(input.id, ctx.scope.dataUserId);
+      await deleteProjectWithFile(input.id, ctx.scope.dataUserId);
       return { success: true };
     }),
 
@@ -148,11 +152,11 @@ export const projectsRouter = router({
         buffer,
         "application/pdf"
       );
-      await db.updateProject(input.projectId, ctx.scope.dataUserId, {
+      await setProjectPdfReleasingOld(input.projectId, ctx.scope.dataUserId, {
         pdfUrl: url,
         pdfKey: key,
         pdfFilename: filename,
-      } as Parameters<typeof db.updateProject>[2]);
+      });
       // `url` from storagePut is the stored reference; what goes back to the
       // browser has to be a tokenized, fetchable one.
       return { key, url: storageUrl(key, new Date()), filename };

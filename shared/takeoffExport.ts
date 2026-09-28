@@ -73,7 +73,10 @@ export type TakeoffExportRuns = {
   groundFeet: number;
   /** On a sheet with no usable scale, so not in the feet above. */
   unmeasurableCount: number;
-  /** Branch wiring the devices' whips carry (D18), so not in the feet. */
+  /**
+   * Branch wiring the devices' whips carry (D18). Its wire is not in the feet;
+   * on a conduit type its pipe is, and on a cable type nothing of it is.
+   */
   branchCount: number;
   /** Nobody has said home run or branch yet — counted anyway. */
   unansweredCount: number;
@@ -134,6 +137,7 @@ const plural = (n: number, one: string, many: string) =>
 
 /** What a run row says about the runs NOT in its feet. */
 function runNote(runs: {
+  pathType: "conduit" | "cable";
   unmeasurableCount: number;
   branchCount: number;
   unansweredCount: number;
@@ -151,9 +155,12 @@ function runNote(runs: {
     parts.push(
       `${plural(runs.unmeasurableCount, "run", "runs")} not measured — no usable scale on the sheet`
     );
+  // On a conduit type only the wire goes to the devices (D18); the pipe stays.
   if (runs.branchCount > 0)
     parts.push(
-      `${plural(runs.branchCount, "run", "runs")} left out as branch wiring the devices already carry`
+      runs.pathType === "conduit"
+        ? `${plural(runs.branchCount, "run is", "runs are")} branch wiring — wire left out, the devices carry it; conduit counted`
+        : `${plural(runs.branchCount, "run", "runs")} left out as branch wiring the devices already carry`
     );
   if (runs.unansweredCount > 0)
     parts.push(
@@ -168,7 +175,12 @@ function runRow(
   runs: RunTotals,
   where: Pick<TakeoffExportRow, "planFile" | "page" | "sheet" | "sheetTitle">
 ): TakeoffExportRow {
-  const measured = runs.runCount - runs.unmeasurableCount - runs.branchCount;
+  // A branch conduit run still has its pipe in the feet; a branch cable run
+  // has nothing in them (runTypeFootageCore.ts).
+  const measured =
+    runs.runCount -
+    runs.unmeasurableCount -
+    (runs.pathType === "cable" ? runs.branchCount : 0);
   const hasFeet = measured > 0;
   return {
     ...where,
@@ -310,7 +322,9 @@ export function buildTakeoffExport(
   // ── Notes: what the numbers mean, and what is not in them ──────────────────
   const notes: string[] = [
     "Run Quantity is raceway or cable in feet: Traced ft plus Vertical ft (the drops and rises at run ends). Wire ft is insulated conductors across every circuit; Ground ft is bare or green ground. A cable's conductors are inside its jacket, so a cable run has no Wire or Ground ft.",
-    "Status: Finished runs are done; Draft runs are still being traced. The bid prices both. The run totals on the Takeoff screen count Finished runs only, so they will read lower while any run is a Draft.",
+    // Until 2026-09-27 this said the run totals count Finished runs only and
+    // read lower while a run is a Draft. They now count what the bid prices.
+    "Status: Finished runs are done; Draft runs are still being traced. The bid prices both, and so do the run totals on the Plans screen.",
     "No extra is included — no waste, makeup or allowance is added to any footage.",
     "Fittings counted from the runs (couplings, connectors, straps, elbows) are not in this file. They are on the Materials list.",
     "Runs the app suggested and nobody accepted are not included.",

@@ -1456,6 +1456,15 @@ are **Run Time and encrypted**. `VITE_APP_ID` stays **Run and Build Time**.
 Staging's `JWT_SECRET` is its own, so a live session cookie means nothing
 there and the reverse.
 
+**Check the file before pasting it:** `pnpm tsx scripts/stagingSettingsCheck.mts`
+connects with the certificate exactly as the app reads it, writes and deletes
+a probe object in `bidrender-plans-staging`, and confirms the key is REFUSED
+on `bidrender-plans` and `bidsoftware`. Six `ok` lines on 2026-09-27; if the
+count differs, stop and find out why. It exists because the first version of
+the file put the certificate on 25 lines — a `\n` typed through the shell
+became real line breaks (CLAUDE.md § "Edit code with the Edit tool") — and
+App Platform would have been handed a broken certificate.
+
 ### The staging app's database access
 
 The staging app is on the same VPC as the database, uses the `private-`

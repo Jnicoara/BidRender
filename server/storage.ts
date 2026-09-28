@@ -14,11 +14,13 @@
 // break every existing plan link at once.
 
 import {
+  deleteDiskObject,
   diskObjectExists,
   diskUploadUrl,
   writeDiskObject,
 } from "./diskStorage";
 import {
+  r2DeleteObject,
   r2ObjectExists,
   r2PresignGet,
   r2PresignPut,
@@ -135,6 +137,35 @@ export async function resolveReadBackend(
     if (legacy === "disk" && (await diskObjectExists(key))) return "disk";
   }
   return null;
+}
+
+/**
+ * Delete a stored file from EVERY store a read of it could reach.
+ *
+ * Not just the live backend: a read falls back to an older store on a miss
+ * (`resolveReadBackend` above), so a plan uploaded to the disk folder before
+ * the switch to R2 still opens — and a delete that only asked R2 would leave
+ * it there, still opening. Missing from any store is fine; each delete is
+ * idempotent.
+ *
+ * Call it only for a key NOTHING names any more. `releaseStoredFiles` in
+ * storedFiles.ts is the caller that checks; two rows can name one object.
+ */
+export async function storageDelete(relKey: string): Promise<void> {
+  const key = normalizeKey(relKey);
+  const backend = selectStorageBackend();
+  if (backend === "disk") {
+    await deleteDiskObject(key);
+    return;
+  }
+  if (backend === "r2") {
+    await r2DeleteObject(key);
+    for (const legacy of legacyReadBackends()) {
+      if (legacy === "disk") await deleteDiskObject(key);
+    }
+    return;
+  }
+  return unhandledBackend(backend);
 }
 
 export async function storageGetSignedUrl(relKey: string): Promise<string> {
