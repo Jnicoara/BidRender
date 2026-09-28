@@ -1167,7 +1167,7 @@ is absent. So the message means "no Anthropic key", worded by the wrong layer.
 It has sent one investigation down the wrong path already. Removing the shim is
 tracked in `todo.md`.
 
-## 9. Storage needs a CORS rule, and without it no plan uploads
+## 9. Storage needs a CORS rule, and without it no plan uploads — or views
 
 > **Configured — this is no longer an outstanding issue.** The rule is on the
 > `bidrender-plans` R2 bucket and covers six origins: `https://bidridge.com`
@@ -1204,21 +1204,45 @@ now reports the two differently, so the message on screen says which.
 
 ### The configuration required
 
-The `bidrender-plans` R2 bucket needs a rule permitting the deployed origin to
-PUT, and exposing nothing it does not need to. Set it in the Cloudflare
-dashboard under R2 → `bidrender-plans` → Settings → CORS policy:
+> **Corrected 2026-09-27 — the rule below used to allow PUT only, and that
+> breaks VIEWING.** This section was written about uploads, and a rule copied
+> from it onto the staging bucket uploaded fine and then could not open a
+> single plan: "could not be opened — Failed to fetch". The viewer does not go
+> through this server; `planViewerUrl` hands pdf.js a signed bucket link and
+> the browser GETs byte ranges from the bucket directly, which is
+> cross-origin exactly like the upload. Measured the same day, the LIVE
+> bucket's rule allows `GET, PUT, POST, HEAD` with the `range` and
+> `content-type` headers — it had always been wider than this document said.
+
+The plans bucket needs a rule permitting the deployed origin to **view and
+upload**. Set it in the Cloudflare dashboard under R2 → the bucket → Settings →
+CORS policy:
 
 ```json
 [
   {
     "AllowedOrigins": ["https://<the deployed site origin>"],
-    "AllowedMethods": ["PUT"],
-    "AllowedHeaders": ["Content-Type"],
-    "ExposeHeaders": ["ETag"],
+    "AllowedMethods": ["GET", "HEAD", "PUT", "POST"],
+    "AllowedHeaders": ["Content-Type", "Range"],
+    "ExposeHeaders": [
+      "ETag",
+      "Accept-Ranges",
+      "Content-Range",
+      "Content-Length",
+      "Content-Encoding"
+    ],
     "MaxAgeSeconds": 3600
   }
 ]
 ```
+
+**`GET` + `HEAD` + `Range` are for viewing.** pdf.js asks for one piece of the
+file at a time (`shared/pdfRangeLoading.ts`), with a `Range` header, which is
+not CORS-safelisted and so is preflighted. **`Accept-Ranges` and
+`Content-Range` must be exposed** or pdf.js cannot see that the bucket serves
+pieces, and falls back to downloading the whole file — which the app refuses
+above `PDF_WHOLE_DOWNLOAD_LIMIT_BYTES`. That is the same "works on a small
+file, fails on a real one" shape as the 25MB upload fallback below.
 
 `AllowedHeaders` must include `Content-Type`: the upload sends
 `Content-Type: application/pdf`, and that header is precisely what forces the
@@ -1274,6 +1298,17 @@ large multi-part upload will reassemble.
 Failing that, attach a plan **over 25MB**. Under that size the fallback hides
 the answer; over it, only the direct path can succeed.
 
+**And check viewing, not only uploading** — the same preflight with
+`Access-Control-Request-Method: GET` and `Access-Control-Request-Headers:
+range` must also answer `204` naming the origin. A rule that passes the PUT
+probe above and fails this one uploads every plan and opens none.
+
+For the staging bucket all of this is one command,
+`pnpm tsx scripts/stagingSettingsCheck.mts`: it preflights GET, HEAD and PUT
+from `staging.bidridge.com`, confirms other origins are refused, and makes a
+real signed range read to see `Accept-Ranges`, `Content-Range` and `ETag`
+exposed (§ 11).
+
 ## The guard on scripts that write
 
 **Every script that can write to or drop a database refuses one that is not on
@@ -1306,9 +1341,18 @@ the same as a safe one, and only one of those should let a `DROP` proceed.
 ## 10. The database only answers addresses on its trusted list
 
 **From Stage 4 (2026-09-27).** The DigitalOcean database refuses every
-connection except from the addresses on its **Trusted Sources** list: the app
-itself, and the owner's laptop. That laptop entry is what lets a migration
-(§ 5a) or `scripts/schemaDrift.mts` run from here.
+connection except from the addresses on its **Trusted Sources** list. Three
+entries, all entered as IP addresses (picking the app by name from the list
+does NOT work — it took the site down on the first try):
+
+| Entry           | What it is                                                              |
+| --------------- | ----------------------------------------------------------------------- |
+| `10.124.0.3`    | the live app's VPC egress IP — **removing it takes the live site down** |
+| `10.124.0.4`    | the staging app's VPC egress IP (§ 11)                                  |
+| `97.94.233.209` | the owner's laptop — changes with the home connection                   |
+
+That laptop entry is what lets a migration (§ 5a) or
+`scripts/schemaDrift.mts` run from here.
 
 **A home internet address changes** — after a router restart, an outage, or
 whenever the internet company decides. When it does, the laptop is no longer
@@ -1449,26 +1493,107 @@ started with zero users and zero bids.
 
 ### Its settings
 
-Made by script into the gitignored `staging-app-settings.txt` (delete it once
-pasted). Secrets — `DATABASE_URL`, `DATABASE_CA_CERT`, `JWT_SECRET`,
-`STAGING_PASSWORD`, `R2_PLANS_ACCESS_KEY_ID`, `R2_PLANS_SECRET_ACCESS_KEY` —
-are **Run Time and encrypted**. `VITE_APP_ID` stays **Run and Build Time**.
+Made by script into the gitignored `staging-app-settings.txt`, pasted with
+"Add from .env" on the component, then deleted (2026-09-27). Fourteen settings;
+as they stand on the staging app:
+
+| Scope              | Encrypted | Settings                                                                                                                                                                                    |
+| ------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Run Time**       | yes       | `DATABASE_URL`, `DATABASE_CA_CERT`, `JWT_SECRET`, `STAGING_PASSWORD`, `R2_PLANS_ACCESS_KEY_ID`, `R2_PLANS_SECRET_ACCESS_KEY`, `R2_PLANS_ACCOUNT_ID`, `R2_PLANS_ENDPOINT`, `R2_PLANS_BUCKET` |
+| Run and Build Time | no        | `NODE_ENV`, `VITE_APP_ID`, `DISABLE_SCHEDULED_JOBS`, `DISABLE_AI_FEATURES`, `PLAN_STORAGE`                                                                                                  |
+
+**Nine are encrypted, not six.** The last three R2 names are not secrets —
+on live they are plain — and encrypting them costs only that DigitalOcean
+will not show their values again. They are in the Cloudflare dashboard if
+ever needed. `VITE_APP_ID` must stay **Run and Build Time**: it is baked into
+the page at build.
+
+> **RUN TIME, NOT BUILD TIME.** The scope dropdown offers both, next to each
+> other. A setting on **Build Time** exists only while the app is being built
+> and is GONE when it runs — the running app sees it as empty. That is what
+> happened to all five `R2_PLANS_*` settings on 2026-09-27: uploads failed with
+> "PLAN*STORAGE=r2 but the plan bucket is not configured. Missing: …" while
+> every value was present and correct. The fix was the dropdown, not the
+> values. The build (`scripts/build.mts`) reads nothing but `VITE*`names, so
+**no setting here should ever be Build Time alone.** To check without
+reading a value: download the App Spec and look at each`scope:`— the
+staging spec showed`BUILD_TIME` on exactly the five that failed.
+
 Staging's `JWT_SECRET` is its own, so a live session cookie means nothing
 there and the reverse.
 
 **Check the file before pasting it:** `pnpm tsx scripts/stagingSettingsCheck.mts`
 connects with the certificate exactly as the app reads it, writes and deletes
 a probe object in `bidrender-plans-staging`, and confirms the key is REFUSED
-on `bidrender-plans` and `bidsoftware`. Six `ok` lines on 2026-09-27; if the
-count differs, stop and find out why. It exists because the first version of
+on `bidrender-plans` and `bidsoftware`, then checks the bucket's CORS rule the
+way a browser on staging meets it — viewing as well as uploading (§ 9).
+Sixteen `ok` lines on 2026-09-27; if the count differs, stop and find out why —
+either this line is stale or the settings are not what you think. It exists
+because the first version of
 the file put the certificate on 25 lines — a `\n` typed through the shell
 became real line breaks (CLAUDE.md § "Edit code with the Edit tool") — and
 App Platform would have been handed a broken certificate.
 
+**The file it reads is deleted now**, so re-running it means making the file
+again: the database line from `.env.staging.local` (with `private-` inserted
+after the `@`), and a NEW R2 token from Cloudflare — the old token's secret is
+shown once and now lives only in DigitalOcean, encrypted. To check the bucket
+rule alone, the `curl` probes in § 9 need no file.
+
 ### The staging app's database access
 
-The staging app is on the same VPC as the database, uses the `private-`
-host, and its VPC egress IP is on the database's Trusted Sources — exactly
-like live (§ 10). **Without that entry the staging app cannot reach its
-database** — every screen fails to load: the lock from Stage 4 applies to it
-too.
+The staging app is on the same VPC as the database (`default-sfo3`), uses the
+`private-` host, and its VPC egress IP **`10.124.0.4`** is on the database's
+Trusted Sources — exactly like live (§ 10). **Without that entry the staging
+app cannot reach its database** — every screen fails to load: the lock from
+Stage 4 applies to it too. (Seen on creation, 2026-09-27: the app showed
+"Degraded" until the entry went in, then Healthy.)
+
+### How it was created, 2026-09-27 — for the next time
+
+App `bidrender-staging`, SFO3, 1 vCPU / 1 GiB fixed ($10), branch `staging`,
+autodeploy on, **build command empty**, **run command `node dist/index.js`**
+(the wizard proposes `pnpm start`; live uses `node dist/index.js`), "Connect
+app to VPC network" → `default-sfo3`. Settings were added on the COMPONENT
+with "Add from .env". Default address:
+`https://bidrender-staging-t9gxx.ondigitalocean.app`.
+
+### The domain — and the warning that looks worse than it is
+
+`staging.bidridge.com` was added with **"You manage your domain"**, then ONE
+record created by hand in Networking → Domains → `bidridge.com`:
+
+```
+CNAME  staging  →  bidrender-staging-t9gxx.ondigitalocean.app
+```
+
+**Adding the domain shows a yellow warning** — "This domain is already being
+used by another app. Adding it again will overwrite existing DNS records" —
+with BOTH options, because the live app owns the `bidridge.com` zone. With
+"You manage" it wrote nothing: every record for `bidridge.com` and
+`www.bidridge.com` was snapshotted from public DNS before the click and was
+identical after it, and DigitalOcean's own nameserver still had no `staging`
+record until the CNAME was added by hand. **"We manage your domain" was NOT
+tried** on the live zone and should not be. HTTPS came up about two minutes
+after the CNAME.
+
+The live zone, for recovery, as it stood 2026-09-27: `A @ 162.159.140.98`,
+`A @ 172.66.0.96`, `AAAA @ 2a06:98c1:58::60`, `AAAA @ 2606:4700:7::60`,
+`CNAME www → bidrender-hulvy.ondigitalocean.app`, `NS ns1–3.digitalocean.com`,
+plus the staging CNAME above.
+
+### The plans bucket
+
+`bidrender-plans-staging`, with its own R2 token (Object Read & Write on that
+bucket only) and the § 9 CORS rule for `https://staging.bidridge.com`: `GET`,
+`HEAD`, `PUT`, `POST`; `Content-Type` and `Range`; `ETag`, `Accept-Ranges`,
+`Content-Range`, `Content-Length`, `Content-Encoding` exposed.
+
+**Its first rule allowed only `PUT`** (copied from § 9 as it then stood), and
+the first plan uploaded to staging could not be opened: "Failed to fetch".
+The bucket answered a viewing preflight with 403 while the live bucket, asked
+the same question, allowed `GET, PUT, POST, HEAD`. Both § 9 and
+`stagingSettingsCheck.mts` now cover viewing. Also found the same day: the
+five `R2_PLANS_*` settings had been set to **Build Time**, so the running app
+saw them as empty — "PLAN_STORAGE=r2 but the plan bucket is not configured".
+They must be **Run Time** (the build never reads them).
