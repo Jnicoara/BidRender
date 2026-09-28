@@ -1167,7 +1167,7 @@ is absent. So the message means "no Anthropic key", worded by the wrong layer.
 It has sent one investigation down the wrong path already. Removing the shim is
 tracked in `todo.md`.
 
-## 9. Storage needs a CORS rule, and without it no plan uploads
+## 9. Storage needs a CORS rule, and without it no plan uploads — or views
 
 > **Configured — this is no longer an outstanding issue.** The rule is on the
 > `bidrender-plans` R2 bucket and covers six origins: `https://bidridge.com`
@@ -1204,21 +1204,45 @@ now reports the two differently, so the message on screen says which.
 
 ### The configuration required
 
-The `bidrender-plans` R2 bucket needs a rule permitting the deployed origin to
-PUT, and exposing nothing it does not need to. Set it in the Cloudflare
-dashboard under R2 → `bidrender-plans` → Settings → CORS policy:
+> **Corrected 2026-09-27 — the rule below used to allow PUT only, and that
+> breaks VIEWING.** This section was written about uploads, and a rule copied
+> from it onto the staging bucket uploaded fine and then could not open a
+> single plan: "could not be opened — Failed to fetch". The viewer does not go
+> through this server; `planViewerUrl` hands pdf.js a signed bucket link and
+> the browser GETs byte ranges from the bucket directly, which is
+> cross-origin exactly like the upload. Measured the same day, the LIVE
+> bucket's rule allows `GET, PUT, POST, HEAD` with the `range` and
+> `content-type` headers — it had always been wider than this document said.
+
+The plans bucket needs a rule permitting the deployed origin to **view and
+upload**. Set it in the Cloudflare dashboard under R2 → the bucket → Settings →
+CORS policy:
 
 ```json
 [
   {
     "AllowedOrigins": ["https://<the deployed site origin>"],
-    "AllowedMethods": ["PUT"],
-    "AllowedHeaders": ["Content-Type"],
-    "ExposeHeaders": ["ETag"],
+    "AllowedMethods": ["GET", "HEAD", "PUT", "POST"],
+    "AllowedHeaders": ["Content-Type", "Range"],
+    "ExposeHeaders": [
+      "ETag",
+      "Accept-Ranges",
+      "Content-Range",
+      "Content-Length",
+      "Content-Encoding"
+    ],
     "MaxAgeSeconds": 3600
   }
 ]
 ```
+
+**`GET` + `HEAD` + `Range` are for viewing.** pdf.js asks for one piece of the
+file at a time (`shared/pdfRangeLoading.ts`), with a `Range` header, which is
+not CORS-safelisted and so is preflighted. **`Accept-Ranges` and
+`Content-Range` must be exposed** or pdf.js cannot see that the bucket serves
+pieces, and falls back to downloading the whole file — which the app refuses
+above `PDF_WHOLE_DOWNLOAD_LIMIT_BYTES`. That is the same "works on a small
+file, fails on a real one" shape as the 25MB upload fallback below.
 
 `AllowedHeaders` must include `Content-Type`: the upload sends
 `Content-Type: application/pdf`, and that header is precisely what forces the
@@ -1273,6 +1297,17 @@ large multi-part upload will reassemble.
 
 Failing that, attach a plan **over 25MB**. Under that size the fallback hides
 the answer; over it, only the direct path can succeed.
+
+**And check viewing, not only uploading** — the same preflight with
+`Access-Control-Request-Method: GET` and `Access-Control-Request-Headers:
+range` must also answer `204` naming the origin. A rule that passes the PUT
+probe above and fails this one uploads every plan and opens none.
+
+For the staging bucket all of this is one command,
+`pnpm tsx scripts/stagingSettingsCheck.mts`: it preflights GET, HEAD and PUT
+from `staging.bidridge.com`, confirms other origins are refused, and makes a
+real signed range read to see `Accept-Ranges`, `Content-Range` and `ETag`
+exposed (§ 11).
 
 ## The guard on scripts that write
 
@@ -1468,8 +1503,11 @@ there and the reverse.
 **Check the file before pasting it:** `pnpm tsx scripts/stagingSettingsCheck.mts`
 connects with the certificate exactly as the app reads it, writes and deletes
 a probe object in `bidrender-plans-staging`, and confirms the key is REFUSED
-on `bidrender-plans` and `bidsoftware`. Six `ok` lines on 2026-09-27; if the
-count differs, stop and find out why. It exists because the first version of
+on `bidrender-plans` and `bidsoftware`, then checks the bucket's CORS rule the
+way a browser on staging meets it — viewing as well as uploading (§ 9).
+Sixteen `ok` lines on 2026-09-27; if the count differs, stop and find out why —
+either this line is stale or the settings are not what you think. It exists
+because the first version of
 the file put the certificate on 25 lines — a `\n` typed through the shell
 became real line breaks (CLAUDE.md § "Edit code with the Edit tool") — and
 App Platform would have been handed a broken certificate.
@@ -1519,7 +1557,15 @@ plus the staging CNAME above.
 ### The plans bucket
 
 `bidrender-plans-staging`, with its own R2 token (Object Read & Write on that
-bucket only) and a CORS rule allowing `PUT` from `https://staging.bidridge.com`
-with `ETag` exposed — the same shape as § 9. Checked: a preflight from
-`staging.bidridge.com` is allowed; from `bidridge.com` or anywhere else it is
-refused; the token is refused on `bidrender-plans` and `bidsoftware`.
+bucket only) and the § 9 CORS rule for `https://staging.bidridge.com`: `GET`,
+`HEAD`, `PUT`, `POST`; `Content-Type` and `Range`; `ETag`, `Accept-Ranges`,
+`Content-Range`, `Content-Length`, `Content-Encoding` exposed.
+
+**Its first rule allowed only `PUT`** (copied from § 9 as it then stood), and
+the first plan uploaded to staging could not be opened: "Failed to fetch".
+The bucket answered a viewing preflight with 403 while the live bucket, asked
+the same question, allowed `GET, PUT, POST, HEAD`. Both § 9 and
+`stagingSettingsCheck.mts` now cover viewing. Also found the same day: the
+five `R2_PLANS_*` settings had been set to **Build Time**, so the running app
+saw them as empty — "PLAN_STORAGE=r2 but the plan bucket is not configured".
+They must be **Run Time** (the build never reads them).

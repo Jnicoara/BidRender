@@ -29,6 +29,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { mysqlConnection } from "../server/databaseConnection";
 
 const LIVE_BUCKETS = ["bidrender-plans", "bidsoftware"];
@@ -120,6 +121,84 @@ for (const bucket of LIVE_BUCKETS) {
     const name = (error as { name?: string }).name ?? "error";
     ok(`key refused on ${bucket} (${name})`);
   }
+}
+
+// ── The bucket's CORS rule, as a browser on the staging site meets it ───────
+// Added 2026-09-27: the first staging rule allowed only PUT (copied from
+// deploying.md § 9, which described uploads and forgot viewing). Uploads
+// worked; opening a plan failed with "Failed to fetch", because the viewer
+// GETs byte ranges straight from the bucket. So check VIEWING, not just
+// uploading — with a real signed range request, the way pdf.js makes one.
+const STAGING_ORIGIN = "https://staging.bidridge.com";
+const objectUrl = `${settings.R2_PLANS_ENDPOINT.replace(/\/+$/, "")}/${STAGING_BUCKET}/cors-probe.pdf`;
+
+async function preflight(origin: string, method: string, headers?: string) {
+  const res = await fetch(objectUrl, {
+    method: "OPTIONS",
+    headers: {
+      Origin: origin,
+      "Access-Control-Request-Method": method,
+      ...(headers ? { "Access-Control-Request-Headers": headers } : {}),
+    },
+  });
+  return res.headers.get("access-control-allow-origin") === origin;
+}
+
+for (const [method, headers] of [
+  ["GET", "range"],
+  ["HEAD", "range"],
+  ["PUT", "content-type"],
+] as const) {
+  if (await preflight(STAGING_ORIGIN, method, headers))
+    ok(`browser on staging may ${method} (${headers})`);
+  else
+    fail(`bucket refuses a ${method} with ${headers} from ${STAGING_ORIGIN}`);
+}
+for (const stranger of ["https://bidridge.com", "https://evil.example"]) {
+  if (await preflight(stranger, "GET", "range"))
+    fail(`bucket lets ${stranger} read staging plans`);
+  else ok(`bucket refuses ${stranger}`);
+}
+
+// A real ranged read, signed the way the app signs viewer links, and the
+// response headers the viewer must be able to see.
+const rangeKey = `staging-settings-check/${Date.now()}-range.pdf`;
+try {
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: STAGING_BUCKET,
+      Key: rangeKey,
+      Body: "0123456789abcdefghij",
+      ContentType: "application/pdf",
+    })
+  );
+  const signed = await getSignedUrl(
+    s3,
+    new GetObjectCommand({ Bucket: STAGING_BUCKET, Key: rangeKey }),
+    { expiresIn: 60 }
+  );
+  const res = await fetch(signed, {
+    headers: { Origin: STAGING_ORIGIN, Range: "bytes=0-4" },
+  });
+  const exposed = (res.headers.get("access-control-expose-headers") ?? "")
+    .toLowerCase()
+    .split(/\s*,\s*/);
+  if (res.status === 206 && (await res.text()) === "01234")
+    ok("signed range read returns just the piece asked for (206)");
+  else fail(`signed range read answered ${res.status}`);
+  if (res.headers.get("access-control-allow-origin") === STAGING_ORIGIN)
+    ok("the range response is readable by the staging site");
+  else fail("the range response carries no CORS allow-origin for staging");
+  for (const header of ["accept-ranges", "content-range", "etag"]) {
+    if (exposed.includes(header)) ok(`the browser can read ${header}`);
+    else fail(`${header} is not exposed — add it to ExposeHeaders`);
+  }
+} catch (error) {
+  fail(`signed range read: ${(error as Error).message}`);
+} finally {
+  await s3
+    .send(new DeleteObjectCommand({ Bucket: STAGING_BUCKET, Key: rangeKey }))
+    .catch(() => {});
 }
 
 if (failures > 0) {
