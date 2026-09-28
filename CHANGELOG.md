@@ -22,6 +22,10 @@ This is the human-readable companion to the git history — read this to see wha
   from the plans and a line added by hand were only flagged as the same work
   when both used the same copy, so the same receptacles could sit on a bid
   twice without the warning.
+- **A bid now says when its lines use an older labor rate.** A line keeps the
+  rate it was added at, which is deliberate, but nothing said when that rate
+  had since changed — lines at $68/hr sat beside a role now at $43/hr. Draft
+  and Active bids now point it out. No line's price is changed.
 
 ## [2026-09-27]
 

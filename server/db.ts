@@ -3042,6 +3042,53 @@ export async function getAssemblyFamilies(
   return families;
 }
 
+/**
+ * Today's hourly rate for the role on each of these STORED assembly ids — the
+ * rate `snapshotForAssembly` would freeze if the assembly were added now.
+ *
+ * Resolved the way `getAssemblyForStoredReference` resolves one id (the
+ * company's fork of a shipped row wins), but for many ids in two queries and
+ * without loading recipes, since only the role is wanted. For the stale-rate
+ * flag on the bid (`staleRateLines`). An id that resolves to nothing is left
+ * out of the map.
+ */
+export async function currentAssemblyRates(
+  storedIds: readonly number[],
+  userId: number
+): Promise<Map<number, number>> {
+  const rates = new Map<number, number>();
+  const wanted = Array.from(new Set(storedIds));
+  if (wanted.length === 0) return rates;
+  const db = await getDb();
+  if (!db) return rates;
+  const [candidates, roles] = await Promise.all([
+    db
+      .select()
+      .from(assemblies)
+      .where(
+        or(
+          and(
+            inArray(assemblies.id, wanted),
+            or(isNull(assemblies.userId), eq(assemblies.userId, userId))
+          ),
+          and(
+            eq(assemblies.userId, userId),
+            inArray(assemblies.baselineId, wanted)
+          )
+        )
+      ),
+    getLibraryLaborRates(userId),
+  ]);
+  // MERGE BEFORE RESOLVING, as getAssemblyForStoredReference does.
+  const visible = mergeLibraryRows(candidates, userId);
+  for (const id of wanted) {
+    const resolved = resolveAssembly(visible, id);
+    if (!resolved) continue;
+    rates.set(id, hourlyCostFor(roles, resolved.laborRateId));
+  }
+  return rates;
+}
+
 export async function getAssemblyDetail(
   id: number,
   userId: number

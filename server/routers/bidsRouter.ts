@@ -57,6 +57,11 @@ import {
   type BridgeLine,
 } from "../../shared/takeoffBridge";
 import {
+  staleRateLines,
+  type RatedLineLike,
+  type StaleRateLine,
+} from "../../shared/laborRatePricing";
+import {
   followsDrawing,
   quantitySource,
   typedQuantityRefusal,
@@ -94,6 +99,18 @@ import { deleteBidWithFiles } from "../storedFiles";
  * every time the bid is shown rather than fired once at the crossing. That is
  * what makes R3 a rule in the code instead of a note in a document.
  */
+/** Lines priced at an older labor rate than their role has now. */
+async function staleRatesFor(
+  lines: readonly RatedLineLike[],
+  userId: number
+): Promise<StaleRateLine[]> {
+  const candidates = lines.flatMap(line =>
+    line.assemblyId === null ? [] : [line.assemblyId]
+  );
+  const current = await db.currentAssemblyRates(candidates, userId);
+  return staleRateLines(lines, id => current.get(id) ?? null);
+}
+
 async function planAttentionFor(
   bidId: number,
   userId: number,
@@ -900,6 +917,16 @@ export const bidsRouter = router({
          * it contradicts. None of them is a badge on the drawing.
          */
         fromPlans: await planAttentionFor(bid.id, ctx.scope.dataUserId, lines),
+        /**
+         * Assembly lines frozen at a labor rate their role no longer has —
+         * "$68/hr where Journeyman is $43/hr now". Flagged, never changed:
+         * the freeze is by design (R4). Only on a bid still being priced; on
+         * a Won or Lost bid an older rate is history, not a mistake.
+         */
+        staleRates:
+          bid.status === "Draft" || bid.status === "Active"
+            ? await staleRatesFor(lines, ctx.scope.dataUserId)
+            : [],
       };
     }),
 
