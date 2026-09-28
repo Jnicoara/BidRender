@@ -1676,6 +1676,13 @@ the app's origin. Without one the client falls back to the same-origin route in
 The rule must also **expose the `ETag` header** — an upload in pieces cannot be
 reassembled without the receipt R2 returns for each piece.
 
+**And the same rule must allow VIEWING — `GET`/`HEAD` with a `Range` header,
+exposing `Accept-Ranges` and `Content-Range`.** The viewer fetches byte ranges
+from the bucket directly, not through this server. A PUT-only rule (which this
+paragraph and `deploying.md` § 9 used to imply) uploads every plan and opens
+none: "Failed to fetch", found on staging 2026-09-27. The full rule is in
+`references/deploying.md` § 9.
+
 ## Large plan sets — pieces going up, byte ranges coming down
 
 `MAX_PDF_BYTES` is 2GB, and that number is only real on R2. Two things make it
