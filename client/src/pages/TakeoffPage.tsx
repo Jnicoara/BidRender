@@ -172,6 +172,7 @@ import {
   formatBytes,
   looksLikePdf,
 } from "@shared/uploadLimits";
+import { sheetSize, type SheetSize } from "@shared/sheetSize";
 import {
   postViaServer,
   putDirectToStorage,
@@ -2890,6 +2891,14 @@ export default function TakeoffPage({
   const pageCanvasScale = useRef(RENDER_SCALE);
   const pageTextByPage = useRef<Map<number, string>>(new Map());
   const [renderedPage, setRenderedPage] = useState<number | null>(null);
+  const [renderedPageSize, setRenderedPageSize] = useState<{
+    docId: number | null;
+    pageNumber: number;
+    size: SheetSize | null;
+  } | null>(null);
+  /** The plan set on screen, read by the render callback (which is stable). */
+  const renderedDocId = useRef<number | null>(null);
+  renderedDocId.current = doc?.id ?? null;
   const [copilotAnswer, setCopilotAnswer] = useState<string | null>(null);
   /**
    * Read each sheet as it is opened, rather than on a button press.
@@ -2939,9 +2948,29 @@ export default function TakeoffPage({
       pageCanvas.current = canvas;
       pageCanvasScale.current = scale;
       setRenderedPage(pageNumber);
+      // The page's size in points, from the render that produced the canvas —
+      // the same division `snapshotPage` makes. Keyed by document AND page,
+      // because `renderedPage` alone survives a switch to another plan set.
+      setRenderedPageSize({
+        docId: renderedDocId.current,
+        pageNumber,
+        size: sheetSize(canvas.width / scale, canvas.height / scale),
+      });
     },
     []
   );
+
+  /**
+   * The paper size of the sheet on screen, for the sheet-size check (S8).
+   * NULL until this sheet has been drawn, so a size is never shown for the
+   * page before it.
+   */
+  const activePageSize =
+    renderedPageSize &&
+    renderedPageSize.docId === (doc?.id ?? null) &&
+    renderedPageSize.pageNumber === page
+      ? renderedPageSize.size
+      : null;
 
   /** False while the server has AI switched off (server/aiFeatures.ts). */
   const readerAvailable = useCompany().hasFeature("takeoff.copilot");
@@ -5075,6 +5104,7 @@ export default function TakeoffPage({
                   !measurability?.ok && (reachingForMeasure || calibrating)
                 }
                 notToScale={notToScaleBySheet[activeSheet.id] ?? false}
+                pageSize={activePageSize}
                 onSet={scaleText =>
                   setSheetScale.mutateAsync({ id: activeSheet.id, scaleText })
                 }

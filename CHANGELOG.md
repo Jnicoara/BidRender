@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **The plan viewer warns when a sheet is a shrunk print.** A 24×36 set
+  saved at 11×17 still says 1/4" = 1'-0", so every length measured from it
+  came out at about half, with nothing on screen to say so. The scale control
+  now shows each page's paper size, and on a size sets are commonly reduced
+  to it says so in amber until the scale has been checked against a
+  dimension you know.
 - **T conduit bodies in the catalog.** A T body for EMT, rigid, IMC and both
   PVC schedules, at every trade size from 1/2" to 4": 45 generic, unpriced
   rows, each priced with its cover and gasket. Searching "tee body",
