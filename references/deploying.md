@@ -1493,10 +1493,32 @@ started with zero users and zero bids.
 
 ### Its settings
 
-Made by script into the gitignored `staging-app-settings.txt` (delete it once
-pasted). Secrets — `DATABASE_URL`, `DATABASE_CA_CERT`, `JWT_SECRET`,
-`STAGING_PASSWORD`, `R2_PLANS_ACCESS_KEY_ID`, `R2_PLANS_SECRET_ACCESS_KEY` —
-are **Run Time and encrypted**. `VITE_APP_ID` stays **Run and Build Time**.
+Made by script into the gitignored `staging-app-settings.txt`, pasted with
+"Add from .env" on the component, then deleted (2026-09-27). Fourteen settings;
+as they stand on the staging app:
+
+| Scope              | Encrypted | Settings                                                                                                                                                                                    |
+| ------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Run Time**       | yes       | `DATABASE_URL`, `DATABASE_CA_CERT`, `JWT_SECRET`, `STAGING_PASSWORD`, `R2_PLANS_ACCESS_KEY_ID`, `R2_PLANS_SECRET_ACCESS_KEY`, `R2_PLANS_ACCOUNT_ID`, `R2_PLANS_ENDPOINT`, `R2_PLANS_BUCKET` |
+| Run and Build Time | no        | `NODE_ENV`, `VITE_APP_ID`, `DISABLE_SCHEDULED_JOBS`, `DISABLE_AI_FEATURES`, `PLAN_STORAGE`                                                                                                  |
+
+**Nine are encrypted, not six.** The last three R2 names are not secrets —
+on live they are plain — and encrypting them costs only that DigitalOcean
+will not show their values again. They are in the Cloudflare dashboard if
+ever needed. `VITE_APP_ID` must stay **Run and Build Time**: it is baked into
+the page at build.
+
+> **RUN TIME, NOT BUILD TIME.** The scope dropdown offers both, next to each
+> other. A setting on **Build Time** exists only while the app is being built
+> and is GONE when it runs — the running app sees it as empty. That is what
+> happened to all five `R2_PLANS_*` settings on 2026-09-27: uploads failed with
+> "PLAN*STORAGE=r2 but the plan bucket is not configured. Missing: …" while
+> every value was present and correct. The fix was the dropdown, not the
+> values. The build (`scripts/build.mts`) reads nothing but `VITE*`names, so
+**no setting here should ever be Build Time alone.** To check without
+reading a value: download the App Spec and look at each`scope:`— the
+staging spec showed`BUILD_TIME` on exactly the five that failed.
+
 Staging's `JWT_SECRET` is its own, so a live session cookie means nothing
 there and the reverse.
 
@@ -1511,6 +1533,12 @@ because the first version of
 the file put the certificate on 25 lines — a `\n` typed through the shell
 became real line breaks (CLAUDE.md § "Edit code with the Edit tool") — and
 App Platform would have been handed a broken certificate.
+
+**The file it reads is deleted now**, so re-running it means making the file
+again: the database line from `.env.staging.local` (with `private-` inserted
+after the `@`), and a NEW R2 token from Cloudflare — the old token's secret is
+shown once and now lives only in DigitalOcean, encrypted. To check the bucket
+rule alone, the `curl` probes in § 9 need no file.
 
 ### The staging app's database access
 
