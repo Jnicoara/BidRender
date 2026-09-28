@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **Every LB conduit body now says it is priced with its cover and gasket**,
+  the same as the T bodies. The bid never adds a separate cover for a conduit
+  body, so a price for the bare body would have left the cover off every job.
+  A check now fails if any future body shape (LL, LR, C) ships without it.
 - **T conduit bodies in the catalog.** A T body for EMT, rigid, IMC and both
   PVC schedules, at every trade size from 1/2" to 4": 45 generic, unpriced
   rows, each priced with its cover and gasket. Searching "tee body",
