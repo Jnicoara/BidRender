@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **Handy box covers and a siding mounting block.** The handy box used to ship
+  with no cover at all, so one on a bid could not be finished; blank, duplex,
+  single-toggle and decorator covers now sit beside it. The siding mounting
+  block is what every outdoor light or receptacle on vinyl siding sits on.
+  Eight existing boxes also now say what the rows next to them already said:
+  the 4-11/16" box is 2-1/8" deep, every steel pull box is NEMA 1 (indoor),
+  and the PVC pull boxes are NEMA 4X.
 - **Every LB conduit body now says it is priced with its cover and gasket**,
   the same as the T bodies. The bid never adds a separate cover for a conduit
   body, so a price for the bare body would have left the cover off every job.
