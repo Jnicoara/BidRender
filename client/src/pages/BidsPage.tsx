@@ -1376,8 +1376,9 @@ export default function BidsPage({
                     </span>{" "}
                     — their hours are in the total above and their labor is
                     priced at $0. On a line priced by hand, pick who does the
-                    hours beside them. On an assembly line, give the assembly a
-                    role in the Library, then re-add the line to pick the rate
+                    hours beside them. On an assembly line, give its role a rate
+                    in Labor Rates — or, if the assembly has no role, give it
+                    one in the Library — then re-add the line to pick the rate
                     up.
                   </p>
                 </div>

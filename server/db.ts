@@ -6867,11 +6867,15 @@ export async function getMaterialUsageForCompany(
           JOIN assembly_materials am ON am.assemblyId = g.assemblyId
          WHERE b.userId = ${dataUserId} AND li.archivedAt IS NULL
         UNION ALL
-        SELECT CASE li.runMaterialRole
+        -- The line's own part first: a fitting (coupling, connector, strap,
+        -- elbow, box, cover...) is counted from the trace, so its type names
+        -- no material and only runMaterialId says what it is. Until
+        -- 2026-09-28 every fitting sent from a trace counted as never used.
+        SELECT COALESCE(li.runMaterialId, CASE li.runMaterialRole
                  WHEN 'conductor' THEN rt.conductorMaterialId
                  WHEN 'ground'    THEN rt.groundMaterialId
                  WHEN 'raceway'   THEN rt.racewayMaterialId
-               END,
+               END),
                li.bidId, li.createdAt
           FROM bid_line_items li
           JOIN bids b ON b.id = li.bidId

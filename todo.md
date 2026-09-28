@@ -1418,19 +1418,37 @@ path is ever revived, give it the same treatment first.
       the card chip (checked at 1536 px only; `flex-wrap`, so expected fine).
       And on an account still showing the getting-started checklist, the row
       sits near the fold — worth a look if Phase 1 still feels hidden.
-- [ ] **Found, not chased (2026-09-27):** `getMaterialUsageForCompany`
-      (`server/db.ts`) builds `lastUsedAt` with `new Date()` from a raw
-      `MAX(...)` — the same shape that read 7 hours out on the Dashboard's
-      newest-plan date (fixed there with `DATE_FORMAT(... 'Z')`,
-      `dashboardPlans.test.ts`). It goes through `db.execute`, whose driver
-      may already return a Date, so measure before changing it.
+- [x] **MEASURED 2026-09-28 and left alone: `lastUsedAt` is right.** The
+      entry below guessed it read 7 hours out like the Dashboard's
+      newest-plan date. Asked the driver instead: `db.execute` returns a raw
+      TIMESTAMP as zone-less text in the SESSION's time zone, and the local
+      MySQL session is `SYSTEM` (Pacific). `li.createdAt` is filled by the
+      database default, so its text is Pacific and `new Date(text)` reads it
+      correctly — `materialUsage.test.ts` "dates the last use" passes on a
+      Pacific laptop. Switching to `DATE_FORMAT(... 'Z')` would have made it
+      7 hours EARLY. On production (UTC database, UTC Node) both forms agree.
+      The entry as it stood: `getMaterialUsageForCompany` builds `lastUsedAt`
+      with `new Date()` from a raw `MAX(...)` — the same shape that read 7
+      hours out on the Dashboard's newest-plan date. Measure before changing.
+- [ ] **The flip side, found by that measurement: locally, the Dashboard's
+      newest-plan date is 7 hours EARLY for a real upload.** `lastPlanAt`
+      uses `DATE_FORMAT(MAX(p.createdAt), '…Z')`, which is right for a row
+      whose createdAt the APP wrote (drizzle writes UTC text) — which is what
+      `dashboardPlans.test.ts` inserts — and wrong for one the DATABASE
+      defaulted, which is every real upload. Production is unaffected (its
+      session zone is UTC, so the two agree). The real fix is one rule for
+      the connection — `timezone: "Z"` on the pool, or `SET time_zone =
+  '+00:00'` per session — so text means UTC everywhere; that touches
+      every raw date read and wants its own look.
 
-- [ ] **PLANNED 2026-09-27, not built: the next Track B batch**
+- [ ] **BUILT 2026-09-28, NOT YET LOOKED AT: the next Track B batch**
       (`references/track-b-next-batch-plan.md`). Stale run figures after a
       mark, plan or height change; Dashboard and analytics totals that leave
       out unpriced lines silently; the sheet-size check (S8/D5); the
       double-count warning missing forks; a flag for lines frozen at an old
-      labor rate; small polish. No migrations.
+      labor rate; small polish. No migrations. **Before merging: one screen
+      pass over pieces 1, 2, 3 and 5**, per the plan's "Verify on screen"
+      steps, plus the Recent plans row at phone width.
 
 ## Plan viewer overhaul
 

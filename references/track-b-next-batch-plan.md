@@ -1,6 +1,26 @@
 # Track B: the next batch (after the beta plan)
 
-**PLANNED 2026-09-27 on `track-b`. Nothing is built yet.** Every file:line
+**BUILT 2026-09-28 on `track-b`, one commit per piece, in the owner's order
+3 → 1 → 2 → 4 → 5 → 6. Not merged. NOT YET LOOKED AT ON SCREEN** — the owner's
+answer was to build without the dev server and check pieces 1, 2, 3 and 5 in
+one pass before any merge. Until that pass, none of them is done by
+CLAUDE.md's rule. The plan below is kept as written; what changed while
+building is here.
+
+**Owner's answers (2026-09-27):** all four as recommended — build first and
+look once at the end; "Check it" clears the sheet-size warning; old labor
+rate is flag only; the headline leaves the sample bid out.
+
+| Piece            | Commit    | What differs from the plan below                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3. Sheet size    | `8ebcec0` | **The warning clears on the existing `scaleCheckedAt`, not for the visit only.** The column was already there and a check already writes it, so "nothing new stored" held and a checked sheet stays quiet on the next visit. `scaleCheckedAt` records that somebody checked, not that the check agreed: an estimator who keeps a disputed scale also clears it, which is the existing rule for that stamp. 18×24 and 17×22 warn. |
+| 1. Stale figures | `3dad0fb` | As planned. Placing marks does NOT refresh the run figures; only removing one does. That commit broke a source test (`sheetScaleCache.test.ts`), fixed in piece 6's commit.                                                                                                                                                                                                                                                      |
+| 2. Totals        | `58c7988` | Also found: the column totals included the sample bid, which the headline left out. Both go through `sumBidTotals` now. Analytics counts frozen unpriced parts only; a line from before 0087 is not read live there (noted on `BidCostRow`).                                                                                                                                                                                     |
+| 4. Forks (R3)    | `a396a1a` | `takeoff_groups.materialId` and `.laborRateId` became `exempt`, not resolvers. Nothing reads either today, and each has a test that fails the day that changes.                                                                                                                                                                                                                                                                  |
+| 5. Old rate      | `c3b12e1` | Assembly lines only: a hand-priced or run-type line stores no role to compare against.                                                                                                                                                                                                                                                                                                                                           |
+| 6. Polish        | this one  | **`lastUsedAt` measured and left alone.** It is right. The Dashboard's newest-plan date is the one that is 7 h out locally (see `todo.md`). The Layers note is true (the totals are whole-bid; only the run list filters), so it is unchanged. Fitting lines now count as used. The phone-width look joins the screen pass.                                                                                                      |
+
+**PLANNED 2026-09-27 on `track-b`.** Every file:line
 reference below was read on `track-b` at `965f584`, which is local-dev
 fast-forwarded in. The dev server was not run for this plan (the laptop is low
 on memory), so every claim below comes from reading the code. **Nothing here

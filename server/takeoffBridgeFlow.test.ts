@@ -561,7 +561,10 @@ withDb("a count follows YOUR fork of a shipped assembly", () => {
     */
     const { bidId, sheetId } = await scenario();
     const database = await getDb();
-    const name = `Fork R3 starter ${Date.now()}`;
+    // Named under "Fork flow starter" so beforeEach's clean-by-name heals a
+    // run that fails before its own cleanup — this row is GLOBAL (userId
+    // NULL), and one left behind broke assemblies.test.ts on 2026-09-28.
+    const name = `Fork flow starter R3 ${Date.now()}`;
     const [shipped] = await database!.insert(assemblies).values({
       userId: null,
       name,

@@ -26,6 +26,11 @@ This is the human-readable companion to the git history — read this to see wha
   rate it was added at, which is deliberate, but nothing said when that rate
   had since changed — lines at $68/hr sat beside a role now at $43/hr. Draft
   and Active bids now point it out. No line's price is changed.
+- **Fittings sent from a trace now count as "used" in material search.**
+  Couplings, connectors, straps and the like were never credited, so they
+  never got the small ranking boost that materials you use often get. The
+  bid's "$0 labor" warning also now gives the right advice when the
+  assembly's role exists but has no rate.
 
 ## [2026-09-27]
 
