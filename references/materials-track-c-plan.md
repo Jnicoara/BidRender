@@ -385,6 +385,13 @@ fault in § 3.
 
 ## 5. Conduit body covers — one rule for every body shape
 
+> **BUILT 2026-09-27 on `track-c`.** The owner accepted C1 and C2 and said
+> not now to C3. The 45 LB rows carry "Priced with its cover and gasket." from
+> one constant shared with the T rows; `materialsCatalog.test.ts` fails on any
+> "… conduit body" row without it (checked red with the LB description
+> removed: exactly the 45 LB rows). The pricing sheet has a Notes column
+> beside Name, filled from every shipped description (195 generic rows).
+
 Plan only, 2026-09-27. Answers the covers half of the open todo item "LB
 covers and gaskets, LL/LR/C bodies and PVC sweeps".
 
@@ -496,6 +503,14 @@ complete. That is the one place this rule can quietly fail. See C2.
 ---
 
 ## 6. Boxes — what is left after Tiers 1 + 2
+
+> **BUILT 2026-09-27 on `track-c`: Tier 2.5 and the 8 description fixes**
+> (owner: B1 yes; B2 hold Tier 3, concrete ring boxes first; B3 hold).
+> Catalog 1,315 → **1,320**, Boxes 85 → **90**, pricing sheet 1,442 → 1,447
+> generic rows. The search sweep moved in one place only: a bare "cover" still
+> leads with `4" square blank cover`, and the four handy box covers now take
+> places 3–5 where `4" round blank cover` and two 4-11/16" covers were.
+> Tier 3 below is unchanged and held.
 
 Plan only, 2026-09-27. Measured on `track-c` at `232e188` by importing
 `BASELINE_MATERIALS`: **85 rows on the Boxes shelf**, 1,315 in the catalog. If

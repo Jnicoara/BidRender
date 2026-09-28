@@ -1747,14 +1747,15 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       missing unit as 0 and read "0 h" — they cannot be told apart from a
       set zero. Production had no bid lines at deploy time, so no live bid
       carries any.
-- [ ] **LB covers and gaskets, LL/LR/C bodies and PVC sweeps are not in the
-      catalog.** Sweeps wait for an Underground category (answer 2). T bodies
-      shipped 2026-09-27 (see "T bodies at a tee" above). LL/LR/C are held by
-      the owner (T6) until the takeoff proposes them, +135 rows when they come.
-      Covers: the T rows say they are priced with cover and gasket (T3). The
-      LB rows say nothing either way, so decide covers for all body shapes
-      together, per size, and word the LB to match. Planned 2026-09-27 in
-      `references/materials-track-c-plan.md` § 5 (awaiting the owner).
+- [ ] **LL/LR/C bodies and PVC sweeps are not in the catalog.** Sweeps wait
+      for an Underground category (answer 2). T bodies shipped 2026-09-27 (see
+      "T bodies at a tee" above). LL/LR/C are held by the owner (T6) until the
+      takeoff proposes them, +135 rows when they come. **Covers are DECIDED
+      (2026-09-27, owner, plan § 5 C1): every body is priced with its cover
+      and gasket, no separate cover rows.** The LB rows now say so like the T
+      rows, and `materialsCatalog.test.ts` fails on any "… conduit body" row
+      without the description — so LL/LR/C must carry it when they come.
+      Replacement covers as their own rows: not now (C3).
 - [ ] **Three local tables are on the wrong collation** —
       `ai_usage_daily`, `bid_mounting_heights`, `takeoff_mounting_heights`
       (reported by `scripts/schemaDrift.mts` on `bidrender_local`, 2026-09-26).

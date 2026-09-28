@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-27]
 
+- **The pricing spreadsheet has a Notes column next to each item's name**,
+  showing what the app says about that item. Some notes are instructions for
+  whoever fills in prices. A conduit body, for example, is "Priced with its
+  cover and gasket", so it should be priced as all three together, not as the
+  bare body.
 - **Handy box covers and a siding mounting block.** The handy box used to ship
   with no cover at all, so one on a bid could not be finished; blank, duplex,
   single-toggle and decorator covers now sit beside it. The siding mounting
