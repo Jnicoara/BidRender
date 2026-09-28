@@ -45,6 +45,7 @@ import { verticalsNotice } from "@shared/takeoffHeights";
 import { FITTING_KIND_LABELS, type FittingKind } from "@shared/runFittings";
 import { fittingRowSpeaks } from "@shared/runFittingMaterials";
 import type { TraceMode } from "@shared/traceMode";
+import type { RunTotalsLeftOut } from "@shared/runOnBid";
 
 /**
  * One run's bends and pull points, as the server works them out
@@ -339,6 +340,25 @@ const exact = (value: number) =>
   });
 
 /**
+ * "2 runs have no type — 48 ft of conduit is not on the bid. …"
+ *
+ * In `feet`, the figures' own format, so the footage reads "30 ft" under a
+ * "70 ft" rather than "30.00 ft" — seen on screen 2026-09-27.
+ */
+function noTypeSentence(noType: RunTotalsLeftOut["noType"]): string {
+  const runs = `${noType.count} run${noType.count === 1 ? " has" : "s have"} no type`;
+  const parts = [
+    noType.conduitFeet > 0 ? `${feet(noType.conduitFeet)} of conduit` : null,
+    noType.cableFeet > 0 ? `${feet(noType.cableFeet)} of cable` : null,
+  ].filter(Boolean);
+  const what =
+    parts.length > 0
+      ? `${parts.join(" and ")} ${parts.length === 1 ? "is" : "are"} not on the bid`
+      : `${noType.count === 1 ? "it is" : "they are"} not on the bid`;
+  return `${runs} — ${what}. Give each run a type to price it.`;
+}
+
+/**
  * A footage that SHOWS ITS ARITHMETIC: `87.40 + 8.50 = 95.90 ft`.
  *
  * The whole point of this phase is that vertical footage stops being
@@ -530,7 +550,10 @@ export type RunTypeBridgeEntry = {
   fittings: RunTypeBridgeFitting[];
   /** Runs of this type nobody has answered the branch-wiring question for. */
   unansweredCount: number;
-  /** Runs excluded because the devices already carry them. */
+  /**
+   * Runs answered branch wiring. Their wire is left out; on a conduit type
+   * their pipe still counts (runTypeFootageCore.ts).
+   */
   branchCount: number;
   /** Runs on a sheet with no scale, so not in these numbers at all. */
   unmeasurableCount: number;
@@ -674,6 +697,8 @@ export function RunsPanel({
     | (ReturnType<typeof totalQuantities> & {
         /** Quantity traces on the bid (D21): how many, and ends with no drop. */
         quantity?: { traceCount: number; openEnds: number };
+        /** What the bid does not price, said under the figures. */
+        leftOut?: RunTotalsLeftOut;
       })
     | undefined;
   /** Switch a run between route and quantity (D21) — root and legs. */
@@ -1137,13 +1162,22 @@ export function RunsPanel({
                     the devices already carry, a question still open, and a
                     sheet with no scale.
                   */}
+                  {/*
+                    On a conduit type only the WIRE is left out: no device
+                    carries pipe, so the pipe stays (runTypeFootageCore.ts).
+                    Saying "not in this" of the whole run there would be the
+                    old meaning, which dropped the pipe too.
+                  */}
                   {entry.branchCount > 0 && (
                     <p className="mt-1 text-[0.7rem] text-muted-foreground">
                       {entry.branchCount} run
                       {entry.branchCount === 1 ? " is" : "s are"} branch wiring
                       your devices already include, so{" "}
-                      {entry.branchCount === 1 ? "it is" : "they are"} not in
-                      this.
+                      {entry.pathType === "conduit"
+                        ? (entry.branchCount === 1 ? "its" : "their") +
+                          " wire is not in this. The conduit is."
+                        : (entry.branchCount === 1 ? "it is" : "they are") +
+                          " not in this."}
                     </p>
                   )}
                   {entry.unansweredCount > 0 && (
@@ -1570,8 +1604,9 @@ export function RunsPanel({
                   {run.branchWiring === true &&
                     run.traceMode !== "quantity" && (
                       <p className="text-[0.7rem] text-muted-foreground mt-1.5">
-                        Branch wiring — your devices already include this cable,
-                        so it is not counted again.{" "}
+                        {run.pathType === "conduit"
+                          ? "Branch wiring — your devices already include this wire, so it is not counted again. The conduit still is."
+                          : "Branch wiring — your devices already include this cable, so it is not counted again."}{" "}
                         {onAnswerBranchWiring && (
                           <button
                             className="underline hover:text-foreground"
@@ -2224,8 +2259,37 @@ export function RunsPanel({
               totals — their sheets have no usable scale.
             </p>
           )}
+          {/*
+            WHAT THE BID PRICES, AND WHAT IT DOES NOT (owner, 2026-09-27).
+
+            These figures used to be finished runs only while the bid priced
+            drafts too, so the two disagreed and the caption was the only
+            thing saying so. Now both come from shared/runOnBid.ts. What is
+            left out is said here with its FEET where it has any: "2 runs
+            have no type" sends somebody hunting; the footage tells them
+            whether it matters. Amber for no type, because it is footage
+            missing from a bid; plain for branch wiring, because that one is
+            the estimator's own answer working as intended.
+          */}
+          {(totals.leftOut?.noType.count ?? 0) > 0 && (
+            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+              {noTypeSentence(totals.leftOut!.noType)}
+            </p>
+          )}
+          {(totals.leftOut?.branch.count ?? 0) > 0 && (
+            <p className="text-[0.7rem] text-muted-foreground pt-1">
+              {totals.leftOut!.branch.count} run
+              {totals.leftOut!.branch.count === 1 ? " is" : "s are"} branch
+              wiring — the devices already include that wire, so it is not
+              counted here. Conduit still is.
+            </p>
+          )}
           <p className="text-[0.7rem] text-muted-foreground/70 pt-1">
-            Finished runs only. Drafts and suggestions are not counted.
+            What the bid prices, all sheets.
+            {(totals.leftOut?.draftCount ?? 0) > 0 &&
+              ` Includes ${totals.leftOut!.draftCount} run${totals.leftOut!.draftCount === 1 ? "" : "s"} not finished yet.`}{" "}
+            Suggestions are not counted.
           </p>
         </div>
       )}

@@ -60,6 +60,7 @@ import {
   normaliseForSearch,
 } from "../../shared/planTextSearch";
 import * as db from "../db";
+import { deleteBidPdfWithFile } from "../storedFiles";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -487,7 +488,7 @@ export const bidPdfsRouter = router({
       const row = await db.getBidPdf(input.id, ctx.scope.dataUserId);
       if (!row)
         throw new TRPCError({ code: "NOT_FOUND", message: "Sheet not found." });
-      await db.deleteBidPdf(input.id, ctx.scope.dataUserId);
+      await deleteBidPdfWithFile(input.id, ctx.scope.dataUserId);
       return { success: true };
     }),
 

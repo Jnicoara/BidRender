@@ -90,6 +90,26 @@ import { LineCost } from "@/components/LineCost";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { lineHoursUnset, lineNotPriced } from "@shared/lineNotPriced";
 import { bidNotPricedCount } from "@/lib/notPricedTotal";
+import { planCountLabel } from "@shared/planCounts";
+
+/**
+ * "the Plans screen", as a link to it. The bid's warnings send people there
+ * to finish a job ("press Send again on the Plans screen"); naming a screen
+ * without going to it made them go and find it.
+ */
+function PlansLink({ bidId }: { bidId: number }) {
+  return (
+    <button
+      type="button"
+      className="underline underline-offset-2 hover:text-foreground"
+      onClick={() => {
+        window.location.hash = `/bids/${bidId}/plans`;
+      }}
+    >
+      Plans screen
+    </button>
+  );
+}
 
 const STATUSES = ["Draft", "Active", "Won", "Lost"] as const;
 type Status = (typeof STATUSES)[number];
@@ -222,8 +242,13 @@ export default function BidsPage({
   const { data: assemblies = [] } = trpc.assemblies.list.useQuery();
   const { data: units = [] } = trpc.bids.units.useQuery({ bidId });
   const { data: unitStates = [] } = trpc.bids.unitStates.useQuery({ bidId });
-  const { data: sheets = [] } = trpc.bidPdfs.list.useQuery({ bidId });
-  const sheetCount = sheets.length;
+  const { data: planSets = [] } = trpc.bidPdfs.list.useQuery({ bidId });
+  const planLabel = planCountLabel({
+    sets: planSets.length,
+    pages: planSets.reduce((sum, p) => sum + (p.pageCount ?? 0), 0),
+    setsUncounted: planSets.filter(p => p.pageCount === null).length,
+    lastUploadedAt: null,
+  });
   const markupPreview = trpc.bids.markupReapplyPreview.useQuery({ bidId });
 
   /**
@@ -565,18 +590,31 @@ export default function BidsPage({
           {/* Plans live on their own screen (the takeoff surface). The count
               sits on the button so an estimator can see whether this job has
               drawings attached without opening anything. */}
+          {/*
+            THE WAY TO THE DRAWINGS IS THE FIRST THING ON THE BID when it has
+            any (2026-09-27): filled, where Count and Send stay outlined. It
+            used to be one of three equal small outline buttons with a bare
+            number beside it — a count of FILES, which read as sheets. The
+            label now comes from shared/planCounts.ts, the same words as the
+            Dashboard's chip. With no plans it says "Add plans" and stays
+            outlined: an offer, not a demand, since a bid needs no drawings.
+          */}
           <Button
             size="sm"
-            variant="outline"
+            variant={planLabel ? "default" : "outline"}
             className="h-8 gap-1.5 text-xs shrink-0"
             onClick={() => {
               window.location.hash = `/bids/${bid.id}/plans`;
             }}
           >
             <FileText className="w-3.5 h-3.5" />
-            Plans
-            {sheetCount > 0 && (
-              <span className="text-muted-foreground">{sheetCount}</span>
+            {planLabel ? (
+              <>
+                Plans
+                <span className="opacity-70">· {planLabel}</span>
+              </>
+            ) : (
+              "Add plans"
             )}
           </Button>
 
@@ -1223,16 +1261,21 @@ export default function BidsPage({
                     cost.
                     {missingEntry.noPrice > 0 &&
                       " Type a price on a line priced by hand (0 is fine if it really costs nothing)."}
-                    {notPricedFromPlans > 0 &&
-                      ` ${
-                        notPricedFromPlans === notPriced.length
-                          ? notPriced.length === 1
-                            ? "It is"
-                            : `All ${notPriced.length} are`
-                          : notPricedFromPlans === 1
-                            ? "One is"
-                            : `${notPricedFromPlans} are`
-                      } from traced runs: price the material on the Materials screen, then press Send again on the Plans screen — it fills in the price on a line that has none, and never changes one that is set.`}
+                    {notPricedFromPlans > 0 && (
+                      <>
+                        {` ${
+                          notPricedFromPlans === notPriced.length
+                            ? notPriced.length === 1
+                              ? "It is"
+                              : `All ${notPriced.length} are`
+                            : notPricedFromPlans === 1
+                              ? "One is"
+                              : `${notPricedFromPlans} are`
+                        } from traced runs: price the material on the Materials screen, then press Send again on the `}
+                        <PlansLink bidId={bidId} />
+                        {` — it fills in the price on a line that has none, and never changes one that is set.`}
+                      </>
+                    )}
                   </p>
                 </div>
               )}
@@ -1276,8 +1319,9 @@ export default function BidsPage({
                     so no labor for{" "}
                     {laborNotPricedFromPlans === 1 ? "it" : "them"} is in the
                     total above. Set the hours on the Materials screen, then
-                    press Send again on the Plans screen — it fills in labor on
-                    a line that has none, and never changes hours that are set.
+                    press Send again on the <PlansLink bidId={bidId} /> — it
+                    fills in labor on a line that has none, and never changes
+                    hours that are set.
                   </p>
                 </div>
               )}
@@ -1346,7 +1390,7 @@ export default function BidsPage({
                       this bid yet
                     </span>{" "}
                     — they are marked on your plans, and none of them is in the
-                    total above. Send them from the Plans screen.
+                    total above. Send them from the <PlansLink bidId={bidId} />.
                   </p>
                 </div>
               )}
@@ -1364,8 +1408,8 @@ export default function BidsPage({
                     </span>{" "}
                     — they were counted against an assembly that is no longer in
                     your library, so there is nothing to price them from. Count
-                    them again on the Plans screen, from the library or as a
-                    free count.
+                    them again on the <PlansLink bidId={bidId} />, from the
+                    library or as a free count.
                   </p>
                 </div>
               )}

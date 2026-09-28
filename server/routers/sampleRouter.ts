@@ -39,6 +39,7 @@ import {
   SAMPLE_SITE_ADDRESS,
 } from "../../shared/sampleProject";
 import * as db from "../db";
+import { removeSampleWithFiles } from "../storedFiles";
 
 const procedure = scoped("bids.view", "bids.edit");
 
@@ -123,7 +124,7 @@ export const sampleRouter = router({
         });
       }
 
-      await db.removeSampleProject(sample.id, ctx.scope.dataUserId);
+      await removeSampleWithFiles(sample.id, ctx.scope.dataUserId);
       return { success: true };
     }),
 });

@@ -70,6 +70,8 @@ drizzle's own migration ledger, so the restored database does not look
 unmigrated and does not invite anyone to re-run migrations over live data.
 
 Set `DATABASE_URL` to the new server. Restore per `references/backups.md` § 7.
+**A restore brings back every bid deleted after that backup was taken, and its
+drawings** — re-delete them by hand afterwards (same section, last paragraph).
 
 **If you are building fresh rather than restoring**, build from the migrations —
 `pnpm db:push` against an empty database — never by restoring an old provider's

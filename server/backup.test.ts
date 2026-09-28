@@ -74,6 +74,9 @@ function fakeTarget(
     async list(prefix) {
       return Array.from(written.keys()).filter(k => k.startsWith(prefix));
     },
+    async deleteMany(keys) {
+      for (const key of keys) written.delete(key);
+    },
   };
 }
 

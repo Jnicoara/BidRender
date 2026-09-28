@@ -71,6 +71,19 @@ export const NAVIGATION_TARGETS: NavigationTarget[] = [
       "Build a bid fast by adding assemblies and quantities, with no plan takeoff. The quickest way to price a job or start a new estimate.",
   },
   {
+    /**
+     * Plans live on each bid (/bids/:id/plans), which needs a bid and so
+     * cannot be linked to from here. Since 2026-09-27 the Dashboard answers
+     * the question directly: a "Recent plans" row, and a Plans chip on every
+     * card whose bid has drawings.
+     */
+    id: "plans",
+    label: "Plans",
+    path: "#/dashboard",
+    purpose:
+      "Your plan drawings and PDFs — open the plans for a job to count and trace on them, or upload a new plan set. Find them under Recent plans on the Dashboard, or the Plans button on any bid.",
+  },
+  {
     id: "clients",
     label: "Clients",
     path: "#/clients",

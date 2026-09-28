@@ -198,3 +198,67 @@ describe("a quantity trace lands in the same bucket (D21)", () => {
     expect(approved.legs.find(l => l.id === "300")!.to).toBe("run:300:end");
   });
 });
+
+/*
+  D18 moves the WIRE between devices onto the devices' whips. It says nothing
+  about the pipe: every whip the starters ship is NM-B cable, and nothing on a
+  device prices EMT. So a conduit run answered "branch wiring" keeps its pipe,
+  its fittings and its vertical pipe on the bid, and loses only the wire.
+  Until 2026-09-27 it lost all of it — found by reading, not reported.
+*/
+describe("a run answered branch wiring (D18)", () => {
+  const stored = [
+    {
+      runId: 500,
+      name: "1",
+      conductorCount: 2,
+      groundCount: 1,
+      separateGround: null,
+    },
+  ];
+  const ends = { startKind: "receptacle", endKind: "receptacle" };
+
+  it("keeps a conduit run's pipe and fittings, and drops only its wire", () => {
+    const homerun = group(
+      [run({ id: 500, ...ends, branchWiring: false })],
+      [],
+      stored
+    ).get(7)!;
+    const branch = group(
+      [run({ id: 500, ...ends, branchWiring: true })],
+      [],
+      stored
+    ).get(7)!;
+
+    expect(homerun.conduitFeet).toBeCloseTo(22.22, 2);
+    expect(homerun.insulatedFeet).toBeGreaterThan(0);
+
+    expect(branch.branchCount).toBe(1);
+    expect(branch.conduitFeet).toBe(homerun.conduitFeet);
+    expect(branch.verticalFeet).toBe(homerun.verticalFeet);
+    expect(branch.legs).toEqual(homerun.legs);
+    expect(branch.insulatedFeet).toBe(0);
+    expect(branch.groundFeet).toBe(0);
+  });
+
+  it("still leaves a cable run out entirely — the cable IS the whip", () => {
+    const cable = group(
+      [run({ id: 500, ...ends, pathType: "cable", branchWiring: true })],
+      [],
+      stored
+    ).get(7)!;
+    expect(cable.branchCount).toBe(1);
+    expect(cable.cableFeet).toBe(0);
+    expect(cable.conduitFeet).toBe(0);
+  });
+
+  it("still says why when the pipe of a branch run cannot be measured", () => {
+    const unscaled = group(
+      [run({ id: 500, ...ends, sheetId: 99, branchWiring: true })],
+      [],
+      stored
+    ).get(7)!;
+    expect(unscaled.unmeasurableCount).toBe(1);
+    expect(unscaled.legs).toHaveLength(1);
+  });
+});

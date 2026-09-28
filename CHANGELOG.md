@@ -36,6 +36,35 @@ This is the human-readable companion to the git history — read this to see wha
   (Carlon, Raco, Steel City, Red Dot) now find the right boxes in search.
   The pricing sheet was brought up to date at the same time, which also added
   about 130 rows from catalog changes since 2026-09-25 that it had missed.
+- **Plans are easier to get back to.** The Dashboard has a "Recent plans"
+  row: the jobs whose drawings were added most recently, one click from their
+  plans. Every bid card that has drawings shows a "Plans · 5 sheets" button
+  that goes straight to them. On a bid, Plans is now the main button when the
+  bid has drawings, and says how many; a bid with none shows "Add plans". The
+  bid's notes that say "on the Plans screen" are now links to it.
+- **The run totals on the Plans screen now match the bid.** The "This bid,
+  all sheets" block used to count finished runs only, while the bid also
+  priced runs still being drawn, so the two could show different footage for
+  the same runs. Now the block shows exactly what the bid prices, says how
+  many unfinished runs that includes, and says what it leaves out: runs with
+  no type (with how many feet, so you can tell whether it matters) and
+  branch wiring. The materials list follows the same rule and says when a run
+  has no type.
+- **Deleting a bid now deletes its drawings.** Before, deleting a bid (by
+  hand, with "Delete all", or by the 30-day clean-out) removed it from the app
+  but left its plan PDFs sitting in storage, even though the screen said the
+  plans went with it. Now the files go too. The same is true when you remove
+  one plan set from a bid, or replace or remove your company logo. The nightly
+  backups now keep 30 days of history (and always the last 7 good ones), so a
+  deleted drawing is gone from the backups within 30 days as well. A tool for
+  clearing out files left behind before this change is ready to run by hand.
+- **Conduit marked as branch wiring is back on the bid.** When you told the
+  app a conduit run between two devices was branch wiring, it left out the
+  whole run: the wire (correct, because your devices already include it) but
+  also the pipe, its fittings and its drops, which nothing else on the bid
+  priced. Now only the wire is left out, and the pipe is priced. Unlocked bids
+  pick this up on their own. Cable runs marked as branch wiring are still left
+  out entirely, because there the cable is the wire.
 - **The Performance screen says when its dollar figures are short.** If a
   bid in the chosen range has a line the app can't price, the win-rate and
   finished-jobs sections now show a red "incomplete" line saying how many,

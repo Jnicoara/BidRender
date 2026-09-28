@@ -45,6 +45,7 @@ import {
 } from "../cronAuth";
 import { RETENTION_DAYS, systemClock } from "../../shared/retention";
 import * as db from "../db";
+import { deleteBidWithFiles } from "../storedFiles";
 
 /**
  * When the purge runs. Five fields, UTC — standard cron, no seconds.
@@ -74,15 +75,16 @@ export type PurgeResult = {
  * Exported separately from the HTTP handler so tests can drive it with a clock
  * they control. There is no other way to test a 30-day rule.
  *
- * Line items and PDF rows go with the bid via `onDelete: "cascade"`.
+ * Line items and PDF rows go with the bid via `onDelete: "cascade"`, and the
+ * plan FILES go after them, through `deleteBidWithFiles`.
  *
- * ── What is NOT cleaned up, and why ──────────────────────────────────────────
- * The S3 objects behind those PDF rows are orphaned rather than deleted: the
- * Forge storage API this app uses exposes presigned PUT and GET only, with no
- * delete. Losing the row loses the key, so the file becomes unreachable through
- * the app — which is what the user is promised — but the bytes still sit in the
- * bucket. Worth fixing if a delete endpoint appears; not worth blocking the
- * feature on, and not something to paper over by pretending it happened.
+ * ── The files, since 2026-09-27 ──────────────────────────────────────────────
+ * This used to leave every plan file in storage, and said the storage API had
+ * no delete. That stopped being true when the app left Manus, and nobody
+ * revisited it: a contractor's drawings outlived the bid the archive said they
+ * went with. The files are now deleted once no row names them; one a store
+ * refuses stays for `scripts/sweepOrphanPlans.mts`. The nightly backup keeps
+ * its own copies for 30 days (references/backups.md § Retention).
  */
 export async function purgeExpiredBids(
   now: Date = systemClock(),
@@ -95,7 +97,7 @@ export async function purgeExpiredBids(
     // One at a time, by (id, userId), so a single bad row cannot take the whole
     // sweep down with it and leave the rest to pile up until someone notices.
     try {
-      await db.deleteBidForever(bid.id, bid.userId);
+      await deleteBidWithFiles(bid.id, bid.userId);
       ids.push(bid.id);
     } catch (err) {
       console.error(`[PurgeArchivedBids] bid ${bid.id} failed to delete:`, err);

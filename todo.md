@@ -1334,7 +1334,24 @@ path is ever revived, give it the same treatment first.
 
 ## Stage 5 follow-ups (references/stage-5-track-b-plan.md, 2026-09-27)
 
-- [ ] **Leftover plan PDFs after delete — MUST BE FIXED BEFORE THE BETA: these
+- [x] **BUILT 2026-09-27 (Track B), owner's answers as recommended in
+      `references/track-b-beta-plan.md` § 1.** `storageDelete` on both
+      backends (asks the disk folder too when R2 is live, and drops the R2
+      existence cache); every delete path goes through `server/storedFiles.ts`
+      — rows first, then any file no row in any account names — and
+      `server/storedFiles.test.ts` fails on a raw call. Also covers removing
+      one plan set, the sample bid, logo replace/clear and the legacy project
+      PDF. `scripts/sweepOrphanPlans.mts` for what is already left behind: dry
+      run by default, by hand for the first month, refuses an empty database
+      and (unless `--allow-majority`) a majority of orphans. Backups: 30 days,
+      newest 7 good always kept, only after a good night
+      (`references/backups.md` § 9). Probed on the real plan bucket with a
+      key of our own: put, delete, gone. **Still to do: run the sweep against
+      production** — dry run first, read the list. _Seen on the local dry run:_
+      `.local-storage` holds a folder named `bid-plans/1/` + ANSI colour codes
+      around `1728349` — some script wrote a coloured number into a storage
+      key. Local only, found not chased.
+      The request as it stood: **Leftover plan PDFs after delete — MUST BE FIXED BEFORE THE BETA: these
       are customer drawings.** Deleting a bid, whether by hand, with the
       archive's "Delete all", or by the nightly 30-day purge, removes only
       DATABASE rows. The `bid_pdfs` rows cascade away, but the files behind
@@ -1354,7 +1371,18 @@ path is ever revived, give it the same treatment first.
       and a one-off sweep for the files already orphaned (`pnpm r2:ls`
       against the `bid_pdfs` keys). Decided by the owner 2026-09-27: a
       separate piece after the Stage 5 Track B batch.
-- [ ] **The run totals and the bid can report different footage for the same
+- [x] **BUILT 2026-09-27 (Track B), owner's answer: the totals and the
+      materials list show what the bid prices.** One rule,
+      `shared/runOnBid.ts`, asked by `groupRunFootage`, `takeoffRuns.totals`,
+      `takeoffRuns.drops` and the materials list. Drafts count; runs with no
+      type are left out and reported with their feet; branch wiring's wire is
+      left out (its conduit counts — see the branch-wiring fix the same day).
+      `takeoffRuns.test.ts` "equals the footage the bid prices" is the forcing
+      test: one bid with every kind of run, totals equal to the bid's own
+      footage exactly. Against the old router it read 100 ft to the bid's 175.
+      T5 in `references/takeoff-spec.md` records the override. **Not done:
+      measuring how many drafts exist on production — Track A.**
+      The request as it stood: **The run totals and the bid can report different footage for the same
       runs. Look into it after the Stage 5 Track B batch** (owner,
       2026-09-27). Two differences are known, both read from the code and
       the second one measured: (1) **Draft runs.**
@@ -1375,6 +1403,27 @@ path is ever revived, give it the same treatment first.
       its caption ("Finished runs only. Drafts and suggestions are not
       counted.") does today, and the bid should probably wait for a draft to
       be finished. Measure how many drafts exist on real bids first.
+
+- [x] **BUILT 2026-09-27 (Track B): plans are easier to find, Phase 1**
+      (`references/track-b-beta-plan.md` § 3). Dashboard "Recent plans" row
+      and a Plans chip on every card with drawings, both from
+      `getDashboardBids`; Plans is the primary button on a bid; the bid's
+      "Plans screen" mentions are links; a `plans` navigation target.
+- [ ] **Plans, Phase 2 — a Plans entry in the left menu — deferred by the
+      owner (2026-09-27): "Phase 1 first, left-menu tab later".** The design
+      is in `references/track-b-beta-plan.md` § 3 (a `/plans` index screen,
+      not a dead end), and it means rewriting CLAUDE.md's "none of them is in
+      the nav" and the eight-destination comments in the same change.
+- [ ] **Not checked at phone width:** the Dashboard's "Recent plans" row and
+      the card chip (checked at 1536 px only; `flex-wrap`, so expected fine).
+      And on an account still showing the getting-started checklist, the row
+      sits near the fold — worth a look if Phase 1 still feels hidden.
+- [ ] **Found, not chased (2026-09-27):** `getMaterialUsageForCompany`
+      (`server/db.ts`) builds `lastUsedAt` with `new Date()` from a raw
+      `MAX(...)` — the same shape that read 7 hours out on the Dashboard's
+      newest-plan date (fixed there with `DATE_FORMAT(... 'Z')`,
+      `dashboardPlans.test.ts`). It goes through `db.execute`, whose driver
+      may already return a Date, so measure before changing it.
 
 ## Plan viewer overhaul
 
