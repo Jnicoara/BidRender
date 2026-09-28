@@ -340,6 +340,25 @@ const exact = (value: number) =>
   });
 
 /**
+ * "2 runs have no type — 48 ft of conduit is not on the bid. …"
+ *
+ * In `feet`, the figures' own format, so the footage reads "30 ft" under a
+ * "70 ft" rather than "30.00 ft" — seen on screen 2026-09-27.
+ */
+function noTypeSentence(noType: RunTotalsLeftOut["noType"]): string {
+  const runs = `${noType.count} run${noType.count === 1 ? " has" : "s have"} no type`;
+  const parts = [
+    noType.conduitFeet > 0 ? `${feet(noType.conduitFeet)} of conduit` : null,
+    noType.cableFeet > 0 ? `${feet(noType.cableFeet)} of cable` : null,
+  ].filter(Boolean);
+  const what =
+    parts.length > 0
+      ? `${parts.join(" and ")} ${parts.length === 1 ? "is" : "are"} not on the bid`
+      : `${noType.count === 1 ? "it is" : "they are"} not on the bid`;
+  return `${runs} — ${what}. Give each run a type to price it.`;
+}
+
+/**
  * A footage that SHOWS ITS ARITHMETIC: `87.40 + 8.50 = 95.90 ft`.
  *
  * The whole point of this phase is that vertical footage stops being
@@ -351,22 +370,6 @@ const exact = (value: number) =>
  * 87.40` is noise standing where a number goes. A run counting nothing
  * vertical says so in its own line instead — see the row below.
  */
-/** "2 runs have no type — 48.0 ft of conduit is not on the bid. …" */
-function noTypeSentence(noType: RunTotalsLeftOut["noType"]): string {
-  const runs = `${noType.count} run${noType.count === 1 ? " has" : "s have"} no type`;
-  const parts = [
-    noType.conduitFeet > 0
-      ? `${exact(noType.conduitFeet)} ft of conduit`
-      : null,
-    noType.cableFeet > 0 ? `${exact(noType.cableFeet)} ft of cable` : null,
-  ].filter(Boolean);
-  const what =
-    parts.length > 0
-      ? `${parts.join(" and ")} ${parts.length === 1 ? "is" : "are"} not on the bid`
-      : `${noType.count === 1 ? "it is" : "they are"} not on the bid`;
-  return `${runs} — ${what}. Give each run a type to price it.`;
-}
-
 function Footage({
   label,
   flat,
