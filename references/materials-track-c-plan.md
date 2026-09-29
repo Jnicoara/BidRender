@@ -871,7 +871,91 @@ sweeps counted on every job.
 `runBends.ts` merges same-direction turns closer than 3 ft into one bend. A
 36"-radius 90 has about 4.7 ft of arc, so an arc traced with clicks more than
 3 ft apart may count as two 45s rather than one 90. Trace one on the fixture
-bid and read the count.
+bid and read the count. **Measured and fixed 2026-09-29 — § 8a.**
+
+### 8a. A traced sweep counted as two 45s — MEASURED, FIXED 2026-09-29
+
+Owner's instruction: test this BEFORE shipping the run-type pickers, fix it
+or say what the fix needs, and add a test that fails without the fix.
+
+**Measured** through `legBends` / `countFittings`, a 90° turn traced four
+ways at 1/4" = 1'-0" (gap = distance between the two clicks that must merge):
+
+| Traced as               | 24" radius           | 36" radius                     |
+| ----------------------- | -------------------- | ------------------------------ |
+| one click at the corner | 1 × 90               | 1 × 90                         |
+| **the arc's two ends**  | gap 2.83 ft → 1 × 90 | **gap 4.24 ft → 2 × 45 WRONG** |
+| ends and middle         | gap 1.53 → 1 × 90    | gap 2.30 → 1 × 90              |
+| ends and two between    | gap 1.04 → 1 × 90    | gap 1.55 → 1 × 90              |
+
+(48", which does not ship, also went wrong on "ends and middle": 3.06 ft.)
+The degrees toward a pull point were right throughout (45 + 45 = 90); only
+the FITTINGS were wrong — and on a type whose 45 is still the standard elbow,
+the wrong part as well. The 24" two-click case passed by 0.17 ft.
+
+**Fix — code only, no schema, no Track A.** On a run type whose 90 or 45
+override is a sweep, the merge distance becomes that sweep's 90° chord ×
+1.25 (`mergeWithinFeetFor`, `shared/runBends.ts`): 5.30 ft for 36", 3.54 ft
+for 24". The radius is read off the chosen row's name (`sweepRadiusInches`,
+the inverse of `sweepName`). Every type without a sweep keeps exactly 3 ft,
+so no existing count moves — the 124 existing bend, fitting and network
+tests pass untouched. Both paths carry it: the bid (`countFittings`, whose
+`bends` argument now REQUIRES `mergeWithinFeet`) and the run panel
+(`runBendsFor`, whose per-type context requires it too), so the two cannot
+disagree.
+
+**Accepted cost:** on a sweep type, two separate same-direction 45s closer
+than the reach count as one 90. At that spacing the trace cannot tell them
+from one sweep. A test pins that two 45s 6 ft apart still count as two.
+
+**Test:** `server/runBendsSweep.test.ts`, 16 cases. Run against the code
+with the old 3 ft still in the comparison: **3 failed** — exactly the 36"
+two-click case through the bid, the panel, and the two agreeing. After the
+fix: 16 passed.
+
+**Not covered:** a type on STANDARD elbows with a big arc drawn on the plan
+still counts it by the 3 ft rule. That is right when the pipe really is
+standard elbows; if a drawn arc is a sweep, the type should say so (S6).
+
+### 8b. The run-type pickers (S6) — BUILT 2026-09-29, looked at
+
+"90° bends" and "45° bends" sit in the run-type editor's existing fittings
+fold, after coupling, connector and strap (one fold, rule 1 of "never in
+the way"). Empty reads "Standard elbow, from the catalog" — that is what
+the takeoff counts then, so empty is not a warning. No migration: the
+columns, the router input and the listing already existed.
+
+**Checked in the running app** (bid "Bar layout check", sheet 1, type
+`2" PVC Sch 40`, on `bidrender_local_c`), not just the suite:
+
+- A run saved as a 36" sweep traced by its two ends read "90° of bend on
+  the drawing (**2 corners**)" before anything was chosen.
+- Picked `2" PVC Sch 40 90-degree sweep, 36" radius` through the new slot's
+  own search and pressed Save. The same run then read "(**1 corner**)", and
+  the side panel's fitting list changed on its own, with no reload: the 90
+  line named the sweep, "≥ 2" (this run's 90° + the other run's 131°), and
+  the 45 line "≥ 1" (the 131° remainder) — where the old rule would have
+  added two 45s.
+- The check run was removed and the type's override cleared afterwards, so
+  the fixture is as it was.
+
+**Found by looking, and fixed in the same change:** with "Choose fittings
+yourself" open, the editor measured **873px tall in a 737px window, with no
+scroll — Save sat at y = 957, off the screen.** It was already over with the
+original three slots; the two new ones made it worse. The popover is now
+capped at Radix's available height and scrolls, the pattern the app's
+dropdown and select menus already use; measured after, 616px, Save at y = 708.
+
+**Left as it is, for the owner:** the sentence under a sweep row still says
+"At least 2 90° elbows". The kind is called "90° elbow" everywhere
+(`FITTING_KIND_LABELS`), so renaming it to "bend" changes wording on every
+raceway. Small, but it is a caption saying elbow beside a row that is a
+sweep.
+
+**Local database note:** `bidrender_local_c` was 7 migrations behind the
+code (0089–0095, Track B's, arrived with the last `local-dev` merge), so the
+takeoff screen's queries failed until `scripts/migrate.mts` applied them.
+Local only; no file in `drizzle/` was written or changed.
 
 ### How it would be built (one commit; no schema, no migration)
 

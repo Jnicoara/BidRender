@@ -11,6 +11,15 @@ This is the human-readable companion to the git history — read this to see wha
   every shipped item). Searching "sweep" now finds them rather than the
   ordinary PVC elbow; "2 pvc 90" still leads with the ordinary elbow, which
   is what the takeoff counts.
+- **A traced 36" sweep now counts as one 90, not two 45s**, on a run type
+  set to use sweeps. Tracing a drawn sweep by clicking where the curve
+  starts and ends put the clicks too far apart to be read as one bend.
+  Run types on ordinary elbows count exactly as before.
+- **A run type can now be told to use sweeps.** Its editor has "90° bends"
+  and "45° bends" beside coupling, connector and strap; pick a sweep and
+  every corner traced under that type is counted as one. The editor also
+  scrolls now — with its fittings open it was taller than a laptop screen,
+  and the Save button sat below the bottom edge.
 
 ## [2026-09-28]
 

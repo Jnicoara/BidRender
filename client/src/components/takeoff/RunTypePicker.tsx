@@ -127,6 +127,16 @@ export type PickableRunType = {
   couplingMaterialName: string | null;
   connectorMaterialName: string | null;
   strapMaterialName: string | null;
+  /**
+   * The rows every traced 90 and 45 is bought as, instead of the catalog's
+   * standard elbow — how a type counts SWEEPS (plan § 8, S6). A sweep here
+   * also widens how far apart two clicks can be and still be one bend
+   * (`bendMergeFeetForOverrides`).
+   */
+  elbow90MaterialId: number | null;
+  elbow45MaterialId: number | null;
+  elbow90MaterialName: string | null;
+  elbow45MaterialName: string | null;
   needsSpecification: boolean;
   isShipped: boolean;
   runCount: number;
@@ -165,6 +175,10 @@ type Draft = {
   connectorMaterialName: string | null;
   strapMaterialId: number | null;
   strapMaterialName: string | null;
+  elbow90MaterialId: number | null;
+  elbow90MaterialName: string | null;
+  elbow45MaterialId: number | null;
+  elbow45MaterialName: string | null;
 };
 
 export type RunTypePatch = {
@@ -180,6 +194,8 @@ export type RunTypePatch = {
   couplingMaterialId: number | null;
   connectorMaterialId: number | null;
   strapMaterialId: number | null;
+  elbow90MaterialId: number | null;
+  elbow45MaterialId: number | null;
 };
 
 /** Where a fitting override is picked from. */
@@ -218,6 +234,10 @@ const draftOf = (type: PickableRunType): Draft => ({
   connectorMaterialName: type.connectorMaterialName,
   strapMaterialId: type.strapMaterialId,
   strapMaterialName: type.strapMaterialName,
+  elbow90MaterialId: type.elbow90MaterialId,
+  elbow90MaterialName: type.elbow90MaterialName,
+  elbow45MaterialId: type.elbow45MaterialId,
+  elbow45MaterialName: type.elbow45MaterialName,
 });
 
 /**
@@ -537,7 +557,17 @@ export function RunTypePicker({
           </Button>
         )}
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 p-2">
+      {/*
+        Capped at the room Radix reports and scrolled, like the app's menus.
+        The editor with "Choose fittings yourself" open measured 873px tall
+        in a 737px window with no scroll, and Save sat at y=957 — off the
+        screen, and past reach (2026-09-29, when the 90°/45° rows arrived;
+        it was already over with the first three).
+      */}
+      <PopoverContent
+        align="start"
+        className="w-72 p-2 max-h-(--radix-popover-content-available-height) overflow-y-auto"
+      >
         {editing && draft ? (
           <>
             <div className="flex items-center gap-1 mb-1">
@@ -909,30 +939,39 @@ export function RunTypePicker({
                   </div>
                 ) : (
                   <p className="text-[0.7rem] text-muted-foreground mt-1">
-                    Couplings, connectors and straps are counted from the trace
-                    and matched to this raceway in the catalog.
+                    Couplings, connectors, straps and bends are counted from the
+                    trace and matched to this raceway in the catalog.
                   </p>
                 )}
 
                 {choosingFittings ||
                 draft.couplingMaterialId !== null ||
                 draft.connectorMaterialId !== null ||
-                draft.strapMaterialId !== null ? (
+                draft.strapMaterialId !== null ||
+                draft.elbow90MaterialId !== null ||
+                draft.elbow45MaterialId !== null ? (
                   <>
                     {(
                       [
-                        ["coupling", "Coupling"],
-                        ["connector", "Connector"],
-                        ["strap", "Strap"],
+                        ["coupling", "Coupling", "coupling"],
+                        ["connector", "Connector", "connector"],
+                        ["strap", "Strap", "strap"],
+                        // Where a type is told to count sweeps (plan § 8, S6).
+                        ["elbow90", "90° bends", "sweep"],
+                        ["elbow45", "45° bends", "45 sweep"],
                       ] as const
-                    ).map(([kind, title]) => (
+                    ).map(([kind, title, example]) => (
                       <MaterialSlot
                         key={kind}
                         title={title}
                         categories={FITTING_SHELF}
-                        hint={`Search fittings — “${kind}”…`}
+                        hint={`Search fittings — “${example}”…`}
                         name={draft[`${kind}MaterialName`]}
-                        emptyLabel="From the catalog"
+                        emptyLabel={
+                          kind === "elbow90" || kind === "elbow45"
+                            ? "Standard elbow, from the catalog"
+                            : "From the catalog"
+                        }
                         onPick={m =>
                           setDraft({
                             ...draft,
@@ -1006,6 +1045,8 @@ export function RunTypePicker({
                       couplingMaterialId: draft.couplingMaterialId,
                       connectorMaterialId: draft.connectorMaterialId,
                       strapMaterialId: draft.strapMaterialId,
+                      elbow90MaterialId: draft.elbow90MaterialId,
+                      elbow45MaterialId: draft.elbow45MaterialId,
                     });
                     stopEditing();
                   } finally {
