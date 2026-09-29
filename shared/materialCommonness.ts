@@ -52,6 +52,14 @@ export type StarterCommonness = "core" | "common";
  * pipe's is shorter. Spread FIRST in the table, so a hand-written entry for
  * the same name (1/2" EMT is "core") overrides it.
  *
+ * The LB joined them 2026-09-28, when LL, LR and C bodies shipped. All five
+ * shapes tie on "condulet" and "conduit body", and the tie went to the
+ * alphabet, where "C" sorts first — so the rarest body led the generic
+ * searches. The LB is the body nearly every job buys. The known cost,
+ * measured: on a bare pipe search ("1-1/4 rigid") the LB now sits third,
+ * ahead of the 45, and the connector and coupling drop two places (plan § 7,
+ * L2). `materialSearchRank.test.ts` pins the body searches.
+ *
  * `materialsCatalog.test.ts` fails on any key that is not a shipped name, so a
  * size or family written wrong here cannot pass quietly.
  */
@@ -73,6 +81,7 @@ function rigidRacewaysAndTheirNineties(): Record<string, StarterCommonness> {
     for (const size of sizes) {
       out[`${size} ${family}`] = "common";
       out[`${size} ${family} 90-degree elbow`] = "common";
+      out[`${size} ${family} LB conduit body`] = "common";
     }
   }
   return out;

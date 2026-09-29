@@ -6,6 +6,46 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-28]
 
+- **The shipped catalog may now grow to 3,000 items, up from 1,500**, with a
+  test that proves the app still works at that size: search stays quick
+  while typing, the catalog loads, and the pricing spreadsheet still builds.
+  The old limit was only a safety check in the tests, and nothing in the app
+  depended on it. The same test now shows the next real limit: every search
+  box receives the whole catalog, so past 3,000 the list needs to load in
+  pages.
+
+- **LL, LR and C conduit bodies are in the catalog**: all three shapes for
+  EMT, rigid, IMC and both PVC schedules, 1/2" to 4" — 135 rows, each priced
+  with its cover and gasket like the LB and T. They are for adding by hand or
+  in an assembly; the takeoff still suggests only LBs and pull boxes.
+  The pricing spreadsheet has the 135 new rows too, each with its "priced
+  with its cover and gasket" note.
+- **Searching "condulet" or "conduit body" still shows the LB first.** With
+  the new shapes in, the rarely used C body had jumped to the top on
+  alphabetical order alone. The LB now counts as a common part, so it also
+  shows a little higher on a plain pipe search like "1-1/4 rigid".
+- **Searching "c body" now finds the C conduit body.** A single letter used to
+  count the same as the start of any word, so "c" matched "conduit" in every
+  body and the C body could not be asked for by name.
+- **The database is ready for extra footage, typed lengths and drops from
+  marks** (not live yet). Seven new database changes add empty places to hold
+  a company's wire and conduit extra and makeup, a length typed onto a run
+  when the sheet has no scale, how a counted device drops from the run
+  height, and the hours a bid line is priced on separately from what is
+  bought. Nothing uses them yet, and every one starts empty, so no bid, total
+  or hour count changes. The screens that use them come later.
+- **A deleted drawing can no longer keep pricing a bid.** Every count and run
+  length a bid is priced from now only reads marks and runs on sheets whose
+  plan set still exists. On the live database this was already true, because
+  deleting a plan set deletes everything drawn on it. A database copied
+  without those links (one developer copy has none) kept counting the deleted
+  drawing's marks. A test now builds exactly that case and fails if any
+  quantity read goes back to counting by bid alone.
+- **The database check now looks at the links between tables**, the rules
+  that make deleting a bid or a plan set delete everything drawn on it. It
+  lists any link a database is missing, with the command that adds it, and
+  prints a loud warning if a database has no links at all. Production passes
+  (133 of 133).
 - **Figures on the Plans screen now update straight away in three places
   where they didn't.** Removing a mark at the end of a run, removing a whole
   plan set, and changing a job height each left some run totals, drops or the

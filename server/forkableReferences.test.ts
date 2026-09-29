@@ -192,6 +192,10 @@ const REGISTRY: Record<string, Entry> = {
     kind: "exempt",
     why: "Reviewed 2026-09-27: nothing reads or writes it. A free count crosses with rate 0 and the role is picked on the bid line (addCountToBid). The 'unused group labor rate' test below goes red the day server code reads it, so the question gets asked then.",
   },
+  "takeoff_groups.dropRunTypeId": {
+    kind: "exempt",
+    why: "Reviewed 2026-09-28, the day 0094/0095 added it: nothing reads or writes it yet — Track B's group drops (references/track-b-held-migrations-plan.md § 3) are not built. When they are, the drop's materials must come through resolveRunType, exactly as takeoff_runs.runTypeId, or a drop on a shipped type the user has forked prices from the baseline. The 'unused group drop type' test below goes red the day any non-test file names the column, and this entry becomes a resolver then.",
+  },
   "takeoff_stamps.assemblyId": {
     kind: "unreviewed",
     since: "2026-09-21",
@@ -409,6 +413,33 @@ describe("every stored id into a forkable row is accounted for", () => {
       }
     };
     walk(root);
+    expect(readers).toEqual([]);
+  });
+
+  it("unused group drop type: nothing outside the schema names takeoff_groups.dropRunTypeId", () => {
+    /*
+      The same red for the same reason: its entry is `exempt` because nothing
+      reads it, and that is a claim about code elsewhere. Unlike laborRateId the
+      column name is unique to this table, so the bare name catches a read off
+      a whole row too, in the server, the shared modules and the client. The
+      schema itself is the one file allowed to spell it.
+    */
+    const repo = path.resolve(__dirname, "..");
+    const readers: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (
+          /\.tsx?$/.test(entry.name) &&
+          !/\.test\.tsx?$/.test(entry.name) &&
+          fs.readFileSync(full, "utf8").includes("dropRunTypeId")
+        )
+          readers.push(path.relative(repo, full));
+      }
+    };
+    for (const dir of ["server", "shared", "client/src"])
+      walk(path.join(repo, dir));
     expect(readers).toEqual([]);
   });
 });

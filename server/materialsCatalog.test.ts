@@ -31,12 +31,16 @@ import { countNeedingPricing, needsPricing } from "../shared/materialPricing";
 import { smartSearch } from "../client/src/lib/smartSearch";
 import { wordsInName } from "../shared/aliasSuggestions";
 import {
+  cBodyName,
   elbowName,
   lbName,
+  llName,
+  lrName,
   parseRacewayName,
   pullBoxFor,
   tBodyName,
 } from "../shared/runFittingMaterials";
+import { CATALOG_ROW_LIMIT } from "./seed/materials/types";
 
 const hasDb = !!process.env.DATABASE_URL;
 /**
@@ -70,12 +74,28 @@ describe("shipped catalog shape", () => {
     // family — Conduit Fittings, 338 rows — doubles (1,237 + 338 = 1,575).
     // A tripwire against a runaway generator, not a limit on the catalog.
     //
-    // REVISIT when the 519 brand-variant rows land (panels and breakers,
-    // after the parent/variant work): that takes the catalog to ~1,900. At
-    // that point also measure the library response — `materials.list` and the
-    // bid screens read the whole catalog unpaged (getLibraryMaterials), about
-    // 255 KB of seed data alone at 1,237 rows — before raising this again.
-    expect(BASELINE_MATERIALS.length).toBeLessThan(1500);
+    // Raised to CATALOG_ROW_LIMIT (3,000) on 2026-09-28 at 1,455 rows. The
+    // REVISIT that stood here asked for the library response to be measured
+    // first; `server/catalogScale.test.ts` now does that AT the limit —
+    // search per keystroke, the library read and its response size, and the
+    // pricing sheet — so the number and its proof cannot drift apart. The
+    // 519 brand variants (~1,975 rows) fit with room.
+    expect(BASELINE_MATERIALS.length).toBeLessThan(CATALOG_ROW_LIMIT);
+  });
+
+  it("has no shelf that has doubled by accident", () => {
+    // What the 1,500 line also caught, and 3,000 no longer does: the biggest
+    // generated family doubling (Conduit Fittings 518 -> 1,036 still fits
+    // under 3,000). So a per-shelf line, set 2026-09-28 at 518 on the biggest
+    // shelf. A tripwire, like the one above: raise it on purpose, with a
+    // reason, when a shelf is meant to grow.
+    const perShelf = new Map<string, number>();
+    for (const m of BASELINE_MATERIALS) {
+      const shelf = m.category ?? "(no shelf)";
+      perShelf.set(shelf, (perShelf.get(shelf) ?? 0) + 1);
+    }
+    const over = Array.from(perShelf).filter(([, count]) => count >= 1000);
+    expect(over).toEqual([]);
   });
 
   it("has no duplicate names", () => {
@@ -151,7 +171,7 @@ describe("every part the bend count can ask for is shipped", () => {
     expect(raceways).toHaveLength(53);
   });
 
-  it("ships a 90, a 45, an LB and a T body for every rigid raceway", () => {
+  it("ships a 90, a 45 and every body shape for every rigid raceway", () => {
     const missing: string[] = [];
     for (const { size, family } of raceways) {
       if (family.includes("flexible")) continue;
@@ -160,6 +180,9 @@ describe("every part the bend count can ask for is shipped", () => {
         elbowName(size, family, 45),
         lbName(size, family),
         tBodyName(size, family),
+        llName(size, family),
+        lrName(size, family),
+        cBodyName(size, family),
       ]) {
         if (!names.has(want)) missing.push(want);
       }
@@ -174,7 +197,9 @@ describe("every part the bend count can ask for is shipped", () => {
     const bodies = BASELINE_MATERIALS.filter(m =>
       m.name.endsWith(" conduit body")
     );
-    expect(bodies.length).toBeGreaterThanOrEqual(90);
+    // LB, T, LL, LR and C × 5 families × 9 sizes (2026-09-28). A floor, so a
+    // shape that stops generating goes red here as well as above.
+    expect(bodies.length).toBeGreaterThanOrEqual(225);
     const undescribed = bodies
       .filter(m => m.description !== "Priced with its cover and gasket.")
       .map(m => m.name);

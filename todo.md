@@ -29,6 +29,24 @@ left as written rather than rewritten to match the rename.
 
 ## Pending / Future
 
+### The whole catalog goes to the browser, and grows with it
+
+- [ ] **`materials.list` is unpaged and search runs on the main thread.**
+      Measured 2026-09-28 by `server/catalogScale.test.ts`: about 725 bytes a
+      row as superjson, so **~1 MB today (1,455 rows) and 2.1 MB at the
+      3,000-row limit**, parsed in 40–62 ms. Live traffic is compressed by the
+      Cloudflare edge (`Content-Encoding: br` on bidridge.com, ~115 KB at
+      3,000); the Express server compresses nothing, so any host without that
+      edge — staging included — sends the full size. Search per keystroke at
+      3,000: 9–12 ms median, 82–100 ms p95, worst ~175 ms on a first letter,
+      on a desktop; a field laptop is slower. Everything is linear and inside
+      budget at 3,000, which is why the limit was raised. This is CLAUDE.md
+      § Responsiveness rule 2 ("lists load a window, never the whole table"),
+      which these screens predate. **Do before the catalog needs to pass
+      3,000:** page `materials.list` and move search to the server, or at
+      least off the main thread. The scale test's budgets are the alarm; do
+      not loosen them to get past it.
+
 ### Flaky tests — fix in a batch before beta
 
 Both are timing, not wrong answers, and both touch the shared test database.
@@ -42,12 +60,31 @@ everyone to re-run instead of read.
       restore is compared against a moving target. Not reproduced in
       isolation yet. Before calling it fixed, run it alongside the full suite
       several times — a pass alone proves nothing about a race.
-- [ ] **`server/seedPreservesUserPrices.test.ts` "keeps the fork's price…"
+      **2026-09-28:** failed in two full runs while a draft of
+      `server/catalogScale.test.ts` was padding the shared test database with
+      1,545 `materials` rows — but the run whose detail was read failed on
+      `assemblies` and on a JSON-column check, which that draft never wrote,
+      so the draft is not shown to be the cause. The scale test was changed
+      anyway to build its own scratch database (`bidrender_catalogscale_test`)
+      and only READ the shared one, so it cannot be. New tests that write a
+      lot should do the same until this is fixed.
+- [x] **`server/seedPreservesUserPrices.test.ts` "keeps the fork's price…"
       flakes on the 5 s default timeout.** 2026-09-27: failed in a full run
       (5010 ms), then run alone it passed once and failed once — it seeds the
       whole catalog and sits right at the limit. Not a wrong answer, a slow
       one; 45ada57 gave the seeder test a 60 s limit for the same reason, and
-      this one wants the same.
+      this one wants the same. **FIXED 2026-09-28** with that 60 s limit: at
+      1,455 rows it failed on every run, alone too, at 5.4 s with every
+      assertion passing once the limit was lifted.
+- [ ] **`server/seedReactivatesRetired.test.ts` "never switches on a company
+      row that shares a shipped name" lost its own row under a full run.**
+      2026-09-28, once, on the local-dev + track-c merge: the company row it
+      inserts was gone when read back (`Cannot read properties of undefined
+    (reading 'userId')`, line ~264). Passes alone. Nothing found that
+      deletes it: every broad `delete(materials)` in the suite is scoped to its
+      own user ids, and no other file uses 7404/7405. A race, not yet
+      explained. Run it alongside the full suite several times before calling
+      anything fixed.
 - [ ] **`scripts/schemaDrift.mts` says "this database has never been migrated"
       when it simply cannot connect.** Measured 2026-09-27 against production
       with the laptop off the database's trusted list: that line printed, then
@@ -1780,14 +1817,16 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       missing unit as 0 and read "0 h" — they cannot be told apart from a
       set zero. Production had no bid lines at deploy time, so no live bid
       carries any.
-- [ ] **LL/LR/C bodies and PVC sweeps are not in the catalog.** Sweeps wait
-      for an Underground category (answer 2). T bodies shipped 2026-09-27 (see
-      "T bodies at a tee" above). LL/LR/C are held by the owner (T6) until the
-      takeoff proposes them, +135 rows when they come. **Covers are DECIDED
+- [ ] **PVC sweeps are not in the catalog.** Sweeps wait for an Underground
+      category (answer 2). T bodies shipped 2026-09-27 (see "T bodies at a
+      tee" above). **LL/LR/C SHIPPED 2026-09-28** (plan § 7, 135 rows,
+      overriding T6's "until the takeoff proposes them"). The takeoff still
+      proposes none of them: offering them at a pull point needs a new
+      `runMaterialRole` (Track A) and is held (L5). **Covers are DECIDED
       (2026-09-27, owner, plan § 5 C1): every body is priced with its cover
       and gasket, no separate cover rows.** The LB rows now say so like the T
       rows, and `materialsCatalog.test.ts` fails on any "… conduit body" row
-      without the description — so LL/LR/C must carry it when they come.
+      without the description — LL/LR/C carry it.
       Replacement covers as their own rows: not now (C3).
 - [ ] **Three local tables are on the wrong collation** —
       `ai_usage_daily`, `bid_mounting_heights`, `takeoff_mounting_heights`

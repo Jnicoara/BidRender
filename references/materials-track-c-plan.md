@@ -380,6 +380,9 @@ fault in § 3.
 - **T6. LL, LR and C bodies: same job or later?** _Recommend later._ Nothing
   in the takeoff proposes them yet, so they would be rows nothing uses.
   Adding them later is +135 rows (~1,450).
+  **Overridden 2026-09-28 by § 7:** the owner asked for the rows anyway, for
+  adding by hand. Built, 1,320 → 1,455. The takeoff still proposes none of
+  them (§ 7, L5).
 
 ---
 
@@ -576,3 +579,175 @@ Expected after Tier 2.5: catalog **1,315 + 5 = 1,320**, Boxes **85 → 90**.
 - **B3. More pull-box sizes?** _Recommend hold until the takeoff decides
   whether `pullBoxFor` should propose them_ — it is a takeoff change wearing a
   catalog row's clothes.
+
+---
+
+## 7. LL, LR and C conduit bodies — BUILT 2026-09-28
+
+> **BUILT 2026-09-28 on `track-c`, owner accepted L1–L5.** Measured after:
+> catalog **1,455**, Conduit Fittings **518**, bodies **225**, pricing sheet
+> **1,582** generic rows (0 typed prices before regenerating; 135 added, 0
+> removed, 0 changed). L2 as planned: the sweep matched the prototype line
+> for line. **L1 was traced and the plan's guess was wrong:** the alias map
+> was never consulted. The typed "c" already scored tier 3 on every body
+> through "conduit", above anything an alias reaches, so the fix is in
+> scoring: a finished one-letter word that only starts a word of the name is
+> demoted to tier 5 (`smartSearch.ts`, `finishedLetter`). The sweep is
+> unchanged by it; `ALIAS_MAP["c body"]` was left as it was.
+
+Written as a plan, 2026-09-28. **This goes against T6** (§ 4, "LL, LR and C bodies:
+same job or later? _Recommend later_", accepted 2026-09-27): the owner has now
+asked for the rows. When this is built, T6 and the todo.md item "LL/LR/C
+bodies and PVC sweeps" both get a line saying so.
+
+Measured on `track-c` at `e3d20e9` (after pulling `local-dev`) by importing
+`BASELINE_MATERIALS`: **1,320 rows**, Conduit Fittings **383**, rows ending
+`conduit body` **90** (45 LB + 45 T). Pricing sheet: **1,447** generic rows.
+If a re-run prints different numbers, stop and find out why before acting on
+anything below — either this section is stale or the branch is not where it
+was.
+
+The search results below were MEASURED, not predicted: the 135 rows were added
+in a throwaway worktree (since removed, nothing committed), and
+`scripts/searchSpotCheck.mts` was run before and after, plus
+`materialsCatalog.test.ts` and `materialSearchRank.test.ts`.
+
+### Rows — 135, exactly like the LB and T
+
+Three more entries in `FITTINGS` (`server/seed/materials/conduit.ts`), so the
+generator gives each shape to all 5 families × 9 trade sizes, the same as the
+LB and T. **3 × 5 × 9 = 135 rows.**
+
+| Shape | Name                                | Slang (beyond the family and size slang every fitting gets) |
+| ----- | ----------------------------------- | ----------------------------------------------------------- |
+| LL    | `1/2" EMT LL conduit body` … `4" …` | condulet access fitting pull left                           |
+| LR    | `1/2" EMT LR conduit body` … `4" …` | condulet access fitting pull right                          |
+| C     | `1/2" EMT C conduit body` … `4" …`  | condulet access fitting pull straight through               |
+
+- **Families:** EMT, PVC Sch 40, PVC Sch 80, rigid conduit, IMC. The row is
+  keyed by the raceway the body goes on, not the metal it is cast from
+  (die-cast, malleable iron, aluminum, PVC) — same as LB and T, and generic
+  per the brands rule. No aluminum-conduit family exists to key one to.
+- **Sizes:** 1/2", 3/4", 1", 1-1/4", 1-1/2", 2", 2-1/2", 3", 4"
+  (`TRADE_SIZES`). No flex: flex turns itself and has no LB either.
+- **Description:** `BODY_DESCRIPTION`, "Priced with its cover and gasket.",
+  the same constant. The existing test "says every conduit body is priced with
+  its cover and gasket" covers them by name ending with no change; in the
+  prototype it passed with 225 bodies. Its floor `>= 90` rises to `>= 225` so
+  the new shapes cannot vanish unnoticed.
+- **Unit / price / category:** each, `UNPRICED`, Conduit Fittings.
+- **Name helpers:** `llName`, `lrName`, `cBodyName` in
+  `shared/runFittingMaterials.ts` beside `lbName` / `tBodyName`, and the test
+  "ships a 90, a 45, an LB and a T body for every rigid raceway" grows all
+  three. Nothing in the takeoff calls them yet; they exist so that the day
+  something does, the name is built by the function the test checks.
+- **No brand aliases** (the T got "crouse hinds" / "carlon"; the LB has none).
+  See question L4.
+
+**Catalog 1,320 → 1,455; Conduit Fittings 383 → 518; bodies 90 → 225.**
+Headroom to the 1,500 tripwire drops to **45**. See question L3.
+
+**Pricing sheet: 1,447 → 1,582 generic rows.** The sheet takes its rows from
+`BASELINE_MATERIALS` and its Notes column from each row's description, so the
+new rows arrive with size, type (e.g. `EMT LL conduit body`), unit and "Priced
+with its cover and gasket." with no change to `pricing/buildPricingSheet.mts`.
+Regenerating overwrites `starter-catalog-pricing.xlsx`: **check it holds no
+typed prices first**, as the last regeneration did (0 found then).
+
+### Takeoff — no effect, by design
+
+Nothing in the takeoff proposes, counts or prices LL, LR or C:
+
+- pull points are `lb` or `pullBox` (`PULL_POINT_KINDS`, `shared/runBends.ts`),
+  and `pullPointKindFor` only ever answers those two;
+- bid lines are keyed by run type + `runMaterialRole`, a DATABASE ENUM with no
+  body role but `lb` (and `teeBody`, pending, § 4).
+
+So the rows are inert to the traced-run count. They are for **hand use**: an
+estimator adds an LR from the catalog like any other part, or builds it into an
+assembly. That is a first-class path (CLAUDE.md, "as manual or as automated"),
+and it is why the rows are worth shipping before the takeoff knows about them.
+Offering "LB / LL / LR / C" at a pull point needs a new role in the enum — a
+Track A migration and a three-step deploy — and is NOT in this job. See L5.
+
+### Search — two measured problems, one fix known, one not
+
+**1. The C body wins bare body searches on the alphabet.** Within a tie the
+name decides, and `C conduit body` sorts before `LB conduit body` (and before
+`connector`). With the rows added and nothing else changed, the app-order
+sweep moved:
+
+| Query                                                 | Today                           | With the rows only                   |
+| ----------------------------------------------------- | ------------------------------- | ------------------------------------ |
+| `condulet`, `conduit body`, `access fitting`          | LB first                        | **C first** (C sizes fill the top 5) |
+| `1-1/4 rigid` (3 spellings), `2 inch imc`, `4 pvc 80` | pipe, 90, 45, connector, …      | pipe, 90, 45, **C body**, connector  |
+| `ll`, `lr`                                            | 90-degree elbows (no LL/LR yet) | LL / LR first — the point            |
+| `1 rigid lr`, `1/2 emt ll`                            | elbow first                     | LR / LL first — the point            |
+| `lb`, `tee body`, `elbow`, `3/4 emt 90`               | —                               | unchanged                            |
+
+The pinned tests all still PASS with this regression, because their `search()`
+is raw smartSearch without the app's role grouping. That is the gap, and the
+sweep is what saw it.
+
+**Fix (measured):** the one the 90 got over the 45 — mark every LB `"common"`
+in `rigidRacewaysAndTheirNineties()` (`shared/materialCommonness.ts`). The LB
+is the body nearly every job buys. Measured with it:
+
+- `condulet`, `conduit body`, `access fitting`: **LB first again.**
+- On the 7 bare size+family queries in the sweep (`1/2 emt`, `3/4 pvc`,
+  `1-1/4 rigid` ×3 spellings, `2 inch imc`, `4 pvc 80`) the LB moves up to
+  3rd, ahead of the 45, and on five of them the C body sits 5th; connector
+  and coupling drop two places. That changes searches that work today — L2.
+- Pin `condulet` / `conduit body` → LB first and `ll` / `lr` → LL / LR first
+  against the ROLE-RANKED order (`rankMaterialHits`), since the raw order is
+  what missed this.
+
+**2. "c body" cannot find the C body.** A one-letter word does not
+discriminate: `c body`, `2 pvc c body` and `c condulet` return all five shapes
+tied, and ranking falls to the alphabet (with the LB fix, LB first;
+`2 pvc c body` puts the C 3rd). Tried in the prototype and it did NOTHING:
+pointing `ALIAS_MAP["c body"]` at "straight through" (the C rows' slang). So
+either the phrase never reaches the alias table or one-letter words are
+dropped before it — not yet traced. See L1.
+
+### How it would be built (one commit; Track C rules — no schema, no migration)
+
+1. Stop `pnpm dev` (seed edits under `tsx watch`, CLAUDE.md).
+2. `scripts/searchSpotCheck.mts` BEFORE, saved.
+3. `FITTINGS` + 3 entries; `llName` / `lrName` / `cBodyName`; rewrite the
+   `FITTINGS` doc comment (T6 overridden, LL/LR/C shipped).
+4. LB `"common"` (if L2 = yes), and the L1 fix.
+5. Tests: the rigid-raceway test grows LL/LR/C; body floor 90 → 225; the
+   pinned role-ranked searches above.
+6. Sweep AFTER, diffed against step 2 — every moved line must be one listed in
+   this section. If anything else moved, stop and find out why.
+7. `pnpm check`, `pnpm test` (against `bidrender_test_clean`).
+8. Check the xlsx for typed prices; regenerate the pricing sheet.
+9. § 4 T6 and todo.md say this overrides "later". CHANGELOG line.
+
+Expected after: catalog **1,455**, Conduit Fittings **518**, bodies **225**,
+pricing sheet **1,582** generic rows. If a count differs, stop and find out
+why before going on.
+
+### Questions for the owner (recommended answer first)
+
+- **L1. How should "c body" find the C body?** _Recommend a small search fix_:
+  trace why the `ALIAS_MAP["c body"]` phrase does not take effect, make it
+  reach "straight through", and pin it with a test. Fallback if that proves
+  invasive: ship without it — "straight through", the full name and browsing
+  the family still find it — and record the gap in todo.md.
+- **L2. Mark the LB "common" so it leads bare body searches?** _Recommend
+  yes._ Without it the C body leads "condulet" and "conduit body" purely on the
+  alphabet. The cost: bare pipe searches ("1-1/4 rigid") show the LB 3rd and
+  push connector/coupling down two places.
+- **L3. Tripwire headroom drops to 45.** _Recommend leaving 1,500 where it is
+  for this job._ It still fits; raise it deliberately, with the
+  library-response measurement its comment asks for, when the next family
+  needs it.
+- **L4. Brand aliases on LL/LR/C ("crouse hinds", "carlon") like the T?**
+  _Recommend no_, to match the LB and keep a brand query from surfacing 135
+  more rows. "crouse hinds tee" already works.
+- **L5. Offer LL/LR/C at a pull point in the takeoff?** _Recommend not now._
+  It needs a new `runMaterialRole` (Track A migration, three-step deploy) and
+  a way to know which side the pipe turns to, which the trace does not record.
+  The rows are useful by hand without it.

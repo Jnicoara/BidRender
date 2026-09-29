@@ -340,3 +340,31 @@ describe("punctuation in a query separates words", () => {
     expect(search('1-1/4" emt,', names)[0]).toBe('1-1/4" EMT');
   });
 });
+
+describe("a finished one-letter word", () => {
+  // Five body shapes share every other word; only the letter tells them apart.
+  const BODIES = [
+    '1/2" EMT LB conduit body',
+    '1/2" EMT T conduit body',
+    '1/2" EMT LL conduit body',
+    '1/2" EMT LR conduit body',
+    '1/2" EMT C conduit body',
+  ];
+
+  it('puts the name holding it whole first: "c body" is the C body', () => {
+    expect(search("c body", BODIES)[0]).toBe('1/2" EMT C conduit body');
+    expect(search("t body", BODIES)[0]).toBe('1/2" EMT T conduit body');
+  });
+
+  it("demotes the other names rather than dropping them", () => {
+    // Nothing a search returned before the rule may go missing because of it.
+    expect(search("c body", BODIES)).toHaveLength(BODIES.length);
+  });
+
+  it("leaves a letter still being typed as a prefix", () => {
+    // "emt c" may be the start of "emt conduit", so every body still ties.
+    const hits = search("emt c", BODIES);
+    expect(hits).toHaveLength(BODIES.length);
+    expect(hits[0]).toBe(BODIES[0]);
+  });
+});

@@ -797,16 +797,29 @@ interface TokenExpansion {
    * strict size matching lost it.
    */
   asWord?: boolean;
+  /**
+   * A single LETTER with another word after it — the "c" of "c body". It is
+   * finished, not being typed, so a name holding it as a whole word ("C
+   * conduit body") must beat one where it merely starts a word ("LB conduit
+   * body", via "conduit"). See scoreItem.
+   */
+  finishedLetter?: boolean;
 }
+
+/** A one-letter word; see TokenExpansion.finishedLetter. */
+const ONE_LETTER = /^[a-z]$/;
 
 /** Each query word, expanded — counts flagged by the word after them. */
 function expandTokens(tokens: string[]): TokenExpansion[] {
-  return tokens.map((token, i) =>
-    expandTokenCached(
+  return tokens.map((token, i) => {
+    const expansion = expandTokenCached(
       token,
       HAS_DIGIT.test(token) && COUNT_NOUN.test(tokens[i + 1] ?? "")
-    )
-  );
+    );
+    return ONE_LETTER.test(token) && i < tokens.length - 1
+      ? { ...expansion, finishedLetter: true }
+      : expansion;
+  });
 }
 
 /**
@@ -999,19 +1012,37 @@ function scoreItem<T extends SearchableItem>(
 ): number {
   let totalScore = 0;
 
-  for (const { typed, aliases, asWord } of tokenExpansions) {
+  for (const { typed, aliases, asWord, finishedLetter } of tokenExpansions) {
     // A count ("2" of "2 gang") is matched as a word — see TokenExpansion.
     const tier = (term: string) =>
       asWord
         ? matchTier(term, indexed.descNorm, indexed.descWords, indexed.text)
         : termTier(term, indexed);
-    let bestForToken = TYPED_POINTS[tier(typed)];
+    const typedPoints = TYPED_POINTS[tier(typed)];
+    let bestForToken = typedPoints;
+    // A finished one-letter word that only STARTS a word of the name ranks
+    // like a match anywhere in it (tier 5), so the name holding it whole
+    // leads. Demoted, never dropped: the item still qualifies, so no search
+    // returns less than it did. Added 2026-09-28 for "c body", where every
+    // body tied at tier 3 on "conduit" and the C body could not be asked for.
+    if (
+      finishedLetter &&
+      typedPoints >= TYPED_POINTS[3] &&
+      !indexed.descWords.includes(typed)
+    )
+      bestForToken = TYPED_POINTS[5];
 
     // No alias can score more than ALIAS_POINTS[1], so once the typed word
     // has reached it the alias loop cannot change the answer. Skipping it is
     // what keeps a one-letter query — which expands to hundreds of aliases —
     // inside a frame on a 2,000-row catalog.
-    if (bestForToken >= ALIAS_POINTS[1]) {
+    //
+    // Decided on the points BEFORE the demotion above. Deciding on the demoted
+    // points ran the alias loop for every row a finished letter demoted, and
+    // doubled the cost of "c b" (36 -> 64 ms at 1,455 rows, measured
+    // 2026-09-28 by catalogScale.test.ts's probe). Skipping it cannot reorder
+    // anything: an alias tops out at 70, below the 80 the whole-word row keeps.
+    if (typedPoints >= ALIAS_POINTS[1]) {
       totalScore += bestForToken;
       continue;
     }
