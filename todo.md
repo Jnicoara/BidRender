@@ -82,7 +82,7 @@ everyone to re-run instead of read.
       this one wants the same. **FIXED 2026-09-28** with that 60 s limit: at
       1,455 rows it failed on every run, alone too, at 5.4 s with every
       assertion passing once the limit was lifted.
-- [ ] **`server/seedReactivatesRetired.test.ts` "never switches on a company
+- [x] **`server/seedReactivatesRetired.test.ts` "never switches on a company
       row that shares a shipped name" lost its own row under a full run.**
       2026-09-28, once, on the local-dev + track-c merge: the company row it
       inserts was gone when read back (`Cannot read properties of undefined
@@ -91,6 +91,18 @@ everyone to re-run instead of read.
       own user ids, and no other file uses 7404/7405. A race, not yet
       explained. Run it alongside the full suite several times before calling
       anything fixed.
+      **FIXED 2026-09-29 — the other deleter was a second RUN, not another
+      file.** Every worktree was told to test against `bidrender_test_clean`,
+      and `fileParallelism: false` only orders one run's own files. Starting
+      this file twice, two seconds apart, on one database failed 5 of 6 cases,
+      one with the exact `reading 'userId'` error: each run's `beforeEach`
+      deleted the other's 7404 rows. `vitest.globalSetup.ts` now holds a MySQL
+      named lock on the test database for the whole run
+      (`scripts/testSuiteLock.ts`) and a second run on the same database is
+      refused by name; separate databases (`bidrender_test_b`, `_c`) still
+      run together. `server/testSuiteLock.test.ts` checks from inside the run
+      that the lock is held — red with the globalSetup call removed. Rerun of
+      the two-at-once repro: first passed 3/3, second refused.
 - [ ] **`scripts/schemaDrift.mts` says "this database has never been migrated"
       when it simply cannot connect.** Measured 2026-09-27 against production
       with the laptop off the database's trusted list: that line printed, then

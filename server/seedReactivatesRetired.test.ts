@@ -22,8 +22,12 @@
  *   AssertionError: the fixture is back in the catalog but still hidden:
  *                   expected false to be true
  *
- * Fixture ids are distinct from every other suite — vitest runs files in
- * parallel and shared ids delete each other's rows mid-run.
+ * Fixture ids are distinct from every other suite, so no other FILE can
+ * delete these rows. A second RUN of this same file could, and did: the
+ * 2026-09-28 "lost its own row" failure was two worktrees testing against one
+ * database, each run's `beforeEach` deleting the other's user-7404 rows.
+ * Reproduced 2026-09-29 by starting this file twice at once; a whole run now
+ * holds its database (scripts/testSuiteLock.ts) and the second is refused.
  */
 import {
   describe,
