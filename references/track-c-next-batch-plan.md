@@ -195,6 +195,16 @@ uses a threaded connector into a knockout.
 >    boxes. So "skip at a threaded hub" can be applied at LBs today and
 >    nowhere else without a new answer per end (A3).
 
+> **Fact 2 ANSWERED 2026-09-29 (owner) — the no-wire-size case.** On small
+> conduit (under 1-1/4", not rigid or IMC), where the bushing depends on
+> wire size: if the run type has NO conductor chosen, count NO bushing and
+> say so on screen, beside the type's fitting lines: **"wire size not set,
+> bushings not counted"**. Nothing is guessed. The warning is the point: a
+> blank would read as "no bushings needed", and a guessed size would be a
+> number nobody chose. Rigid, IMC and 1-1/4"-and-up ends are unaffected;
+> they count a bushing without asking the wire. Still held for A1. Also in
+> `references/track-c-retail-catalog-plan.md` § R8.
+
 ### Left out of this batch, and why
 
 | Item                                                            | Why not now                                                                                                 |
@@ -492,6 +502,16 @@ grep is not enough, though: an insert that omits `userId` also writes NULL.
 >   history: files that clean at the START of their next run net to zero;
 >   these 20 grow every run. Fixing them is the separate change the owner
 >   asked for (todo.md).
+
+> **T3 FIXED 2026-09-29 (owner: fix every file).** `dropFixtureUsersAfterAll`
+> (`server/testFixtureUsers.ts`) deletes a file's fixture users in `afterAll`,
+> pass or fail. All 52 `userId` foreign keys cascade from `users`, so that is
+> everything the file wrote. After the local-dev merge the leakers were 21
+> files and 209 rows (three new files came with the merge). All 23 files
+> named here or new are fixed. Full suite, 209 files, 4,211 passed: **0 rows
+> left.** A second run of the 23 files: 0, with nothing left to clear. Forced
+> failing test: 0 rows with the call, 46 without. No app code changed, and no
+> file was skipped.
 
 #### T3-measured: files that left user-owned rows, one full run
 

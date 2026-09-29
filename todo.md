@@ -2017,8 +2017,24 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       TYPE (its conductor), not per run, and not at all when a type names no
       conductor; the box at a run end is not known, so hubs are known only at
       LBs. A2/A3 there are the schema options if the owner wants those gaps
-      closed.
-- [ ] **Tests leave user-owned rows behind: 20 files, 195 rows per run.**
+      closed. **No wire size (owner, 2026-09-29):** on small conduit, a type
+      with no conductor chosen counts no bushing and says "wire size not
+      set, bushings not counted" (plan § W5).
+- [ ] **Commercial retail catalog gaps** — plan only, owner to answer RQ1–RQ5:
+      `references/track-c-retail-catalog-plan.md`. First: MC runs count no
+      connectors or straps, and there is no 12-4 MC. Surface raceway needs
+      Track A's category enum first.
+- [x] **FIXED 2026-09-29:** `dropFixtureUsersAfterAll` (`server/testFixtureUsers.ts`)
+      deletes each file's fixture users in `afterAll`, and every `userId`
+      table cascades from `users`. 23 files (the 20 below plus
+      stampDeleteAndDropUndo, quoteAppPanel, planCopilot from the local-dev
+      merge). Full run on `bidrender_test_c`: before, 21 files left 209 rows;
+      after, 0, and a second run of the 23 is 0 with nothing to clear. A
+      forced failing test in materialsList left 0 with the call, 46 without.
+      Still open: switching the report to a failure (needs it to count
+      user-owned rows only, so a seeder adding shipped rows is not flagged).
+      The entry as it stood: **Tests leave user-owned rows behind: 20
+      files, 195 rows per run.**
       Measured 2026-09-29 with `TEST_LEAK_REPORT` (vitest.setup.ts): materials
       93, assemblies 41, takeoff_run_types 37, then bids, users,
       company_members and others. Worst: materialsList (38), proposal (18),
