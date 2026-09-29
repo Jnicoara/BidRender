@@ -32,6 +32,29 @@ any outside user is invited** (`references/invite-gate-plan.md`).
   "outcome and tier only, no crops, no labels". Owner answer 4 replaced that
   for the correction log. A note has been added at § 9.5 on this branch.
 
+## The owner's answers (2026-09-29) — these override anything below
+
+**Q1–Q7 in § 11 are all answered as recommended**, and Q5 now has an owner and
+a deadline:
+
+1. **Log accepts too** (`accepted`).
+2. **Deleting a bid keeps the anonymised half and its cut-out**, with the
+   identity columns nulled. **This answer DEPENDS ON Q5.** It is only
+   acceptable once the terms say so plainly. Until the terms sentence exists,
+   treat Q2 as provisional. If the terms end up saying otherwise, § 4's
+   `set null` becomes a delete of the whole row and its crop, and that has to
+   be decided **before** the first outside user makes a correction, because
+   rows written under one promise cannot be re-promised.
+3. **Deleting a whole count logs one row per AI mark**, as `deleted_with_group`.
+4. **The shared half keeps the label, cut to 40 characters.**
+5. **The owner writes the terms sentence before the first outside invite.**
+   So the order is: terms sentence, then first outside invite. This log must
+   also be live by then ("Why now"). `invite-gate-plan.md` § 8.9 carries the
+   same condition.
+6. **Location tags are logged**, as `location_set`.
+7. **The group fault was real and is fixed**, on branch `a-ai-marks` (§ 1),
+   which merges into `local-dev` before this log is built.
+
 ---
 
 ## 1. What an "AI-made mark" is today (measured)
@@ -55,12 +78,18 @@ AI-made.
 - **Found while planning, not caused by this: a placed AI mark is written with
   `groupId` NULL** (`planCopilotRouter.ts:925-940`). Both stamp counters skip
   a NULL group (`db.ts:5147`, `db.ts:8613`). **By the code, a placed AI mark is
-  drawn on the sheet but counted on no bid line.** This has not been checked in
-  the running app yet. Per CLAUDE.md, measure before believing it: place one
-  AI mark on the fixture bid and see whether the bid's quantity moves. If it is
-  real, it is a wrong-number fault in its own right and gets fixed on its own
-  (§ 8). It also changes this plan, because once AI marks have groups,
-  deleting a **group** deletes AI marks too (§ 3).
+  drawn on the sheet but counted on no bid line.** It also changes this plan,
+  because once AI marks have groups, deleting a **group** deletes AI marks too
+  (§ 2).
+
+  > **Measured 2026-09-29, and real.** On the local fixture bid, one hand mark
+  > plus one placed AI mark of the same assembly read **bid line 1, materials
+  > list 2**, and the sheet showed the assembly as two counts of 1. It is fixed
+  > on `a-ai-marks` (`2ca2def`): Place now finds or makes the assembly's count
+  > through the same function as the stamp tool (`server/assemblyGroup.ts`).
+  > **No repair is needed.** Live, counted read-only the same day, has 0 placed
+  > AI marks outside a count, 0 confirmed findings and 0 plan-reader runs ever.
+  > The local copy also has 0.
 
 ---
 
@@ -342,7 +371,11 @@ repeated in `invite-gate-plan.md` § 10 because that is where strangers meet it.
 
 ---
 
-## 11. Questions for the owner
+## 11. Questions for the owner — ANSWERED 2026-09-29
+
+All seven answered as recommended; see "The owner's answers" at the top. Q2
+depends on Q5: it stands only once the terms sentence exists. Kept below as
+asked.
 
 1. **Q1. Log accepts too?** "Edited or deleted" is the ask. Without accepts
    there is nothing to divide by: 40 dismissals out of 50 proposals and 40 out

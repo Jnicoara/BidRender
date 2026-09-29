@@ -106,6 +106,11 @@ everyone to re-run instead of read.
       symbol learning later. Nothing may export, pool or share it — even the
       anonymised half — until users have agreed to terms that say so. Not
       blocking the log itself; blocking the first read of it.
+      **Moved earlier 2026-09-29 (owner): the owner writes the terms sentence
+      BEFORE THE FIRST OUTSIDE INVITE**, not before sharing, because keeping a
+      deleted bid's anonymised rows and cut-outs rests on it
+      (`references/ai-correction-log-plan.md`, answers 2 and 5;
+      `references/invite-gate-plan.md` § 8.9).
 - [ ] **Before the priced catalog ships: give "nobody has priced this" its own
       signal.** `shared/materialPricing.ts` and the Materials screen's unpriced
       filter both decide it from `costPerUnit === 0`. That works only while

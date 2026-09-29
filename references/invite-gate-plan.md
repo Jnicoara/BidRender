@@ -6,6 +6,32 @@ restate it. Measured against `local-dev` at `977b789`, and against
 `a-email-reset` at `af82b2f` (password reset by email). That branch is finished
 but **not merged**, and this plan depends on it (§ 9).
 
+## The owner's answers (2026-09-29) — these override anything below
+
+**Q1–Q7 in § 11 are answered as recommended**, with one addition to Q2:
+
+1. **One invite at a time.** No bulk button.
+2. **The account must use the invited email**, for both kinds, except that a
+   company code copied by hand works with any email. **Added: resend to a
+   DIFFERENT address.** The platform admin (new-company invites), and a company
+   owner or admin (staff invites), can resend an invite to another email, so
+   someone who signs up with a different address is not stuck. It revokes the
+   old code and issues a new one bound to the new address, in one step
+   (§ 3, § 8.4, § 8.5).
+3. **Reply-To:** staff invites reply to the inviter; new-company invites reply
+   to the owner's own address.
+4. **Seats on a new-company invite:** 1 / 5 / 15 or typed, default 1.
+5. **Reset for someone invited but not signed up sends nothing**, plus the
+   one-line pointer to the invite email.
+6. **Duplicate emails on live: counted 2026-09-29, read-only. There are none:
+   3 users, 0 duplicate addresses ignoring case, 0 with no email.** The column
+   is `utf8mb4_unicode_ci`, which ignores case, so a UNIQUE index on
+   `users.email` would apply cleanly today. It is still a separate item, not
+   part of this migration. Re-count first, because the gate is what starts
+   adding users.
+7. **Every existing account keeps working**, test accounts included. Nobody is
+   removed.
+
 **Read first.** These are the decisions this plan follows. Each is cited, not
 re-opened:
 
@@ -105,6 +131,13 @@ NULL AND expiresAt > now`). Two tabs racing on one link produce one account.
   This is the same claim pattern as `completePasswordReset`.
 - **"Resend" mints a new code and revokes the old one.** Codes are stored
   hashed, so the old one cannot be sent again. The expiry restarts at 14 days.
+- **Resend can change the address (owner answer 2).** Same step: revoke the
+  old code, then issue a new one bound to the new email, in one transaction.
+  The old link then says "revoked — ask {inviter} for a new one", never
+  "invalid". For a staff invite the seat carries over: one invite is revoked
+  and one is issued under the same lock, so resending to a new address can
+  never fail for lack of a seat, and it can never hold two seats. For a
+  new-company invite the seat limit and note carry over too.
 - **An expired invite frees its seat by itself.** Checked 2026-09-29:
   `shared/seats.ts:6-10` counts an invite only while it is unaccepted, unrevoked
   and not expired. Nobody has to tidy up.
@@ -220,13 +253,16 @@ the database). Count duplicates on live first, as a separate item (Q6).
 3. **`auth.inviteInfo(code)`** — public and rate-limited. It returns the kind,
    the company name, the email and the inviter's name, or the rejection reason.
 4. **Admin: new-company invites.** A panel beside `SeatLimitsPanel`. It needs
-   email, seat limit and note. It lists invites with status, plus revoke and
-   resend. **The waitlist rows get "Invite"**, which fills the email, links
+   email, seat limit and note. It lists invites with status, plus revoke,
+   resend, and **resend to a different email** (owner answer 2).
+   **The waitlist rows get "Invite"**, which fills the email, links
    `earlyAccessId` and stamps `notifiedAt` **only when the send reports
    success**. A stamp for a mail that did not go is the same lie as a save
    flash for a save that did not happen.
 5. **Team screen: company invites get an email field and "Send".** Copying the
-   code stays.
+   code stays. A pending invite gets **"Send to a different email"** for an
+   owner or admin (`members.manage`), which is the same revoke-and-reissue as
+   the admin's (owner answer 2).
 6. **Two email templates in `server/email/`**, one per kind. They name the
    inviter, say when the invite expires and carry a Reply-To (Q3).
 7. **Login page:** remove "Create account" and add the invite-only line. Add a
@@ -234,6 +270,11 @@ the database). Count duplicates on live first, as a separate item (Q6).
 8. **Go-live list.** The owner sends the people who must be able to get in on
    day one (stage-4 § F). Existing accounts are untouched, so this list is only
    for people who **do not have an account yet**.
+9. **Before the first OUTSIDE invite goes out, two things must be true**
+   (owner, 2026-09-29): the owner's terms sentence exists
+   (`ai-correction-log-plan.md` Q5), and the AI correction log is live
+   (that plan's "Why now"). Neither blocks building the gate. Both block
+   using it on a stranger.
 
 **Tests** (server suite, `appRouter.createCaller`):
 
@@ -243,7 +284,13 @@ the database). Count duplicates on live first, as a separate item (Q6).
 - a company invite creates exactly one membership, with the invited role, and
   **no personal company** (count `companies` before and after);
 - a new-company invite creates one company with the invite's `seatLimit`;
-- the email must match the invite (if Q2 = yes);
+- the email must match the invite (a sent code), and any email works for a
+  staff code copied by hand;
+- resending to a different email revokes the old code (its link now says
+  revoked), binds the new one to the new address, and leaves the company's
+  seat count unchanged, **including when the company is at its limit**;
+- only `members.manage` can resend a staff invite, and only a platform admin
+  can resend a new-company one;
 - reset for an invited-but-not-accepted address sends nothing (stub mode
   records the send, so assert that none was recorded);
 - the existing `acceptInvite` path for signed-in users still works.
@@ -308,7 +355,10 @@ sees whatever the catalog says that day.
 
 ---
 
-## 11. Questions for the owner
+## 11. Questions for the owner — ANSWERED 2026-09-29
+
+All seven answered as recommended; see "The owner's answers" at the top, which
+also adds resend-to-a-different-email to Q2. Kept below as asked.
 
 1. **Q1. The waitlist "Invite" button — invite one at a time only?**
    Recommendation: yes. There should be no bulk button, because of the email cap
