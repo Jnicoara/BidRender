@@ -1390,9 +1390,10 @@ path is ever revived, give it the same treatment first.
 
 ## Stage 5 follow-ups (references/stage-5-track-b-plan.md, 2026-09-27)
 
-- [ ] **PLANNED 2026-09-29 (Track B), not built: prices in the takeoff CSV
-      (opt-in, off every time) and the "For your quote app" panel (five
-      buckets per scope, pre-tax, a copy button per number).** Plan in
+- [x] **BUILT 2026-09-29 (Track B; `8f74785`, `9295841`, `3fee5ee`): prices
+      in the takeoff CSV (opt-in, off every time) and the "For your quote
+      app" panel (five buckets per scope, pre-tax, a copy button per
+      number).** What differs from the plan is in its "As built" table. Plan in
       `references/quote-app-panel-plan.md`. **Owner answered all seven
       questions the same day** (§ 1a). The panel shows the price TO THE
       CUSTOMER (markup, overhead and profit inside Material and Labor), with a
@@ -1401,6 +1402,12 @@ path is ever revived, give it the same treatment first.
       attached items stay out. No migration for v1. **Handoff for Track A**
       (§ 10): H1 a quote bucket per expense, and H2 the example-price flag
       with a saved copy on each bid line.
+- [ ] **Track A (migration): remove ONE mark's drop.** Asked for with "Undo
+      drops" (built 2026-09-29, `34f8515`) and not built, because a drop is
+      set on the count and nothing on `takeoff_stamps` can exclude one mark.
+      Needs a nullable `takeoff_stamps.dropExcluded` (NULL = follows the
+      count; additive). Spec and B's follow-up in
+      `references/quote-app-panel-plan.md` § 10, H3.
 
 - [x] **BUILT 2026-09-27 (Track B), owner's answers as recommended in
       `references/track-b-beta-plan.md` § 1.** `storageDelete` on both

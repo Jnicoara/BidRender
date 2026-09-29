@@ -565,7 +565,7 @@ price and watch it move.
 
 ## 10. Handoff for Track A (schema)
 
-**Two items, and neither blocks v1.** Track B builds everything in this plan
+**Three items (H3 added 2026-09-29), and none blocks v1.** Track B builds everything in this plan
 without them. Each one, when it lands, is an additive migration that B then
 reads. Per-line scopes (the first draft's H3) were **dropped** by the owner on
 2026-09-29 and are not handed off.
@@ -608,9 +608,30 @@ reads. Per-line scopes (the first draft's H3) were **dropped** by the owner on
   lands", which already flags this). The marker is what replaces that
   reading. If any `UPDATE` in H2 writes an existing column, it is a **meaning
   migration**: code first, backfill after.
-- **B's side once it lands:** `lineUsesExamplePrice` takes the new field, and
-  the compile errors (§ 6) show every place that must pass it. The CSV status
-  and the panel line are already built and tested.
+- **B's side once it lands:** the panel router's `examplePricedLines: 0`
+  (`server/routers/quoteAppRouter.ts`) becomes a count of lines whose
+  snapshot says example, and the CSV gains its `Example price` status. The
+  panel's wording for it is already built and tested (T4). (This said a
+  `lineUsesExamplePrice` stub would force the change by compile error; no stub
+  was built — see "As built" at the top.)
+
+### H3. Remove ONE mark's drop — a per-mark exception (added 2026-09-29)
+
+Asked for with "Undo drops" and **not built**, because it needs a column.
+
+- **Why a column:** a drop is set once on the COUNT (`takeoff_groups.dropKind`
+  / `dropHeightInches` / `dropRunTypeId`) and every mark in it carries one
+  (`shared/groupDrops.ts`). Nothing on `takeoff_stamps` can say "not this
+  one". "Undo drops" (built) reverses the last change to the count's drop; it
+  cannot take one mark out.
+- **Column:** `takeoff_stamps.dropExcluded` (or `noDrop`), boolean, **nullable,
+  no default** — NULL means "follows the count", the only meaning today, so it
+  is **additive**, step 1 of the three-step deploy.
+- **B's side once it lands:** `groupDrops.ts` skips excluded marks the same
+  way it skips marks a run end claims (`stampsClaimedByRuns`), the drop row's
+  arithmetic says "× N of M marks", and the selected-marks pill gains "No drop
+  on these". Tests: excluding one of four marks takes exactly one drop off
+  the totals, the readout, the bid line and the materials list.
 
 ---
 
