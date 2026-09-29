@@ -10,6 +10,8 @@ This is the human-readable companion to the git history — read this to see wha
   EMT, rigid, IMC and both PVC schedules, 1/2" to 4" — 135 rows, each priced
   with its cover and gasket like the LB and T. They are for adding by hand or
   in an assembly; the takeoff still suggests only LBs and pull boxes.
+  The pricing spreadsheet has the 135 new rows too, each with its "priced
+  with its cover and gasket" note.
 - **Searching "condulet" or "conduit body" still shows the LB first.** With
   the new shapes in, the rarely used C body had jumped to the top on
   alphabetical order alone. The LB now counts as a common part, so it also
