@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **New on the bid's Send menu: "For your quote app"** (internal accounts
+  first). It shows what you charge the customer, before tax, in the five
+  buckets your quote app takes (Tasks, Material, Equipment, Labor, Misc), with
+  a Copy button on every figure that copies the exact cents for pasting on a
+  phone. Material and labor include your markup, overhead and profit; each
+  charge is listed under Misc at what the bid bills for it. The buckets always
+  add up to the bid's total before tax. If any line has no price, the panel
+  lists those lines and shows no figures until they are priced, so a partial
+  price can't be copied into a quote.
 - **You can now delete counted marks on the plans, one or many at once.**
   Click a mark to select it, Shift-click or Shift-drag a box to select more,
   then press Delete or use the Delete button. Deleting more than one asks

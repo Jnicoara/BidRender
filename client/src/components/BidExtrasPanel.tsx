@@ -53,6 +53,8 @@ export function BidExtrasPanel({ bidId }: { bidId: number }) {
     // The rollup and the document both change when a charge does.
     void utils.bids.get.invalidate({ id: bidId });
     void utils.proposals.document.invalidate({ bidId });
+    // Every charge is a figure under Misc in "For your quote app".
+    void utils.quoteApp.get.invalidate({ bidId });
   };
 
   const onError = (e: { message: string }) => toast.error(e.message);
