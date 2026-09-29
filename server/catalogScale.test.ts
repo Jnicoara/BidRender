@@ -43,6 +43,7 @@ import { createPool, type Pool } from "mysql2/promise";
 import { drizzle } from "drizzle-orm/mysql2";
 import { materials } from "../drizzle/schema";
 import { mysqlConnection } from "./databaseConnection";
+import { scratchSchemaFor } from "../scripts/testSuiteLock";
 import { BASELINE_MATERIALS } from "./seed/materials";
 import {
   CATALOG_ROW_LIMIT,
@@ -180,8 +181,14 @@ const COMPANY = 6303;
  * `server/backup.test.ts`, which dumps every table and compares counts, and
  * the first version of this file made it fail (todo.md, "Flaky tests").
  * The `bidrender_%` grant covers the name.
+ *
+ * Named after the database under test (scratchSchemaFor), not fixed: a fixed
+ * name is shared by every test database on the server, so two worktrees
+ * running this file at once would drop each other's copy.
  */
-const SCRATCH = "bidrender_catalogscale_test";
+const SCRATCH = hasDb
+  ? scratchSchemaFor(process.env.DATABASE_URL!, "catalogscale")
+  : "";
 
 describe.skipIf(!hasDb)(`loading a ${CATALOG_ROW_LIMIT}-row library`, () => {
   let admin: Pool | null = null;

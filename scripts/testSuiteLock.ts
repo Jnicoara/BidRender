@@ -42,6 +42,29 @@ function databaseOf(url: string): string {
 }
 
 /**
+ * A scratch SCHEMA a test creates and drops, named after the database under
+ * test — never a fixed name.
+ *
+ * The lock above keeps two runs off one database, but a schema name is
+ * server-wide: `backup.test.ts` restored into `bidrender_backup_restore_test`
+ * whichever database it was testing, so track B on `bidrender_test_b` and
+ * track C on `bidrender_test_c` dropped and refilled each other's restore.
+ * Reproduced 2026-09-29 by running the restore test against `bidrender_test_c`
+ * and a schema-only copy of it at once: the copy's restore held the other
+ * run's tables. Each alone passes.
+ *
+ * Throws rather than truncating past MySQL's 64 characters, because a
+ * truncated name is how two databases would come to share one again.
+ */
+export function scratchSchemaFor(url: string, purpose: string): string {
+  const name = `${databaseOf(url)}__${purpose}`;
+  if (name.length > 64) {
+    throw new Error(`Scratch schema name "${name}" is over MySQL's 64.`);
+  }
+  return name;
+}
+
+/**
  * Take the lock for `url`'s database and keep the connection that holds it
  * open. Resolves to the release function; rejects, naming the database, if
  * another run holds it.

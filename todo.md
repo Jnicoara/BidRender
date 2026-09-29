@@ -59,7 +59,7 @@ everyone to re-run instead of read.
       passing. Given 60 s like `seedPreservesUserPrices`. A timeout, not a
       race — but the next catalog growth will push other seed-heavy tests
       toward 5 s the same way.
-- [ ] **`server/backup.test.ts` "restores into an empty database, table for
+- [x] **`server/backup.test.ts` "restores into an empty database, table for
       table and row for row" (line ~248) came up 11 `assemblies` rows short.**
       2026-09-27. A timing race on the shared test database: something else
       seeds or touches `assemblies` between the dump and the count, so the
@@ -74,6 +74,22 @@ everyone to re-run instead of read.
       anyway to build its own scratch database (`bidrender_catalogscale_test`)
       and only READ the shared one, so it cannot be. New tests that write a
       lot should do the same until this is fixed.
+      **FIXED 2026-09-29 — two causes, both OTHER RUNS, never another file.**
+      (1) Two runs on one database: the lock in `scripts/testSuiteLock.ts`
+      (see the seedReactivatesRetired entry) now refuses the second. (2) Two
+      runs on two DIFFERENT databases still collided, because the restore
+      went into the fixed schema `bidrender_backup_restore_test` (and the
+      verify tests into fixed `bidrender_verify_*`) — a schema name is
+      server-wide. Track B was seen dumping `bidrender_test_b` mid-session.
+      Reproduced by running the restore test against `bidrender_test_c` and a
+      schema-only copy of it at once: the copy's restore held the other run's
+      tables; alone it passed. Every scratch schema in `backup.test.ts` and
+      `catalogScale.test.ts` is now `<database>__<purpose>`
+      (`scratchSchemaFor`); the new naming case in `backup.test.ts` is red on
+      the old fixed name. The same two-at-once repro then passed twice.
+      Leftover: the corrupt-dump verify case never drops its scratch schema
+      (the restore fails before the drop), so `<db>__verify_corrupt` lingers
+      between runs — harmless, dropped on the next run's start.
 - [x] **`server/seedPreservesUserPrices.test.ts` "keeps the fork's price…"
       flakes on the 5 s default timeout.** 2026-09-27: failed in a full run
       (5010 ms), then run alone it passed once and failed once — it seeds the
