@@ -167,6 +167,34 @@ EMT/other ends from 1-1/4" up (where a #4 or larger conductor usually is,
 NEC 300.4(G)). Locknuts: one per connector end on every conduit family that
 uses a threaded connector into a knockout.
 
+> **Q3 ANSWERED 2026-09-29 (owner) — and HELD, not built.** The rule: one
+> bushing per conduit end at a box or enclosure — ALWAYS on 1-1/4" and up
+> (no wire-size check), ALWAYS on rigid and IMC at any size, and on smaller
+> conduit only when the wire is #4 or larger; SKIP where the box has a
+> threaded hub or its own smooth entry, or where the connector row says it
+> includes the insulated throat. Locknuts: the same check, skipped where the
+> connector already includes one. Held until A adds the two roles. What was
+> asked for before building, measured:
+>
+> 1. **No connector row says it includes a locknut or an insulated throat.**
+>    All 71 conduit-connector rows (EMT set-screw, compression and raintight;
+>    PVC 40 and 80; rigid; IMC — 9 sizes each; FMC and LFMC — 4 each) were
+>    searched in name, aliases and description: none mentions either. So the
+>    "skip where included" condition matches nothing today, and the rule as
+>    written would count a locknut and bushing at every end. The catalog has
+>    to SAY it first — see A2 in § 4.
+> 2. **Wire size is known per RUN TYPE, not per run.**
+>    `takeoff_run_types.conductorMaterialId` names the conductor, and its size
+>    reads through `CONDUCTOR_SIZES` (`shared/materialSizeOrder.ts`), so
+>    "#4 or larger" can be answered for any type that names a conductor. Runs
+>    and circuits hold counts only, no size. **A type with no conductor
+>    chosen has no wire size — the owner's "tell me and we'll decide" case.**
+> 3. **Whether the box at an end has a hub is not known.** A run end records
+>    its KIND (device, distribution, …), not the box. The app knows hubs only
+>    for LB bodies (`lbHubsTakeConnectors`); tee and pull boxes are knockout
+>    boxes. So "skip at a threaded hub" can be applied at LBs today and
+>    nowhere else without a new answer per end (A3).
+
 ### Left out of this batch, and why
 
 | Item                                                            | Why not now                                                                                                 |
@@ -442,6 +470,54 @@ Only two test files write `userId: null` literally (`takeoffBridgeFlow`,
 `materialsLibrary` — the second is a pure-function fixture, no database). A
 grep is not enough, though: an insert that omits `userId` also writes NULL.
 
+> **BUILT 2026-09-29 — T1, T2, and T3 in report mode.** Full suite with the
+> guard live: **205 files, 4,165 passed, 0 failed; no file leaves a shared
+> row.**
+>
+> - **T1:** `dropSharedAssemblyWhenDone` registers the delete with
+>   `onTestFinished` right after each insert. Forced check: the R3 test made
+>   to throw after its insert left **0** shared rows; with the registration
+>   removed, the same run left `Fork flow starter R3 …` — the leak exactly.
+> - **T2:** `scripts/testLeakGuard.ts` + hooks in `vitest.setup.ts`. On that
+>   forced leak it failed the FILE: "server\takeoffBridgeFlow.test.ts left 1
+>   SHARED row(s) behind … assemblies #1810 "Fork flow starter R3 …"". Hook
+>   order confirmed, not assumed: `seedReactivatesRetired`'s non-shipped
+>   fixture row, removed in its own `afterAll`, passes — the guard runs after.
+> - **T3 (report only, `TEST_LEAK_REPORT=<file>`):** per run, **20 of 205
+>   files leave 195 user-owned rows** — materials 93, assemblies 41,
+>   takeoff_run_types 37, then 1–3 each of bids, users, company_members and
+>   others. The worst: `materialsList.test.ts` 38, `proposal.test.ts` 18,
+>   `linePricingProblems.test.ts` 18, `assemblyOverhead.test.ts` 16,
+>   `extrasLaborSplit.test.ts` 13. The 4,242 bids measured earlier are
+>   history: files that clean at the START of their next run net to zero;
+>   these 20 grow every run. Fixing them is the separate change the owner
+>   asked for (todo.md).
+
+#### T3-measured: files that left user-owned rows, one full run
+
+| File                                        | Rows | By table                                                                                                                                                                                 |
+| ------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| server/materialsList.test.ts                | 38   | materials 19, assemblies 14, takeoff_run_types 5                                                                                                                                         |
+| server/proposal.test.ts                     | 18   | materials 18                                                                                                                                                                             |
+| server/linePricingProblems.test.ts          | 18   | assemblies 9, materials 9                                                                                                                                                                |
+| server/assemblyOverhead.test.ts             | 16   | materials 16                                                                                                                                                                             |
+| server/extrasLaborSplit.test.ts             | 13   | materials 3, bid_pdf_sheets 1, bid_pdfs 1, bids 1, company_members 1, pricing_defaults 1, takeoff_extra_defaults 1, takeoff_run_circuits 1, takeoff_run_types 1, takeoff_runs 1, users 1 |
+| server/takeoffRuns.test.ts                  | 12   | takeoff_run_types 12                                                                                                                                                                     |
+| server/accountingExport.test.ts             | 12   | assemblies 6, materials 6                                                                                                                                                                |
+| server/takeoffExport.test.ts                | 12   | takeoff_run_types 12                                                                                                                                                                     |
+| server/materialMarkupAgreement.test.ts      | 11   | assemblies 11                                                                                                                                                                            |
+| server/groupDropsBid.test.ts                | 9    | bid_pdf_sheets 1, bid_pdfs 1, bids 1, company_members 1, pricing_defaults 1, takeoff_groups 1, takeoff_height_defaults 1, takeoff_stamps 1, users 1                                      |
+| server/takeoffRunTypes.test.ts              | 8    | materials 8                                                                                                                                                                              |
+| server/companyDefaults.test.ts              | 8    | materials 8                                                                                                                                                                              |
+| server/typedLengthRuns.test.ts              | 8    | takeoff_run_types 6, company_members 1, users 1                                                                                                                                          |
+| server/permissions.test.ts                  | 3    | materials 2, clients 1                                                                                                                                                                   |
+| server/assemblies.test.ts                   | 3    | materials 3                                                                                                                                                                              |
+| server/closeout.test.ts                     | 2    | bid_closeouts 1, bids 1                                                                                                                                                                  |
+| server/bids.test.ts                         | 1    | materials 1                                                                                                                                                                              |
+| server/takeoffStamps.test.ts                | 1    | assemblies 1                                                                                                                                                                             |
+| server/laborRateSharing.test.ts             | 1    | kits 1                                                                                                                                                                                   |
+| server/quantitiesIgnoreDeletedPlans.test.ts | 1    | takeoff_run_types 1                                                                                                                                                                      |
+
 ### T1. Fix the file that did it
 
 `takeoffBridgeFlow.test.ts`: register the delete with `onTestFinished` right
@@ -486,6 +562,18 @@ change once the list is known.
 | #   | Migration                                                                                   | Kind                                                                   | Unblocks |
 | --- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | -------- |
 | A1  | Append `locknut`, `bushing` to `bid_line_items.runMaterialRole` (like 0084/0085, no UPDATE) | ADDITIVE — apply BEFORE the code (CLAUDE.md § "Deploying a migration") | W5       |
+
+**Possibly also, depending on the owner's answers to the Q3 findings (W5):**
+
+- **A2 — only if a company's OWN connector must be able to say "includes a
+  locknut / insulated throat".** Two nullable booleans on `materials`
+  (`includesLocknut`, `insulatedThroat`; NULL = not stated, counted as not
+  included), additive. The alternative needs no schema: a flag on the SEED
+  rows, which a fork reads through its `baselineId` — enough for every
+  shipped connector, not for one a company typed from scratch.
+- **A3 — only if "skip at a threaded hub" must apply at run ends.** A
+  nullable per-end answer on `takeoff_runs` (what box the end lands in),
+  additive. Without it the hub skip applies at LB bodies only.
 
 Already waiting on A from earlier work, unchanged: `teeBody` on the same enum
 (`todo.md`, "T bodies at a tee").

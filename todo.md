@@ -1990,7 +1990,24 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       picker.
 - [ ] **Locknuts and bushings** at each connector (RMC/IMC, and EMT into a
       panel). The rows exist (`conduit bushing`, `conduit locknut`); nothing
-      counts them yet.
+      counts them yet. **Rule decided by the owner 2026-09-29, build HELD
+      until Track A appends `locknut` and `bushing` to `runMaterialRole`
+      (A1).** Three facts reported first, in
+      `references/track-c-next-batch-plan.md` § W5: no connector row says it
+      includes a locknut or insulated throat; wire size is known per run
+      TYPE (its conductor), not per run, and not at all when a type names no
+      conductor; the box at a run end is not known, so hubs are known only at
+      LBs. A2/A3 there are the schema options if the owner wants those gaps
+      closed.
+- [ ] **Tests leave user-owned rows behind: 20 files, 195 rows per run.**
+      Measured 2026-09-29 with `TEST_LEAK_REPORT` (vitest.setup.ts): materials
+      93, assemblies 41, takeoff_run_types 37, then bids, users,
+      company_members and others. Worst: materialsList (38), proposal (18),
+      linePricingProblems (18), assemblyOverhead (16), extrasLaborSplit (13);
+      the full list is in the plan, § 3. None crosses files today (distinct
+      fixture ids) and SHARED rows are now a failure (`testLeakGuard.ts`);
+      these are the owner's "fix as a separate change" (Q5). When they are
+      clean, switch the report to a failure like the shared-row guard.
 - [ ] **PVC expansion fittings** on long exposed PVC runs.
 - [ ] **MC cable connectors and straps.** MC needs the same counting — a
       connector at each end, straps at 6 ft and within 12 in of a box — and
