@@ -89,6 +89,28 @@ export type RacewayFacts = {
  */
 export const UNPRICED = "0.0000";
 
+/**
+ * The most shipped rows the catalog may hold. A TRIPWIRE, not a limit
+ * anything enforces: no database column, index, seed step or screen stops at
+ * it. It exists to catch a generator that has gone wrong, and to make growth
+ * past it a decision rather than a drift.
+ *
+ * Raised 1,500 -> 3,000 on 2026-09-28, at 1,455 rows, after
+ * `server/catalogScale.test.ts` measured the app at 3,000 (desktop, alone):
+ * search 9–12 ms median and 82–100 ms p95 per keystroke, library read
+ * 37–53 ms, a 2.1 MB `materials.list` response (~115 KB compressed at the
+ * Cloudflare edge; Express does not compress) parsed in 40–62 ms, and the
+ * pricing sheet built in ~1.2 s. Roughly double today's costs, all linear.
+ *
+ * That test runs AT this number, so raising it again re-runs the proof at the
+ * new size. If it fails there, make the slow part faster — page
+ * `materials.list`, move search off the main thread or onto the server —
+ * rather than loosen the budgets. `materialsCatalog.test.ts` also caps any
+ * one shelf, which is what catches a single generator running away now that
+ * this line sits far above the catalog.
+ */
+export const CATALOG_ROW_LIMIT = 3000;
+
 // ─── Trade sizes ──────────────────────────────────────────────────────────────
 
 // Defined in shared/tradeSizes.ts, so shared/renamedMaterials.ts can read it.

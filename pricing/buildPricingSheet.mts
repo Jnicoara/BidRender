@@ -22,7 +22,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { BASELINE_MATERIALS } from "../server/seed/materials/index";
+import { BASELINE_MATERIALS as SHIPPED_CATALOG } from "../server/seed/materials/index";
+import type { BaselineMaterial } from "../server/seed/materials/types";
 import { compareBySize, materialTypeName } from "../shared/materialSizeOrder";
 import { compareMaterials } from "../shared/materialOrder";
 import {
@@ -32,6 +33,23 @@ import {
 } from "./movedFromSheet";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+/*
+  Two settings, both unset in normal use, which then changes nothing: the
+  catalog is the shipped one and the output lands beside this file.
+
+  They exist for server/catalogScale.test.ts, which runs THIS script on a
+  3,000-row catalog to prove the sheet still builds at the catalog limit
+  (2026-09-28). PRICING_CATALOG_JSON names a JSON array of seed rows to read
+  instead of the shipped catalog; PRICING_OUT_DIR sends rows.json and the
+  ai-review folder somewhere else, so a test never overwrites the committed
+  sheet's inputs. writeWorkbook.cjs reads rows.json from the same place.
+*/
+const BASELINE_MATERIALS: readonly BaselineMaterial[] = process.env
+  .PRICING_CATALOG_JSON
+  ? JSON.parse(fs.readFileSync(process.env.PRICING_CATALOG_JSON, "utf8"))
+  : SHIPPED_CATALOG;
+const OUT_DIR = process.env.PRICING_OUT_DIR ?? HERE;
 
 type Row = {
   parent: string;
@@ -1563,7 +1581,7 @@ const generic = sortRows(rows);
 const branded = sortRows(brandRows);
 
 fs.writeFileSync(
-  path.join(HERE, "rows.json"),
+  path.join(OUT_DIR, "rows.json"),
   JSON.stringify({ generic, branded }, null, 0)
 );
 
@@ -1573,7 +1591,7 @@ fs.writeFileSync(
   question is "what is missing", and both would only be noise for it. The
   folder is rewritten whole so a category that disappears leaves no stale file.
 */
-const REVIEW_DIR = path.join(HERE, "ai-review");
+const REVIEW_DIR = path.join(OUT_DIR, "ai-review");
 fs.rmSync(REVIEW_DIR, { recursive: true, force: true });
 fs.mkdirSync(REVIEW_DIR);
 const byCategory = new Map<string, Row[]>();

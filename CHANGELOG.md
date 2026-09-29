@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-28]
 
+- **The shipped catalog may now grow to 3,000 items, up from 1,500**, with a
+  test that proves the app still works at that size: search stays quick
+  while typing, the catalog loads, and the pricing spreadsheet still builds.
+  The old limit was only a safety check in the tests, and nothing in the app
+  depended on it. The same test now shows the next real limit: every search
+  box receives the whole catalog, so past 3,000 the list needs to load in
+  pages.
+
 - **LL, LR and C conduit bodies are in the catalog**: all three shapes for
   EMT, rigid, IMC and both PVC schedules, 1/2" to 4" — 135 rows, each priced
   with its cover and gasket like the LB and T. They are for adding by hand or

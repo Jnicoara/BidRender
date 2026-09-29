@@ -29,6 +29,24 @@ left as written rather than rewritten to match the rename.
 
 ## Pending / Future
 
+### The whole catalog goes to the browser, and grows with it
+
+- [ ] **`materials.list` is unpaged and search runs on the main thread.**
+      Measured 2026-09-28 by `server/catalogScale.test.ts`: about 725 bytes a
+      row as superjson, so **~1 MB today (1,455 rows) and 2.1 MB at the
+      3,000-row limit**, parsed in 40–62 ms. Live traffic is compressed by the
+      Cloudflare edge (`Content-Encoding: br` on bidridge.com, ~115 KB at
+      3,000); the Express server compresses nothing, so any host without that
+      edge — staging included — sends the full size. Search per keystroke at
+      3,000: 9–12 ms median, 82–100 ms p95, worst ~175 ms on a first letter,
+      on a desktop; a field laptop is slower. Everything is linear and inside
+      budget at 3,000, which is why the limit was raised. This is CLAUDE.md
+      § Responsiveness rule 2 ("lists load a window, never the whole table"),
+      which these screens predate. **Do before the catalog needs to pass
+      3,000:** page `materials.list` and move search to the server, or at
+      least off the main thread. The scale test's budgets are the alarm; do
+      not loosen them to get past it.
+
 ### Flaky tests — fix in a batch before beta
 
 Both are timing, not wrong answers, and both touch the shared test database.
@@ -42,6 +60,14 @@ everyone to re-run instead of read.
       restore is compared against a moving target. Not reproduced in
       isolation yet. Before calling it fixed, run it alongside the full suite
       several times — a pass alone proves nothing about a race.
+      **2026-09-28:** failed in two full runs while a draft of
+      `server/catalogScale.test.ts` was padding the shared test database with
+      1,545 `materials` rows — but the run whose detail was read failed on
+      `assemblies` and on a JSON-column check, which that draft never wrote,
+      so the draft is not shown to be the cause. The scale test was changed
+      anyway to build its own scratch database (`bidrender_catalogscale_test`)
+      and only READ the shared one, so it cannot be. New tests that write a
+      lot should do the same until this is fixed.
 - [ ] **`server/seedPreservesUserPrices.test.ts` "keeps the fork's price…"
       flakes on the 5 s default timeout.** 2026-09-27: failed in a full run
       (5010 ms), then run alone it passed once and failed once — it seeds the

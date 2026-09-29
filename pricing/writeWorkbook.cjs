@@ -23,8 +23,13 @@ const path = require("path");
 
 const HERE = __dirname;
 const OUT = process.argv[2] || path.join(HERE, "starter-catalog-pricing.xlsx");
+// PRICING_OUT_DIR: where buildPricingSheet.mts wrote rows.json when it was
+// told to write somewhere else — see the note there. Unset, it is this folder.
 const { generic, branded } = JSON.parse(
-  fs.readFileSync(path.join(HERE, "rows.json"), "utf8")
+  fs.readFileSync(
+    path.join(process.env.PRICING_OUT_DIR || HERE, "rows.json"),
+    "utf8"
+  )
 );
 
 const HEADERS = [
