@@ -18,11 +18,16 @@ export function useTakeoffExport(bidId: number) {
   const utils = trpc.useUtils();
   const [pending, setPending] = useState(false);
 
-  const exportCsv = async () => {
+  /**
+   * `includePrices` is the person's explicit choice, made each time in the
+   * export dialog (owner, 2026-09-29). Omitted is false: the plain,
+   * quantities-only file.
+   */
+  const exportCsv = async (options: { includePrices?: boolean } = {}) => {
     setPending(true);
     try {
       const doc = await utils.takeoffExport.get.fetch(
-        { bidId },
+        { bidId, includePrices: options.includePrices ?? false },
         { staleTime: 0 }
       );
       if (doc.bySheet.length === 0) {
@@ -37,7 +42,11 @@ export function useTakeoffExport(bidId: number) {
         }),
         takeoffExportFilename(doc)
       );
-      toast.success("Takeoff saved as CSV.");
+      toast.success(
+        doc.prices
+          ? "Takeoff with prices saved as CSV. It carries your costs — keep it internal."
+          : "Takeoff saved as CSV."
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "The export failed."

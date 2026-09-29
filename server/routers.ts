@@ -19,6 +19,7 @@ import { bidExtrasRouter } from "./routers/bidExtrasRouter";
 import { materialsListRouter } from "./routers/materialsListRouter";
 import { takeoffExportRouter } from "./routers/takeoffExportRouter";
 import { accountingRouter } from "./routers/accountingRouter";
+import { quoteAppRouter } from "./routers/quoteAppRouter";
 import { companyRouter } from "./routers/companyRouter";
 import { closeoutRouter } from "./routers/closeoutRouter";
 import { analyticsRouter } from "./routers/analyticsRouter";
@@ -68,6 +69,8 @@ export const appRouter = router({
   materialsList: materialsListRouter,
   takeoffExport: takeoffExportRouter,
   accounting: accountingRouter,
+  // A bid's customer price, before tax, in the owner's quote app's buckets.
+  quoteApp: quoteAppRouter,
   // Access control: who is in the company and what they may do. Every route
   // acts on ctx.scope.companyId — none of them take a company id.
   company: companyRouter,

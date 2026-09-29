@@ -24,8 +24,15 @@
  *     an unlinked run end, which MAY be counted twice (flagged, not guessed).
  */
 import { useState } from "react";
-import { TriangleAlert } from "lucide-react";
+import { TriangleAlert, Undo2 } from "lucide-react";
 import { HeightFields } from "@/components/HeightFields";
+import {
+  applyDropPatch,
+  dropFieldsDiffer,
+  dropFieldsOf,
+  restoreDropPatch,
+  type DropFields,
+} from "@/lib/dropUndo";
 import { formatElevation } from "@shared/takeoffHeights";
 import type { GroupDrop as GroupDropResult } from "@shared/groupDrops";
 
@@ -66,6 +73,24 @@ export function GroupDrop({
   locked: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  /**
+   * The drop as it was before the last change, for "Undo drops" (owner,
+   * 2026-09-29). The drops a click adds are exactly the difference between
+   * the group's three fields before and after it, so undoing the click is
+   * writing those three back — nothing else moves. See @/lib/dropUndo.
+   */
+  const [undo, setUndo] = useState<DropFields | null>(null);
+  const set = (patch: GroupDropPatch) => {
+    const before = dropFieldsOf(info);
+    if (dropFieldsDiffer(before, applyDropPatch(before, patch)))
+      setUndo(before);
+    onSet(patch);
+  };
+  const undoDrops = () => {
+    if (!undo) return;
+    onSet(restoreDropPatch(undo));
+    setUndo(null);
+  };
   const r = info.result;
 
   if (info.dropKind === null && !open) {
@@ -101,7 +126,7 @@ export function GroupDrop({
           disabled={locked}
           aria-label="What each mark drops to"
           onChange={e =>
-            onSet({ dropKind: e.target.value === "" ? null : e.target.value })
+            set({ dropKind: e.target.value === "" ? null : e.target.value })
           }
         >
           <option value="">no drop</option>
@@ -124,7 +149,7 @@ export function GroupDrop({
           disabled={locked}
           aria-label="What each drop is made of"
           onChange={e =>
-            onSet({
+            set({
               dropRunTypeId:
                 e.target.value === "" ? null : Number(e.target.value),
             })
@@ -139,6 +164,18 @@ export function GroupDrop({
         </select>
       </div>
 
+      {undo && !locked && (
+        <button
+          type="button"
+          className="flex items-center gap-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+          onClick={undoDrops}
+          title="Put this count's drop back the way it was before your last change. Its marks and every other count stay as they are."
+        >
+          <Undo2 className="w-3 h-3" />
+          Undo drops
+        </button>
+      )}
+
       {info.dropKind !== null && info.dropKind !== DISTRIBUTION && (
         <div className="flex items-center gap-2 text-[0.7rem]">
           <span className="text-muted-foreground shrink-0">
@@ -148,10 +185,10 @@ export function GroupDrop({
             value={info.dropHeightInches}
             belowFloor={false}
             ariaPrefix="Device height for this count"
-            onSave={inches => onSet({ dropHeightInches: inches })}
+            onSave={inches => set({ dropHeightInches: inches })}
             onClear={
               info.dropHeightInches !== null
-                ? () => onSet({ dropHeightInches: null })
+                ? () => set({ dropHeightInches: null })
                 : undefined
             }
             clearLabel="Use the type's"

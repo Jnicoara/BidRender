@@ -8674,6 +8674,29 @@ export async function deleteStamp(id: number, userId: number) {
     .where(and(eq(takeoffStamps.id, id), eq(takeoffStamps.userId, userId)));
 }
 
+/**
+ * Remove several marks in ONE statement, and say how many actually went.
+ *
+ * One statement so a selection is deleted whole or not at all: a loop of
+ * single deletes that failed halfway would leave the count at a number
+ * nobody chose. Scoped by `userId` like `deleteStamp`, so an id from another
+ * company is simply not matched rather than refused by name.
+ */
+export async function deleteStamps(
+  ids: readonly number[],
+  userId: number
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db
+    .delete(takeoffStamps)
+    .where(
+      and(inArray(takeoffStamps.id, [...ids]), eq(takeoffStamps.userId, userId))
+    );
+  return result.affectedRows;
+}
+
 /** Every symbol the user has captured, linked or not. */
 export async function getSymbolLinks(userId: number): Promise<SymbolLink[]> {
   const db = await getDb();

@@ -184,6 +184,30 @@ export const takeoffStampsRouter = router({
       return { success: true };
     }),
 
+  /**
+   * Remove a SELECTION of marks — the box-select and shift-click path.
+   *
+   * One statement, so a selection goes whole or not at all. The count, the
+   * bid line that follows it, a group's drops and the materials list all
+   * derive from the rows that remain, so there is nothing else to update: a
+   * deleted mark cannot leave a number behind. A run that ended on one loses
+   * that end (`ON DELETE SET NULL`), as with `remove`.
+   *
+   * `removed` is read back from the database rather than echoed from the
+   * input, so the screen reports what actually went.
+   */
+  removeMany: procedure
+    .input(
+      z.object({
+        ids: z.array(z.number().int().positive()).min(1).max(2000),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ids = Array.from(new Set(input.ids));
+      const removed = await db.deleteStamps(ids, ctx.scope.dataUserId);
+      return { removed };
+    }),
+
   /** Every stamp on a sheet, for drawing the marks. */
   listForSheet: procedure
     .input(z.object({ sheetId: z.number().int().positive() }))

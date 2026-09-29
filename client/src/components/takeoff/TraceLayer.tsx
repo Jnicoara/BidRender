@@ -54,6 +54,7 @@ import {
 } from "@shared/takeoffGeometry";
 import type { Measurability, RunPathType } from "@shared/takeoffQuantities";
 import { legSnapLabel, type LegSnap } from "@/lib/legSnap";
+import { stampsInBox } from "@/lib/stampSelection";
 import { projectOntoPath } from "@shared/runNetwork";
 import { JOINED_WITHIN_POINTS } from "@shared/quantityDrops";
 
@@ -227,8 +228,11 @@ export function TraceLayer({
   stamps,
   proposals,
   onDropStamp,
-  selectedStampId,
-  onSelectStamp,
+  selectedStampIds,
+  onStampClick,
+  onBoxSelect,
+  onDeleteSelected,
+  onClearSelection,
   focusPoint,
   chromeTarget,
   legs,
@@ -297,8 +301,16 @@ export function TraceLayer({
   /** Awaiting the user's decision. Never counted, never priced. */
   proposals?: ProposedStamp[];
   onDropStamp: (at: { x: number; y: number }) => void;
-  selectedStampId: number | null;
-  onSelectStamp: (id: number | null) => void;
+  /**
+   * The marks selected for deleting (@/lib/stampSelection). A click selects
+   * one, Shift-click adds or removes one, Shift-drag boxes several.
+   */
+  selectedStampIds: ReadonlySet<number>;
+  onStampClick: (id: number, additive: boolean) => void;
+  /** The saved marks inside a Shift-drag box, in page points. */
+  onBoxSelect: (ids: number[]) => void;
+  onDeleteSelected: () => void;
+  onClearSelection: () => void;
   /** Highlighted after a jump from the counted-items list. */
   focusPoint: { x: number; y: number } | null;
   /** Untransformed layer for screen-sized chrome. See `withChrome` below. */
@@ -368,8 +380,8 @@ export function TraceLayer({
     [renderScale]
   );
 
-  const pointerToPage = useCallback(
-    (e: React.PointerEvent): PagePoint | null => {
+  const clientToPage = useCallback(
+    (clientX: number, clientY: number): PagePoint | null => {
       const svg = svgRef.current;
       if (!svg) return null;
       const rect = svg.getBoundingClientRect();
@@ -379,14 +391,98 @@ export function TraceLayer({
       const scaleY = rect.height === 0 ? 1 : height / rect.height;
       return screenToPagePoints(
         {
-          x: (e.clientX - rect.left) * scaleX,
-          y: (e.clientY - rect.top) * scaleY,
+          x: (clientX - rect.left) * scaleX,
+          y: (clientY - rect.top) * scaleY,
         },
         renderScale
       );
     },
     [width, height, renderScale]
   );
+  const pointerToPage = useCallback(
+    (e: React.PointerEvent): PagePoint | null =>
+      clientToPage(e.clientX, e.clientY),
+    [clientToPage]
+  );
+
+  /**
+   * SHIFT-DRAG SELECTS A BOX of marks (@/lib/stampSelection).
+   *
+   * Only while Shift is held and no tool is armed: a plain drag on the sheet
+   * pans, and that stays the gesture people use most. While Shift is held the
+   * unarmed overlay takes pointer events so the drag reaches it, and its
+   * pointerdown stops propagation so the viewport underneath does not pan at
+   * the same time — the same claim an armed overlay makes, for the same
+   * reason (see onPointerDown below).
+   *
+   * The move and release are followed on the WINDOW, so a box dragged past
+   * the edge of the sheet still finishes.
+   */
+  const [shiftHeld, setShiftHeld] = useState(false);
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "Shift") setShiftHeld(true);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.key === "Shift") setShiftHeld(false);
+    };
+    // A Shift released while the window is not focused never sends keyup.
+    const clear = () => setShiftHeld(false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", clear);
+    };
+  }, []);
+  const boxing = shiftHeld && !tracing && !stamping;
+  const [box, setBox] = useState<{ from: PagePoint; to: PagePoint } | null>(
+    null
+  );
+  const boxRef = useRef(box);
+  boxRef.current = box;
+  useEffect(() => {
+    if (!box) return;
+    const move = (e: PointerEvent) => {
+      const page = clientToPage(e.clientX, e.clientY);
+      if (page) setBox(current => (current ? { ...current, to: page } : null));
+    };
+    const end = () => {
+      const done = boxRef.current;
+      setBox(null);
+      if (!done) return;
+      /*
+        A press that barely moved is a click, not a box. Measured in page
+        points against the snap reach, which is a fixed distance on SCREEN
+        whatever the zoom.
+      */
+      const reach = snapReach() * 0.3;
+      if (
+        Math.abs(done.to.x - done.from.x) < reach &&
+        Math.abs(done.to.y - done.from.y) < reach
+      )
+        return;
+      onBoxSelect(
+        stampsInBox(
+          stamps.filter(s => !s.pending),
+          done.from,
+          done.to
+        )
+      );
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+    };
+    // Re-bound only when a box starts or ends, not on every move.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [box !== null, clientToPage, snapReach, stamps, onBoxSelect]);
 
   /** Live length of what is being traced, including the rubber-band segment. */
   const liveInches = useMemo(() => {
@@ -463,7 +559,8 @@ export function TraceLayer({
         viewBox={`0 0 ${width} ${height}`}
         className={cn(
           "absolute inset-0 w-full h-full",
-          tracing || stamping ? "" : "pointer-events-none"
+          tracing || stamping || boxing || box ? "" : "pointer-events-none",
+          (boxing || box) && "cursor-crosshair"
         )}
         /*
           The crosshair is the CURSOR, not something drawn into the overlay.
@@ -517,6 +614,13 @@ export function TraceLayer({
           if (tracing || stamping) e.stopPropagation();
           const page = pointerToPage(e);
           if (!page) return;
+          if (boxing) {
+            // A Shift-drag selects; it must not also pan the sheet.
+            e.stopPropagation();
+            e.preventDefault();
+            setBox({ from: page, to: page });
+            return;
+          }
           if (tracing) {
             /*
               Branch legs (D20). While a leg is being saved a click would snap
@@ -742,7 +846,7 @@ export function TraceLayer({
             that blends into the drawing defeats exactly that. */}
         {stamps.map(placed => {
           const at = toScreen({ x: placed.x, y: placed.y });
-          const isSelected = placed.id === selectedStampId;
+          const isSelected = !placed.pending && selectedStampIds.has(placed.id);
           const { shape, color } = markAppearance(placed);
           /*
             Sized in screen pixels and expressed in overlay units, because this
@@ -760,10 +864,18 @@ export function TraceLayer({
                   ? ""
                   : "pointer-events-auto cursor-pointer"
               }
-              onClick={() =>
+              /*
+                A press that starts ON a mark is a click on that mark, never
+                the start of a box: stopped here so the overlay's box does not
+                begin underneath it, and Shift-click can add or remove it.
+              */
+              onPointerDown={e => {
+                if (boxing && !placed.pending) e.stopPropagation();
+              }}
+              onClick={e =>
                 !tracing &&
                 !placed.pending &&
-                onSelectStamp(isSelected ? null : placed.id)
+                onStampClick(placed.id, e.shiftKey)
               }
             >
               <path
@@ -784,6 +896,28 @@ export function TraceLayer({
             </g>
           );
         })}
+
+        {/* The Shift-drag selection box, while it is being dragged. */}
+        {box &&
+          (() => {
+            const a = toScreen(box.from);
+            const b = toScreen(box.to);
+            const stroke = markStrokeInOverlay(zoom);
+            return (
+              <rect
+                x={Math.min(a.x, b.x)}
+                y={Math.min(a.y, b.y)}
+                width={Math.abs(b.x - a.x)}
+                height={Math.abs(b.y - a.y)}
+                fill="#F5C518"
+                fillOpacity={0.08}
+                stroke="#F5C518"
+                strokeWidth={stroke}
+                strokeDasharray={`${stroke * 4} ${stroke * 3}`}
+                pointerEvents="none"
+              />
+            );
+          })()}
 
         {/*
           PULL POINTS, on top of runs and marks so a proposal is never hidden
@@ -1139,6 +1273,46 @@ export function TraceLayer({
             `blocked` still drives the CURSOR and the refusal to start a
             trace — that part was never about the notice.
           */}
+
+          {!tracing && !stamping && selectedStampIds.size > 0 && (
+            /*
+              What is selected, and the one thing to do with it. The body is
+              click-through like the other pills, so a pointer crossing it does
+              not stop the sheet underneath tracking; only the buttons take
+              pointer events. Delete is also the Delete / Backspace key.
+            */
+            <div
+              className="absolute top-3 left-1/2 -translate-x-1/2 w-max whitespace-nowrap flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="text-sm font-medium">
+                {selectedStampIds.size}{" "}
+                {selectedStampIds.size === 1 ? "mark" : "marks"} selected
+              </span>
+              <span className="text-[0.7rem] text-muted-foreground">
+                Shift-click or Shift-drag to add more
+              </span>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-6 px-2 text-xs pointer-events-auto"
+                onClick={onDeleteSelected}
+              >
+                Delete
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0 text-muted-foreground pointer-events-auto"
+                onClick={onClearSelection}
+                aria-label="Clear the selection"
+                title="Clear the selection (Esc)"
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          )}
 
           {stamping && armedGroupName && (
             /*
