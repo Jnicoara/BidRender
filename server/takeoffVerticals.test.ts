@@ -68,6 +68,7 @@ const QUARTER_INCH = 48; // 1/4" = 1'-0"
 /** 100 ft of traced pipe at 1/4" scale — 25 inches of paper, 1800 points. */
 const RUN_100FT = {
   pathType: "conduit" as const,
+  typedLengthInches: null,
   points: [
     { x: 0, y: 0 },
     { x: 1800, y: 0 },
@@ -465,7 +466,7 @@ describe("vertical footage reaches the wire, once per conductor", () => {
       }
     );
     const quantities = quantitiesForRun(
-      { pathType: "cable", points: RUN_100FT.points },
+      { pathType: "cable", points: RUN_100FT.points, typedLengthInches: null },
       [],
       QUARTER_INCH,
       verticals

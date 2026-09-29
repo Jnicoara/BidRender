@@ -30,6 +30,7 @@ function run(over: Partial<GroupableRun> & { id: number }): GroupableRun {
       { x: 0, y: 0 },
       { x: 400, y: 0 },
     ],
+    typedLengthInches: null,
     isSuggestion: false,
     branchWiring: null,
     startKind: null,

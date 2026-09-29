@@ -26,6 +26,7 @@
 import {
   circuitWire,
   quantitiesForRun,
+  tracedRunOf,
   type RunPathType,
 } from "../shared/takeoffQuantities";
 import { runOnBid } from "../shared/runOnBid";
@@ -72,6 +73,13 @@ export type RunTypeFootageRow = {
    */
   verticalFeet: number;
   /**
+   * The share of `conduitFeet` / `cableFeet` whose FLAT length the estimator
+   * typed rather than traced (§ 4c). Already inside those totals, like
+   * `verticalFeet`; a reader shows it apart because a typed number and a
+   * measured one are different kinds of fact.
+   */
+  typedFeet: number;
+  /**
    * Measured runs with at least one end whose drop was NOT counted — no
    * mounting height answered. Asked of the ENDS, through `uncountedEnds`, the
    * same question `totalQuantities` asks, so a vertical figure of 0 can be told
@@ -100,6 +108,13 @@ export type GroupableRun = {
   runTypeId: number | null;
   pathType: RunPathType;
   points: { x: number; y: number }[];
+  /**
+   * A length the estimator typed (§ 4c), as the row holds it — a DECIMAL
+   * string. REQUIRED: this shape is restated field by field, and a typed run
+   * that lost this field on the way here would price as unmeasurable on the
+   * bid while the panel showed its footage.
+   */
+  typedLengthInches: string | number | null;
   isSuggestion: boolean;
   branchWiring: boolean | null;
   startKind: string | null;
@@ -190,6 +205,7 @@ export function groupRunFootage(input: {
         branchCount: 0,
         quantityFeet: 0,
         verticalFeet: 0,
+        typedFeet: 0,
         endsNotCountedCount: 0,
         legs: [],
         tees: [],
@@ -222,7 +238,7 @@ export function groupRunFootage(input: {
 
     const verticals = verticalsForRunRow(run, input.heights);
     const quantities = quantitiesForRun(
-      { pathType: run.pathType, points: run.points },
+      tracedRunOf(run),
       (input.circuitsByRun.get(run.id) ?? []).map(circuitWire),
       ratio,
       verticals
@@ -280,6 +296,8 @@ export function groupRunFootage(input: {
     row.conduitFeet += quantities.conduitFeet ?? 0;
     row.cableFeet += quantities.cableFeet ?? 0;
     row.verticalFeet += quantities.verticalFeet;
+    if (quantities.lengthSource === "typed")
+      row.typedFeet += quantities.runFeet;
     const notCounted = quantities.verticals
       ? uncountedEnds(quantities.verticals).length
       : 2;
@@ -314,6 +332,7 @@ export function groupRunFootage(input: {
     row.groundFeet = round2(row.groundFeet);
     row.quantityFeet = round2(row.quantityFeet);
     row.verticalFeet = round2(row.verticalFeet);
+    row.typedFeet = round2(row.typedFeet);
   }
   return byType;
 }

@@ -56,6 +56,7 @@ function runs(
     runCount: 1,
     totalFeet: 50,
     verticalFeet: 10,
+    typedFeet: 0,
     wireFeet: 150,
     groundFeet: 50,
     unmeasurableCount: 0,
@@ -214,9 +215,9 @@ describe("building the export", () => {
     expect(doc.wholeBid[0].quantity).toBeNull();
 
     const csv = takeoffExportCsv(doc);
-    // Quantity, Traced, Vertical, Wire, Ground: five blanks, then the note.
+    // Quantity, Traced, Typed, Vertical, Wire, Ground: six blanks, then the note.
     expect(csv).toContain(
-      '"ft","","","","","","1 run not measured — no usable scale on the sheet"'
+      '"ft","","","","","","","1 run not measured — no usable scale on the sheet"'
     );
   });
 

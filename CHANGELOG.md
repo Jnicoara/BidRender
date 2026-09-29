@@ -4,6 +4,17 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-29]
+
+- **Conduit on a sheet with no scale can now be counted: draw the path, type
+  the length.** Riser diagrams, one-lines and details drawn at another scale
+  used to refuse tracing outright, so their conduit could not be counted at
+  all. Now you trace the route and type how long it is; the run goes on the
+  bid, in the totals, on the materials list and in the takeoff export like
+  any other. A typed length is always labelled "typed", never passed off as
+  measured, and the export gives it its own "Typed ft" column. It is the
+  flat run only; drops and extra are added on top.
+
 ## [2026-09-28]
 
 - **The shipped catalog may now grow to 3,000 items, up from 1,500**, with a

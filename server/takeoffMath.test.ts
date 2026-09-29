@@ -395,6 +395,7 @@ const RUN_100FT = {
   pathType: "conduit" as const,
   // 25 paper inches at 1/4" = 1'-0" → 100 feet.
   points: [p(0, 0), p(25 * 72, 0)],
+  typedLengthInches: null,
 };
 
 describe("conduit footage is counted once", () => {
@@ -412,7 +413,14 @@ describe("conduit footage is counted once", () => {
   it("refuses a cable run rather than returning zero", () => {
     // Zero would reach a bid as a considered "no pipe needed" line.
     expect(
-      conduitFeet({ pathType: "cable", points: RUN_100FT.points }, QUARTER_INCH)
+      conduitFeet(
+        {
+          pathType: "cable",
+          points: RUN_100FT.points,
+          typedLengthInches: null,
+        },
+        QUARTER_INCH
+      )
     ).toBeNull();
   });
 
@@ -536,7 +544,11 @@ describe("wire footage is counted per circuit, per conductor", () => {
   it("refuses a cable run — a cable has no separate pulled wire", () => {
     expect(
       wireFeetByCircuit(
-        { pathType: "cable", points: RUN_100FT.points },
+        {
+          pathType: "cable",
+          points: RUN_100FT.points,
+          typedLengthInches: null,
+        },
         [
           {
             name: "x",
@@ -569,7 +581,11 @@ describe("wire footage is counted per circuit, per conductor", () => {
 });
 
 describe("cable runs", () => {
-  const CABLE_100FT = { pathType: "cable" as const, points: RUN_100FT.points };
+  const CABLE_100FT = {
+    pathType: "cable" as const,
+    points: RUN_100FT.points,
+    typedLengthInches: null,
+  };
 
   it("count the traced length as cable, once", () => {
     expect(cableFeet(CABLE_100FT, QUARTER_INCH)).toBe(100);
@@ -642,6 +658,7 @@ describe("a shared run across a whole takeoff", () => {
     const shortRun = {
       pathType: "conduit" as const,
       points: [p(0, 0), p(12.5 * 72, 0)],
+      typedLengthInches: null,
     }; // 50ft
     const totals = totalsOf([
       {
@@ -676,7 +693,11 @@ describe("a shared run across a whole takeoff", () => {
   });
 
   it("keeps conduit and cable in separate totals", () => {
-    const cableRun = { pathType: "cable" as const, points: RUN_100FT.points };
+    const cableRun = {
+      pathType: "cable" as const,
+      points: RUN_100FT.points,
+      typedLengthInches: null,
+    };
     const totals = totalsOf([
       {
         run: RUN_100FT,
@@ -750,6 +771,7 @@ describe("a shared run across a whole takeoff", () => {
       unmeasurableCount: 0,
       flatOnlyCount: 0,
       partialVerticalCount: 0,
+      typedCount: 0,
     });
   });
 
@@ -863,10 +885,12 @@ describe("a realistic takeoff, checked by hand", () => {
     const feeder = {
       pathType: "conduit" as const,
       points: [p(0, 0), p(10 * 72, 0)],
+      typedLengthInches: null,
     };
     const branch = {
       pathType: "cable" as const,
       points: [p(0, 0), p(5 * 72, 0)],
+      typedLengthInches: null,
     };
 
     const feederQuantities = quantitiesForRun(
@@ -961,6 +985,7 @@ describe("a realistic takeoff, checked by hand", () => {
       // and partial are different faults with different fixes.
       partialVerticalCount: 0,
       unmeasurableCount: 0,
+      typedCount: 0,
     });
   });
 

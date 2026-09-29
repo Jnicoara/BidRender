@@ -165,19 +165,102 @@ export function measurabilityOf(sheet: {
 export type TracedRun = {
   pathType: RunPathType;
   points: PagePoint[];
+  /**
+   * A length the estimator TYPED, in inches — § 4c of
+   * references/plan-viewer-overhaul.md. NULL means "measure the points", which
+   * is every run before migration 0091.
+   *
+   * It is the FLAT run along the drawing, exactly what a traced line measures
+   * (owner, 2026-09-28, Q6): drops and extra are added on top by the same
+   * arithmetic, and the field on screen says so.
+   *
+   * REQUIRED rather than optional, for the reason `quantitiesForRun` gives
+   * about `verticals`: an optional field a caller can forget reads as "not
+   * typed", and a typed run on a sheet with no scale then reports as
+   * unmeasurable on one screen while another counts it. Every caller has to
+   * say which run it means.
+   */
+  typedLengthInches: number | null;
 };
 
 /**
- * The measured length of a run in billable feet, or null if it cannot be
- * measured. Shared by both raceway types — the length is the length.
+ * A stored run ROW as the arithmetic reads it.
+ *
+ * Takes the row rather than being handed fields, so a caller has nothing to
+ * destructure and therefore nothing to forget — CLAUDE.md § "structural in the
+ * maths". The typed length arrives from MySQL as a DECIMAL string; converting
+ * it here, once, means no caller can pass the string through and have
+ * `Number.isFinite` quietly refuse it.
  */
-export function runFeet(
-  run: TracedRun,
+export function tracedRunOf(row: {
+  pathType: string;
+  points: PagePoint[] | null;
+  typedLengthInches: string | number | null;
+}): TracedRun {
+  return {
+    pathType: row.pathType === "cable" ? "cable" : "conduit",
+    points: row.points ?? [],
+    typedLengthInches:
+      row.typedLengthInches === null ? null : Number(row.typedLengthInches),
+  };
+}
+
+/** Where a run's flat length came from. Two different kinds of fact. */
+export type LengthSource = "typed" | "traced";
+
+/**
+ * A typed length the arithmetic will use: finite and above zero.
+ *
+ * The router refuses anything else at the door; this is the second check, so
+ * a bad stored value is loud (unmeasurable) rather than quietly replaced by
+ * the drawn length — which would put a number on the bid nobody chose.
+ */
+export function isUsableTypedLength(
+  inches: number | null | undefined
+): inches is number {
+  return typeof inches === "number" && Number.isFinite(inches) && inches > 0;
+}
+
+/** Typed or traced — the word a screen puts beside the length. */
+export function lengthSourceOf(
+  run: Pick<TracedRun, "typedLengthInches">
+): LengthSource {
+  return run.typedLengthInches === null ? "traced" : "typed";
+}
+
+/**
+ * What the drawn line measures, whether or not a length was typed.
+ *
+ * Shown beside a typed length on a scaled sheet ("typed 60.00 · drawn 54.20")
+ * so a typo of 600 is one glance away. Never used for a quantity.
+ */
+export function drawnFeet(
+  run: Pick<TracedRun, "points">,
   ratio: number | null | undefined
 ): number | null {
   const inches = pathRealInches(run.points, ratio);
   if (inches === null) return null;
   return toBillableFeet(inches);
+}
+
+/**
+ * The flat length of a run in billable feet, or null if it cannot be
+ * measured. Shared by both raceway types — the length is the length.
+ *
+ * A TYPED length wins, and the ratio is not consulted: that is the whole
+ * point of typing one, on a riser or a one-line with no single scale. A run
+ * with no typed length is measured from its points as it always was.
+ */
+export function runFeet(
+  run: TracedRun,
+  ratio: number | null | undefined
+): number | null {
+  if (run.typedLengthInches !== null) {
+    return isUsableTypedLength(run.typedLengthInches)
+      ? toBillableFeet(run.typedLengthInches)
+      : null;
+  }
+  return drawnFeet(run, ratio);
 }
 
 /**
@@ -515,8 +598,18 @@ export const NO_VERTICALS: RunVerticals | null = null;
 
 export type RunQuantities = {
   pathType: RunPathType;
-  /** The traced length itself, in feet. Flat, overhead, no verticals. */
+  /** The flat length itself, in feet — traced or typed. No verticals. */
   runFeet: number;
+  /**
+   * Whether `runFeet` was TYPED by the estimator or TRACED from the points.
+   * Every screen showing the footage says which (§ 4c).
+   */
+  lengthSource: LengthSource;
+  /**
+   * What the drawn line measures on this sheet. On a typed run it is shown
+   * beside the typed figure so a typo is visible; null with no scale.
+   */
+  drawnFeet: number | null;
   /** Drops and rises at the two ends, counted once each. 0 when none. */
   verticalFeet: number;
   /**
@@ -621,11 +714,15 @@ export function quantitiesForRun(
   if (length === null) return null;
 
   const verticalFeet = verticals?.feet ?? 0;
+  const lengthSource = lengthSourceOf(run);
+  const drawn = drawnFeet(run, ratio);
 
   if (run.pathType === "cable") {
     return {
       pathType: "cable",
       runFeet: length,
+      lengthSource,
+      drawnFeet: drawn,
       verticalFeet,
       verticals,
       conduitFeet: null,
@@ -674,6 +771,8 @@ export function quantitiesForRun(
   return {
     pathType: "conduit",
     runFeet: length,
+    lengthSource,
+    drawnFeet: drawn,
     verticalFeet,
     verticals,
     conduitFeet: round2(length + verticalFeet),
@@ -766,6 +865,12 @@ export function totalQuantities(
    * of the two and the one that had no way of being said.
    */
   partialVerticalCount: number;
+  /**
+   * Measured runs whose flat length was TYPED rather than traced (§ 4c). They
+   * ARE in the totals; this is what lets the totals say so, because a number
+   * the estimator supplied and one the app measured are different facts.
+   */
+  typedCount: number;
 } {
   let conduit = 0;
   let cable = 0;
@@ -785,12 +890,22 @@ export function totalQuantities(
   // whole, whichever of its legs made it so.
   const byRun = new Map<
     number,
-    { unmeasurable: boolean; unanswered: boolean; verticalFeet: number }
+    {
+      unmeasurable: boolean;
+      unanswered: boolean;
+      verticalFeet: number;
+      typed: boolean;
+    }
   >();
   const runState = (key: number) => {
     let state = byRun.get(key);
     if (!state) {
-      state = { unmeasurable: false, unanswered: false, verticalFeet: 0 };
+      state = {
+        unmeasurable: false,
+        unanswered: false,
+        verticalFeet: 0,
+        typed: false,
+      };
       byRun.set(key, state);
     }
     return state;
@@ -808,6 +923,7 @@ export function totalQuantities(
       state.unmeasurable = true;
       continue;
     }
+    if (quantities.lengthSource === "typed") state.typed = true;
     conduit += quantities.conduitFeet ?? 0;
     cable += quantities.cableFeet ?? 0;
     wire += quantities.totalWireFeet;
@@ -851,7 +967,9 @@ export function totalQuantities(
   let unmeasurable = 0;
   let flatOnly = 0;
   let partialVertical = 0;
+  let typed = 0;
   byRun.forEach(state => {
+    if (state.typed && !state.unmeasurable) typed++;
     if (state.unmeasurable) {
       unmeasurable++;
       return;
@@ -872,5 +990,6 @@ export function totalQuantities(
     unmeasurableCount: unmeasurable,
     flatOnlyCount: flatOnly,
     partialVerticalCount: partialVertical,
+    typedCount: typed,
   };
 }

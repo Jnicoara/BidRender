@@ -134,6 +134,7 @@ export const takeoffExportRouter = router({
               runCount: partRuns.filter(r => r.runTypeId === runTypeId).length,
               totalFeet: row.conduitFeet + row.cableFeet,
               verticalFeet: row.verticalFeet,
+              typedFeet: row.typedFeet,
               wireFeet: row.insulatedFeet,
               groundFeet: row.groundFeet,
               unmeasurableCount: row.unmeasurableCount,

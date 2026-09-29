@@ -47,7 +47,11 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import { groupStamps, stampName } from "../../shared/takeoffCounts";
-import { circuitWire, totalQuantities } from "../../shared/takeoffQuantities";
+import {
+  circuitWire,
+  totalQuantities,
+  tracedRunOf,
+} from "../../shared/takeoffQuantities";
 import { verticalsForRunRow } from "../runVerticals";
 import {
   aggregateMaterials,
@@ -374,7 +378,7 @@ export const materialsListRouter = router({
               ? sheet.scaleRatio
               : null;
           return {
-            run: { pathType: run.pathType, points: run.points },
+            run: tracedRunOf(run),
             circuits: wireCounts.has(run.id)
               ? (circuitsByRun.get(run.id) ?? []).map(circuitWire)
               : [],

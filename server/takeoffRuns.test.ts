@@ -184,7 +184,14 @@ describe.skipIf(!hasDb)("the scale gate", () => {
     expect(saved.lengthFeet).toBeNull();
   });
 
-  it("REFUSES to commit a run on an unscaled sheet", async () => {
+  /*
+    CHANGED 2026-09-29 (§ 4c, typed lengths). These two asserted that commit
+    REFUSED on an unscaled or N.T.S. sheet. A riser is traced there on purpose
+    and its length typed, so finishing it has to work — but the part of the old
+    rule that protects a number stands, and is what they assert now: finishing
+    stores NO measured length and reports none.
+  */
+  it("finishes a run on an unscaled sheet WITHOUT measuring it", async () => {
     const { bidId, sheetId } = await scenario();
     const saved = await caller().takeoffRuns.save({
       bidId,
@@ -193,12 +200,15 @@ describe.skipIf(!hasDb)("the scale gate", () => {
       pathType: "conduit",
       points: RUN_100FT,
     });
-    await expect(caller().takeoffRuns.commit({ id: saved.id })).rejects.toThrow(
-      /no scale set/i
-    );
+    const done = await caller().takeoffRuns.commit({ id: saved.id });
+    expect(done.lengthFeet).toBeNull();
+    expect(done.runFeet).toBeNull();
+    const rows = await caller().takeoffRuns.listForSheet({ sheetId });
+    expect(rows[0].status).toBe("committed");
+    expect(rows[0].quantities).toBeNull();
   });
 
-  it("REFUSES to commit a run on a not-to-scale sheet", async () => {
+  it("finishes a run on a not-to-scale sheet WITHOUT measuring it", async () => {
     const { bidId, sheetId } = await scenario({ notToScale: true });
     const saved = await caller().takeoffRuns.save({
       bidId,
@@ -207,9 +217,11 @@ describe.skipIf(!hasDb)("the scale gate", () => {
       pathType: "conduit",
       points: RUN_100FT,
     });
-    await expect(caller().takeoffRuns.commit({ id: saved.id })).rejects.toThrow(
-      /not to scale/i
-    );
+    const done = await caller().takeoffRuns.commit({ id: saved.id });
+    expect(done.lengthFeet).toBeNull();
+    expect(done.runFeet).toBeNull();
+    const rows = await caller().takeoffRuns.listForSheet({ sheetId });
+    expect(rows[0].quantities).toBeNull();
   });
 
   it("shows no quantities for runs on an unscaled sheet — not zero", async () => {

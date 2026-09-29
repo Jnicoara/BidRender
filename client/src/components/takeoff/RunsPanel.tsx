@@ -298,6 +298,12 @@ export type PanelRun = {
     separateGround: boolean;
   }[];
   quantities: RunQuantities | null;
+  /**
+   * A length the estimator typed, in inches (§ 4c). Null is "measured from the
+   * drawing". Optional only so a caller that never edits lengths need not
+   * pass it; the Takeoff screen always does.
+   */
+  typedLengthInches?: number | null;
   /** What is at each end. Undefined only for a suggestion the AI proposed. */
   ends?: {
     startKind: string | null;
@@ -375,12 +381,23 @@ function Footage({
   flat,
   vertical,
   total,
+  typed = false,
 }: {
   label: React.ReactNode;
   flat: number;
   vertical: number;
   total: number;
+  /**
+   * The flat share was TYPED by the estimator, not traced (§ 4c). Said on the
+   * line itself — "60.00 typed + 8.50 = 68.50 ft" — because a number somebody
+   * supplied and one the app measured are different kinds of fact, and this
+   * line is where an estimator checks where every foot came from.
+   */
+  typed?: boolean;
 }) {
+  const word = typed ? (
+    <span className="font-sans text-sky-600 dark:text-sky-400"> typed</span>
+  ) : null;
   return (
     <div className="flex items-baseline justify-between text-xs gap-2">
       <span className="text-muted-foreground shrink-0">{label}</span>
@@ -388,14 +405,101 @@ function Footage({
         {vertical > 0 ? (
           <>
             <span className="text-muted-foreground/70">
-              {exact(flat)} + {exact(vertical)} ={" "}
+              {exact(flat)}
+              {word} + {exact(vertical)} ={" "}
             </span>
             {exact(total)} ft
           </>
         ) : (
-          feet(total)
+          <>
+            {feet(total)}
+            {word}
+          </>
         )}
       </span>
+    </div>
+  );
+}
+
+/**
+ * The typed-length box on a run row — § 4c, "draw the path, type the length".
+ *
+ * Three states, and the words differ in each because the situation does:
+ *
+ *   - NO SCALE on the sheet: the box is the only way this run gets a number,
+ *     so it is always shown, under the notice saying the run is not counted.
+ *   - TYPED: the box shows what was typed, and what the drawn line measures
+ *     beside it on a scaled sheet — so a slipped key (600 for 60) is one glance
+ *     away — with a way back to the drawing.
+ *   - TRACED on a scaled sheet: one quiet link, because typing over a good
+ *     measurement is the exception.
+ *
+ * Decimal FEET, through `InlineNumberField`, so it follows every rule in
+ * CLAUDE.md § Editing fields without a second implementation of them. The
+ * label says the length is FLAT (owner, 2026-09-28, Q6): drops and extra go
+ * on top, so typing the whole pull here would count the drops twice.
+ */
+function TypedLength({
+  run,
+  onSet,
+}: {
+  run: PanelRun;
+  onSet: (runId: number, inches: number | null) => void;
+}) {
+  const typedInches = run.typedLengthInches ?? null;
+  const drawn = run.quantities?.drawnFeet ?? null;
+  const [open, setOpen] = useState(false);
+  const noScale = run.quantities === null && typedInches === null;
+  const shown = noScale || typedInches !== null || open;
+
+  if (!shown) {
+    return (
+      <button
+        className="mt-1 text-[0.7rem] text-muted-foreground underline hover:text-foreground"
+        onClick={e => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+      >
+        Type a length instead
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-1.5 space-y-0.5" onClick={e => e.stopPropagation()}>
+      <div className="flex items-center justify-between text-xs gap-2">
+        <span className="text-muted-foreground shrink-0">
+          Length along the drawing
+        </span>
+        <InlineNumberField
+          value={typedInches === null ? null : typedInches / 12}
+          whenUnset={{ placeholder: "type ft" }}
+          rules={{ min: 0.01, max: 10_000, epsilon: 1e-4 }}
+          onSave={feet => onSet(run.id, feet * 12)}
+          onClear={() => onSet(run.id, null)}
+          ariaLabel="Typed length of this run, in feet"
+          suffix="ft"
+          className="w-24"
+        />
+      </div>
+      <p className="text-[0.7rem] text-muted-foreground">
+        Flat length only — drops and extra are added on top.
+        {typedInches !== null && drawn !== null && (
+          <> The drawn line measures {exact(drawn)} ft.</>
+        )}
+        {typedInches !== null && drawn !== null && (
+          <>
+            {" "}
+            <button
+              className="underline hover:text-foreground"
+              onClick={() => onSet(run.id, null)}
+            >
+              Use the drawn length
+            </button>
+          </>
+        )}
+      </p>
     </div>
   );
 }
@@ -589,6 +693,7 @@ export function RunsPanel({
   renderRunEnds,
   renderRunType,
   onAnswerBranchWiring,
+  onSetTypedLength,
   runTypeBridge,
   onSendRunType,
   sendingRunTypeId,
@@ -629,6 +734,11 @@ export function RunsPanel({
    * show the question rather than showing a dead control.
    */
   onAnswerBranchWiring?: (runId: number, answer: boolean | null) => void;
+  /**
+   * Type a run's flat length, or clear it back to the drawing (§ 4c).
+   * Inches; null clears. Optional: without it the panel offers no length box.
+   */
+  onSetTypedLength?: (runId: number, inches: number | null) => void;
   /** What each traced type would put on the bid. Undefined while loading. */
   runTypeBridge?: RunTypeBridgeEntry[];
   onSendRunType?: (runTypeId: number) => void;
@@ -1623,11 +1733,17 @@ export function RunsPanel({
 
                   {/* A run that cannot be measured says so instead of showing 0 */}
                   {run.quantities === null ? (
-                    <p className="text-xs text-[#F5C518] mt-1.5 flex items-start gap-1.5">
-                      <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-                      Flat length not measurable — no scale on this sheet, so
-                      this run is not in the totals.
-                    </p>
+                    <>
+                      <p className="text-xs text-[#F5C518] mt-1.5 flex items-start gap-1.5">
+                        <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                        {onSetTypedLength
+                          ? "No scale on this sheet, so this run is not in the totals. Type its length to count it."
+                          : "Flat length not measurable — no scale on this sheet, so this run is not in the totals."}
+                      </p>
+                      {onSetTypedLength && (
+                        <TypedLength run={run} onSet={onSetTypedLength} />
+                      )}
+                    </>
                   ) : (
                     <div className="mt-1.5 space-y-0.5">
                       {/* Conduit and wire kept visually separate: they are two
@@ -1638,6 +1754,7 @@ export function RunsPanel({
                           flat={run.quantities.runFeet}
                           vertical={run.quantities.verticalFeet}
                           total={run.quantities.conduitFeet}
+                          typed={run.quantities.lengthSource === "typed"}
                         />
                       )}
                       {run.quantities.cableFeet !== null && (
@@ -1646,8 +1763,16 @@ export function RunsPanel({
                           flat={run.quantities.runFeet}
                           vertical={run.quantities.verticalFeet}
                           total={run.quantities.cableFeet}
+                          typed={run.quantities.lengthSource === "typed"}
                         />
                       )}
+                      {/* A typed run always says so; the offer to type one
+                          over a good measurement waits until the run is
+                          opened, since it is the exception. */}
+                      {onSetTypedLength &&
+                        (isSelected || run.typedLengthInches != null) && (
+                          <TypedLength run={run} onSet={onSetTypedLength} />
+                        )}
                       {/*
                       WIRE, OR THE REASON THERE IS NONE.
 
@@ -1691,6 +1816,7 @@ export function RunsPanel({
                             flat={wireFlat(run)}
                             vertical={wireVertical(run)}
                             total={run.quantities.totalWireFeet}
+                            typed={run.quantities.lengthSource === "typed"}
                           />
                         ) : (
                           <div className="flex items-baseline justify-between text-xs gap-2">
@@ -1746,6 +1872,7 @@ export function RunsPanel({
                             flat={wireFlat(run)}
                             vertical={wireVertical(run)}
                             total={run.quantities.totalWireFeet}
+                            typed={run.quantities.lengthSource === "typed"}
                           />
                         ))}
                       {/*
@@ -2256,7 +2383,24 @@ export function RunsPanel({
               <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
               {totals.unmeasurableCount} run
               {totals.unmeasurableCount === 1 ? " is" : "s are"} not in these
-              totals — their sheets have no usable scale.
+              totals — no usable scale on the sheet. Type{" "}
+              {totals.unmeasurableCount === 1 ? "its length" : "their lengths"}{" "}
+              in the run to count{" "}
+              {totals.unmeasurableCount === 1 ? "it" : "them"}.
+            </p>
+          )}
+          {/*
+            Typed lengths ARE in the figures above (§ 4c), and this says so:
+            a number an estimator supplied and one the app measured are
+            different kinds of fact. Plain, not amber — typing is an answer.
+          */}
+          {totals.typedCount > 0 && (
+            <p className="text-[0.7rem] text-muted-foreground pt-1">
+              {totals.typedCount} run
+              {totals.typedCount === 1
+                ? " has a length"
+                : "s have lengths"}{" "}
+              typed by hand rather than measured off the drawing.
             </p>
           )}
           {/*

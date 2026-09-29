@@ -48,7 +48,9 @@ import {
   circuitWire,
   measurabilityOf,
   quantitiesForRun,
+  runFeet as runFeetOf,
   totalQuantities,
+  tracedRunOf,
   type RunPathType,
 } from "../../shared/takeoffQuantities";
 import { runWireOwnership } from "../../shared/branchWire";
@@ -304,10 +306,7 @@ export const takeoffRunsRouter = router({
           separateGround: c.separateGround ?? false,
         }));
 
-        const traced = {
-          pathType: run.pathType as RunPathType,
-          points: run.points ?? [],
-        };
+        const traced = tracedRunOf(run);
         return {
           id: run.id,
           name: run.name,
@@ -342,6 +341,12 @@ export const takeoffRunsRouter = router({
           isSuggestion: run.isSuggestion,
           location: run.location,
           circuits: runCircuits,
+          /**
+           * What the estimator typed, in inches, or null for "measured from
+           * the drawing" (§ 4c). Raw, for the field that edits it; the
+           * arithmetic reads it through `quantities`.
+           */
+          typedLengthInches: traced.typedLengthInches,
           /** Null whenever the sheet cannot be measured — never a fallback 0. */
           quantities: quantitiesForRun(
             traced,
@@ -599,18 +604,25 @@ export const takeoffRunsRouter = router({
   /**
    * Mark a run finished.
    *
-   * Refuses if the sheet cannot be measured: committing is the point at which
-   * a run enters the bill of materials, and an uncounted line there is worse
-   * than a draft the user can see is unfinished.
+   * ── On a sheet with no usable scale this FINISHES, and measures nothing ────
+   * Changed 2026-09-29 for typed lengths (§ 4c). It used to refuse, on the
+   * reasoning that committing is when a run enters the bill of materials. That
+   * stopped being true on 2026-09-27 — drafts count on the bid too
+   * (shared/runOnBid.ts) — and the refusal left a riser traced on purpose,
+   * to have its length typed, stuck as a draft forever.
+   *
+   * What is still refused is a MEASURED number: no `lengthInches` is stored
+   * against points on such a sheet, and the run reports as not measured
+   * everywhere until a length is typed. `runFeet` in the reply is null in that
+   * case, and the screen says to type the length rather than "0 ft traced".
    */
   commit: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const run = await requireRun(input.id, ctx.scope.dataUserId);
-      const { ratio } = await requireMeasurableSheet(
-        run.sheetId,
-        ctx.scope.dataUserId
-      );
+      const sheet = await requireSheet(run.sheetId, ctx.scope.dataUserId);
+      const measurability = measurabilityOf(sheetScale(sheet));
+      const ratio = measurability.ok ? measurability.ratio : null;
 
       const points = run.points ?? [];
       if (points.length < 2) {
@@ -620,8 +632,8 @@ export const takeoffRunsRouter = router({
         });
       }
 
-      const inches = pathRealInches(points, ratio);
-      if (inches === null) {
+      const inches = ratio === null ? null : pathRealInches(points, ratio);
+      if (ratio !== null && inches === null) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "That path could not be measured.",
@@ -644,24 +656,39 @@ export const takeoffRunsRouter = router({
         two numbers for one run. It used to name only the leg being
         committed: "57.6 ft traced" for a three-leg, 121 ft run (D20).
       */
-      let runFeet = 0;
+      /*
+        Each leg's feet through the shared `runFeet`, so a TYPED leg counts
+        what was typed and a traced one what the drawing measures — the same
+        figure the panel shows. A leg with neither leaves the whole-run figure
+        null rather than quietly short.
+      */
+      let runFeet: number | null = 0;
       for (const row of group) {
         const rowInches =
-          row.id === run.id ? inches : pathRealInches(row.points ?? [], ratio);
-        if (rowInches !== null) runFeet += toBillableFeet(rowInches);
+          ratio === null
+            ? null
+            : row.id === run.id
+              ? inches
+              : pathRealInches(row.points ?? [], ratio);
+        const rowFeet = runFeetOf(tracedRunOf(row), ratio);
+        runFeet =
+          runFeet === null || rowFeet === null ? null : runFeet + rowFeet;
         await db.updateRun(row.id, ctx.scope.dataUserId, {
           status: "committed",
           isSuggestion: false,
           lengthInches: rowInches === null ? null : rowInches.toFixed(4),
-          scaleRatioUsed: String(ratio),
+          scaleRatioUsed: ratio === null ? null : String(ratio),
         });
       }
       return {
         id: input.id,
-        /** This row alone. */
-        lengthFeet: toBillableFeet(inches),
-        /** Every leg of the run, and how many there are. */
-        runFeet: Math.round(runFeet * 100) / 100,
+        /** This row alone, as drawn. Null with no scale. */
+        lengthFeet: inches === null ? null : toBillableFeet(inches),
+        /**
+         * Every leg of the run, typed or traced. Null when a leg has no length
+         * yet — no scale and nothing typed — so the screen asks for one.
+         */
+        runFeet: runFeet === null ? null : Math.round(runFeet * 100) / 100,
         legCount: Math.max(group.length, 1),
       };
     }),
@@ -698,6 +725,55 @@ export const takeoffRunsRouter = router({
     }),
 
   /** Tag a run's Location without disturbing its geometry. */
+  /**
+   * Type a run's flat length, or clear it back to the drawing — § 4c.
+   *
+   * ── Its own column, and nothing else here writes it ──────────────────────
+   * `lengthInches` is recomputed from the points on every save, so a typed
+   * value stored there would be overwritten the next time a point moved or
+   * the sheet's scale changed. `typedLengthInches` is written HERE and only
+   * here; `save` lists its columns explicitly and this is not one of them.
+   * `server/typedLengthRuns.test.ts` re-saves, re-scales and re-points a
+   * typed run and asserts the number is still what the estimator typed.
+   *
+   * ── Per ROW, not per run ───────────────────────────────────────────────────
+   * A branched run is a root and legs (D20), and each leg has its own length.
+   * Unlike `traceMode`, nothing here needs keeping equal across the rows.
+   *
+   * ── No scale needed ────────────────────────────────────────────────────────
+   * That is the point: a riser or a one-line has no single scale. So this
+   * does not go through `requireMeasurableSheet`.
+   */
+  setTypedLength: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        /**
+         * Inches, flat along the drawing. NULL goes back to measuring the
+         * points. Zero and negative are refused rather than stored: a zero
+         * length prices the run at nothing, which is never what somebody who
+         * typed a length meant. The ceiling (10,000 ft) catches a slipped
+         * key — no single pull is that long.
+         */
+        typedLengthInches: z
+          .number()
+          .finite()
+          .positive()
+          .max(120_000)
+          .nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await requireRun(input.id, ctx.scope.dataUserId);
+      await db.updateRun(input.id, ctx.scope.dataUserId, {
+        typedLengthInches:
+          input.typedLengthInches === null
+            ? null
+            : input.typedLengthInches.toFixed(4),
+      });
+      return { success: true };
+    }),
+
   setLocation: procedure
     .input(
       z.object({
@@ -1225,10 +1301,7 @@ export const takeoffRunsRouter = router({
       const measure = (rows: typeof runs, withWire: (id: number) => boolean) =>
         totalQuantities(
           rows.map(run => ({
-            run: {
-              pathType: run.pathType as RunPathType,
-              points: run.points ?? [],
-            },
+            run: tracedRunOf(run),
             // A branch run's wire belongs to the devices (D18): its pipe is
             // measured and its wire is not.
             circuits: withWire(run.id)
