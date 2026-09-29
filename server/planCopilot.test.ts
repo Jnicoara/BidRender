@@ -340,14 +340,115 @@ runIf("no writes without confirmation", () => {
       confirmed: true,
     });
 
-    // A confirmed finding and a hand-placed stamp are the same thing to
-    // everything downstream — including the pricing engine, which is what the
-    // counted-items list feeds.
+    // This test used to stop at the counted-items list and call that "counting
+    // sees it". That list also shows marks that belong to no count, so it
+    // passed for months while a placed mark reached no bid line (2026-09-29).
+    // The tests below check the count and the line, which is where it matters.
     const counted = await caller().takeoffStamps.countedItems({
       sheetId: s.sheetId,
     });
     expect(counted).toHaveLength(1);
     expect(counted[0]).toMatchObject({ kind: "assembly", count: 1 });
+    expect(counted[0].kind === "assembly" && counted[0].groupId).not.toBeNull();
+  });
+
+  it("puts a placed mark in its assembly's count, making one if needed", async () => {
+    const s = await scenario(USER);
+    say(
+      reply("Power plan.", [
+        {
+          action: "propose_stamp",
+          symbol: "Duplex receptacle",
+          x: 0.3,
+          y: 0.4,
+          confidence: 0.95,
+        },
+      ])
+    );
+    const state = await caller().planCopilot.read(readInput(s));
+    await caller().planCopilot.confirm({
+      runId: state.runId!,
+      findingIds: [state.findings[0].id],
+      confirmed: true,
+    });
+
+    const [stamp] = await getStampsForSheet(s.sheetId, USER);
+    expect(stamp.groupId).not.toBeNull();
+    const { groups } = await caller().takeoffGroups.list({ bidId: s.bidId });
+    const group = groups.find(g => g.id === stamp.groupId);
+    expect(group).toMatchObject({
+      kind: "assembly",
+      assemblyId: s.recepAssemblyId,
+      count: 1,
+    });
+  });
+
+  it("adds a placed mark to the count already on the bid, so the bid line moves", async () => {
+    // The wrong number this guards: one hand-placed receptacle sent to the bid,
+    // then one placed by the reader. The bid line must read 2, and the sheet
+    // must show ONE receptacle count of 2, not two counts of 1 each.
+    const s = await scenario(USER);
+    const armed = await caller().takeoffGroups.forAssembly({
+      bidId: s.bidId,
+      assemblyId: s.recepAssemblyId,
+    });
+    await caller().takeoffStamps.drop({
+      bidId: s.bidId,
+      sheetId: s.sheetId,
+      groupId: armed.id,
+      at: [{ x: 100, y: 100 }],
+    });
+    await caller().takeoffGroups.sendToBid({ id: armed.id });
+
+    const lineQty = async () => {
+      const detail = await caller().bids.get({ id: s.bidId });
+      const line = detail.lines.find(l => l.takeoffGroupId === armed.id);
+      return Number(line?.qty);
+    };
+    expect(await lineQty()).toBe(1);
+
+    say(
+      reply("Power plan.", [
+        {
+          action: "propose_stamp",
+          symbol: "Duplex receptacle",
+          x: 0.3,
+          y: 0.4,
+          confidence: 0.95,
+        },
+      ])
+    );
+    const state = await caller().planCopilot.read(readInput(s));
+    await caller().planCopilot.confirm({
+      runId: state.runId!,
+      findingIds: [state.findings[0].id],
+      confirmed: true,
+    });
+
+    expect(await lineQty()).toBe(2);
+    const counted = await caller().takeoffStamps.countedItems({
+      sheetId: s.sheetId,
+    });
+    expect(counted).toHaveLength(1);
+    expect(counted[0]).toMatchObject({ groupId: armed.id, count: 2 });
+    const { groups } = await caller().takeoffGroups.list({ bidId: s.bidId });
+    expect(groups.filter(g => g.assemblyId === s.recepAssemblyId)).toHaveLength(
+      1
+    );
+
+    // Deleting the placed mark (Track B's selection delete) takes it back off
+    // the bid. Two fixes that met on 2026-09-29: before Place joined a count,
+    // deleting a placed mark moved nothing, because it was never counted.
+    const placed = (await getStampsForSheet(s.sheetId, USER)).find(
+      st => Number(st.x) !== 100
+    )!;
+    const removed = await caller().takeoffStamps.removeMany({
+      ids: [placed.id],
+    });
+    expect(removed.removed).toBe(1);
+    expect(await lineQty()).toBe(1);
+    const after = await caller().takeoffGroups.list({ bidId: s.bidId });
+    expect(after.groups.find(g => g.id === armed.id)?.count).toBe(1);
   });
 
   it("refuses a confirmation that does not say it was confirmed", async () => {

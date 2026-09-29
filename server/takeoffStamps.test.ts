@@ -187,9 +187,18 @@ describe("counting stamps — the group is the identity", () => {
   });
 
   it("still counts marks placed before groups existed", () => {
-    // The fallback keys, unchanged. Every database in use before phase 6 is
-    // full of these, and the backfill is not the only thing standing between
-    // them and a correct count.
+    // The fallback keys, unchanged, for marks with no group. This is what the
+    // SHEET'S counted-items list, the materials list and the takeoff export
+    // do with them.
+    //
+    // It is NOT what the bid does. This comment used to say the fallback
+    // stood "between them and a correct count", which read as if these marks
+    // were counted everywhere. The bid counts through groups only
+    // (`countStampsByGroup` skips a NULL group), so an ungrouped mark with an
+    // assembly reaches the materials list and no bid line. That is how the
+    // plan reader's Place went wrong until 2026-09-29 (planCopilot.test.ts).
+    // Measured the same day: live holds no ungrouped marks, and nothing
+    // writes them any more, so today the two cannot disagree.
     const counted = groupStamps([
       stamp(1, 10, "Duplex receptacle"),
       stamp(2, 10, "Duplex receptacle"),

@@ -23,20 +23,44 @@ import { resolveRunType } from "../../shared/runTypeLookup";
 import { sheetDisplay } from "../../shared/sheetIdentity";
 import {
   buildTakeoffExport,
+  mayIncludePrices,
   type RunStatus,
   type TakeoffExportCount,
   type TakeoffExportDoc,
   type TakeoffExportRuns,
   type TakeoffExportSheet,
+  type TakeoffPrices,
 } from "../../shared/takeoffExport";
+import {
+  lineHoursUnset,
+  lineNotPriced,
+  linePartsNotPriced,
+} from "../../shared/lineNotPriced";
+import { bidRollup, companyDefaultsFor } from "../bidPricing";
+import type { Bid } from "../../drizzle/schema";
 
 const procedure = scoped("bids.view", "bids.edit");
 
 export const takeoffExportRouter = router({
   get: procedure
-    .input(z.object({ bidId: z.number().int().positive() }))
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        /**
+         * The bid's COSTS on the Whole bid rows. Off unless asked for, every
+         * time (owner, 2026-09-29), and refused without `pricing.view`:
+         * the client hides the box, and this is what makes hiding it true.
+         */
+        includePrices: z.boolean().default(false),
+      })
+    )
     .query(async ({ input, ctx }): Promise<TakeoffExportDoc> => {
       const userId = ctx.scope.dataUserId;
+      if (input.includePrices && !mayIncludePrices(ctx.scope.capabilities))
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Your role (${ctx.scope.role}) cannot see prices.`,
+        });
       const bid = await db.getBidById(input.bidId, userId);
       if (!bid)
         throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
@@ -195,6 +219,72 @@ export const takeoffExportRouter = router({
         counts,
         runs,
         untypedRunCount,
+        prices: input.includePrices
+          ? await pricesFor(bid, userId, palette, runs)
+          : undefined,
       });
     }),
 });
+
+/**
+ * The bid's lines as the bid prices them — the SAME `bidRollup` the bid
+ * screen reads, with nothing computed here — each tagged with the whole-bid
+ * row it belongs to.
+ *
+ * A count's row is `group:<id>` (`countKey`), which is exactly what a line
+ * from the plans points at. A run type's row is keyed by the id its runs
+ * carry; a line may hold the shipped id or a fork of it, so both sides are
+ * compared through `resolveRunType`, the way the bid resolves them.
+ */
+async function pricesFor(
+  bid: Bid,
+  userId: number,
+  palette: Awaited<ReturnType<typeof db.getRunTypesFor>>,
+  runs: readonly TakeoffExportRuns[]
+): Promise<TakeoffPrices> {
+  const [lines, company, expenseRows] = await Promise.all([
+    db.getRollupLines(bid.id, userId),
+    companyDefaultsFor(userId),
+    db.getBidExpenses(bid.id),
+  ]);
+  // Tax is not read: this file stops at the Direct cost, before any of it.
+  const rollup = bidRollup(
+    bid,
+    lines,
+    company,
+    undefined,
+    expenseRows.map(row => ({
+      name: row.name,
+      amount: Number(row.amount),
+      taxable: row.taxable,
+      markedUp: row.markedUp,
+    }))
+  );
+  const resolved = (id: number) => resolveRunType(palette, id)?.id ?? id;
+  const runKeyByType = new Map<number, string>();
+  for (const r of runs) runKeyByType.set(resolved(Number(r.key)), r.key);
+
+  return {
+    lines: rollup.priced.map(({ line, breakdown, problem }) => {
+      const directCost = problem || !breakdown ? null : breakdown.directCost;
+      const rowKey =
+        line.takeoffGroupId !== null
+          ? `group:${line.takeoffGroupId}`
+          : line.takeoffRunTypeId !== null
+            ? (runKeyByType.get(resolved(line.takeoffRunTypeId)) ?? null)
+            : null;
+      return {
+        rowKey,
+        qty: Number(line.qty),
+        directCost,
+        notPriced: directCost !== null && lineNotPriced(line, directCost),
+        hoursNotSet: directCost !== null && lineHoursUnset(line),
+        partsNotPriced:
+          directCost === null ? 0 : linePartsNotPriced(line, directCost),
+      };
+    }),
+    markedUpCharges: rollup.totals.markedUpCharges,
+    directCost: rollup.totals.directCost,
+    quantitiesLockedAt: bid.quantitiesLockedAt,
+  };
+}

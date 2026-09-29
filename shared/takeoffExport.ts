@@ -14,8 +14,15 @@
  * Decided by the owner 2026-09-27: no prices in v1. A takeoff gets forwarded,
  * and a forwarded sheet should not carry the contractor's cost. When prices
  * come, they come as an explicit choice the person makes in the export, off by
- * default — not as columns that appear because a builder was copied. There is
- * no field below a price could go in.
+ * default — not as columns that appear because a builder was copied.
+ *
+ * ── Prices arrived 2026-09-29, exactly that way ──────────────────────────────
+ * This said "there is no field below a price could go in" until then. Now
+ * there is one, `source.prices`, and it is filled only when the person ticks
+ * "Include prices" — unticked every time, and refused by the server without
+ * `pricing.view`. They are COSTS, as the bid's Cost column shows them (owner:
+ * "it is a takeoff"), on the Whole bid rows only, and a footer ties them to
+ * the bid's Direct cost. references/quote-app-panel-plan.md § 4.
  *
  * ── The whole-bid rows are SUMS of the sheet rows ────────────────────────────
  * Summed here, not computed separately, so the file always adds up in the
@@ -108,6 +115,46 @@ export type TakeoffExportSource = {
   runs: readonly TakeoffExportRuns[];
   /** Runs traced with no type, which cannot be grouped (see router). */
   untypedRunCount: number;
+  /**
+   * The bid's COSTS, when the person ticked "Include prices" (owner,
+   * 2026-09-29; references/quote-app-panel-plan.md § 4). Absent, the file is
+   * exactly the quantities-only file it always was.
+   */
+  prices?: TakeoffPrices;
+};
+
+/**
+ * One bid line, as the bid prices it — from `bidRollup`, never recomputed.
+ *
+ * `rowKey` says which whole-bid row it belongs to: a count's `group:<id>`, a
+ * run type's key, or null for a line that did not come from the plans.
+ */
+export type TakeoffPricedLine = {
+  rowKey: string | null;
+  /** The quantity the line is priced on. Differs from the marks under a lock. */
+  qty: number;
+  /** The line's direct cost at quantity. Null: the engine cannot price it. */
+  directCost: number | null;
+  /** Its cost cell on the bid says "Not priced" (`lineNotPriced`). */
+  notPriced: boolean;
+  /**
+   * Its HOURS cell on the bid says "Not priced" (`lineHoursUnset`) — a traced
+   * part with no labor unit. Its material is priced and in the Cost column, so
+   * it is here too, and the status says the labor is missing.
+   */
+  hoursNotSet: boolean;
+  /** Parts with no price inside an otherwise priced line. */
+  partsNotPriced: number;
+};
+
+export type TakeoffPrices = {
+  lines: readonly TakeoffPricedLine[];
+  /** Marked-up charges AT COST — the third part of the bid's Direct cost. */
+  markedUpCharges: number;
+  /** The bid's own Direct cost, which the footer must add up to. */
+  directCost: number;
+  /** Set when the bid's quantities are locked (shared/quantityLock.ts). */
+  quantitiesLockedAt: Date | null;
 };
 
 // ─── Output ──────────────────────────────────────────────────────────────────
@@ -144,6 +191,44 @@ export type TakeoffExportRow = {
   wireFeet: number | null;
   groundFeet: number | null;
   note: string;
+  /** Whole-bid rows only, and only when prices were asked for. */
+  price?: RowPrice;
+};
+
+/**
+ * What the bid charges for a whole-bid row, at COST — the figure in the bid's
+ * Cost column, before markup, overhead, profit and tax.
+ *
+ * A gap is BLANK with a status saying why, never $0 (owner, 2026-09-26: an
+ * unpriced line never shows as $0).
+ */
+export type RowPrice = {
+  status: string;
+  /** The quantity the bid prices, for a count; null on a run type. */
+  qtyOnBid: number | null;
+  /** Line cost ÷ quantity, for a count; blank on a run type (several parts). */
+  unitCost: number | null;
+  lineCost: number | null;
+};
+
+/** The footer that ties the priced rows to the bid's Direct cost. */
+export type PriceFooter = {
+  /** The Line cost cells above, added up. */
+  pricedRows: number;
+  /** Lines marked Not priced, at what the bid counts for them so far. */
+  notPricedCost: number;
+  notPricedLines: number;
+  /** Lines on the bid that did not come from the plans. */
+  otherCost: number;
+  otherLines: number;
+  markedUpCharges: number;
+  directCost: number;
+  /** Lines the bid cannot price: in no figure, the bid's included. */
+  cantPriceLines: number;
+  partsNotPriced: number;
+  quantitiesLockedAt: Date | null;
+  /** A count's marks differ from what the bid prices (a lock). */
+  qtyDiffers: boolean;
 };
 
 export type TakeoffExportDoc = {
@@ -152,6 +237,8 @@ export type TakeoffExportDoc = {
   bySheet: TakeoffExportRow[];
   wholeBid: TakeoffExportRow[];
   notes: string[];
+  /** Present only when prices were asked for. */
+  prices: PriceFooter | null;
 };
 
 // ─── Building it ─────────────────────────────────────────────────────────────
@@ -267,6 +354,170 @@ function runRow(
 const byName = (a: { name: string }, b: { name: string }) =>
   a.name.localeCompare(b.name);
 
+// ─── Prices, when asked for ──────────────────────────────────────────────────
+
+/**
+ * Whether this person may take the bid's costs out in a file. The server
+ * refuses `includePrices` on this, and the client hides the box on it.
+ *
+ * Every role carries `pricing.view` today (shared/permissions.ts), so no real
+ * account is refused yet; the rule is here so a role without it is refused the
+ * day one exists, rather than the day somebody notices.
+ */
+export function mayIncludePrices(capabilities: readonly string[]): boolean {
+  return capabilities.includes("pricing.view");
+}
+
+const toCents = (dollars: number) => Math.round(dollars * 100);
+const fromCents = (cents: number) => cents / 100;
+
+/**
+ * What the bid charges for one whole-bid row, from the lines behind it.
+ *
+ * A row's Line cost is the lines the bid has PRICED. A line the bid shows as
+ * "Not priced" is left out of the cell and said in the status; the footer
+ * then names what the bid counts for it so far, so the file still adds up to
+ * the bid's Direct cost.
+ */
+function priceFor(
+  lines: readonly TakeoffPricedLine[],
+  kind: "Count" | "Run"
+): RowPrice {
+  const qtyOnBid =
+    kind === "Count" && lines.length > 0
+      ? lines.reduce((q, l) => q + l.qty, 0)
+      : null;
+  if (lines.length === 0)
+    return {
+      status: "Not on bid",
+      qtyOnBid: null,
+      unitCost: null,
+      lineCost: null,
+    };
+  const priced = lines.filter(l => l.directCost !== null && !l.notPriced);
+  const cant = lines.filter(l => l.directCost === null).length;
+  if (priced.length === 0)
+    return {
+      status: cant === lines.length ? "Can't price" : "Not priced",
+      qtyOnBid,
+      unitCost: null,
+      lineCost: null,
+    };
+  const cents = priced.reduce((c, l) => c + toCents(l.directCost ?? 0), 0);
+  const parts = priced.reduce((p, l) => p + l.partsNotPriced, 0);
+  const noHours = priced.filter(l => l.hoursNotSet).length;
+  const status =
+    priced.length < lines.length
+      ? `Part not priced (${lines.length - priced.length} of ${lines.length})`
+      : parts > 0
+        ? `Priced, ${plural(parts, "part", "parts")} not priced`
+        : noHours > 0
+          ? `Priced, no labor hours on ${plural(noHours, "part", "parts")}`
+          : "Priced";
+  return {
+    status,
+    qtyOnBid,
+    // A unit cost only where one line holds one kind of thing at a quantity.
+    unitCost:
+      kind === "Count" && priced.length === 1 && lines.length === 1 && qtyOnBid
+        ? round2(fromCents(cents) / qtyOnBid)
+        : null,
+    lineCost: fromCents(cents),
+  };
+}
+
+/**
+ * Price the whole-bid rows, and build the footer that ties them to the bid.
+ *
+ * Every line with a figure lands in exactly one of four places — a row's
+ * cell, "Not priced so far", "Other lines", or nowhere because the engine
+ * cannot price it (as on the bid) — so the footer adds up to the bid's Direct
+ * cost to the cent. server/takeoffExport.test.ts holds that.
+ */
+function applyPrices(
+  keyed: readonly {
+    key: string;
+    status: RunStatus | null;
+    row: TakeoffExportRow;
+  }[],
+  prices: TakeoffPrices
+): PriceFooter {
+  const rowKeys = new Set(keyed.map(k => k.key));
+  const linesByKey = new Map<string, TakeoffPricedLine[]>();
+  let otherCents = 0;
+  let otherLines = 0;
+  let notPricedCents = 0;
+  let notPricedLines = 0;
+  let cantPriceLines = 0;
+  let partsNotPriced = 0;
+  for (const line of prices.lines) {
+    if (line.directCost === null) cantPriceLines++;
+    if (line.rowKey === null || !rowKeys.has(line.rowKey)) {
+      otherLines++;
+      otherCents += toCents(line.directCost ?? 0);
+      continue;
+    }
+    const list = linesByKey.get(line.rowKey) ?? [];
+    list.push(line);
+    linesByKey.set(line.rowKey, list);
+    if (line.notPriced && line.directCost !== null) {
+      notPricedLines++;
+      notPricedCents += toCents(line.directCost);
+    }
+    if (!line.notPriced && line.directCost !== null)
+      partsNotPriced += line.partsNotPriced;
+  }
+
+  /*
+    A run type can have a Finished row AND a Draft row, and its bid lines are
+    for both together — the bid prices drafts too. The price goes on ONE row
+    (Finished when there is one) and the other says where it is, rather than
+    splitting a cost the bid never split.
+  */
+  const pricedRunKeys = new Set<string>();
+  const ordered = [...keyed].sort((a, b) =>
+    a.status === b.status ? 0 : a.status === "committed" ? -1 : 1
+  );
+  let rowCents = 0;
+  let qtyDiffers = false;
+  for (const { key, row } of ordered) {
+    if (row.kind === "Run") {
+      if (pricedRunKeys.has(key)) {
+        row.price = {
+          status: "On the Finished row",
+          qtyOnBid: null,
+          unitCost: null,
+          lineCost: null,
+        };
+        continue;
+      }
+      pricedRunKeys.add(key);
+    }
+    row.price = priceFor(linesByKey.get(key) ?? [], row.kind);
+    if (row.price.lineCost !== null) rowCents += toCents(row.price.lineCost);
+    if (
+      row.kind === "Count" &&
+      row.price.qtyOnBid !== null &&
+      row.price.qtyOnBid !== row.quantity
+    )
+      qtyDiffers = true;
+  }
+
+  return {
+    pricedRows: fromCents(rowCents),
+    notPricedCost: fromCents(notPricedCents),
+    notPricedLines,
+    otherCost: fromCents(otherCents),
+    otherLines,
+    markedUpCharges: prices.markedUpCharges,
+    directCost: prices.directCost,
+    cantPriceLines,
+    partsNotPriced,
+    quantitiesLockedAt: prices.quantitiesLockedAt,
+    qtyDiffers,
+  };
+}
+
 /** Finished before Draft, within one type. */
 const runOrder = (a: RunTotals, b: RunTotals) =>
   a.typeLabel.localeCompare(b.typeLabel) ||
@@ -366,12 +617,19 @@ export function buildTakeoffExport(
     runTotals.set(key, total);
   }
 
-  const wholeBid: TakeoffExportRow[] = [
-    ...Array.from(countTotals.values())
+  const keyed: {
+    key: string;
+    status: RunStatus | null;
+    row: TakeoffExportRow;
+  }[] = [
+    ...Array.from(countTotals.entries())
+      .map(([key, count]) => ({ key, ...count }))
       .filter(c => c.count > 0)
       .sort(byName)
-      .map(
-        (count): TakeoffExportRow => ({
+      .map(count => ({
+        key: count.key,
+        status: null,
+        row: {
           ...allSheets,
           kind: "Count",
           item: count.name,
@@ -386,13 +644,19 @@ export function buildTakeoffExport(
           wireFeet: null,
           groundFeet: null,
           note: "",
-        })
-      ),
+        } satisfies TakeoffExportRow,
+      })),
     ...Array.from(runTotals.values())
       .filter(r => r.runCount > 0)
       .sort(runOrder)
-      .map(runs => runRow(runs, allSheets)),
+      .map(runs => ({
+        key: runs.key,
+        status: runs.status,
+        row: runRow(runs, allSheets),
+      })),
   ];
+  const prices = source.prices ? applyPrices(keyed, source.prices) : null;
+  const wholeBid = keyed.map(k => k.row);
 
   // ── Notes: what the numbers mean, and what is not in them ──────────────────
   const notes: string[] = [
@@ -418,6 +682,21 @@ export function buildTakeoffExport(
   if (bySheet.length === 0) {
     notes.unshift("Nothing has been counted or traced on this bid yet.");
   }
+  if (prices) {
+    notes.push(
+      "Prices are COSTS, as the bid's Cost column shows them: material and labor, before material markup, overhead, profit and sales tax. This file is internal — do not send it to a customer or a supplier.",
+      "Prices are on the Whole bid rows only. A count's Line cost is its bid line; a run type's is every bid line from that type added together — pipe or cable, wire, ground, and the fittings the bid counts for it — so a run type has no single Unit cost.",
+      "A blank cost is not $0. The Price status says why: Not priced (nobody has priced it on the bid), Can't price (the bid cannot work it out), Not on bid (counted or traced but never sent), or On the Finished row (a type's Draft and Finished footage share one set of bid lines)."
+    );
+    if (prices.qtyDiffers || prices.quantitiesLockedAt)
+      notes.push(
+        `The bid's quantities are locked${
+          prices.quantitiesLockedAt
+            ? ` (since ${prices.quantitiesLockedAt.toISOString().slice(0, 10)})`
+            : ""
+        }: Qty on bid is what the bid prices, and can differ from the marks counted now.`
+      );
+  }
 
   return {
     bidName: source.bidName,
@@ -425,6 +704,7 @@ export function buildTakeoffExport(
     bySheet,
     wholeBid,
     notes,
+    prices,
   };
 }
 
@@ -477,27 +757,100 @@ function rowCells(row: TakeoffExportRow): (string | number)[] {
 /**
  * Two tables with the same columns — by sheet, then the whole bid — so either
  * can be selected and pivoted on its own, then the notes.
+ *
+ * With prices, the Whole bid table gains its price columns AT THE END, so
+ * every quantity column stays where a spreadsheet built on the plain file
+ * expects it, and a Prices block ties the cells to the bid's Direct cost.
+ * Without prices the file is byte-for-byte the quantities-only file
+ * (server/takeoffExport.test.ts, T8).
  */
 export function takeoffExportCsv(doc: TakeoffExportDoc): string {
+  const p = doc.prices;
+  if (!p) {
+    return csvDocument([
+      ["Takeoff", doc.bidName],
+      ["Prepared", doc.preparedOn.toISOString().slice(0, 10)],
+      ["Quantities only — no pricing"],
+      "",
+      ["By sheet"],
+      [...HEADER],
+      ...doc.bySheet.map(rowCells),
+      "",
+      ["Whole bid"],
+      [...HEADER],
+      ...doc.wholeBid.map(rowCells),
+      "",
+      ["Notes"],
+      ...doc.notes.map(note => [note]),
+    ]);
+  }
+  const withQty = p.qtyDiffers || p.quantitiesLockedAt !== null;
+  const priceHeader = [
+    "Price status",
+    ...(withQty ? ["Qty on bid"] : []),
+    "Unit cost",
+    "Line cost",
+  ];
+  const priceCells = (row: TakeoffExportRow): (string | number)[] => {
+    const price = row.price;
+    return [
+      price?.status ?? "",
+      ...(withQty ? [blankIfNull(price?.qtyOnBid ?? null)] : []),
+      blankIfNull(price?.unitCost ?? null),
+      blankIfNull(price?.lineCost ?? null),
+    ];
+  };
+  const footer: (string | number)[][] = [
+    ["Priced rows above, added up", p.pricedRows],
+  ];
+  if (p.notPricedLines > 0)
+    footer.push([
+      `Lines marked Not priced, as the bid counts them so far (${plural(p.notPricedLines, "line", "lines")})`,
+      p.notPricedCost,
+    ]);
+  footer.push([
+    `Other lines on the bid, not from the plans (${plural(p.otherLines, "line", "lines")})`,
+    p.otherCost,
+  ]);
+  if (p.markedUpCharges !== 0)
+    footer.push(["Marked-up charges, at cost", p.markedUpCharges]);
+  footer.push(["Direct cost — the same figure as on the bid", p.directCost]);
+  if (p.cantPriceLines > 0)
+    footer.push([
+      `${plural(p.cantPriceLines, "line", "lines")} the bid cannot price — in no figure here, and not in the bid's either`,
+    ]);
+  if (p.partsNotPriced > 0)
+    footer.push([
+      `${plural(p.partsNotPriced, "part", "parts")} inside priced lines have no price — the costs above are short by them`,
+    ]);
   return csvDocument([
     ["Takeoff", doc.bidName],
     ["Prepared", doc.preparedOn.toISOString().slice(0, 10)],
-    ["Quantities only — no pricing"],
+    [
+      "With prices — COSTS, before markup, overhead, profit and tax. Internal: do not send to a customer or supplier.",
+    ],
     "",
     ["By sheet"],
     [...HEADER],
     ...doc.bySheet.map(rowCells),
     "",
     ["Whole bid"],
-    [...HEADER],
-    ...doc.wholeBid.map(rowCells),
+    [...HEADER, ...priceHeader],
+    ...doc.wholeBid.map(row => [...rowCells(row), ...priceCells(row)]),
+    "",
+    ["Prices"],
+    ...footer,
     "",
     ["Notes"],
     ...doc.notes.map(note => [note]),
   ]);
 }
 
-/** `<bid>-takeoff-<date>.csv`, the same shape as the materials list's name. */
+/**
+ * `<bid>-takeoff-<date>.csv`, the same shape as the materials list's name —
+ * `<bid>-takeoff-with-prices-<date>.csv` when it carries costs, so the name
+ * says which file it is before anybody opens or forwards it.
+ */
 export function takeoffExportFilename(doc: TakeoffExportDoc): string {
   const slug =
     doc.bidName
@@ -505,5 +858,6 @@ export function takeoffExportFilename(doc: TakeoffExportDoc): string {
       .replace(/[^a-zA-Z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 60) || "bid";
-  return `${slug}-takeoff-${doc.preparedOn.toISOString().slice(0, 10)}.csv`;
+  const what = doc.prices ? "takeoff-with-prices" : "takeoff";
+  return `${slug}-${what}-${doc.preparedOn.toISOString().slice(0, 10)}.csv`;
 }

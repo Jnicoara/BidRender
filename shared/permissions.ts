@@ -197,6 +197,12 @@ export const FEATURES = {
    */
   "accounting.quickbooks": { availability: "internal" },
   /**
+   * "For your quote app": a bid's customer price, before tax, in five buckets
+   * per scope. Internal first (owner, 2026-09-29): it is shaped to one
+   * company's own quote app. references/quote-app-panel-plan.md.
+   */
+  "quoteapp.panel": { availability: "internal" },
+  /**
    * The business analytics dashboard. Shipped to everyone.
    *
    * Tagged even though it is released, because the two axes answer different

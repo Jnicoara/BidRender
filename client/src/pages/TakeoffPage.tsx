@@ -51,7 +51,7 @@ import {
 import { createPortal } from "react-dom";
 import { trpc } from "@/lib/trpc";
 import { useCompany } from "@/hooks/useCompany";
-import { useTakeoffExport } from "@/hooks/useTakeoffExport";
+import { TakeoffExportDialog } from "@/components/TakeoffExportDialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -233,6 +233,13 @@ import type { TraceMode } from "@shared/traceMode";
 import { LegendPanel } from "@/components/takeoff/LegendPanel";
 import { CoPilotPanel } from "@/components/takeoff/CoPilotPanel";
 import { snapshotPage } from "@/lib/planSnapshot";
+import {
+  boxSelection,
+  clickSelection,
+  deleteNeedsConfirm,
+  deleteQuestion,
+  pruneSelection,
+} from "@/lib/stampSelection";
 import { withSavedSheet, withSheetChecked } from "@/lib/sheetScaleCache";
 import { canRetryWithFreshUrl, isExpiredPlanUrl } from "@/lib/planUrlRefresh";
 import { groupStamps } from "@shared/takeoffCounts";
@@ -1846,7 +1853,8 @@ export default function TakeoffPage({
   const uploading = isBusy(uploads);
   const [confirmRemove, setConfirmRemove] = useState<Document | null>(null);
   const [materialsListOpen, setMaterialsListOpen] = useState(false);
-  const takeoffExport = useTakeoffExport(bidId);
+  /** "Export takeoff" — the dialog where prices are ticked, or not. */
+  const [takeoffExportOpen, setTakeoffExportOpen] = useState(false);
   /**
    * Which sheets state NOT TO SCALE, by sheet id.
    *
@@ -2160,7 +2168,18 @@ export default function TakeoffPage({
     /** Null for a plain count. Kept for the legend panel's active-row mark. */
     assemblyId: number | null;
   } | null>(null);
-  const [selectedStampId, setSelectedStampId] = useState<number | null>(null);
+  /**
+   * The marks selected for deleting — one by click, more by Shift-click or
+   * Shift-drag. The rules are in @/lib/stampSelection, where a test reaches
+   * them; this only holds the set.
+   */
+  const [selectedStampIds, setSelectedStampIds] = useState<ReadonlySet<number>>(
+    () => new Set()
+  );
+  /** Waiting for "Delete N marks?" to be answered. */
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  /** The question as it was asked — see `deleteSelected`. */
+  const [deleteAsked, setDeleteAsked] = useState(() => deleteQuestion([]));
   /** Where a click in the counted-items list sent the viewer. */
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(
     null
@@ -2314,6 +2333,12 @@ export default function TakeoffPage({
           return;
         case "bidPdfs.sheetJumpList":
           void utils.bidPdfs.sheetJumpList.invalidate({ bidId });
+          return;
+        case "bids.get":
+          void utils.bids.get.invalidate({ id: bidId });
+          return;
+        case "materialsList.get":
+          void utils.materialsList.get.invalidate({ bidId });
           return;
         case "bidPdfs.searchText":
           void utils.bidPdfs.searchText.invalidate();
@@ -2928,6 +2953,56 @@ export default function TakeoffPage({
     // (ON DELETE SET NULL), so its drops, connectors and Send preview move.
     onSettled: () => refreshFor("markRemoved"),
   });
+
+  /*
+    DELETING A SELECTION OF MARKS (owner, 2026-09-29).
+
+    One request for the whole selection, so it goes whole or not at all, and
+    the same "markRemoved" refresh as a single mark: the count, the bid's
+    lines, every drop, the totals and the materials list all move
+    (@/lib/takeoffRefresh). The toast reports what the SERVER removed, not
+    what was asked for.
+  */
+  const removeStamps = trpc.takeoffStamps.removeMany.useMutation({
+    onSuccess: r =>
+      toast.success(
+        `Deleted ${r.removed} ${r.removed === 1 ? "mark" : "marks"}.`
+      ),
+    onError: e => toast.error(e.message),
+    onSettled: () => {
+      setSelectedStampIds(new Set());
+      refreshFor("markRemoved");
+    },
+  });
+  const selectedStamps = useMemo(
+    () => stamps.filter(s => selectedStampIds.has(s.id)),
+    [stamps, selectedStampIds]
+  );
+  // A mark deleted elsewhere, or a different sheet, leaves the selection.
+  useEffect(() => {
+    setSelectedStampIds(current => pruneSelection(current, stamps));
+  }, [stamps]);
+  const deleteSelected = useCallback(
+    (confirmed: boolean) => {
+      if (selectedStamps.length === 0 || removeStamps.isPending) return;
+      if (!confirmed && deleteNeedsConfirm(selectedStamps.length)) {
+        /*
+          The question is FROZEN when it is asked. Derived live, it re-read
+          the selection as the dialog closed and said "Delete 0 marks?" for
+          the length of the fade (seen 2026-09-29) — the wrong number, on the
+          one dialog whose job is the number.
+        */
+        setDeleteAsked(
+          deleteQuestion(selectedStamps.map(s => ({ groupName: s.name })))
+        );
+        setConfirmingDelete(true);
+        return;
+      }
+      setConfirmingDelete(false);
+      removeStamps.mutate({ ids: selectedStamps.map(s => s.id) });
+    },
+    [selectedStamps, removeStamps]
+  );
   const captureSymbol = trpc.takeoffStamps.captureSymbol.useMutation({
     onError: e => toast.error(e.message),
     onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
@@ -3444,6 +3519,37 @@ export default function TakeoffPage({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [activeSheet, tracing, selectingText, startSelectingText]);
+
+  /**
+   * Delete / Backspace deletes the selected marks; Escape lets go of them.
+   *
+   * Only while no tool is armed: tracing has its own Backspace (undo the last
+   * point), and a key meant for a field never reaches here.
+   */
+  useEffect(() => {
+    if (selectedStampIds.size === 0 || tracing || armedGroup) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable)
+      )
+        return;
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        deleteSelected(false);
+      } else if (e.key === "Escape" && !confirmingDelete) {
+        e.preventDefault();
+        setSelectedStampIds(new Set());
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedStampIds, tracing, armedGroup, deleteSelected, confirmingDelete]);
 
   /** Escape puts the stamp tool down. */
   useEffect(() => {
@@ -4744,6 +4850,11 @@ export default function TakeoffPage({
         open={materialsListOpen}
         onOpenChange={setMaterialsListOpen}
       />
+      <TakeoffExportDialog
+        bidId={bidId}
+        open={takeoffExportOpen}
+        onOpenChange={setTakeoffExportOpen}
+      />
 
       {/*
         Hidden in focus mode, which is what makes focus mode worth a key.
@@ -4802,16 +4913,10 @@ export default function TakeoffPage({
               size="sm"
               variant="outline"
               className="h-8 gap-1.5 text-xs shrink-0"
-              onClick={() => void takeoffExport.exportCsv()}
-              disabled={takeoffExport.pending}
-              title="Every count and run, by sheet and type — quantities only"
+              onClick={() => setTakeoffExportOpen(true)}
+              title="Every count and run, by sheet and type — prices only if you ask"
             >
-              {takeoffExport.pending ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <FileSpreadsheet className="w-3.5 h-3.5" />
-              )}{" "}
-              Export takeoff
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Export takeoff
             </Button>
             {docs.length > 0 && (
               <Button
@@ -5627,8 +5732,19 @@ export default function TakeoffPage({
                       ]}
                       proposals={proposals}
                       onDropStamp={queueStamp}
-                      selectedStampId={selectedStampId}
-                      onSelectStamp={setSelectedStampId}
+                      selectedStampIds={selectedStampIds}
+                      onStampClick={(id, additive) =>
+                        setSelectedStampIds(current =>
+                          clickSelection(current, id, additive)
+                        )
+                      }
+                      onBoxSelect={ids =>
+                        setSelectedStampIds(current =>
+                          boxSelection(current, ids)
+                        )
+                      }
+                      onDeleteSelected={() => deleteSelected(false)}
+                      onClearSelection={() => setSelectedStampIds(new Set())}
                       focusPoint={focusPoint}
                       chromeTarget={size.chromeTarget}
                       legs={{
@@ -6022,6 +6138,30 @@ export default function TakeoffPage({
           </div>
         </div>
       )}
+
+      {/* "Delete N marks?" — asked for more than one, never for one. */}
+      <AlertDialog
+        open={confirmingDelete}
+        onOpenChange={open => !open && setConfirmingDelete(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{deleteAsked.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteAsked.detail}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep them</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => deleteSelected(true)}
+            >
+              {deleteAsked.confirm}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={confirmRemove !== null}

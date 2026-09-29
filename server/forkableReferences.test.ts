@@ -455,10 +455,16 @@ describe("every stored id into a forkable row is accounted for", () => {
         server/db.ts                  loads and writes the stored id, unresolved
         server/routers/takeoffGroupsRouter.ts  validates and stores the id
         client/src/components/takeoff/GroupDrop.tsx  shows and picks the id
+        client/src/lib/dropUndo.ts    "Undo drops" (2026-09-29): writes the
+                                      stored id back VERBATIM. Resolving it
+                                      here would be wrong — undo restores what
+                                      was stored, and the price still resolves
+                                      through runVerticals on every read.
     */
     expect(readers.map(r => r.split(path.sep).join("/")).sort()).toEqual(
       [
         "client/src/components/takeoff/GroupDrop.tsx",
+        "client/src/lib/dropUndo.ts",
         "server/db.ts",
         "server/routers/takeoffGroupsRouter.ts",
         "server/runVerticals.ts",

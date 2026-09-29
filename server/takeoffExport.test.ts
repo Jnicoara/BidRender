@@ -19,12 +19,14 @@ import { footageByRunType } from "./runTypeFootage";
 import { bidPdfs, bidPdfSheets, bids, users } from "../drizzle/schema";
 import {
   buildTakeoffExport,
+  mayIncludePrices,
   takeoffExportCsv,
   takeoffExportFilename,
   type TakeoffExportRuns,
   type TakeoffExportSource,
 } from "../shared/takeoffExport";
 import type { TrpcContext } from "./_core/context";
+import { lineNotPriced } from "../shared/lineNotPriced";
 
 const USER = 9331;
 const OTHER_USER = 9332;
@@ -312,6 +314,172 @@ describe("building the export", () => {
 
 // ── Against the database: does the file agree with the bid? ─────────────────
 
+// ── Prices (owner, 2026-09-29; quote-app-panel-plan.md § 4) ──────────────────
+
+describe("the export with prices", () => {
+  const withRows = source({
+    counts: [
+      { sheetId: 1, key: "group:1", name: "Duplex", count: 2 },
+      { sheetId: 2, key: "group:1", name: "Duplex", count: 1 },
+      { sheetId: 1, key: "group:2", name: "Exit sign", count: 4 },
+      { sheetId: 1, key: "group:3", name: "Smoke", count: 1 },
+    ],
+    runs: [
+      runs({ sheetId: 1, key: "7" }),
+      runs({ sheetId: 2, key: "7", status: "draft" }),
+    ],
+  });
+  const line = (
+    rowKey: string | null,
+    directCost: number | null,
+    over: Partial<{
+      qty: number;
+      notPriced: boolean;
+      parts: number;
+      noHours: boolean;
+    }> = {}
+  ) => ({
+    rowKey,
+    qty: over.qty ?? 1,
+    directCost,
+    notPriced: over.notPriced ?? false,
+    hoursNotSet: over.noHours ?? false,
+    partsNotPriced: over.parts ?? 0,
+  });
+  const PRICES = {
+    lines: [
+      line("group:1", 45.3, { qty: 3 }),
+      // Exit signs: on the bid, nobody priced them.
+      line("group:2", 0, { qty: 4, notPriced: true }),
+      // A run type is several lines: pipe, wire, ground.
+      line("7", 120.11),
+      line("7", 33.33),
+      line("7", 0.47, { notPriced: true }),
+      // Not from the plans at all.
+      line(null, 500),
+      line(null, null),
+    ],
+    markedUpCharges: 200,
+    directCost: 45.3 + 0 + 120.11 + 33.33 + 0.47 + 500 + 200,
+    quantitiesLockedAt: null,
+  };
+  const doc = buildTakeoffExport({ ...withRows, prices: PRICES });
+  const row = (item: string, status = "") =>
+    doc.wholeBid.find(r => r.item === item && r.status === status)!;
+
+  it("prices a count from its bid line, with a unit cost", () => {
+    expect(row("Duplex").price).toEqual({
+      status: "Priced",
+      qtyOnBid: 3,
+      unitCost: 15.1,
+      lineCost: 45.3,
+    });
+  });
+
+  it("leaves a gap BLANK and says why — never $0", () => {
+    expect(row("Exit sign").price).toMatchObject({
+      status: "Not priced",
+      lineCost: null,
+      unitCost: null,
+    });
+    expect(row("Smoke").price).toMatchObject({
+      status: "Not on bid",
+      lineCost: null,
+    });
+    const csv = takeoffExportCsv(doc);
+    const exitRow = csv
+      .split("\r\n")
+      .find(r => r.includes('"Exit sign"') && r.includes("Not priced"))!;
+    // The last cell, Line cost, is empty — not "0".
+    expect(exitRow.endsWith(',""')).toBe(true);
+  });
+
+  it("puts a run type's lines on ONE row, and says where on the other", () => {
+    const finished = row('3/4" EMT', "Finished").price!;
+    expect(finished.status).toBe("Part not priced (1 of 3)");
+    expect(finished.lineCost).toBe(153.44);
+    expect(finished.unitCost).toBeNull();
+    expect(row('3/4" EMT', "Draft").price!.status).toBe("On the Finished row");
+  });
+
+  it("adds up to the bid's Direct cost, to the cent (T7)", () => {
+    const f = doc.prices!;
+    const cents = (n: number) => Math.round(n * 100);
+    expect(
+      cents(f.pricedRows) +
+        cents(f.notPricedCost) +
+        cents(f.otherCost) +
+        cents(f.markedUpCharges)
+    ).toBe(cents(f.directCost));
+    expect(f.otherLines).toBe(2);
+    expect(f.cantPriceLines).toBe(1);
+  });
+
+  it("shows a cost with no labor hours, and says the labor is missing", () => {
+    const d = buildTakeoffExport({
+      ...withRows,
+      prices: {
+        ...PRICES,
+        lines: [line("group:1", 12.5, { qty: 3, noHours: true })],
+        directCost: 12.5,
+        markedUpCharges: 0,
+      },
+    });
+    expect(d.wholeBid.find(r => r.item === "Duplex")!.price).toMatchObject({
+      status: "Priced, no labor hours on 1 part",
+      lineCost: 12.5,
+    });
+  });
+
+  it("carries no price on a by-sheet row", () => {
+    for (const r of doc.bySheet) expect(r.price).toBeUndefined();
+  });
+
+  it("without prices is the quantities-only file, unchanged (T8)", () => {
+    const plain = takeoffExportCsv(buildTakeoffExport(withRows));
+    const alsoPlain = takeoffExportCsv(
+      buildTakeoffExport({ ...withRows, prices: undefined })
+    );
+    expect(alsoPlain).toBe(plain);
+    expect(plain).toContain("Quantities only — no pricing");
+    expect(plain).not.toMatch(/Price status|Line cost|Unit cost|Direct cost/);
+    const priced = takeoffExportCsv(doc);
+    // The quantity columns keep their places; prices are added at the end.
+    expect(priced).toContain('"Note","Price status","Unit cost","Line cost"');
+    expect(priced).toMatch(/COSTS, before markup, overhead, profit and tax/);
+  });
+
+  it("adds Qty on bid when the bid's quantities are locked", () => {
+    const locked = buildTakeoffExport({
+      ...withRows,
+      prices: {
+        ...PRICES,
+        quantitiesLockedAt: new Date("2026-09-20T00:00:00Z"),
+      },
+    });
+    const csv = takeoffExportCsv(locked);
+    expect(csv).toContain(
+      '"Price status","Qty on bid","Unit cost","Line cost"'
+    );
+    expect(csv).toContain("locked (since 2026-09-20)");
+  });
+
+  it("names the priced file so it is not mistaken for the plain one", () => {
+    expect(takeoffExportFilename(doc)).toBe(
+      "Main-St-takeoff-with-prices-2026-09-27.csv"
+    );
+  });
+
+  it("refuses prices to anyone who cannot see them (T9)", () => {
+    /*
+      Every role carries pricing.view today, so no real account reaches the
+      refusal; the rule the router applies is tested here directly.
+    */
+    expect(mayIncludePrices(["bids.view"])).toBe(false);
+    expect(mayIncludePrices(["bids.view", "pricing.view"])).toBe(true);
+  });
+});
+
 async function newSheet(
   bidId: number,
   pdfId: number,
@@ -536,6 +704,163 @@ describe.skipIf(!hasDb)("the export against a real bid", () => {
     await expect(
       callerFor(OTHER_USER).takeoffExport.get({ bidId })
     ).rejects.toThrow(/not found/i);
+  });
+
+  it("with prices, ties to the bid's own Direct cost and line costs (T7)", async () => {
+    const bid = await caller().bids.create({
+      name: `Priced export ${uniq()}`,
+      trades: ["electrical"],
+    });
+    const bidId = bid!.id;
+    const pdfId = await newPlan(bidId);
+    const sheet = await newSheet(bidId, pdfId, 1, 48);
+
+    // A run type whose parts are priced — the Priced row.
+    const priced = async (name: string, cost: number) => {
+      const row = (await caller().materials.list()).find(m => m.name === name)!;
+      const updated = await caller().materials.update({
+        id: row.id,
+        costPerUnit: cost,
+      });
+      return updated?.material?.id ?? row.id;
+    };
+    const emt = await caller().takeoffRunTypes.create({
+      label: `Priced EMT ${uniq()}`,
+      pathType: "conduit",
+      racewayMaterialId: await priced('1/2" EMT', 1.25),
+      conductorMaterialId: await priced("#12 THHN", 0.18),
+      conductorCount: 2,
+      groundMaterialId: await priced("#12 bare CU, solid", 0.12),
+      groundCount: 1,
+    });
+    await caller().takeoffRuns.save({
+      bidId,
+      sheetId: sheet,
+      name: "Homerun",
+      pathType: "conduit",
+      runTypeId: emt.id,
+      status: "committed",
+      points: [
+        { x: 0, y: 0 },
+        { x: 720, y: 0 },
+      ],
+    });
+    await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: emt.id });
+
+    // A count on the bid that nobody priced, and one never sent.
+    const duplex = await caller().takeoffGroups.create({
+      bidId,
+      label: "Duplex",
+    });
+    await caller().takeoffStamps.drop({
+      bidId,
+      sheetId: sheet,
+      groupId: duplex.id,
+      at: [
+        { x: 1, y: 1 },
+        { x: 2, y: 2 },
+        { x: 3, y: 3 },
+      ],
+    });
+    await caller().takeoffGroups.sendToBid({ id: duplex.id });
+    const smoke = await caller().takeoffGroups.create({
+      bidId,
+      label: "Smoke",
+    });
+    await caller().takeoffStamps.drop({
+      bidId,
+      sheetId: sheet,
+      groupId: smoke.id,
+      at: [{ x: 9, y: 9 }],
+    });
+
+    // A line that did not come from the plans, and a marked-up charge.
+    const material = await caller().materials.create({
+      name: `Export gear ${uniq()}`,
+      unitOfSale: "each",
+      costPerUnit: 100,
+      category: "Receptacles",
+    });
+    const assembly = await caller().assemblies.create({
+      name: `Export assembly ${uniq()}`,
+      category: "Devices",
+      trade: "electrical",
+      projectType: "both",
+      baseLaborHours: 0,
+      materials: [{ materialId: material!.id, qty: 1 }],
+      modifierIds: [],
+    });
+    await caller().bids.addAssembly({
+      bidId,
+      assemblyId: assembly!.id,
+      qty: 2,
+    });
+    await caller().bidExtras.expenses.addToBid({
+      bidId,
+      name: "Lift rental",
+      amount: 200,
+      markedUp: true,
+    });
+
+    const plain = await caller().takeoffExport.get({ bidId });
+    expect(plain.prices).toBeNull();
+
+    const doc = await caller().takeoffExport.get({
+      bidId,
+      includePrices: true,
+    });
+    const detail = await caller().bids.get({ id: bidId });
+    const cents = (n: number) => Math.round(n * 100);
+
+    // The footer IS the bid's Direct cost, and adds up to it exactly.
+    const f = doc.prices!;
+    expect(cents(f.directCost)).toBe(cents(detail.totals.directCost));
+    expect(
+      cents(f.pricedRows) +
+        cents(f.notPricedCost) +
+        cents(f.otherCost) +
+        cents(f.markedUpCharges)
+    ).toBe(cents(detail.totals.directCost));
+    expect(f.otherLines).toBe(1);
+    expect(f.otherCost).toBe(200);
+    expect(f.markedUpCharges).toBe(200);
+
+    // The run type's cell is its bid lines, added up, as the bid prices them.
+    const typeLines = detail.lines.filter(l => l.takeoffRunTypeId === emt.id);
+    expect(typeLines.length).toBeGreaterThan(0);
+    const typeRow = doc.wholeBid.find(r => r.item === emt.label)!;
+    /*
+      Which of the type's lines the bid itself shows as "Not priced" — by the
+      bid screen's own rule on the bid's own figures. The type sends pipe, wire
+      and ground (priced above) and its fittings, whose catalog price is $0.
+    */
+    const unpriced = typeLines.filter(l =>
+      lineNotPriced(l, l.breakdown?.directCost ?? null)
+    );
+    expect(unpriced.length).toBeGreaterThan(0);
+    expect(typeRow.price?.status).toBe(
+      `Part not priced (${unpriced.length} of ${typeLines.length})`
+    );
+    // The cell is the priced lines as the bid prices them, to the cent.
+    expect(cents(typeRow.price!.lineCost!)).toBe(
+      typeLines
+        .filter(l => !unpriced.includes(l))
+        .reduce((c, l) => c + cents(l.breakdown!.directCost), 0)
+    );
+
+    // Gaps are blank with a reason, never $0.
+    const duplexRow = doc.wholeBid.find(r => r.item === "Duplex")!;
+    expect(duplexRow.price).toMatchObject({
+      status: "Not priced",
+      qtyOnBid: 3,
+      lineCost: null,
+    });
+    expect(doc.wholeBid.find(r => r.item === "Smoke")!.price).toMatchObject({
+      status: "Not on bid",
+      lineCost: null,
+    });
+    // Per-sheet rows stay quantities.
+    for (const r of doc.bySheet) expect(r.price).toBeUndefined();
   });
 
   it("an empty bid is a document that says so, not an error", async () => {

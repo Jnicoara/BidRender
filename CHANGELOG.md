@@ -40,6 +40,38 @@ This is the human-readable companion to the git history — read this to see wha
   working. Threaded closure plugs (1/2" and 3/4") are in the catalog too,
   for the unused hubs (unpriced, like every shipped item).
 
+- **Marks placed by the plan reader now count on the bid.** Pressing Place
+  drew the marks and added their parts to the materials list, but the count
+  and the bid line never moved, so the bid and the supply list disagreed with
+  nothing on screen to say so. A placed mark now joins that assembly's count
+  (making one if the bid has none yet), exactly as a hand-placed mark does.
+- **The takeoff CSV can now carry prices, if you ask for them.** "Export
+  takeoff" opens a small dialog with an "Include prices" box, unticked every
+  time. Ticked, the whole-bid rows gain a price status, unit cost and line
+  cost — your costs as the bid's Cost column shows them, before markup,
+  overhead, profit and tax — and a short block that adds up to the bid's
+  Direct cost exactly. A line nobody priced is left blank with the reason
+  ("Not priced", "Can't price", "Not on bid"), never $0. Unticked, the file
+  is exactly what it was.
+- **New on the bid's Send menu: "For your quote app"** (internal accounts
+  first). It shows what you charge the customer, before tax, in the five
+  buckets your quote app takes (Tasks, Material, Equipment, Labor, Misc), with
+  a Copy button on every figure that copies the exact cents for pasting on a
+  phone. Material and labor include your markup, overhead and profit; each
+  charge is listed under Misc at what the bid bills for it. The buckets always
+  add up to the bid's total before tax. If any line has no price, the panel
+  lists those lines and shows no figures until they are priced, so a partial
+  price can't be copied into a quote.
+- **You can now delete counted marks on the plans, one or many at once.**
+  Click a mark to select it, Shift-click or Shift-drag a box to select more,
+  then press Delete or use the Delete button. Deleting more than one asks
+  first and names what it will take off. Until now there was no way to remove
+  a mark at all, so a misplaced one stayed on the count and on the bid.
+- **"Undo drops" puts a count's drop back as it was before your last
+  change**, taking off exactly the drops that change added and nothing else.
+  After any delete or undo, the totals, the "From marks" rows, the bid's lines
+  and the materials list all update straight away. The bid and the materials
+  list used to keep showing the old number until they were reloaded.
 - **Counted devices can now carry their drop from the ceiling.** On any
   counted item — thirty receptacles, say — choose what each one drops to and
   what the drop is made of, once, and every mark gets its drop of pipe and

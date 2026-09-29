@@ -32,6 +32,7 @@ import {
   FileSpreadsheet,
   Lock,
   Receipt,
+  Smartphone,
   FileSignature,
   FileText,
   Plus,
@@ -65,8 +66,9 @@ import { UnitLinkBadge } from "@/components/UnitLinkBadge";
 import { UnitTemplateActions } from "@/components/UnitTemplateActions";
 import { MaterialsListDialog } from "@/components/MaterialsListDialog";
 import { useCompany } from "@/hooks/useCompany";
-import { useTakeoffExport } from "@/hooks/useTakeoffExport";
+import { TakeoffExportDialog } from "@/components/TakeoffExportDialog";
 import { AccountingExportDialog } from "@/components/AccountingExportDialog";
+import { QuoteAppPanel } from "@/components/QuoteAppPanel";
 import { ClientLinkField } from "@/components/ClientLinkField";
 import { BidTaxControls } from "@/components/BidTaxControls";
 import { BidExtrasPanel } from "@/components/BidExtrasPanel";
@@ -237,8 +239,9 @@ export default function BidsPage({
   const [addUnit, setAddUnit] = useState("");
   const [materialsListOpen, setMaterialsListOpen] = useState(false);
   const [accountingOpen, setAccountingOpen] = useState(false);
+  const [quoteAppOpen, setQuoteAppOpen] = useState(false);
   const access = useCompany();
-  const takeoffExport = useTakeoffExport(bidId);
+  const [takeoffExportOpen, setTakeoffExportOpen] = useState(false);
 
   const utils = trpc.useUtils();
   const detailQuery = trpc.bids.get.useQuery({ id: bidId });
@@ -282,6 +285,8 @@ export default function BidsPage({
     // to this helper for the reason the lock query above was: a count of lines
     // that has stopped being true, stated in the confident voice of a fresh one.
     void utils.bids.markupReapplyPreview.invalidate({ bidId });
+    // "For your quote app" figures follow every line, for the same reason.
+    void utils.quoteApp.get.invalidate({ bidId });
     void utils.bids.list.invalidate();
   }, [utils, bidId]);
 
@@ -575,6 +580,16 @@ export default function BidsPage({
         open={accountingOpen}
         onOpenChange={setAccountingOpen}
       />
+      <QuoteAppPanel
+        bidId={bidId}
+        open={quoteAppOpen}
+        onOpenChange={setQuoteAppOpen}
+      />
+      <TakeoffExportDialog
+        bidId={bidId}
+        open={takeoffExportOpen}
+        onOpenChange={setTakeoffExportOpen}
+      />
       <div className="border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Button
@@ -704,12 +719,11 @@ export default function BidsPage({
               </DropdownMenuItem>
 
               {/* The takeoff itself rather than the parts it needs: every
-                  count and run, by sheet and type. A download, not a dialog —
-                  it is read in the spreadsheet it lands in. */}
-              <DropdownMenuItem
-                onSelect={() => void takeoffExport.exportCsv()}
-                disabled={takeoffExport.pending}
-              >
+                  count and run, by sheet and type. A small dialog since
+                  2026-09-29, because whether the file carries prices is a
+                  choice made on purpose each time — it was a straight
+                  download before prices existed. */}
+              <DropdownMenuItem onSelect={() => setTakeoffExportOpen(true)}>
                 <FileSpreadsheet className="w-3.5 h-3.5" />
                 <span className="flex-1">
                   Takeoff
@@ -730,6 +744,21 @@ export default function BidsPage({
                     Accounting export
                     <span className="block text-xs text-muted-foreground">
                       For the bookkeeper — QuickBooks CSV
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+              )}
+
+              {/* The customer's price, before tax, in the quote app's five
+                  buckets. Internal tier first; hidden, not disabled, for the
+                  same reason as the accounting export above. */}
+              {access.hasFeature("quoteapp.panel") && (
+                <DropdownMenuItem onSelect={() => setQuoteAppOpen(true)}>
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span className="flex-1">
+                    For your quote app
+                    <span className="block text-xs text-muted-foreground">
+                      Customer price before tax, five buckets to copy
                     </span>
                   </span>
                 </DropdownMenuItem>
