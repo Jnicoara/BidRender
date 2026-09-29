@@ -1476,7 +1476,7 @@ additive ones run BEFORE the push (§ 5, three steps).
 5. Then production, in the same order — see the release entry below for the
    current one, and § 5a for the full commands.
 
-### Live release: migrations 0089–0095 (written 2026-09-29, not yet done)
+### Live release: migrations 0089–0095 (written 2026-09-29, done 2026-09-29)
 
 Staging took this release on 2026-09-29: its drift check went from 6 tables
 and 2 foreign keys out of line (89 migrations) to "Database matches the
@@ -1514,6 +1514,23 @@ empty. The order:
 
 When it is done, change this heading's "not yet done" to the date, and say so
 here.
+
+**Done 2026-09-29, in this order.** Backup `2026-09-29T19-00-13Z` (62 tables,
+3144 rows, 5 files) restored and VERIFIED into local MySQL with
+`KEEP_SCRATCH=1`, and 0089–0095 rehearsed on that restored copy: 7 applied,
+matches, 135/135 foreign keys; scratch dropped. Live drift before: 89
+recorded, 6 tables and 2 foreign keys out. Live migrate: 7 applied, 96
+recorded, "Database matches the schema", 135/135. Old code (`45ada57`) then
+opened bid 23 and its plans with 0 failed API calls. `main` pushed
+`45ada57..3ca33dc` at 19:05:36Z; `/api/version` reported `3ca33dc`, `builtAt`
+19:06:28Z. Bid 23 re-checked on the new bundle.
+
+**One figure moved, on purpose — do not read it as a fault.** Bid 23's
+"This bid, all sheets" read Conduit 104.52 ft on the old code and 0 ft on the
+new, with "2 runs have no type — 179.87 ft of conduit is not on the bid". That
+is the 2026-09-27 decision in `shared/runOnBid.ts`: the totals show what the
+bid prices, so untyped runs are left out and named, and a draft now counts
+(104.52 ft finished + a draft = 179.87 ft).
 
 ### What keeps it away from live data — and how to check it still does
 
