@@ -195,6 +195,9 @@ const squareBoxes: BaselineMaterial[] = [
       SQUARE_BOX,
       STEEL_BRANDS
     ),
+    // How it is normally bought; said so the 4" pair's depth note is not the
+    // only one on the shelf (plan § 6, 2026-09-27).
+    description: '2-1/8" deep.',
   },
   {
     ...each,
@@ -438,6 +441,15 @@ const enclosures: BaselineMaterial[] = [
       PLASTIC_BRANDS
     ),
   },
+  // Plan § 6, Tier 2.5 (2026-09-27): every exterior light or receptacle on
+  // vinyl siding sits on one, and nothing else in the catalog is one.
+  {
+    ...each,
+    name: "Siding mounting block",
+    searchAliases: aliases(
+      "vinyl jblock j-block split mount kit exterior outdoor light fixture receptacle lap"
+    ),
+  },
   {
     ...each,
     name: "Handy box",
@@ -445,6 +457,21 @@ const enclosures: BaselineMaterial[] = [
       "utility 1900 shallow surface exposed steel single gang"
     ),
   },
+  // Plan § 6, Tier 2.5 (2026-09-27): the handy box shipped with no cover, and
+  // the 4" square raised covers do not fit it, so it could not be finished.
+  ...[
+    { kind: "blank", slang: "flat plate lid" },
+    { kind: "duplex", slang: "receptacle outlet" },
+    { kind: "single toggle", slang: "switch 1 one" },
+    { kind: "decorator", slang: "decora gfci gfi rocker paddle" },
+  ].map(({ kind, slang }) => ({
+    ...each,
+    name: `Handy box cover, ${kind}`,
+    searchAliases: aliases(
+      "utility industrial raised surface exposed steel",
+      slang
+    ),
+  })),
   {
     ...each,
     name: "Floor box",
@@ -536,12 +563,11 @@ const pullBoxes: BaselineMaterial[] = [
       size.replace("x", " x "),
       "junction jbox j box nema screw cover trough wireway steel"
     ),
-    ...(HAS_3R.has(size)
-      ? {
-          description:
-            "Screw cover, NEMA 1 (indoor). The NEMA 3R box is a separate item.",
-        }
-      : {}),
+    // Every size says what it is; only the ones with a 3R sibling point at it
+    // (plan § 6, 2026-09-27 — the other three said nothing).
+    description: HAS_3R.has(size)
+      ? "Screw cover, NEMA 1 (indoor). The NEMA 3R box is a separate item."
+      : "Screw cover, NEMA 1 (indoor).",
   };
   if (!HAS_3R.has(size)) return [indoor];
   return [
@@ -576,6 +602,7 @@ const pvcPullBoxes: BaselineMaterial[] = ["4x4", "6x6", "8x8", "12x12"].map(
       "junction jbox j box plastic nonmetallic nema 4x outdoor underground screw cover",
       PLASTIC_BRANDS
     ),
+    description: "Nonmetallic, NEMA 4X.",
   })
 );
 

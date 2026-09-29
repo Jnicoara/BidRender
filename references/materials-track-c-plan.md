@@ -250,7 +250,7 @@ Owner's direction: separate from the boxes job, T first (§ 3 question G).
 > **One correction to T3 below:** it says the body is priced with its cover
 > "the way the LB row is today". The LB rows do not actually say that either
 > way; nothing records it. The T rows now say it. The LB wording is left for
-> the covers decision (todo.md, "LB covers and gaskets").
+> the covers decision (todo.md, "LB covers and gaskets"), planned in § 5.
 
 ### What already exists, and what is already decided
 
@@ -380,3 +380,199 @@ fault in § 3.
 - **T6. LL, LR and C bodies: same job or later?** _Recommend later._ Nothing
   in the takeoff proposes them yet, so they would be rows nothing uses.
   Adding them later is +135 rows (~1,450).
+
+---
+
+## 5. Conduit body covers — one rule for every body shape
+
+> **BUILT 2026-09-27 on `track-c`.** The owner accepted C1 and C2 and said
+> not now to C3. The 45 LB rows carry "Priced with its cover and gasket." from
+> one constant shared with the T rows; `materialsCatalog.test.ts` fails on any
+> "… conduit body" row without it (checked red with the LB description
+> removed: exactly the 45 LB rows). The pricing sheet has a Notes column
+> beside Name, filled from every shipped description (195 generic rows).
+
+Plan only, 2026-09-27. Answers the covers half of the open todo item "LB
+covers and gaskets, LL/LR/C bodies and PVC sweeps".
+
+Measured on `track-c` at `232e188`, by importing `BASELINE_MATERIALS` and
+filtering: **1,315 rows**. If a re-run prints a different total, stop and find
+out why before acting on anything below — either this section is stale or the
+branch is not where it was.
+
+### What is in the catalog today
+
+| Shape                  | Rows | Name (`shared/runFittingMaterials.ts`)  | Description                         |
+| ---------------------- | ---- | --------------------------------------- | ----------------------------------- |
+| LB                     | 45   | `lbName` → `1/2" EMT LB conduit body`   | **none**                            |
+| T                      | 45   | `tBodyName` → `1/2" EMT T conduit body` | "Priced with its cover and gasket." |
+| LL, LR, C, SLB, others | 0    | —                                       | held by the owner (T6)              |
+
+No cover, gasket or body blank-cover row exists anywhere in the catalog
+(searched names, aliases and descriptions for "cover", "gasket", "body",
+"condulet"; every hit was a box cover, wall plate or the two body families
+above). The pricing sheet drops `Conduit body, 4" LB` on purpose
+(`pricing/movedFromSheet.ts`, "No raceway type").
+
+**How the takeoff already uses them:** one `lb` bid line per LB pull point and
+**no cover line** — `RUN_MATERIAL_ROLES` has `lb` and `pullBox` and no cover
+role for either. The T body tee in § 4, step 3 was specified the same way ("No
+cover line for a body tee"). So the takeoff has always behaved as if the cover
+is in the body's price. Only the words are missing on the LB.
+
+### Recommendation: every body is priced WITH its cover and gasket
+
+One rule for LB, T and every shape added later (LL, LR, C): **a conduit body
+row is the complete fitting — body, cover and gasket — at one price.** No
+separate cover rows.
+
+- **A body is never installed without its cover.** Separate cover rows mean a
+  second line the takeoff must add for every body, per size, per shape. Miss
+  it once and the bid is short a part with nothing on screen to say so. One
+  row cannot be half-counted.
+- **It is what the takeoff already does.** Separate rows would need a new
+  cover role, which is a database enum change (Track A) plus a deploy step, for
+  no difference in the total.
+- **It matches how most are sold.** EMT die-cast and PVC bodies come with
+  cover and gasket in the box. Cast rigid/IMC bodies are often listed body and
+  cover separately at the counter; the estimator adds the two and types one
+  number. The description tells them to, which is the whole fix.
+- **Both directions stay open (CLAUDE.md, "as manual or as automated").**
+  Anyone who wants covers as their own line can add their own material. The
+  shipped catalog just does not require it.
+
+Gasket wording: a dry-location body is often fitted without one. "Priced with
+its cover and gasket" is still the right instruction for the pricer — the
+gasket is cents and the rows are generic across locations. Keep the T wording
+exactly, so both shapes read the same.
+
+### Every row that would change — 45 rows, description only
+
+The 45 LB rows gain the description **"Priced with its cover and gasket."**,
+set once on the `LB conduit body` entry in `FITTINGS`
+(`server/seed/materials/conduit.ts`), the way the T entry already carries it.
+5 families × 9 trade sizes (1/2", 3/4", 1", 1-1/4", 1-1/2", 2", 2-1/2", 3", 4"):
+
+| Family        | Rows                                                                          |
+| ------------- | ----------------------------------------------------------------------------- |
+| EMT           | `1/2" EMT LB conduit body` … `4" EMT LB conduit body` (9)                     |
+| PVC Sch 40    | `1/2" PVC Sch 40 LB conduit body` … `4" PVC Sch 40 LB conduit body` (9)       |
+| PVC Sch 80    | `1/2" PVC Sch 80 LB conduit body` … `4" PVC Sch 80 LB conduit body` (9)       |
+| rigid conduit | `1/2" rigid conduit LB conduit body` … `4" rigid conduit LB conduit body` (9) |
+| IMC           | `1/2" IMC LB conduit body` … `4" IMC LB conduit body` (9)                     |
+
+**Unchanged:** the 45 T rows (already say it). No renames, no new rows, no
+migration, no retirement. The catalog stays at 1,315.
+
+It reaches every database on the next start with nothing else to do:
+`backfillMaterialMetadata` re-stamps `description` on baseline rows
+(`server/db.ts` ~line 2053), scoped to shipped rows only, so a company's forked
+LB keeps whatever it says.
+
+Also in the same change:
+
+- Rewrite the `FITTINGS` doc comment in `conduit.ts` to state the rule for all
+  bodies, and say LL/LR/C follow it when they come.
+- A test in `server/materialsCatalog.test.ts`: every row whose name ends
+  `conduit body` carries the description. That makes the rule structural — an
+  LL/LR/C family added later without it goes red.
+- Close the covers half of the todo item; LL/LR/C and sweeps stay open.
+- Update § 4's note ("The LB wording is left for the covers decision") to
+  say it is decided.
+- CHANGELOG line.
+
+### The pricing sheet does not show descriptions
+
+`pricing/rows.json` carries category, name, size, type, unit, brand, job —
+**no description.** Whoever prices the 90 body rows cannot see "with its cover
+and gasket", and a bare-body price from a rigid catalog would go in looking
+complete. That is the one place this rule can quietly fail. See C2.
+
+### Questions for the owner (recommended answer first)
+
+- **C1. One rule: every body priced with its cover and gasket, no separate
+  cover rows?** _Recommend yes._ 45 LB descriptions, nothing else.
+- **C2. Show the description in the pricing sheet (a Notes column)?**
+  _Recommend yes, in the same change._ A small edit to
+  `pricing/buildPricingSheet.mts`, and it helps every other described row too
+  (FS/FD, NEMA 1/3R, plastic/steel, floor box without cover).
+- **C3. Replacement covers (for a body already in the wall) as their own
+  rows?** _Recommend no, not now._ Service work only, and one per size × shape
+  × family is 90+ rows nothing proposes.
+
+---
+
+## 6. Boxes — what is left after Tiers 1 + 2
+
+> **BUILT 2026-09-27 on `track-c`: Tier 2.5 and the 8 description fixes**
+> (owner: B1 yes; B2 hold Tier 3, concrete ring boxes first; B3 hold).
+> Catalog 1,315 → **1,320**, Boxes 85 → **90**, pricing sheet 1,442 → 1,447
+> generic rows. The search sweep moved in one place only: a bare "cover" still
+> leads with `4" square blank cover`, and the four handy box covers now take
+> places 3–5 where `4" round blank cover` and two 4-11/16" covers were.
+> Tier 3 below is unchanged and held.
+
+Plan only, 2026-09-27. Measured on `track-c` at `232e188` by importing
+`BASELINE_MATERIALS`: **85 rows on the Boxes shelf**, 1,315 in the catalog. If
+a re-run prints different numbers, stop and find out why before acting.
+
+### Tier 2.5 — small, and a real hole (recommend next), 5 rows
+
+| #   | Proposed                                                                                                            | Rows | Why                                                                                                                                       |
+| --- | ------------------------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `Handy box cover, blank`, `Handy box cover, duplex`, `Handy box cover, single toggle`, `Handy box cover, decorator` | 4    | **`Handy box` ships with no cover at all**, and the 4" square raised covers do not fit it. A handy box on a bid today cannot be finished. |
+| 2   | `Siding mounting block`                                                                                             | 1    | Every exterior light or receptacle on vinyl siding. Nothing in the catalog is one (searched "siding", "mounting block").                  |
+
+### Description-only fixes — 0 new rows, 8 rows touched (recommend with 2.5)
+
+Tiers 1+2 described some pairs and not their siblings, so the same question is
+answered on one row and not the next:
+
+- `4-11/16" square box` — says no depth, while `4" square box` says 1-1/2".
+  Recommend "2-1/8\" deep.", which is how it is normally bought.
+- `4x4 pull box`, `16x16 pull box`, `24x24 pull box` — no NEMA wording while
+  6x6/8x8/12x12 say "Screw cover, NEMA 1 (indoor)." Recommend that sentence
+  alone (no 3R exists at these sizes to point to).
+- The four `PVC pull box` rows — recommend "Nonmetallic, NEMA 4X." It is
+  already an alias; the description says what the alias implies.
+
+### Tier 3 — still held (from § 3), now with rough counts
+
+| Group                                                      | Rows | Hold reason                                                                                                    |
+| ---------------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------- |
+| Concrete (slab/deck) ring boxes, backplate, cover          | 3–4  | Commercial deck pours. **The strongest Tier 3 candidate** — first in line if commercial work is the next push. |
+| More pull-box sizes (10x10, 18x18, 30x30)                  | 3    | **Changes what `pullBoxFor` proposes** (a 1-1/2" angle pull moves 12x12 → 10x10). A takeoff decision first.    |
+| Pull-box depths (6x6x4 vs 6x6x6 …)                         | 6+   | The lookup keys on side only; depth means teaching it depth.                                                   |
+| NEMA 4X steel / stainless / fiberglass / hinged enclosures | 4–8  | Spec-driven; those jobs price from the spec.                                                                   |
+| Weatherproof boxes by hub size (1/2" vs 3/4")              | 3–6  | The rows are unsized today; sizing them is a rename plus adds, not just adds.                                  |
+| FST/FDT tee-through cast boxes; 1-1/4"+ FS/FD              | 4–6  | Rare.                                                                                                          |
+| Adjustable-depth device boxes                              | 2    | An ordinary box plus the shipped extender covers it.                                                           |
+| Masonry deep; old-work 4-gang; metal 4-gang                | 3–5  | Rare.                                                                                                          |
+| 4-11/16" single-device raised covers                       | 2    | The 4" raised covers already serve one device.                                                                 |
+
+All of Tier 3: roughly 30–40 rows. Headroom to the 1,500 tripwire today: 185.
+
+### How it would be built
+
+Same shape as Tiers 1+2 (§ 3, "How it would be built"): rows in
+`server/seed/materials/boxes.ts`, unpriced, slang via `aliases()` ("utility
+cover", "industrial cover" on the handy box covers; "siding block", "j block",
+"mounting kit" on the block), no alias that is another row's name.
+`scripts/searchSpotCheck.mts` before and after, and
+`server/materialSearchRank.test.ts` — a new cover row can take the top of a
+bare "cover" search, which is exactly what the decorator raised cover did in
+§ 3. Regenerate the pricing sheet in the same commit. Stop `pnpm dev` while
+editing seed files. No schema, no migration, no rename.
+
+Expected after Tier 2.5: catalog **1,315 + 5 = 1,320**, Boxes **85 → 90**.
+
+### Questions for the owner (recommended answer first)
+
+- **B1. Build Tier 2.5 (4 handy box covers, siding mounting block) plus the
+  8 description fixes?** _Recommend yes_ — the handy box is unfinishable
+  without it.
+- **B2. Tier 3: keep holding?** _Recommend hold_, with concrete ring boxes
+  first when commercial deck work comes up.
+- **B3. More pull-box sizes?** _Recommend hold until the takeoff decides
+  whether `pullBoxFor` should propose them_ — it is a takeoff change wearing a
+  catalog row's clothes.

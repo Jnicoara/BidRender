@@ -129,21 +129,34 @@ const FAMILIES: Family[] = [
  * The T body was added 2026-09-27 (references/materials-track-c-plan.md § 4,
  * owner's answers T1–T6): all nine sizes, one row per family, matching the LB
  * so a body chosen at any tee has a row to price against. Its name comes from
- * `tBodyName`. Priced WITH its cover and gasket (T3), which the description
- * says, because the catalog ships no separate cover. LL, LR and C bodies are
- * held (T6): nothing in the takeoff proposes them.
+ * `tBodyName`. LL, LR and C bodies are held (T6): nothing in the takeoff
+ * proposes them.
+ *
+ * EVERY conduit body is priced WITH its cover and gasket, and says so (owner,
+ * 2026-09-27, plan § 5, C1). The catalog ships no separate cover row and the
+ * takeoff adds no cover line for an LB or a T, so a bare-body price would
+ * leave the cover off every bid with nothing to show it. The LB rows said
+ * nothing either way until then. `BODY_DESCRIPTION` is shared so the shapes
+ * cannot drift apart; LL, LR and C take it too when they come, and
+ * `materialsCatalog.test.ts` fails on any "conduit body" row without it.
  */
+const BODY_DESCRIPTION = "Priced with its cover and gasket.";
+
 const FITTINGS: { suffix: string; slang: string; description?: string }[] = [
   { suffix: "connector", slang: "fitting terminal adapter male box" },
   { suffix: "coupling", slang: "coupler splice join" },
   { suffix: "90-degree elbow", slang: "ell bend sweep factory" },
   { suffix: "45-degree elbow", slang: "ell bend factory forty five" },
-  { suffix: "LB conduit body", slang: "condulet access fitting pull" },
+  {
+    suffix: "LB conduit body",
+    slang: "condulet access fitting pull",
+    description: BODY_DESCRIPTION,
+  },
   {
     // Not "tee body": "body" is in the name, so the phrase is "tee" + name.
     suffix: "T conduit body",
     slang: "tee condulet access fitting pull branch split",
-    description: "Priced with its cover and gasket.",
+    description: BODY_DESCRIPTION,
   },
 ];
 

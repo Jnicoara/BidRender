@@ -29,6 +29,19 @@ left as written rather than rewritten to match the rename.
 
 ## Pending / Future
 
+### Flaky tests — fix in a batch before beta
+
+Both are timing, not wrong answers, and both touch the shared test database.
+Fix them together: a green run that sometimes lies about being red trains
+everyone to re-run instead of read.
+
+- [ ] **`server/backup.test.ts` "restores into an empty database, table for
+      table and row for row" (line ~248) came up 11 `assemblies` rows short.**
+      2026-09-27. A timing race on the shared test database: something else
+      seeds or touches `assemblies` between the dump and the count, so the
+      restore is compared against a moving target. Not reproduced in
+      isolation yet. Before calling it fixed, run it alongside the full suite
+      several times — a pass alone proves nothing about a race.
 - [ ] **`server/seedPreservesUserPrices.test.ts` "keeps the fork's price…"
       flakes on the 5 s default timeout.** 2026-09-27: failed in a full run
       (5010 ms), then run alone it passed once and failed once — it seeds the
@@ -1734,13 +1747,15 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       missing unit as 0 and read "0 h" — they cannot be told apart from a
       set zero. Production had no bid lines at deploy time, so no live bid
       carries any.
-- [ ] **LB covers and gaskets, LL/LR/C bodies and PVC sweeps are not in the
-      catalog.** Sweeps wait for an Underground category (answer 2). T bodies
-      shipped 2026-09-27 (see "T bodies at a tee" above). LL/LR/C are held by
-      the owner (T6) until the takeoff proposes them, +135 rows when they come.
-      Covers: the T rows say they are priced with cover and gasket (T3). The
-      LB rows say nothing either way, so decide covers for all body shapes
-      together, per size, and word the LB to match.
+- [ ] **LL/LR/C bodies and PVC sweeps are not in the catalog.** Sweeps wait
+      for an Underground category (answer 2). T bodies shipped 2026-09-27 (see
+      "T bodies at a tee" above). LL/LR/C are held by the owner (T6) until the
+      takeoff proposes them, +135 rows when they come. **Covers are DECIDED
+      (2026-09-27, owner, plan § 5 C1): every body is priced with its cover
+      and gasket, no separate cover rows.** The LB rows now say so like the T
+      rows, and `materialsCatalog.test.ts` fails on any "… conduit body" row
+      without the description — so LL/LR/C must carry it when they come.
+      Replacement covers as their own rows: not now (C3).
 - [ ] **Three local tables are on the wrong collation** —
       `ai_usage_daily`, `bid_mounting_heights`, `takeoff_mounting_heights`
       (reported by `scripts/schemaDrift.mts` on `bidrender_local`, 2026-09-26).
