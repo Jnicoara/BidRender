@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Weatherproof boxes now say their hub size, 1/2" or 3/4"**, and the
+  3/4" single-gang, double-gang, round and PVC boxes are new. The old
+  unsized rows became the 1/2" ones, so anything already using them keeps
+  working. Threaded closure plugs (1/2" and 3/4") are in the catalog too,
+  for the unused hubs (unpriced, like every shipped item).
+
 - **Concrete ring boxes for deck pours are in the catalog**: 4" and 6"
   deep, and the backplate that goes with them (unpriced, like every
   shipped item).

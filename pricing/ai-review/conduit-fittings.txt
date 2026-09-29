@@ -1,5 +1,5 @@
 Category: Conduit Fittings
-Items: 579
+Items: 581
 
 Category | Name | Size
 Conduit Fittings | 1/2" EMT 45-degree elbow | 1/2"
@@ -581,3 +581,5 @@ Conduit Fittings | 2" rigid one-hole strap | 2"
 Conduit Fittings | 2-1/2" rigid one-hole strap | 2-1/2"
 Conduit Fittings | 3" rigid one-hole strap | 3"
 Conduit Fittings | 4" rigid one-hole strap | 4"
+Conduit Fittings | 1/2" threaded closure | 1/2"
+Conduit Fittings | 3/4" threaded closure | 3/4"

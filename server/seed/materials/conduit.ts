@@ -429,6 +429,24 @@ const terminations: BaselineMaterial[] = [
     searchAliases: aliases(sizeAliases(size), "lock nut ring steel"),
     defaultQty: 2,
   })),
+  // Plan § 9b, owner 2026-09-29: every unused hub on a weatherproof box takes
+  // one, and nothing in the catalog closed a hub before. 1/2" and 3/4" only,
+  // the two hub sizes the weatherproof boxes ship in.
+  //
+  // Sold as a "closure plug", but "plug" is kept OUT of the name, and that was
+  // measured: named `1/2" closure plug`, the pair led a bare "plug" search
+  // ahead of Duplex receptacle — the same fault that renamed the plug-on SPD
+  // (power.ts). A word in a name outranks an alias; here it is an alias.
+  ...(['1/2"', '3/4"'] as const).map(size => ({
+    name: `${size} threaded closure`,
+    unitOfSale: "each" as const,
+    costPerUnit: UNPRICED,
+    category: "Conduit Fittings" as const,
+    searchAliases: aliases(
+      sizeAliases(size),
+      "closure plug hub plug cap blank wp weatherproof bell box hole filler"
+    ),
+  })),
 ];
 
 // ─── Weatherheads ─────────────────────────────────────────────────────────────

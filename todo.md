@@ -127,6 +127,19 @@ everyone to re-run instead of read.
       as an empty database — a false "never migrated" is an invitation to
       re-run every migration against live data. `references/deploying.md`
       § 10 warns about it until fixed.
+- [ ] **`scripts/schemaDrift.mts` says a missing foreign key's migration is
+      "already recorded as applied" when it is NOT.** Measured 2026-09-29 on
+      `bidrender_test_c` with 89 of 96 migrations recorded: it listed
+      `takeoff_extra_defaults(userId)` and `takeoff_groups(dropRunTypeId)` as
+      missing and said "db:push will not add these — the migration that
+      declared each one is already recorded as applied", then printed
+      hand-written `ALTER TABLE … ADD CONSTRAINT` lines. Both come from 0089
+      and 0095, which were pending; applying them added both keys. The text is
+      a fixed string (`server/schemaCheck.ts` ~712) that never checks the
+      journal. Harm: it steers someone to hand-add a key that `migrate.mts`
+      would add itself, after which the pending migration dies on a duplicate
+      constraint. It should say which migration declares each key and
+      whether that one is applied. Not fixed yet.
 - [ ] **A terms page BEFORE any sharing of the AI correction log is turned
       on.** Decided by the owner 2026-09-27 (Stage 4, question 7). The log
       (`references/stage-4-safety-plan.md` § 3) records corrections from day
