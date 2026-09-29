@@ -62,6 +62,17 @@ import {
 } from "../../shared/takeoffCounts";
 import * as db from "../db";
 import {
+  RUN_PACKET,
+  openPacket,
+  packetSchema,
+  sealPacket,
+} from "../restorePacket";
+import {
+  removeRunWithSnapshot,
+  restoreNetwork,
+  type NetworkSnapshot,
+} from "../takeoffRestore";
+import {
   EMPTY_HEIGHT_CONTEXT,
   extrasForRunRow,
   extrasViewForRunRow,
@@ -1022,12 +1033,47 @@ export const takeoffRunsRouter = router({
       await refuseIfLocked(run.bidId, ctx.scope.dataUserId);
       const sheet = await requireSheet(run.sheetId, ctx.scope.dataUserId);
       const measurability = measurabilityOf(sheetScale(sheet));
-      const result = await db.removeLeg(
-        input.id,
+      // The whole network is snapshotted, because a leg delete can re-join
+      // the pieces either side of a tee (server/takeoffRestore.ts).
+      const { result, snapshot } = await removeRunWithSnapshot(
+        run,
         ctx.scope.dataUserId,
-        measurability.ok ? measurability.ratio : null
+        () =>
+          db.removeLeg(
+            input.id,
+            ctx.scope.dataUserId,
+            measurability.ok ? measurability.ratio : null
+          )
       );
-      return { success: true, ...result };
+      return {
+        success: true,
+        ...result,
+        undo: sealPacket(RUN_PACKET, ctx.scope.dataUserId, snapshot),
+      };
+    }),
+
+  /**
+   * Put a deleted run or leg back exactly as it was — undo of a delete, redo
+   * of a finish. Refused when the run has changed since, when a mark it ended
+   * on is gone, or on a locked bid (server/takeoffRestore.ts).
+   */
+  restore: procedure
+    .input(z.object({ undo: packetSchema }))
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const snapshot = openPacket<NetworkSnapshot>(
+        RUN_PACKET,
+        userId,
+        input.undo
+      );
+      if (!snapshot)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "That undo step is not valid here.",
+        });
+      await refuseIfLocked(snapshot.bidId, userId);
+      await restoreNetwork(snapshot, userId);
+      return { restored: snapshot.rootId };
     }),
 
   /**

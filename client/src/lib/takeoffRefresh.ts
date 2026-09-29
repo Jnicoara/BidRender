@@ -125,7 +125,34 @@ export type TakeoffChange =
    * footage lands on run-type lines, so every bid quantity moves, and the
    * group row shows the result.
    */
-  | "groupDrop";
+  | "groupDrop"
+  /**
+   * An undo or redo (@/lib/undoStack). It can put back or take away marks
+   * AND runs at once, so it moves everything either can. Its per-sheet lists
+   * are the STEP's sheet, which may not be the open one — see
+   * `sheetsToRefresh`.
+   */
+  | "undo"
+  /** Every mark and run on one sheet removed (or put back) in one step. */
+  | "sheetCleared";
+
+/**
+ * Which sheets' own lists (marks, runs) a change must refresh.
+ *
+ * The screen invalidated per-sheet lists for the OPEN sheet only. An undo
+ * pressed after switching sheets changes the sheet the step was on, and that
+ * sheet's cached marks would have shown the old answer on return — the
+ * staleness class in CLAUDE.md. So both, when they differ.
+ */
+export function sheetsToRefresh(
+  openSheetId: number | null | undefined,
+  stepSheetId: number | null | undefined
+): number[] {
+  const ids = [openSheetId, stepSheetId].filter(
+    (id): id is number => typeof id === "number"
+  );
+  return Array.from(new Set(ids));
+}
 
 function unique(list: readonly TakeoffQuery[]): readonly TakeoffQuery[] {
   return Array.from(new Set(list));
@@ -153,4 +180,6 @@ export const QUERIES_MOVED_BY: Readonly<
   ]),
   heights: unique(["takeoffHeights.forBid", ...RUN_QUERIES]),
   groupDrop: unique([...MARK_QUERIES, ...RUN_QUERIES]),
+  undo: unique([...MARK_QUERIES, ...RUN_QUERIES]),
+  sheetCleared: unique([...MARK_QUERIES, ...RUN_QUERIES]),
 };

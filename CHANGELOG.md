@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Undo and redo on the Plans screen.** Placing marks, deleting marks,
+  finishing a run and deleting a run can each be undone with the new arrow in
+  the toolbar or Ctrl+Z, and redone with Ctrl+Shift+Z. The tooltip names the
+  step ("Undo: 3 marks placed"). Anything put back returns exactly as it was,
+  with the same links: a run that ended on a mark ends on it again, so no
+  vertical or count quietly changes. If something changed since (the count
+  was deleted, or the run was edited), the step is refused with the reason.
+  The history is per bid and lasts until the page is reloaded.
 - **While tracing, the top readout shows only the run total.** It used to
   show a second, bigger "to cursor" figure that jumped whenever the mouse
   moved, which read as the run's length. The pill now holds only the clicked

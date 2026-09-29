@@ -73,6 +73,8 @@ import {
   Trash2,
   Upload,
   X,
+  Redo2,
+  Undo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -186,9 +188,26 @@ import {
 import { uploadInParts } from "@/lib/multipartUpload";
 import {
   QUERIES_MOVED_BY,
+  sheetsToRefresh,
   type TakeoffChange,
   type TakeoffQuery,
 } from "@/lib/takeoffRefresh";
+import {
+  EMPTY_UNDO,
+  countLabel,
+  dropStep,
+  nextRedo,
+  nextUndo,
+  pushStep,
+  redoTitle,
+  settleRedo,
+  settleUndo,
+  undoTitle,
+  type Packet,
+  type UndoEntry,
+  type UndoOp,
+  type UndoState,
+} from "@/lib/undoStack";
 import type { PageTextLayer } from "@/lib/textSelection";
 import { TextSelectLayer } from "@/components/takeoff/TextSelect";
 import { useUploadSpeeds } from "@/lib/useUploadSpeeds";
@@ -2291,16 +2310,18 @@ export default function TakeoffPage({
    * a test can go red. This only carries it out.
    */
   const invalidateQuery = useCallback(
-    (query: TakeoffQuery) => {
-      const sheetId = activeSheet?.id;
+    (query: TakeoffQuery, stepSheetId?: number) => {
+      // The open sheet, and the sheet the change was made on when that is a
+      // different one (an undo pressed after switching). @/lib/takeoffRefresh.
+      const sheetIds = sheetsToRefresh(activeSheet?.id, stepSheetId);
       const bidPdfId = doc?.id;
       switch (query) {
         case "takeoffRuns.listForSheet":
-          if (sheetId)
+          for (const sheetId of sheetIds)
             void utils.takeoffRuns.listForSheet.invalidate({ sheetId });
           return;
         case "takeoffStamps.listForSheet":
-          if (sheetId)
+          for (const sheetId of sheetIds)
             void utils.takeoffStamps.listForSheet.invalidate({ sheetId });
           return;
         case "bidPdfs.sheets":
@@ -2356,12 +2377,112 @@ export default function TakeoffPage({
     [utils, activeSheet?.id, doc?.id, bidId]
   );
   const refreshFor = useCallback(
-    (change: TakeoffChange) => {
-      for (const query of QUERIES_MOVED_BY[change]) invalidateQuery(query);
+    (change: TakeoffChange, stepSheetId?: number) => {
+      for (const query of QUERIES_MOVED_BY[change])
+        invalidateQuery(query, stepSheetId);
     },
     [invalidateQuery]
   );
   const refreshSheets = () => refreshFor("sheet");
+
+  /*
+    ── UNDO AND REDO (takeoff-spec.md D6; Track B plan, Part 3) ───────────────
+    The stack is @/lib/undoStack, pure and tested; this carries it out.
+
+    Per bid (the page is keyed by bid), in the page: a reload, another tab and
+    a colleague's change are not on it. Every step names what it undoes in the
+    button's tooltip, and a step the server refuses (its target changed since)
+    is dropped with the server's sentence rather than retried.
+
+    The undo calls are their own mutations, not the ones the tools use: those
+    push a NEW step on success, and an undo that pushed a step would clear the
+    redo it had just made.
+  */
+  const [undoState, setUndoState] = useState<UndoState>(EMPTY_UNDO);
+  const undoRef = useRef(undoState);
+  undoRef.current = undoState;
+  const [undoBusy, setUndoBusy] = useState(false);
+  const pushUndo = useCallback(
+    (entry: UndoEntry) => setUndoState(s => pushStep(s, entry)),
+    []
+  );
+  const undoRemoveMarks = trpc.takeoffStamps.removeMany.useMutation();
+  const undoRestoreMarks = trpc.takeoffStamps.restore.useMutation();
+  const undoRemoveRun = trpc.takeoffRuns.remove.useMutation();
+  const undoRestoreRun = trpc.takeoffRuns.restore.useMutation();
+  /** Ops whose mutations are declared further down the page. */
+  const runUndoOpLater = useRef<(op: UndoOp) => Promise<UndoOp | null>>(
+    async () => null
+  );
+
+  /** Carry out one step; returns the step that reverses it, or null. */
+  const runUndoOp = useCallback(
+    async (op: UndoOp): Promise<UndoOp | null> => {
+      switch (op.kind) {
+        case "removeMarks": {
+          const r = await undoRemoveMarks.mutateAsync({ ids: op.ids });
+          return r.undo
+            ? { kind: "restoreMarks", packet: r.undo, ids: op.ids }
+            : null;
+        }
+        case "restoreMarks":
+          await undoRestoreMarks.mutateAsync({ undo: op.packet });
+          return { kind: "removeMarks", ids: op.ids };
+        case "removeRun": {
+          const r = await undoRemoveRun.mutateAsync({ id: op.id });
+          return r.undo
+            ? { kind: "restoreRun", packet: r.undo, id: op.id }
+            : null;
+        }
+        case "restoreRun":
+          await undoRestoreRun.mutateAsync({ undo: op.packet });
+          return { kind: "removeRun", id: op.id };
+        case "setPoints":
+        case "restoreSheet":
+        case "clearSheet":
+          // Wired with the tools that make them (drag points, clear sheet).
+          return runUndoOpLater.current(op);
+        default: {
+          const unhandled: never = op;
+          return unhandled;
+        }
+      }
+    },
+    [undoRemoveMarks, undoRestoreMarks, undoRemoveRun, undoRestoreRun]
+  );
+
+  const stepBack = useCallback(
+    async (direction: "undo" | "redo") => {
+      if (undoBusy) return;
+      const state = undoRef.current;
+      const entry = direction === "undo" ? nextUndo(state) : nextRedo(state);
+      const op = direction === "undo" ? entry?.undo : entry?.redo;
+      if (!entry || !op) return;
+      setUndoBusy(true);
+      try {
+        const reverse = await runUndoOp(op);
+        setUndoState(s =>
+          reverse === null
+            ? dropStep(s, entry)
+            : direction === "undo"
+              ? settleUndo(s, entry, reverse)
+              : settleRedo(s, entry, reverse)
+        );
+        toast.success(
+          `${direction === "undo" ? "Undone" : "Redone"}: ${entry.label}.`
+        );
+      } catch (error) {
+        setUndoState(s => dropStep(s, entry));
+        toast.error(
+          `Could not ${direction} "${entry.label}". ${(error as Error).message}`
+        );
+      } finally {
+        setUndoBusy(false);
+        refreshFor("undo", entry.sheetId);
+      }
+    },
+    [undoBusy, runUndoOp, refreshFor]
+  );
 
   const createTicket = trpc.bidPdfs.createUploadTicket.useMutation();
   const confirmAttach = trpc.bidPdfs.confirmAttach.useMutation();
@@ -2947,7 +3068,22 @@ export default function TakeoffPage({
     },
     []
   );
+  /** A mark delete as an undo step: the packet puts them back, same ids. */
+  const pushMarksDeleted = (
+    undo: Packet | null,
+    ids: number[],
+    removed: number
+  ) => {
+    if (!undo || !activeSheet || removed === 0) return;
+    pushUndo({
+      label: countLabel(removed, "mark", "marks", "deleted"),
+      sheetId: activeSheet.id,
+      undo: { kind: "restoreMarks", packet: undo, ids },
+      redo: null,
+    });
+  };
   const removeStamp = trpc.takeoffStamps.remove.useMutation({
+    onSuccess: (r, vars) => pushMarksDeleted(r.undo, [vars.id], 1),
     onError: e => toast.error(e.message),
     // Not `refreshStamps`: a run that ended on this mark loses that end
     // (ON DELETE SET NULL), so its drops, connectors and Send preview move.
@@ -2964,10 +3100,12 @@ export default function TakeoffPage({
     what was asked for.
   */
   const removeStamps = trpc.takeoffStamps.removeMany.useMutation({
-    onSuccess: r =>
+    onSuccess: (r, vars) => {
+      pushMarksDeleted(r.undo, vars.ids, r.removed);
       toast.success(
-        `Deleted ${r.removed} ${r.removed === 1 ? "mark" : "marks"}.`
-      ),
+        `Deleted ${r.removed} ${r.removed === 1 ? "mark" : "marks"}. Ctrl+Z puts ${r.removed === 1 ? "it" : "them"} back.`
+      );
+    },
     onError: e => toast.error(e.message),
     onSettled: () => {
       setSelectedStampIds(new Set());
@@ -3345,7 +3483,16 @@ export default function TakeoffPage({
           instead would blank the marks for the length of one refetch and paint
           them again — a flicker in exactly the place a count is being read.
         */
-        onSuccess: async () => {
+        onSuccess: async result => {
+          // One batch, one undo step. No ids back means the server could not
+          // confirm which marks it wrote, and an undo guessing would be worse.
+          if (result.ids.length > 0)
+            pushUndo({
+              label: countLabel(result.ids.length, "mark", "marks", "placed"),
+              sheetId,
+              undo: { kind: "removeMarks", ids: result.ids },
+              redo: null,
+            });
           await utils.takeoffStamps.listForSheet.invalidate({ sheetId });
           setPending(pendingStamps.current.filter(m => !keys.has(m.key)));
           mirrorQueue(sheetId);
@@ -3364,7 +3511,7 @@ export default function TakeoffPage({
         },
       }
     );
-  }, [bidId, dropStamps, mirrorQueue, setPending, utils]);
+  }, [bidId, dropStamps, mirrorQueue, setPending, utils, pushUndo]);
   /**
    * Take a click: draw it now, send it shortly after.
    *
@@ -3550,6 +3697,37 @@ export default function TakeoffPage({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedStampIds, tracing, armedGroup, deleteSelected, confirmingDelete]);
+
+  /**
+   * Ctrl/⌘+Z undoes, Ctrl/⌘+Shift+Z and Ctrl+Y redo. Not while tracing,
+   * where TraceLayer's own Ctrl+Z takes back the last point, and never from a
+   * field, where the browser's own undo is the one meant.
+   */
+  useEffect(() => {
+    if (tracing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable)
+      )
+        return;
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        void stepBack("undo");
+      } else if ((key === "z" && e.shiftKey) || key === "y") {
+        e.preventDefault();
+        void stepBack("redo");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tracing, stepBack]);
 
   /** Escape puts the stamp tool down. */
   useEffect(() => {
@@ -3768,7 +3946,15 @@ export default function TakeoffPage({
   });
   const commitRun = trpc.takeoffRuns.commit.useMutation({
     onError: e => toast.error(e.message),
-    onSuccess: result =>
+    onSuccess: (result, vars) => {
+      // Undoing a finish deletes the run, legs and all; redo puts it back.
+      if (activeSheet)
+        pushUndo({
+          label: "run finished",
+          sheetId: activeSheet.id,
+          undo: { kind: "removeRun", id: vars.id },
+          redo: null,
+        });
       // "traced", because this is the FLAT length and the panel two inches
       // away may already be showing a larger number with the drops added.
       // Two figures for the same run in the same second, one of them
@@ -3783,12 +3969,20 @@ export default function TakeoffPage({
           : result.legCount > 1
             ? `Run finished — ${result.legCount} legs, ${result.runFeet} ft flat.`
             : `Run finished — ${result.runFeet} ft flat.`
-      ),
+      );
+    },
     onSettled: refreshRuns,
   });
   const removeRun = trpc.takeoffRuns.remove.useMutation({
     onError: e => toast.error(e.message),
-    onSuccess: result => {
+    onSuccess: (result, vars) => {
+      if (result.undo && activeSheet)
+        pushUndo({
+          label: "run deleted",
+          sheetId: activeSheet.id,
+          undo: { kind: "restoreRun", packet: result.undo, id: vars.id },
+          redo: null,
+        });
       // A tee the last branch left behind that could not be joined back is
       // still a box on the drawing — said, not left to be discovered (D20).
       if (result.keptAsBox.length > 0)
@@ -5200,6 +5394,41 @@ export default function TakeoffPage({
                 <TextSelect className="w-3.5 h-3.5" />
                 Select text
                 {selectingText && <X className="w-3 h-3" />}
+              </Button>
+            </>
+          )}
+
+          {/*
+            ── UNDO / REDO (D6) ─────────────────────────────────────────────
+            Icons only, and the tooltip NAMES the step ("Undo: 3 marks
+            placed"), so nobody undoes blind. Hidden while tracing: there,
+            Ctrl+Z takes back the last point, and two arrows meaning two
+            different things on one screen is the confusion to avoid.
+          */}
+          {activeSheet && !tracing && (
+            <>
+              <div className="w-px h-4 bg-border" />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 px-0"
+                onClick={() => void stepBack("undo")}
+                disabled={undoBusy || nextUndo(undoState) === null}
+                title={undoTitle(undoState)}
+                aria-label={undoTitle(undoState)}
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 px-0"
+                onClick={() => void stepBack("redo")}
+                disabled={undoBusy || nextRedo(undoState) === null}
+                title={redoTitle(undoState)}
+                aria-label={redoTitle(undoState)}
+              >
+                <Redo2 className="w-3.5 h-3.5" />
               </Button>
             </>
           )}
