@@ -5043,7 +5043,12 @@ async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
   const rows = await db
     .select({ groupId: takeoffStamps.groupId, total: sql<number>`count(*)` })
     .from(takeoffStamps)
-    .where(eq(takeoffStamps.bidId, bidId))
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+      )
+    )
     .groupBy(takeoffStamps.groupId);
 
   const counts = new Map<number, number>();
@@ -7284,6 +7289,30 @@ export async function getRunsForSheet(
     .orderBy(asc(takeoffRuns.id));
 }
 
+/**
+ * A mark or run counts toward a bid only while its sheet, and that sheet's
+ * plan set, still exist on the bid. EVERY bid-wide read of marks or runs goes
+ * through this — the rollup, the counts, the export, the materials list.
+ *
+ * On a database with its foreign keys the condition is always true: deleting a
+ * plan set cascades to its sheets and from each sheet to its marks and runs.
+ * It is here for a database WITHOUT them — one copied with `CREATE TABLE …
+ * LIKE`, which drops every foreign key (bidrender_local_b, measured 2026-09-28:
+ * 0), or a restore done the wrong way. There the rows stay behind, and a read
+ * by `bidId` alone kept pricing a deleted drawing's marks and counting its runs'
+ * connectors. The quantities must not depend on which kind of database this is.
+ *
+ * `server/quantitiesIgnoreDeletedPlans.test.ts` removes the rows with foreign
+ * key checks off and holds every read against a bid that never had them; it
+ * also fails if a bid-wide read of marks or runs is written without this.
+ */
+function onLivePlanSheet(
+  sheetId: typeof takeoffRuns.sheetId | typeof takeoffStamps.sheetId,
+  bidId: number
+) {
+  return sql`${sheetId} IN (SELECT ${bidPdfSheets.id} FROM ${bidPdfSheets} INNER JOIN ${bidPdfs} ON ${bidPdfs.id} = ${bidPdfSheets.bidPdfId} WHERE ${bidPdfs.bidId} = ${bidId})`;
+}
+
 /** Every run on a whole bid, for the bill of materials rollup. */
 export async function getRunsForBid(
   bidId: number,
@@ -7294,7 +7323,13 @@ export async function getRunsForBid(
   return db
     .select()
     .from(takeoffRuns)
-    .where(and(eq(takeoffRuns.bidId, bidId), eq(takeoffRuns.userId, userId)))
+    .where(
+      and(
+        eq(takeoffRuns.bidId, bidId),
+        eq(takeoffRuns.userId, userId),
+        onLivePlanSheet(takeoffRuns.sheetId, bidId)
+      )
+    )
     .orderBy(asc(takeoffRuns.id));
 }
 
@@ -8048,7 +8083,11 @@ export async function getStampsForBid(
     .from(takeoffStamps)
     .leftJoin(takeoffGroups, eq(takeoffStamps.groupId, takeoffGroups.id))
     .where(
-      and(eq(takeoffStamps.bidId, bidId), eq(takeoffStamps.userId, userId))
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        eq(takeoffStamps.userId, userId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+      )
     )
     .orderBy(asc(takeoffStamps.id));
 }
@@ -8358,7 +8397,11 @@ export async function countStampsByGroup(
     })
     .from(takeoffStamps)
     .where(
-      and(eq(takeoffStamps.bidId, bidId), eq(takeoffStamps.userId, userId))
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        eq(takeoffStamps.userId, userId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+      )
     )
     .groupBy(takeoffStamps.groupId);
 

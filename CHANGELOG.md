@@ -4,6 +4,16 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-28]
+
+- **A deleted drawing can no longer keep pricing a bid.** Every count and run
+  length a bid is priced from now only reads marks and runs on sheets whose
+  plan set still exists. On the live database this was already true, because
+  deleting a plan set deletes everything drawn on it. A database copied
+  without those links (one developer copy has none) kept counting the deleted
+  drawing's marks. A test now builds exactly that case and fails if any
+  quantity read goes back to counting by bid alone.
+
 ## [2026-09-27]
 
 - **The pricing spreadsheet has a Notes column next to each item's name**,
