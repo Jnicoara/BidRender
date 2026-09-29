@@ -1,11 +1,23 @@
 # Track B: the next batch (after the beta plan)
 
 **BUILT 2026-09-28 on `track-b`, one commit per piece, in the owner's order
-3 → 1 → 2 → 4 → 5 → 6. Not merged. NOT YET LOOKED AT ON SCREEN** — the owner's
-answer was to build without the dev server and check pieces 1, 2, 3 and 5 in
-one pass before any merge. Until that pass, none of them is done by
-CLAUDE.md's rule. The plan below is kept as written; what changed while
-building is here.
+3 → 1 → 2 → 4 → 5 → 6. Not merged. Screen pass done the same day** (table
+below). The plan below is kept as written; what changed while building is
+here.
+
+**The screen pass (2026-09-28, `pnpm dev` on 3002 against
+`bidrender_local_b`, user 1, a scratch bid deleted afterwards).** Nothing
+needed fixing. How each check was done, and what it could NOT show:
+
+| Check                              | Result                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 3. 11×17 sheet                     | **Pass.** A hand-written 1224×792 pt PDF rendered 1836×1188 at 1.5×. No scale: quiet, and the popover says "Page 11×17 in". Picking 1/4": chip `1/4" = 1'-0" · ⚠ 11×17 page` + "Check it". A check that agreed ("Agrees — the scale checks out") cleared it at once, and it stayed quiet after a reload. Setting 1/8" brought it back.                                                                                                                      |
+| 1c. Job height → Send preview      | **Pass.** 10 ft set through the heights chip: 111.11 → 119.61 ft in the totals and every preview row, verticals 8.50 ft, "Send 4 lines" → "Send 5 lines", couplings "over 119.61 ft" — no reload, equal to the server.                                                                                                                                                                                                                                       |
+| 1b. Plan set removed, another open | **Pass on what can be seen locally.** After "Remove plan", the page re-fetched totals, drops, colours, the bridge, the count list and measurability (browser request log) — all keyed by bid, so only the fix re-reads them. The NUMBER could not move: `bidrender_local_b` has **0 foreign keys**, so the set's sheets and run were not cascaded and the server itself still said 119.61. Production has the keys; the server half is covered by the suite. |
+| 1a. End mark removed               | **Not checkable: there is no control that removes one mark.** `RunsPanel` takes `onRemoveStamp` and has never called it (added in `ba6702c`, 2026-08-12); nothing else in the client calls `takeoffStamps.remove`. That is C6 in `takeoff-spec.md`, still open. The refresh rule for it is in place and tested for when the control lands. See `todo.md`.                                                                                                    |
+| 2. Dashboard, columns, analytics   | **Pass.** Headline `$831 + 3 lines not priced`, Draft column the same, from the one card carrying 3 ("Bar layout check"); analytics shows the amber "not priced — 1 bid in this range…" note. No closed jobs locally, so the profitability half rests on the suite.                                                                                                                                                                                          |
+| 5. Old labor rate                  | **Pass.** A scratch role at $68, two assembly lines, role changed to $43: "2 lines use $68.00/hr — the role on their assembly is $43.00/hr now (…)", with labor still 3 h × $68 = $204.                                                                                                                                                                                                                                                                      |
+| Layout at the shipped width        | **NOT checked.** The driven Chrome window was hidden and stuck at 766 CSS px (dpr 2); `resize_window` did nothing, so the app drew its phone layout, and screenshots were taken with CSS zoom 0.5. Content and wording were read from the DOM; desktop placement of the chip, the headline tail and the strip was not seen at 1536 px. The phone-width look at Recent plans is likewise still open.                                                          |
 
 **Owner's answers (2026-09-27):** all four as recommended — build first and
 look once at the end; "Check it" clears the sheet-size warning; old labor

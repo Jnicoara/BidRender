@@ -1438,17 +1438,25 @@ path is ever revived, give it the same treatment first.
       defaulted, which is every real upload. Production is unaffected (its
       session zone is UTC, so the two agree). The real fix is one rule for
       the connection — `timezone: "Z"` on the pool, or `SET time_zone =
-  '+00:00'` per session — so text means UTC everywhere; that touches
+'+00:00'` per session — so text means UTC everywhere; that touches
       every raw date read and wants its own look.
 
-- [ ] **BUILT 2026-09-28, NOT YET LOOKED AT: the next Track B batch**
-      (`references/track-b-next-batch-plan.md`). Stale run figures after a
-      mark, plan or height change; Dashboard and analytics totals that leave
-      out unpriced lines silently; the sheet-size check (S8/D5); the
-      double-count warning missing forks; a flag for lines frozen at an old
-      labor rate; small polish. No migrations. **Before merging: one screen
-      pass over pieces 1, 2, 3 and 5**, per the plan's "Verify on screen"
-      steps, plus the Recent plans row at phone width.
+- [x] **BUILT AND SCREEN-PASSED 2026-09-28: the next Track B batch**
+      (`references/track-b-next-batch-plan.md`, pass table at the top).
+      Pieces 1, 2, 3 and 5 checked on screen; nothing needed fixing. Not
+      merged. **Still open from the pass:** the layout at the shipped desktop
+      width was not seen (the driven window was stuck at 766 px), and the
+      Recent plans row at phone width.
+- [ ] **No control removes a single mark (C6), and a dead prop hides that.**
+      Found by the 2026-09-28 screen pass, trying to remove a run's end mark.
+      `RunsPanel` accepts `onRemoveStamp` and has never called it (added in
+      `ba6702c`, 2026-08-12); nothing else in the client calls
+      `takeoffStamps.remove`. A reader seeing the prop wired in
+      `TakeoffPage` would believe removal exists. D6 in `takeoff-spec.md`
+      already decides the shape (tap a mark, Remove / Delete key / Undo).
+      When it is built, the refresh is ready: `refreshFor("markRemoved")` in
+      `removeStamp`, tested in `takeoffRefresh.test.ts`. Until then, either
+      build it or drop the prop, so the wiring stops implying a feature.
 
 ## Plan viewer overhaul
 
