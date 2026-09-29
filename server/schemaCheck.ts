@@ -482,7 +482,17 @@ export async function findSchemaDrift(): Promise<TableDrift[]> {
   return drift;
 }
 
-/** How many migrations this database believes it has run. */
+/**
+ * How many migrations this database believes it has run — null ONLY when it
+ * has no migrations table at all (never migrated).
+ *
+ * Any other failure THROWS. Until 2026-09-29 every error landed in a bare
+ * `catch` and came back as null, so a database that simply could not be
+ * reached — a timeout, a refused connection, a wrong password — was reported
+ * as "never migrated". Measured against production (89 applied) from off its
+ * trusted list, 2026-09-27. A false "never migrated" is an invitation to
+ * re-run every migration against live data; a connection error is not.
+ */
 export async function appliedMigrationCount(): Promise<number | null> {
   const db = await getDb();
   if (!db) return null;
@@ -491,11 +501,33 @@ export async function appliedMigrationCount(): Promise<number | null> {
       sql`SELECT COUNT(*) AS n FROM __drizzle_migrations`
     )) as unknown as [Array<{ n: number | string }>];
     return Number(rows[0]?.n ?? 0);
-  } catch {
-    // The table is absent on a database that has never been migrated at all,
-    // which is a legitimate answer rather than an error.
-    return null;
+  } catch (err) {
+    if (isMissingTable(err)) return null;
+    throw err;
   }
+}
+
+/**
+ * MySQL's "table doesn't exist" (ER_NO_SUCH_TABLE, 1146). drizzle wraps the
+ * driver's error and puts the real one on `cause`, so both are read; nothing
+ * else counts — measured, a refused connection arrives as ECONNREFUSED on
+ * the same `cause`.
+ */
+export function isMissingTable(err: unknown): boolean {
+  const codeOf = (e: unknown) =>
+    e && typeof e === "object"
+      ? {
+          code: (e as { code?: unknown }).code,
+          errno: (e as { errno?: unknown }).errno,
+        }
+      : { code: undefined, errno: undefined };
+  const direct = codeOf(err);
+  const cause = codeOf(
+    err && typeof err === "object" ? (err as { cause?: unknown }).cause : null
+  );
+  return [direct, cause].some(
+    c => c.code === "ER_NO_SUCH_TABLE" || c.errno === 1146
+  );
 }
 
 // ── Foreign keys — the links that make a delete take what hangs off it ──────

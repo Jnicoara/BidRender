@@ -1377,13 +1377,15 @@ are:
 wrong password answers at once with `Access denied`; a stale address never
 answers at all.
 
-> **And `scripts/schemaDrift.mts` LIES first.** Before the timeout it prints
-> **"No \_\_drizzle_migrations table — this database has never been
-> migrated."** That is false — production had 89 applied at the time. The
-> script read a failed connection as an empty answer. **Never act on that line
-> without a successful connection**: running every migration against a live
-> database because of it is the one outcome here worse than the lockout. See
-> `todo.md`.
+> **`scripts/schemaDrift.mts` used to LIE first — FIXED 2026-09-29.** Before
+> the timeout it printed **"No \_\_drizzle_migrations table — this database
+> has never been migrated."** That was false — production had 89 applied at
+> the time — because the script read a failed connection as an empty answer.
+> It now prints **"Could not read this database (…). This is NOT 'never
+> migrated'"** and exits 2 before checking anything
+> (`scripts/schemaDrift.test.ts`). "Never been migrated" now appears only when
+> the database answered and has no migrations table. The rule stands anyway:
+> never act on a migration count from a run that did not connect.
 
 If a production command fails like this and the site itself still loads,
 the address is the first thing to check — before suspecting the password, the

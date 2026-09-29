@@ -119,7 +119,13 @@ everyone to re-run instead of read.
       run together. `server/testSuiteLock.test.ts` checks from inside the run
       that the lock is held — red with the globalSetup call removed. Rerun of
       the two-at-once repro: first passed 3/3, second refused.
-- [ ] **`scripts/schemaDrift.mts` says "this database has never been migrated"
+- [x] **FIXED 2026-09-29 (plan W2):** only MySQL's "no such table" (1146,
+      read off drizzle's `cause`) means never migrated (`isMissingTable`,
+      `server/schemaCheck.ts`); anything else throws, and the script prints
+      "Could not read this database (…)" and exits 2 before checking anything.
+      `scripts/schemaDrift.test.ts` runs the script against a refused port —
+      red on the old code, which printed "never been migrated". The entry:
+- [x] **`scripts/schemaDrift.mts` says "this database has never been migrated"
       when it simply cannot connect.** Measured 2026-09-27 against production
       with the laptop off the database's trusted list: that line printed, then
       `ETIMEDOUT` on `connect` ~20 s later. Production had 89 migrations. The

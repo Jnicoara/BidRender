@@ -55,6 +55,16 @@ run type buys (recommended), or say "bend" on every raceway?
 
 ### W2. `schemaDrift.mts` says "never been migrated" when it cannot connect
 
+> **BUILT 2026-09-29.** Measured first: drizzle wraps the driver error and
+> the real code is on `cause` — `ER_NO_SUCH_TABLE` / 1146 for a missing
+> table, `ECONNREFUSED` for a refused port. `isMissingTable` reads both;
+> anything else throws, and the script prints "Could not read this database
+> (ECONNREFUSED). This is NOT 'never migrated'" and exits 2.
+> `scripts/schemaDrift.test.ts` RUNS the script: against port 1 (red on
+> `50618c9`, which printed "never been migrated"), and against an empty
+> scratch schema, which must still say "never been migrated". `deploying.md`
+> § 10's warning now says it was fixed, with the old wording kept.
+
 **What is wrong.** `server/schemaCheck.ts` ~489–495 reads the migration count
 inside `try { … } catch { }` and treats EVERY error as "the table is absent".
 A timeout, a refused connection or a bad password all print "No

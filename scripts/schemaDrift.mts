@@ -57,7 +57,27 @@ function where(): string {
 
 console.log("database: " + where());
 
-const applied = await appliedMigrationCount();
+/*
+  A database that cannot be READ is not an unmigrated one. This used to print
+  "never been migrated" and carry on when the connection timed out — measured
+  against production from off its trusted list, 2026-09-27. Now it says what
+  actually happened and stops, before any of the drift below is printed from
+  a database it never reached. Exit 2, apart from drift's 1.
+*/
+let applied: number | null;
+try {
+  applied = await appliedMigrationCount();
+} catch (err) {
+  const reason =
+    (err as { cause?: { code?: string; message?: string } })?.cause?.code ??
+    (err as Error)?.message ??
+    String(err);
+  console.log(
+    `Could not read this database (${reason}). This is NOT "never migrated" — ` +
+      "nothing was checked. Fix the connection and run this again."
+  );
+  process.exit(2);
+}
 console.log(
   applied === null
     ? "No __drizzle_migrations table — this database has never been migrated."
