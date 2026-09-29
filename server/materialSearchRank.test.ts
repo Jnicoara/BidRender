@@ -529,7 +529,7 @@ describe("conduit bodies: the LB for the generic words, each shape by name", () 
  * Marking the 90 sweeps "common" would fix that and push the LB down on
  * every bare PVC pipe search, which is the worse trade.
  */
-describe("PVC sweeps: found by 'sweep', never ahead of the elbow on '90'", () => {
+describe("PVC sweeps and concrete rings: each found by what it is called", () => {
   const index = BASELINE_MATERIALS.map((row, i) => ({
     id: String(i),
     description: row.name,
@@ -558,6 +558,25 @@ describe("PVC sweeps: found by 'sweep', never ahead of the elbow on '90'", () =>
       expect(first(query)).toMatch(/ PVC Sch (40|80) \d\d-degree sweep, /);
     }
   );
+
+  /*
+    Concrete ring boxes (plan § 9a), in the same ranked order. A concrete
+    ring is a BOX, so on a bare "ring" it leads as a product over the mud
+    rings, which are a box's fittings — the role rule as designed, and the
+    same reason "Drywall repair ring" already led it. Accepted and measured
+    2026-09-29. What must hold is that naming the part finds it.
+  */
+  it.each([
+    ["mud ring", '4" square mud ring'],
+    // "deck box" finds nothing: aliasing "box" put a ring 4th on a bare "box"
+    // and was taken off. Known, and reported to the owner.
+    ["concrete ring", 'Concrete ring, 4" deep'],
+    ["deck ring", 'Concrete ring, 4" deep'],
+    ["6 concrete ring", 'Concrete ring, 6" deep'],
+    ["ring backplate", "Concrete ring backplate"],
+  ])('"%s" leads with %s', (query, expected) => {
+    expect(first(query)).toBe(expected);
+  });
 
   it.each([
     ["2 pvc 90 sweep", '2" PVC Sch 40 90-degree sweep, 24" radius'],

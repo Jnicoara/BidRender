@@ -662,12 +662,60 @@ const roughIn: BaselineMaterial[] = [
   },
 ];
 
+/**
+ * Concrete ring boxes for deck pours — Tier 3's first group (owner,
+ * 2026-09-29, references/materials-track-c-plan.md § 9a, B5): 4" and 6"
+ * deep, and the backplate, which is sold separately and without which a
+ * ring cannot be poured.
+ *
+ * No cover row. A concrete ring is a 4" octagon, so its face takes the
+ * shipped `4" round blank cover` (aliased "octagon") or the fixture. The
+ * owner is asked to confirm that; if it is wrong, add one row here.
+ *
+ * The 4" ring is "common" (materialCommonness.ts) so it leads "concrete
+ * ring" over its backplate.
+ *
+ * Takeoff: none. Nothing proposes a box at a stamp; these are added by
+ * hand or built into a "light on deck" assembly. Concrete-tight EMT
+ * fittings are the compression style, already shipped.
+ */
+const RING = "deck pour slab ceiling concrete-tight octagon oct cr";
+const concreteRings: BaselineMaterial[] = [
+  {
+    ...each,
+    name: 'Concrete ring, 4" deep',
+    // Not "box": as an alias it put this ring 4th for a bare "box", ahead
+    // of boxes that NAME it (materialSearchCommonness.test.ts, 2026-09-29).
+    searchAliases: aliases(RING, STEEL_BRANDS, "appleton"),
+    description:
+      '4" octagon ring for a deck pour. Needs the backplate, sold separately.',
+  },
+  {
+    ...each,
+    name: 'Concrete ring, 6" deep',
+    searchAliases: aliases(RING, "thick", STEEL_BRANDS, "appleton"),
+    description:
+      '4" octagon ring for a deck pour. Needs the backplate, sold separately.',
+  },
+  {
+    ...each,
+    name: "Concrete ring backplate",
+    searchAliases: aliases(
+      "deck pour slab bottom plate back cover knockout ko",
+      STEEL_BRANDS,
+      "appleton"
+    ),
+    description: "Closes the back of a concrete ring. One per ring.",
+  },
+];
+
 export const BOXES: BaselineMaterial[] = [
   ...deviceBoxes,
   ...oldWorkBoxes,
   ...masonryBoxes,
   ...squareBoxes,
   ...ceilingBoxes,
+  ...concreteRings,
   ...enclosures,
   ...castBoxes,
   ...twoGangCastBoxes,

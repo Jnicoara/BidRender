@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Concrete ring boxes for deck pours are in the catalog**: 4" and 6"
+  deep, and the backplate that goes with them (unpriced, like every
+  shipped item).
+
 - **Large-radius PVC sweeps are now in the catalog** — 1" to 4", 90° and
   45°, 24" and 36" radius, Schedule 40 and 80 (56 items, unpriced like
   every shipped item). Searching "sweep" now finds them rather than the

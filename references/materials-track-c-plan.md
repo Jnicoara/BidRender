@@ -1015,6 +1015,29 @@ and search, not size.
 
 ### 9a. Concrete ring boxes — first in line, 4–5 rows
 
+> **BUILT 2026-09-29 on `track-c`, 3 rows (B5 as recommended):**
+> `Concrete ring, 4" deep`, `Concrete ring, 6" deep`, `Concrete ring
+backplate`. **No cover row** — a ring is a 4" octagon and the shipped
+> `4" round blank cover` (aliased "octagon") is taken to fit. **The owner
+> should confirm that**; if wrong, it is one row. Catalog 1,511 → **1,514**,
+> Boxes 90 → **93**, pricing sheet 1,638 → **1,641** (0 typed prices).
+>
+> Search, measured: the standard sweep did not move. Three things found on
+> the way, each pinned in `materialSearchRank.test.ts`:
+>
+> - A "box" alias on the rings put one 4th for a bare "box", ahead of boxes
+>   that name the word — and exposed an arrival-order tie
+>   (`materialSearchCommonness.test.ts` went red). Alias removed. **Cost:
+>   "deck box" now finds nothing** (every typed word must match). "deck
+>   ring", "concrete ring" and "pour" find them.
+> - On "concrete ring" the backplate led: two typed words stand the role
+>   grouping down, so the plate tied the ring and won on the name. The 4"
+>   ring is marked "common", the same move as the LB.
+> - A bare "ring" leads with the two rings, then "Drywall repair ring", then
+>   the mud rings. That is the role rule as designed — a ring box is a
+>   product, a mud ring is a box's fitting — and "Drywall repair ring"
+>   already led it for the same reason. "mud ring" is unchanged.
+
 For deck pours: a ring nailed to the form with a backplate, and the pipe run
 in the pour. Nothing in the catalog is one today (names searched for
 "concrete", "deck", "ring": only mud and extension rings, and
