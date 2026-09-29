@@ -2646,6 +2646,14 @@ export const RUN_MATERIAL_ROLES = [
   */
   "teeBox",
   "teeCover",
+  /*
+    A T conduit body at a branch tee (0096), appended. Its own role because a
+    run type can have box tees and body tees on one bid, and a line is keyed
+    by run type + role. No cover role: the body is priced with its cover and
+    gasket. Nothing writes it until the Track C wiring ships
+    (references/materials-track-c-plan.md § 4).
+  */
+  "teeBody",
 ] as const;
 export type RunMaterialRole = (typeof RUN_MATERIAL_ROLES)[number];
 

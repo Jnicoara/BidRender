@@ -5278,6 +5278,19 @@ function feetForRole(
       return footage.cableFeet > 0 ? footage.cableFeet : footage.insulatedFeet;
     case "ground":
       return footage.groundFeet;
+    /*
+      A T body is a COUNT, not footage, and 0096 added its role before the
+      code that counts it (references/materials-track-c-plan.md § 4). Until
+      that code ships, nothing writes a `teeBody` line — `sendToBid` builds no
+      candidate with it — so this answers 0 rather than a length.
+
+      This case is a tripwire, not a feature: the wiring adds `teeBody` to
+      `TEE_KINDS`, which takes it out of this switch's type, and this label
+      then fails to compile. Delete it at that point — the count path in
+      `withTracedFootage` above takes over.
+    */
+    case "teeBody":
+      return 0;
   }
 }
 

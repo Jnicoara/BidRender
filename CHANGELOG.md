@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **The database can now record a T conduit body at a branch tee as its own
+  bid line** (migration 0096). Nothing uses it yet — the plan viewer still
+  offers only a box at a tee — but the change that does needs the database
+  ready first. Rehearsed on a restored copy of the live database.
 - **Concrete ring boxes for deck pours are in the catalog**: 4" and 6"
   deep, and the backplate that goes with them (unpriced, like every
   shipped item).
