@@ -1805,8 +1805,12 @@ sheet scale were removed afterwards — production back to 0 bid lines, 2 runs.
       a size-parsing problem, not punctuation. Found by
       `scripts/catalogRehearsal.mts search`. Planned 2026-09-29:
       `references/track-c-next-batch-plan.md` § S2.
-- [ ] **A count number in a search matches inside and at the start of
+- [x] **A count number in a search matches inside and at the start of
       SIZES: "2 gang box", "3 hole", "2 pole 20" lead with the wrong rows.**
+      **FIXED 2026-09-29:** one count rule (`shared/searchCounts.ts`) read by
+      the matcher AND the ranker; "2 gang box" leads with Double-gang box.
+      Standard sweep unchanged; the new count sweep's 40 moved queries are
+      listed in the plan, § S1-moved.
       Found 2026-09-29. "2 gang box" is a REGRESSION from `8c5c478` (the
       weatherproof rows): `Double-gang box` was 4th at `e70ec15` and is now
       out of the top five, behind `1/2" weatherproof box, single-gang` — the
@@ -1815,6 +1819,16 @@ sheet scale were removed afterwards — production back to 0 bid lines, 2 runs.
       sweep has none of these queries, which is why it passed. Planned, with
       the risk to other count searches: `references/track-c-next-batch-plan.md`
       § S1.
+- [ ] **`aliases()` drops a repeated word, which silently breaks alias
+      PHRASES.** `server/seed/materials/types.ts`: it de-duplicates word by
+      word, so "one hole 1 hole two hole 2 hole" was stored as "one hole 1
+      two 2" and "2 hole strap" could not find `EMT strap`; my own "3 hole 5
+      hole" on the weatherproof boxes became "3 hole 5". Both fixed by
+      hyphenating (2026-09-29). NOT audited: other rows may have lost a
+      phrase the same way. The audit is to compare each seed row's alias
+      INPUT with what `aliases()` returned and list every word dropped that
+      was not in the name — a script, not a grep, because the input is only
+      visible in the seed source.
 
 Couplings (sticks minus one per leg, drops included), connectors (one per
 conduit end, by node degree) and straps (one near each box, then spacing)

@@ -483,8 +483,11 @@ export const CONDUIT: BaselineMaterial[] = [
     unitOfSale: "each",
     costPerUnit: UNPRICED,
     category: "Conduit Fittings",
+    // Hyphenated, one word each: aliases() drops a repeated word, so the
+    // spaced "one hole 1 hole two hole 2 hole" was stored as "one hole 1 two
+    // 2" and "2 hole strap" could not find it (count sweep, 2026-09-29).
     searchAliases: aliases(
-      "one hole 1 hole two hole 2 hole conduit pipe clamp minerallac hanger"
+      "one-hole 1-hole two-hole 2-hole hole conduit pipe clamp minerallac hanger"
     ),
     defaultQty: 3,
   },

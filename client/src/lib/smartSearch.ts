@@ -18,6 +18,13 @@
  *  - Rich alias map with trade slang, abbreviations, and brand names.
  */
 
+import {
+  countNounAfter,
+  phraseHoldsCount,
+  wordIsCount,
+  wordsHoldCount,
+} from "@shared/searchCounts";
+
 // ─── Normalize ────────────────────────────────────────────────────────────────
 function normalize(s: string): string {
   return s
@@ -640,6 +647,29 @@ function isSizeTerm(term: string): boolean {
   );
 }
 
+/**
+ * The tier for a COUNT number ("2" of "2 gang box") — see TokenExpansion.
+ *
+ * It used to go through matchTier, which is prefix- and substring-friendly by
+ * design, so a count matched the start or inside of a SIZE: "2 gang box" put
+ * `1/2" weatherproof box, single-gang` above Double-gang box, "3 hole" led
+ * with 3/4" straps, "2 pole" with a 20 ft light pole (count sweep in
+ * scripts/searchSpotCheck.mts, 2026-09-29). Now a count matches only a word
+ * that IS that count. Same tiers as matchTier, so the points are unchanged.
+ */
+function countTier(
+  n: string,
+  noun: string,
+  indexed: IndexedItem<SearchableItem>
+): number {
+  const { descWords, text } = indexed;
+  if (descWords.length > 0 && wordIsCount(descWords[0], n, noun, descWords[1]))
+    return 2;
+  if (wordsHoldCount(descWords, n, noun)) return 3;
+  if (phraseHoldsCount(text, n, noun)) return 6;
+  return 0;
+}
+
 /** The tier for any term: sizes by sizeTier, words by matchTier. */
 function termTier(term: string, indexed: IndexedItem<SearchableItem>): number {
   return isSizeTerm(term)
@@ -724,9 +754,6 @@ export function normalizeSizeWords(text: string): string {
   return q.replace(/\s+/g, " ").trim();
 }
 
-/** Words that make the number before them a COUNT — "2 gang", "3 way". */
-const COUNT_NOUN = /^(?:gang|pole|way|hole|head|light|space|circuit)s?$/;
-
 /**
  * A cable spec typed with a space — "12 2", "6 3", "10 3" — is the spec
  * 12-2, 6-3, 10-3. Only a building-wire gauge followed by 2, 3 or 4
@@ -792,11 +819,12 @@ interface TokenExpansion {
   aliases: string[];
   /**
    * A number that is a COUNT, not a size — the "2" of "2 gang box", because
-   * the next word is a count noun (COUNT_NOUN). Matched as a word, exactly as
-   * before sizes became strict: "Double-gang box" spells its count out, and
-   * strict size matching lost it.
+   * the next word is a count noun (COUNT_NOUN). Holds that noun ("gang"),
+   * because the count is matched against it: `2-gang`, `2g` and
+   * `double-gang` answer "2 gang"; `2-pole`, `20A` and `1/2"` do not. See
+   * wordIsCount.
    */
-  asWord?: boolean;
+  countOf?: string;
   /**
    * A single LETTER with another word after it — the "c" of "c body". It is
    * finished, not being typed, so a name holding it as a whole word ("C
@@ -814,7 +842,7 @@ function expandTokens(tokens: string[]): TokenExpansion[] {
   return tokens.map((token, i) => {
     const expansion = expandTokenCached(
       token,
-      HAS_DIGIT.test(token) && COUNT_NOUN.test(tokens[i + 1] ?? "")
+      countNounAfter(token, tokens[i + 1]) ?? undefined
     );
     return ONE_LETTER.test(token) && i < tokens.length - 1
       ? { ...expansion, finishedLetter: true }
@@ -829,12 +857,12 @@ function expandTokens(tokens: string[]): TokenExpansion[] {
  * map twice. The map is a constant, so the answer for a word never changes.
  */
 const expansionCache = new Map<string, TokenExpansion>();
-function expandTokenCached(token: string, asWord = false): TokenExpansion {
-  const cacheKey = asWord ? `${token} #count` : token;
+function expandTokenCached(token: string, countOf?: string): TokenExpansion {
+  const cacheKey = countOf ? `${token} #count ${countOf}` : token;
   let hit = expansionCache.get(cacheKey);
   if (!hit) {
-    hit = asWord
-      ? { ...expandToken(token, true), asWord: true }
+    hit = countOf
+      ? { ...expandToken(token, countOf), countOf }
       : expandToken(token);
     expansionCache.set(cacheKey, hit);
   }
@@ -856,7 +884,7 @@ function runsOnFrom(token: string, term: string): boolean {
   return term.length >= MIN_ALIAS_TERM_LENGTH && token.startsWith(term);
 }
 
-function expandToken(token: string, asWord = false): TokenExpansion {
+function expandToken(token: string, countOf?: string): TokenExpansion {
   const aliases = new Set<string>();
 
   /*
@@ -866,7 +894,7 @@ function expandToken(token: string, asWord = false): TokenExpansion {
     (2026-09-25). A size still being typed ("1-", "1/") keeps the prefix
     behaviour like any partial word.
   */
-  if (!asWord && isSizeTerm(token) && COMPLETE_SIZE.test(sizeKey(token))) {
+  if (!countOf && isSizeTerm(token) && COMPLETE_SIZE.test(sizeKey(token))) {
     /*
       ...and only to phrases that CONTAIN that same size. A size is satisfied
       by that size or not at all: the map's "4 square" entry also lists
@@ -891,6 +919,26 @@ function expandToken(token: string, asWord = false): TokenExpansion {
       const phrases = [k, ...expansions].map(normalize);
       if (!phrases.some(carries)) continue;
       for (const p of phrases) if (carries(p)) aliases.add(p);
+    }
+    aliases.delete(token);
+    return { typed: token, aliases: Array.from(aliases) };
+  }
+
+  /*
+    A COUNT ("2" of "2 gang box") reaches only entries that hold that count of
+    that noun — "double gang", "2-gang" — never an entry that merely starts
+    with the digit. The prefix tests below took "2" to the "20a" and "200a"
+    entries, and "2 circuit" listed 20A breakers (2026-09-29, count sweep).
+  */
+  if (countOf) {
+    // ...and only the phrases that hold it, as a size keeps only phrases that
+    // carry the size: the "two hole" entry also lists "conduit strap", which
+    // let every strap answer the "2" of "2 hole".
+    const holds = (phrase: string) => phraseHoldsCount(phrase, token, countOf);
+    for (const [key, expansions] of Object.entries(ALIAS_MAP)) {
+      for (const p of [key, ...expansions].map(normalize)) {
+        if (holds(p)) aliases.add(p);
+      }
     }
     aliases.delete(token);
     return { typed: token, aliases: Array.from(aliases) };
@@ -1012,13 +1060,16 @@ function scoreItem<T extends SearchableItem>(
 ): number {
   let totalScore = 0;
 
-  for (const { typed, aliases, asWord, finishedLetter } of tokenExpansions) {
-    // A count ("2" of "2 gang") is matched as a word — see TokenExpansion.
+  for (const { typed, aliases, countOf, finishedLetter } of tokenExpansions) {
+    // A count ("2" of "2 gang") matches only a word that IS that count of
+    // that noun (countTier); what it expanded to ("double gang") is matched
+    // as words.
     const tier = (term: string) =>
-      asWord
+      countOf
         ? matchTier(term, indexed.descNorm, indexed.descWords, indexed.text)
         : termTier(term, indexed);
-    const typedPoints = TYPED_POINTS[tier(typed)];
+    const typedPoints =
+      TYPED_POINTS[countOf ? countTier(typed, countOf, indexed) : tier(typed)];
     let bestForToken = typedPoints;
     // A finished one-letter word that only STARTS a word of the name ranks
     // like a match anywhere in it (tier 5), so the name holding it whole

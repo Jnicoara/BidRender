@@ -1,6 +1,8 @@
-# Track C — next batch (plan only, 2026-09-29)
+# Track C — next batch (2026-09-29)
 
-**Status: PLAN. Nothing below is built.** Written on `track-c` at `8c5c478`.
+**Status: APPROVED by the owner (Q1–Q5 as recommended; Q3 given a final rule
+and HELD — see § 1 W5). Built pieces are marked BUILT in their section.**
+Written on `track-c` at `8c5c478`.
 No migrations in this batch: the one item that needs a schema change is
 listed as a handoff for Track A (§ 4) and waits on it.
 
@@ -132,6 +134,35 @@ uses a threaded connector into a knockout.
 
 ### S1. A COUNT number matches inside and at the start of SIZES — root cause of three wrong results
 
+> **BUILT 2026-09-29.** The count rule is one module,
+> `shared/searchCounts.ts`, read by BOTH halves of search — the matcher
+> (`smartSearch.ts`) and the ranker (`materialSearchRank.ts`). Fixing the
+> matcher alone was not enough, and that was measured: the ranker still read
+> "1" as present in `1/2"` and absent from "Single-gang", so "1 gang box" kept
+> leading with weatherproof boxes. A count now matches the number or its
+> spelling joined to its noun (`2-gang`, `2g`, `double-gang`, `single-pole`,
+> `30-space`), or standing alone with the noun next to it ("two gang",
+> "3 hole") — never a size, never another noun's count.
+>
+> **Sweeps:** the count sweep (`searchSpotCheck.mts --counts`, 46 queries,
+> new, "2 gang box" in it) was recorded on the unchanged code FIRST. After:
+> **the standard sweep is byte-identical (58 queries)**; 40 of 46 count
+> queries moved, every one listed in § S1-moved below. Three now return
+> nothing, all honestly: no 3- or 5-hole strap is in the catalog, and a quad
+> breaker is described as two 2-pole circuits, not four.
+>
+> **Two catalog rows had lost words to `aliases()`**, which drops a repeated
+> word: `EMT strap`'s "one hole … two hole" was stored as "one hole 1 two 2",
+> and my own weatherproof "3 hole 5 hole" as "3 hole 5". Both now hyphenated
+> (`two-hole`, `5-hole`). Whether other rows lost phrases the same way is not
+> audited — logged in todo.md.
+>
+> **Tests:** `server/searchCounts.test.ts` (the rule) and a block in
+> `materialSearchRank.test.ts` against the shipped catalog. Run against the
+> unfixed code in a worktree: **11 red** — the six queries that were wrong,
+> the "2 gang box" top-five check, and all four "never lists a size" checks.
+> The five that were already right passed there too, as intended.
+
 **Found while planning this, and one of the three is mine:**
 
 | Query        | Top of the list today                                               | Should lead with                                 |
@@ -196,6 +227,131 @@ commonest searches in the app. What could move:
 a size? Recommend yes. If you would rather not touch search now, the
 catalog-only stopgap for "2 gang box" is to mark `Double-gang box` "common"
 (`shared/materialCommonness.ts`); it does not fix "3 hole" or "2 pole 20".
+
+#### S1-moved: every count query whose top five changed (40 of 46)
+
+Ranked the way the picker ranks (`searchSpotCheck.mts --counts`). The six not listed were unchanged: "2 gang mud ring", "1 pole 20", "3 pole 60", "4 way switch", "30 space", "42 space".
+
+- **"1 gang"**
+  - before: 1-gang blank plate · 1/2" weatherproof box, single-gang · 1/2" FS cast box, 2-gang · 1/2" weatherproof box, double-gang · 1/2" weatherproof box, single-gang, PVC
+  - after: 1-gang blank plate · Single-gang box · Single-gang metal box · Single-gang box extender · Single-gang box, deep
+- **"1 gang box"**
+  - before: 1/2" weatherproof box, single-gang · 1/2" FS cast box, 2-gang · 1/2" weatherproof box, double-gang · 1/2" weatherproof box, single-gang, PVC · 1/2" weatherproof box, triple-gang
+  - after: Single-gang box · Single-gang metal box · Single-gang box extender · Single-gang box, deep · Single-gang old-work box
+- **"2 gang"**
+  - before: 2-gang blank plate · 2-gang wall plate · 4" square mud ring, 2-gang · 1/2" FS cast box, 2-gang · 3/4" FS cast box, 2-gang
+  - after: 2-gang blank plate · 2-gang wall plate · Double-gang box · Double-gang metal box · Double-gang box, deep
+- **"2 gang box"**
+  - before: 1/2" FS cast box, 2-gang · 3/4" FS cast box, 2-gang · Handy box · 1/2" weatherproof box, single-gang · 1/2" weatherproof box, double-gang
+  - after: Double-gang box · Double-gang metal box · Double-gang box, deep · Double-gang old-work box · 1/2" FS cast box, 2-gang
+- **"3 gang"**
+  - before: 3-gang blank plate · 3-gang wall plate · 3/4" weatherproof box, single-gang · 3/4" FS cast box, 2-gang · 3/4" weatherproof box, double-gang
+  - after: 3-gang blank plate · 3-gang wall plate · Triple-gang box · Triple-gang metal box · Triple-gang old-work box
+- **"3 gang box"**
+  - before: 3/4" weatherproof box, single-gang · 3/4" FS cast box, 2-gang · 3/4" weatherproof box, double-gang · 3/4" weatherproof box, single-gang, PVC · 3/4" FD cast box
+  - after: Triple-gang box · Triple-gang metal box · Triple-gang old-work box · Masonry box, triple-gang · 1/2" weatherproof box, triple-gang
+- **"4 gang"**
+  - before: 4-gang box · 4-gang blank plate · 4-gang wall plate · 4" square mud ring, 2-gang · 4-11/16" square mud ring, 2-gang
+  - after: 4-gang box · 4-gang blank plate · 4-gang wall plate
+- **"4 gang box"**
+  - before: 4-gang box · 3/4" weatherproof box, single-gang · 3/4" FS cast box, 2-gang · 3/4" weatherproof box, double-gang · 3/4" weatherproof box, single-gang, PVC
+  - after: 4-gang box
+- **"5 gang"**
+  - before: 5-gang box · 5-gang wall plate · 1/2" weatherproof box, single-gang · 3/4" weatherproof box, single-gang · 1/2" weatherproof box, double-gang
+  - after: 5-gang box · 5-gang wall plate
+- **"5 gang box"**
+  - before: 5-gang box · 1/2" weatherproof box, single-gang · 3/4" weatherproof box, single-gang · 1/2" weatherproof box, double-gang · 3/4" weatherproof box, double-gang
+  - after: 5-gang box
+- **"2 gang plate"**
+  - before: 2-gang blank plate · 2-gang wall plate · Duplex/toggle combo plate · Weatherproof blank cover, double-gang
+  - after: 2-gang blank plate · 2-gang wall plate · Weatherproof blank cover, double-gang · Duplex/toggle combo plate
+- **"3 gang plate"**
+  - before: 3-gang blank plate · 3-gang wall plate · Single-gang box extender
+  - after: 3-gang blank plate · 3-gang wall plate
+- **"1 pole"**
+  - before: 12 ft light pole · Tele-power pole, 10 ft · Tele-power pole, 15 ft · 15A Single-Pole breaker · 100A 2-Pole breaker
+  - after: Single-pole switch · 15A Single-Pole breaker · 20A Single-Pole breaker · 30A Single-Pole breaker · 15A Single-Pole AFCI breaker
+- **"1 pole breaker"**
+  - before: 15A Single-Pole breaker · 100A 2-Pole breaker · 110A 2-Pole breaker · 125A 2-Pole breaker · 15A Single-Pole AFCI breaker
+  - after: 15A Single-Pole breaker · 20A Single-Pole breaker · 30A Single-Pole breaker · 15A Single-Pole AFCI breaker · 20A Single-Pole AFCI breaker
+- **"2 pole"**
+  - before: 20 ft light pole · 20A Single-Pole breaker · 20A 2-Pole breaker · 20A Single-Pole AFCI breaker · 20A Single-Pole GFCI breaker
+  - after: 20A 2-Pole breaker · 30A 2-Pole breaker · 40A 2-Pole breaker · 50A 2-Pole breaker · 60A 2-Pole breaker
+- **"2 pole breaker"**
+  - before: 20A Single-Pole breaker · 20A 2-Pole breaker · 20A Single-Pole AFCI breaker · 20A Single-Pole GFCI breaker · 20A Single-Pole AFCI/GFCI combo breaker
+  - after: 20A 2-Pole breaker · 30A 2-Pole breaker · 40A 2-Pole breaker · 50A 2-Pole breaker · 60A 2-Pole breaker
+- **"3 pole"**
+  - before: 30 ft light pole · 30A 2-Pole breaker · 30A Single-Pole breaker · 30A double-pole switch · 30A 2-Pole half-size breaker
+  - after: 15A 3-Pole breaker · 20A 3-Pole breaker · 25A 3-Pole breaker · 30A 3-Pole breaker · 35A 3-Pole breaker
+- **"3 pole breaker"**
+  - before: 30A 2-Pole breaker · 30A Single-Pole breaker · 30A 2-Pole half-size breaker · 30A Single-Pole half-size breaker · 35A Single-Pole breaker
+  - after: 15A 3-Pole breaker · 20A 3-Pole breaker · 25A 3-Pole breaker · 30A 3-Pole breaker · 35A 3-Pole breaker
+- **"2 pole 20"**
+  - before: 20 ft light pole · 20A Single-Pole breaker · 20A 2-Pole breaker · 20A Single-Pole AFCI breaker · 20A Single-Pole GFCI breaker
+  - after: 20A 2-Pole breaker · 20A 2-Pole half-size breaker · 20A 2-Pole quad breaker · 20A 2-Pole AFCI breaker · 20A 2-Pole GFCI breaker
+- **"2 pole 30"**
+  - before: 30A 2-Pole breaker · 30A 2-Pole half-size breaker · 30A 2-Pole AFCI breaker · 30A 2-Pole GFCI breaker · 30A 2-Pole AFCI/GFCI combo breaker
+  - after: 30A 2-Pole breaker · 30A double-pole switch · 30A 2-Pole half-size breaker · 30A 2-Pole AFCI breaker · 30A 2-Pole GFCI breaker
+- **"3 way"**
+  - before: 3-way switch · 3-way dimmer · 20A 3-way switch · Coax splitter · 4-way switch
+  - after: 3-way switch · 3-way dimmer · 20A 3-way switch · Strut wing connector
+- **"3 way switch"**
+  - before: 3-way switch · 20A 3-way switch · 4-way switch · 20A 4-way switch
+  - after: 3-way switch · 20A 3-way switch
+- **"4 way"**
+  - before: 4-way switch · 20A 4-way switch · Coax splitter · 4x4 wireway
+  - after: 4-way switch · 20A 4-way switch
+- **"1 hole"**
+  - before: 1/2" EMT one-hole strap · 1" EMT one-hole strap · 1-1/4" EMT one-hole strap · 1-1/2" EMT one-hole strap · 1/2" PVC one-hole strap
+  - after: 1/2" EMT one-hole strap · 3/4" EMT one-hole strap · 1" EMT one-hole strap · 1-1/4" EMT one-hole strap · 1-1/2" EMT one-hole strap
+- **"1 hole strap"**
+  - before: 1/2" EMT one-hole strap · 1" EMT one-hole strap · 1-1/4" EMT one-hole strap · 1-1/2" EMT one-hole strap · 1/2" PVC one-hole strap
+  - after: 1/2" EMT one-hole strap · 3/4" EMT one-hole strap · 1" EMT one-hole strap · 1-1/4" EMT one-hole strap · 1-1/2" EMT one-hole strap
+- **"2 hole"**
+  - before: 2" EMT one-hole strap · 2-1/2" EMT one-hole strap · 2" PVC one-hole strap · 2-1/2" PVC one-hole strap · 2" rigid one-hole strap
+  - after: EMT strap
+- **"2 hole strap"**
+  - before: 2" EMT one-hole strap · 2-1/2" EMT one-hole strap · 2" PVC one-hole strap · 2-1/2" PVC one-hole strap · 2" rigid one-hole strap
+  - after: EMT strap
+- **"3 hole"**
+  - before: 3/4" EMT one-hole strap · 3" EMT one-hole strap · 3/4" PVC one-hole strap · 3" PVC one-hole strap · 3/4" rigid one-hole strap
+  - after: 1/2" weatherproof box, single-gang · 3/4" weatherproof box, single-gang · 1/2" weatherproof box, double-gang · 3/4" weatherproof box, double-gang · 1/2" weatherproof box, triple-gang
+- **"3 hole strap"**
+  - before: 3/4" EMT one-hole strap · 3" EMT one-hole strap · 3/4" PVC one-hole strap · 3" PVC one-hole strap · 3/4" rigid one-hole strap
+  - after: (nothing)
+- **"5 hole"**
+  - before: 500 kcmil crimp lug, single size · 1/2" weatherproof box, single-gang · 3/4" weatherproof box, single-gang · 1/2" weatherproof box, double-gang · 3/4" weatherproof box, double-gang
+  - after: 1/2" weatherproof box, single-gang · 3/4" weatherproof box, single-gang · 1/2" weatherproof box, double-gang · 3/4" weatherproof box, double-gang · 1/2" weatherproof box, triple-gang
+- **"5 hole strap"**
+  - before: 500 kcmil crimp lug, single size · 250-350 kcmil crimp lug
+  - after: (nothing)
+- **"3 hole box"**
+  - before: 3/4" weatherproof box, single-gang · 3/4" weatherproof box, double-gang · 3/4" weatherproof round box · 3/4" threaded closure · 1/2" weatherproof box, single-gang
+  - after: 1/2" weatherproof box, single-gang · 3/4" weatherproof box, single-gang · 1/2" weatherproof box, double-gang · 3/4" weatherproof box, double-gang · 1/2" weatherproof box, triple-gang
+- **"2 head"**
+  - before: LED security light, motion-activated, 2-head · 2" metal weatherhead · 2-1/2" metal weatherhead · 2" PVC weatherhead · 2-1/2" PVC weatherhead
+  - after: LED security light, motion-activated, 2-head
+- **"2 light"**
+  - before: 20 ft light pole · 24" under-cabinet light bar · LED security light, motion-activated, 2-head · Vanity light, 2-light · 2 ft LED strip fixture
+  - after: Vanity light, 2-light
+- **"3 light"**
+  - before: 30 ft light pole · 36" under-cabinet light bar · LED security light, motion-activated, 3-head · Vanity light, 3-light · 3/4" weatherproof round box
+  - after: Vanity light, 3-light
+- **"20 space"**
+  - before: 200A main panel, 30-space · 200A main panel, 40-space · 200A main panel, 42-space · 200A main-lug sub-panel, 30-space · 200A main-lug sub-panel, 40-space
+  - after: 100A main panel, 20-space · 125A main panel, 20-space · 100A main-lug sub-panel, 20-space · 125A main-lug sub-panel, 20-space
+- **"40 space"**
+  - before: 400A main panel, 42-space · 400A main-lug sub-panel, 42-space · 150A main panel, 40-space · 200A main panel, 40-space · 150A main-lug sub-panel, 40-space
+  - after: 150A main panel, 40-space · 200A main panel, 40-space · 150A main-lug sub-panel, 40-space · 200A main-lug sub-panel, 40-space
+- **"20 space panel"**
+  - before: 200A main panel, 30-space · 200A main panel, 40-space · 200A main panel, 42-space · 100A main panel, 20-space · 125A main panel, 20-space
+  - after: 100A main panel, 20-space · 125A main panel, 20-space · 100A main-lug sub-panel, 20-space · 125A main-lug sub-panel, 20-space
+- **"2 circuit"**
+  - before: 20A Single-Pole breaker · 20A 2-Pole breaker · 20A Single-Pole AFCI breaker · 20A Single-Pole GFCI breaker · 20A Single-Pole AFCI/GFCI combo breaker
+  - after: 15/15 tandem breaker · 20/20 tandem breaker · 15/20 tandem breaker · 30/30 tandem breaker · 15A 2-Pole quad breaker
+- **"4 circuit"**
+  - before: 40A 2-Pole breaker · 40A 2-Pole half-size breaker · 40A Single-Pole breaker · 45A Single-Pole breaker · 45A 2-Pole breaker
+  - after: (nothing)
 
 ### S2. `5/6" wafer LED downlight` (the old spelling) finds nothing
 

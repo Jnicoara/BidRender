@@ -397,7 +397,9 @@ const WP_HUB_SIZES = [
   { size: '1/2"', slang: "1/2 half 0.5" },
   { size: '3/4"', slang: "3/4 three quarter 0.75" },
 ];
-const WP_HOLES = "3 hole 5 hole hub bell box";
+// Hyphenated, one word each: aliases() drops a repeated word, so
+// "3 hole 5 hole" was stored as "3 hole 5" and "5 hole" found nothing.
+const WP_HOLES = "3-hole 5-hole hole hub bell box";
 const enclosures: BaselineMaterial[] = [
   ...WP_HUB_SIZES.flatMap(({ size, slang }) => [
     {

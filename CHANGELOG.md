@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Searching a count now finds that count.** "2 gang box" leads with the
+  double-gang box again (a weatherproof-box change earlier today had pushed
+  it out of the top five), "1 gang box" with the single-gang box, "2 pole"
+  and "2 pole 20" with 2-pole breakers instead of a 20 ft light pole, "20
+  space" with 20-space panels, and "3 hole" with the weatherproof boxes
+  rather than 3/4" straps. A number typed before "gang", "pole", "hole" and
+  the like no longer matches a size that merely starts with it.
+
 - **Weatherproof boxes now say their hub size, 1/2" or 3/4"**, and the
   3/4" single-gang, double-gang, round and PVC boxes are new. The old
   unsized rows became the 1/2" ones, so anything already using them keeps
