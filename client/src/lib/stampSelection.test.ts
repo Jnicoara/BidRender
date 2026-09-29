@@ -69,6 +69,7 @@ describe("deleting a selection", () => {
       { groupName: "Receptacle" },
     ]);
     expect(q.title).toBe("Delete 3 marks?");
+    expect(q.confirm).toBe("Delete 3 marks");
     expect(q.detail).toMatch(/^2 × Receptacle, 1 × Switch\./);
   });
 });

@@ -2178,6 +2178,8 @@ export default function TakeoffPage({
   );
   /** Waiting for "Delete N marks?" to be answered. */
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  /** The question as it was asked — see `deleteSelected`. */
+  const [deleteAsked, setDeleteAsked] = useState(() => deleteQuestion([]));
   /** Where a click in the counted-items list sent the viewer. */
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(
     null
@@ -2984,6 +2986,15 @@ export default function TakeoffPage({
     (confirmed: boolean) => {
       if (selectedStamps.length === 0 || removeStamps.isPending) return;
       if (!confirmed && deleteNeedsConfirm(selectedStamps.length)) {
+        /*
+          The question is FROZEN when it is asked. Derived live, it re-read
+          the selection as the dialog closed and said "Delete 0 marks?" for
+          the length of the fade (seen 2026-09-29) — the wrong number, on the
+          one dialog whose job is the number.
+        */
+        setDeleteAsked(
+          deleteQuestion(selectedStamps.map(s => ({ groupName: s.name })))
+        );
         setConfirmingDelete(true);
         return;
       }
@@ -2991,10 +3002,6 @@ export default function TakeoffPage({
       removeStamps.mutate({ ids: selectedStamps.map(s => s.id) });
     },
     [selectedStamps, removeStamps]
-  );
-  const deleteSelectedQuestion = useMemo(
-    () => deleteQuestion(selectedStamps.map(s => ({ groupName: s.name }))),
-    [selectedStamps]
   );
   const captureSymbol = trpc.takeoffStamps.captureSymbol.useMutation({
     onError: e => toast.error(e.message),
@@ -6139,9 +6146,9 @@ export default function TakeoffPage({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{deleteSelectedQuestion.title}</AlertDialogTitle>
+            <AlertDialogTitle>{deleteAsked.title}</AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteSelectedQuestion.detail}
+              {deleteAsked.detail}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -6150,7 +6157,7 @@ export default function TakeoffPage({
               className="bg-destructive text-white hover:bg-destructive/90"
               onClick={() => deleteSelected(true)}
             >
-              Delete {selectedStamps.length} marks
+              {deleteAsked.confirm}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

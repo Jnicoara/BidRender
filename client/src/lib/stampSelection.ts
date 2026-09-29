@@ -91,6 +91,8 @@ export function deleteNeedsConfirm(count: number): boolean {
 export function deleteQuestion(selected: readonly { groupName: string }[]): {
   title: string;
   detail: string;
+  /** The confirm button, carrying the same number as the title. */
+  confirm: string;
 } {
   const byName = new Map<string, number>();
   for (const s of selected)
@@ -101,5 +103,6 @@ export function deleteQuestion(selected: readonly { groupName: string }[]): {
   return {
     title: `Delete ${selected.length} marks?`,
     detail: `${parts.join(", ")}. Their counts, and any bid line that follows them, go down by the same number.`,
+    confirm: `Delete ${selected.length} marks`,
   };
 }

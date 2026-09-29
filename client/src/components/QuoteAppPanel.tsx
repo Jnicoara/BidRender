@@ -63,6 +63,10 @@ export function QuoteAppPanel({
 
   const [copied, setCopied] = useState<string | null>(null);
   const [announce, setAnnounce] = useState("");
+  /** Shown, not only announced: a sighted person needs to know too. */
+  const [copyFailed, setCopyFailed] = useState<string | null>(null);
+  /** The figure shown in its pasteable form after a failed copy. */
+  const [plain, setPlain] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -72,24 +76,45 @@ export function QuoteAppPanel({
   );
   const copy = async (key: string, label: string, text: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      /*
+        Raced against a timer. Seen 2026-09-29: in a background tab
+        `writeText` neither resolves nor rejects, and the button then did
+        nothing at all — no flash, no message. A copy that has not answered in
+        1.5 s is treated as failed, so the fallback below always runs.
+      */
+      await Promise.race([
+        navigator.clipboard.writeText(text),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("clipboard timed out")), 1500)
+        ),
+      ]);
       setAnnounce(`Copied ${label}: ${text}`);
     } catch {
       /*
-        No clipboard (an insecure page, or a browser that refused). Select the
-        figure instead, so a long-press copies it — and say so.
+        No clipboard (an insecure page, a browser that refused, or one that
+        never answered). Show the figure in its PASTEABLE form (`1452.00`,
+        not `$1,452.00` — seen 2026-09-29, the selection held the dollar
+        sign and comma a numeric field refuses) and select it, so a
+        long-press copies what Copy would have. And say so.
       */
-      const el = document.getElementById(`quote-figure-${key}`);
-      if (el) {
+      setPlain(key);
+      setTimeout(() => {
+        const el = document.getElementById(`quote-figure-${key}`);
+        if (!el) return;
         const range = document.createRange();
         range.selectNodeContents(el);
         const selection = window.getSelection();
         selection?.removeAllRanges();
         selection?.addRange(range);
-      }
+      }, 0);
       setAnnounce(`Could not copy. ${label} is selected — copy it by hand.`);
+      setCopyFailed(
+        `Could not copy ${label}. It is selected — copy it by hand.`
+      );
       return;
     }
+    setCopyFailed(null);
+    setPlain(null);
     setCopied(key);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setCopied(null), 1200);
@@ -97,7 +122,13 @@ export function QuoteAppPanel({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex flex-col h-dvh max-h-dvh w-full max-w-full rounded-none p-0 gap-0 sm:h-auto sm:max-h-[90dvh] sm:max-w-md sm:rounded-lg">
+      {/*
+        Full height ONLY on a phone (`max-sm:`). It was `h-dvh … sm:h-auto`,
+        and measured on a 1536px window the `h-dvh` still won: the desktop
+        dialog stood 712px tall around 469px of content. A phone-only rule
+        cannot leak onto a desktop, whatever order the rules land in.
+      */}
+      <DialogContent className="flex flex-col p-0 gap-0 max-h-[90dvh] sm:max-w-md max-sm:h-dvh max-sm:max-h-dvh max-sm:max-w-full max-sm:rounded-none">
         <DialogHeader className="shrink-0 border-b border-border px-5 pt-5 pb-3 text-left">
           <DialogTitle>For your quote app</DialogTitle>
           <DialogDescription className="text-foreground">
@@ -140,6 +171,7 @@ export function QuoteAppPanel({
                     shown={scope.name}
                     text={scope.name}
                     copied={copied}
+                    plain={plain}
                     onCopy={copy}
                     strong
                   />
@@ -157,6 +189,7 @@ export function QuoteAppPanel({
                           shown={displayAmount(bucket.cents)}
                           text={clipboardAmount(bucket.cents)}
                           copied={copied}
+                          plain={plain}
                           onCopy={copy}
                           mono
                         />
@@ -170,6 +203,7 @@ export function QuoteAppPanel({
                             shown={displayAmount(row.cents)}
                             text={clipboardAmount(row.cents)}
                             copied={copied}
+                            plain={plain}
                             onCopy={copy}
                             mono
                             indent
@@ -210,6 +244,11 @@ export function QuoteAppPanel({
             </>
           )}
         </div>
+        {copyFailed && (
+          <p className="shrink-0 border-t border-border px-5 py-2 text-xs text-[#F5C518]">
+            {copyFailed}
+          </p>
+        )}
         <p className="sr-only" aria-live="polite">
           {announce}
         </p>
@@ -262,6 +301,7 @@ function FigureRow({
   shown,
   text,
   copied,
+  plain,
   onCopy,
   mono,
   strong,
@@ -272,6 +312,8 @@ function FigureRow({
   shown: string;
   text: string;
   copied: string | null;
+  /** This row's figure is shown as `text` — after a copy that failed. */
+  plain: string | null;
   onCopy: (key: string, label: string, text: string) => void;
   mono?: boolean;
   strong?: boolean;
@@ -304,7 +346,7 @@ function FigureRow({
           done && "text-emerald-500"
         )}
       >
-        {shown}
+        {plain === id ? text : shown}
       </span>
       <button
         type="button"

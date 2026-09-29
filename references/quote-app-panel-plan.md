@@ -7,6 +7,16 @@ now carries: the panel shows the price TO THE CUSTOMER, with a worked example
 (§ 5, "What the panel shows"), and unpriced lines no longer refuse the panel
 (§ 5, "When lines are not priced").
 
+## As built (2026-09-29, `track-b`) — what differs from the plan below
+
+The plan is kept as written; this is what changed while building, so it is
+not read as a description of the code.
+
+| Piece           | Commit(s)                | Differs from the plan                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Quote-app panel | `8f74785` + screen fixes | Feature id is `quoteapp.panel`, lowercase — `scopeDiscipline.test.ts` accepts only `[a-z.]` ids. Blocks on a line whose hours carry a **$0 labor rate** too ("labor rate not set"), found on screen: 20 h at a starter $0 rate showed Labor as "None". Copy races a 1.5 s timer and falls back to selecting the plain `1452.00`. Example-price slot (§ 6) is the panel line only, fed `0`; no stub function.                               |
+| Priced CSV      | `9295841`                | One shared **dialog**, not a popover (§ 7), because the bid's Send menu cannot host a popover. A traced part with no labor unit keeps its material cost with status "Priced, no labor hours on N parts" — the bid's Cost column shows it, so blanking it would disagree. The footer names Not-priced lines at what the bid counts so far, so it still ties to Direct cost. `Example price` status is not emitted (nothing can be one yet). |
+
 Source: the owner's Stage 5 notes, pasted into the session on 2026-09-29.
 Nothing about them was in the repo. The parts this plan depends on are quoted
 in § 1 so the next reader does not have to find that conversation.

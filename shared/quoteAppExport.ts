@@ -77,7 +77,11 @@ export type QuoteGapLine = {
     name: string;
     unitLabel: string | null;
   };
-  breakdown: { directCost: number } | null;
+  breakdown: {
+    directCost: number;
+    totalLaborHours: number;
+    laborCost: number;
+  } | null;
   problem: { code: string } | null;
 };
 
@@ -86,9 +90,10 @@ export type QuoteGapLine = {
  * "Not priced" and "Can't price" by (shared/lineNotPriced.ts), so the panel
  * and the bid cannot disagree about which lines are missing.
  *
- * A line that is priced but missing PARTS, or a traced line whose hours are
- * unset, is listed too: its figure is short, and a short figure copied into a
- * quote is the thing this panel must not produce.
+ * A line that is priced but missing PARTS, a traced line whose hours are
+ * unset, or a line whose hours carry a $0 labor rate is listed too: its
+ * figure is short, and a short figure copied into a quote is the thing this
+ * panel must not produce.
  */
 export function quoteGaps(
   priced: readonly QuoteGapLine[],
@@ -125,6 +130,23 @@ export function quoteGaps(
         name,
         status: "Not priced",
         detail: "labor hours not set",
+      });
+    } else if (
+      breakdown &&
+      breakdown.totalLaborHours > 0 &&
+      breakdown.laborCost === 0
+    ) {
+      /*
+        Hours with no rate behind them — a starter labor rate still at $0
+        (CLAUDE.md § "Starter content ships unpriced"). Found on screen
+        2026-09-29: without this, 20 hours at $0 showed Labor as "None", an
+        empty-looking figure for labor that is on the bid and unpriced.
+      */
+      gaps.push({
+        lineId: line.id,
+        name,
+        status: "Not priced",
+        detail: "labor rate not set",
       });
     } else {
       const parts = linePartsNotPriced(line, directCost);

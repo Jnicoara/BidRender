@@ -355,6 +355,33 @@ describe("a line with no price blocks every figure (T3)", () => {
     expect(text).not.toMatch(/:0[,}]/);
   });
 
+  it("blocks hours priced at a $0 labor rate, rather than showing Labor as None", () => {
+    // Found on screen 2026-09-29: the starter rates ship at $0.
+    const { doc } = panelFor(
+      bid,
+      [
+        line({
+          name: "Panel swap",
+          cost: "600.0000",
+          hours: "20.0000",
+          rate: "0",
+        }),
+      ],
+      [],
+      TAX_OFF
+    );
+    expect(doc.state).toBe("blocked");
+    if (doc.state === "blocked")
+      expect(doc.gaps).toEqual([
+        {
+          lineId: expect.any(Number),
+          name: "Panel swap",
+          status: "Not priced",
+          detail: "labor rate not set",
+        },
+      ]);
+  });
+
   it("opens with figures once the lines are priced", () => {
     const { doc } = panelFor(bid, EXAMPLE_LINES(), EXAMPLE_EXPENSES, TAX_OFF);
     expect(doc.state).toBe("ready");
