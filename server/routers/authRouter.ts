@@ -8,8 +8,51 @@ import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import * as db from "../db";
 import { nanoid } from "nanoid";
 import { toPublicUser } from "@shared/publicUser";
+import { PASSWORD_MAX_LENGTH, passwordProblem } from "@shared/passwordRules";
+import { emailLinkBase, sendEmail } from "../email";
+import {
+  RESET_TOKEN_TTL_MS,
+  hashResetToken,
+  newResetToken,
+  resetEmail,
+  resetLink,
+} from "../passwordReset";
+import { clientKey, createRateLimiter } from "../rateLimit";
 
 const SALT_ROUNDS = 12;
+
+/** A new password, checked against the one list the screens show. */
+const newPassword = z
+  .string()
+  .max(PASSWORD_MAX_LENGTH)
+  .superRefine((p, ctx) => {
+    const problem = passwordProblem(p);
+    if (problem) ctx.addIssue({ code: "custom", message: problem });
+  });
+
+/*
+  Reset limits (server/rateLimit.ts says what these are and are not). Per
+  address as well as per sender, so nobody can fill one person's inbox from
+  many machines; the cost is that someone can use up a stranger's three
+  requests for an hour, which delays a reset and exposes nothing. The real
+  backstop is the token: 256 random bits, one hour, one use.
+*/
+const overResetRequestLimit = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+});
+const overResetAddressLimit = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+});
+/** Each attempt costs a bcrypt hash, so the form that spends one is limited too. */
+const overResetSubmitLimit = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+});
+
+const TOO_MANY_RESETS =
+  "Too many password reset attempts. Wait an hour and try again.";
 
 export const authRouter = router({
   /**
@@ -28,22 +71,7 @@ export const authRouter = router({
     .input(
       z.object({
         email: z.string().email().max(320),
-        password: z
-          .string()
-          .min(8, "Password must be at least 8 characters")
-          .max(128)
-          .refine(
-            p => /[A-Z]/.test(p),
-            "Password must contain at least one uppercase letter"
-          )
-          .refine(
-            p => /[0-9]/.test(p),
-            "Password must contain at least one number"
-          )
-          .refine(
-            p => /[^A-Za-z0-9]/.test(p),
-            "Password must contain at least one special character"
-          ),
+        password: newPassword,
         name: z.string().min(1).max(128).optional(),
       })
     )
@@ -170,8 +198,117 @@ export const authRouter = router({
       }
 
       const newHash = await bcrypt.hash(input.newPassword, SALT_ROUNDS);
+      // Ends every session issued before now — this device's included…
       await db.updateUserPassword(user.id, newHash);
+      // …so this device gets a fresh one and stays signed in, while every
+      // OTHER device is signed out (owner's answer, 2026-09-29). Issued after
+      // the cutoff, so it passes shared/sessionValidity.ts.
+      const token = await sdk.createSessionToken(user.openId, {
+        name: user.name ?? "",
+      });
+      ctx.res.cookie(COOKIE_NAME, token, getSessionCookieOptions(ctx.req));
 
       return { success: true };
+    }),
+
+  /**
+   * "Forgot password?" — email a single-use link to reset it.
+   *
+   * ── The same answer for every address ──────────────────────────────────────
+   * Whether or not the address has an account, the reply is identical, so this
+   * form cannot be used to find out who has one. The one thing it does say is
+   * whether this SERVER can send email at all (`emailing: false`), which is
+   * true or false for everybody alike.
+   *
+   * The email is sent WITHOUT waiting for the provider, so the reply for a real
+   * account is not a provider round-trip slower than for a made-up one. What is
+   * left is one database write, milliseconds against a network's noise.
+   *
+   * An account with no password (the retired OAuth path) gets no email:
+   * a reset would give it a password it never had.
+   */
+  requestPasswordReset: publicProcedure
+    .input(z.object({ email: z.string().email().max(320) }))
+    .mutation(async ({ input, ctx }) => {
+      const now = new Date();
+      const email = input.email.trim().toLowerCase();
+      // Both limits are counted on every request, so neither can be skipped
+      // by tripping the other first.
+      const overSender = overResetRequestLimit(
+        clientKey(ctx.req),
+        now.getTime()
+      );
+      const overAddress = overResetAddressLimit(email, now.getTime());
+      if (overSender || overAddress)
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: TOO_MANY_RESETS,
+        });
+
+      const base = emailLinkBase();
+      if (!base) {
+        console.warn("[auth] password reset asked for, but email is off");
+        return { emailing: false } as const;
+      }
+
+      const user = await db.getUserByEmail(email);
+      if (user?.passwordHash && user.email) {
+        const token = newResetToken();
+        await db.createPasswordResetToken(
+          user.id,
+          hashResetToken(token),
+          new Date(now.getTime() + RESET_TOKEN_TTL_MS),
+          now
+        );
+        void sendEmail({
+          kind: "password-reset",
+          to: user.email,
+          ...resetEmail(resetLink(base, token)),
+        }).catch(error =>
+          console.error("[auth] password reset email failed:", error)
+        );
+      }
+      return { emailing: true } as const;
+    }),
+
+  /**
+   * Set a new password from an emailed link. The link works once, and using it
+   * ends every session the account had — both inside
+   * `db.completePasswordReset`, in one transaction.
+   *
+   * Does not sign this browser in: the person signs in with the new password,
+   * which is also the proof they now know it.
+   */
+  resetPassword: publicProcedure
+    .input(
+      z.object({
+        token: z.string().min(1).max(200),
+        newPassword,
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (overResetSubmitLimit(clientKey(ctx.req), Date.now()))
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: TOO_MANY_RESETS,
+        });
+
+      const passwordHash = await bcrypt.hash(input.newPassword, SALT_ROUNDS);
+      const userId = await db.completePasswordReset(
+        hashResetToken(input.token),
+        passwordHash
+      );
+      if (userId === null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "This reset link has expired or has already been used. Ask for a new one from the sign-in page.",
+        });
+
+      // Whatever session this browser held ended with the rest; drop the
+      // cookie too, so the next screen is the sign-in form and not an error.
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      return { success: true } as const;
     }),
 });

@@ -35,6 +35,7 @@ function createAuthContext(): {
     activeCompanyId: null,
     onboardingCompletedAt: null,
     checklistDismissedAt: null,
+    sessionsValidAfter: null,
   };
 
   const ctx: TrpcContext = {

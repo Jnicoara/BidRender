@@ -6,6 +6,7 @@ import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
+import { sessionStillValid } from "@shared/sessionValidity";
 import { ENV } from "./env";
 import type {
   ExchangeTokenRequest,
@@ -187,19 +188,30 @@ class SDKServer {
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
     const secretKey = this.getSessionSecret();
 
-    return new SignJWT({
-      openId: payload.openId,
-      appId: payload.appId,
-      name: payload.name,
-    })
-      .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-      .setExpirationTime(expirationSeconds)
-      .sign(secretKey);
+    return (
+      new SignJWT({
+        openId: payload.openId,
+        appId: payload.appId,
+        name: payload.name,
+      })
+        .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+        // The issue time is what lets a password reset end this session: a token
+        // issued before the user's `sessionsValidAfter` is refused. Tokens signed
+        // before 2026-09-29 have none — see shared/sessionValidity.ts for how
+        // they are judged.
+        .setIssuedAt(Math.floor(issuedAt / 1000))
+        .setExpirationTime(expirationSeconds)
+        .sign(secretKey)
+    );
   }
 
-  async verifySession(
-    cookieValue: string | undefined | null
-  ): Promise<{ openId: string; appId: string; name: string } | null> {
+  async verifySession(cookieValue: string | undefined | null): Promise<{
+    openId: string;
+    appId: string;
+    name: string;
+    /** Whole seconds, or null for a token signed before issue times existed. */
+    issuedAt: number | null;
+  } | null> {
     if (!cookieValue) {
       console.warn("[Auth] Missing session cookie");
       return null;
@@ -225,6 +237,7 @@ class SDKServer {
         openId,
         appId,
         name,
+        issuedAt: typeof payload.iat === "number" ? payload.iat : null,
       };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
@@ -310,6 +323,13 @@ class SDKServer {
 
     if (!user) {
       throw ForbiddenError("User not found");
+    }
+
+    // A password reset or change ended every session issued before it.
+    // Checked here, on the row this request already loaded, so it costs no
+    // query and no reader can skip it.
+    if (!sessionStillValid(session.issuedAt, user.sessionsValidAfter)) {
+      throw ForbiddenError("Session ended by a password change");
     }
 
     await db.upsertUser({

@@ -152,6 +152,7 @@ import {
   projects,
   userMaterialsDb,
   users,
+  passwordResetTokens,
   masterItems,
   masterAssemblies,
   masterAssemblyItems,
@@ -177,6 +178,7 @@ import {
   type RunMaterialRole,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { sessionCutoff } from "../shared/sessionValidity";
 import { FILE_SOURCES } from "./backup/collectFiles";
 import type { PlanCounts } from "../shared/planCounts";
 import {
@@ -440,13 +442,125 @@ export async function countBidsWithLineItems(userId: number): Promise<number> {
   return Number(row?.n ?? 0);
 }
 
-export async function updateUserPassword(userId: number, passwordHash: string) {
+/**
+ * Set a new password AND end every session issued before now (0097).
+ *
+ * The only way a password changes, so the two cannot be separated: a password
+ * change that left the old sessions running would not help the person whose
+ * password was stolen. The caller issues the CURRENT device a fresh session
+ * afterwards if it should stay signed in (`authRouter.changePassword`).
+ */
+export async function updateUserPassword(
+  userId: number,
+  passwordHash: string,
+  now: Date = new Date()
+) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   await db
     .update(users)
-    .set({ passwordHash, updatedAt: new Date() })
+    .set({
+      passwordHash,
+      sessionsValidAfter: sessionCutoff(now),
+      updatedAt: now,
+    })
     .where(eq(users.id, userId));
+}
+
+/**
+ * Store a new reset token for `userId`, voiding any earlier unused one.
+ *
+ * Only the newest link works: asking twice and then clicking the first email
+ * is refused. That keeps "which link is live" a question with one answer, and
+ * it means a mailbox holding several old reset emails holds one credential,
+ * not several.
+ */
+export async function createPasswordResetToken(
+  userId: number,
+  tokenHash: string,
+  expiresAt: Date,
+  now: Date = new Date()
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.transaction(async tx => {
+    await tx
+      .update(passwordResetTokens)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(passwordResetTokens.userId, userId),
+          isNull(passwordResetTokens.usedAt)
+        )
+      );
+    await tx
+      .insert(passwordResetTokens)
+      .values({ userId, tokenHash, expiresAt, createdAt: now });
+  });
+}
+
+/**
+ * Use a reset token: claim it, set the password, end every old session — all
+ * in one transaction, or none of it.
+ *
+ * ── Single-use, by construction ─────────────────────────────────────────────
+ * The claim is ONE conditional UPDATE: `usedAt IS NULL AND expiresAt > now`.
+ * MySQL takes a row lock for it, so of two requests racing on the same link
+ * exactly one sees `affectedRows = 1`; the other sees 0 and changes nothing.
+ * A read-then-write ("is it unused? then mark it") would let both through.
+ *
+ * Returns the user whose password changed, or null when the token is unknown,
+ * already used or expired — deliberately one answer for all three, since
+ * which of them it was tells a stranger holding a guessed token nothing useful
+ * and tells the real owner nothing they can act on differently.
+ */
+export async function completePasswordReset(
+  tokenHash: string,
+  passwordHash: string,
+  now: Date = new Date()
+): Promise<number | null> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.transaction(async tx => {
+    const [claim] = await tx
+      .update(passwordResetTokens)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(passwordResetTokens.tokenHash, tokenHash),
+          isNull(passwordResetTokens.usedAt),
+          gt(passwordResetTokens.expiresAt, now)
+        )
+      );
+    if (claim.affectedRows !== 1) return null;
+
+    const [row] = await tx
+      .select({ userId: passwordResetTokens.userId })
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.tokenHash, tokenHash))
+      .limit(1);
+    if (!row) return null;
+
+    await tx
+      .update(users)
+      .set({
+        passwordHash,
+        sessionsValidAfter: sessionCutoff(now),
+        updatedAt: now,
+      })
+      .where(eq(users.id, row.userId));
+    // Any other link still in the mailbox dies with this one.
+    await tx
+      .update(passwordResetTokens)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(passwordResetTokens.userId, row.userId),
+          isNull(passwordResetTokens.usedAt)
+        )
+      );
+    return row.userId;
+  });
 }
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
