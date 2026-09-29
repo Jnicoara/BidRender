@@ -1,5 +1,10 @@
 # Materials catalog — Track C plan (2026-09-27)
 
+> **The next Track C batch (wrong numbers, how search reads a count, tests
+> that leave rows behind) is planned in `references/track-c-next-batch-plan.md`
+> (2026-09-29).** It includes a search regression from § 9b's weatherproof
+> rows: "2 gang box" lost `Double-gang box` from its top five.
+
 Plan only. Nothing here is built. Track C rules apply: no migrations or schema
 changes, no deploys, nothing against the live site.
 

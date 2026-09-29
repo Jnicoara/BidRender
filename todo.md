@@ -1803,7 +1803,18 @@ sheet scale were removed afterwards — production back to 0 bid lines, 2 runs.
 - [ ] **`5/6" wafer LED downlight` (the old spelling) reads as a fraction
       and finds nothing.** Split out of the comma item above on 2026-09-26:
       a size-parsing problem, not punctuation. Found by
-      `scripts/catalogRehearsal.mts search`.
+      `scripts/catalogRehearsal.mts search`. Planned 2026-09-29:
+      `references/track-c-next-batch-plan.md` § S2.
+- [ ] **A count number in a search matches inside and at the start of
+      SIZES: "2 gang box", "3 hole", "2 pole 20" lead with the wrong rows.**
+      Found 2026-09-29. "2 gang box" is a REGRESSION from `8c5c478` (the
+      weatherproof rows): `Double-gang box` was 4th at `e70ec15` and is now
+      out of the top five, behind `1/2" weatherproof box, single-gang` — the
+      count "2" matches inside `1/2"`. "3 hole" leads with 3/4" and 3" one-hole
+      straps; "2 pole 20" with `20 ft light pole`. The standard spot-check
+      sweep has none of these queries, which is why it passed. Planned, with
+      the risk to other count searches: `references/track-c-next-batch-plan.md`
+      § S1.
 
 Couplings (sticks minus one per leg, drops included), connectors (one per
 conduit end, by node degree) and straps (one near each box, then spacing)
