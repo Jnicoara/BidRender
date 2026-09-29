@@ -133,7 +133,15 @@ everyone to re-run instead of read.
       as an empty database — a false "never migrated" is an invitation to
       re-run every migration against live data. `references/deploying.md`
       § 10 warns about it until fixed.
-- [ ] **`scripts/schemaDrift.mts` says a missing foreign key's migration is
+- [x] **FIXED 2026-09-29 (plan W3):** `linkOrigins` (`server/schemaCheck.ts`)
+      finds the migration that names each missing key and whether this
+      database ran it, by the migrator's own rule (`pendingMigrations`); the
+      report says "0095\_… adds it — scripts/migrate.mts adds these, do NOT add
+      them by hand" for a pending one, keeps the ALTER for an applied one,
+      and says when no migration declares it. Reproduced on a scratch schema
+      rolled back to 89 of 96: old script printed the false sentence and two
+      ALTERs, new one names 0089 and 0095. The entry:
+- [x] **`scripts/schemaDrift.mts` says a missing foreign key's migration is
       "already recorded as applied" when it is NOT.** Measured 2026-09-29 on
       `bidrender_test_c` with 89 of 96 migrations recorded: it listed
       `takeoff_extra_defaults(userId)` and `takeoff_groups(dropRunTypeId)` as

@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **The database check no longer gives wrong advice before a deploy.** It
+  used to say a database that could not be reached had "never been
+  migrated", and to call a missing link's migration "already applied" when
+  it simply had not run yet — with hand-written fixes that would have
+  broken the real migration. It now says it could not connect, and names
+  which pending migration will add each missing link.
+
 - **A run type bought as sweeps now says "sweep" under its sweep row.** The
   count sentence said "At least 2 90° elbows" beside a row that was a 36"
   sweep. It now names what the type actually buys — sweep or elbow — and

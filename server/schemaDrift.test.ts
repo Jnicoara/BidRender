@@ -38,12 +38,22 @@ import {
   findForeignKeyDrift,
   findSchemaDrift,
   hasForeignKeyDrift,
+  linkOrigins,
   liveDefault,
   liveForeignKeys,
   normalizeColumnType,
   type ForeignKeySpec,
+  type LinkOrigin,
   type LiveColumn,
 } from "./schemaCheck";
+import type { Migration } from "./migrationRun";
+
+/** No missing link has a known origin — for the cases where none is missing. */
+const NO_ORIGINS: ReadonlyMap<string, LinkOrigin> = new Map();
+/** `stamps_fk` was declared by a migration this database HAS run (0004's case). */
+const APPLIED_STAMPS: ReadonlyMap<string, LinkOrigin> = new Map([
+  ["stamps_fk", { tag: "0004_links", pending: false }],
+]);
 
 /** The declared table, from drizzle/schema.ts itself — not a hand-made copy. */
 function declared(name: string) {
@@ -529,7 +539,9 @@ describe.skipIf(!hasDb)("the database matches the schema", () => {
 
   it("has every foreign key the schema declares, with its delete rule", async () => {
     const links = await findForeignKeyDrift();
-    expect(describeForeignKeyDrift(links)).toMatch(/^Foreign keys match/);
+    expect(describeForeignKeyDrift(links, NO_ORIGINS)).toMatch(
+      /^Foreign keys match/
+    );
     expect(links.liveCount).toBeGreaterThan(0);
   });
 
@@ -582,7 +594,9 @@ describe("foreign keys — the links a column check cannot see", () => {
   it("agrees when the database has every declared link", () => {
     const drift = compareForeignKeys([link()], [link()]);
     expect(hasForeignKeyDrift(drift)).toBe(false);
-    expect(describeForeignKeyDrift(drift)).toMatch(/^Foreign keys match/);
+    expect(describeForeignKeyDrift(drift, NO_ORIGINS)).toMatch(
+      /^Foreign keys match/
+    );
   });
 
   it("compares what a link does, not what it is called", () => {
@@ -596,12 +610,74 @@ describe("foreign keys — the links a column check cannot see", () => {
       [link()]
     );
     expect(drift.missing.map(l => l.table)).toEqual(["takeoff_stamps"]);
-    const message = describeForeignKeyDrift(drift);
+    const message = describeForeignKeyDrift(drift, APPLIED_STAMPS);
     expect(message).toContain("1 missing");
     expect(message).toContain(
       "ALTER TABLE `takeoff_stamps` ADD CONSTRAINT `stamps_fk` FOREIGN KEY (`sheetId`) REFERENCES `bid_pdf_sheets` (`id`) ON DELETE CASCADE;"
     );
     expect(message).not.toContain("db:push`");
+    expect(message).toContain("(0004_links) is already");
+  });
+
+  /*
+    The false sentence (plan W3, measured 2026-09-29 on bidrender_test_c at
+    89 of 96): two links missing because 0089 and 0095 had not run, reported
+    as "the migration that declared each one is already recorded as applied",
+    with ALTERs that would have made those migrations fail. Red before the
+    fix: the message was that fixed sentence whatever the origin.
+  */
+  it("says a link from a PENDING migration will be added by migrate.mts — and prints no ALTER for it", () => {
+    const drift = compareForeignKeys(
+      [link(), link({ table: "takeoff_stamps", name: "stamps_fk" })],
+      [link()]
+    );
+    const message = describeForeignKeyDrift(
+      drift,
+      new Map([["stamps_fk", { tag: "0095_stamps", pending: true }]])
+    );
+    expect(message).not.toMatch(/already\s+recorded as applied/);
+    expect(message).toContain("0095_stamps adds takeoff_stamps(sheetId)");
+    expect(message).toContain("scripts/migrate.mts adds these");
+    expect(message).not.toContain("ALTER TABLE `takeoff_stamps`");
+  });
+
+  it("says so when no migration declares a link at all", () => {
+    const drift = compareForeignKeys(
+      [link(), link({ table: "takeoff_stamps", name: "stamps_fk" })],
+      [link()]
+    );
+    const message = describeForeignKeyDrift(drift, NO_ORIGINS);
+    expect(message).not.toMatch(/already\s+recorded as applied/);
+    expect(message).toContain("No migration in drizzle/ declares these");
+  });
+
+  it("finds the migration that names a link, and whether this database ran it", () => {
+    const migrations: Migration[] = [
+      { tag: "0089_a", when: 100, statements: ["CREATE TABLE `x` (`id` int)"] },
+      {
+        tag: "0095_b",
+        when: 200,
+        statements: [
+          "ALTER TABLE `takeoff_stamps` ADD CONSTRAINT `stamps_fk` FOREIGN KEY (`sheetId`) REFERENCES `bid_pdf_sheets`(`id`)",
+        ],
+      },
+    ];
+    const missing = [
+      link({ table: "takeoff_stamps", name: "stamps_fk" }),
+      link({ name: "nobody_fk" }),
+    ];
+    // Ran up to 0089: 0095 is pending.
+    expect(linkOrigins(missing, migrations, 100)).toEqual(
+      new Map([
+        ["stamps_fk", { tag: "0095_b", pending: true }],
+        ["nobody_fk", null],
+      ])
+    );
+    // Ran everything: applied.
+    expect(linkOrigins(missing, migrations, 200).get("stamps_fk")).toEqual({
+      tag: "0095_b",
+      pending: false,
+    });
   });
 
   it("reports a link whose delete rule differs", () => {
@@ -610,7 +686,7 @@ describe("foreign keys — the links a column check cannot see", () => {
       [link({ onDelete: "SET NULL" })]
     );
     expect(drift.wrongRule).toHaveLength(1);
-    expect(describeForeignKeyDrift(drift)).toContain(
+    expect(describeForeignKeyDrift(drift, NO_ORIGINS)).toContain(
       "schema ON DELETE CASCADE, database SET NULL"
     );
   });
@@ -625,7 +701,7 @@ describe("foreign keys — the links a column check cannot see", () => {
 
   it("SHOUTS when a database has no links at all — a CREATE TABLE … LIKE copy", () => {
     const drift = compareForeignKeys([link(), link({ table: "x" })], []);
-    const message = describeForeignKeyDrift(drift);
+    const message = describeForeignKeyDrift(drift, NO_ORIGINS);
     expect(message).toContain("HAS NO FOREIGN KEYS AT ALL — 0 of 2");
     expect(message).toContain("Rebuild it from the migrations");
     expect(hasForeignKeyDrift(drift)).toBe(true);

@@ -83,6 +83,17 @@ returns "never migrated". Then remove the warning in `references/deploying.md`
 
 ### W3. `schemaDrift.mts` says a missing key's migration "is already recorded as applied" when it is not
 
+> **BUILT 2026-09-29.** `linkOrigins` matches each missing key to the
+> migration that names its constraint and decides pending/applied with
+> `pendingMigrations` — the same rule `migrate.mts` uses. `describeForeignKeyDrift`
+> now REQUIRES the origins, so no caller can fall back to the fixed sentence.
+> Tests in `server/schemaDrift.test.ts`: 4 red on `d3da6e9`. End to end on a
+> scratch schema migrated to 96, ledger rolled back to 89 and the two keys
+> dropped: the old script printed "already recorded as applied" and two
+> ALTERs; the new one prints "Not applied yet — scripts/migrate.mts adds
+> these … 0089_takeoff_extra_defaults adds …, 0095_group_drop_run_type_fk
+> adds …" and no ALTER.
+
 **What is wrong.** Measured 2026-09-29 on `bidrender_test_c` at 89 of 96: it
 listed two missing foreign keys and said the migrations declaring them were
 applied, then printed hand-written `ALTER TABLE … ADD CONSTRAINT` lines. Both

@@ -37,6 +37,7 @@
  * not an answer to it.
  */
 import "dotenv/config";
+import path from "node:path";
 import {
   appliedMigrationCount,
   describeDrift,
@@ -44,7 +45,10 @@ import {
   findForeignKeyDrift,
   findSchemaDrift,
   hasForeignKeyDrift,
+  lastMigrationAt,
+  linkOrigins,
 } from "../server/schemaCheck";
+import { readMigrations } from "../server/migrationRun";
 
 function where(): string {
   try {
@@ -90,6 +94,13 @@ console.log(describeDrift(drift));
 // The links between tables, which the column check above cannot see: a copy
 // made with CREATE TABLE … LIKE has every column right and no links at all.
 const links = await findForeignKeyDrift();
-console.log(describeForeignKeyDrift(links));
+// Which migration adds each missing link, and whether it has run here — so a
+// link that is merely pending is not reported as needing a hand-written ALTER.
+const origins = linkOrigins(
+  links.missing,
+  readMigrations(path.resolve(import.meta.dirname, "..", "drizzle")),
+  await lastMigrationAt()
+);
+console.log(describeForeignKeyDrift(links, origins));
 
 process.exit(drift.length === 0 && !hasForeignKeyDrift(links) ? 0 : 1);
