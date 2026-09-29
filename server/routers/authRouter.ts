@@ -9,7 +9,7 @@ import * as db from "../db";
 import { nanoid } from "nanoid";
 import { toPublicUser } from "@shared/publicUser";
 import { PASSWORD_MAX_LENGTH, passwordProblem } from "@shared/passwordRules";
-import { emailLinkBase, sendEmail } from "../email";
+import { emailAvailability, emailLinkBase, sendEmail } from "../email";
 import {
   RESET_TOKEN_TTL_MS,
   hashResetToken,
@@ -53,6 +53,10 @@ const overResetSubmitLimit = createRateLimiter({
 
 const TOO_MANY_RESETS =
   "Too many password reset attempts. Wait an hour and try again.";
+
+/** Said when email is capped or paused — the plain words the owner asked for. */
+const COULD_NOT_SEND =
+  "We couldn't send the email right now. Please try again later.";
 
 export const authRouter = router({
   /**
@@ -245,10 +249,31 @@ export const authRouter = router({
           message: TOO_MANY_RESETS,
         });
 
+      /*
+        Asked BEFORE the address is looked up, so both answers below are the
+        same for every address: they describe this server, not the account.
+        A send that fails later for one real account is logged by the email
+        door and not reported here — reporting it would tell a stranger that
+        the address has an account (see the owner's answers, 2026-09-29).
+      */
+      const availability = emailAvailability({ now });
       const base = emailLinkBase();
-      if (!base) {
-        console.warn("[auth] password reset asked for, but email is off");
+      if (availability.status === "off" || !base) {
+        console.warn(
+          `[auth] password reset asked for, but email is off: ${
+            availability.status === "off" ? availability.why : "no link base"
+          }`
+        );
         return { emailing: false } as const;
+      }
+      if (availability.status === "later") {
+        console.error(
+          `[auth] password reset refused, email paused: ${availability.why}`
+        );
+        throw new TRPCError({
+          code: "SERVICE_UNAVAILABLE",
+          message: COULD_NOT_SEND,
+        });
       }
 
       const user = await db.getUserByEmail(email);

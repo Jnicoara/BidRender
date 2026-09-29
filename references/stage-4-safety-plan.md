@@ -31,11 +31,15 @@ starts with what already exists, measured against the code on `local-dev` at
 
 These refine § "Shape of each code piece" item 1 and § E below.
 
-1. **Mail comes from `no-reply@bidridge.com`.** The root domain is verified in
-   Resend, whose bounce and SPF records sit on the `send.` subdomain. Measured
-   2026-09-29: bidridge.com had no MX, no TXT and no `_dmarc` record, so
-   nothing clashes — and nothing receives mail, so a reply to `no-reply@` goes
-   nowhere. Invites will want a real Reply-To.
+1. **Mail comes from `no-reply@mail.bidridge.com`.** _Overridden later the
+   same day:_ this line first said `no-reply@bidridge.com` with the root domain
+   verified. The owner verified the SUBDOMAIN `mail.bidridge.com` in Resend
+   (us-east-1) instead, so the From address is
+   `BidRidge <no-reply@mail.bidridge.com>`, built into
+   `server/email/config.ts` as the default. Measured 2026-09-29 before that:
+   bidridge.com had no MX, no TXT and no `_dmarc` record — and nothing receives
+   mail, so a reply to `no-reply@` goes nowhere. Invites will want a real
+   Reply-To.
 2. **Changing a password in Settings also signs out every OTHER device**; the
    device making the change gets a fresh session and stays in. Same mechanism
    as a reset (`users.sessionsValidAfter`).
@@ -44,6 +48,38 @@ These refine § "Shape of each code piece" item 1 and § E below.
    Live and staging get separate Resend keys so either can be revoked alone.
 4. **A reset link is single-use and ends every old session.** Owner's
    condition before the build, with a test for each half.
+
+5. **Resend free tier, pay-as-you-go OFF:** 100 a day, 3,000 a month, 10 a
+   second; a send past it fails rather than bills. The email door stops at
+   100 / 3,000 per instance, treats a provider quota refusal as a pause for
+   everybody until the quota resets, logs every failed send, and sends to
+   exactly ONE address per call.
+6. **A failed send says so, plainly, without revealing accounts.** "We
+   couldn't send the email right now. Please try again later." is shown when
+   email is capped or paused — decided BEFORE the address is looked up, so
+   every address gets the same answer. A one-off failure on one real
+   account's send is logged but not shown, because showing it would tell a
+   stranger that the address has an account. Owner may override.
+7. **The key is `RESEND_API_KEY`, a Run Time encrypted secret the owner adds
+   in DigitalOcean.** Never committed, logged or pasted in chat. Local and test
+   runs never call Resend, even with a key present (stub mode). Production
+   without the key answers "Password reset by email is not set up on this
+   server yet" instead of failing.
+
+**Settings, per app** (Apps → the app → Settings → App-Level Environment
+Variables; saving one redeploys that app):
+
+| App                 | Setting                   | Value                               |
+| ------------------- | ------------------------- | ----------------------------------- |
+| `bidrender-staging` | `RESEND_API_KEY`          | the staging key — Run Time, Encrypt |
+| `bidrender-staging` | `STAGING_EMAIL_ALLOWLIST` | the owner's address — Run Time      |
+| `bidrender` (live)  | `RESEND_API_KEY`          | the live key — Run Time, Encrypt    |
+
+Nothing else is needed: the From address and each app's link domain
+(`https://staging.bidridge.com`, `https://bidridge.com`) are defaults in
+`server/email/config.ts`, overridable with `EMAIL_FROM` / `APP_BASE_URL`.
+**Neither key does anything until code carrying this branch is deployed to
+that app** — adding one early is harmless.
 
 Found while planning: `signSession` set no issued-at time, so no session could
 be told apart by age. The reset work adds `setIssuedAt()`, and a token WITHOUT

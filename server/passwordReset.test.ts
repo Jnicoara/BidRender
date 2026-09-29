@@ -37,16 +37,27 @@ import { hashResetToken } from "./passwordReset";
 import { passwordResetTokens, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 
-const { sent } = vi.hoisted(() => ({
+const { sent, forcePaused } = vi.hoisted(() => ({
   sent: [] as { to: string; text: string }[],
+  /** Set to make the next availability check answer "later". */
+  forcePaused: { on: false },
 }));
-vi.mock("./email", async importOriginal => ({
-  ...(await importOriginal<typeof import("./email")>()),
-  sendEmail: vi.fn(async (message: { to: string; text: string }) => {
-    sent.push({ to: message.to, text: message.text });
-    return { status: "sent", id: "test" };
-  }),
-}));
+vi.mock("./email", async importOriginal => {
+  const real = await importOriginal<typeof import("./email")>();
+  return {
+    ...real,
+    emailAvailability: vi.fn(
+      (options?: Parameters<typeof real.emailAvailability>[0]) =>
+        forcePaused.on
+          ? { status: "later", why: "daily cap of 100 reached" }
+          : real.emailAvailability(options)
+    ),
+    sendEmail: vi.fn(async (message: { to: string; text: string }) => {
+      sent.push({ to: message.to, text: message.text });
+      return { status: "sent", id: "test" };
+    }),
+  };
+});
 
 const USER = 8798;
 const OPEN_ID = `test-reset-${USER}`;
@@ -127,8 +138,9 @@ async function requestLink(): Promise<string> {
 const savedEnv = { ...process.env };
 
 beforeAll(async () => {
-  process.env.RESEND_API_KEY = "re_test_key";
-  process.env.EMAIL_FROM = "BidRidge <no-reply@bidridge.com>";
+  // A test run is stub mode (server/email/config.ts): nothing could reach
+  // Resend even without the mock. The base is set so the link is checked
+  // against the live domain rather than the localhost default.
   process.env.APP_BASE_URL = "https://bidridge.com";
   if (!hasDb) return;
   const database = await getDb();
@@ -208,9 +220,10 @@ withDb("asking for a reset link", () => {
     expect(sent).toHaveLength(3);
   });
 
-  it("says email is off — for every address alike — when this server cannot send", async () => {
-    const base = process.env.APP_BASE_URL;
-    delete process.env.APP_BASE_URL;
+  it("says email is off — for every address alike — when production has no key", async () => {
+    const nodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    delete process.env.RESEND_API_KEY;
     try {
       const reply = await publicCaller().caller.auth.requestPasswordReset({
         email: EMAIL,
@@ -218,7 +231,25 @@ withDb("asking for a reset link", () => {
       expect(reply).toEqual({ emailing: false });
       expect(sent).toHaveLength(0);
     } finally {
-      process.env.APP_BASE_URL = base;
+      process.env.NODE_ENV = nodeEnv;
+    }
+  });
+
+  it("says plainly it couldn't send when email is capped or paused, and looks nobody up", async () => {
+    forcePaused.on = true;
+    try {
+      for (const email of [EMAIL, `nobody-${USER}@example.com`])
+        await expect(
+          publicCaller().caller.auth.requestPasswordReset({ email })
+        ).rejects.toThrow("We couldn't send the email right now");
+      expect(sent).toHaveLength(0);
+      const rows = await (await getDb())!
+        .select()
+        .from(passwordResetTokens)
+        .where(eq(passwordResetTokens.userId, USER));
+      expect(rows).toHaveLength(0);
+    } finally {
+      forcePaused.on = false;
     }
   });
 });
