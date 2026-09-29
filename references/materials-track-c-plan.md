@@ -338,6 +338,12 @@ fault in § 3.
 
 ### Order of work (three deploy steps, per CLAUDE.md)
 
+> **2026-09-29, owner's answer: the migration adds `teeBody` ONLY.** Not
+> `ll` / `lr` / `cBody` for a pull point (§ 7, L5) — those get their own
+> additive migration when somebody builds that feature, so the enum never
+> carries roles nothing writes. File: `drizzle/0096_tee_body_role.sql`,
+> rehearsed on a restored live backup before staging.
+
 1. **Track A: additive migration**, appending `teeBody` to
    `bid_line_items.runMaterialRole`. Appended, so every stored value keeps its
    index, like 0084/0085. No UPDATE. It goes out BEFORE the code.
@@ -751,6 +757,8 @@ why before going on.
   It needs a new `runMaterialRole` (Track A migration, three-step deploy) and
   a way to know which side the pipe turns to, which the trace does not record.
   The rows are useful by hand without it.
+  _2026-09-29: the `teeBody` migration (0096) deliberately does NOT add these
+  roles too — see § 4 "Order of work". This stays its own migration._
 
 ---
 

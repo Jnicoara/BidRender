@@ -27,6 +27,30 @@ starts with what already exists, measured against the code on `local-dev` at
 7. **Terms page later, but it must exist before any sharing is turned on.**
    Recorded in `todo.md` § Pending.
 
+## The owner's answers (2026-09-29) — email and password reset (piece 1)
+
+These refine § "Shape of each code piece" item 1 and § E below.
+
+1. **Mail comes from `no-reply@bidridge.com`.** The root domain is verified in
+   Resend, whose bounce and SPF records sit on the `send.` subdomain. Measured
+   2026-09-29: bidridge.com had no MX, no TXT and no `_dmarc` record, so
+   nothing clashes — and nothing receives mail, so a reply to `no-reply@` goes
+   nowhere. Invites will want a real Reply-To.
+2. **Changing a password in Settings also signs out every OTHER device**; the
+   device making the change gets a fresh session and stays in. Same mechanism
+   as a reset (`users.sessionsValidAfter`).
+3. **Staging delivers only to an allow-list** (`STAGING_EMAIL_ALLOWLIST`,
+   starting with the owner's address). Anything else is logged as not sent.
+   Live and staging get separate Resend keys so either can be revoked alone.
+4. **A reset link is single-use and ends every old session.** Owner's
+   condition before the build, with a test for each half.
+
+Found while planning: `signSession` set no issued-at time, so no session could
+be told apart by age. The reset work adds `setIssuedAt()`, and a token WITHOUT
+one is refused once `sessionsValidAfter` is set — that is every session issued
+before the change. The reset link is built from `APP_BASE_URL`, never from the
+request's Host header, which an attacker controls.
+
 ---
 
 ## What already exists
