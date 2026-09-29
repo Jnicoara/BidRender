@@ -1018,7 +1018,8 @@ function scoreItem<T extends SearchableItem>(
       asWord
         ? matchTier(term, indexed.descNorm, indexed.descWords, indexed.text)
         : termTier(term, indexed);
-    let typedTier = tier(typed);
+    const typedPoints = TYPED_POINTS[tier(typed)];
+    let bestForToken = typedPoints;
     // A finished one-letter word that only STARTS a word of the name ranks
     // like a match anywhere in it (tier 5), so the name holding it whole
     // leads. Demoted, never dropped: the item still qualifies, so no search
@@ -1026,18 +1027,22 @@ function scoreItem<T extends SearchableItem>(
     // body tied at tier 3 on "conduit" and the C body could not be asked for.
     if (
       finishedLetter &&
-      typedTier >= 1 &&
-      typedTier <= 3 &&
+      typedPoints >= TYPED_POINTS[3] &&
       !indexed.descWords.includes(typed)
     )
-      typedTier = 5;
-    let bestForToken = TYPED_POINTS[typedTier];
+      bestForToken = TYPED_POINTS[5];
 
     // No alias can score more than ALIAS_POINTS[1], so once the typed word
     // has reached it the alias loop cannot change the answer. Skipping it is
     // what keeps a one-letter query — which expands to hundreds of aliases —
     // inside a frame on a 2,000-row catalog.
-    if (bestForToken >= ALIAS_POINTS[1]) {
+    //
+    // Decided on the points BEFORE the demotion above. Deciding on the demoted
+    // points ran the alias loop for every row a finished letter demoted, and
+    // doubled the cost of "c b" (36 -> 64 ms at 1,455 rows, measured
+    // 2026-09-28 by catalogScale.test.ts's probe). Skipping it cannot reorder
+    // anything: an alias tops out at 70, below the 80 the whole-word row keeps.
+    if (typedPoints >= ALIAS_POINTS[1]) {
       totalScore += bestForToken;
       continue;
     }
