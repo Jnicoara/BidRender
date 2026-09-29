@@ -35,6 +35,10 @@ const HEADERS = [
   // Derived by the app's own materialTypeName, never by a second rule here.
   "Type",
   "Name",
+  // The shipped row's description. Beside the name because some of them are
+  // instructions to the pricer — "Priced with its cover and gasket" — and a
+  // note past the price column is a note nobody reads before typing a price.
+  "Notes",
   "Size",
   "Unit of sale",
   "NEW",
@@ -45,7 +49,19 @@ const HEADERS = [
   "Pack price",
   "Price per unit",
 ];
-const WIDTHS = [34, 24, 26, 44, 12, 12, 7, 11, 40, 18, 10, 12, 14];
+const WIDTHS = [34, 24, 26, 44, 36, 12, 12, 7, 11, 40, 18, 10, 12, 14];
+if (WIDTHS.length !== HEADERS.length)
+  throw new Error("writeWorkbook: one width per header");
+
+/**
+ * Column numbers by header, so inserting a column cannot leave a cell or the
+ * per-unit formula pointing at its neighbour. The formula's letters come from
+ * here too — they were typed as L and K until the Notes column moved them.
+ */
+const COL = Object.fromEntries(HEADERS.map((h, i) => [h, i + 1]));
+const letter = n => String.fromCharCode(64 + n);
+const PACK_PRICE = letter(COL["Pack price"]);
+const PACK_QTY = letter(COL["Pack qty"]);
 
 /**
  * Where a row gets priced.
@@ -213,31 +229,38 @@ function buildSheet(name, rows, note) {
       ...row,
       name: row.packAs ?? row.name,
     });
-    ws.getCell(r, 1).value = row.parent;
-    ws.getCell(r, 2).value = row.category;
-    ws.getCell(r, 3).value = row.type;
-    ws.getCell(r, 4).value = row.name;
-    ws.getCell(r, 5).value = row.size;
-    ws.getCell(r, 6).value = row.unit;
-    ws.getCell(r, 7).value = row.isNew ? "NEW" : "";
-    ws.getCell(r, 8).value = priceAt(row);
-    ws.getCell(r, 9).value = searchTerm(row);
-    ws.getCell(r, 10).value = packText;
-    ws.getCell(r, 11).value = packQty;
-    ws.getCell(r, 12).value = null; // the only column to type in
-    ws.getCell(r, 13).value = {
-      formula: `IFERROR(IF(N(L${r})=0,"",L${r}/K${r}),"")`,
+    const cell = header => ws.getCell(r, COL[header]);
+    cell("Parent").value = row.parent;
+    cell("Category").value = row.category;
+    cell("Type").value = row.type;
+    cell("Name").value = row.name;
+    cell("Notes").value = row.notes ?? "";
+    cell("Size").value = row.size;
+    cell("Unit of sale").value = row.unit;
+    cell("NEW").value = row.isNew ? "NEW" : "";
+    cell("Price at").value = priceAt(row);
+    cell("Home Depot search term").value = searchTerm(row);
+    cell("Pack size").value = packText;
+    cell("Pack qty").value = packQty;
+    cell("Pack price").value = null; // the only column to type in
+    cell("Price per unit").value = {
+      formula: `IFERROR(IF(N(${PACK_PRICE}${r})=0,"",${PACK_PRICE}${r}/${PACK_QTY}${r}),"")`,
     };
+    const WRAP = new Set([
+      COL["Name"],
+      COL["Notes"],
+      COL["Home Depot search term"],
+    ]);
     for (let c = 1; c <= HEADERS.length; c++) {
-      const cell = ws.getCell(r, c);
-      cell.font = { name: "Arial", size: 10 };
-      cell.alignment = { vertical: "top", wrapText: c === 4 || c === 9 };
+      const each = ws.getCell(r, c);
+      each.font = { name: "Arial", size: 10 };
+      each.alignment = { vertical: "top", wrapText: WRAP.has(c) };
     }
-    if (row.isNew) ws.getCell(r, 7).fill = NEW_FILL;
-    ws.getCell(r, 12).fill = INPUT_FILL;
-    ws.getCell(r, 12).numFmt = "$#,##0.00";
-    ws.getCell(r, 13).numFmt = "$#,##0.0000";
-    ws.getCell(r, 11).numFmt = "0";
+    if (row.isNew) cell("NEW").fill = NEW_FILL;
+    cell("Pack price").fill = INPUT_FILL;
+    cell("Pack price").numFmt = "$#,##0.00";
+    cell("Price per unit").numFmt = "$#,##0.0000";
+    cell("Pack qty").numFmt = "0";
   });
   ws.autoFilter = {
     from: { row: 2, column: 1 },
@@ -287,6 +310,10 @@ const lines = [
     "Paste into homedepot.com. Blank where the row says Supplier.",
   ],
   [
+    "Notes",
+    "What the app says about the row. Read it before pricing: some say what the price must include — a conduit body is 'Priced with its cover and gasket', so price the three together.",
+  ],
+  [
     "NEW",
     "Not in the app's catalog yet. Blank means it already exists with that exact name, unit and category.",
   ],
@@ -326,7 +353,11 @@ lines.forEach((pair, i) => {
   legend.getCell(r, 2).font = { name: "Arial", size: 10 };
   legend.getCell(r, 2).alignment = { wrapText: true, vertical: "top" };
 });
-legend.getCell(16, 1).fill = INPUT_FILL;
+// Found by label: it was row 16, and the Notes line moved it.
+legend.getCell(
+  lines.findIndex(pair => pair[0] === "New categories") + 1,
+  1
+).fill = INPUT_FILL;
 
 wb.xlsx.writeFile(OUT).then(() => {
   console.log(`wrote ${OUT}`);

@@ -1,5 +1,5 @@
 Category: Boxes
-Items: 85
+Items: 90
 
 Category | Name | Size
 Boxes | 4-gang box | -
@@ -23,6 +23,10 @@ Boxes | 1" FS cast box | 1"
 Boxes | 1/2" FS cast box, 2-gang | 1/2"
 Boxes | 3/4" FS cast box, 2-gang | 3/4"
 Boxes | Handy box | -
+Boxes | Handy box cover, blank | -
+Boxes | Handy box cover, decorator | -
+Boxes | Handy box cover, duplex | -
+Boxes | Handy box cover, single toggle | -
 Boxes | Low-voltage mud ring | -
 Boxes | Masonry box, double-gang | -
 Boxes | Masonry box, single-gang | -
@@ -52,6 +56,7 @@ Boxes | Retrofit bar hanger | -
 Boxes | 4" round blank cover | 4"
 Boxes | 4" round extension ring | 4"
 Boxes | Shallow round box | -
+Boxes | Siding mounting block | -
 Boxes | Single-gang box | -
 Boxes | Single-gang box extender | -
 Boxes | Single-gang box, deep | -

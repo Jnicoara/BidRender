@@ -40,6 +40,22 @@ This is the human-readable companion to the git history — read this to see wha
   now shows each page's paper size, and on a size sets are commonly reduced
   to it says so in amber until the scale has been checked against a
   dimension you know.
+- **The pricing spreadsheet has a Notes column next to each item's name**,
+  showing what the app says about that item. Some notes are instructions for
+  whoever fills in prices. A conduit body, for example, is "Priced with its
+  cover and gasket", so it should be priced as all three together, not as the
+  bare body.
+- **Handy box covers and a siding mounting block.** The handy box used to ship
+  with no cover at all, so one on a bid could not be finished; blank, duplex,
+  single-toggle and decorator covers now sit beside it. The siding mounting
+  block is what every outdoor light or receptacle on vinyl siding sits on.
+  Eight existing boxes also now say what the rows next to them already said:
+  the 4-11/16" box is 2-1/8" deep, every steel pull box is NEMA 1 (indoor),
+  and the PVC pull boxes are NEMA 4X.
+- **Every LB conduit body now says it is priced with its cover and gasket**,
+  the same as the T bodies. The bid never adds a separate cover for a conduit
+  body, so a price for the bare body would have left the cover off every job.
+  A check now fails if any future body shape (LL, LR, C) ships without it.
 - **T conduit bodies in the catalog.** A T body for EMT, rigid, IMC and both
   PVC schedules, at every trade size from 1/2" to 4": 45 generic, unpriced
   rows, each priced with its cover and gasket. Searching "tee body",

@@ -45,6 +45,8 @@ type Row = {
   job: string;
   /** The sheet's old name, for a row that moved into the catalog renamed. */
   packAs?: string;
+  /** The shipped row's description, for the sheet's Notes column. */
+  notes?: string;
 };
 
 const rows: Row[] = [];
@@ -1537,6 +1539,24 @@ const PACK_AS = new Map(
 for (const r of rows) {
   const sheetName = PACK_AS.get(r.name);
   if (sheetName) r.packAs = sheetName;
+}
+
+/*
+  The shipped description goes in the sheet's Notes column (owner, 2026-09-27,
+  materials-track-c-plan.md § 5, C2). Several descriptions are instructions to
+  whoever PRICES the row — "Priced with its cover and gasket", "The box only" —
+  and until then the sheet did not show them, so a bare conduit body price
+  from a rigid catalog would have gone in looking complete.
+*/
+const DESCRIPTION = new Map(
+  BASELINE_MATERIALS.filter(m => m.description).map(m => [
+    m.name,
+    m.description!,
+  ])
+);
+for (const r of rows) {
+  const notes = DESCRIPTION.get(r.name);
+  if (notes) r.notes = notes;
 }
 
 const generic = sortRows(rows);

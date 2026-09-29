@@ -167,6 +167,20 @@ describe("every part the bend count can ask for is shipped", () => {
     expect(missing).toEqual([]);
   });
 
+  it("says every conduit body is priced with its cover and gasket", () => {
+    // The takeoff adds no cover line for a body, so the price has to include
+    // it (plan § 5, C1). Matches by the name's ending rather than by shape, so
+    // an LL, LR or C family added later without the description goes red.
+    const bodies = BASELINE_MATERIALS.filter(m =>
+      m.name.endsWith(" conduit body")
+    );
+    expect(bodies.length).toBeGreaterThanOrEqual(90);
+    const undescribed = bodies
+      .filter(m => m.description !== "Priced with its cover and gasket.")
+      .map(m => m.name);
+    expect(undescribed).toEqual([]);
+  });
+
   it("ships every pull box the NEC sizing can propose", () => {
     const missing = raceways
       .map(r => pullBoxFor(`${r.size} ${r.family}`, null).name)
