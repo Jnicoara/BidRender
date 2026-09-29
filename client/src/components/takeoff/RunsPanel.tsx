@@ -481,9 +481,15 @@ function Footage({
           )}
         </span>
       </div>
+      {/* Short on each line; the WHY is said once under the totals and on
+          hover. Repeating "extra is material only" on every line was noise
+          (seen on screen, 2026-09-29). */}
       {extra > 0 && (
-        <div className="text-right text-[0.7rem] text-muted-foreground/80">
-          labor on {exact(installed)} ft installed — extra is material only
+        <div
+          className="text-right text-[0.7rem] text-muted-foreground/80"
+          title="Extra is bought but not installed, so it carries no install hours. Makeup is installed and does."
+        >
+          labor on {exact(installed)} ft
         </div>
       )}
     </div>
@@ -584,8 +590,10 @@ function inheritedText(resolved: ResolvedExtra, format: (n: number) => string) {
         : "starter";
   return `${from} ${format(resolved.value)}`;
 }
-const pctLabel = (f: number) => `${Math.round(f * 10000) / 100}%`;
-const inLabel = (n: number) => `${n} in`;
+// Bare numbers: the field's own suffix ("%", "in") names the unit, and a
+// second one in the placeholder read "starter 5% %" (seen on screen).
+const pctLabel = (f: number) => String(Math.round(f * 10000) / 100);
+const inLabel = (n: number) => String(n);
 
 /**
  * THIS RUN'S own extra and makeup — the nearest level of the chain (owner,
@@ -2020,20 +2028,6 @@ export function RunsPanel({
                           run's own below.
                         </p>
                       )}
-                      {/* A typed run always says so; the offer to type one
-                          over a good measurement waits until the run is
-                          opened, since it is the exception. */}
-                      {onSetTypedLength &&
-                        (isSelected || run.typedLengthInches != null) && (
-                          <TypedLength run={run} onSet={onSetTypedLength} />
-                        )}
-                      {onSetRunExtras && isSelected && run.extras && (
-                        <RunExtrasEditor
-                          run={{ ...run, extras: run.extras }}
-                          customHeightTypes={customHeightTypes}
-                          onSet={onSetRunExtras}
-                        />
-                      )}
                       {/*
                       WIRE, OR THE REASON THERE IS NONE.
 
@@ -2163,6 +2157,28 @@ export function RunsPanel({
                             {feet(wireGround(run))}
                           </span>
                         </div>
+                      )}
+
+                      {/*
+                        The run's own length and extras come AFTER every
+                        footage line, never between them: placed after the
+                        conduit line they split the arithmetic in two, and the
+                        wire line read as belonging to the editor (seen on
+                        screen, 2026-09-29).
+
+                        A typed run always says so; the offer to type one over
+                        a good measurement waits until the run is opened.
+                      */}
+                      {onSetTypedLength &&
+                        (isSelected || run.typedLengthInches != null) && (
+                          <TypedLength run={run} onSet={onSetTypedLength} />
+                        )}
+                      {onSetRunExtras && isSelected && run.extras && (
+                        <RunExtrasEditor
+                          run={{ ...run, extras: run.extras }}
+                          customHeightTypes={customHeightTypes}
+                          onSet={onSetRunExtras}
+                        />
                       )}
 
                       {/*
@@ -2612,6 +2628,14 @@ export function RunsPanel({
             makeup={totals.wireMakeupFeet}
             total={totals.wireBoughtFeet}
           />
+          {totals.conduitExtraFeet +
+            totals.cableExtraFeet +
+            totals.wireExtraFeet >
+            0 && (
+            <p className="text-[0.7rem] text-muted-foreground pt-1">
+              Extra is bought, not installed — labor is on the installed feet.
+            </p>
+          )}
           {totals.noExtraCount > 0 && (
             <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
               <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />

@@ -1121,7 +1121,10 @@ export default function BidsPage({
                                   }
                                 >
                                   {round(line.breakdown.totalLaborHours, 2)} h
+                                  {/* Only when there ARE hours: "0 h on 111 ft"
+                                      said where nothing sits (seen on screen). */}
                                   {line.laborQty !== null &&
+                                    line.breakdown.totalLaborHours > 0 &&
                                     Number(line.laborQty) !==
                                       Number(line.qty) && (
                                       <span className="block font-sans text-[0.65rem]">

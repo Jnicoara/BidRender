@@ -33,17 +33,21 @@ import { CompanyDefaultNotice } from "@/components/CompanyDefaultNotice";
 import { asPercent, fromPercent } from "@/lib/inlineEdit";
 import type { ResolvedExtra } from "@shared/runExtras";
 
-/** "10%", "18 in (1'-6")", in the estimator's words. */
+/** "10%", in the estimator's words. */
 function pctText(fraction: number) {
   return `${Math.round(fraction * 10000) / 100}%`;
 }
+/**
+ * The bare number of inches, for a placeholder. The field already says "in"
+ * beside it; "starter 18 in (1'-6")" was cut off in the box (looked at on
+ * screen, 2026-09-29).
+ */
 function inchesText(inches: number) {
-  const feet = Math.floor(inches / 12);
-  const rest = inches % 12;
-  if (inches < 12) return `${inches} in`;
-  return rest === 0
-    ? `${inches} in (${feet} ft)`
-    : `${inches} in (${feet}'-${rest}")`;
+  return String(inches);
+}
+/** The bare percent, for a placeholder beside a "%" suffix. */
+function pctNumber(fraction: number) {
+  return String(Math.round(fraction * 10000) / 100);
 }
 
 /** What an empty field falls back to, as its placeholder. */
@@ -157,7 +161,7 @@ export function ExtrasSection() {
               ? null
               : asPercent(stored.conduitExtraPct)
           }
-          placeholder={fallback(effective.conduitExtraPct, pctText)}
+          placeholder={fallback(effective.conduitExtraPct, pctNumber)}
           max={100}
           onSave={v => setExtras.mutate({ conduitExtraPct: fromPercent(v) })}
           onClear={() => setExtras.mutate({ conduitExtraPct: null })}
@@ -169,7 +173,7 @@ export function ExtrasSection() {
           value={
             stored.wireExtraPct === null ? null : asPercent(stored.wireExtraPct)
           }
-          placeholder={fallback(effective.wireExtraPct, pctText)}
+          placeholder={fallback(effective.wireExtraPct, pctNumber)}
           max={100}
           onSave={v => setExtras.mutate({ wireExtraPct: fromPercent(v) })}
           onClear={() => setExtras.mutate({ wireExtraPct: null })}
@@ -256,7 +260,9 @@ export function ExtrasSection() {
                       <InlineNumberField
                         value={own.makeupInches}
                         whenUnset={{
-                          placeholder: isPanel ? "panel figure" : "box figure",
+                          // Short enough to fit the box: "panel figure" was cut
+                          // off on screen. Empty follows the box/panel value.
+                          placeholder: isPanel ? "as panel" : "as box",
                         }}
                         rules={{ min: 0, max: 240 }}
                         onSave={v =>
