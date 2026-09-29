@@ -13,6 +13,11 @@ This is the human-readable companion to the git history — read this to see wha
   without those links (one developer copy has none) kept counting the deleted
   drawing's marks. A test now builds exactly that case and fails if any
   quantity read goes back to counting by bid alone.
+- **The database check now looks at the links between tables**, the rules
+  that make deleting a bid or a plan set delete everything drawn on it. It
+  lists any link a database is missing, with the command that adds it, and
+  prints a loud warning if a database has no links at all. Production passes
+  (133 of 133).
 
 ## [2026-09-27]
 
