@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Marks placed by the plan reader now count on the bid.** Pressing Place
+  drew the marks and added their parts to the materials list, but the count
+  and the bid line never moved, so the bid and the supply list disagreed with
+  nothing on screen to say so. A placed mark now joins that assembly's count
+  (making one if the bid has none yet), exactly as a hand-placed mark does.
 - **The takeoff CSV can now carry prices, if you ask for them.** "Export
   takeoff" opens a small dialog with an "Include prices" box, unticked every
   time. Ticked, the whole-bid rows gain a price status, unit cost and line

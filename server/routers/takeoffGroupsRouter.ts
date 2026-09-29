@@ -27,6 +27,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import * as db from "../db";
+import { groupForAssembly } from "../assemblyGroup";
 import { refuseUnknownKinds } from "../extrasInput";
 import { DISTRIBUTION_KIND } from "../../shared/takeoffHeights";
 import { resolveRunType } from "../../shared/runTypeLookup";
@@ -349,35 +350,8 @@ export const takeoffGroupsRouter = router({
           message: "Assembly not found.",
         });
 
-      const existing = await db.getGroupsForBid(
-        input.bidId,
-        ctx.scope.dataUserId
-      );
-      const already = existing.find(
-        group => group.assemblyId === input.assemblyId
-      );
-      if (already) {
-        return {
-          id: already.id,
-          label: already.label,
-          kind: already.kind,
-          created: false,
-        };
-      }
-
-      const id = await db.createTakeoffGroup({
-        bidId: input.bidId,
-        userId: ctx.scope.dataUserId,
-        label: assembly.name,
-        kind: "assembly",
-        assemblyId: assembly.id,
-      });
-      return {
-        id,
-        label: assembly.name,
-        kind: "assembly" as const,
-        created: true,
-      };
+      // Shared with the plan reader's Place, so both reach the same count.
+      return groupForAssembly(input.bidId, ctx.scope.dataUserId, assembly);
     }),
 
   /** Change what a count is called. Every mark follows, because none holds it. */
