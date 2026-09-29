@@ -673,6 +673,11 @@ against this.**
 - **Leave out:** the old "Clear page". Undo covers mistakes, and a one-tap wipe
   is how a whole takeoff gets lost.
 
+> **PROPOSED OVERRIDE, 2026-09-29, awaiting the owner:** the owner asked for
+> "Clear all marks on this sheet". `references/track-b-plans-screen-edits-plan.md`
+> Part 3 proposes it as never one tap (it lists exactly what goes and asks) and
+> undoable in one step, which is how it answers the reason above.
+
 **D7 — How much run editing (T8–T11).**
 
 - (a) Drag a point, add to the end, delete a point, rename.
