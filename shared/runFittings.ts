@@ -256,7 +256,12 @@ export function nodeDegrees(legs: readonly FittingLeg[]): Map<string, number> {
 export function countFittings(
   legs: readonly FittingLeg[],
   raceway: RacewayFittingSpec,
-  bends: { method: BendMethod; limit: number },
+  /**
+   * `mergeWithinFeet` is required on purpose: this is the bid's path, and a
+   * type bought as sweeps counts a traced sweep wrongly on the flat 3 ft
+   * (`mergeWithinFeetFor`). `bendMergeFeetForOverrides` gives it.
+   */
+  bends: { method: BendMethod; limit: number; mergeWithinFeet: number },
   /**
    * The tees whose box THIS raceway buys (`teeBoxOwners`). Required, so a
    * caller has to decide: passing every tee its legs touch would buy the box
@@ -271,7 +276,8 @@ export function countFittings(
     strap: countStraps(pieces, raceway),
     // Bends read the UNSPLIT legs: a pull point replaces the bend it sits on,
     // which only the whole leg can see.
-    ...countBends(legs, bends.method, bends.limit).counts,
+    ...countBends(legs, bends.method, bends.limit, bends.mergeWithinFeet)
+      .counts,
     ...teeFittingCounts(ownedTees, raceway.teeCoverIncluded),
   };
 }

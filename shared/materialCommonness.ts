@@ -200,6 +200,10 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   '4" square box, 2-1/8" deep': "common",
   '4" square mud ring, 2-gang': "common",
   '4" square blank cover': "common",
+  // The ring over its backplate, 2026-09-29 (plan § 9a). Two typed words
+  // stand the role grouping down, so on "concrete ring" the plate tied the
+  // ring and led on the name. Marking the ring is the same move as the LB.
+  'Concrete ring, 4" deep': "common",
   "Handy box": "common",
   "Weatherproof box, single-gang": "common",
 

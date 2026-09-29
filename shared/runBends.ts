@@ -46,6 +46,37 @@ export const MIN_BEND_DEGREES = 15;
 /** Same-direction turns closer together than this are one bend (a sweep). */
 export const MERGE_WITHIN_FEET = 3;
 
+/**
+ * How far past a sweep's own 90° chord the merge reaches: clicks on a drawn
+ * arc are not exact, and a click just outside the curve must not split it.
+ */
+const SWEEP_CLICK_SLACK = 1.25;
+
+/**
+ * The merge distance for a run type, given the radius of every sweep its
+ * bends are bought as (the 90 and the 45 it points at, when either is one).
+ *
+ * ── Why 3 ft is not enough on a sweep type (measured 2026-09-29) ──────────────
+ * The natural way to trace a drawn sweep is a click where the curve starts
+ * and one where it ends. Those sit a 90° chord apart, √2 × the radius: 2.83
+ * ft on a 24" sweep, which merges, and 4.24 ft on a 36" one, which did NOT —
+ * so the 36" sweep counted as two 45s. `server/runBendsSweep.test.ts` pins
+ * every way of tracing one, through both the bid's count and the panel's.
+ *
+ * With no sweep chosen this is exactly `MERGE_WITHIN_FEET`, so a type on
+ * standard elbows counts as it always has. The cost on a sweep type, which
+ * is accepted: two separate same-direction 45s closer together than the
+ * reach count as one 90 — at that spacing the trace cannot tell them from
+ * one sweep, and neither can the pipe.
+ */
+export function mergeWithinFeetFor(
+  sweepRadiiInches: readonly number[]
+): number {
+  const widest = Math.max(0, ...sweepRadiiInches);
+  const chordFeet = (Math.SQRT2 * widest) / 12;
+  return Math.max(MERGE_WITHIN_FEET, chordFeet * SWEEP_CLICK_SLACK);
+}
+
 /** The two limits offered. 360° is the code maximum between pull points. */
 export const PULL_POINT_LIMITS = [360, 270] as const;
 export type PullPointLimit = (typeof PULL_POINT_LIMITS)[number];
@@ -247,8 +278,18 @@ export type LegBends = {
   unknownDrops: number;
 };
 
-/** Everything that turns along one leg, in order. */
-export function legBends(leg: Omit<BendLeg, "answers" | "id">): LegBends {
+/**
+ * Everything that turns along one leg, in order.
+ *
+ * `mergeWithinFeet` is the run type's reach (`mergeWithinFeetFor`); it
+ * defaults to the flat 3 ft, which is right for every type not bought as
+ * sweeps. The two production callers — the bid through `countFittings`, the
+ * run panel through `runBendsFor` — are made to pass it by their own types.
+ */
+export function legBends(
+  leg: Omit<BendLeg, "answers" | "id">,
+  mergeWithinFeet: number = MERGE_WITHIN_FEET
+): LegBends {
   const p = leg.points;
   const bends: Bend[] = [];
   let wobble = 0;
@@ -275,7 +316,7 @@ export function legBends(leg: Omit<BendLeg, "answers" | "id">): LegBends {
     const sign = Math.sign(t);
     const close =
       leg.feetPerPoint !== null &&
-      sinceLast * leg.feetPerPoint < MERGE_WITHIN_FEET;
+      sinceLast * leg.feetPerPoint < mergeWithinFeet;
     if (current && current.sign === sign && close) {
       current.vertices.push(i);
       current.sum += t;
@@ -559,10 +600,11 @@ const NO_KICKS = "plans do not show the kicks and offsets at boxes";
 export function countBends(
   legs: readonly BendLeg[],
   method: BendMethod,
-  limit: number
+  limit: number,
+  mergeWithinFeet: number = MERGE_WITHIN_FEET
 ): BendReport {
   const perLeg = legs.map(leg => {
-    const bends = legBends(leg);
+    const bends = legBends(leg, mergeWithinFeet);
     return {
       legId: leg.id,
       bends,

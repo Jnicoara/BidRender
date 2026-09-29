@@ -993,6 +993,13 @@ The owner's design, and six answers given the same day:
 - **Wobble (answer 4):** same-direction turns under 3 ft apart merge into one
   bend FIRST (a traced sweep), then anything under 15° is drawing wobble —
   neither a bend nor degrees. Fixed defaults, no setting.
+  > **Narrowed 2026-09-29 (owner asked for the check, plan § 8a):** on a run
+  > type whose 90 or 45 is a SWEEP, the 3 ft reaches that sweep's 90° chord
+  > plus 25% (√2 × radius × 1.25: 5.3 ft for 36", 3.5 ft for 24"). Measured:
+  > a 36" sweep traced by clicking its two ends sits 4.24 ft apart and
+  > counted as two 45s. Still no setting — the reach comes from the row the
+  > type already points at. Every other type keeps exactly 3 ft.
+  > `server/runBendsSweep.test.ts`.
 - **Factory or field:** a company setting, "factory elbows from" (1-1/4"
   shipped). Below it a bend is field-bent — labor only. PVC always takes
   factory elbows; flex turns itself.
@@ -1010,6 +1017,11 @@ The owner's design, and six answers given the same day:
   corner is proposed afresh.
 - **45° elbows only (answer 2)** were added to the catalog; sweeps wait for an
   Underground category.
+  > **Overridden 2026-09-29 (owner, `materials-track-c-plan.md` § 8, S1):**
+  > sweeps shipped without waiting — 56 PVC rows on Conduit Fittings.
+  > Underground is a location tag on the run (D8), not a shelf. The takeoff
+  > still counts the standard elbow unless a run type's 90/45 is pointed at a
+  > sweep.
 - **A user assembly that already holds an elbow (answer 6)** is left
   unguarded, as connectors are — logged in `todo.md`.
 

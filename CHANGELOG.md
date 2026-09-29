@@ -34,6 +34,25 @@ This is the human-readable companion to the git history — read this to see wha
   measured, and the export gives it its own "Typed ft" column. It is the
   flat run only; drops and extra are added on top.
 
+- **Concrete ring boxes for deck pours are in the catalog**: 4" and 6"
+  deep, and the backplate that goes with them (unpriced, like every
+  shipped item).
+
+- **Large-radius PVC sweeps are now in the catalog** — 1" to 4", 90° and
+  45°, 24" and 36" radius, Schedule 40 and 80 (56 items, unpriced like
+  every shipped item). Searching "sweep" now finds them rather than the
+  ordinary PVC elbow; "2 pvc 90" still leads with the ordinary elbow, which
+  is what the takeoff counts.
+- **A traced 36" sweep now counts as one 90, not two 45s**, on a run type
+  set to use sweeps. Tracing a drawn sweep by clicking where the curve
+  starts and ends put the clicks too far apart to be read as one bend.
+  Run types on ordinary elbows count exactly as before.
+- **A run type can now be told to use sweeps.** Its editor has "90° bends"
+  and "45° bends" beside coupling, connector and strap; pick a sweep and
+  every corner traced under that type is counted as one. The editor also
+  scrolls now — with its fittings open it was taller than a laptop screen,
+  and the Save button sat below the bottom edge.
+
 ## [2026-09-28]
 
 - **The shipped catalog may now grow to 3,000 items, up from 1,500**, with a

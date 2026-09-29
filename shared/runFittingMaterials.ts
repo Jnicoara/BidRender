@@ -24,7 +24,12 @@ import {
   type FittingKind,
 } from "./runFittings";
 import { needsPricing } from "./materialPricing";
-import { isBendRole, type BendMethod, type PullPointKind } from "./runBends";
+import {
+  isBendRole,
+  mergeWithinFeetFor,
+  type BendMethod,
+  type PullPointKind,
+} from "./runBends";
 import { tradeSizeAtLeast } from "./materialSizeOrder";
 import { isTeeRole } from "./runNetwork";
 
@@ -291,6 +296,51 @@ export function elbowName(
   angle: 90 | 45
 ): string {
   return `${size} ${family} ${angle}-degree elbow`;
+}
+
+/**
+ * `2" PVC Sch 40 90-degree sweep, 36" radius` — a large-radius factory bend,
+ * shipped for the two PVC families (references/materials-track-c-plan.md
+ * § 8). Nothing in the takeoff builds this name on its own: a run type counts
+ * sweeps only when its 90 or 45 is pointed at one. It lives here beside
+ * `elbowName` so that the day something does build it, the seed and the
+ * lookup share one spelling.
+ */
+export function sweepName(
+  size: string,
+  family: string,
+  angle: 90 | 45,
+  radiusInches: number
+): string {
+  return `${size} ${family} ${angle}-degree sweep, ${radiusInches}" radius`;
+}
+
+/** The radius `sweepName` wrote, or null for anything that is not a sweep. */
+export function sweepRadiusInches(name: string | null): number | null {
+  if (name === null) return null;
+  const match = / sweep, (\d+(?:\.\d+)?)" radius$/.exec(name);
+  return match ? Number(match[1]) : null;
+}
+
+/**
+ * The bend-merge distance for a run type, from the rows its 90 and 45 are
+ * pointed at (`takeoff_run_types.elbow90MaterialId` / `elbow45MaterialId`).
+ * A sweep among them widens it to that sweep's reach; standard elbows, or no
+ * override, leave it at the flat 3 ft. See `mergeWithinFeetFor`.
+ *
+ * Read off the chosen row's OWN name, so a company's fork of a shipped sweep
+ * keeps its radius — unless they renamed it without one, which falls back to
+ * 3 ft rather than guessing.
+ */
+export function bendMergeFeetForOverrides(
+  elbow90Name: string | null,
+  elbow45Name: string | null
+): number {
+  return mergeWithinFeetFor(
+    [sweepRadiusInches(elbow90Name), sweepRadiusInches(elbow45Name)].filter(
+      (r): r is number => r !== null
+    )
+  );
 }
 
 export function lbName(size: string, family: string): string {

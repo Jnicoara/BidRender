@@ -53,6 +53,12 @@ Both are timing, not wrong answers, and both touch the shared test database.
 Fix them together: a green run that sometimes lies about being red trains
 everyone to re-run instead of read.
 
+- [x] **`materialsCatalog.test.ts` "renames the reshaped rows in place"
+      timed out at 5,004 ms** in a full run, 2026-09-29, after the sweeps
+      took the catalog to 1,511 rows; 4.1–4.4 s alone, all assertions
+      passing. Given 60 s like `seedPreservesUserPrices`. A timeout, not a
+      race — but the next catalog growth will push other seed-heavy tests
+      toward 5 s the same way.
 - [ ] **`server/backup.test.ts` "restores into an empty database, table for
       table and row for row" (line ~248) came up 11 `assemblies` rows short.**
       2026-09-27. A timing race on the shared test database: something else
@@ -80,7 +86,7 @@ everyone to re-run instead of read.
       row that shares a shipped name" lost its own row under a full run.**
       2026-09-28, once, on the local-dev + track-c merge: the company row it
       inserts was gone when read back (`Cannot read properties of undefined
-    (reading 'userId')`, line ~264). Passes alone. Nothing found that
+(reading 'userId')`, line ~264). Passes alone. Nothing found that
       deletes it: every broad `delete(materials)` in the suite is scoped to its
       own user ids, and no other file uses 7404/7405. A race, not yet
       explained. Run it alongside the full suite several times before calling
@@ -1818,7 +1824,26 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       set zero. Production had no bid lines at deploy time, so no live bid
       carries any.
 - [ ] **PVC sweeps are not in the catalog.** Sweeps wait for an Underground
-      category (answer 2). T bodies shipped 2026-09-27 (see "T bodies at a
+      category (answer 2). **SWEEPS SHIPPED 2026-09-29 on `track-c`**,
+      overriding answer 2 (plan § 8, S1; takeoff-spec D19 says so too): 56
+      PVC rows on Conduit Fittings, and "sweep" taken off the PVC 90's
+      aliases (S5). The run-type editor's 90°/45° pickers shipped the same
+      day (S6, plan § 8b), and a traced sweep now counts as one bend on a
+      sweep type (plan § 8a).
+- [ ] **The sentence under a sweep row still says "90° elbows".** Found
+      2026-09-29 looking at the run panel (plan § 8b): the fitting line is
+      named `2" PVC Sch 40 90-degree sweep, 36" radius` and the caption
+      under it reads "At least 2 90° elbows: 2 corners …". The kind is
+      labelled "90° elbow" everywhere (`FITTING_KIND_LABELS`,
+      `shared/runFittings.ts`, and the counted sentences in
+      `shared/runBends.ts`), so saying "bend" instead changes the wording on
+      every raceway, not just sweeps — the owner's call which. A caption
+      naming the old part beside a row that is a different one reads as
+      confirmation (CLAUDE.md rule 7), so it should not stay this way.
+- [x] **Concrete ring cover — DECIDED 2026-09-29 (owner): no cover row.** A
+      concrete ring is a 4" octagon and the shipped `4" round blank cover`
+      fits it (plan § 9a).
+      T bodies shipped 2026-09-27 (see "T bodies at a
       tee" above). **LL/LR/C SHIPPED 2026-09-28** (plan § 7, 135 rows,
       overriding T6's "until the takeoff proposes them"). The takeoff still
       proposes none of them: offering them at a pull point needs a new
