@@ -99,15 +99,15 @@ AI-made.
 The list comes from reading every mutation in `takeoffStampsRouter`,
 `takeoffGroupsRouter`, `takeoffRunsRouter` and `planCopilotRouter`.
 
-| Event (`action`)      | Path                                                                | "What the AI said"                                     | "What the user changed it to"                                                                     |
-| --------------------- | ------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `dismissed`           | `planCopilot.dismiss` — a proposal rejected before it became a mark | label, point, tier, score, the assembly it resolved to | nothing — "not this / not here"                                                                   |
-| `relabelled`          | `planCopilot.correct` — "this label is really that symbol"          | label, resolved symbol and assembly                    | the symbol link and assembly the user chose                                                       |
-| `deleted`             | `takeoffStamps.remove` on a stamp a finding points at               | the finding                                            | nothing — "should not exist"                                                                      |
-| `location_set`        | `takeoffStamps.setLocation` / `setLocationForGroup` on such a stamp | the finding (the AI said no location)                  | the location                                                                                      |
-| `deleted_with_group`  | `takeoffGroups.remove`, **only once AI marks have groups** (§ 1)    | each finding                                           | nothing, but see Q3 — this is often "wrong count" rather than "wrong mark"                        |
-| `accepted` (Q1)       | `planCopilot.confirm`                                               | the finding                                            | the stamp id — "right"                                                                            |
-| Runs (`isSuggestion`) | `takeoffRuns.acceptSuggestion`, `remove`, …                         | —                                                      | **Not built.** Hook when something creates AI runs. A test (§ 7) makes that impossible to forget. |
+| Event (`action`)      | Path                                                                                                                                                                                                       | "What the AI said"                                     | "What the user changed it to"                                                                     |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `dismissed`           | `planCopilot.dismiss` — a proposal rejected before it became a mark                                                                                                                                        | label, point, tier, score, the assembly it resolved to | nothing — "not this / not here"                                                                   |
+| `relabelled`          | `planCopilot.correct` — "this label is really that symbol"                                                                                                                                                 | label, resolved symbol and assembly                    | the symbol link and assembly the user chose                                                       |
+| `deleted`             | `takeoffStamps.remove` on a stamp a finding points at, AND `takeoffStamps.removeMany` (Track B's selection delete, `34f8515`, not yet on `local-dev` at 2026-09-29) — one row per AI mark in the selection | the finding                                            | nothing — "should not exist"                                                                      |
+| `location_set`        | `takeoffStamps.setLocation` / `setLocationForGroup` on such a stamp                                                                                                                                        | the finding (the AI said no location)                  | the location                                                                                      |
+| `deleted_with_group`  | `takeoffGroups.remove`, **only once AI marks have groups** (§ 1)                                                                                                                                           | each finding                                           | nothing, but see Q3 — this is often "wrong count" rather than "wrong mark"                        |
+| `accepted` (Q1)       | `planCopilot.confirm`                                                                                                                                                                                      | the finding                                            | the stamp id — "right"                                                                            |
+| Runs (`isSuggestion`) | `takeoffRuns.acceptSuggestion`, `remove`, …                                                                                                                                                                | —                                                      | **Not built.** Hook when something creates AI runs. A test (§ 7) makes that impossible to forget. |
 
 **Not logged, on purpose:** deleting a plan set, a bid (by hand or by the
 nightly purge) or a user. Those are not corrections. Cascades remove the stamps
@@ -279,9 +279,13 @@ will hold.
 2. **`server/aiCorrections.ts`**: `logAiCorrection(event)` (anonymises and
    writes, never throws to its caller), `readCorrectionContext(stampId)`
    (wrapped) and `attachCrop`.
-3. **Call sites:** `planCopilot.dismiss`, `correct`, `confirm` (if Q1),
-   `takeoffStamps.remove`, `setLocation`, `setLocationForGroup`, and
-   `takeoffGroups.remove` once AI marks have groups.
+3. **Call sites:** `planCopilot.dismiss`, `correct`, `confirm` (Q1 = yes),
+   `takeoffStamps.remove`, **`removeMany`** (Track B, a selection of up to
+   2,000 marks: read the findings for the whole selection BEFORE the delete,
+   in one query, and write one log row per AI mark after it), `setLocation`,
+   `setLocationForGroup`, and `takeoffGroups.remove`. **AI marks have groups
+   now** (`a-ai-marks`), so `takeoffGroups.remove` is a live call site, not a
+   later one.
 4. **`aiCorrections.attachCrop(shareId, png)`**: a `companyProcedure` mutation
    that checks the correction row belongs to this company before storing. It is
    write-only and returns nothing from the row, so it is not a read (§ 6).
