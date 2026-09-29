@@ -462,3 +462,54 @@ describe("an old name finds the row it was renamed to, first", () => {
     expect(renamedTo("30A breaker extra")).toBeNull();
   });
 });
+
+/**
+ * The five conduit body shapes, as MaterialPicker ranks them.
+ *
+ * Pinned against the ROLE-RANKED order with the starter commonness, because
+ * that is where the fault lived: when LL, LR and C arrived (2026-09-28) the
+ * raw smartSearch order the catalog test reads was fine, while the order an
+ * estimator sees put the C body first for "condulet" and "conduit body" —
+ * purely because "C" sorts before "LB". Seen by searchSpotCheck, not by a
+ * test. The LB is marked "common" to hold its place (plan § 7, L2).
+ */
+describe("conduit bodies: the LB for the generic words, each shape by name", () => {
+  const index = BASELINE_MATERIALS.map((row, i) => ({
+    id: String(i),
+    description: row.name,
+    searchAliases: row.searchAliases,
+  }));
+  const FAMILIES = familySizes(BASELINE_MATERIALS);
+  const NOW = new Date("2026-09-28T12:00:00Z");
+  const first = (query: string): string => {
+    const { results, searchedQuery } = smartSearchCorrected(index, query, 80);
+    return rankMaterialHits(
+      results.map(hit => ({
+        row: BASELINE_MATERIALS[Number(hit.item.id)],
+        score: hit.score,
+      })),
+      searchedQuery,
+      {
+        families: FAMILIES,
+        commonness: row => commonnessPoints(row.name, undefined, NOW),
+      }
+    )[0].name;
+  };
+
+  it.each(["condulet", "conduit body", "access fitting", "lb"])(
+    '"%s" leads with an LB',
+    query => {
+      expect(first(query)).toMatch(/ LB conduit body$/);
+    }
+  );
+
+  it.each([
+    ["ll", '1/2" EMT LL conduit body'],
+    ["lr", '1/2" EMT LR conduit body'],
+    ["1 rigid lr", '1" rigid conduit LR conduit body'],
+    ["1/2 emt ll", '1/2" EMT LL conduit body'],
+    ["tee body", '1/2" EMT T conduit body'],
+  ])('"%s" leads with %s', (query, expected) => {
+    expect(first(query)).toBe(expected);
+  });
+});
