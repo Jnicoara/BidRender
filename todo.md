@@ -68,12 +68,23 @@ everyone to re-run instead of read.
       anyway to build its own scratch database (`bidrender_catalogscale_test`)
       and only READ the shared one, so it cannot be. New tests that write a
       lot should do the same until this is fixed.
-- [ ] **`server/seedPreservesUserPrices.test.ts` "keeps the fork's price…"
+- [x] **`server/seedPreservesUserPrices.test.ts` "keeps the fork's price…"
       flakes on the 5 s default timeout.** 2026-09-27: failed in a full run
       (5010 ms), then run alone it passed once and failed once — it seeds the
       whole catalog and sits right at the limit. Not a wrong answer, a slow
       one; 45ada57 gave the seeder test a 60 s limit for the same reason, and
-      this one wants the same.
+      this one wants the same. **FIXED 2026-09-28** with that 60 s limit: at
+      1,455 rows it failed on every run, alone too, at 5.4 s with every
+      assertion passing once the limit was lifted.
+- [ ] **`server/seedReactivatesRetired.test.ts` "never switches on a company
+      row that shares a shipped name" lost its own row under a full run.**
+      2026-09-28, once, on the local-dev + track-c merge: the company row it
+      inserts was gone when read back (`Cannot read properties of undefined
+    (reading 'userId')`, line ~264). Passes alone. Nothing found that
+      deletes it: every broad `delete(materials)` in the suite is scoped to its
+      own user ids, and no other file uses 7404/7405. A race, not yet
+      explained. Run it alongside the full suite several times before calling
+      anything fixed.
 - [ ] **`scripts/schemaDrift.mts` says "this database has never been migrated"
       when it simply cannot connect.** Measured 2026-09-27 against production
       with the laptop off the database's trusted list: that line printed, then
