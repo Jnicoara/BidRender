@@ -210,25 +210,31 @@ export function aggregateMaterials(
 
 /** Footage totals, as the document's measured section. */
 export function measuredEntries(totals: {
-  conduitFeet: number;
-  cableFeet: number;
-  wireFeet: number;
-  /** The bare share OF wireFeet. Optional so an older caller still compiles. */
-  wireGroundFeet?: number;
+  /*
+    BOUGHT footage — flat, vertical, extra and (wire, cable) makeup. This list
+    is what somebody orders from, so it is the bought figure, and the notes
+    say what is in it. Renamed from `conduitFeet` / `cableFeet` / `wireFeet`
+    on 2026-09-29 so the meaning change could not pass unnoticed.
+  */
+  conduitBoughtFeet: number;
+  cableBoughtFeet: number;
+  wireBoughtFeet: number;
+  /** The bare share OF wireBoughtFeet. */
+  wireGroundBoughtFeet: number;
 }): MeasuredEntry[] {
   const out: MeasuredEntry[] = [];
-  if (totals.conduitFeet > 0) {
+  if (totals.conduitBoughtFeet > 0) {
     out.push({
       label: "Conduit",
-      feet: roundQty(totals.conduitFeet),
-      note: "Traced length, every conduit type on this job combined. Not broken out by type or trade size.",
+      feet: roundQty(totals.conduitBoughtFeet),
+      note: "Every conduit type on this job combined — the run lengths, their drops, and any extra set. Not broken out by type or trade size.",
     });
   }
-  if (totals.cableFeet > 0) {
+  if (totals.cableBoughtFeet > 0) {
     out.push({
       label: "Cable",
-      feet: roundQty(totals.cableFeet),
-      note: "Traced length, every cable type on this job combined. Not broken out by type or size.",
+      feet: roundQty(totals.cableBoughtFeet),
+      note: "Every cable type on this job combined — the run lengths, their drops, makeup and any extra set. Not broken out by type or size.",
     });
   }
   /*
@@ -242,8 +248,8 @@ export function measuredEntries(totals: {
     `wireFeet`, so the insulated line is the remainder. Pushing both from the
     same total is what keeps them summing to what the run panel shows.
   */
-  const bare = roundQty(Math.max(0, totals.wireGroundFeet ?? 0));
-  const insulated = roundQty(Math.max(0, totals.wireFeet - bare));
+  const bare = roundQty(Math.max(0, totals.wireGroundBoughtFeet));
+  const insulated = roundQty(Math.max(0, totals.wireBoughtFeet - bare));
 
   if (insulated > 0) {
     out.push({

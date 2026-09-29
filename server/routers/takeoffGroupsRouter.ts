@@ -27,6 +27,10 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import * as db from "../db";
+import { refuseUnknownKinds } from "../extrasInput";
+import { DISTRIBUTION_KIND } from "../../shared/takeoffHeights";
+import { resolveRunType } from "../../shared/runTypeLookup";
+import { whipFeetOf } from "../../shared/branchWire";
 import {
   countsWaitingToSend,
   countsWithNoPrice,
@@ -148,12 +152,53 @@ export const takeoffGroupsRouter = router({
     .input(z.object({ bidId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      const userId = ctx.scope.dataUserId;
       const [groups, counts] = await Promise.all([
-        db.getGroupsForBid(input.bidId, ctx.scope.dataUserId),
-        db.countStampsByGroup(input.bidId, ctx.scope.dataUserId),
+        db.getGroupsForBid(input.bidId, userId),
+        db.countStampsByGroup(input.bidId, userId),
       ]);
       const lines = await db.getBidLineItems(input.bidId);
       const bridgeLines = lines.map(toBridgeLine);
+
+      /*
+        DROPS (§ 3), computed by the one function the bid and the totals use,
+        so the row cannot say one thing while the bid line says another. In
+        this query rather than one of its own: it is the query every mark
+        change already refreshes (CLAUDE.md § "yesterday's answer").
+      */
+      const heights = await db.heightContextForBid(
+        input.bidId,
+        userId,
+        bid.distributionHeightInches
+      );
+      const drops = new Map(
+        (
+          await db.loadGroupDrops(
+            input.bidId,
+            userId,
+            heights,
+            await db.getRunsForBid(input.bidId, userId),
+            await db.getSheetScalesForBid(input.bidId, userId)
+          )
+        ).map(d => [d.groupId, d])
+      );
+      // The assembly's whip, so a drop and a whip show side by side (Q7).
+      const assemblyIds = Array.from(
+        new Set(
+          groups
+            .map(g => g.assemblyId)
+            .filter((id): id is number => id !== null)
+        )
+      );
+      const whipByAssembly = new Map<number, number>();
+      for (const line of await db.getAssemblyMaterialQuantities(assemblyIds)) {
+        if (!line.isBranchWhip) continue;
+        const feet = whipFeetOf(line.qty) ?? 0;
+        whipByAssembly.set(
+          line.assemblyId,
+          (whipByAssembly.get(line.assemblyId) ?? 0) + feet
+        );
+      }
 
       const rows = groups.map(group => ({
         id: group.id,
@@ -165,10 +210,25 @@ export const takeoffGroupsRouter = router({
         unitHours: group.unitHours === null ? null : Number(group.unitHours),
         count: counts.get(group.id) ?? 0,
       }));
+      const dropOf = (group: (typeof groups)[number]) => ({
+        /** What was stored — the picker opens on these. */
+        dropKind: group.dropKind,
+        dropHeightInches: group.dropHeightInches,
+        dropRunTypeId: group.dropRunTypeId,
+        /** What it comes to, from shared/groupDrops.ts. */
+        result: drops.get(group.id) ?? null,
+        /** Feet of whip each of this assembly's devices already carries. */
+        whipFeet:
+          group.assemblyId === null
+            ? null
+            : (whipByAssembly.get(group.assemblyId) ?? null),
+      });
 
       return {
-        groups: rows.map(row => ({
+        groups: rows.map((row, i) => ({
           ...row,
+          /** Verticals on these marks (§ 3). */
+          drop: dropOf(groups[i]),
           /**
            * Whether this count can go to the bid, and if not, which of the
            * four reasons — so the panel can say the right next thing rather
@@ -340,6 +400,63 @@ export const takeoffGroupsRouter = router({
         label: input.label,
       });
       return { id: input.id, label: input.label };
+    }),
+
+  /**
+   * Say what each mark of this count drops to, and in what — VERTICALS ON
+   * MARKS (references/track-b-held-migrations-plan.md § 3).
+   *
+   * Set once on the GROUP, never per mark (§ 7). Omitted leaves a field; NULL
+   * clears it: `dropKind` NULL goes back to "no drop asked for", which counts
+   * nothing. `distribution` is "no drop" as an answer.
+   *
+   * The run type is stored as picked and RESOLVED on every read through
+   * `resolveRunType` (server/runVerticals.ts, `dropTypeFor`), so a drop on a
+   * shipped type the company later forks prices from the fork. Refused on a
+   * locked bid: it moves quantities.
+   */
+  setDrop: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        dropKind: z.string().trim().min(1).max(64).nullable().optional(),
+        /** −240 to 600 in, the same believable range as every height. */
+        dropHeightInches: z
+          .number()
+          .int()
+          .min(-240)
+          .max(600)
+          .nullable()
+          .optional(),
+        dropRunTypeId: z.number().int().positive().nullable().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const group = await requireGroup(input.id, userId);
+      const bid = await requireBid(group.bidId, userId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "This bid's quantities are locked, so its drops cannot be changed. Unlock them on the bid first.",
+        });
+      if (input.dropKind && input.dropKind !== DISTRIBUTION_KIND)
+        await refuseUnknownKinds([input.dropKind], userId);
+      if (input.dropRunTypeId != null) {
+        const palette = await db.getRunTypesFor(userId, true);
+        if (!resolveRunType(palette, input.dropRunTypeId))
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "That run type is not in your palette.",
+          });
+      }
+      await db.setGroupDrop(input.id, userId, {
+        dropKind: input.dropKind,
+        dropHeightInches: input.dropHeightInches,
+        dropRunTypeId: input.dropRunTypeId,
+      });
+      return { id: input.id };
     }),
 
   /**

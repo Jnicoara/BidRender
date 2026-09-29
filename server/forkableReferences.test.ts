@@ -193,8 +193,10 @@ const REGISTRY: Record<string, Entry> = {
     why: "Reviewed 2026-09-27: nothing reads or writes it. A free count crosses with rate 0 and the role is picked on the bid line (addCountToBid). The 'unused group labor rate' test below goes red the day server code reads it, so the question gets asked then.",
   },
   "takeoff_groups.dropRunTypeId": {
-    kind: "exempt",
-    why: "Reviewed 2026-09-28, the day 0094/0095 added it: nothing reads or writes it yet — Track B's group drops (references/track-b-held-migrations-plan.md § 3) are not built. When they are, the drop's materials must come through resolveRunType, exactly as takeoff_runs.runTypeId, or a drop on a shipped type the user has forked prices from the baseline. The 'unused group drop type' test below goes red the day any non-test file names the column, and this entry becomes a resolver then.",
+    kind: "resolver",
+    resolver: "resolveRunType",
+    readBy: "server/runVerticals.ts",
+    note: "Became a resolver 2026-09-29 when Track B built group drops (held-migrations plan § 3). Was 'exempt' while nothing read it. `HeightContext.dropTypeFor` resolves the stored id through resolveRunType, so a drop on a forked shipped type prices from the fork; shared/groupDrops.ts reaches the type ONLY through that. The 'group drop type readers' test below lists every file allowed to name the column.",
   },
   "takeoff_stamps.assemblyId": {
     kind: "unreviewed",
@@ -416,7 +418,7 @@ describe("every stored id into a forkable row is accounted for", () => {
     expect(readers).toEqual([]);
   });
 
-  it("unused group drop type: nothing outside the schema names takeoff_groups.dropRunTypeId", () => {
+  it("group drop type readers: only the listed files name takeoff_groups.dropRunTypeId", () => {
     /*
       The same red for the same reason: its entry is `exempt` because nothing
       reads it, and that is a claim about code elsewhere. Unlike laborRateId the
@@ -440,6 +442,28 @@ describe("every stored id into a forkable row is accounted for", () => {
     };
     for (const dir of ["server", "shared", "client/src"])
       walk(path.join(repo, dir));
-    expect(readers).toEqual([]);
+    /*
+      CHANGED 2026-09-29, when group drops were built (held-migrations plan
+      § 3). This asserted NOBODY read the column, which was the right red for
+      an 'exempt' entry. Now the entry is a resolver, and the red that keeps it
+      honest is a LIST: every file that names the column, each of which was
+      read for how it uses the id. A new file here means a new reader, and the
+      question "does it resolve the fork?" gets asked again.
+
+        server/runVerticals.ts        resolves it: dropTypeFor → resolveRunType
+        shared/groupDrops.ts          reaches the type only through typeFor()
+        server/db.ts                  loads and writes the stored id, unresolved
+        server/routers/takeoffGroupsRouter.ts  validates and stores the id
+        client/src/components/takeoff/GroupDrop.tsx  shows and picks the id
+    */
+    expect(readers.map(r => r.split(path.sep).join("/")).sort()).toEqual(
+      [
+        "client/src/components/takeoff/GroupDrop.tsx",
+        "server/db.ts",
+        "server/routers/takeoffGroupsRouter.ts",
+        "server/runVerticals.ts",
+        "shared/groupDrops.ts",
+      ].sort()
+    );
   });
 });

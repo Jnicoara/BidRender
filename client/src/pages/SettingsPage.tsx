@@ -71,9 +71,12 @@ const SECTION_INFO: Record<SettingsSection, { label: string; blurb: string }> =
         "Material markup, overhead, profit and productivity. Each says below whether it reaches bids that already exist.",
     },
     heights: {
-      label: "Heights",
+      // "& extra" since 2026-09-29: extra and makeup live here too, because
+      // they are the other thing a traced line cannot see. The address is
+      // unchanged (`/settings/heights`), so no link needed moving.
+      label: "Heights & extra",
       blurb:
-        "What a traced line cannot see. Tracing measures flat distance only, so every drop and rise on a run comes from these numbers.",
+        "What a traced line cannot see. Tracing measures flat distance only, so every drop and rise on a run comes from these numbers — and so does the extra and makeup a job buys beyond the measured length.",
     },
     branding: {
       label: "Branding",

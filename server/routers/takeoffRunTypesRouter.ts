@@ -40,6 +40,7 @@ import { router, scoped } from "../_core/trpc";
 import { RUN_PATH_TYPES } from "../../drizzle/schema";
 import { resolveMaterial } from "../../shared/materialLookup";
 import { resolveRunType } from "../../shared/runTypeLookup";
+import { extraNumber } from "../../shared/runExtras";
 import { runTypeRows, runRowSendability } from "../../shared/takeoffBridge";
 import {
   EMT_FITTING_STYLES,
@@ -53,6 +54,13 @@ import { resendPlan, swapText, type ResendPlan } from "../../shared/resendLine";
 import { footageByRunType } from "../runTypeFootage";
 import { MARK_COLORS } from "../../shared/takeoffMarks";
 import { RUN_MATERIAL_ROLES } from "../../drizzle/schema";
+import {
+  extraPctSchema,
+  makeupByKindSchema,
+  makeupInchesSchema,
+  pctText,
+  refuseUnknownKinds,
+} from "../extrasInput";
 import * as db from "../db";
 
 /**
@@ -328,6 +336,16 @@ export const takeoffRunTypesRouter = router({
         groundLaborHours: laborOf(type.groundMaterialId),
         conductorCount: type.conductorCount,
         groundCount: type.groundCount,
+        /**
+         * This type's own extra and makeup (0090). NULL follows the company,
+         * which the editor shows as a placeholder rather than a zero.
+         * Percentages as fractions.
+         */
+        conduitExtraPct: extraNumber(type.conduitExtraPct),
+        wireExtraPct: extraNumber(type.wireExtraPct),
+        makeupDeviceInches: type.makeupDeviceInches,
+        makeupPanelInches: type.makeupPanelInches,
+        makeupByKindInches: type.makeupByKindInches,
         /** NULL reads as set-screw on EMT; ignored on other raceways. */
         fittingStyle: type.fittingStyle,
         couplingMaterialId: type.couplingMaterialId,
@@ -450,10 +468,27 @@ export const takeoffRunTypesRouter = router({
          * other field (owner, 2026-09-27).
          */
         color: z.enum(MARK_COLORS).nullable().optional(),
+        /*
+          EXTRA AND MAKEUP for this type (0090; held-migrations plan § 1).
+          NULL follows the company; omitted leaves it. Percentages are
+          fractions. `makeupByKindInches` maps a height type's key to its own
+          makeup on this type — a nearer level than any company figure (Q10).
+        */
+        conduitExtraPct: extraPctSchema.nullable().optional(),
+        wireExtraPct: extraPctSchema.nullable().optional(),
+        makeupDeviceInches: makeupInchesSchema.nullable().optional(),
+        makeupPanelInches: makeupInchesSchema.nullable().optional(),
+        makeupByKindInches: makeupByKindSchema.nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const target = await requireOwnType(input.id, ctx.scope.dataUserId);
+      if (input.makeupByKindInches) {
+        await refuseUnknownKinds(
+          Object.keys(input.makeupByKindInches),
+          ctx.scope.dataUserId
+        );
+      }
 
       /*
         REFUSE BEFORE FORKING. The check ran after the fork until 2026-09-26,
@@ -474,8 +509,17 @@ export const takeoffRunTypesRouter = router({
           ? await db.forkRunType(target.id, ctx.scope.dataUserId)
           : target.id;
 
-      const { id: _ignored, ...rest } = input;
-      await db.updateRunType(id, ctx.scope.dataUserId, rest);
+      const { id: _ignored, conduitExtraPct, wireExtraPct, ...rest } = input;
+      await db.updateRunType(id, ctx.scope.dataUserId, {
+        ...rest,
+        // DECIMAL columns take a string; omitted stays omitted.
+        ...(conduitExtraPct !== undefined
+          ? { conduitExtraPct: pctText(conduitExtraPct) }
+          : {}),
+        ...(wireExtraPct !== undefined
+          ? { wireExtraPct: pctText(wireExtraPct) }
+          : {}),
+      });
       return { id, forked: id !== target.id };
     }),
 
@@ -605,12 +649,10 @@ export const takeoffRunTypesRouter = router({
             conductorMaterialName: nameOf(type.conductorMaterialId),
             groundMaterialId: type.groundMaterialId,
             groundMaterialName: nameOf(type.groundMaterialId),
-            footage: {
-              conduitFeet: f.conduitFeet,
-              cableFeet: f.cableFeet,
-              insulatedFeet: f.insulatedFeet,
-              groundFeet: f.groundFeet,
-            },
+            // The footage ROW, not a restatement of it: bought and installed
+            // both arrive, and a figure added to the row later cannot be left
+            // behind here.
+            footage: f,
           });
           /*
           What Send-again would do to each line ALREADY on the bid — the same
@@ -783,12 +825,8 @@ export const takeoffRunTypesRouter = router({
         conductorMaterialName: nameOf(type.conductorMaterialId),
         groundMaterialId: type.groundMaterialId,
         groundMaterialName: nameOf(type.groundMaterialId),
-        footage: {
-          conduitFeet: f.conduitFeet,
-          cableFeet: f.cableFeet,
-          insulatedFeet: f.insulatedFeet,
-          groundFeet: f.groundFeet,
-        },
+        // The footage ROW — see the matching call in `bridge` above.
+        footage: f,
       });
 
       /*
@@ -809,6 +847,8 @@ export const takeoffRunTypesRouter = router({
         ...rows.map(row => ({
           role: row.role as (typeof RUN_MATERIAL_ROLES)[number],
           qty: row.feet,
+          // Labour is on INSTALLED footage — extra is material only (Q5).
+          laborQty: row.installedFeet as number | null,
           materialId: row.materialId,
           materialName: row.materialName,
           sendable: runRowSendability(row),
@@ -817,6 +857,8 @@ export const takeoffRunTypesRouter = router({
         ...fittings.map(row => ({
           role: row.role as (typeof RUN_MATERIAL_ROLES)[number],
           qty: row.qty,
+          // A fitting's labour is on its count; null reads as `qty`.
+          laborQty: null as number | null,
           materialId: row.pick.ok ? row.pick.materialId : null,
           materialName: row.pick.ok ? row.pick.name : null,
           sendable: fittingRowSendability(row),
@@ -912,8 +954,17 @@ export const takeoffRunTypesRouter = router({
             });
             refilled.push(row.materialName ?? row.role);
           }
-          const qtyMoved = Number(live.qty) !== row.qty;
-          if (qtyMoved) await db.refreshRunTypeLineQty(live.id, row.qty);
+          // Either quantity moving is a move: bought is the material, installed
+          // the labour, and both are stored together (Q5).
+          const storedLabor =
+            live.laborQty === null ? null : Number(live.laborQty);
+          const qtyMoved =
+            Number(live.qty) !== row.qty || storedLabor !== row.laborQty;
+          if (qtyMoved)
+            await db.refreshRunTypeLineQty(live.id, {
+              bought: row.qty,
+              installed: row.laborQty,
+            });
           if (qtyMoved || plan.kind !== "keep") {
             updated.push(row.role);
           } else {
@@ -949,6 +1000,7 @@ export const takeoffRunTypesRouter = router({
           */
           name: runLineName(type.label, row.materialName),
           qty: row.qty,
+          laborQty: row.laborQty,
         });
         sent.push(row.role);
       }

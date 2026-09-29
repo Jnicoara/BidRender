@@ -2039,6 +2039,18 @@ export default function TakeoffPage({
   const { data: heightsForBid } = trpc.takeoffHeights.forBid.useQuery({
     bidId,
   });
+  /**
+   * The company's OWN height types, active — each can take its own makeup on
+   * a run type or a run (held-migrations plan § 1). Shipped types take the
+   * plain box or panel figure, so they are not listed one by one.
+   */
+  const customHeightTypes = useMemo(
+    () =>
+      (heightsForBid?.types ?? [])
+        .filter(t => !t.isShipped && t.isActive)
+        .map(t => ({ typeKey: t.typeKey, label: t.label })),
+    [heightsForBid?.types]
+  );
   const armedEndsLabel = useMemo(
     () => traceEndsLabel(traceEnds, heightsForBid?.types),
     [traceEnds, heightsForBid?.types]
@@ -2606,12 +2618,21 @@ export default function TakeoffPage({
    * calibration, because calibration does not exist yet — this wants revisiting
    * when it does, since there will then be two ways out rather than one.
    */
-  const traceBlockedReason = useMemo(() => {
-    if (!measurability) return "Checking this sheet…";
-    if (measurability.ok) return null;
+  /**
+   * Tracing on a sheet with no usable scale is ALLOWED, with a condition —
+   * § 4c. Risers and one-lines never have a single scale, and they are full of
+   * conduit. The path is drawn to show where it goes, and its length is typed
+   * in the run panel afterwards. Before 2026-09-29 the tool refused outright,
+   * so that conduit could not be counted at all.
+   *
+   * What is still refused is a MEASURED number: the server stores no length
+   * for these points, and the run says "not in the totals" until one is typed.
+   */
+  const traceCondition = useMemo(() => {
+    if (!measurability || measurability.ok) return null;
     return measurability.reason === "not-to-scale"
-      ? "This sheet is marked not to scale — set a scale by hand to trace on it"
-      : "No scale set for this sheet — set one to trace on it";
+      ? "Marked not to scale — trace the path, then type its length in the run panel"
+      : "No scale on this sheet — trace the path, then type its length in the run panel";
   }, [measurability]);
 
   /*
@@ -2813,6 +2834,21 @@ export default function TakeoffPage({
    * number rather than the part of it currently on screen.
    */
   const bidCounts = trpc.takeoffGroups.list.useQuery({ bidId });
+
+  /**
+   * Each count's DROP (held-migrations plan § 3), from the same bid-wide
+   * list — so a drop set on one sheet shows on every sheet's row for that
+   * count, and moves with the "groupDrop" refresh.
+   */
+  const groupDropsById = useMemo(
+    () =>
+      new Map((bidCounts.data?.groups ?? []).map(g => [g.id, g.drop] as const)),
+    [bidCounts.data?.groups]
+  );
+  const setGroupDrop = trpc.takeoffGroups.setDrop.useMutation({
+    onError: e => toast.error(e.message),
+    onSettled: () => refreshFor("groupDrop"),
+  });
 
   /**
    * Whether this bid's quantities are frozen (shared/quantityLock.ts).
@@ -3633,10 +3669,14 @@ export default function TakeoffPage({
       // unlabelled, is the confusion this phase exists to remove. The WHOLE
       // run's length, with its legs counted — the figure the panel's leg
       // header shows (D20); it named only one leg until 2026-09-26.
+      // No scale and nothing typed yet (§ 4c): the run is finished and has no
+      // length, so the message says what to do rather than "0 ft".
       toast.success(
-        result.legCount > 1
-          ? `Run finished — ${result.legCount} legs, ${result.runFeet} ft traced.`
-          : `Run finished — ${result.runFeet} ft traced.`
+        result.runFeet === null
+          ? "Run finished — no scale on this sheet, so type its length in the run panel."
+          : result.legCount > 1
+            ? `Run finished — ${result.legCount} legs, ${result.runFeet} ft flat.`
+            : `Run finished — ${result.runFeet} ft flat.`
       ),
     onSettled: refreshRuns,
   });
@@ -3792,6 +3832,20 @@ export default function TakeoffPage({
    * answered and the totals unchanged after the answer changed them.
    */
   const setBranchWiring = trpc.takeoffRuns.setEnds.useMutation({
+    onError: e => toast.error(e.message),
+    onSettled: refreshRuns,
+  });
+  /**
+   * A typed length, or clearing one (§ 4c). Through `refreshRuns` like every
+   * run mutation: it moves the row, the totals and the bridge's run-type
+   * lines, and all three are keyed there.
+   */
+  const setTypedLength = trpc.takeoffRuns.setTypedLength.useMutation({
+    onError: e => toast.error(e.message),
+    onSettled: refreshRuns,
+  });
+  /** A run's own extra and makeup — moves its row, the totals and the bridge. */
+  const setRunExtras = trpc.takeoffRuns.setExtras.useMutation({
     onError: e => toast.error(e.message),
     onSettled: refreshRuns,
   });
@@ -4909,23 +4963,18 @@ export default function TakeoffPage({
               <Button
                 size="sm"
                 variant="outline"
-                className={cn(
-                  "h-7 gap-1.5 text-xs",
-                  !measurability?.ok && "opacity-50"
-                )}
-                aria-disabled={!measurability?.ok}
+                className="h-7 gap-1.5 text-xs"
+                aria-disabled={!measurability}
                 onClick={() => {
-                  if (!measurability?.ok) {
-                    if (traceBlockedReason) toast.info(traceBlockedReason);
-                    return;
-                  }
+                  if (!measurability) return;
+                  if (traceCondition) toast.info(traceCondition);
                   startTracing("conduit");
                 }}
                 onMouseEnter={() => setReachingForMeasure(true)}
                 onMouseLeave={() => setReachingForMeasure(false)}
                 onFocus={() => setReachingForMeasure(true)}
                 onBlur={() => setReachingForMeasure(false)}
-                title={traceBlockedReason ?? "Trace a conduit run"}
+                title={traceCondition ?? "Trace a conduit run"}
               >
                 {/* Plain, deliberately — see runIcons. The shape says which
                     tool this is; colour on the drawing says which TYPE, and a
@@ -4945,6 +4994,7 @@ export default function TakeoffPage({
               <RunTypePicker
                 pathType="conduit"
                 runColors={runColors}
+                customHeightTypes={customHeightTypes}
                 types={runTypes.data ?? []}
                 armedId={armedRunType.conduit?.id ?? null}
                 onPick={type => armRunType("conduit", type, false)}
@@ -4972,16 +5022,11 @@ export default function TakeoffPage({
               <Button
                 size="sm"
                 variant="outline"
-                className={cn(
-                  "h-7 gap-1.5 text-xs",
-                  !measurability?.ok && "opacity-50"
-                )}
-                aria-disabled={!measurability?.ok}
+                className="h-7 gap-1.5 text-xs"
+                aria-disabled={!measurability}
                 onClick={() => {
-                  if (!measurability?.ok) {
-                    if (traceBlockedReason) toast.info(traceBlockedReason);
-                    return;
-                  }
+                  if (!measurability) return;
+                  if (traceCondition) toast.info(traceCondition);
                   startTracing("cable");
                 }}
                 onMouseEnter={() => setReachingForMeasure(true)}
@@ -4989,7 +5034,7 @@ export default function TakeoffPage({
                 onFocus={() => setReachingForMeasure(true)}
                 onBlur={() => setReachingForMeasure(false)}
                 title={
-                  traceBlockedReason ??
+                  traceCondition ??
                   "Trace a run of self-contained cable — MC or Romex"
                 }
               >
@@ -4999,6 +5044,7 @@ export default function TakeoffPage({
               <RunTypePicker
                 pathType="cable"
                 runColors={runColors}
+                customHeightTypes={customHeightTypes}
                 types={runTypes.data ?? []}
                 armedId={armedRunType.cable?.id ?? null}
                 onPick={type => armRunType("cable", type, false)}
@@ -5625,7 +5671,8 @@ export default function TakeoffPage({
               hideOtherRuns={hideOtherRuns}
               onToggleHideOtherRuns={() => setHideOtherRuns(on => !on)}
               onAddLeg={run => {
-                if (measurability?.ok === false) return;
+                // A leg on a sheet with no scale is drawn and then typed, like
+                // any run there (§ 4c) — each leg has its own length.
                 addLegTo({ ...run, parentRunId: run.parentRunId ?? null });
               }}
               runs={visibleRuns.map(r => ({
@@ -5641,6 +5688,14 @@ export default function TakeoffPage({
                     : (circuitDefaultsByRunType.get(r.runTypeId) ?? null),
               }))}
               stampGroups={stampGroups}
+              groupDrops={groupDropsById}
+              onSetGroupDrop={(groupId, patch) =>
+                setGroupDrop.mutate({ id: groupId, ...patch })
+              }
+              dropHeightTypes={(heightsForBid?.types ?? []).filter(
+                t => t.isActive
+              )}
+              dropRunTypes={runTypes.data ?? []}
               bridge={bridgeByGroup}
               quantitiesLocked={quantitiesLocked}
               waitingToSend={bidCounts.data?.waitingToSend}
@@ -5659,6 +5714,13 @@ export default function TakeoffPage({
               onAnswerBranchWiring={(runId, answer) =>
                 setBranchWiring.mutate({ id: runId, branchWiring: answer })
               }
+              onSetTypedLength={(runId, inches) =>
+                setTypedLength.mutate({ id: runId, typedLengthInches: inches })
+              }
+              onSetRunExtras={(runId, patch) =>
+                setRunExtras.mutate({ runId, ...patch })
+              }
+              customHeightTypes={customHeightTypes}
               onAnswerPullPoint={answer => answerPullPoint.mutate(answer)}
               onUndoPullPoint={id => undoPullPoint.mutate({ id })}
               pullPointBusy={
@@ -5683,6 +5745,7 @@ export default function TakeoffPage({
                       <RunTypePicker
                         pathType={run.pathType}
                         runColors={runColors}
+                        customHeightTypes={customHeightTypes}
                         types={runTypes.data ?? []}
                         armedId={run.runTypeId}
                         onPick={type =>

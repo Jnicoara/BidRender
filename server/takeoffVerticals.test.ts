@@ -42,6 +42,7 @@ import {
   type HeightLayers,
 } from "../shared/takeoffHeights";
 import {
+  NO_EXTRAS,
   NO_VERTICALS,
   quantitiesForRun,
   totalQuantities,
@@ -60,7 +61,11 @@ import {
 function totalsOf(
   runs: Omit<Parameters<typeof totalQuantities>[0][number], "runKey">[]
 ) {
-  return totalQuantities(runs.map((entry, i) => ({ ...entry, runKey: i })));
+  // No drops from marks here — those have their own suite (groupDrops).
+  return totalQuantities(
+    runs.map((entry, i) => ({ ...entry, runKey: i })),
+    []
+  );
 }
 
 const QUARTER_INCH = 48; // 1/4" = 1'-0"
@@ -68,6 +73,7 @@ const QUARTER_INCH = 48; // 1/4" = 1'-0"
 /** 100 ft of traced pipe at 1/4" scale — 25 inches of paper, 1800 points. */
 const RUN_100FT = {
   pathType: "conduit" as const,
+  typedLengthInches: null,
   points: [
     { x: 0, y: 0 },
     { x: 1800, y: 0 },
@@ -411,13 +417,14 @@ describe("vertical footage reaches the wire, once per conductor", () => {
       RUN_100FT,
       circuits,
       QUARTER_INCH,
-      verticals
+      verticals,
+      NO_EXTRAS
     )!;
 
     expect(quantities.runFeet).toBe(100); // flat, untouched
     expect(quantities.verticalFeet).toBe(8.5);
-    expect(quantities.conduitFeet).toBe(108.5); // one pipe down the drop
-    expect(quantities.totalWireFeet).toBe(325.5); // 3 conductors down it too
+    expect(quantities.conduitBoughtFeet).toBe(108.5); // one pipe down the drop
+    expect(quantities.wireBoughtFeet).toBe(325.5); // 3 conductors down it too
     expect(quantities.wireByCircuit[0]).toMatchObject({
       flatFeet: 300,
       verticalFeet: 25.5,
@@ -444,10 +451,11 @@ describe("vertical footage reaches the wire, once per conductor", () => {
       RUN_100FT,
       [],
       QUARTER_INCH,
-      verticals
+      verticals,
+      NO_EXTRAS
     )!;
     expect(quantities.runFeet + quantities.verticalFeet).toBe(
-      quantities.conduitFeet
+      quantities.conduitBoughtFeet
     );
   });
 
@@ -465,13 +473,14 @@ describe("vertical footage reaches the wire, once per conductor", () => {
       }
     );
     const quantities = quantitiesForRun(
-      { pathType: "cable", points: RUN_100FT.points },
+      { pathType: "cable", points: RUN_100FT.points, typedLengthInches: null },
       [],
       QUARTER_INCH,
-      verticals
+      verticals,
+      NO_EXTRAS
     )!;
-    expect(quantities.cableFeet).toBe(108.5);
-    expect(quantities.conduitFeet).toBeNull();
+    expect(quantities.cableBoughtFeet).toBe(108.5);
+    expect(quantities.conduitBoughtFeet).toBeNull();
   });
 
   it("ignores a nonsense conductor count instead of producing NaN", () => {
@@ -516,7 +525,9 @@ describe("vertical footage reaches the wire, once per conductor", () => {
       }
     );
     expect(verticals.feet).toBe(12.5);
-    expect(quantitiesForRun(RUN_100FT, [], null, verticals)).toBeNull();
+    expect(
+      quantitiesForRun(RUN_100FT, [], null, verticals, NO_EXTRAS)
+    ).toBeNull();
   });
 });
 
@@ -540,10 +551,11 @@ describe("the headline number from the brief", () => {
         circuits: [],
         ratio: QUARTER_INCH,
         verticals,
+        extras: NO_EXTRAS,
       }))
     );
     expect(totals.conduitVerticalFeet).toBe(255);
-    expect(totals.conduitFeet).toBe(3255); // 3,000 traced + 255 nobody could see
+    expect(totals.conduitBoughtFeet).toBe(3255); // 3,000 traced + 255 nobody could see
     expect(totals.flatOnlyCount).toBe(0);
   });
 });
@@ -641,11 +653,12 @@ describe("a bid with no heights set reads exactly as it did before", () => {
       RUN_100FT,
       circuits,
       QUARTER_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
     expect(quantities.runFeet).toBe(100);
-    expect(quantities.conduitFeet).toBe(100);
-    expect(quantities.totalWireFeet).toBe(500); // 300 + 200, exactly as before
+    expect(quantities.conduitBoughtFeet).toBe(100);
+    expect(quantities.wireBoughtFeet).toBe(500); // 300 + 200, exactly as before
     expect(quantities.verticalFeet).toBe(0);
     expect(quantities.verticals).toBeNull();
   });
@@ -661,11 +674,12 @@ describe("a bid with no heights set reads exactly as it did before", () => {
       RUN_100FT,
       circuits,
       QUARTER_INCH,
-      verticals
+      verticals,
+      NO_EXTRAS
     )!;
     expect(quantities.verticalFeet).toBe(0);
-    expect(quantities.conduitFeet).toBe(100);
-    expect(quantities.totalWireFeet).toBe(500);
+    expect(quantities.conduitBoughtFeet).toBe(100);
+    expect(quantities.wireBoughtFeet).toBe(500);
   });
 
   it("totals a whole bid unchanged, and says how many runs are flat only", () => {
@@ -675,16 +689,18 @@ describe("a bid with no heights set reads exactly as it did before", () => {
         circuits,
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
       },
       {
         run: RUN_100FT,
         circuits: [],
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
       },
     ]);
-    expect(totals.conduitFeet).toBe(200);
-    expect(totals.wireFeet).toBe(500);
+    expect(totals.conduitBoughtFeet).toBe(200);
+    expect(totals.wireBoughtFeet).toBe(500);
     expect(totals.conduitVerticalFeet).toBe(0);
     expect(totals.wireVerticalFeet).toBe(0);
     // The zero has to shout: the panel can say "2 runs are counted flat only"
@@ -697,12 +713,19 @@ describe("a bid with no heights set reads exactly as it did before", () => {
     // Two different problems. One needs a scale, the other needs a height, and
     // reporting them as one number would send the estimator to the wrong screen.
     const totals = totalsOf([
-      { run: RUN_100FT, circuits: [], ratio: null, verticals: NO_VERTICALS },
+      {
+        run: RUN_100FT,
+        circuits: [],
+        ratio: null,
+        verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
+      },
       {
         run: RUN_100FT,
         circuits: [],
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
       },
     ]);
     expect(totals.unmeasurableCount).toBe(1);
@@ -718,15 +741,19 @@ describe("a bid with no heights set reads exactly as it did before", () => {
       ratio: QUARTER_INCH,
       verticals: NO_VERTICALS,
       runKey: 40,
+      extras: NO_EXTRAS,
     };
-    const flat = totalQuantities([leg, leg, leg]);
-    expect(flat.conduitFeet).toBe(300);
+    const flat = totalQuantities([leg, leg, leg], []);
+    expect(flat.conduitBoughtFeet).toBe(300);
     expect(flat.flatOnlyCount).toBe(1);
 
-    const unscaled = totalQuantities([
-      { ...leg, ratio: null },
-      { ...leg, ratio: null },
-    ]);
+    const unscaled = totalQuantities(
+      [
+        { ...leg, ratio: null },
+        { ...leg, ratio: null },
+      ],
+      []
+    );
     expect(unscaled.unmeasurableCount).toBe(1);
   });
 });
@@ -1366,7 +1393,13 @@ describe("what the BID TOTAL says about half-counted verticals", () => {
 
   const bid = (verticals: ReturnType<typeof verticalsForRun>) =>
     totalsOf([
-      { run: RUN_100FT, circuits: [], ratio: QUARTER_INCH, verticals },
+      {
+        run: RUN_100FT,
+        circuits: [],
+        ratio: QUARTER_INCH,
+        verticals,
+        extras: NO_EXTRAS,
+      },
     ]);
 
   it("counts a run with ONE end unanswered as partial, not as finished", () => {
@@ -1406,12 +1439,14 @@ describe("what the BID TOTAL says about half-counted verticals", () => {
         circuits: [],
         ratio: QUARTER_INCH,
         verticals: verticalsForRun(NO_HEIGHT_FOR_PANEL, DROPS_TO_RECEPTACLE),
+        extras: NO_EXTRAS,
       },
       {
         run: RUN_100FT,
         circuits: [],
         ratio: QUARTER_INCH,
         verticals: verticalsForRun(NO_HEIGHT_FOR_PANEL, NO_HEIGHT_FOR_PANEL),
+        extras: NO_EXTRAS,
       },
       {
         run: RUN_100FT,
@@ -1421,6 +1456,7 @@ describe("what the BID TOTAL says about half-counted verticals", () => {
           CARRIES_ON_AT_RUN_HEIGHT,
           DROPS_TO_RECEPTACLE
         ),
+        extras: NO_EXTRAS,
       },
     ]);
     expect(totals.partialVerticalCount).toBe(1);

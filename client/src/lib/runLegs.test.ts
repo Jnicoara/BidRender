@@ -14,7 +14,7 @@ function row(over: Partial<LegRow> & { id: number }): LegRow {
     parentRunId: null,
     startTee: null,
     circuits: [A1, A3],
-    quantities: { conduitFeet: 10, cableFeet: null },
+    quantities: { conduitInstalledFeet: 10, cableInstalledFeet: null },
     ...over,
   };
 }
@@ -23,20 +23,23 @@ describe("laying out a run of legs", () => {
   // As the server lists them: by id, so a later plain run sits between a
   // root and a leg added to it afterwards.
   const rows = [
-    row({ id: 10, quantities: { conduitFeet: 36.19, cableFeet: null } }),
+    row({
+      id: 10,
+      quantities: { conduitInstalledFeet: 36.19, cableInstalledFeet: null },
+    }),
     row({ id: 11 }),
     row({
       id: 12,
       parentRunId: 10,
       startTee: { id: 1 },
-      quantities: { conduitFeet: 56.98, cableFeet: null },
+      quantities: { conduitInstalledFeet: 56.98, cableInstalledFeet: null },
     }),
     row({
       id: 13,
       parentRunId: 10,
       startTee: { id: 1 },
       circuits: [A1],
-      quantities: { conduitFeet: 14.37, cableFeet: null },
+      quantities: { conduitInstalledFeet: 14.37, cableInstalledFeet: null },
     }),
     row({ id: 14, parentRunId: 10 }),
   ];

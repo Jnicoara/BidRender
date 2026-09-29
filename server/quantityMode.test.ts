@@ -212,8 +212,8 @@ withDb("drops on a quantity trace", () => {
     // Before: 60 ft flat, wire from the type (3 conductors), no drops, and
     // three ends waiting (the leg's start is on the main — not offered).
     const before = await caller().takeoffRuns.totals({ bidId });
-    expect(before.conduitFeet).toBeCloseTo(60, 2);
-    expect(before.wireFeet).toBeCloseTo(180, 2);
+    expect(before.conduitBoughtFeet).toBeCloseTo(60, 2);
+    expect(before.wireBoughtFeet).toBeCloseTo(180, 2);
     expect(before.conduitVerticalFeet).toBe(0);
     expect(before.flatOnlyCount).toBe(0);
     expect(before.quantity).toEqual({ traceCount: 1, openEnds: 3 });
@@ -230,7 +230,7 @@ withDb("drops on a quantity trace", () => {
     });
     const after = await caller().takeoffRuns.totals({ bidId });
     expect(after.conduitVerticalFeet).toBeCloseTo(25.5, 2); // 3 × 8.5
-    expect(after.conduitFeet).toBeCloseTo(85.5, 2);
+    expect(after.conduitBoughtFeet).toBeCloseTo(85.5, 2);
     expect(after.quantity.openEnds).toBe(0);
     const readout = await caller().takeoffRuns.drops({ bidId });
     expect(readout.drops).toHaveLength(3);
@@ -320,7 +320,8 @@ withDb("switching modes", () => {
       rootRunId: rootId,
       answers: [{ runId: rootId, end: "start", kind: "receptacle" }],
     });
-    const wireBefore = (await caller().takeoffRuns.totals({ bidId })).wireFeet;
+    const wireBefore = (await caller().takeoffRuns.totals({ bidId }))
+      .wireBoughtFeet;
 
     const result = await caller().takeoffRuns.setTraceMode({
       runId: legId,
@@ -344,7 +345,7 @@ withDb("switching modes", () => {
       );
     expect(circuits.map(c => c.conductorCount)).toEqual([3, 3]);
     // The wire did not move: the same circuit, now stored.
-    expect((await caller().takeoffRuns.totals({ bidId })).wireFeet).toBe(
+    expect((await caller().takeoffRuns.totals({ bidId })).wireBoughtFeet).toBe(
       wireBefore
     );
 

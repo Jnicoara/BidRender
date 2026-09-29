@@ -56,12 +56,18 @@ function runs(
     runCount: 1,
     totalFeet: 50,
     verticalFeet: 10,
+    typedFeet: 0,
     wireFeet: 150,
     groundFeet: 50,
     unmeasurableCount: 0,
     branchCount: 0,
     unansweredCount: 0,
     endsNotCountedCount: 0,
+    extraFeet: 0,
+    makeupFeet: 0,
+    noExtraCount: 0,
+    markDropCount: 0,
+    markDropFeet: 0,
     ...over,
   };
 }
@@ -214,9 +220,10 @@ describe("building the export", () => {
     expect(doc.wholeBid[0].quantity).toBeNull();
 
     const csv = takeoffExportCsv(doc);
-    // Quantity, Traced, Vertical, Wire, Ground: five blanks, then the note.
+    // Quantity, Traced, Typed, Vertical, Extra, Makeup, Wire, Ground: eight
+    // blanks, then the note.
     expect(csv).toContain(
-      '"ft","","","","","","1 run not measured — no usable scale on the sheet"'
+      '"ft","","","","","","","","","1 run not measured — no usable scale on the sheet"'
     );
   });
 
@@ -263,7 +270,11 @@ describe("building the export", () => {
   it("names what is not in the file", () => {
     const doc = buildTakeoffExport(source({ untypedRunCount: 2 }));
     const notes = doc.notes.join("\n");
-    expect(notes).toContain("No extra is included");
+    // Said what extra and makeup are since 2026-09-29, when they arrived; it
+    // read "No extra is included" before. Extra carrying no hours is the
+    // half a reader would not guess, so the note must say it.
+    expect(notes).toContain("Extra ft is added material");
+    expect(notes).toContain("the bid puts no install hours on it");
     expect(notes).toContain("Fittings counted from the runs");
     expect(notes).toContain("The bid prices both");
     expect(notes).toContain("2 traced runs have no run type");
@@ -445,8 +456,8 @@ describe.skipIf(!hasDb)("the export against a real bid", () => {
 
     for (const type of [emt, mc]) {
       const expected =
-        bidFootage.get(type.id)!.conduitFeet +
-        bidFootage.get(type.id)!.cableFeet;
+        bidFootage.get(type.id)!.conduitBoughtFeet +
+        bidFootage.get(type.id)!.cableBoughtFeet;
       expect(expected).toBeGreaterThan(0);
 
       const wholeBid = doc.wholeBid
@@ -494,7 +505,9 @@ describe.skipIf(!hasDb)("the export against a real bid", () => {
     const everyConduit = doc.wholeBid
       .filter(r => r.item === emt.label)
       .reduce((sum, r) => sum + (r.quantity ?? 0), 0);
-    expect(Math.abs(everyConduit - totals.conduitFeet)).toBeLessThan(0.05);
+    expect(Math.abs(everyConduit - totals.conduitBoughtFeet)).toBeLessThan(
+      0.05
+    );
     expect(totals.leftOut.noType.count).toBe(1);
     expect(
       Math.abs(totals.leftOut.noType.conduitFeet - (190 / 72) * (48 / 12))

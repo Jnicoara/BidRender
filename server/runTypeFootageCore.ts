@@ -24,8 +24,10 @@
  * a competitive bid.
  */
 import {
+  carriesNoExtra,
   circuitWire,
   quantitiesForRun,
+  tracedRunOf,
   type RunPathType,
 } from "../shared/takeoffQuantities";
 import { runOnBid } from "../shared/runOnBid";
@@ -34,20 +36,60 @@ import type { TeeRef } from "../shared/runNetwork";
 import type { PullPointAnswer } from "../shared/runBends";
 import { pointsToRealInches } from "../shared/takeoffGeometry";
 import { uncountedEnds } from "../shared/takeoffHeights";
-import { verticalsForRunRow, type HeightContext } from "./runVerticals";
+import {
+  extrasForRunRow,
+  verticalsForRunRow,
+  type HeightContext,
+} from "./runVerticals";
+import type { ExtrasRow } from "../shared/runExtras";
+import { dropsFootage, type MarkDropEntry } from "../shared/groupDrops";
 import type { TraceMode, WireCircuits } from "../shared/traceMode";
 
 export type RunTypeFootageRow = {
   runTypeId: number;
   pathType: RunPathType;
-  /** Pipe — traced plus vertical. 0 on a cable type. */
-  conduitFeet: number;
-  /** The cable itself — traced plus vertical. 0 on a conduit type. */
-  cableFeet: number;
-  /** Insulated conductors, every circuit. 0 on a cable type. */
-  insulatedFeet: number;
-  /** Bare or green ground. 0 on a cable type — it is inside the jacket. */
-  groundFeet: number;
+  /*
+    BOUGHT and INSTALLED, per role (owner, 2026-09-28, Q5): a bid line's
+    MATERIAL is its bought footage and its LABOUR is its installed footage,
+    because extra is material only and makeup carries labour. Renamed from
+    `conduitFeet`, `cableFeet`, `insulatedFeet` and `groundFeet` on 2026-09-29
+    so no reader kept the old meaning without deciding which one it wanted.
+  */
+  /** Pipe to buy: flat, vertical and extra. 0 on a cable type. */
+  conduitBoughtFeet: number;
+  /** Pipe installed: flat and vertical. What its labour is on. */
+  conduitInstalledFeet: number;
+  /** Cable to buy: flat, vertical, makeup and extra. 0 on a conduit type. */
+  cableBoughtFeet: number;
+  /** Cable installed: flat, vertical and makeup. */
+  cableInstalledFeet: number;
+  /** Insulated conductors to buy, every circuit. 0 on a cable type. */
+  insulatedBoughtFeet: number;
+  /** Insulated conductors installed: no extra, makeup included. */
+  insulatedInstalledFeet: number;
+  /** Bare or green ground to buy. 0 on a cable type — inside the jacket. */
+  groundBoughtFeet: number;
+  /** Ground installed: no extra, makeup included. */
+  groundInstalledFeet: number;
+  /**
+   * The EXTRA inside the raceway figure — conduit extra on a conduit type,
+   * cable extra on a cable type. Material only.
+   */
+  racewayExtraFeet: number;
+  /** The extra inside the wire figures (insulated + ground). */
+  wireExtraFeet: number;
+  /** Makeup inside the wire figures, or inside the cable on a cable type. */
+  makeupFeet: number;
+  /** Measured runs of this type carrying an extra NOBODY SET (§ 5j). */
+  noExtraCount: number;
+  /**
+   * DROPS FROM MARKS on this type (held-migrations plan § 3): the pipe or
+   * cable of the drops themselves, already INSIDE the raceway figures above,
+   * and how many drops. Shown apart as "from marks"; fittings for them are
+   * NOT counted (Q8), and every screen showing this says so.
+   */
+  markDropFeet: number;
+  markDropCount: number;
   /** Runs of this type that could not be measured, so are NOT in the above. */
   unmeasurableCount: number;
   /** Runs of this type nobody has answered the branch question for. */
@@ -59,18 +101,23 @@ export type RunTypeFootageRow = {
    */
   branchCount: number;
   /**
-   * The share of `conduitFeet` / `cableFeet` that came from QUANTITY traces
-   * (D21, answer 3). Already INSIDE those totals — this is the split the
-   * panel shows, never a second amount to add.
+   * The share of the INSTALLED raceway (or cable) that came from QUANTITY
+   * traces (D21, answer 3). Already inside it — this is the split the panel
+   * shows, never a second amount to add.
    */
   quantityFeet: number;
   /**
-   * The share of `conduitFeet` / `cableFeet` that is VERTICAL — drops and
-   * rises at run ends. Already INSIDE those totals, like `quantityFeet`; the
-   * traced share is the total minus this. Added 2026-09-27 for the takeoff
-   * export, which shows the two apart.
+   * The share of the INSTALLED raceway (or cable) that is VERTICAL — drops
+   * and rises at run ends. Added 2026-09-27 for the takeoff export, which
+   * shows the parts apart.
    */
   verticalFeet: number;
+  /**
+   * The share of the INSTALLED raceway (or cable) whose FLAT length the
+   * estimator typed rather than traced (§ 4c). Shown apart because a typed
+   * number and a measured one are different kinds of fact.
+   */
+  typedFeet: number;
   /**
    * Measured runs with at least one end whose drop was NOT counted — no
    * mounting height answered. Asked of the ENDS, through `uncountedEnds`, the
@@ -100,6 +147,13 @@ export type GroupableRun = {
   runTypeId: number | null;
   pathType: RunPathType;
   points: { x: number; y: number }[];
+  /**
+   * A length the estimator typed (§ 4c), as the row holds it — a DECIMAL
+   * string. REQUIRED: this shape is restated field by field, and a typed run
+   * that lost this field on the way here would price as unmeasurable on the
+   * bid while the panel showed its footage.
+   */
+  typedLengthInches: string | number | null;
   isSuggestion: boolean;
   branchWiring: boolean | null;
   startKind: string | null;
@@ -117,7 +171,7 @@ export type GroupableRun = {
   endTeeId: number | null;
   /** Route or quantity (D21). */
   traceMode: TraceMode | null;
-};
+} & ExtrasRow; // the run's own extra and makeup — REQUIRED, see ExtrasRow
 
 export type SheetScale = {
   scaleRatio: number | null;
@@ -165,6 +219,13 @@ export function groupRunFootage(input: {
    * and the tee box is never bought.
    */
   teesById: ReadonlyMap<number, TeeRef>;
+  /**
+   * Drops from counted marks (held-migrations plan § 3), per group per sheet.
+   * REQUIRED, like every input here that adds footage: a caller that could
+   * leave it out would price a bid without its drops and say nothing.
+   * `[]` where a caller genuinely has none.
+   */
+  markDrops: readonly MarkDropEntry[];
 }): Map<number, RunTypeFootageRow> {
   const byType = new Map<number, RunTypeFootageRow>();
 
@@ -176,26 +237,7 @@ export function groupRunFootage(input: {
     const runTypeId = run.runTypeId;
     if (runTypeId === null) continue; // runOnBid said noType; this narrows it.
 
-    let row = byType.get(runTypeId);
-    if (!row) {
-      row = {
-        runTypeId,
-        pathType: run.pathType,
-        conduitFeet: 0,
-        cableFeet: 0,
-        insulatedFeet: 0,
-        groundFeet: 0,
-        unmeasurableCount: 0,
-        unansweredCount: 0,
-        branchCount: 0,
-        quantityFeet: 0,
-        verticalFeet: 0,
-        endsNotCountedCount: 0,
-        legs: [],
-        tees: [],
-      };
-      byType.set(runTypeId, row);
-    }
+    const row = rowFor(byType, runTypeId, run.pathType);
 
     /*
       The guard, applied before anything is added. A run the estimator called
@@ -222,10 +264,11 @@ export function groupRunFootage(input: {
 
     const verticals = verticalsForRunRow(run, input.heights);
     const quantities = quantitiesForRun(
-      { pathType: run.pathType, points: run.points },
+      tracedRunOf(run),
       (input.circuitsByRun.get(run.id) ?? []).map(circuitWire),
       ratio,
-      verticals
+      verticals,
+      extrasForRunRow(run, input.heights)
     );
 
     /*
@@ -261,7 +304,9 @@ export function groupRunFootage(input: {
           startStampId: run.startStampId,
           endStampId: run.endStampId,
           points: run.points,
-          conduitFeet: quantities?.conduitFeet ?? null,
+          // INSTALLED pipe: extra conduit covers route uncertainty and adds no
+          // couplings or straps (held-migrations plan § 1).
+          conduitFeet: quantities?.conduitInstalledFeet ?? null,
           verticals,
           feetPerPoint: inchesPerPoint === null ? null : inchesPerPoint / 12,
           answers: input.pullPointAnswersByRun.get(run.id) ?? [],
@@ -277,16 +322,31 @@ export function groupRunFootage(input: {
       continue;
     }
 
-    row.conduitFeet += quantities.conduitFeet ?? 0;
-    row.cableFeet += quantities.cableFeet ?? 0;
+    row.conduitBoughtFeet += quantities.conduitBoughtFeet ?? 0;
+    row.conduitInstalledFeet += quantities.conduitInstalledFeet ?? 0;
+    row.cableBoughtFeet += quantities.cableBoughtFeet ?? 0;
+    row.cableInstalledFeet += quantities.cableInstalledFeet ?? 0;
     row.verticalFeet += quantities.verticalFeet;
+    if (quantities.lengthSource === "typed")
+      row.typedFeet += quantities.runFeet;
+    if (carriesNoExtra(quantities)) row.noExtraCount++;
     const notCounted = quantities.verticals
       ? uncountedEnds(quantities.verticals).length
       : 2;
     if (notCounted > 0) row.endsNotCountedCount++;
     if (run.traceMode === "quantity")
-      row.quantityFeet +=
-        (quantities.conduitFeet ?? 0) + (quantities.cableFeet ?? 0);
+      row.quantityFeet += quantities.runFeet + quantities.verticalFeet;
+    /*
+      The raceway's extra, and on a cable type its makeup too — the cable IS
+      the wire, and its footage is on the bid even when D18 says branch
+      (branch cable is left out above, whole, before reaching here).
+    */
+    if (quantities.pathType === "conduit") {
+      row.racewayExtraFeet += quantities.conduitExtraFeet;
+    } else {
+      row.racewayExtraFeet += quantities.wireExtraFeet;
+      row.makeupFeet += quantities.makeupFeet;
+    }
     /*
       Insulated and ground are a SUBTRACTION, not two additions — the shape
       `totalQuantities` uses for `wireGroundFeet`. `totalWireFeet` is everything
@@ -302,22 +362,115 @@ export function groupRunFootage(input: {
       re-meant.
     */
     if (!on.wire) continue;
-    const groundShare = quantities.groundFeet;
-    row.groundFeet += groundShare;
-    row.insulatedFeet += Math.max(0, quantities.totalWireFeet - groundShare);
+    // Bought and installed, each a subtraction of its own ground share.
+    row.groundBoughtFeet += quantities.groundBoughtFeet;
+    row.groundInstalledFeet += quantities.groundInstalledFeet;
+    row.insulatedBoughtFeet += Math.max(
+      0,
+      quantities.wireBoughtFeet - quantities.groundBoughtFeet
+    );
+    row.insulatedInstalledFeet += Math.max(
+      0,
+      quantities.wireInstalledFeet - quantities.groundInstalledFeet
+    );
+    if (quantities.pathType === "conduit") {
+      row.wireExtraFeet += quantities.wireExtraFeet;
+      row.makeupFeet += quantities.makeupFeet;
+    }
+  }
+
+  /*
+    DROPS FROM MARKS (held-migrations plan § 3), onto the same run-type row
+    as the traced footage of that type — one purchase, one bid line, the way
+    D21 puts quantity and route footage of one type on one line. A drop is
+    vertical footage, so it adds to `verticalFeet` too; the claim rule and the
+    extras were applied in shared/groupDrops.ts, once.
+  */
+  for (const entry of input.markDrops) {
+    const f = dropsFootage(entry.perDrop, entry.count);
+    const row = rowFor(byType, entry.runTypeId, f.pathType);
+    row.markDropFeet += f.dropFeet;
+    row.markDropCount += entry.count;
+    row.verticalFeet += f.dropFeet;
+    row.conduitBoughtFeet += f.conduitBoughtFeet;
+    row.conduitInstalledFeet += f.conduitInstalledFeet;
+    row.cableBoughtFeet += f.cableBoughtFeet;
+    row.cableInstalledFeet += f.cableInstalledFeet;
+    row.groundBoughtFeet += f.groundBoughtFeet;
+    row.groundInstalledFeet += f.groundInstalledFeet;
+    row.insulatedBoughtFeet += Math.max(
+      0,
+      f.wireBoughtFeet - f.groundBoughtFeet
+    );
+    row.insulatedInstalledFeet += Math.max(
+      0,
+      f.wireInstalledFeet - f.groundInstalledFeet
+    );
+    row.makeupFeet += f.makeupFeet;
+    if (f.pathType === "cable") row.racewayExtraFeet += f.wireExtraFeet;
+    else row.wireExtraFeet += f.wireExtraFeet;
   }
 
   for (const row of Array.from(byType.values())) {
-    row.conduitFeet = round2(row.conduitFeet);
-    row.cableFeet = round2(row.cableFeet);
-    row.insulatedFeet = round2(row.insulatedFeet);
-    row.groundFeet = round2(row.groundFeet);
+    row.markDropFeet = round2(row.markDropFeet);
+    row.conduitBoughtFeet = round2(row.conduitBoughtFeet);
+    row.conduitInstalledFeet = round2(row.conduitInstalledFeet);
+    row.cableBoughtFeet = round2(row.cableBoughtFeet);
+    row.cableInstalledFeet = round2(row.cableInstalledFeet);
+    row.insulatedBoughtFeet = round2(row.insulatedBoughtFeet);
+    row.insulatedInstalledFeet = round2(row.insulatedInstalledFeet);
+    row.groundBoughtFeet = round2(row.groundBoughtFeet);
+    row.groundInstalledFeet = round2(row.groundInstalledFeet);
+    row.racewayExtraFeet = round2(row.racewayExtraFeet);
+    row.wireExtraFeet = round2(row.wireExtraFeet);
+    row.makeupFeet = round2(row.makeupFeet);
     row.quantityFeet = round2(row.quantityFeet);
     row.verticalFeet = round2(row.verticalFeet);
+    row.typedFeet = round2(row.typedFeet);
   }
   return byType;
 }
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+/** The row for a run type, created empty the first time — runs and drops alike. */
+function rowFor(
+  byType: Map<number, RunTypeFootageRow>,
+  runTypeId: number,
+  pathType: RunPathType
+): RunTypeFootageRow {
+  let row = byType.get(runTypeId);
+  if (!row) {
+    row = {
+      runTypeId,
+      pathType,
+      conduitBoughtFeet: 0,
+      conduitInstalledFeet: 0,
+      cableBoughtFeet: 0,
+      cableInstalledFeet: 0,
+      insulatedBoughtFeet: 0,
+      insulatedInstalledFeet: 0,
+      groundBoughtFeet: 0,
+      groundInstalledFeet: 0,
+      racewayExtraFeet: 0,
+      wireExtraFeet: 0,
+      makeupFeet: 0,
+      noExtraCount: 0,
+      markDropFeet: 0,
+      markDropCount: 0,
+      unmeasurableCount: 0,
+      unansweredCount: 0,
+      branchCount: 0,
+      quantityFeet: 0,
+      verticalFeet: 0,
+      typedFeet: 0,
+      endsNotCountedCount: 0,
+      legs: [],
+      tees: [],
+    };
+    byType.set(runTypeId, row);
+  }
+  return row;
 }

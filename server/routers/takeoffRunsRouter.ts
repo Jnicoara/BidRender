@@ -48,7 +48,9 @@ import {
   circuitWire,
   measurabilityOf,
   quantitiesForRun,
+  runFeet as runFeetOf,
   totalQuantities,
+  tracedRunOf,
   type RunPathType,
 } from "../../shared/takeoffQuantities";
 import { runWireOwnership } from "../../shared/branchWire";
@@ -59,7 +61,20 @@ import {
   runNameParts,
 } from "../../shared/takeoffCounts";
 import * as db from "../db";
-import { EMPTY_HEIGHT_CONTEXT, verticalsForRunRow } from "../runVerticals";
+import {
+  EMPTY_HEIGHT_CONTEXT,
+  extrasForRunRow,
+  extrasViewForRunRow,
+  verticalsForRunRow,
+} from "../runVerticals";
+import {
+  extraPctSchema,
+  makeupByKindSchema,
+  makeupInchesSchema,
+  pctText,
+  refuseUnknownKinds,
+} from "../extrasInput";
+import { markDropEntries } from "../../shared/groupDrops";
 import { resolveRunType } from "../../shared/runTypeLookup";
 import { resolveMaterial } from "../../shared/materialLookup";
 import { rootOf } from "../../shared/runNetwork";
@@ -304,10 +319,7 @@ export const takeoffRunsRouter = router({
           separateGround: c.separateGround ?? false,
         }));
 
-        const traced = {
-          pathType: run.pathType as RunPathType,
-          points: run.points ?? [],
-        };
+        const traced = tracedRunOf(run);
         return {
           id: run.id,
           name: run.name,
@@ -342,12 +354,25 @@ export const takeoffRunsRouter = router({
           isSuggestion: run.isSuggestion,
           location: run.location,
           circuits: runCircuits,
+          /**
+           * What the estimator typed, in inches, or null for "measured from
+           * the drawing" (§ 4c). Raw, for the field that edits it; the
+           * arithmetic reads it through `quantities`.
+           */
+          typedLengthInches: traced.typedLengthInches,
+          /**
+           * This run's own extra and makeup, and what it inherits without
+           * them — for the panel's fields and their placeholders. The
+           * arithmetic reads them through `quantities`.
+           */
+          extras: extrasViewForRunRow(run, heights),
           /** Null whenever the sheet cannot be measured — never a fallback 0. */
           quantities: quantitiesForRun(
             traced,
             forMaths,
             ratio,
-            verticalsForRunRow(run, heights)
+            verticalsForRunRow(run, heights),
+            extrasForRunRow(run, heights)
           ),
           /** What is at each end, so the panel can show it and change it. */
           ends: {
@@ -599,18 +624,25 @@ export const takeoffRunsRouter = router({
   /**
    * Mark a run finished.
    *
-   * Refuses if the sheet cannot be measured: committing is the point at which
-   * a run enters the bill of materials, and an uncounted line there is worse
-   * than a draft the user can see is unfinished.
+   * ── On a sheet with no usable scale this FINISHES, and measures nothing ────
+   * Changed 2026-09-29 for typed lengths (§ 4c). It used to refuse, on the
+   * reasoning that committing is when a run enters the bill of materials. That
+   * stopped being true on 2026-09-27 — drafts count on the bid too
+   * (shared/runOnBid.ts) — and the refusal left a riser traced on purpose,
+   * to have its length typed, stuck as a draft forever.
+   *
+   * What is still refused is a MEASURED number: no `lengthInches` is stored
+   * against points on such a sheet, and the run reports as not measured
+   * everywhere until a length is typed. `runFeet` in the reply is null in that
+   * case, and the screen says to type the length rather than "0 ft traced".
    */
   commit: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const run = await requireRun(input.id, ctx.scope.dataUserId);
-      const { ratio } = await requireMeasurableSheet(
-        run.sheetId,
-        ctx.scope.dataUserId
-      );
+      const sheet = await requireSheet(run.sheetId, ctx.scope.dataUserId);
+      const measurability = measurabilityOf(sheetScale(sheet));
+      const ratio = measurability.ok ? measurability.ratio : null;
 
       const points = run.points ?? [];
       if (points.length < 2) {
@@ -620,8 +652,8 @@ export const takeoffRunsRouter = router({
         });
       }
 
-      const inches = pathRealInches(points, ratio);
-      if (inches === null) {
+      const inches = ratio === null ? null : pathRealInches(points, ratio);
+      if (ratio !== null && inches === null) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "That path could not be measured.",
@@ -644,24 +676,39 @@ export const takeoffRunsRouter = router({
         two numbers for one run. It used to name only the leg being
         committed: "57.6 ft traced" for a three-leg, 121 ft run (D20).
       */
-      let runFeet = 0;
+      /*
+        Each leg's feet through the shared `runFeet`, so a TYPED leg counts
+        what was typed and a traced one what the drawing measures — the same
+        figure the panel shows. A leg with neither leaves the whole-run figure
+        null rather than quietly short.
+      */
+      let runFeet: number | null = 0;
       for (const row of group) {
         const rowInches =
-          row.id === run.id ? inches : pathRealInches(row.points ?? [], ratio);
-        if (rowInches !== null) runFeet += toBillableFeet(rowInches);
+          ratio === null
+            ? null
+            : row.id === run.id
+              ? inches
+              : pathRealInches(row.points ?? [], ratio);
+        const rowFeet = runFeetOf(tracedRunOf(row), ratio);
+        runFeet =
+          runFeet === null || rowFeet === null ? null : runFeet + rowFeet;
         await db.updateRun(row.id, ctx.scope.dataUserId, {
           status: "committed",
           isSuggestion: false,
           lengthInches: rowInches === null ? null : rowInches.toFixed(4),
-          scaleRatioUsed: String(ratio),
+          scaleRatioUsed: ratio === null ? null : String(ratio),
         });
       }
       return {
         id: input.id,
-        /** This row alone. */
-        lengthFeet: toBillableFeet(inches),
-        /** Every leg of the run, and how many there are. */
-        runFeet: Math.round(runFeet * 100) / 100,
+        /** This row alone, as drawn. Null with no scale. */
+        lengthFeet: inches === null ? null : toBillableFeet(inches),
+        /**
+         * Every leg of the run, typed or traced. Null when a leg has no length
+         * yet — no scale and nothing typed — so the screen asks for one.
+         */
+        runFeet: runFeet === null ? null : Math.round(runFeet * 100) / 100,
         legCount: Math.max(group.length, 1),
       };
     }),
@@ -698,6 +745,55 @@ export const takeoffRunsRouter = router({
     }),
 
   /** Tag a run's Location without disturbing its geometry. */
+  /**
+   * Type a run's flat length, or clear it back to the drawing — § 4c.
+   *
+   * ── Its own column, and nothing else here writes it ──────────────────────
+   * `lengthInches` is recomputed from the points on every save, so a typed
+   * value stored there would be overwritten the next time a point moved or
+   * the sheet's scale changed. `typedLengthInches` is written HERE and only
+   * here; `save` lists its columns explicitly and this is not one of them.
+   * `server/typedLengthRuns.test.ts` re-saves, re-scales and re-points a
+   * typed run and asserts the number is still what the estimator typed.
+   *
+   * ── Per ROW, not per run ───────────────────────────────────────────────────
+   * A branched run is a root and legs (D20), and each leg has its own length.
+   * Unlike `traceMode`, nothing here needs keeping equal across the rows.
+   *
+   * ── No scale needed ────────────────────────────────────────────────────────
+   * That is the point: a riser or a one-line has no single scale. So this
+   * does not go through `requireMeasurableSheet`.
+   */
+  setTypedLength: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        /**
+         * Inches, flat along the drawing. NULL goes back to measuring the
+         * points. Zero and negative are refused rather than stored: a zero
+         * length prices the run at nothing, which is never what somebody who
+         * typed a length meant. The ceiling (10,000 ft) catches a slipped
+         * key — no single pull is that long.
+         */
+        typedLengthInches: z
+          .number()
+          .finite()
+          .positive()
+          .max(120_000)
+          .nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await requireRun(input.id, ctx.scope.dataUserId);
+      await db.updateRun(input.id, ctx.scope.dataUserId, {
+        typedLengthInches:
+          input.typedLengthInches === null
+            ? null
+            : input.typedLengthInches.toFixed(4),
+      });
+      return { success: true };
+    }),
+
   setLocation: procedure
     .input(
       z.object({
@@ -1222,13 +1318,28 @@ export const takeoffRunsRouter = router({
         bid.distributionHeightInches
       );
 
-      const measure = (rows: typeof runs, withWire: (id: number) => boolean) =>
+      /*
+        DROPS FROM MARKS (§ 3): in the totals exactly as on the bid, so the
+        panel and the bid line cannot disagree about them. Counted against
+        ALL runs, because any run end — typed or not — can claim a mark.
+      */
+      const drops = await db.loadGroupDrops(
+        input.bidId,
+        ctx.scope.dataUserId,
+        heights,
+        allRuns,
+        await db.getSheetScalesForBid(input.bidId, ctx.scope.dataUserId)
+      );
+      const dropEntries = markDropEntries(drops);
+
+      const measure = (
+        rows: typeof runs,
+        withWire: (id: number) => boolean,
+        markDrops: typeof dropEntries
+      ) =>
         totalQuantities(
           rows.map(run => ({
-            run: {
-              pathType: run.pathType as RunPathType,
-              points: run.points ?? [],
-            },
+            run: tracedRunOf(run),
             // A branch run's wire belongs to the devices (D18): its pipe is
             // measured and its wire is not.
             circuits: withWire(run.id)
@@ -1236,19 +1347,24 @@ export const takeoffRunsRouter = router({
               : [],
             ratio: ratioBySheet.get(run.sheetId) ?? null,
             verticals: verticalsForRunRow(run, heights),
+            extras: extrasForRunRow(run, heights),
             // A branched run is several rows and ONE run in the counts (D20).
             runKey: rootOf(run),
-          }))
+          })),
+          markDrops
         );
 
-      const totals = measure(runs, id => wireCounts.has(id));
-      const untyped = measure(noType, () => true);
+      const totals = measure(runs, id => wireCounts.has(id), dropEntries);
+      // Untyped RUNS only: a drop with no type is not footage anybody can
+      // price, and is counted below as its own note.
+      const untyped = measure(noType, () => true, []);
       const roots = (rows: typeof allRuns) => new Set(rows.map(rootOf)).size;
       const leftOut: RunTotalsLeftOut = {
         noType: {
           count: roots(noType),
-          conduitFeet: untyped.conduitFeet,
-          cableFeet: untyped.cableFeet,
+          // What these runs would buy, had they a type to price them under.
+          conduitFeet: untyped.conduitBoughtFeet,
+          cableFeet: untyped.cableBoughtFeet,
         },
         branch: {
           count: roots(
@@ -1257,7 +1373,23 @@ export const takeoffRunsRouter = router({
         },
         draftCount: roots(runs.filter(r => r.status === "draft")),
       };
-      return { ...totals, quantity: quantityTraceSummary(runs), leftOut };
+      return {
+        ...totals,
+        quantity: quantityTraceSummary(runs),
+        leftOut,
+        /**
+         * What the DROPS FROM MARKS leave out, said beside the totals (§ 3):
+         * groups that want a drop but have no run type or no height, and
+         * counted drops sitting near an unlinked run end — a possible double
+         * count, flagged rather than guessed. Fittings for drops are never
+         * counted (Q8); `markDropCount` above is what that sentence counts.
+         */
+        markDropNotes: {
+          noTypeGroups: drops.filter(d => d.status === "no-type").length,
+          noHeightGroups: drops.filter(d => d.status === "no-height").length,
+          mayDoubleCount: drops.reduce((n, d) => n + d.mayDoubleCount, 0),
+        },
+      };
     }),
 
   /**
@@ -1427,6 +1559,44 @@ export const takeoffRunsRouter = router({
    * Refused on a quantity-locked bid, like retyping a run: it changes what
    * the run's wire is made of, which is what the lock holds still.
    */
+  /**
+   * A run's own extra and makeup — the nearest level of the chain (held-
+   * migrations plan § 1, owner 2026-09-28: every value at every level).
+   *
+   * Written to EVERY row of the run so a leg reads the run's figure from its
+   * own row (the `traceMode` rule). Omitted leaves a value; NULL goes back to
+   * the run type's. Refused on a locked bid: it moves quantities.
+   */
+  setExtras: procedure
+    .input(
+      z.object({
+        /** Any row of the run: the root or one of its legs. */
+        runId: z.number().int().positive(),
+        conduitExtraPct: extraPctSchema.nullable().optional(),
+        wireExtraPct: extraPctSchema.nullable().optional(),
+        makeupDeviceInches: makeupInchesSchema.nullable().optional(),
+        makeupPanelInches: makeupInchesSchema.nullable().optional(),
+        makeupByKindInches: makeupByKindSchema.nullable().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const run = await requireRun(input.runId, userId);
+      await refuseIfLocked(run.bidId, userId);
+      if (input.makeupByKindInches)
+        await refuseUnknownKinds(Object.keys(input.makeupByKindInches), userId);
+      const { runId: _run, conduitExtraPct, wireExtraPct, ...rest } = input;
+      return db.setRunExtras(rootOf(run), userId, {
+        ...rest,
+        ...(conduitExtraPct !== undefined
+          ? { conduitExtraPct: pctText(conduitExtraPct) }
+          : {}),
+        ...(wireExtraPct !== undefined
+          ? { wireExtraPct: pctText(wireExtraPct) }
+          : {}),
+      });
+    }),
+
   setTraceMode: procedure
     .input(
       z.object({
@@ -1608,7 +1778,38 @@ export const takeoffRunsRouter = router({
           });
         }
       }
-      return { drops, notMeasurable, noRunHeight };
+
+      /*
+        DROPS FROM MARKS (held-migrations plan § 3), one line per counted item
+        rather than per mark — thirty receptacles are one decision made once
+        on the group. From the same function the bid and the totals read, so
+        this list cannot disagree with them. A mark needs no scale.
+      */
+      const groups = await db.getGroupsForBid(input.bidId, userId);
+      const groupLabel = new Map(groups.map(g => [g.id, g.label]));
+      const fromMarks = (
+        await db.loadGroupDrops(input.bidId, userId, heights, allRuns, scales)
+      )
+        .filter(d => d.status === "counted" && d.perDropFeet !== null)
+        .map(d => ({
+          groupId: d.groupId,
+          groupLabel: groupLabel.get(d.groupId) ?? "Count",
+          label:
+            heightTypeLabel(
+              groups.find(g => g.id === d.groupId)?.dropKind ?? "",
+              heights.types
+            ) ?? "",
+          count: d.countedMarks.length,
+          perDropFeet: d.perDropFeet as number,
+          feet:
+            Math.round(
+              (d.perDropFeet as number) * d.countedMarks.length * 100
+            ) / 100,
+          runTypeId: d.runTypeId,
+          mayDoubleCount: d.mayDoubleCount,
+        }))
+        .filter(d => d.count > 0);
+      return { drops, notMeasurable, noRunHeight, fromMarks };
     }),
 
   /**

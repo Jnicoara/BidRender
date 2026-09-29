@@ -36,6 +36,7 @@ import {
   type LineProblem,
 } from "../shared/linePricingProblems";
 import { storedMarkupPct } from "../shared/materialMarkup";
+import { laborQtyOf } from "../shared/lineLaborQty";
 import { countNotPriced } from "../shared/lineNotPriced";
 
 /**
@@ -220,6 +221,9 @@ export function priceLine(line: BidLineItem, productivityPct: number) {
     modifiers: [{ laborAdjustmentPct: Number(line.snapshotModifierPct) }],
     laborRate: Number(line.snapshotLaborRate),
     quantity: Number(line.qty),
+    // Traced footage: labour on INSTALLED feet, the extra is material only
+    // (Q5). Every other line reads its qty — see shared/lineLaborQty.ts.
+    laborQuantity: laborQtyOf(line),
     productivityPct,
     // Frozen with the rest of the snapshot. NULL — a line from before markup
     // rules — reads as 0%, which is what keeps every such line where it was.
@@ -618,7 +622,9 @@ export function bidRollup<L extends RollupLine>(
        * and they have to be on the same footing.
        */
       laborHoursBeforeProductivity: pricedOnly.reduce(
-        (sum, p) => sum + p.breakdown.hoursAfterModifiers * Number(p.line.qty),
+        (sum, p) =>
+          // Installed, not bought — the same footing as totalLaborHours (Q5).
+          sum + p.breakdown.hoursAfterModifiers * laborQtyOf(p.line),
         0
       ),
       materialCost,

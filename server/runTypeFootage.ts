@@ -9,6 +9,7 @@
 import * as db from "./db";
 import { groupRunFootage, type RunTypeFootageRow } from "./runTypeFootageCore";
 import { rootOf } from "../shared/runNetwork";
+import { markDropEntries } from "../shared/groupDrops";
 
 export type { RunTypeFootageRow };
 
@@ -36,18 +37,27 @@ export async function loadRunFootageInput(
     db.getRunsForBid(bidId, userId),
     db.getSheetScalesForBid(bidId, userId),
   ]);
-  if (runs.length === 0) return null;
-
-  // A quantity trace's wire comes from its type (D21).
-  const circuitsByRun = await db.getWireCircuitsForRuns(runs, userId);
 
   const heights = await db.heightContextForBid(
     bidId,
     userId,
     distributionHeightInches
   );
+  /*
+    Drops from counted marks (§ 3). Loaded BEFORE the "no runs" exit: a bid
+    whose conduit is all drops to marked devices has no traced run at all,
+    and returning early there would price every one of its drops at nothing.
+  */
+  const markDrops = markDropEntries(
+    await db.loadGroupDrops(bidId, userId, heights, runs, scales)
+  );
+  if (runs.length === 0 && markDrops.length === 0) return null;
+
+  // A quantity trace's wire comes from its type (D21).
+  const circuitsByRun = await db.getWireCircuitsForRuns(runs, userId);
 
   return {
+    markDrops,
     runs,
     circuitsByRun,
     scales,

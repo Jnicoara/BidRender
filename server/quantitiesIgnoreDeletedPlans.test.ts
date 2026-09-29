@@ -260,7 +260,7 @@ withDb("a deleted plan set's marks and runs reach no quantity", () => {
     // The control is not vacuous: two marks at $10, one run with footage.
     expect(expected.count).toBe(2);
     expect(expected.materialCost).toBe(20);
-    expect(expected.footage[0].conduitFeet).toBeGreaterThan(0);
+    expect(expected.footage[0].conduitBoughtFeet).toBeGreaterThan(0);
 
     const subject = await buildBid(emt.id, true);
     const before = await readings(subject.bidId, subject.groupId);

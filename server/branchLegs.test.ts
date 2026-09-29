@@ -428,7 +428,11 @@ withDb("the whole run moves together", () => {
     // before, which the panel's leg header contradicted.
     expect(done.legCount).toBe(3);
     expect(done.runFeet).toBeCloseTo(90, 2);
-    expect(done.lengthFeet).toBeLessThan(done.runFeet);
+    // Both nullable since a run on an unscaled sheet can be finished (§ 4c);
+    // this sheet is scaled, so a null on either side must fail, not pass.
+    expect(done.lengthFeet ?? Number.POSITIVE_INFINITY).toBeLessThan(
+      done.runFeet ?? 0
+    );
   });
 
   it("deletes legs and tees with the run", async () => {

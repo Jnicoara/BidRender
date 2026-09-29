@@ -40,9 +40,12 @@ import {
   stampName,
   symbolLookupKey,
 } from "../../shared/takeoffCounts";
-import { measurabilityOf } from "../../shared/takeoffQuantities";
+import {
+  measurabilityOf,
+  runFeet,
+  tracedRunOf,
+} from "../../shared/takeoffQuantities";
 import { TAKEOFF_LOCATIONS } from "../../drizzle/schema";
-import { pathRealInches, toBillableFeet } from "../../shared/takeoffGeometry";
 import * as db from "../db";
 
 /**
@@ -294,16 +297,17 @@ export const takeoffStampsRouter = router({
           // says what the job contains until the user accepts it.
           .filter(run => !run.isSuggestion)
           .map(run => {
-            const points = run.points ?? [];
-            const inches =
-              ratio === null ? null : pathRealInches(points, ratio);
+            // Through the same `runFeet` every other reading uses, so a TYPED
+            // length (§ 4c) counts here too rather than reading as
+            // unmeasurable on a sheet with no scale.
+            const traced = tracedRunOf(run);
             return {
               id: run.id,
               sheetId: run.sheetId,
               name: run.name,
-              pathType: run.pathType as "conduit" | "cable",
-              points,
-              runFeet: inches === null ? null : toBillableFeet(inches),
+              pathType: traced.pathType,
+              points: traced.points,
+              runFeet: runFeet(traced, ratio),
             };
           })
       );

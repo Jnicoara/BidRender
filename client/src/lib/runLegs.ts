@@ -21,7 +21,15 @@ export type LegRow = {
     groundCount: number | null;
     separateGround: boolean;
   }[];
-  quantities: { conduitFeet: number | null; cableFeet: number | null } | null;
+  /**
+   * INSTALLED footage — the run's length as laid, flat and vertical, the same
+   * figure the header showed before extras existed. Not bought: a run's
+   * length does not grow because a percentage was bought to cover it.
+   */
+  quantities: {
+    conduitInstalledFeet: number | null;
+    cableInstalledFeet: number | null;
+  } | null;
 };
 
 export type LegPlace = {
@@ -79,7 +87,8 @@ export function layoutLegs<T extends LegRow>(
     let total: number | null = 0;
     for (const leg of legs) {
       const feet = leg.quantities
-        ? (leg.quantities.conduitFeet ?? leg.quantities.cableFeet)
+        ? (leg.quantities.conduitInstalledFeet ??
+          leg.quantities.cableInstalledFeet)
         : null;
       total = total === null || feet === null ? null : total + feet;
     }

@@ -40,7 +40,26 @@ import {
   suggestAfter,
 } from "@/lib/runCircuits";
 import { runAppearance, type RunTypeColors } from "@shared/takeoffMarks";
-import type { RunQuantities, totalQuantities } from "@shared/takeoffQuantities";
+import {
+  carriesNoExtra,
+  type RunQuantities,
+  type totalQuantities,
+} from "@shared/takeoffQuantities";
+import type { ResolvedExtra } from "@shared/runExtras";
+import {
+  GroupDrop,
+  type GroupDropInfo,
+  type GroupDropPatch,
+} from "@/components/takeoff/GroupDrop";
+
+/** A run's own extra and makeup, as the panel sends it. Omitted = unchanged. */
+export type RunExtrasPatch = {
+  conduitExtraPct?: number | null;
+  wireExtraPct?: number | null;
+  makeupDeviceInches?: number | null;
+  makeupPanelInches?: number | null;
+  makeupByKindInches?: Record<string, number> | null;
+};
 import { verticalsNotice } from "@shared/takeoffHeights";
 import { FITTING_KIND_LABELS, type FittingKind } from "@shared/runFittings";
 import { fittingRowSpeaks } from "@shared/runFittingMaterials";
@@ -298,6 +317,32 @@ export type PanelRun = {
     separateGround: boolean;
   }[];
   quantities: RunQuantities | null;
+  /**
+   * A length the estimator typed, in inches (§ 4c). Null is "measured from the
+   * drawing". Optional only so a caller that never edits lengths need not
+   * pass it; the Takeoff screen always does.
+   */
+  typedLengthInches?: number | null;
+  /**
+   * This run's own extra and makeup, and what it inherits without them —
+   * `extrasViewForRunRow` on the server. Optional for the same reason as the
+   * typed length; the Takeoff screen always sends it.
+   */
+  extras?: {
+    own: {
+      conduitExtraPct: number | null;
+      wireExtraPct: number | null;
+      makeupDeviceInches: number | null;
+      makeupPanelInches: number | null;
+      makeupByKindInches: Record<string, number> | null;
+    };
+    inherited: {
+      conduitExtraPct: ResolvedExtra;
+      wireExtraPct: ResolvedExtra;
+      makeupDeviceInches: ResolvedExtra;
+      makeupPanelInches: ResolvedExtra;
+    };
+  };
   /** What is at each end. Undefined only for a suggestion the AI proposed. */
   ends?: {
     startKind: string | null;
@@ -375,27 +420,333 @@ function Footage({
   flat,
   vertical,
   total,
+  typed = false,
+  extra = 0,
+  makeup = 0,
 }: {
   label: React.ReactNode;
   flat: number;
   vertical: number;
+  /** What gets BOUGHT — every term below added up. */
   total: number;
+  /**
+   * The flat share was TYPED by the estimator, not traced (§ 4c). Said on the
+   * line itself — "60.00 typed + 8.50 = 68.50 ft" — because a number somebody
+   * supplied and one the app measured are different kinds of fact, and this
+   * line is where an estimator checks where every foot came from.
+   */
+  typed?: boolean;
+  /**
+   * EXTRA and MAKEUP (§ 5j), each its own named term: "112.00 + 8.50 vertical
+   * + 5.60 extra = 126.10 ft". A total with them folded in is as invisible as
+   * not counting them. Zero terms are dropped — `+ 0.00 extra` is noise where
+   * a number goes; "nobody set this" is said by the run row instead.
+   *
+   * When extra is present a second line says where the LABOUR is: extra is
+   * material only and makeup is installed (owner, 2026-09-28, Q5), so the
+   * hours are on flat + vertical + makeup and the reader can see that number.
+   */
+  extra?: number;
+  makeup?: number;
 }) {
+  const word = typed ? (
+    <span className="font-sans text-sky-600 dark:text-sky-400"> typed</span>
+  ) : null;
+  const padded = extra > 0 || makeup > 0;
+  const installed = total - extra;
   return (
-    <div className="flex items-baseline justify-between text-xs gap-2">
-      <span className="text-muted-foreground shrink-0">{label}</span>
-      <span className="font-mono text-right">
-        {vertical > 0 ? (
-          <>
-            <span className="text-muted-foreground/70">
-              {exact(flat)} + {exact(vertical)} ={" "}
-            </span>
-            {exact(total)} ft
-          </>
-        ) : (
-          feet(total)
+    <div className="text-xs">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-muted-foreground shrink-0">{label}</span>
+        <span className="font-mono text-right">
+          {padded ? (
+            <>
+              <span className="text-muted-foreground/70">
+                {exact(flat)}
+                {word}
+                {vertical > 0 && <> + {exact(vertical)} vertical</>}
+                {extra > 0 && <> + {exact(extra)} extra</>}
+                {makeup > 0 && <> + {exact(makeup)} makeup</>} ={" "}
+              </span>
+              {exact(total)} ft
+            </>
+          ) : vertical > 0 ? (
+            <>
+              <span className="text-muted-foreground/70">
+                {exact(flat)}
+                {word} + {exact(vertical)} ={" "}
+              </span>
+              {exact(total)} ft
+            </>
+          ) : (
+            <>
+              {feet(total)}
+              {word}
+            </>
+          )}
+        </span>
+      </div>
+      {/* Short on each line; the WHY is said once under the totals and on
+          hover. Repeating "extra is material only" on every line was noise
+          (seen on screen, 2026-09-29). */}
+      {extra > 0 && (
+        <div
+          className="text-right text-[0.7rem] text-muted-foreground/80"
+          title="Extra is bought but not installed, so it carries no install hours. Makeup is installed and does."
+        >
+          labor on {exact(installed)} ft
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The typed-length box on a run row — § 4c, "draw the path, type the length".
+ *
+ * Three states, and the words differ in each because the situation does:
+ *
+ *   - NO SCALE on the sheet: the box is the only way this run gets a number,
+ *     so it is always shown, under the notice saying the run is not counted.
+ *   - TYPED: the box shows what was typed, and what the drawn line measures
+ *     beside it on a scaled sheet — so a slipped key (600 for 60) is one glance
+ *     away — with a way back to the drawing.
+ *   - TRACED on a scaled sheet: one quiet link, because typing over a good
+ *     measurement is the exception.
+ *
+ * Decimal FEET, through `InlineNumberField`, so it follows every rule in
+ * CLAUDE.md § Editing fields without a second implementation of them. The
+ * label says the length is FLAT (owner, 2026-09-28, Q6): drops and extra go
+ * on top, so typing the whole pull here would count the drops twice.
+ */
+function TypedLength({
+  run,
+  onSet,
+}: {
+  run: PanelRun;
+  onSet: (runId: number, inches: number | null) => void;
+}) {
+  const typedInches = run.typedLengthInches ?? null;
+  const drawn = run.quantities?.drawnFeet ?? null;
+  const [open, setOpen] = useState(false);
+  const noScale = run.quantities === null && typedInches === null;
+  const shown = noScale || typedInches !== null || open;
+
+  if (!shown) {
+    return (
+      <button
+        className="mt-1 text-[0.7rem] text-muted-foreground underline hover:text-foreground"
+        onClick={e => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+      >
+        Type a length instead
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-1.5 space-y-0.5" onClick={e => e.stopPropagation()}>
+      <div className="flex items-center justify-between text-xs gap-2">
+        <span className="text-muted-foreground shrink-0">
+          Length along the drawing
+        </span>
+        <InlineNumberField
+          value={typedInches === null ? null : typedInches / 12}
+          whenUnset={{ placeholder: "type ft" }}
+          rules={{ min: 0.01, max: 10_000, epsilon: 1e-4 }}
+          onSave={feet => onSet(run.id, feet * 12)}
+          onClear={() => onSet(run.id, null)}
+          ariaLabel="Typed length of this run, in feet"
+          suffix="ft"
+          className="w-24"
+        />
+      </div>
+      <p className="text-[0.7rem] text-muted-foreground">
+        Flat length only — drops and extra are added on top.
+        {typedInches !== null && drawn !== null && (
+          <> The drawn line measures {exact(drawn)} ft.</>
         )}
-      </span>
+        {typedInches !== null && drawn !== null && (
+          <>
+            {" "}
+            <button
+              className="underline hover:text-foreground"
+              onClick={() => onSet(run.id, null)}
+            >
+              Use the drawn length
+            </button>
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
+/** Where an inherited extra comes from, in the words a placeholder needs. */
+function inheritedText(resolved: ResolvedExtra, format: (n: number) => string) {
+  if (resolved.value === null) return "not set";
+  const from =
+    resolved.source === "type"
+      ? "type"
+      : resolved.source === "company"
+        ? "company"
+        : "starter";
+  return `${from} ${format(resolved.value)}`;
+}
+// Bare numbers: the field's own suffix ("%", "in") names the unit, and a
+// second one in the placeholder read "starter 5% %" (seen on screen).
+const pctLabel = (f: number) => String(Math.round(f * 10000) / 100);
+const inLabel = (n: number) => String(n);
+
+/**
+ * THIS RUN'S own extra and makeup — the nearest level of the chain (owner,
+ * 2026-09-28: every value at every level). Behind one link on the open run,
+ * because a run that differs from its type is the exception; open by itself
+ * when this run already differs, and says so with a one-click reset (§ 2.5).
+ *
+ * Self-saving fields: each placeholder names what applies when it is empty —
+ * "type 10%", "company 5%", "not set" — never a zero (CLAUDE.md § Editing
+ * fields, rule 6). A typed 0 is "none on this run", an answer.
+ */
+function RunExtrasEditor({
+  run,
+  customHeightTypes,
+  onSet,
+}: {
+  run: PanelRun & { extras: NonNullable<PanelRun["extras"]> };
+  customHeightTypes: readonly { typeKey: string; label: string }[];
+  onSet: (runId: number, patch: RunExtrasPatch) => void;
+}) {
+  const { own, inherited } = run.extras;
+  const differs =
+    own.conduitExtraPct !== null ||
+    own.wireExtraPct !== null ||
+    own.makeupDeviceInches !== null ||
+    own.makeupPanelInches !== null ||
+    (own.makeupByKindInches !== null &&
+      Object.keys(own.makeupByKindInches).length > 0);
+  const [open, setOpen] = useState(false);
+
+  if (!open && !differs) {
+    return (
+      <button
+        className="mt-1 block text-[0.7rem] text-muted-foreground underline hover:text-foreground"
+        onClick={e => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+      >
+        Extra and makeup for this run
+      </button>
+    );
+  }
+
+  const row = (
+    label: string,
+    value: number | null,
+    placeholder: string,
+    suffix: string,
+    max: number,
+    save: (v: number | null) => void
+  ) => (
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <InlineNumberField
+        value={value}
+        whenUnset={{ placeholder }}
+        rules={{ min: 0, max }}
+        onSave={v => save(v)}
+        onClear={() => save(null)}
+        ariaLabel={`${label} for this run`}
+        suffix={suffix}
+        className="w-24"
+      />
+    </div>
+  );
+  const pct = (v: number | null) =>
+    v === null ? null : Math.round(v * 10000) / 100;
+
+  return (
+    <div className="mt-1.5 space-y-0.5" onClick={e => e.stopPropagation()}>
+      <div className="flex items-center justify-between text-[0.7rem]">
+        <span className="font-medium">
+          Extra and makeup{differs ? " — differs from its type" : ""}
+        </span>
+        {differs && (
+          <button
+            className="underline text-muted-foreground hover:text-foreground"
+            onClick={() =>
+              onSet(run.id, {
+                conduitExtraPct: null,
+                wireExtraPct: null,
+                makeupDeviceInches: null,
+                makeupPanelInches: null,
+                makeupByKindInches: null,
+              })
+            }
+          >
+            Follow the type
+          </button>
+        )}
+      </div>
+      {run.pathType === "conduit" &&
+        row(
+          "Conduit extra",
+          pct(own.conduitExtraPct),
+          inheritedText(inherited.conduitExtraPct, pctLabel),
+          "%",
+          100,
+          v => onSet(run.id, { conduitExtraPct: v === null ? null : v / 100 })
+        )}
+      {row(
+        run.pathType === "cable" ? "Cable extra" : "Wire extra",
+        pct(own.wireExtraPct),
+        inheritedText(inherited.wireExtraPct, pctLabel),
+        "%",
+        100,
+        v => onSet(run.id, { wireExtraPct: v === null ? null : v / 100 })
+      )}
+      {row(
+        "Makeup at a box",
+        own.makeupDeviceInches,
+        inheritedText(inherited.makeupDeviceInches, inLabel),
+        "in",
+        240,
+        v =>
+          onSet(run.id, {
+            makeupDeviceInches: v === null ? null : Math.round(v),
+          })
+      )}
+      {row(
+        "Makeup at a panel",
+        own.makeupPanelInches,
+        inheritedText(inherited.makeupPanelInches, inLabel),
+        "in",
+        240,
+        v =>
+          onSet(run.id, {
+            makeupPanelInches: v === null ? null : Math.round(v),
+          })
+      )}
+      {customHeightTypes.map(t =>
+        row(
+          `Makeup at ${t.label}`,
+          own.makeupByKindInches?.[t.typeKey] ?? null,
+          "type or company",
+          "in",
+          240,
+          v => {
+            const next = { ...(own.makeupByKindInches ?? {}) };
+            if (v === null) delete next[t.typeKey];
+            else next[t.typeKey] = Math.round(v);
+            onSet(run.id, {
+              makeupByKindInches: Object.keys(next).length > 0 ? next : null,
+            });
+          }
+        )
+      )}
     </div>
   );
 }
@@ -436,7 +787,7 @@ function wireVertical(run: PanelRun): number {
  * screen whose whole job is saying how much of which wire to buy.
  */
 function wireGround(run: PanelRun): number {
-  return run.quantities?.groundFeet ?? 0;
+  return run.quantities?.groundBoughtFeet ?? 0;
 }
 
 /** Stamped assemblies, grouped, as the list shows them. */
@@ -589,6 +940,13 @@ export function RunsPanel({
   renderRunEnds,
   renderRunType,
   onAnswerBranchWiring,
+  onSetTypedLength,
+  onSetRunExtras,
+  customHeightTypes = [],
+  groupDrops,
+  onSetGroupDrop,
+  dropHeightTypes = [],
+  dropRunTypes = [],
   runTypeBridge,
   onSendRunType,
   sendingRunTypeId,
@@ -629,6 +987,32 @@ export function RunsPanel({
    * show the question rather than showing a dead control.
    */
   onAnswerBranchWiring?: (runId: number, answer: boolean | null) => void;
+  /**
+   * Type a run's flat length, or clear it back to the drawing (§ 4c).
+   * Inches; null clears. Optional: without it the panel offers no length box.
+   */
+  onSetTypedLength?: (runId: number, inches: number | null) => void;
+  /**
+   * Change a run's own extra and makeup (held-migrations plan § 1). Optional:
+   * without it the panel offers none.
+   */
+  onSetRunExtras?: (runId: number, patch: RunExtrasPatch) => void;
+  /** The company's own height types, for per-type makeup on a run. */
+  customHeightTypes?: readonly { typeKey: string; label: string }[];
+  /**
+   * Each counted group's drop (held-migrations plan § 3), from
+   * `takeoffGroups.list`, keyed by group id. Optional: without it and
+   * `onSetGroupDrop` the rows offer no drop.
+   */
+  groupDrops?: ReadonlyMap<number, GroupDropInfo>;
+  onSetGroupDrop?: (groupId: number, patch: GroupDropPatch) => void;
+  /** What a drop can go to, and be made of. */
+  dropHeightTypes?: readonly {
+    typeKey: string;
+    label: string;
+    heightInches: number | null;
+  }[];
+  dropRunTypes?: readonly { id: number; label: string; pathType: string }[];
   /** What each traced type would put on the bid. Undefined while loading. */
   runTypeBridge?: RunTypeBridgeEntry[];
   onSendRunType?: (runTypeId: number) => void;
@@ -699,6 +1083,12 @@ export function RunsPanel({
         quantity?: { traceCount: number; openEnds: number };
         /** What the bid does not price, said under the figures. */
         leftOut?: RunTotalsLeftOut;
+        /** What drops from marks leave out (held-migrations plan § 3). */
+        markDropNotes?: {
+          noTypeGroups: number;
+          noHeightGroups: number;
+          mayDoubleCount: number;
+        };
       })
     | undefined;
   /** Switch a run between route and quantity (D21) — root and legs. */
@@ -888,6 +1278,21 @@ export function RunsPanel({
                 </button>
               );
             })()}
+            {/* The drop to each of these devices (held-migrations plan § 3):
+                set once on the count, shown once set. */}
+            {group.groupId !== null &&
+              groupDrops?.get(group.groupId) &&
+              onSetGroupDrop && (
+                <GroupDrop
+                  info={groupDrops.get(group.groupId)!}
+                  heightTypes={dropHeightTypes}
+                  runTypes={dropRunTypes}
+                  locked={quantitiesLocked}
+                  onSet={patch =>
+                    onSetGroupDrop(group.groupId as number, patch)
+                  }
+                />
+              )}
             {/* Walk the instances: each chip jumps the viewer to that mark. */}
             <div className="flex flex-wrap gap-1 mt-1.5">
               {group.stamps.map((placed, index) => (
@@ -1623,30 +2028,49 @@ export function RunsPanel({
 
                   {/* A run that cannot be measured says so instead of showing 0 */}
                   {run.quantities === null ? (
-                    <p className="text-xs text-[#F5C518] mt-1.5 flex items-start gap-1.5">
-                      <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-                      Flat length not measurable — no scale on this sheet, so
-                      this run is not in the totals.
-                    </p>
+                    <>
+                      <p className="text-xs text-[#F5C518] mt-1.5 flex items-start gap-1.5">
+                        <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                        {onSetTypedLength
+                          ? "No scale on this sheet, so this run is not in the totals. Type its length to count it."
+                          : "Flat length not measurable — no scale on this sheet, so this run is not in the totals."}
+                      </p>
+                      {onSetTypedLength && (
+                        <TypedLength run={run} onSet={onSetTypedLength} />
+                      )}
+                    </>
                   ) : (
                     <div className="mt-1.5 space-y-0.5">
                       {/* Conduit and wire kept visually separate: they are two
                       different purchases measured along one line. */}
-                      {run.quantities.conduitFeet !== null && (
+                      {run.quantities.conduitBoughtFeet !== null && (
                         <Footage
                           label="Conduit"
                           flat={run.quantities.runFeet}
                           vertical={run.quantities.verticalFeet}
-                          total={run.quantities.conduitFeet}
+                          extra={run.quantities.conduitExtraFeet}
+                          total={run.quantities.conduitBoughtFeet}
+                          typed={run.quantities.lengthSource === "typed"}
                         />
                       )}
-                      {run.quantities.cableFeet !== null && (
+                      {run.quantities.cableBoughtFeet !== null && (
                         <Footage
                           label="Cable"
                           flat={run.quantities.runFeet}
                           vertical={run.quantities.verticalFeet}
-                          total={run.quantities.cableFeet}
+                          extra={run.quantities.wireExtraFeet}
+                          makeup={run.quantities.makeupFeet}
+                          total={run.quantities.cableBoughtFeet}
+                          typed={run.quantities.lengthSource === "typed"}
                         />
+                      )}
+                      {/* An extra nobody set whispers (§ 2.3), so the row
+                          says it — the totals count these as well. */}
+                      {carriesNoExtra(run.quantities) && (
+                        <p className="text-[0.7rem] text-muted-foreground">
+                          No extra set — Settings › Heights & extra, or this
+                          run's own below.
+                        </p>
                       )}
                       {/*
                       WIRE, OR THE REASON THERE IS NONE.
@@ -1677,7 +2101,7 @@ export function RunsPanel({
                       */}
                       {run.pathType === "conduit" &&
                         run.traceMode === "quantity" &&
-                        (run.quantities.totalWireFeet > 0 ? (
+                        (run.quantities.wireBoughtFeet > 0 ? (
                           <Footage
                             label={
                               <>
@@ -1690,7 +2114,10 @@ export function RunsPanel({
                             }
                             flat={wireFlat(run)}
                             vertical={wireVertical(run)}
-                            total={run.quantities.totalWireFeet}
+                            extra={run.quantities.wireExtraFeet}
+                            makeup={run.quantities.makeupFeet}
+                            total={run.quantities.wireBoughtFeet}
+                            typed={run.quantities.lengthSource === "typed"}
                           />
                         ) : (
                           <div className="flex items-baseline justify-between text-xs gap-2">
@@ -1745,7 +2172,10 @@ export function RunsPanel({
                             }
                             flat={wireFlat(run)}
                             vertical={wireVertical(run)}
-                            total={run.quantities.totalWireFeet}
+                            extra={run.quantities.wireExtraFeet}
+                            makeup={run.quantities.makeupFeet}
+                            total={run.quantities.wireBoughtFeet}
+                            typed={run.quantities.lengthSource === "typed"}
                           />
                         ))}
                       {/*
@@ -1771,6 +2201,28 @@ export function RunsPanel({
                             {feet(wireGround(run))}
                           </span>
                         </div>
+                      )}
+
+                      {/*
+                        The run's own length and extras come AFTER every
+                        footage line, never between them: placed after the
+                        conduit line they split the arithmetic in two, and the
+                        wire line read as belonging to the editor (seen on
+                        screen, 2026-09-29).
+
+                        A typed run always says so; the offer to type one over
+                        a good measurement waits until the run is opened.
+                      */}
+                      {onSetTypedLength &&
+                        (isSelected || run.typedLengthInches != null) && (
+                          <TypedLength run={run} onSet={onSetTypedLength} />
+                        )}
+                      {onSetRunExtras && isSelected && run.extras && (
+                        <RunExtrasEditor
+                          run={{ ...run, extras: run.extras }}
+                          customHeightTypes={customHeightTypes}
+                          onSet={onSetRunExtras}
+                        />
                       )}
 
                       {/*
@@ -2112,7 +2564,7 @@ export function RunsPanel({
                               )}
                             </span>
                             <span className="font-mono text-muted-foreground/70 shrink-0">
-                              {feet(run.quantities.groundFeet)}
+                              {feet(run.quantities.groundBoughtFeet)}
                             </span>
                           </div>
                         )}
@@ -2181,24 +2633,96 @@ export function RunsPanel({
           <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1">
             This bid, all sheets
           </div>
+          {/* Bought, with every term that went into it — the flat share is
+              the remainder, so the four always add up on screen. */}
           <Footage
             label="Conduit"
-            flat={round2(totals.conduitFeet - totals.conduitVerticalFeet)}
+            flat={round2(
+              totals.conduitBoughtFeet -
+                totals.conduitVerticalFeet -
+                totals.conduitExtraFeet
+            )}
             vertical={totals.conduitVerticalFeet}
-            total={totals.conduitFeet}
+            extra={totals.conduitExtraFeet}
+            total={totals.conduitBoughtFeet}
           />
           <Footage
             label="Cable"
-            flat={round2(totals.cableFeet - totals.cableVerticalFeet)}
+            flat={round2(
+              totals.cableBoughtFeet -
+                totals.cableVerticalFeet -
+                totals.cableExtraFeet -
+                totals.cableMakeupFeet
+            )}
             vertical={totals.cableVerticalFeet}
-            total={totals.cableFeet}
+            extra={totals.cableExtraFeet}
+            makeup={totals.cableMakeupFeet}
+            total={totals.cableBoughtFeet}
           />
           <Footage
             label="Wire"
-            flat={round2(totals.wireFeet - totals.wireVerticalFeet)}
+            flat={round2(
+              totals.wireBoughtFeet -
+                totals.wireVerticalFeet -
+                totals.wireExtraFeet -
+                totals.wireMakeupFeet
+            )}
             vertical={totals.wireVerticalFeet}
-            total={totals.wireFeet}
+            extra={totals.wireExtraFeet}
+            makeup={totals.wireMakeupFeet}
+            total={totals.wireBoughtFeet}
           />
+          {/* Drops from marks (§ 3): what they add, and what is not counted
+              for them — fittings (Q8), a count with no run type or height,
+              and marks near an unlinked run end that may count twice. */}
+          {totals.markDropCount > 0 && (
+            <p className="text-[0.7rem] text-muted-foreground pt-1">
+              Includes {totals.markDropCount} drop
+              {totals.markDropCount === 1 ? "" : "s"} to counted devices (
+              {totals.markDropFeet.toFixed(2)} ft). Connectors and elbows for
+              them are not counted.
+            </p>
+          )}
+          {(totals.markDropNotes?.noTypeGroups ?? 0) +
+            (totals.markDropNotes?.noHeightGroups ?? 0) >
+            0 && (
+            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+              {(totals.markDropNotes?.noTypeGroups ?? 0) +
+                (totals.markDropNotes?.noHeightGroups ?? 0)}{" "}
+              counted item
+              {(totals.markDropNotes?.noTypeGroups ?? 0) +
+                (totals.markDropNotes?.noHeightGroups ?? 0) ===
+              1
+                ? " asks"
+                : "s ask"}{" "}
+              for a drop that is not counted — see the item for why.
+            </p>
+          )}
+          {(totals.markDropNotes?.mayDoubleCount ?? 0) > 0 && (
+            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+              {totals.markDropNotes?.mayDoubleCount} marked device
+              {totals.markDropNotes?.mayDoubleCount === 1 ? "" : "s"} near a
+              run's end may have its drop counted twice.
+            </p>
+          )}
+          {totals.conduitExtraFeet +
+            totals.cableExtraFeet +
+            totals.wireExtraFeet >
+            0 && (
+            <p className="text-[0.7rem] text-muted-foreground pt-1">
+              Extra is bought, not installed — labor is on the installed feet.
+            </p>
+          )}
+          {totals.noExtraCount > 0 && (
+            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+              {totals.noExtraCount} run
+              {totals.noExtraCount === 1 ? " carries" : "s carry"} no extra —
+              none is set. Set it in Settings › Heights & extra.
+            </p>
+          )}
 
           {/*
             THE ZERO HAS TO SHOUT.
@@ -2256,7 +2780,24 @@ export function RunsPanel({
               <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
               {totals.unmeasurableCount} run
               {totals.unmeasurableCount === 1 ? " is" : "s are"} not in these
-              totals — their sheets have no usable scale.
+              totals — no usable scale on the sheet. Type{" "}
+              {totals.unmeasurableCount === 1 ? "its length" : "their lengths"}{" "}
+              in the run to count{" "}
+              {totals.unmeasurableCount === 1 ? "it" : "them"}.
+            </p>
+          )}
+          {/*
+            Typed lengths ARE in the figures above (§ 4c), and this says so:
+            a number an estimator supplied and one the app measured are
+            different kinds of fact. Plain, not amber — typing is an answer.
+          */}
+          {totals.typedCount > 0 && (
+            <p className="text-[0.7rem] text-muted-foreground pt-1">
+              {totals.typedCount} run
+              {totals.typedCount === 1
+                ? " has a length"
+                : "s have lengths"}{" "}
+              typed by hand rather than measured off the drawing.
             </p>
           )}
           {/*

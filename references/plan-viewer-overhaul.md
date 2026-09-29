@@ -201,6 +201,15 @@ percentage.
 
 ### 2.3 Starter values — shipped, labelled, and dated
 
+> **OVERRIDDEN IN PART 2026-09-28 by the owner**
+> (`references/track-b-held-migrations-plan.md` § 7). The starters still ship
+> with real numbers, but they are **inert until the company clicks Accept**,
+> following CLAUDE.md's 2026-09-25 starter rule, which is newer than this
+> section. **Makeup starter: 18 in per conductor at a device, 5 ft at a panel**,
+> replacing "2 ft … more at panels" below. **The extra percentages are
+> material only and carry no labor hours; makeup does carry labor.** All five
+> values can be set for the company, per run type and per run.
+
 **These ship with real numbers, NOT zero.** This is a deliberate exception to
 `CLAUDE.md` § Starter content, and the reasoning is worth keeping:
 
@@ -2343,6 +2352,9 @@ price:**
   becomes asking the user to re-count.
 - **Phase 8's stamp verticals**, which § 7 already decided belong to the group.
   The table pays for itself twice, and Phase 8 stops needing its own migration.
+  > **Wrong, found 2026-09-28:** `takeoff_groups` has no height columns, so
+  > Phase 8 still needs three (and an FK). The row made the migration SMALLER,
+  > not absent. See `references/track-b-held-migrations-plan.md` § 3.
 
 ```
 takeoff_groups          one row per counted thing per BID
@@ -3507,6 +3519,10 @@ form. The chain above keeps that intact: the company default is still where it
 starts, and there is still no form of nine fields on every traced line.
 
 ### Starter values — unchanged from § 2.3
+
+> **Changed 2026-09-28**: see the note at the top of § 2.3. The starters are
+> inert until accepted, makeup is 18 in at a device and 5 ft at a panel, and
+> extra is material only. Details in `references/track-b-held-migrations-plan.md`.
 
 10% wire, 5% conduit, 2 ft per conductor per end, more at panels. Shipped with
 real numbers rather than zero, labelled as starters, dated, for the reasons

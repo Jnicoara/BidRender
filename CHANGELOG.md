@@ -12,6 +12,34 @@ This is the human-readable companion to the git history — read this to see wha
   working. Threaded closure plugs (1/2" and 3/4") are in the catalog too,
   for the unused hubs (unpriced, like every shipped item).
 
+- **Counted devices can now carry their drop from the ceiling.** On any
+  counted item — thirty receptacles, say — choose what each one drops to and
+  what the drop is made of, once, and every mark gets its drop of pipe and
+  wire on the bid (30 receptacles at 18 in under a 10 ft run height is 255 ft).
+  A device a traced run already ends on is not counted twice, and one sitting
+  near a run's end without being linked is flagged. Wire extra and makeup
+  apply to the drops; conduit extra does not. Connectors and elbows for these
+  drops are not counted, and every screen and the materials list say so.
+
+- **Traced runs can now carry extra and makeup, and the bid keeps install
+  hours honest.** Extra wire and conduit (a percentage) and makeup (the tail
+  left at each box and panel) can be set for the company, per run type and
+  per run. The shipped starting values — 5% conduit, 10% wire, 18 in at a
+  box, 5 ft at a panel — do nothing until you press Accept in Settings ›
+  Heights & extra, and the screen says how many bids that will change first.
+  Extra is bought but carries no install hours; makeup carries hours. Every
+  run and total shows each part — measured, drops, extra, makeup — and locked
+  bids freeze both the material and the labor figure.
+
+- **Conduit on a sheet with no scale can now be counted: draw the path, type
+  the length.** Riser diagrams, one-lines and details drawn at another scale
+  used to refuse tracing outright, so their conduit could not be counted at
+  all. Now you trace the route and type how long it is; the run goes on the
+  bid, in the totals, on the materials list and in the takeoff export like
+  any other. A typed length is always labelled "typed", never passed off as
+  measured, and the export gives it its own "Typed ft" column. It is the
+  flat run only; drops and extra are added on top.
+
 - **Concrete ring boxes for deck pours are in the catalog**: 4" and 6"
   deep, and the backplate that goes with them (unpriced, like every
   shipped item).

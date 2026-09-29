@@ -92,6 +92,13 @@ export type LineItemInput = {
   /** How many of this assembly. Defaults to 1. */
   quantity?: number;
   /**
+   * How many units the LABOUR is on, when that differs from `quantity`.
+   * Defaults to `quantity`, which is every line except traced footage: there
+   * the extra is bought but not installed (Q5, shared/lineLaborQty.ts), so a
+   * bid line passes its installed footage here and its bought footage above.
+   */
+  laborQuantity?: number;
+  /**
    * Company-wide productivity adjustment, as a fraction (0.10 = +10%).
    *
    * Applied AFTER modifiers as its own step, never added to them — see
@@ -582,7 +589,13 @@ export function calculateLineItem(input: LineItemInput): LineItemBreakdown {
     productivityPct
   );
 
-  const totalLaborHours = hours * quantity;
+  const laborQuantity = input.laborQuantity ?? quantity;
+  assertFinite(laborQuantity, "laborQuantity");
+  if (laborQuantity < 0)
+    throw new Error(
+      `laborQuantity cannot be negative, received: ${laborQuantity}`
+    );
+  const totalLaborHours = hours * laborQuantity;
   const laborCents = toCents(totalLaborHours * input.laborRate);
 
   // Material markup, on the LINE's material cents after quantity, rounded to a

@@ -1238,7 +1238,11 @@ export function TraceLayer({
                   : formatFeetInches(committedInches)}
               </span>
               <span className="text-[0.7rem] text-muted-foreground">
-                placed
+                {/* No scale: the path is still worth drawing, and its length
+                    is typed in the run panel once it is finished (§ 4c). */}
+                {ratio === null
+                  ? "no scale — type the length when finished"
+                  : "placed"}
               </span>
               <span
                 className={cn(

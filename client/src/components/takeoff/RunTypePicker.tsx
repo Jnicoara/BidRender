@@ -128,6 +128,15 @@ export type PickableRunType = {
   connectorMaterialName: string | null;
   strapMaterialName: string | null;
   /**
+   * This type's own extra and makeup (0090), NULL to follow the company.
+   * Percentages as fractions; makeup in inches per conductor per end.
+   */
+  conduitExtraPct: number | null;
+  wireExtraPct: number | null;
+  makeupDeviceInches: number | null;
+  makeupPanelInches: number | null;
+  makeupByKindInches: Record<string, number> | null;
+  /**
    * The rows every traced 90 and 45 is bought as, instead of the catalog's
    * standard elbow — how a type counts SWEEPS (plan § 8, S6). A sweep here
    * also widens how far apart two clicks can be and still be one bend
@@ -175,6 +184,11 @@ type Draft = {
   connectorMaterialName: string | null;
   strapMaterialId: number | null;
   strapMaterialName: string | null;
+  conduitExtraPct: number | null;
+  wireExtraPct: number | null;
+  makeupDeviceInches: number | null;
+  makeupPanelInches: number | null;
+  makeupByKindInches: Record<string, number> | null;
   elbow90MaterialId: number | null;
   elbow90MaterialName: string | null;
   elbow45MaterialId: number | null;
@@ -194,6 +208,16 @@ export type RunTypePatch = {
   couplingMaterialId: number | null;
   connectorMaterialId: number | null;
   strapMaterialId: number | null;
+  /*
+    Extra and makeup (0090). Sent every save from a draft opened on the stored
+    row, so a field the form did not touch is written back unchanged — never
+    cleared (CLAUDE.md § Editing fields, rule 7).
+  */
+  conduitExtraPct: number | null;
+  wireExtraPct: number | null;
+  makeupDeviceInches: number | null;
+  makeupPanelInches: number | null;
+  makeupByKindInches: Record<string, number> | null;
   elbow90MaterialId: number | null;
   elbow45MaterialId: number | null;
 };
@@ -234,11 +258,67 @@ const draftOf = (type: PickableRunType): Draft => ({
   connectorMaterialName: type.connectorMaterialName,
   strapMaterialId: type.strapMaterialId,
   strapMaterialName: type.strapMaterialName,
+  conduitExtraPct: type.conduitExtraPct,
+  wireExtraPct: type.wireExtraPct,
+  makeupDeviceInches: type.makeupDeviceInches,
+  makeupPanelInches: type.makeupPanelInches,
+  makeupByKindInches: type.makeupByKindInches,
   elbow90MaterialId: type.elbow90MaterialId,
   elbow90MaterialName: type.elbow90MaterialName,
   elbow45MaterialId: type.elbow45MaterialId,
   elbow45MaterialName: type.elbow45MaterialName,
 });
+
+/**
+ * One extra or makeup figure in the DRAFT form, blank when the type follows
+ * the company. Like `CountField`: the draft is the state and Save is the
+ * commit, so this holds a null rather than inventing a zero — a blank extra
+ * means "the company's", and a typed 0 means "none on this type".
+ */
+function ExtraDraftField({
+  value,
+  onChange,
+  suffix,
+  max,
+  ariaLabel,
+}: {
+  /** In the unit the field SHOWS: percent, or inches. */
+  value: number | null;
+  onChange: (next: number | null) => void;
+  suffix: string;
+  max: number;
+  ariaLabel: string;
+}) {
+  return (
+    <span className="flex items-center gap-1">
+      <Input
+        value={value === null ? "" : String(value)}
+        onChange={e => {
+          const raw = e.target.value.trim();
+          if (raw === "") {
+            onChange(null);
+            return;
+          }
+          const next = Number(raw);
+          if (!Number.isFinite(next)) return;
+          onChange(Math.min(max, Math.max(0, next)));
+        }}
+        onFocus={selectOnFocus}
+        inputMode="decimal"
+        placeholder="company"
+        className="h-7 w-20 text-xs"
+        aria-label={ariaLabel}
+      />
+      <span className="text-[0.7rem] text-muted-foreground">{suffix}</span>
+    </span>
+  );
+}
+
+/** A fraction as the percent a field shows, rounded to what anyone types. */
+const toPct = (fraction: number | null) =>
+  fraction === null ? null : Math.round(fraction * 10000) / 100;
+const fromPct = (percent: number | null) =>
+  percent === null ? null : percent / 100;
 
 /**
  * A whole-number count in a DRAFT form, blank when nobody has said.
@@ -427,9 +507,16 @@ export function RunTypePicker({
   disabled,
   children,
   runColors,
+  customHeightTypes = [],
 }: {
   pathType: "conduit" | "cable";
   types: PickableRunType[];
+  /**
+   * The company's OWN height types — a "Switchboard", an "MCC" — each of
+   * which can take its own makeup on this type (owner, 2026-09-28: every value
+   * at every level). Empty hides that part of the editor.
+   */
+  customHeightTypes?: readonly { typeKey: string; label: string }[];
   /**
    * Which colour each type has on this bid — `takeoffRuns.typeColors`. Each
    * row wears it, so choosing a type shows which lines on the drawing are
@@ -475,6 +562,7 @@ export function RunTypePicker({
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [choosingFittings, setChoosingFittings] = useState(false);
+  const [showExtras, setShowExtras] = useState(false);
 
   const startEditing = (type: PickableRunType) => {
     setEditing(type);
@@ -484,6 +572,7 @@ export function RunTypePicker({
     setEditing(null);
     setDraft(null);
     setChoosingFittings(false);
+    setShowExtras(false);
   };
 
   const mine = useMemo(
@@ -1001,6 +1090,127 @@ export function RunTypePicker({
               </div>
             )}
 
+            {/*
+              EXTRA AND MAKEUP FOR THIS TYPE — behind one control, because most
+              types follow the company, and open by itself when this one
+              already differs (CLAUDE.md § "Hide OURS, never THEIRS"). Blank is
+              "the company's"; a typed 0 is "none on this type".
+            */}
+            {showExtras ||
+            draft.conduitExtraPct !== null ||
+            draft.wireExtraPct !== null ||
+            draft.makeupDeviceInches !== null ||
+            draft.makeupPanelInches !== null ||
+            (draft.makeupByKindInches !== null &&
+              Object.keys(draft.makeupByKindInches).length > 0) ? (
+              <div className="mt-2.5 space-y-1">
+                <p className="text-[0.7rem] font-medium">Extra and makeup</p>
+                {pathType === "conduit" && (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[0.7rem] text-muted-foreground">
+                      Conduit extra, run length only
+                    </span>
+                    <ExtraDraftField
+                      value={toPct(draft.conduitExtraPct)}
+                      onChange={v =>
+                        setDraft({ ...draft, conduitExtraPct: fromPct(v) })
+                      }
+                      suffix="%"
+                      max={100}
+                      ariaLabel="Conduit extra percent for this type"
+                    />
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[0.7rem] text-muted-foreground">
+                    {pathType === "cable" ? "Cable extra" : "Wire extra"}, run
+                    length and drops
+                  </span>
+                  <ExtraDraftField
+                    value={toPct(draft.wireExtraPct)}
+                    onChange={v =>
+                      setDraft({ ...draft, wireExtraPct: fromPct(v) })
+                    }
+                    suffix="%"
+                    max={100}
+                    ariaLabel="Wire extra percent for this type"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[0.7rem] text-muted-foreground">
+                    Makeup at a box, per wire
+                  </span>
+                  <ExtraDraftField
+                    value={draft.makeupDeviceInches}
+                    onChange={v =>
+                      setDraft({
+                        ...draft,
+                        makeupDeviceInches: v === null ? null : Math.round(v),
+                      })
+                    }
+                    suffix="in"
+                    max={240}
+                    ariaLabel="Makeup at a box for this type, inches"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[0.7rem] text-muted-foreground">
+                    Makeup at a panel, per wire
+                  </span>
+                  <ExtraDraftField
+                    value={draft.makeupPanelInches}
+                    onChange={v =>
+                      setDraft({
+                        ...draft,
+                        makeupPanelInches: v === null ? null : Math.round(v),
+                      })
+                    }
+                    suffix="in"
+                    max={240}
+                    ariaLabel="Makeup at a panel for this type, inches"
+                  />
+                </div>
+                {customHeightTypes.map(t => (
+                  <div
+                    key={t.typeKey}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span className="text-[0.7rem] text-muted-foreground">
+                      Makeup at {t.label}
+                    </span>
+                    <ExtraDraftField
+                      value={draft.makeupByKindInches?.[t.typeKey] ?? null}
+                      onChange={v => {
+                        const next = { ...(draft.makeupByKindInches ?? {}) };
+                        if (v === null) delete next[t.typeKey];
+                        else next[t.typeKey] = Math.round(v);
+                        setDraft({
+                          ...draft,
+                          makeupByKindInches:
+                            Object.keys(next).length > 0 ? next : null,
+                        });
+                      }}
+                      suffix="in"
+                      max={240}
+                      ariaLabel={`Makeup at ${t.label} for this type, inches`}
+                    />
+                  </div>
+                ))}
+                <p className="text-[0.7rem] text-muted-foreground">
+                  Blank follows the company. Extra is material only; makeup
+                  carries labor.
+                </p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowExtras(true)}
+                className="mt-2.5 block text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+              >
+                Extra and makeup differ for this type
+              </button>
+            )}
+
             <p className="text-[0.7rem] text-muted-foreground mt-2.5">
               Labor {laborPerFootSentence({ ...draft, pathType })}
             </p>
@@ -1045,6 +1255,15 @@ export function RunTypePicker({
                       couplingMaterialId: draft.couplingMaterialId,
                       connectorMaterialId: draft.connectorMaterialId,
                       strapMaterialId: draft.strapMaterialId,
+                      // From the draft, which opened on the stored row: a
+                      // figure nobody touched goes back exactly as it was.
+                      // Conduit extra is kept on a cable type too — not
+                      // shown is not cleared (rule 7); nothing reads it there.
+                      conduitExtraPct: draft.conduitExtraPct,
+                      wireExtraPct: draft.wireExtraPct,
+                      makeupDeviceInches: draft.makeupDeviceInches,
+                      makeupPanelInches: draft.makeupPanelInches,
+                      makeupByKindInches: draft.makeupByKindInches,
                       elbow90MaterialId: draft.elbow90MaterialId,
                       elbow45MaterialId: draft.elbow45MaterialId,
                     });

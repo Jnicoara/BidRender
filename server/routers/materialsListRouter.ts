@@ -47,8 +47,13 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import { groupStamps, stampName } from "../../shared/takeoffCounts";
-import { circuitWire, totalQuantities } from "../../shared/takeoffQuantities";
-import { verticalsForRunRow } from "../runVerticals";
+import {
+  circuitWire,
+  totalQuantities,
+  tracedRunOf,
+} from "../../shared/takeoffQuantities";
+import { extrasForRunRow, verticalsForRunRow } from "../runVerticals";
+import { markDropEntries } from "../../shared/groupDrops";
 import {
   aggregateMaterials,
   measuredEntries,
@@ -366,6 +371,17 @@ export const materialsListRouter = router({
         ctx.scope.dataUserId,
         bid.distributionHeightInches
       );
+      // Drops from counted marks (§ 3) — what the bid prices, so the list a
+      // supplier orders from has them too. Claimed against every run.
+      const markDrops = markDropEntries(
+        await db.loadGroupDrops(
+          input.bidId,
+          ctx.scope.dataUserId,
+          heights,
+          runs,
+          scales
+        )
+      );
       const totals = totalQuantities(
         realRuns.map(run => {
           const sheet = scales.get(run.sheetId);
@@ -374,20 +390,33 @@ export const materialsListRouter = router({
               ? sheet.scaleRatio
               : null;
           return {
-            run: { pathType: run.pathType, points: run.points },
+            run: tracedRunOf(run),
             circuits: wireCounts.has(run.id)
               ? (circuitsByRun.get(run.id) ?? []).map(circuitWire)
               : [],
             ratio: usable,
             verticals: verticalsForRunRow(run, heights),
+            extras: extrasForRunRow(run, heights),
             // A branched run is several rows and ONE run in the notes (D20).
             runKey: rootOf(run),
           };
-        })
+        }),
+        markDrops
       );
 
       // ── Notes: everything the reader needs to read the list correctly ──────
       const notes: string[] = [];
+      // Drops to counted devices, and the fittings NOT counted for them (Q8):
+      // this list is what somebody orders from, so it says what is missing.
+      if (totals.markDropCount > 0) {
+        notes.push(
+          `Includes ${totals.markDropCount} ${
+            totals.markDropCount === 1 ? "drop" : "drops"
+          } to counted devices (${totals.markDropFeet.toLocaleString("en-US", {
+            maximumFractionDigits: 2,
+          })} ft of raceway or cable). Connectors and elbows for those drops are NOT counted — add them by hand.`
+        );
+      }
       if (untypedRuns > 0) {
         notes.push(
           `${untypedRuns} traced ${
@@ -497,9 +526,47 @@ export const materialsListRouter = router({
             "ends before ordering."
         );
       }
+      /*
+        EXTRA AND MAKEUP, said in words (held-migrations plan § 1). This note
+        read "carry no allowance for waste" until 2026-09-29, which stopped
+        being true the day extras arrived. A list with extras in it says so and
+        how much; a list whose runs carry none says THAT, because an unset
+        extra is the whisper § 2.3 warns about and this page leaves the app.
+      */
+      const extraFeet =
+        Math.round(
+          (totals.conduitExtraFeet +
+            totals.cableExtraFeet +
+            totals.wireExtraFeet) *
+            100
+        ) / 100;
+      const makeupFeet =
+        Math.round((totals.cableMakeupFeet + totals.wireMakeupFeet) * 100) /
+        100;
+      const feetText = (n: number) =>
+        n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+      if (extraFeet > 0 || makeupFeet > 0) {
+        notes.push(
+          "Includes " +
+            feetText(extraFeet) +
+            " ft of extra (conduit on the run length; wire and cable on " +
+            "the run length and drops) and " +
+            feetText(makeupFeet) +
+            " ft of makeup — the tail left at each box and panel."
+        );
+      }
+      if (totals.noExtraCount > 0) {
+        notes.push(
+          "No extra is set for " +
+            totals.noExtraCount +
+            (totals.noExtraCount === 1 ? " traced run" : " traced runs") +
+            ", so those quantities carry none. Set the extra and makeup in " +
+            "Settings before ordering."
+        );
+      }
       notes.push(
-        "Quantities are taken off the drawings and carry no allowance for waste, " +
-          "spoilage or cut lengths unless the assemblies already include it."
+        "Quantities are taken off the drawings. Assemblies carry only what " +
+          "their own recipes include."
       );
 
       return {

@@ -29,6 +29,23 @@ import {
 } from "../shared/takeoffHeights";
 import { heightAtEnd, kindAtEnd } from "../shared/runNetwork";
 import { kindForMode, type TraceMode } from "../shared/traceMode";
+import {
+  extraNumber,
+  extrasForRun,
+  resolveExtraPct,
+  resolveMakeup,
+  runExtraSettings,
+  NO_EXTRAS_CONTEXT,
+  type ExtrasContext,
+  type ExtrasRow,
+  type ExtraSettings,
+  type RunExtras,
+} from "../shared/runExtras";
+import type { DropTypeSpec } from "../shared/groupDrops";
+import {
+  resolveRunType,
+  type ResolvableRunType,
+} from "../shared/runTypeLookup";
 /*
   NO DATABASE IMPORT, DELIBERATELY.
 
@@ -55,6 +72,22 @@ export type HeightContext = {
    * `heightList` exists to prevent.
    */
   types: HeightRow[];
+  /**
+   * EXTRA AND MAKEUP settings (references/track-b-held-migrations-plan.md
+   * § 1), carried HERE because every caller that computes a run's quantities
+   * already loads this context — so none of them can load the heights and
+   * forget the extras. A second context beside this one would be a second
+   * thing to remember at a dozen call sites. See `extrasForRunRow`.
+   */
+  extras: ExtrasContext;
+  /**
+   * What a counted group's DROP is made of (held-migrations plan § 3): the
+   * run type a stored `takeoff_groups.dropRunTypeId` means, followed through
+   * any fork with `resolveRunType` — so a drop on a shipped type the user has
+   * forked prices from the fork, exactly as a traced run does. Null when the
+   * type is gone.
+   */
+  dropTypeFor: (runTypeId: number) => DropTypeSpec | null;
 };
 
 /**
@@ -77,13 +110,87 @@ export function buildHeightContext(input: {
     label: string;
     heightInches: number | null;
     isActive: boolean;
+    /** Panel or device end for makeup, and this type's own makeup (0092). */
+    makeupAt: "device" | "panel" | null;
+    makeupInches: number | null;
   }[];
   /** Rows from `bid_mounting_heights`. */
   job: readonly { typeKey: string; heightInches: number }[];
   bidDistributionInches: number | null;
+  /** The company's `takeoff_extra_defaults` row, if it has one (0089). */
+  extraDefaults:
+    | {
+        conduitExtraPct: string | null;
+        wireExtraPct: string | null;
+        makeupDeviceInches: number | null;
+        makeupPanelInches: number | null;
+        acceptedAt: Date | null;
+      }
+    | undefined;
+  /**
+   * The run-type palette, archived included, as `getRunTypesFor(userId, true)`
+   * returns it — so `resolveRunType` can follow a fork to the row the user
+   * actually edited. A run stores the BASELINE's id; reading that row
+   * directly would miss every setting on the fork.
+   */
+  runTypes: readonly (ResolvableRunType & {
+    pathType: "conduit" | "cable";
+    conductorCount: number | null;
+    groundCount: number | null;
+    conduitExtraPct: string | null;
+    wireExtraPct: string | null;
+    makeupDeviceInches: number | null;
+    makeupPanelInches: number | null;
+    makeupByKindInches: Record<string, number> | null;
+  })[];
 }): HeightContext {
-  const { defaults, company, job, bidDistributionInches } = input;
+  const {
+    defaults,
+    company,
+    job,
+    bidDistributionInches,
+    extraDefaults,
+    runTypes,
+  } = input;
+  const typeExtras = (type: (typeof runTypes)[number]): ExtraSettings => ({
+    conduitExtraPct: extraNumber(type.conduitExtraPct),
+    wireExtraPct: extraNumber(type.wireExtraPct),
+    makeupDeviceInches: type.makeupDeviceInches,
+    makeupPanelInches: type.makeupPanelInches,
+    makeupByKindInches: type.makeupByKindInches,
+  });
   return {
+    dropTypeFor: runTypeId => {
+      const type = resolveRunType(runTypes, runTypeId);
+      if (!type) return null;
+      return {
+        pathType: type.pathType,
+        conductorCount: type.conductorCount,
+        groundCount: type.groundCount,
+        extras: typeExtras(type),
+      };
+    },
+    extras: {
+      company: extraDefaults
+        ? {
+            conduitExtraPct: extraNumber(extraDefaults.conduitExtraPct),
+            wireExtraPct: extraNumber(extraDefaults.wireExtraPct),
+            makeupDeviceInches: extraDefaults.makeupDeviceInches,
+            makeupPanelInches: extraDefaults.makeupPanelInches,
+            accepted: extraDefaults.acceptedAt !== null,
+          }
+        : null,
+      kinds: new Map(
+        company.map(row => [
+          row.typeKey,
+          { makeupAt: row.makeupAt, makeupInches: row.makeupInches },
+        ])
+      ),
+      typeFor: runTypeId => {
+        const type = resolveRunType(runTypes, runTypeId);
+        return type ? typeExtras(type) : null;
+      },
+    },
     companyInches: defaults?.distributionHeightInches ?? null,
     jobInches: bidDistributionInches,
     layers: {
@@ -111,7 +218,41 @@ export const EMPTY_HEIGHT_CONTEXT: HeightContext = {
   // question from a height: there is nothing to resolve here, but anything that
   // does get named must still be named rather than slugged.
   types: heightList({ company: [] }),
+  extras: NO_EXTRAS_CONTEXT,
+  dropTypeFor: () => null,
 };
+
+/**
+ * The extra and makeup one stored run row applies, from the settings in the
+ * bid's context. Beside `verticalsForRunRow` because every caller of one needs
+ * the other, and takes the ROW for the same reason it does.
+ */
+export function extrasForRunRow(
+  run: ExtrasRow,
+  context: HeightContext
+): RunExtras {
+  return extrasForRun(run, context.extras);
+}
+
+/**
+ * What the run panel shows for a run's extras: the run's OWN values, and
+ * what applies if it had none — so an unset field shows "type's 10%" as a
+ * placeholder rather than a zero (CLAUDE.md § Editing fields, rule 6).
+ */
+export function extrasViewForRunRow(run: ExtrasRow, context: HeightContext) {
+  const type = context.extras.typeFor(run.runTypeId);
+  const inherit = (which: "conduitExtraPct" | "wireExtraPct") =>
+    resolveExtraPct(which, null, type, context.extras);
+  return {
+    own: runExtraSettings(run),
+    inherited: {
+      conduitExtraPct: inherit("conduitExtraPct"),
+      wireExtraPct: inherit("wireExtraPct"),
+      makeupDeviceInches: resolveMakeup(null, null, type, context.extras),
+      makeupPanelInches: resolveMakeup("panel", null, type, context.extras),
+    },
+  };
+}
 
 /** A run row, as far as its verticals are concerned. */
 export type RunEnds = {
