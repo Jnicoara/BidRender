@@ -1019,6 +1019,7 @@ export const takeoffRunsRouter = router({
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const run = await requireRun(input.id, ctx.scope.dataUserId);
+      await refuseIfLocked(run.bidId, ctx.scope.dataUserId);
       const sheet = await requireSheet(run.sheetId, ctx.scope.dataUserId);
       const measurability = measurabilityOf(sheetScale(sheet));
       const result = await db.removeLeg(

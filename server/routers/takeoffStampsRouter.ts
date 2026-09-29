@@ -90,6 +90,24 @@ async function requireBid(bidId: number, userId: number) {
   return bid;
 }
 
+/**
+ * Refuse to delete marks from a bid whose quantities are locked.
+ *
+ * The locked line reads its stored `qty`, so the number would not move — but
+ * the drawing it was priced from would, and unlocking later re-reads that
+ * drawing. Placing a mark stays allowed on purpose (the send toast says further
+ * marks will not change a locked line); taking one away removes evidence the
+ * frozen number was counted from. Whole selection or nothing.
+ */
+async function refuseIfAnyLocked(ids: readonly number[], userId: number) {
+  if ((await db.countStampsOnLockedBids(ids, userId)) > 0)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "This bid's quantities are locked, so its marks cannot be removed. Unlock them on the bid first.",
+    });
+}
+
 export const takeoffStampsRouter = router({
   /**
    * Drop one or more stamps.
@@ -176,10 +194,11 @@ export const takeoffStampsRouter = router({
       return { dropped: input.at.length };
     }),
 
-  /** Remove one stamp — the misclick path. */
+  /** Remove one stamp — the misclick path. Refused on a locked bid. */
   remove: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
+      await refuseIfAnyLocked([input.id], ctx.scope.dataUserId);
       await db.deleteStamp(input.id, ctx.scope.dataUserId);
       return { success: true };
     }),
@@ -204,6 +223,7 @@ export const takeoffStampsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const ids = Array.from(new Set(input.ids));
+      await refuseIfAnyLocked(ids, ctx.scope.dataUserId);
       const removed = await db.deleteStamps(ids, ctx.scope.dataUserId);
       return { removed };
     }),

@@ -8697,6 +8697,34 @@ export async function deleteStamps(
   return result.affectedRows;
 }
 
+/**
+ * How many of these marks sit on a bid whose quantities are locked.
+ *
+ * Asked BEFORE a delete so a selection goes whole or not at all: a selection
+ * that reaches into a locked bid is refused entire, rather than deleting the
+ * unlocked half and leaving the screen to explain a partial result.
+ */
+export async function countStampsOnLockedBids(
+  ids: readonly number[],
+  userId: number
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(takeoffStamps)
+    .innerJoin(bids, eq(bids.id, takeoffStamps.bidId))
+    .where(
+      and(
+        inArray(takeoffStamps.id, [...ids]),
+        eq(takeoffStamps.userId, userId),
+        isNotNull(bids.quantitiesLockedAt)
+      )
+    );
+  return Number(row?.n ?? 0);
+}
+
 /** Every symbol the user has captured, linked or not. */
 export async function getSymbolLinks(userId: number): Promise<SymbolLink[]> {
   const db = await getDb();

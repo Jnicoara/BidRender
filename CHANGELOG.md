@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **A locked bid can no longer lose marks or runs.** Deleting a mark, a
+  selection of marks or a traced run went straight through on a bid whose
+  quantities were locked. The bid's number held, but the drawing behind it
+  changed, and unlocking later would have re-read the gaps. Those deletes are
+  now refused with "unlock them on the bid first". Placing new marks on a
+  locked bid still works, as before.
 - **Marks placed by the plan reader now count on the bid.** Pressing Place
   drew the marks and added their parts to the materials list, but the count
   and the bid line never moved, so the bid and the supply list disagreed with
