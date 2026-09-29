@@ -380,6 +380,9 @@ fault in § 3.
 - **T6. LL, LR and C bodies: same job or later?** _Recommend later._ Nothing
   in the takeoff proposes them yet, so they would be rows nothing uses.
   Adding them later is +135 rows (~1,450).
+  **Overridden 2026-09-28 by § 7:** the owner asked for the rows anyway, for
+  adding by hand. Built, 1,320 → 1,455. The takeoff still proposes none of
+  them (§ 7, L5).
 
 ---
 
@@ -579,9 +582,20 @@ Expected after Tier 2.5: catalog **1,315 + 5 = 1,320**, Boxes **85 → 90**.
 
 ---
 
-## 7. LL, LR and C conduit bodies — PLAN ONLY
+## 7. LL, LR and C conduit bodies — BUILT 2026-09-28
 
-Plan only, 2026-09-28. **This goes against T6** (§ 4, "LL, LR and C bodies:
+> **BUILT 2026-09-28 on `track-c`, owner accepted L1–L5.** Measured after:
+> catalog **1,455**, Conduit Fittings **518**, bodies **225**, pricing sheet
+> **1,582** generic rows (0 typed prices before regenerating; 135 added, 0
+> removed, 0 changed). L2 as planned: the sweep matched the prototype line
+> for line. **L1 was traced and the plan's guess was wrong:** the alias map
+> was never consulted. The typed "c" already scored tier 3 on every body
+> through "conduit", above anything an alias reaches, so the fix is in
+> scoring: a finished one-letter word that only starts a word of the name is
+> demoted to tier 5 (`smartSearch.ts`, `finishedLetter`). The sweep is
+> unchanged by it; `ALIAS_MAP["c body"]` was left as it was.
+
+Written as a plan, 2026-09-28. **This goes against T6** (§ 4, "LL, LR and C bodies:
 same job or later? _Recommend later_", accepted 2026-09-27): the owner has now
 asked for the rows. When this is built, T6 and the todo.md item "LL/LR/C
 bodies and PVC sweeps" both get a line saying so.

@@ -1747,14 +1747,16 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       missing unit as 0 and read "0 h" — they cannot be told apart from a
       set zero. Production had no bid lines at deploy time, so no live bid
       carries any.
-- [ ] **LL/LR/C bodies and PVC sweeps are not in the catalog.** Sweeps wait
-      for an Underground category (answer 2). T bodies shipped 2026-09-27 (see
-      "T bodies at a tee" above). LL/LR/C are held by the owner (T6) until the
-      takeoff proposes them, +135 rows when they come. **Covers are DECIDED
+- [ ] **PVC sweeps are not in the catalog.** Sweeps wait for an Underground
+      category (answer 2). T bodies shipped 2026-09-27 (see "T bodies at a
+      tee" above). **LL/LR/C SHIPPED 2026-09-28** (plan § 7, 135 rows,
+      overriding T6's "until the takeoff proposes them"). The takeoff still
+      proposes none of them: offering them at a pull point needs a new
+      `runMaterialRole` (Track A) and is held (L5). **Covers are DECIDED
       (2026-09-27, owner, plan § 5 C1): every body is priced with its cover
       and gasket, no separate cover rows.** The LB rows now say so like the T
       rows, and `materialsCatalog.test.ts` fails on any "… conduit body" row
-      without the description — so LL/LR/C must carry it when they come.
+      without the description — LL/LR/C carry it.
       Replacement covers as their own rows: not now (C3).
 - [ ] **Three local tables are on the wrong collation** —
       `ai_usage_daily`, `bid_mounting_heights`, `takeoff_mounting_heights`
