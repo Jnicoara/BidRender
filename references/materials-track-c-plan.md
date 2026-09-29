@@ -1016,11 +1016,12 @@ and search, not size.
 ### 9a. Concrete ring boxes — first in line, 4–5 rows
 
 > **BUILT 2026-09-29 on `track-c`, 3 rows (B5 as recommended):**
-> `Concrete ring, 4" deep`, `Concrete ring, 6" deep`, `Concrete ring
-backplate`. **No cover row** — a ring is a 4" octagon and the shipped
-> `4" round blank cover` (aliased "octagon") is taken to fit. **The owner
-> should confirm that**; if wrong, it is one row. Catalog 1,511 → **1,514**,
-> Boxes 90 → **93**, pricing sheet 1,638 → **1,641** (0 typed prices).
+> `Concrete ring, 4" deep`, `Concrete ring, 6" deep` and
+> `Concrete ring backplate`. **No cover row — DECIDED by the owner
+> 2026-09-29:** a ring is a 4" octagon and the shipped
+> `4" round blank cover` (aliased "octagon") fits it. Catalog 1,511 →
+> **1,514**, Boxes 90 → **93**, pricing sheet 1,638 → **1,641** (0 typed
+> prices).
 >
 > Search, measured: the standard sweep did not move. Three things found on
 > the way, each pinned in `materialSearchRank.test.ts`:

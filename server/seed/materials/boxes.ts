@@ -669,8 +669,8 @@ const roughIn: BaselineMaterial[] = [
  * ring cannot be poured.
  *
  * No cover row. A concrete ring is a 4" octagon, so its face takes the
- * shipped `4" round blank cover` (aliased "octagon") or the fixture. The
- * owner is asked to confirm that; if it is wrong, add one row here.
+ * shipped `4" round blank cover` (aliased "octagon") or the fixture —
+ * confirmed by the owner, 2026-09-29.
  *
  * The 4" ring is "common" (materialCommonness.ts) so it leads "concrete
  * ring" over its backplate.

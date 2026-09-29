@@ -1827,8 +1827,22 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       category (answer 2). **SWEEPS SHIPPED 2026-09-29 on `track-c`**,
       overriding answer 2 (plan § 8, S1; takeoff-spec D19 says so too): 56
       PVC rows on Conduit Fittings, and "sweep" taken off the PVC 90's
-      aliases (S5). Counting them automatically waits on the run-type
-      editor showing the 90/45 overrides (S6).
+      aliases (S5). The run-type editor's 90°/45° pickers shipped the same
+      day (S6, plan § 8b), and a traced sweep now counts as one bend on a
+      sweep type (plan § 8a).
+- [ ] **The sentence under a sweep row still says "90° elbows".** Found
+      2026-09-29 looking at the run panel (plan § 8b): the fitting line is
+      named `2" PVC Sch 40 90-degree sweep, 36" radius` and the caption
+      under it reads "At least 2 90° elbows: 2 corners …". The kind is
+      labelled "90° elbow" everywhere (`FITTING_KIND_LABELS`,
+      `shared/runFittings.ts`, and the counted sentences in
+      `shared/runBends.ts`), so saying "bend" instead changes the wording on
+      every raceway, not just sweeps — the owner's call which. A caption
+      naming the old part beside a row that is a different one reads as
+      confirmation (CLAUDE.md rule 7), so it should not stay this way.
+- [x] **Concrete ring cover — DECIDED 2026-09-29 (owner): no cover row.** A
+      concrete ring is a 4" octagon and the shipped `4" round blank cover`
+      fits it (plan § 9a).
       T bodies shipped 2026-09-27 (see "T bodies at a
       tee" above). **LL/LR/C SHIPPED 2026-09-28** (plan § 7, 135 rows,
       overriding T6's "until the takeoff proposes them"). The takeoff still
