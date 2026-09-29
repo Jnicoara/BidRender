@@ -20,6 +20,15 @@ left out, and why, are at the end of § 1.
 
 ### W1. The sentence under a sweep row still says "90° elbows"
 
+> **BUILT 2026-09-29** (Q1: name the part, or "bend"). `bendWordsFor` reads
+> the SAME chosen 90/45 names as `bendMergeFeetForOverrides`, with the same
+> sweep test (`sweepRadiusInches`), so the word and the merge distance
+> cannot disagree about whether a type buys sweeps. `countFittings` requires
+> `words`; the type check found every caller. Where no part matched, the
+> panel and the materials list say "90° bends" (`unmatchedKindWords`).
+> `runBendsBridge.test.ts` "a sweep type's sentence names the sweep": red on
+> `3b49727` with the exact old sentence, "At least 1 90° elbow: 1 corner".
+
 **What is wrong.** A run type set to buy sweeps sends
 `2" PVC Sch 40 90-degree sweep, 36" radius`, and the caption under that row
 reads "At least 2 90° elbows: 2 corners …". The count is right; the part it

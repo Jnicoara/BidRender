@@ -240,6 +240,7 @@ import {
   fittingRows,
   bendMergeFeetForOverrides,
   bendMethodFor,
+  bendWordsFor,
   lbHubsTakeConnectors,
   pickFittingMaterial,
   parseRacewayName,
@@ -11984,6 +11985,11 @@ export async function fittingRowsByRunType(
             // Wider when this type's 90 or 45 is a sweep, so a traced sweep
             // is one bend. The run panel reads the same (`runBendDetail.ts`).
             mergeWithinFeet: bendMergeFeetForOverrides(
+              resolved(t.elbow90MaterialId)?.name ?? null,
+              resolved(t.elbow45MaterialId)?.name ?? null
+            ),
+            // And a sweep type's sentence says "sweeps", from the same names.
+            words: bendWordsFor(
               resolved(t.elbow90MaterialId)?.name ?? null,
               resolved(t.elbow45MaterialId)?.name ?? null
             ),

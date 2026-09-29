@@ -28,6 +28,7 @@ import {
   isBendRole,
   mergeWithinFeetFor,
   type BendMethod,
+  type BendWords,
   type PullPointKind,
 } from "./runBends";
 import { tradeSizeAtLeast } from "./materialSizeOrder";
@@ -341,6 +342,37 @@ export function bendMergeFeetForOverrides(
       (r): r is number => r !== null
     )
   );
+}
+
+/**
+ * What this type's 90s and 45s are called, from the parts it buys — see
+ * `BendWords` (runBends.ts). Read with the same names, and the same sweep
+ * test, as `bendMergeFeetForOverrides`, so the merge distance and the word
+ * cannot disagree about whether a type buys sweeps.
+ *
+ *   nothing chosen        the catalog's factory elbow  → "90° elbow"
+ *   a sweep chosen        → "90° sweep"
+ *   an elbow chosen       → "90° elbow"
+ *   anything else chosen  → "90° bend" — the part is on the row beside it;
+ *                           the sentence does not guess what to call it.
+ */
+export function bendWordsFor(
+  elbow90Name: string | null,
+  elbow45Name: string | null
+): BendWords {
+  const wordFor = (degrees: 90 | 45, name: string | null) => {
+    const noun =
+      name === null || /\belbow\b/i.test(name)
+        ? "elbow"
+        : sweepRadiusInches(name) !== null
+          ? "sweep"
+          : "bend";
+    return { one: `${degrees}° ${noun}`, many: `${degrees}° ${noun}s` };
+  };
+  return {
+    elbow90: wordFor(90, elbow90Name),
+    elbow45: wordFor(45, elbow45Name),
+  };
 }
 
 export function lbName(size: string, family: string): string {

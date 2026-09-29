@@ -25,6 +25,7 @@ import {
   type TeeRef,
 } from "../shared/runNetwork";
 import { teeBoxFor } from "../shared/runFittingMaterials";
+import { ELBOW_WORDS } from "../shared/runBends";
 import type { EndVertical } from "../shared/takeoffHeights";
 
 type P = { x: number; y: number };
@@ -44,6 +45,7 @@ const BENDS = {
   limit: 360,
   // A type on standard elbows: the flat merge distance (runBendsSweep.test.ts).
   mergeWithinFeet: 3,
+  words: ELBOW_WORDS,
 };
 const LEVEL: EndVertical = {
   counted: false,

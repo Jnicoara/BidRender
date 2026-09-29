@@ -50,6 +50,7 @@ import {
   placeAnswer,
   type BendLeg,
   type BendMethod,
+  type BendWords,
   type EndDrop,
   type PullPointAnswer,
 } from "./runBends";
@@ -172,6 +173,22 @@ export const FITTING_KIND_LABELS: Record<
   teeCover: { one: "tee box cover", many: "tee box covers" },
 };
 
+/**
+ * How a kind reads where NO part was matched — the panel row with no material
+ * and the materials list's "not matched" lines. A 90 or 45 is called a BEND
+ * there: what it would be bought as (elbow or sweep) is exactly what is
+ * missing, and "elbows" beside a sweep type that failed to resolve would name
+ * a part nobody chose. Every other kind reads as FITTING_KIND_LABELS.
+ */
+export function unmatchedKindWords(kind: FittingKind): {
+  one: string;
+  many: string;
+} {
+  if (kind === "elbow90") return { one: "90° bend", many: "90° bends" };
+  if (kind === "elbow45") return { one: "45° bend", many: "45° bends" };
+  return FITTING_KIND_LABELS[kind];
+}
+
 /** Whether a bid line's run role is a fitting (a count) rather than footage. */
 export function isFittingRole(
   role: string | null | undefined
@@ -261,7 +278,17 @@ export function countFittings(
    * type bought as sweeps counts a traced sweep wrongly on the flat 3 ft
    * (`mergeWithinFeetFor`). `bendMergeFeetForOverrides` gives it.
    */
-  bends: { method: BendMethod; limit: number; mergeWithinFeet: number },
+  bends: {
+    method: BendMethod;
+    limit: number;
+    mergeWithinFeet: number;
+    /**
+     * What this type's 90s and 45s are called — required for the same reason
+     * as the merge distance: a sweep type's sentence said "90° elbows" beside
+     * a sweep row. `bendWordsFor` gives it.
+     */
+    words: BendWords;
+  },
   /**
    * The tees whose box THIS raceway buys (`teeBoxOwners`). Required, so a
    * caller has to decide: passing every tee its legs touch would buy the box
@@ -276,8 +303,13 @@ export function countFittings(
     strap: countStraps(pieces, raceway),
     // Bends read the UNSPLIT legs: a pull point replaces the bend it sits on,
     // which only the whole leg can see.
-    ...countBends(legs, bends.method, bends.limit, bends.mergeWithinFeet)
-      .counts,
+    ...countBends(
+      legs,
+      bends.method,
+      bends.limit,
+      bends.mergeWithinFeet,
+      bends.words
+    ).counts,
     ...teeFittingCounts(ownedTees, raceway.teeCoverIncluded),
   };
 }

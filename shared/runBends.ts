@@ -592,6 +592,27 @@ export type BendReport = {
 const NO_KICKS = "plans do not show the kicks and offsets at boxes";
 
 /**
+ * What a 90 and a 45 are CALLED on this run type — the part it buys.
+ *
+ * The kind stays `elbow90` / `elbow45` whatever is bought; the WORD follows
+ * the part. A type set to buy sweeps sent `2" PVC Sch 40 90-degree sweep, 36"
+ * radius` under a sentence saying "At least 2 90° elbows" (todo.md, found
+ * 2026-09-29): a caption naming the old part beside a row that is a different
+ * one reads as confirmation (CLAUDE.md rule 7). `bendWordsFor` in
+ * runFittingMaterials.ts decides it from the chosen part's name.
+ */
+export type BendWords = Record<
+  "elbow90" | "elbow45",
+  { one: string; many: string }
+>;
+
+/** A type that chose nothing buys the catalog's factory elbow. */
+export const ELBOW_WORDS: BendWords = {
+  elbow90: { one: "90° elbow", many: "90° elbows" },
+  elbow45: { one: "45° elbow", many: "45° elbows" },
+};
+
+/**
  * Every bend kind for these legs of ONE raceway, plus the per-leg detail.
  *
  * Bends that an accepted pull point sits on are made by that LB or box and are
@@ -601,7 +622,8 @@ export function countBends(
   legs: readonly BendLeg[],
   method: BendMethod,
   limit: number,
-  mergeWithinFeet: number = MERGE_WITHIN_FEET
+  mergeWithinFeet: number = MERGE_WITHIN_FEET,
+  words: BendWords = ELBOW_WORDS
 ): BendReport {
   const perLeg = legs.map(leg => {
     const bends = legBends(leg, mergeWithinFeet);
@@ -710,8 +732,8 @@ export function countBends(
     if (method.method !== "factory")
       return { kind, status: "included", why: method.why };
     return kind === "elbow90"
-      ? counted(kind, n90, "90° elbow", partsFor(corners90, drops))
-      : counted(kind, n45, "45° elbow", partsFor(corners45, 0));
+      ? counted(kind, n90, words.elbow90.one, partsFor(corners90, drops))
+      : counted(kind, n45, words.elbow45.one, partsFor(corners45, 0));
   };
 
   const fieldBend = ((): BendCount => {

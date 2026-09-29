@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **A run type bought as sweeps now says "sweep" under its sweep row.** The
+  count sentence said "At least 2 90° elbows" beside a row that was a 36"
+  sweep. It now names what the type actually buys — sweep or elbow — and
+  says "bend" where no part has been matched yet.
+
 - **Searching a count now finds that count.** "2 gang box" leads with the
   double-gang box again (a weatherproof-box change earlier today had pushed
   it out of the top five), "1 gang box" with the single-gang box, "2 pole"

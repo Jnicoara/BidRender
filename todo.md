@@ -1896,7 +1896,15 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       aliases (S5). The run-type editor's 90°/45° pickers shipped the same
       day (S6, plan § 8b), and a traced sweep now counts as one bend on a
       sweep type (plan § 8a).
-- [ ] **The sentence under a sweep row still says "90° elbows".** Found
+- [x] **FIXED 2026-09-29 (plan W1, owner Q1: name the part, or "bend").**
+      The word follows the part the type buys (`bendWordsFor`,
+      `shared/runFittingMaterials.ts`, from the same names as the sweep merge
+      distance): sweep → "90° sweep", elbow or nothing chosen → "90° elbow",
+      anything else → "90° bend"; where NO part matched, the panel and the
+      materials list say "bend" (`unmatchedKindWords`). `words` is required on
+      `countFittings`, like `mergeWithinFeet`. `runBendsBridge.test.ts` goes
+      red on the old code with the exact old sentence. The entry as found:
+- [x] **The sentence under a sweep row still says "90° elbows".** Found
       2026-09-29 looking at the run panel (plan § 8b): the fitting line is
       named `2" PVC Sch 40 90-degree sweep, 36" radius` and the caption
       under it reads "At least 2 90° elbows: 2 corners …". The kind is
