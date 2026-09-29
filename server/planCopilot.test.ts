@@ -435,6 +435,20 @@ runIf("no writes without confirmation", () => {
     expect(groups.filter(g => g.assemblyId === s.recepAssemblyId)).toHaveLength(
       1
     );
+
+    // Deleting the placed mark (Track B's selection delete) takes it back off
+    // the bid. Two fixes that met on 2026-09-29: before Place joined a count,
+    // deleting a placed mark moved nothing, because it was never counted.
+    const placed = (await getStampsForSheet(s.sheetId, USER)).find(
+      st => Number(st.x) !== 100
+    )!;
+    const removed = await caller().takeoffStamps.removeMany({
+      ids: [placed.id],
+    });
+    expect(removed.removed).toBe(1);
+    expect(await lineQty()).toBe(1);
+    const after = await caller().takeoffGroups.list({ bidId: s.bidId });
+    expect(after.groups.find(g => g.id === armed.id)?.count).toBe(1);
   });
 
   it("refuses a confirmation that does not say it was confirmed", async () => {
