@@ -518,3 +518,54 @@ describe("conduit bodies: the LB for the generic words, each shape by name", () 
     expect(first(query)).toBe(expected);
   });
 });
+
+/**
+ * PVC sweeps (plan § 8, 2026-09-29), role-ranked like the bodies above.
+ *
+ * A sweep must lead any query that says "sweep", and must NOT take the lead
+ * from the standard elbow on a plain "2 pvc 90" — the elbow is what the
+ * takeoff counts and what nearly every job buys. The known cost, measured and
+ * accepted: a bare "sweep" leads with a 45 (the alphabet: "45" < "90").
+ * Marking the 90 sweeps "common" would fix that and push the LB down on
+ * every bare PVC pipe search, which is the worse trade.
+ */
+describe("PVC sweeps: found by 'sweep', never ahead of the elbow on '90'", () => {
+  const index = BASELINE_MATERIALS.map((row, i) => ({
+    id: String(i),
+    description: row.name,
+    searchAliases: row.searchAliases,
+  }));
+  const FAMILIES = familySizes(BASELINE_MATERIALS);
+  const NOW = new Date("2026-09-29T12:00:00Z");
+  const first = (query: string): string => {
+    const { results, searchedQuery } = smartSearchCorrected(index, query, 80);
+    return rankMaterialHits(
+      results.map(hit => ({
+        row: BASELINE_MATERIALS[Number(hit.item.id)],
+        score: hit.score,
+      })),
+      searchedQuery,
+      {
+        families: FAMILIES,
+        commonness: row => commonnessPoints(row.name, undefined, NOW),
+      }
+    )[0].name;
+  };
+
+  it.each(["sweep", "2 pvc sweep", "large radius", "4 pvc 80 sweep"])(
+    '"%s" leads with a PVC sweep',
+    query => {
+      expect(first(query)).toMatch(/ PVC Sch (40|80) \d\d-degree sweep, /);
+    }
+  );
+
+  it.each([
+    ["2 pvc 90 sweep", '2" PVC Sch 40 90-degree sweep, 24" radius'],
+    ["2 pvc 90 sweep 36", '2" PVC Sch 40 90-degree sweep, 36" radius'],
+    ["2 pvc 90", '2" PVC Sch 40 90-degree elbow'],
+    ["2 pvc 45", '2" PVC Sch 40 45-degree elbow'],
+    ["emt sweep", '1/2" EMT 90-degree elbow'],
+  ])('"%s" leads with %s', (query, expected) => {
+    expect(first(query)).toBe(expected);
+  });
+});

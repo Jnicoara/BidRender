@@ -756,6 +756,18 @@ why before going on.
 
 ## 8. PVC sweeps — plan, 2026-09-29
 
+> **ROWS BUILT 2026-09-29 on `track-c`.** Owner accepted the plan with S5
+> (take "sweep" off the PVC 90s — done for PVC only; EMT, rigid and IMC keep
+> it, since they ship no sweep rows). Build order: rows, then the run-type
+> 90/45 pickers (S6) — but first a measured test of how a traced sweep counts
+> (§ 8a). Measured after: catalog **1,511**, Conduit Fittings **574**,
+> pricing sheet 1,582 → **1,638** generic rows (0 typed prices before).
+> Spot-check: one line moved in the standard sweep ("4 pvc 80" 5th place, C
+> body → 45 sweep; both there on the alphabet). **Known cost, accepted in the
+> test:** a bare "sweep" leads with a 45 ("45" < "90"); marking the 90 sweeps
+> "common" would fix it and push the LB down on every bare PVC pipe search.
+> "2 pvc 90 sweep" and "2 pvc 90" both lead with what they name.
+
 Plan only. Nothing here is built. Track C rules: no migration, no schema
 change, no deploy.
 

@@ -4,6 +4,14 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-29]
+
+- **Large-radius PVC sweeps are now in the catalog** — 1" to 4", 90° and
+  45°, 24" and 36" radius, Schedule 40 and 80 (56 items, unpriced like
+  every shipped item). Searching "sweep" now finds them rather than the
+  ordinary PVC elbow; "2 pvc 90" still leads with the ordinary elbow, which
+  is what the takeoff counts.
+
 ## [2026-09-28]
 
 - **The shipped catalog may now grow to 3,000 items, up from 1,500**, with a

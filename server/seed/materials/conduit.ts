@@ -29,6 +29,7 @@ import {
   EMT_FITTING_STYLES,
   emtStyledFittingName,
   oneHoleStrapName,
+  sweepName,
   type EmtFittingStyle,
 } from "../../../shared/runFittingMaterials";
 
@@ -123,8 +124,8 @@ const FAMILIES: Family[] = [
  * had nothing to price against. Its name comes from `elbowName`, the same
  * function the lookup builds with; `materialsCatalog.test.ts` checks every
  * elbow, LB and T body the lookup can ask for exists here. Sweeps
- * (large-radius, for underground) are NOT here, by decision — no Underground
- * category yet.
+ * (large-radius) were held for an Underground category until 2026-09-29, and
+ * now ship as their own rows — see `pvcSweeps` below.
  *
  * The T body was added 2026-09-27 (references/materials-track-c-plan.md § 4,
  * owner's answers T1–T6): all nine sizes, one row per family, matching the LB
@@ -230,6 +231,71 @@ function emtStyledFittings(size: string): BaselineMaterial[] {
   );
 }
 
+/**
+ * A fitting's slang for one family. The only exception: PVC's standard 90
+ * does not answer to "sweep", because PVC ships real sweeps (below) and a
+ * bare "sweep" should find them rather than the ordinary elbow (owner,
+ * 2026-09-29, plan § 8 S5). EMT, rigid and IMC ship no sweep rows, so their
+ * 90 keeps the word — there it is what the trade means by it.
+ */
+function fittingSlang(
+  familyLabel: string,
+  fitting: { suffix: string; slang: string }
+): string {
+  if (fitting.suffix === "90-degree elbow" && PVC_LABELS.has(familyLabel)) {
+    return fitting.slang
+      .split(" ")
+      .filter(w => w !== "sweep")
+      .join(" ");
+  }
+  return fitting.slang;
+}
+
+const PVC_LABELS = new Set(["PVC Sch 40", "PVC Sch 80"]);
+
+/**
+ * Large-radius PVC sweeps, 56 rows (owner, 2026-09-29, plan § 8, S1–S5):
+ * 1" to 4", 90 and 45, 24" and 36" radius, Schedule 40 and 80.
+ *
+ * On Conduit Fittings, NOT waiting for an Underground shelf — this overrides
+ * takeoff-spec D19 answer 2. Underground is a LOCATION tag on the run (D8),
+ * not a shelf, and `backfillMaterialMetadata` re-stamps the category on every
+ * start, so moving them later is a one-word edit here with the same ids.
+ *
+ * Not 1/2" or 3/4": there the factory elbow is the bend. Not 30° or 22.5°:
+ * the bend count only ever produces 90s and 45s, so those would be rows it
+ * can never count — hand-add a custom row. Not marked "common": a bare
+ * "2 pvc 90" still leads with the standard elbow.
+ *
+ * The standard 90 above keeps being what the takeoff counts on a PVC run. A
+ * run type counts sweeps only when its 90 (or 45) is pointed at one of these.
+ */
+const SWEEP_SIZES = ['1"', '1-1/4"', '1-1/2"', '2"', '2-1/2"', '3"', '4"'];
+const SWEEP_ANGLES = [90, 45] as const;
+const SWEEP_RADII = [24, 36] as const;
+
+const pvcSweeps: BaselineMaterial[] = FAMILIES.filter(f =>
+  PVC_LABELS.has(f.label)
+).flatMap(family =>
+  SWEEP_SIZES.flatMap(size =>
+    SWEEP_ANGLES.flatMap(angle =>
+      SWEEP_RADII.map(radius => ({
+        name: sweepName(size, family.label, angle, radius),
+        unitOfSale: "each" as const,
+        costPerUnit: UNPRICED,
+        category: "Conduit Fittings" as const,
+        description: `Large-radius factory sweep, ${radius}" to the centreline.`,
+        searchAliases: aliases(
+          sizeAliases(size),
+          family.slang,
+          "large long big bend ell underground stub stubup riser utility",
+          angle === 45 ? "forty five" : undefined
+        ),
+      }))
+    )
+  )
+);
+
 const rigidFamilies: BaselineMaterial[] = FAMILIES.flatMap(family => [
   // The raceway itself, priced by the foot the way it is estimated even though
   // it is bought in 10 ft sticks — which `raceway` records for the count.
@@ -254,7 +320,7 @@ const rigidFamilies: BaselineMaterial[] = FAMILIES.flatMap(family => [
       searchAliases: aliases(
         sizeAliases(size),
         family.slang,
-        fitting.slang,
+        fittingSlang(family.label, fitting),
         fitting.suffix === "T conduit body"
           ? T_BODY_BRANDS[family.label]
           : undefined
@@ -387,6 +453,7 @@ const weatherheads: BaselineMaterial[] = [
 
 export const CONDUIT: BaselineMaterial[] = [
   ...rigidFamilies,
+  ...pvcSweeps,
   ...straps,
   ...flex,
   ...terminations,

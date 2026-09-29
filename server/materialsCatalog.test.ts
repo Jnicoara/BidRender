@@ -38,6 +38,7 @@ import {
   lrName,
   parseRacewayName,
   pullBoxFor,
+  sweepName,
   tBodyName,
 } from "../shared/runFittingMaterials";
 import { CATALOG_ROW_LIMIT } from "./seed/materials/types";
@@ -188,6 +189,34 @@ describe("every part the bend count can ask for is shipped", () => {
       }
     }
     expect(missing).toEqual([]);
+  });
+
+  it("ships the PVC sweep matrix, and nothing outside it", () => {
+    // Plan § 8 (owner, 2026-09-29): 1"–4", 90 and 45, 24" and 36" radius,
+    // Schedule 40 and 80 = 56. Built through `sweepName`, so a run type's
+    // override and any later lookup find the same spelling.
+    const want: string[] = [];
+    for (const family of ["PVC Sch 40", "PVC Sch 80"])
+      for (const size of ['1"', '1-1/4"', '1-1/2"', '2"', '2-1/2"', '3"', '4"'])
+        for (const angle of [90, 45] as const)
+          for (const radius of [24, 36])
+            want.push(sweepName(size, family, angle, radius));
+    expect(want.filter(n => !names.has(n))).toEqual([]);
+    const shipped = BASELINE_MATERIALS.filter(m => / sweep, /.test(m.name));
+    expect(shipped.map(m => m.name).sort()).toEqual([...want].sort());
+    for (const m of shipped) {
+      expect(m.category, m.name).toBe("Conduit Fittings");
+      expect(m.unitOfSale, m.name).toBe("each");
+      expect(m.description, m.name).toMatch(/^Large-radius factory sweep, /);
+    }
+  });
+
+  it('keeps "sweep" off the PVC 90 and on the others (plan § 8, S5)', () => {
+    const aliasesOf = (name: string) =>
+      BASELINE_MATERIALS.find(m => m.name === name)!.searchAliases.split(" ");
+    expect(aliasesOf('2" PVC Sch 40 90-degree elbow')).not.toContain("sweep");
+    expect(aliasesOf('2" PVC Sch 80 90-degree elbow')).not.toContain("sweep");
+    expect(aliasesOf('2" EMT 90-degree elbow')).toContain("sweep");
   });
 
   it("says every conduit body is priced with its cover and gasket", () => {

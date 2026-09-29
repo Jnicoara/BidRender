@@ -293,6 +293,23 @@ export function elbowName(
   return `${size} ${family} ${angle}-degree elbow`;
 }
 
+/**
+ * `2" PVC Sch 40 90-degree sweep, 36" radius` — a large-radius factory bend,
+ * shipped for the two PVC families (references/materials-track-c-plan.md
+ * § 8). Nothing in the takeoff builds this name on its own: a run type counts
+ * sweeps only when its 90 or 45 is pointed at one. It lives here beside
+ * `elbowName` so that the day something does build it, the seed and the
+ * lookup share one spelling.
+ */
+export function sweepName(
+  size: string,
+  family: string,
+  angle: 90 | 45,
+  radiusInches: number
+): string {
+  return `${size} ${family} ${angle}-degree sweep, ${radiusInches}" radius`;
+}
+
 export function lbName(size: string, family: string): string {
   return `${size} ${family} LB conduit body`;
 }

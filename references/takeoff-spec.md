@@ -1010,6 +1010,11 @@ The owner's design, and six answers given the same day:
   corner is proposed afresh.
 - **45° elbows only (answer 2)** were added to the catalog; sweeps wait for an
   Underground category.
+  > **Overridden 2026-09-29 (owner, `materials-track-c-plan.md` § 8, S1):**
+  > sweeps shipped without waiting — 56 PVC rows on Conduit Fittings.
+  > Underground is a location tag on the run (D8), not a shelf. The takeoff
+  > still counts the standard elbow unless a run type's 90/45 is pointed at a
+  > sweep.
 - **A user assembly that already holds an elbow (answer 6)** is left
   unguarded, as connectors are — logged in `todo.md`.
 
