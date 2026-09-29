@@ -51,7 +51,7 @@ import {
 import { createPortal } from "react-dom";
 import { trpc } from "@/lib/trpc";
 import { useCompany } from "@/hooks/useCompany";
-import { useTakeoffExport } from "@/hooks/useTakeoffExport";
+import { TakeoffExportDialog } from "@/components/TakeoffExportDialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -1853,7 +1853,8 @@ export default function TakeoffPage({
   const uploading = isBusy(uploads);
   const [confirmRemove, setConfirmRemove] = useState<Document | null>(null);
   const [materialsListOpen, setMaterialsListOpen] = useState(false);
-  const takeoffExport = useTakeoffExport(bidId);
+  /** "Export takeoff" — the dialog where prices are ticked, or not. */
+  const [takeoffExportOpen, setTakeoffExportOpen] = useState(false);
   /**
    * Which sheets state NOT TO SCALE, by sheet id.
    *
@@ -4842,6 +4843,11 @@ export default function TakeoffPage({
         open={materialsListOpen}
         onOpenChange={setMaterialsListOpen}
       />
+      <TakeoffExportDialog
+        bidId={bidId}
+        open={takeoffExportOpen}
+        onOpenChange={setTakeoffExportOpen}
+      />
 
       {/*
         Hidden in focus mode, which is what makes focus mode worth a key.
@@ -4900,16 +4906,10 @@ export default function TakeoffPage({
               size="sm"
               variant="outline"
               className="h-8 gap-1.5 text-xs shrink-0"
-              onClick={() => void takeoffExport.exportCsv()}
-              disabled={takeoffExport.pending}
-              title="Every count and run, by sheet and type — quantities only"
+              onClick={() => setTakeoffExportOpen(true)}
+              title="Every count and run, by sheet and type — prices only if you ask"
             >
-              {takeoffExport.pending ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <FileSpreadsheet className="w-3.5 h-3.5" />
-              )}{" "}
-              Export takeoff
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Export takeoff
             </Button>
             {docs.length > 0 && (
               <Button

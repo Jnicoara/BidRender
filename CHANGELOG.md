@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **The takeoff CSV can now carry prices, if you ask for them.** "Export
+  takeoff" opens a small dialog with an "Include prices" box, unticked every
+  time. Ticked, the whole-bid rows gain a price status, unit cost and line
+  cost — your costs as the bid's Cost column shows them, before markup,
+  overhead, profit and tax — and a short block that adds up to the bid's
+  Direct cost exactly. A line nobody priced is left blank with the reason
+  ("Not priced", "Can't price", "Not on bid"), never $0. Unticked, the file
+  is exactly what it was.
 - **New on the bid's Send menu: "For your quote app"** (internal accounts
   first). It shows what you charge the customer, before tax, in the five
   buckets your quote app takes (Tasks, Material, Equipment, Labor, Misc), with

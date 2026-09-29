@@ -66,7 +66,7 @@ import { UnitLinkBadge } from "@/components/UnitLinkBadge";
 import { UnitTemplateActions } from "@/components/UnitTemplateActions";
 import { MaterialsListDialog } from "@/components/MaterialsListDialog";
 import { useCompany } from "@/hooks/useCompany";
-import { useTakeoffExport } from "@/hooks/useTakeoffExport";
+import { TakeoffExportDialog } from "@/components/TakeoffExportDialog";
 import { AccountingExportDialog } from "@/components/AccountingExportDialog";
 import { QuoteAppPanel } from "@/components/QuoteAppPanel";
 import { ClientLinkField } from "@/components/ClientLinkField";
@@ -241,7 +241,7 @@ export default function BidsPage({
   const [accountingOpen, setAccountingOpen] = useState(false);
   const [quoteAppOpen, setQuoteAppOpen] = useState(false);
   const access = useCompany();
-  const takeoffExport = useTakeoffExport(bidId);
+  const [takeoffExportOpen, setTakeoffExportOpen] = useState(false);
 
   const utils = trpc.useUtils();
   const detailQuery = trpc.bids.get.useQuery({ id: bidId });
@@ -585,6 +585,11 @@ export default function BidsPage({
         open={quoteAppOpen}
         onOpenChange={setQuoteAppOpen}
       />
+      <TakeoffExportDialog
+        bidId={bidId}
+        open={takeoffExportOpen}
+        onOpenChange={setTakeoffExportOpen}
+      />
       <div className="border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Button
@@ -714,12 +719,11 @@ export default function BidsPage({
               </DropdownMenuItem>
 
               {/* The takeoff itself rather than the parts it needs: every
-                  count and run, by sheet and type. A download, not a dialog —
-                  it is read in the spreadsheet it lands in. */}
-              <DropdownMenuItem
-                onSelect={() => void takeoffExport.exportCsv()}
-                disabled={takeoffExport.pending}
-              >
+                  count and run, by sheet and type. A small dialog since
+                  2026-09-29, because whether the file carries prices is a
+                  choice made on purpose each time — it was a straight
+                  download before prices existed. */}
+              <DropdownMenuItem onSelect={() => setTakeoffExportOpen(true)}>
                 <FileSpreadsheet className="w-3.5 h-3.5" />
                 <span className="flex-1">
                   Takeoff
