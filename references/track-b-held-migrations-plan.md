@@ -369,9 +369,12 @@ makes the same argument).
 - **FK names** must be drizzle's own and under 64 characters, because
   `server/migrationRun.test.ts` checks them. `takeoff_groups_dropRunTypeId_takeoff_run_types_id_fk`
   is 52 characters (measured).
-- **File 6 is the slow one** and the likeliest to fail, because the live
-  database is missing FKs from the 0004 incident. Rehearse it on a restored
-  backup first (§ 5d's order: backup → rehearse → `schemaDrift.mts` → apply →
+- **File 6 is the slow one**, because MySQL checks every existing row when a
+  foreign key is added. **Production has all its foreign keys**: Track A
+  confirmed 133 on 2026-09-28, which closes the 0004 gap. This line said
+  otherwise until then. The column is new in file 5 and NULL on
+  every row, so the check has no data to reject. That makes this file slow
+  rather than risky. Rehearse on a restored backup first anyway (§ 5d's order: backup → rehearse → `schemaDrift.mts` → apply →
   `schemaDrift.mts` → check old-code totals are unchanged → deploy).
 - **`schema.ts`** gets matching drizzle definitions with the NULL meanings in
   the column comments, as the rest of the file does.
