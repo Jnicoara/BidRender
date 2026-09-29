@@ -22,6 +22,7 @@ import {
   endNodeKey,
   projectOntoPath,
   teeBoxOwners,
+  cableTeeOwners,
   type TeeRef,
 } from "../shared/runNetwork";
 import { teeBoxFor } from "../shared/runFittingMaterials";
@@ -342,5 +343,26 @@ describe("the tee box's size (D20, answer 3)", () => {
   });
   it("proposes nothing for a size it cannot read", () => {
     expect(teeBoxFor("Custom pipe", null).box).toBeNull();
+  });
+});
+
+describe("which cable type buys a tee no pipe owns (cableTeeOwners)", () => {
+  const tee = (id: number): TeeRef => ({ id, fitting: "box", stampId: null });
+
+  it("leaves a tee any pipe meets with the pipe", () => {
+    const owners = cableTeeOwners(new Map([[9, 1]]), new Map([[5, [tee(9)]]]));
+    expect(owners.has(9)).toBe(false);
+  });
+
+  it("gives a cable-only tee to the lowest cable type that touches it", () => {
+    const owners = cableTeeOwners(
+      new Map(),
+      new Map([
+        [7, [tee(4)]],
+        [5, [tee(4), tee(6)]],
+      ])
+    );
+    expect(owners.get(4)).toBe(5);
+    expect(owners.get(6)).toBe(5);
   });
 });

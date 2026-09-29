@@ -900,7 +900,10 @@ export type RunTypeBridgeEntry = {
   /** For the swatch: the line style this type is drawn in. */
   pathType: "conduit" | "cable";
   rows: RunTypeBridgeRow[];
-  /** Conduit types only; empty on a cable type. */
+  /**
+   * Every conduit fitting on a conduit type; on a cable type, only the box
+   * and cover at its tees (`cableTeeRows`, since 2026-09-29).
+   */
   fittings: RunTypeBridgeFitting[];
   /** Runs of this type nobody has answered the branch-wiring question for. */
   unansweredCount: number;

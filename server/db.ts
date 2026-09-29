@@ -241,6 +241,8 @@ import {
   bendMergeFeetForOverrides,
   bendMethodFor,
   bendWordsFor,
+  cableTeeRows,
+  SMALL_TEE_BOX,
   lbHubsTakeConnectors,
   pickFittingMaterial,
   parseRacewayName,
@@ -255,6 +257,7 @@ import {
   rehomeAnswersAtCut,
   rootOf,
   teeBoxOwners,
+  cableTeeOwners,
   type TeeRef,
 } from "../shared/runNetwork";
 import { pathRealInches } from "../shared/takeoffGeometry";
@@ -11855,7 +11858,9 @@ export async function fittingRowsByRunType(
       row,
       type: resolveRunType(palette, storedId),
     }))
-    .filter(e => e.type !== undefined && e.type.pathType === "conduit");
+    // Cable types too, since 2026-09-29: a tee on a cable run buys its box
+    // (cableTeeRows). Everything else below is for conduit and skips them.
+    .filter(e => e.type !== undefined);
   if (entries.length === 0) return out;
 
   const linked = await getMaterialsByIds(
@@ -11885,6 +11890,9 @@ export async function fittingRowsByRunType(
   const wantedNames = Array.from(
     new Set(
       entries.flatMap(({ type }) => {
+        if (type!.pathType === "cable") {
+          return [SMALL_TEE_BOX.box, SMALL_TEE_BOX.cover];
+        }
         const name = racewayBaselineName(resolved(type!.racewayMaterialId));
         if (name === null) return [];
         return FITTING_KINDS.map(kind =>
@@ -11935,10 +11943,28 @@ export async function fittingRowsByRunType(
     new Map(entries.map(({ storedId, row }) => [storedId, row.legs])),
     typeId => sizeByType.get(typeId) ?? null
   );
+  // A tee only cable meets has no pipe legs to be owned through: a cable type
+  // buys it (cableTeeOwners). A tee any pipe meets stays the pipe's.
+  const cableOwners = cableTeeOwners(
+    teeOwners,
+    new Map(
+      entries
+        .filter(({ type }) => type!.pathType === "cable")
+        .map(({ storedId, row }) => [storedId, row.tees])
+    )
+  );
 
   for (const { storedId, row, type } of entries) {
     const t = type!;
     const raceway = resolved(t.racewayMaterialId);
+    if (t.pathType === "cable") {
+      // The box at each tee it owns, and nothing else — no pipe to fit.
+      const ownedByCable = row.tees.filter(
+        tee => cableOwners.get(tee.id) === storedId
+      );
+      out.set(storedId, cableTeeRows(ownedByCable, found));
+      continue;
+    }
     const ownedTees = row.tees.filter(
       tee => teeOwners.get(tee.id) === storedId
     );

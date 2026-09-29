@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **A branch on an MC or NM cable run now buys its box.** A tee on a cable
+  run counted the cable but no box at the split; it now adds a 4" square
+  box and blank cover, the same pair a small-pipe tee buys.
+- **A tee shared by two pipe sizes no longer stores two boxes.** Sending
+  each size to the bid separately saved a box for both; the bid screen
+  showed one, but the saved lines said two. Now only the larger pipe's
+  line carries it.
+
 - **The database check no longer gives wrong advice before a deploy.** It
   used to say a database that could not be reached had "never been
   migrated", and to call a missing link's migration "already applied" when

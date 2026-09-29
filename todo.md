@@ -1773,9 +1773,20 @@ counts need no rule of their own. `shared/runNetwork.ts` is the module.
   - [ ] **Before that deploy:** count stored `fitting = 'body'` tees in
         production. Expected 0, because nothing offers it. If it is not 0,
         stop and find out why before going on: those bids would gain a line.
-- [ ] **A cable run's tee buys nothing.** Cable types have no fitting slot
+- [x] **A cable run's tee buys nothing.** Cable types have no fitting slot
       (the MC item below), so a branch on a cable run counts its footage and
       drops but no junction box at the split. Same fix as MC connectors.
+      **FIXED 2026-09-29 (plan W4, owner Q2):** a tee on a cable run buys a
+      4" square box and blank cover (`SMALL_TEE_BOX`, the pair a small-pipe
+      tee already buys; `cableTeeRows`). Tees are now collected for cable
+      rows; a cable-only tee goes to the lowest cable type touching it
+      (`cableTeeOwners`). Pipe and cable cannot meet at a tee today (a cable
+      branch on a conduit run is refused — pinned). **Found on the way, and
+      fixed with it:** `sendToBid` decided tee ownership from the one type
+      being sent, so a 1/2" and a 3/4" type sharing a tee, sent separately,
+      STORED two boxes; the bid screen was right because it counts every
+      type. `server/cableTeeBox.test.ts`: both red on `1f66d7d` (`[]`, and
+      2 boxes for one tee). MC connectors and straps are still open, below.
 - [ ] **The main past a tee and the branch both read "from a tee"** in the
       runs panel, because nothing stored says which is which. Worth storing if
       the wording confuses anybody.

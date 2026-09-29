@@ -277,24 +277,29 @@ export function groupRunFootage(input: {
       pipe on the bid. Added before the unmeasurable `continue`, because a run
       with no scale still has two ends and therefore two connectors.
     */
+    /*
+      A quantity trace makes no tees (D21). One switched from route keeps
+      its tee rows for switching back, unread: no box, no joined node.
+
+      Collected for CABLE runs too since 2026-09-29: a tee on a cable run buys
+      its box (plan W4, `cableTeeRows`). Only the LEGS below stay conduit-only
+      — they are what pipe fittings are counted over.
+    */
+    const tees = run.traceMode === "quantity" ? null : input.teesById;
+    const startTee =
+      run.startTeeId === null || tees === null
+        ? null
+        : (tees.get(run.startTeeId) ?? null);
+    const endTee =
+      run.endTeeId === null || tees === null
+        ? null
+        : (tees.get(run.endTeeId) ?? null);
+    for (const tee of [startTee, endTee]) {
+      if (tee && !row.tees.some(t => t.id === tee.id)) row.tees.push(tee);
+    }
+
     if (run.pathType === "conduit") {
       const inchesPerPoint = pointsToRealInches(1, ratio);
-      /*
-        A quantity trace makes no tees (D21). One switched from route keeps
-        its tee rows for switching back, unread: no box, no joined node.
-      */
-      const tees = run.traceMode === "quantity" ? null : input.teesById;
-      const startTee =
-        run.startTeeId === null || tees === null
-          ? null
-          : (tees.get(run.startTeeId) ?? null);
-      const endTee =
-        run.endTeeId === null || tees === null
-          ? null
-          : (tees.get(run.endTeeId) ?? null);
-      for (const tee of [startTee, endTee]) {
-        if (tee && !row.tees.some(t => t.id === tee.id)) row.tees.push(tee);
-      }
       row.legs.push(
         legFromRun({
           id: run.id,

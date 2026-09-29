@@ -834,15 +834,19 @@ export const takeoffRunTypesRouter = router({
         the same legs — one list, so the lock rule and the refresh rule below
         are written once for both. `sendable` carries each kind's own reasons.
       */
+      /*
+        Counted across EVERY type on the bid, then this type's rows taken.
+        A tee's box belongs to one type (`teeBoxOwners`: the largest pipe
+        meeting there), and that can only be decided with all of them in
+        view. Given this type alone, it owned every tee it touched, so
+        sending a 1/2" type and a 3/4" type that share a tee stored a box for
+        each (2026-09-29, plan W4). Cable types too: a tee on a cable run buys
+        its box.
+      */
       const fittings =
-        type.pathType === "conduit"
-          ? ((
-              await db.fittingRowsByRunType(
-                ctx.scope.dataUserId,
-                new Map([[input.runTypeId, f]])
-              )
-            ).get(input.runTypeId) ?? [])
-          : [];
+        (await db.fittingRowsByRunType(ctx.scope.dataUserId, footage)).get(
+          input.runTypeId
+        ) ?? [];
       const candidates = [
         ...rows.map(row => ({
           role: row.role as (typeof RUN_MATERIAL_ROLES)[number],

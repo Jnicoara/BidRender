@@ -32,7 +32,12 @@ import {
   type PullPointKind,
 } from "./runBends";
 import { tradeSizeAtLeast } from "./materialSizeOrder";
-import { isTeeRole } from "./runNetwork";
+import {
+  TEE_KINDS,
+  isTeeRole,
+  teeFittingCounts,
+  type TeeRef,
+} from "./runNetwork";
 
 /**
  * EMT's three fitting styles. NULL on a run type reads as set-screw — it is
@@ -242,6 +247,16 @@ export function pullBoxFor(
 }
 
 /**
+ * The box and cover at a tee on small pipe — and at EVERY tee on a cable run
+ * (owner, 2026-09-29, plan W4). One constant, so the two cannot come to name
+ * different parts.
+ */
+export const SMALL_TEE_BOX = {
+  box: '4" square box',
+  cover: '4" square blank cover',
+} as const;
+
+/**
  * The box at a branch tee (D20, answer 3): a 4" square box and blank cover up
  * to 3/4", 4-11/16" from 1" to 1-1/4", and the pull-box rule from 1-1/2" up —
  * a tee in large pipe is an angle pull, and a pull box comes with its screw
@@ -264,8 +279,8 @@ export function teeBoxFor(
   }
   if (inches <= 0.75) {
     return {
-      box: '4" square box',
-      cover: '4" square blank cover',
+      box: SMALL_TEE_BOX.box,
+      cover: SMALL_TEE_BOX.cover,
       why: `a 4" square box at each tee on ${parsed.size}`,
     };
   }
@@ -670,6 +685,46 @@ export function fittingRowSpeaks(row: {
   if (!isBendRole(row.role) && !isTeeRole(row.role)) return true;
   if (row.onBid || row.status === "unknown") return true;
   return row.status === "counted" && row.qty > 0;
+}
+
+/**
+ * A CABLE run's fitting rows: the box and cover at each tee it owns, and
+ * nothing else — a cable has no couplings, straps or elbows to buy.
+ *
+ * Until 2026-09-29 a cable type got no fitting rows at all, so a branch on an
+ * MC or NM run counted its footage and drops and bought no box at the split:
+ * one box and cover short per tee, with nothing on screen saying so (plan
+ * W4). The box is SMALL_TEE_BOX, the owner's answer (Q2); a cable has no trade
+ * size to size it by. Ownership is `teeBoxOwners`, which ranks a type with no
+ * raceway below every pipe — so where conduit meets cable, the conduit buys
+ * the one box, sized to itself.
+ */
+export function cableTeeRows(
+  ownedTees: readonly TeeRef[],
+  found: (
+    name: string
+  ) => { id: number; name: string; costPerUnit: string | number } | undefined
+): FittingRow[] {
+  const counts = teeFittingCounts(ownedTees, false);
+  return TEE_KINDS.map(kind => {
+    const wanted = kind === "teeBox" ? SMALL_TEE_BOX.box : SMALL_TEE_BOX.cover;
+    const row = found(wanted);
+    const count = counts[kind];
+    return {
+      role: kind,
+      count,
+      pick: row
+        ? {
+            ok: true as const,
+            materialId: row.id,
+            name: row.name,
+            costPerUnit: row.costPerUnit,
+            override: false,
+          }
+        : { ok: false as const, why: `No catalog match for ${wanted}` },
+      qty: count.status === "counted" ? count.qty : 0,
+    };
+  });
 }
 
 export function fittingRows(

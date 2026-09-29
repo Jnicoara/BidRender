@@ -111,6 +111,26 @@ a key from a pending one must not print "already recorded as applied".
 
 ### W4. A cable run's tee buys no box
 
+> **BUILT 2026-09-29.** Two things the plan did not know, both measured:
+>
+> - **The box is `4" square box`, not `4" square box, 2-1/8" deep`** as this
+>   section proposed — the owner's answer said "a 4" square box and blank
+>   cover", and that is exactly the pair a small-pipe tee already buys. One
+>   constant, `SMALL_TEE_BOX`, now names it for both.
+> - **Pipe and cable cannot meet at a tee.** The "mixed EMT/MC tee" test
+>   below could not be traced: a cable branch on a conduit run is refused.
+>   Pinned instead; `cableTeeOwners` keeps a tee any pipe meets with the
+>   pipe for the day that changes.
+>
+> Cable rows did not even carry their tees (`runTypeFootageCore.ts`
+> collected them for conduit only); now they do, and legs stay conduit-only.
+>
+> **And a second wrong number, in the send:** `sendToBid` decided tee
+> ownership from the ONE type being sent, so two pipe sizes sharing a tee,
+> sent one at a time, stored two boxes. Now the send counts every type and
+> takes its own rows. `server/cableTeeBox.test.ts`: the cable tee and the
+> two-size send are both red on `1f66d7d`.
+
 **What is wrong.** A branch on a cable run (MC, NM) counts footage and drops
 but no junction box at the split — a quantity silently short, one box per tee.
 `teeBoxOwners` (`shared/runNetwork.ts:299`) ranks by raceway size; a cable type
