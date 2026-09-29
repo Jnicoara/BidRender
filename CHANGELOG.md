@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Finishing a run with a double-click no longer adds a phantom elbow.** The
+  second click of the double-click added a tiny extra point. If the mouse had
+  moved even a pixel, the elbow count read the turn onto it as a corner and
+  put an elbow on the bid that nobody drew. The second click now adds
+  nothing. Runs already saved with a very short stub stop counting it too.
 - **A locked bid can no longer lose marks or runs.** Deleting a mark, a
   selection of marks or a traced run went straight through on a bid whose
   quantities were locked. The bid's number held, but the drawing behind it

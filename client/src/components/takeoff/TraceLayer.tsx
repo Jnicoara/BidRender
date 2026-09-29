@@ -57,6 +57,7 @@ import { legSnapLabel, type LegSnap } from "@/lib/legSnap";
 import { stampsInBox } from "@/lib/stampSelection";
 import { projectOntoPath } from "@shared/runNetwork";
 import { JOINED_WITHIN_POINTS } from "@shared/quantityDrops";
+import { addsTracePoint } from "@/lib/traceClick";
 
 /**
  * How wide a run's invisible click target is, in SCREEN pixels.
@@ -353,13 +354,17 @@ export function TraceLayer({
    * zoom — the same idea as the run's hit target. Measured off the overlay's
    * laid-out size, which already includes the zoom transform.
    */
-  const snapReach = useCallback((): number => {
+  const pagePerScreenPx = useCallback((): number => {
     const svg = svgRef.current;
-    if (!svg) return LEG_SNAP_PX;
+    if (!svg) return 1;
     const rect = svg.getBoundingClientRect();
     const devicePerCss = rect.width === 0 ? 1 : width / rect.width;
-    return (LEG_SNAP_PX * devicePerCss) / renderScale;
+    return devicePerCss / renderScale;
   }, [width, renderScale]);
+  const snapReach = useCallback(
+    (): number => LEG_SNAP_PX * pagePerScreenPx(),
+    [pagePerScreenPx]
+  );
 
   const ratio = measurability.ok ? measurability.ratio : null;
 
@@ -638,6 +643,10 @@ export function TraceLayer({
               legs.onNewLeg(at);
               return;
             }
+            // The second press of a double-click lands on the point the
+            // first one placed; adding it drew a stub the bend counter read
+            // as an elbow. @/lib/traceClick.
+            if (!addsTracePoint(points, page, pagePerScreenPx())) return;
             onPointsChange([...points, page]);
             return;
           }
@@ -647,7 +656,8 @@ export function TraceLayer({
         }}
         onDoubleClick={e => {
           // Double-click finishes, which is what every drawing tool does. The
-          // extra point the first click added is already in the path.
+          // first press placed the end point; the second added nothing
+          // (addsTracePoint above).
           if (tracing && canFinish) {
             e.preventDefault();
             onFinish();

@@ -251,6 +251,41 @@ export function turnDegrees(a: Point, b: Point, c: Point): number | null {
   return (Math.atan2(cross, dot) * 180) / Math.PI;
 }
 
+/**
+ * Two consecutive points closer than this, in PAGE points, are one point as
+ * far as direction goes. 3 points is 1/24" of paper — too short to draw on
+ * purpose at any zoom, and far longer than the drift between the two presses
+ * of a double-click at working zoom.
+ *
+ * Why it exists: a double-click that finishes a trace used to append a second
+ * point a pixel from the first. `turnDegrees` only refuses an EXACTLY zero
+ * segment, so the turn onto that stub — pointing any direction at all — was
+ * counted as a corner and bought as an elbow (server/runBends.test.ts, "a
+ * near-duplicate end point"). The trace tool no longer adds that point; this
+ * is what keeps runs saved before that from still buying one.
+ */
+export const STUB_POINTS = 3;
+
+/**
+ * The indices of `points` that carry direction: each point closer than
+ * STUB_POINTS to the last kept one is dropped, so a real corner clicked twice
+ * keeps its turn and a stub at either end simply disappears.
+ */
+export function directionalVertices(points: readonly Point[]): number[] {
+  const kept: number[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const last = kept[kept.length - 1];
+    if (
+      last !== undefined &&
+      Math.hypot(points[i].x - points[last].x, points[i].y - points[last].y) <
+        STUB_POINTS
+    )
+      continue;
+    kept.push(i);
+  }
+  return kept;
+}
+
 /** A turn this small is straight on — not a bend, and not wobble either. */
 const STRAIGHT_DEGREES = 0.5;
 
@@ -303,15 +338,22 @@ export function legBends(
     });
   }
 
+  // Turns are read off the path with near-duplicate points collapsed (see
+  // STUB_POINTS); `vertices` still name ORIGINAL indices, because pull-point
+  // answers are matched against `leg.points` by position.
+  const kept = directionalVertices(p);
+
   // Group interior vertices: same sign, and within MERGE_WITHIN_FEET of the
   // previous member measured ALONG the path.
   type Group = { vertices: number[]; sum: number; sign: number };
   const groups: Group[] = [];
   let current: Group | null = null;
   let sinceLast = 0; // page points along the path since the group's last vertex
-  for (let i = 1; i < p.length - 1; i++) {
-    sinceLast += Math.hypot(p[i].x - p[i - 1].x, p[i].y - p[i - 1].y);
-    const t = turnDegrees(p[i - 1], p[i], p[i + 1]);
+  for (let k = 1; k < kept.length - 1; k++) {
+    const [a, b, c] = [kept[k - 1], kept[k], kept[k + 1]];
+    const i = b;
+    sinceLast += Math.hypot(p[b].x - p[a].x, p[b].y - p[a].y);
+    const t = turnDegrees(p[a], p[b], p[c]);
     if (t === null || Math.abs(t) < STRAIGHT_DEGREES) continue;
     const sign = Math.sign(t);
     const close =

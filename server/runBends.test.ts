@@ -784,3 +784,45 @@ describe("company settings", () => {
     ).toBe(360);
   });
 });
+
+/*
+  THE DOUBLE-CLICK STUB (Track B, 2026-09-29).
+
+  Finishing a trace with a double-click fires two presses, and each appended a
+  point. A mouse that drifts a pixel between them leaves a near-zero stub at the
+  end pointing any direction at all. `turnDegrees` skips only an EXACTLY zero
+  segment, so the turn onto that stub was read as a corner and bought as an
+  elbow. Measured here before it was fixed: these went red.
+*/
+describe("a near-duplicate end point from a double-click", () => {
+  const straight: P[] = [
+    { x: 0, y: 0 },
+    { x: 300, y: 0 },
+  ];
+
+  it("adds no elbow to a straight run, whichever way the stub points", () => {
+    for (const stub of [
+      { x: 300, y: 1 },
+      { x: 299.4, y: -0.6 },
+      { x: 300.3, y: 0.8 },
+    ]) {
+      const r = legBends(bendLeg([...straight, stub]));
+      expect(r.bends).toEqual([]);
+    }
+  });
+
+  it("adds no elbow to a run that already has one", () => {
+    const L: P[] = [
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+      { x: 300, y: 170 },
+      { x: 301, y: 170.4 },
+    ];
+    expect(legBends(bendLeg(L)).bends).toHaveLength(1);
+  });
+
+  it("does the same at the START, where a double-click can also land", () => {
+    const r = legBends(bendLeg([{ x: 0.5, y: 0.7 }, ...straight]));
+    expect(r.bends).toEqual([]);
+  });
+});
