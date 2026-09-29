@@ -1457,12 +1457,45 @@ path is ever revived, give it the same treatment first.
       the card chip (checked at 1536 px only; `flex-wrap`, so expected fine).
       And on an account still showing the getting-started checklist, the row
       sits near the fold — worth a look if Phase 1 still feels hidden.
-- [ ] **Found, not chased (2026-09-27):** `getMaterialUsageForCompany`
-      (`server/db.ts`) builds `lastUsedAt` with `new Date()` from a raw
-      `MAX(...)` — the same shape that read 7 hours out on the Dashboard's
-      newest-plan date (fixed there with `DATE_FORMAT(... 'Z')`,
-      `dashboardPlans.test.ts`). It goes through `db.execute`, whose driver
-      may already return a Date, so measure before changing it.
+- [x] **MEASURED 2026-09-28 and left alone: `lastUsedAt` is right.** The
+      entry below guessed it read 7 hours out like the Dashboard's
+      newest-plan date. Asked the driver instead: `db.execute` returns a raw
+      TIMESTAMP as zone-less text in the SESSION's time zone, and the local
+      MySQL session is `SYSTEM` (Pacific). `li.createdAt` is filled by the
+      database default, so its text is Pacific and `new Date(text)` reads it
+      correctly — `materialUsage.test.ts` "dates the last use" passes on a
+      Pacific laptop. Switching to `DATE_FORMAT(... 'Z')` would have made it
+      7 hours EARLY. On production (UTC database, UTC Node) both forms agree.
+      The entry as it stood: `getMaterialUsageForCompany` builds `lastUsedAt`
+      with `new Date()` from a raw `MAX(...)` — the same shape that read 7
+      hours out on the Dashboard's newest-plan date. Measure before changing.
+- [ ] **The flip side, found by that measurement: locally, the Dashboard's
+      newest-plan date is 7 hours EARLY for a real upload.** `lastPlanAt`
+      uses `DATE_FORMAT(MAX(p.createdAt), '…Z')`, which is right for a row
+      whose createdAt the APP wrote (drizzle writes UTC text) — which is what
+      `dashboardPlans.test.ts` inserts — and wrong for one the DATABASE
+      defaulted, which is every real upload. Production is unaffected (its
+      session zone is UTC, so the two agree). The real fix is one rule for
+      the connection — `timezone: "Z"` on the pool, or `SET time_zone =
+'+00:00'` per session — so text means UTC everywhere; that touches
+      every raw date read and wants its own look.
+
+- [x] **BUILT AND SCREEN-PASSED 2026-09-28: the next Track B batch**
+      (`references/track-b-next-batch-plan.md`, pass table at the top).
+      Pieces 1, 2, 3 and 5 checked on screen; nothing needed fixing. Not
+      merged. **Still open from the pass:** the layout at the shipped desktop
+      width was not seen (the driven window was stuck at 766 px), and the
+      Recent plans row at phone width.
+- [ ] **No control removes a single mark (C6), and a dead prop hides that.**
+      Found by the 2026-09-28 screen pass, trying to remove a run's end mark.
+      `RunsPanel` accepts `onRemoveStamp` and has never called it (added in
+      `ba6702c`, 2026-08-12); nothing else in the client calls
+      `takeoffStamps.remove`. A reader seeing the prop wired in
+      `TakeoffPage` would believe removal exists. D6 in `takeoff-spec.md`
+      already decides the shape (tap a mark, Remove / Delete key / Undo).
+      When it is built, the refresh is ready: `refreshFor("markRemoved")` in
+      `removeStamp`, tested in `takeoffRefresh.test.ts`. Until then, either
+      build it or drop the prop, so the wiring stops implying a feature.
 
 ## Plan viewer overhaul
 

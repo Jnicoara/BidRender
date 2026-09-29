@@ -3007,6 +3007,88 @@ export async function getAssemblyForStoredReference(
   return getAssemblyDetail(resolved.id, userId);
 }
 
+/**
+ * Which assemblies are the SAME assembly: each id mapped to its family — the
+ * shipped row it was forked from (`baselineId`), or itself when it has none.
+ *
+ * For R3's double-count check (`doubleCountedAssemblies`, `sendWarning`),
+ * which matched stored ids literally: a plan line on the shipped Duplex
+ * receptacle and a hand-added line on the company's priced copy of it are the
+ * same work twice, under two ids, and were not flagged. The registry in
+ * `server/forkableReferences.test.ts` had it as unreviewed since 2026-09-21.
+ *
+ * Only rows this company can see: the shipped rows and its own. An id not
+ * found is left out of the map and reads as its own family.
+ */
+export async function getAssemblyFamilies(
+  ids: readonly number[],
+  userId: number
+): Promise<Map<number, number>> {
+  const families = new Map<number, number>();
+  const wanted = Array.from(new Set(ids));
+  if (wanted.length === 0) return families;
+  const db = await getDb();
+  if (!db) return families;
+  const rows = await db
+    .select({ id: assemblies.id, baselineId: assemblies.baselineId })
+    .from(assemblies)
+    .where(
+      and(
+        inArray(assemblies.id, wanted),
+        or(isNull(assemblies.userId), eq(assemblies.userId, userId))
+      )
+    );
+  for (const row of rows) families.set(row.id, row.baselineId ?? row.id);
+  return families;
+}
+
+/**
+ * Today's hourly rate for the role on each of these STORED assembly ids — the
+ * rate `snapshotForAssembly` would freeze if the assembly were added now.
+ *
+ * Resolved the way `getAssemblyForStoredReference` resolves one id (the
+ * company's fork of a shipped row wins), but for many ids in two queries and
+ * without loading recipes, since only the role is wanted. For the stale-rate
+ * flag on the bid (`staleRateLines`). An id that resolves to nothing is left
+ * out of the map.
+ */
+export async function currentAssemblyRates(
+  storedIds: readonly number[],
+  userId: number
+): Promise<Map<number, number>> {
+  const rates = new Map<number, number>();
+  const wanted = Array.from(new Set(storedIds));
+  if (wanted.length === 0) return rates;
+  const db = await getDb();
+  if (!db) return rates;
+  const [candidates, roles] = await Promise.all([
+    db
+      .select()
+      .from(assemblies)
+      .where(
+        or(
+          and(
+            inArray(assemblies.id, wanted),
+            or(isNull(assemblies.userId), eq(assemblies.userId, userId))
+          ),
+          and(
+            eq(assemblies.userId, userId),
+            inArray(assemblies.baselineId, wanted)
+          )
+        )
+      ),
+    getLibraryLaborRates(userId),
+  ]);
+  // MERGE BEFORE RESOLVING, as getAssemblyForStoredReference does.
+  const visible = mergeLibraryRows(candidates, userId);
+  for (const id of wanted) {
+    const resolved = resolveAssembly(visible, id);
+    if (!resolved) continue;
+    rates.set(id, hourlyCostFor(roles, resolved.laborRateId));
+  }
+  return rates;
+}
+
 export async function getAssemblyDetail(
   id: number,
   userId: number
@@ -5043,7 +5125,12 @@ async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
   const rows = await db
     .select({ groupId: takeoffStamps.groupId, total: sql<number>`count(*)` })
     .from(takeoffStamps)
-    .where(eq(takeoffStamps.bidId, bidId))
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+      )
+    )
     .groupBy(takeoffStamps.groupId);
 
   const counts = new Map<number, number>();
@@ -6785,11 +6872,15 @@ export async function getMaterialUsageForCompany(
           JOIN assembly_materials am ON am.assemblyId = g.assemblyId
          WHERE b.userId = ${dataUserId} AND li.archivedAt IS NULL
         UNION ALL
-        SELECT CASE li.runMaterialRole
+        -- The line's own part first: a fitting (coupling, connector, strap,
+        -- elbow, box, cover...) is counted from the trace, so its type names
+        -- no material and only runMaterialId says what it is. Until
+        -- 2026-09-28 every fitting sent from a trace counted as never used.
+        SELECT COALESCE(li.runMaterialId, CASE li.runMaterialRole
                  WHEN 'conductor' THEN rt.conductorMaterialId
                  WHEN 'ground'    THEN rt.groundMaterialId
                  WHEN 'raceway'   THEN rt.racewayMaterialId
-               END,
+               END),
                li.bidId, li.createdAt
           FROM bid_line_items li
           JOIN bids b ON b.id = li.bidId
@@ -7284,6 +7375,30 @@ export async function getRunsForSheet(
     .orderBy(asc(takeoffRuns.id));
 }
 
+/**
+ * A mark or run counts toward a bid only while its sheet, and that sheet's
+ * plan set, still exist on the bid. EVERY bid-wide read of marks or runs goes
+ * through this — the rollup, the counts, the export, the materials list.
+ *
+ * On a database with its foreign keys the condition is always true: deleting a
+ * plan set cascades to its sheets and from each sheet to its marks and runs.
+ * It is here for a database WITHOUT them — one copied with `CREATE TABLE …
+ * LIKE`, which drops every foreign key (bidrender_local_b, measured 2026-09-28:
+ * 0), or a restore done the wrong way. There the rows stay behind, and a read
+ * by `bidId` alone kept pricing a deleted drawing's marks and counting its runs'
+ * connectors. The quantities must not depend on which kind of database this is.
+ *
+ * `server/quantitiesIgnoreDeletedPlans.test.ts` removes the rows with foreign
+ * key checks off and holds every read against a bid that never had them; it
+ * also fails if a bid-wide read of marks or runs is written without this.
+ */
+function onLivePlanSheet(
+  sheetId: typeof takeoffRuns.sheetId | typeof takeoffStamps.sheetId,
+  bidId: number
+) {
+  return sql`${sheetId} IN (SELECT ${bidPdfSheets.id} FROM ${bidPdfSheets} INNER JOIN ${bidPdfs} ON ${bidPdfs.id} = ${bidPdfSheets.bidPdfId} WHERE ${bidPdfs.bidId} = ${bidId})`;
+}
+
 /** Every run on a whole bid, for the bill of materials rollup. */
 export async function getRunsForBid(
   bidId: number,
@@ -7294,7 +7409,13 @@ export async function getRunsForBid(
   return db
     .select()
     .from(takeoffRuns)
-    .where(and(eq(takeoffRuns.bidId, bidId), eq(takeoffRuns.userId, userId)))
+    .where(
+      and(
+        eq(takeoffRuns.bidId, bidId),
+        eq(takeoffRuns.userId, userId),
+        onLivePlanSheet(takeoffRuns.sheetId, bidId)
+      )
+    )
     .orderBy(asc(takeoffRuns.id));
 }
 
@@ -8048,7 +8169,11 @@ export async function getStampsForBid(
     .from(takeoffStamps)
     .leftJoin(takeoffGroups, eq(takeoffStamps.groupId, takeoffGroups.id))
     .where(
-      and(eq(takeoffStamps.bidId, bidId), eq(takeoffStamps.userId, userId))
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        eq(takeoffStamps.userId, userId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+      )
     )
     .orderBy(asc(takeoffStamps.id));
 }
@@ -8358,7 +8483,11 @@ export async function countStampsByGroup(
     })
     .from(takeoffStamps)
     .where(
-      and(eq(takeoffStamps.bidId, bidId), eq(takeoffStamps.userId, userId))
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        eq(takeoffStamps.userId, userId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+      )
     )
     .groupBy(takeoffStamps.groupId);
 
@@ -10398,6 +10527,20 @@ function costSums(productivityPct: number) {
      * them must say so rather than present them as the bid's value.
      */
     brokenLines: sql<string>`COALESCE(SUM(CASE WHEN ${bidLineItems.id} IS NOT NULL AND NOT ${lineIsPriceable} THEN 1 ELSE 0 END), 0)`,
+    /*
+      Lines nobody priced, which the sums below count as $0 — a different
+      fact from `brokenLines`, and the one a total states as "+ 4 lines not
+      priced" (owner, 2026-09-26). Here rather than in the Dashboard's own
+      select since 2026-09-27, so analytics reads the same count: it summed
+      these lines at $0 and flagged only the broken ones.
+    */
+    notPricedLines: sql<string>`COALESCE(SUM(CASE WHEN ${lineNotPricedSql(productivityPct)} THEN 1 ELSE 0 END), 0)`,
+    /*
+      Parts missing from otherwise-priced lines, as frozen on the line (0087).
+      A line from before 0087 has no frozen count; the Dashboard reads its
+      recipe live (`liveUnpricedParts`), analytics does not — see BidCostRow.
+    */
+    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} AND ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}) ELSE 0 END), 0)`,
     materialCents: sql<string>`COALESCE(SUM(${materialCents}), 0)`,
     laborCents: sql<string>`COALESCE(SUM(${laborCents}), 0)`,
     directCents: sql<string>`COALESCE(SUM(ROUND(${materialCents} + ${laborCents})), 0)`,
@@ -10517,6 +10660,16 @@ export type BidCostRow = {
    * with the bid screen's arithmetic and never said it was leaving lines out.
    */
   brokenLines: number;
+  /**
+   * Lines and parts nobody priced, counted as $0 in every sum above — the
+   * "+ 4 lines not priced" a bid total states. Carried since 2026-09-27.
+   *
+   * Parts are the FROZEN count only. A line added before 0087 stored no
+   * count, and the Dashboard reads its recipe live for it; analytics does
+   * not, so on such a line an unpriced part is not counted here. Lines are
+   * exact either way.
+   */
+  notPriced: NotPricedTally;
 };
 
 function toBidCostRow(row: Record<string, unknown>): BidCostRow {
@@ -10544,6 +10697,10 @@ function toBidCostRow(row: Record<string, unknown>): BidCostRow {
     markedUpExpenses: Number(row.markedUpExpenseCents) / 100,
     totalHours: Number(row.totalHours),
     brokenLines: Number(row.brokenLines),
+    notPriced: {
+      lines: Number(row.notPricedLines),
+      parts: Number(row.frozenParts),
+    },
   };
 }
 
@@ -10806,7 +10963,6 @@ export async function getDashboardBids(
   if (!db) return [];
 
   const sums = costSums(companyProductivityPct);
-  const notPricedLine = lineNotPricedSql(companyProductivityPct);
   const partsCount = linePartsCountSql(companyProductivityPct);
   const liveBids = and(eq(bids.userId, userId), isNull(bids.archivedAt));
   const liveLines = and(
@@ -10834,8 +10990,7 @@ export async function getDashboardBids(
         lastPlanAt: sql<
           string | null
         >`(SELECT DATE_FORMAT(MAX(p.createdAt), '%Y-%m-%dT%H:%i:%sZ') FROM bid_pdfs p WHERE p.bidId = ${bids.id})`,
-        notPricedLines: sql<string>`COALESCE(SUM(CASE WHEN ${notPricedLine} THEN 1 ELSE 0 END), 0)`,
-        frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${partsCount} AND ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}) ELSE 0 END), 0)`,
+        // notPricedLines and frozenParts come with `sums`.
       })
       .from(bids)
       .leftJoin(bidLineItems, liveLines)

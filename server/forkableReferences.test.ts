@@ -185,14 +185,12 @@ const REGISTRY: Record<string, Entry> = {
     note: "THE FIFTH INSTANCE, and the first found on purpose rather than by accident — this file found it on 2026-09-21. addCountToBid used the literal lookup, so counting with a shipped assembly and then pricing it froze the SHIPPED row onto the bid line, permanently, because a snapshot is never re-priced. server/takeoffBridgeFlow.test.ts is the red: 0.5 h instead of 1.25 h.",
   },
   "takeoff_groups.materialId": {
-    kind: "unreviewed",
-    since: "2026-09-21",
-    why: "Level 3 counts price from a material directly; not traced.",
+    kind: "exempt",
+    why: "Reviewed 2026-09-27: nothing prices from it yet. sendability refuses a material count ('unsupported-level'), pinned by server/takeoffBridge.test.ts 'reports a typed or material count as not supported YET' — the test that has to change the day level 3 crosses. When it does, the price must go through resolveMaterial, or a count on a shipped material snapshots its $0 for ever, and this entry becomes a resolver.",
   },
   "takeoff_groups.laborRateId": {
-    kind: "unreviewed",
-    since: "2026-09-21",
-    why: "Not traced.",
+    kind: "exempt",
+    why: "Reviewed 2026-09-27: nothing reads or writes it. A free count crosses with rate 0 and the role is picked on the bid line (addCountToBid). The 'unused group labor rate' test below goes red the day server code reads it, so the question gets asked then.",
   },
   "takeoff_stamps.assemblyId": {
     kind: "unreviewed",
@@ -200,9 +198,11 @@ const REGISTRY: Record<string, Entry> = {
     why: "Same family as takeoff_groups.assemblyId; not traced.",
   },
   "bid_line_items.assemblyId": {
-    kind: "unreviewed",
-    since: "2026-09-21",
-    why: "Pricing is snapshotted so money is safe, but doubleCountedAssemblies matches on this id — a hand-added line on a fork and a plan line on the baseline would not be seen as the same thing.",
+    kind: "resolver",
+    resolver: "getAssemblyFamilies",
+    readBy:
+      "server/routers/bidsRouter.ts, server/routers/takeoffGroupsRouter.ts",
+    note: "Pricing is snapshotted, so money was always safe. What was not: R3's double-count check matched this id literally, so a hand-added line on a fork and a plan line on the baseline were two different things to it. Matched by family since 2026-09-27; server/takeoffBridgeFlow.test.ts 'SEES THE SAME ASSEMBLY TWICE' is the red.",
   },
   "kit_assemblies.assemblyId": {
     kind: "resolver",
@@ -376,6 +376,39 @@ describe("every stored id into a forkable row is accounted for", () => {
     const unreviewed = Object.entries(REGISTRY).filter(
       ([, entry]) => entry.kind === "unreviewed"
     );
-    expect(unreviewed.length).toBeLessThanOrEqual(9);
+    // 9 → 6 on 2026-09-27: bid_line_items.assemblyId resolved,
+    // takeoff_groups.materialId and .laborRateId reviewed and exempt.
+    expect(unreviewed.length).toBeLessThanOrEqual(6);
+  });
+
+  it("unused group labor rate: nothing on the server reads takeoff_groups.laborRateId", () => {
+    /*
+      Its registry entry is `exempt` on the grounds that nothing reads it. That
+      is a claim about code elsewhere, so it gets a red: the day a server file
+      mentions the group's labor rate, this fails and the entry has to become a
+      resolver (a count priced from a shipped role would freeze that role's $0
+      rate) or say why not. Searched by the column accessor, which a query
+      that filters, joins or selects on it has to spell this way.
+
+      What it cannot see: a read off a whole row (`group.laborRateId` after a
+      bare select), because every table with a role has a field of that name.
+      So this catches a new query on the column, not every possible read.
+    */
+    const root = path.resolve(__dirname);
+    const readers: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (/\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name)) {
+          if (
+            fs.readFileSync(full, "utf8").includes("takeoffGroups.laborRateId")
+          )
+            readers.push(path.relative(root, full));
+        }
+      }
+    };
+    walk(root);
+    expect(readers).toEqual([]);
   });
 });

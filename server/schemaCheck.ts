@@ -498,6 +498,231 @@ export async function appliedMigrationCount(): Promise<number | null> {
   }
 }
 
+// ── Foreign keys — the links that make a delete take what hangs off it ──────
+/*
+  Added 2026-09-28. Everything above asks about COLUMNS, and a database can
+  have every column right and no links at all. `bidrender_local_b` was copied
+  with `CREATE TABLE … LIKE`, which keeps every index — even the ones MySQL
+  built for the foreign keys and named after them — and drops every foreign
+  key. It reported "Database matches the schema." while deleting a bid or a
+  plan set there deleted nothing beneath it. Production has lost links before
+  as well: five went missing when migration 0004 failed partway on TiDB and was
+  marked applied by hand (references/deploying.md).
+
+  Compared by what a link DOES — table, columns, referenced table and columns,
+  delete rule — never by its name. Hand-written migrations name constraints
+  the same way drizzle does, but a name is not what cascades. A link the
+  database has and the schema does not declare is not reported: it cannot make
+  a delete do less than the code expects.
+
+  Measured 2026-09-28: the schema declares 133; production and
+  bidrender_test_clean have exactly those 133 with the same delete rules;
+  bidrender_local has 128 (the five 0004 links); bidrender_local_b has 0.
+*/
+
+/** One link, as the schema declares it or as the database has it. */
+export type ForeignKeySpec = {
+  /** The constraint name drizzle gives it — used only to write the fix. */
+  name: string;
+  table: string;
+  columns: string[];
+  referencedTable: string;
+  referencedColumns: string[];
+  /** Upper case, as information_schema spells it: CASCADE, SET NULL, … */
+  onDelete: string;
+};
+
+/** One row of information_schema.KEY_COLUMN_USAGE joined to its rule. */
+export type LiveForeignKeyRow = {
+  CONSTRAINT_NAME: string;
+  TABLE_NAME: string;
+  COLUMN_NAME: string;
+  REFERENCED_TABLE_NAME: string;
+  REFERENCED_COLUMN_NAME: string;
+  ORDINAL_POSITION: number;
+  DELETE_RULE: string;
+};
+
+export type ForeignKeyDrift = {
+  declaredCount: number;
+  liveCount: number;
+  /** Declared links the database does not have at all. */
+  missing: ForeignKeySpec[];
+  /** Links the database has, but with a different delete rule. */
+  wrongRule: Array<{ link: ForeignKeySpec; databaseRule: string }>;
+};
+
+/**
+ * MySQL's two spellings of "refuse the delete". InnoDB checks both at once, so
+ * they behave the same, and drizzle-kit writes `no action` for a link that
+ * names no rule while a hand-written one may say RESTRICT.
+ */
+function canonicalRule(rule: string | undefined): string {
+  const upper = (rule ?? "no action").trim().toUpperCase();
+  return upper === "RESTRICT" ? "NO ACTION" : upper;
+}
+
+function linkKey(link: ForeignKeySpec): string {
+  return `${link.table}(${link.columns.join(",")})->${link.referencedTable}(${link.referencedColumns.join(",")})`;
+}
+
+/** Every link drizzle/schema.ts declares. */
+export function declaredForeignKeys(): ForeignKeySpec[] {
+  const links: ForeignKeySpec[] = [];
+  for (const value of Object.values(schema)) {
+    if (typeof value !== "object" || value === null) continue;
+    let config;
+    try {
+      config = getTableConfig(value as never);
+    } catch {
+      continue;
+    }
+    for (const foreignKey of config.foreignKeys) {
+      const reference = foreignKey.reference();
+      links.push({
+        name: foreignKey.getName(),
+        table: config.name,
+        columns: reference.columns.map(column => column.name),
+        referencedTable: getTableConfig(reference.foreignTable).name,
+        referencedColumns: reference.foreignColumns.map(column => column.name),
+        onDelete: (foreignKey.onDelete ?? "no action").toUpperCase(),
+      });
+    }
+  }
+  return links;
+}
+
+/** The database's rows, one per column, folded back into one per link. */
+export function liveForeignKeys(
+  rows: readonly LiveForeignKeyRow[]
+): ForeignKeySpec[] {
+  const byName = new Map<string, LiveForeignKeyRow[]>();
+  for (const row of rows) {
+    const key = `${row.TABLE_NAME}.${row.CONSTRAINT_NAME}`;
+    byName.set(key, [...(byName.get(key) ?? []), row]);
+  }
+  return Array.from(byName.values()).map(parts => {
+    const ordered = [...parts].sort(
+      (a, b) => Number(a.ORDINAL_POSITION) - Number(b.ORDINAL_POSITION)
+    );
+    return {
+      name: ordered[0].CONSTRAINT_NAME,
+      table: ordered[0].TABLE_NAME,
+      columns: ordered.map(part => part.COLUMN_NAME),
+      referencedTable: ordered[0].REFERENCED_TABLE_NAME,
+      referencedColumns: ordered.map(part => part.REFERENCED_COLUMN_NAME),
+      onDelete: ordered[0].DELETE_RULE.toUpperCase(),
+    };
+  });
+}
+
+export function compareForeignKeys(
+  declared: readonly ForeignKeySpec[],
+  live: readonly ForeignKeySpec[]
+): ForeignKeyDrift {
+  const liveByKey = new Map(live.map(link => [linkKey(link), link]));
+  const missing: ForeignKeySpec[] = [];
+  const wrongRule: ForeignKeyDrift["wrongRule"] = [];
+  for (const link of declared) {
+    const found = liveByKey.get(linkKey(link));
+    if (!found) missing.push(link);
+    else if (canonicalRule(found.onDelete) !== canonicalRule(link.onDelete))
+      wrongRule.push({ link, databaseRule: found.onDelete });
+  }
+  return {
+    declaredCount: declared.length,
+    liveCount: live.length,
+    missing,
+    wrongRule,
+  };
+}
+
+export function hasForeignKeyDrift(drift: ForeignKeyDrift): boolean {
+  return drift.missing.length > 0 || drift.wrongRule.length > 0;
+}
+
+/** Read-only: the links this database has, against the ones declared. */
+export async function findForeignKeyDrift(): Promise<ForeignKeyDrift> {
+  const db = await getDb();
+  if (!db) throw new Error("No database connection — is DATABASE_URL set?");
+  const [rows] = (await db.execute(
+    sql`SELECT k.CONSTRAINT_NAME, k.TABLE_NAME, k.COLUMN_NAME,
+               k.REFERENCED_TABLE_NAME, k.REFERENCED_COLUMN_NAME,
+               k.ORDINAL_POSITION, r.DELETE_RULE
+        FROM information_schema.KEY_COLUMN_USAGE k
+        JOIN information_schema.REFERENTIAL_CONSTRAINTS r
+          ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA
+         AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME
+         AND r.TABLE_NAME = k.TABLE_NAME
+        WHERE k.TABLE_SCHEMA = DATABASE()
+          AND k.REFERENCED_TABLE_NAME IS NOT NULL`
+  )) as unknown as [LiveForeignKeyRow[]];
+  return compareForeignKeys(declaredForeignKeys(), liveForeignKeys(rows));
+}
+
+function addConstraintSql(link: ForeignKeySpec): string {
+  const list = (names: string[]) => names.map(n => `\`${n}\``).join(", ");
+  return (
+    `ALTER TABLE \`${link.table}\` ADD CONSTRAINT \`${link.name}\` ` +
+    `FOREIGN KEY (${list(link.columns)}) REFERENCES \`${link.referencedTable}\` ` +
+    `(${list(link.referencedColumns)}) ON DELETE ${link.onDelete};`
+  );
+}
+
+/** The link drift as something a person reads and can act on. */
+export function describeForeignKeyDrift(drift: ForeignKeyDrift): string {
+  if (drift.liveCount === 0 && drift.declaredCount > 0) {
+    // Shouted, because it is not one gap but a different kind of database.
+    return [
+      "!!! ".repeat(18).trim(),
+      `!!! THIS DATABASE HAS NO FOREIGN KEYS AT ALL — 0 of ${drift.declaredCount}.`,
+      "!!! Deleting a bid, a plan set or a count here deletes NOTHING beneath it:",
+      "!!! marks, runs, sheets and lines stay behind as orphans, and a delete",
+      "!!! checked on this database proves nothing about production.",
+      "!!! A copy made with CREATE TABLE … LIKE, or a dump restored without its",
+      "!!! constraints, looks exactly like this. Rebuild it from the migrations",
+      "!!! on an empty database, then load the data — references/disaster-recovery.md.",
+      "!!! ".repeat(18).trim(),
+    ].join("\n");
+  }
+  if (!hasForeignKeyDrift(drift)) {
+    return `Foreign keys match the schema (${drift.liveCount} present, ${drift.declaredCount} declared).`;
+  }
+  const lines = [
+    `Foreign keys: ${drift.liveCount} present, ${drift.declaredCount} declared — ` +
+      `${drift.missing.length} missing, ${drift.wrongRule.length} with the wrong delete rule:`,
+  ];
+  for (const link of drift.missing) {
+    lines.push(`  missing  ${linkKey(link)} ON DELETE ${link.onDelete}`);
+  }
+  for (const { link, databaseRule } of drift.wrongRule) {
+    lines.push(
+      `  rule     ${linkKey(link)} — schema ON DELETE ${link.onDelete}, database ${databaseRule}`
+    );
+  }
+  /*
+    `pnpm db:push` does not fix this. A link is added by a migration the
+    database has usually already recorded as applied, so re-running changes
+    nothing — the 0004 case. The statement is printed instead. MySQL checks
+    every existing row when a link is added, so an orphan left while it was
+    missing makes the statement fail; that is the database telling the truth.
+  */
+  lines.push(
+    "",
+    "db:push will not add these — the migration that declared each one is",
+    "already recorded as applied. To add one (MySQL checks every existing row,",
+    "so orphans left while it was missing make it fail until they are removed):",
+    ...drift.missing.map(link => `  ${addConstraintSql(link)}`)
+  );
+  if (drift.wrongRule.length > 0) {
+    lines.push(
+      "A wrong delete rule is fixed by dropping that constraint and adding it",
+      "again with the rule the schema declares."
+    );
+  }
+  return lines.join("\n");
+}
+
 /** The drift as something a person reads and can act on. */
 export function describeDrift(drift: readonly TableDrift[]): string {
   if (drift.length === 0) return "Database matches the schema.";

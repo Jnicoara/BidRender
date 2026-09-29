@@ -74,7 +74,10 @@ import { CloseoutPanel } from "@/components/CloseoutPanel";
 import { CollapsiblePanel } from "@/components/CollapsiblePanel";
 import { SampleBidNotice } from "@/components/SampleBidNotice";
 import { QuantityLockPanel } from "@/components/QuantityLockPanel";
-import { countUnpricedLaborLines } from "@shared/laborRatePricing";
+import {
+  countUnpricedLaborLines,
+  groupStaleRates,
+} from "@shared/laborRatePricing";
 import { canPriceByHand, missingEntryCounts } from "@shared/handPricedLines";
 import { problemFixHint } from "@shared/linePricingProblems";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
@@ -471,7 +474,16 @@ export default function BidsPage({
     fromPlans,
     incomplete,
     problems,
+    staleRates,
   } = detailQuery.data;
+
+  /**
+   * Lines frozen at a labor rate their role no longer has, grouped by the
+   * pair of rates, so "4 lines use $68.00/hr; their role is $43.00/hr now" is
+   * one sentence rather than four. See shared/laborRatePricing.ts,
+   * `staleRateLines`. Flag only — nothing here changes a line.
+   */
+  const staleRateGroups = groupStaleRates(staleRates);
 
   /**
    * Lines whose hours are being priced at nothing, because the assembly they
@@ -1364,12 +1376,45 @@ export default function BidsPage({
                     </span>{" "}
                     — their hours are in the total above and their labor is
                     priced at $0. On a line priced by hand, pick who does the
-                    hours beside them. On an assembly line, give the assembly a
-                    role in the Library, then re-add the line to pick the rate
+                    hours beside them. On an assembly line, give its role a rate
+                    in Labor Rates — or, if the assembly has no role, give it
+                    one in the Library — then re-add the line to pick the rate
                     up.
                   </p>
                 </div>
               )}
+
+              {/*
+                Lines frozen at a rate their role no longer has. Not a $0 —
+                a real, older number, which is why nothing flagged it: the
+                owner's own bid carried $68/hr against a $43/hr Journeyman
+                (takeoff-spec.md § 16). The freeze is right and stays; this
+                only says so. One sentence per pair of rates.
+              */}
+              {staleRateGroups.map(group => (
+                <div
+                  key={`${group.frozenRate}-${group.currentRate}`}
+                  className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {group.lineCount} line
+                      {group.lineCount === 1 ? " uses" : "s use"}{" "}
+                      {money(group.frozenRate)}/hr
+                    </span>{" "}
+                    — the role on {group.lineCount === 1 ? "its" : "their"}{" "}
+                    assembly is {money(group.currentRate)}/hr now (
+                    {group.names.slice(0, 3).join(", ")}
+                    {group.names.length > 3
+                      ? `, and ${group.names.length - 3} more`
+                      : ""}
+                    ). A line keeps the rate it was added at, so this bid is
+                    still priced at the older one. To use today&apos;s rate,
+                    re-add the line.
+                  </p>
+                </div>
+              ))}
 
               {/*
                 What the takeoff says that this total does not.

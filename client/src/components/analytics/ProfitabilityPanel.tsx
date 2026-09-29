@@ -24,6 +24,8 @@ import { StatTile } from "./StatTile";
 import { Legend } from "./OutcomesPanel";
 import { IncompleteFiguresNote } from "./IncompleteFiguresNote";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
+import { NotPricedTotal } from "@/components/NotPricedTotal";
+import type { NotPricedTally } from "@shared/lineNotPriced";
 import {
   OUTCOME_COLORS,
   hours,
@@ -63,6 +65,8 @@ type Job = {
   actualHours: number;
   /** Its revenue leaves out a line that can't be priced. */
   incomplete: boolean;
+  /** Lines and parts nobody priced, counted as $0 in its revenue. */
+  notPriced: NotPricedTally;
 };
 
 type Report = {
@@ -71,6 +75,7 @@ type Report = {
   multiTradeJobs: number;
   worstJobs: Job[];
   incompleteJobs: number;
+  notPricedJobs: number;
   truncated: boolean;
   jobsInRange: number;
 };
@@ -107,6 +112,7 @@ export function ProfitabilityPanel({
       <BasisNote overall={overall} report={report} />
       <IncompleteFiguresNote
         count={report.incompleteJobs}
+        notPricedCount={report.notPricedJobs}
         noun={["job", "jobs"]}
       />
 
@@ -261,7 +267,10 @@ export function ProfitabilityPanel({
                     >
                       <td className="py-1.5 pr-3 font-sans">{job.name}</td>
                       <td className="py-1.5 pr-3 text-right">
-                        {moneyWhole(job.revenue)}
+                        <NotPricedTotal
+                          amount={moneyWhole(job.revenue)}
+                          notPriced={job.notPriced}
+                        />
                         <IncompletePriceTag
                           show={job.incomplete}
                           className="ml-1.5"

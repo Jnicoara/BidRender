@@ -24,6 +24,11 @@
  * For collation drift the fix is not db:push — a migration does not set a
  * collation — so the report prints the ALTER TABLE … CONVERT statement.
  *
+ * Since 2026-09-28 it also compares FOREIGN KEYS — the links that make
+ * deleting a bid or a plan set delete what hangs off it — and shouts when a
+ * database has none at all, which is what a `CREATE TABLE … LIKE` copy looks
+ * like (bidrender_local_b). See "Foreign keys" in server/schemaCheck.ts.
+ *
  * Exits 1 on drift so it can gate a deploy step; 0 when they agree.
  *
  * It names the HOST and database it asked, never the URL, so the output can go
@@ -35,7 +40,10 @@ import "dotenv/config";
 import {
   appliedMigrationCount,
   describeDrift,
+  describeForeignKeyDrift,
+  findForeignKeyDrift,
   findSchemaDrift,
+  hasForeignKeyDrift,
 } from "../server/schemaCheck";
 
 function where(): string {
@@ -58,4 +66,10 @@ console.log(
 
 const drift = await findSchemaDrift();
 console.log(describeDrift(drift));
-process.exit(drift.length === 0 ? 0 : 1);
+
+// The links between tables, which the column check above cannot see: a copy
+// made with CREATE TABLE … LIKE has every column right and no links at all.
+const links = await findForeignKeyDrift();
+console.log(describeForeignKeyDrift(links));
+
+process.exit(drift.length === 0 && !hasForeignKeyDrift(links) ? 0 : 1);

@@ -132,6 +132,7 @@ beforeAll(async () => {
   ids.viaGroup = await material(A, "Usage via takeoff group");
   ids.viaGroupAssembly = await material(A, "Usage via group assembly");
   ids.viaRun = await material(A, "Usage via run conductor");
+  ids.viaFitting = await material(A, "Usage via run fitting");
   ids.archivedOnly = await material(A, "Usage on an archived line only");
   // A shipped row, and company A's fork of it.
   ids.shipped = await material(null, BASELINE_NAME);
@@ -179,6 +180,14 @@ beforeAll(async () => {
     takeoffRunTypeId: rt.insertId,
     runMaterialRole: "conductor",
   });
+  // Path 4b: a FITTING line on the same type. The type names no connector —
+  // the part is counted from the trace — so only the line's own
+  // runMaterialId says which material it is.
+  await line(bid1, {
+    takeoffRunTypeId: rt.insertId,
+    runMaterialRole: "connector",
+    runMaterialId: ids.viaFitting,
+  });
 
   // An archived line counts for nothing.
   const archivedRecipe = await assemblyOf(A, "Usage archived recipe", [
@@ -216,6 +225,9 @@ withDb("materials.usage", () => {
       1
     );
     expect(usage.get(ids.viaRun)?.bids, "traced run conductor").toBe(1);
+    // Missing until 2026-09-28: the query's CASE named only conductor, ground
+    // and raceway, so every fitting sent from a trace counted as never used.
+    expect(usage.get(ids.viaFitting)?.bids, "traced run fitting").toBe(1);
   });
 
   it("leaves out archived lines", async () => {

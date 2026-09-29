@@ -550,4 +550,53 @@ withDb("a count follows YOUR fork of a shipped assembly", () => {
 
     await database!.delete(assemblies).where(eq(assemblies.id, baselineId));
   });
+
+  it("SEES THE SAME ASSEMBLY TWICE when one line is on the shipped row and one on the fork", async () => {
+    /*
+      R3's double-count check matched stored ids literally, so a hand line
+      added from the shipped starter and a count sent after the company
+      priced it (a fork: a new id) were two different things to it. Listed
+      as unreviewed in server/forkableReferences.test.ts since 2026-09-21;
+      matched by family since 2026-09-27.
+    */
+    const { bidId, sheetId } = await scenario();
+    const database = await getDb();
+    // Named under "Fork flow starter" so beforeEach's clean-by-name heals a
+    // run that fails before its own cleanup — this row is GLOBAL (userId
+    // NULL), and one left behind broke assemblies.test.ts on 2026-09-28.
+    const name = `Fork flow starter R3 ${Date.now()}`;
+    const [shipped] = await database!.insert(assemblies).values({
+      userId: null,
+      name,
+      category: "Devices",
+      baseLaborHours: "0.5000",
+      overheadLaborHours: "0.0000",
+    });
+    const baselineId = shipped.insertId;
+
+    // Added by hand from the starter, while it was still the shipped row.
+    await caller().bids.addAssembly({ bidId, assemblyId: baselineId, qty: 6 });
+    // Then priced — a fork — and counted and sent.
+    const forked = await caller().assemblies.update({
+      id: baselineId,
+      baseLaborHours: 1.25,
+    });
+    const forkId = forked.assembly!.id;
+    expect(forkId).not.toBe(baselineId);
+    const group = await countOf(bidId, sheetId, forkId, 10);
+    const sent = await caller().takeoffGroups.sendToBid({ id: group.id });
+
+    // The precondition this test exists for: two lines, two DIFFERENT ids.
+    const lines = await lineFor(bidId);
+    expect(lines).toHaveLength(2);
+    expect(new Set(lines.map(l => l.assemblyId)).size).toBe(2);
+
+    // Both halves of R3 see it.
+    expect(sent.warning).toMatch(/added by hand/i);
+    const bid = await caller().bids.get({ id: bidId });
+    expect(bid.fromPlans.doubleCounted.length).toBe(1);
+
+    await database!.delete(assemblies).where(eq(assemblies.id, forkId));
+    await database!.delete(assemblies).where(eq(assemblies.id, baselineId));
+  });
 });

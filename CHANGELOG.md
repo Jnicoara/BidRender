@@ -27,9 +27,52 @@ This is the human-readable companion to the git history — read this to see wha
 - **Searching "c body" now finds the C conduit body.** A single letter used to
   count the same as the start of any word, so "c" matched "conduit" in every
   body and the C body could not be asked for by name.
+- **A deleted drawing can no longer keep pricing a bid.** Every count and run
+  length a bid is priced from now only reads marks and runs on sheets whose
+  plan set still exists. On the live database this was already true, because
+  deleting a plan set deletes everything drawn on it. A database copied
+  without those links (one developer copy has none) kept counting the deleted
+  drawing's marks. A test now builds exactly that case and fails if any
+  quantity read goes back to counting by bid alone.
+- **The database check now looks at the links between tables**, the rules
+  that make deleting a bid or a plan set delete everything drawn on it. It
+  lists any link a database is missing, with the command that adds it, and
+  prints a loud warning if a database has no links at all. Production passes
+  (133 of 133).
+- **Figures on the Plans screen now update straight away in three places
+  where they didn't.** Removing a mark at the end of a run, removing a whole
+  plan set, and changing a job height each left some run totals, drops or the
+  "Send to bid" preview showing the old number until the page was reloaded.
+  Each now updates as soon as the change saves.
+- **Dashboard and analytics totals now say when they include unpriced
+  lines.** Each bid card already said "+ 3 lines not priced", but the "Out
+  for bid" headline, each column's total and the analytics reports added
+  those lines in at $0 without a word. They now say how many lines and parts
+  nobody has priced. The column totals also stop including the sample bid,
+  which the headline already left out.
+- **The "on this bid twice" warning now spots your own priced copy of an
+  assembly.** Pricing a shipped assembly makes a company copy of it. A count
+  from the plans and a line added by hand were only flagged as the same work
+  when both used the same copy, so the same receptacles could sit on a bid
+  twice without the warning.
+- **A bid now says when its lines use an older labor rate.** A line keeps the
+  rate it was added at, which is deliberate, but nothing said when that rate
+  had since changed — lines at $68/hr sat beside a role now at $43/hr. Draft
+  and Active bids now point it out. No line's price is changed.
+- **Fittings sent from a trace now count as "used" in material search.**
+  Couplings, connectors, straps and the like were never credited, so they
+  never got the small ranking boost that materials you use often get. The
+  bid's "$0 labor" warning also now gives the right advice when the
+  assembly's role exists but has no rate.
 
 ## [2026-09-27]
 
+- **The plan viewer warns when a sheet is a shrunk print.** A 24×36 set
+  saved at 11×17 still says 1/4" = 1'-0", so every length measured from it
+  came out at about half, with nothing on screen to say so. The scale control
+  now shows each page's paper size, and on a size sets are commonly reduced
+  to it says so in amber until the scale has been checked against a
+  dimension you know.
 - **The pricing spreadsheet has a Notes column next to each item's name**,
   showing what the app says about that item. Some notes are instructions for
   whoever fills in prices. A conduit body, for example, is "Priced with its

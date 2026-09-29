@@ -29,12 +29,19 @@ import {
   EXPECTED_COLLATION,
   NO_DEFAULT,
   canonicalDefault,
+  compareForeignKeys,
   compareTable,
+  declaredForeignKeys,
   declaredTables,
   describeDrift,
+  describeForeignKeyDrift,
+  findForeignKeyDrift,
   findSchemaDrift,
+  hasForeignKeyDrift,
   liveDefault,
+  liveForeignKeys,
   normalizeColumnType,
+  type ForeignKeySpec,
   type LiveColumn,
 } from "./schemaCheck";
 
@@ -520,6 +527,12 @@ describe.skipIf(!hasDb)("the database matches the schema", () => {
     expect(drift).toEqual([]);
   });
 
+  it("has every foreign key the schema declares, with its delete rule", async () => {
+    const links = await findForeignKeyDrift();
+    expect(describeForeignKeyDrift(links)).toMatch(/^Foreign keys match/);
+    expect(links.liveCount).toBeGreaterThan(0);
+  });
+
   it("names the missing columns when something is adrift", () => {
     // The reporting itself, without needing a broken database to see it.
     const message = describeDrift([
@@ -535,5 +548,108 @@ describe.skipIf(!hasDb)("the database matches the schema", () => {
     ]);
     expect(message).toContain("bids — missing isSample");
     expect(message).toContain("pnpm db:push");
+  });
+});
+
+describe("foreign keys — the links a column check cannot see", () => {
+  const link = (over: Partial<ForeignKeySpec> = {}): ForeignKeySpec => ({
+    name: "takeoff_runs_sheetId_bid_pdf_sheets_id_fk",
+    table: "takeoff_runs",
+    columns: ["sheetId"],
+    referencedTable: "bid_pdf_sheets",
+    referencedColumns: ["id"],
+    onDelete: "CASCADE",
+    ...over,
+  });
+
+  it("declares the plan-set chain the takeoff's deletes rely on", () => {
+    // If one of these stopped being declared, deleting a plan set would stop
+    // removing what is drawn on it — on every database built afterwards.
+    const declared = declaredForeignKeys().map(
+      l =>
+        `${l.table}.${l.columns.join(",")} -> ${l.referencedTable} ${l.onDelete}`
+    );
+    for (const expected of [
+      "bid_pdf_sheets.bidPdfId -> bid_pdfs CASCADE",
+      "takeoff_runs.sheetId -> bid_pdf_sheets CASCADE",
+      "takeoff_stamps.sheetId -> bid_pdf_sheets CASCADE",
+      "takeoff_run_circuits.runId -> takeoff_runs CASCADE",
+    ]) {
+      expect(declared).toContain(expected);
+    }
+  });
+
+  it("agrees when the database has every declared link", () => {
+    const drift = compareForeignKeys([link()], [link()]);
+    expect(hasForeignKeyDrift(drift)).toBe(false);
+    expect(describeForeignKeyDrift(drift)).toMatch(/^Foreign keys match/);
+  });
+
+  it("compares what a link does, not what it is called", () => {
+    const drift = compareForeignKeys([link()], [link({ name: "fk_1" })]);
+    expect(hasForeignKeyDrift(drift)).toBe(false);
+  });
+
+  it("reports a missing link and prints the statement that adds it", () => {
+    const drift = compareForeignKeys(
+      [link(), link({ table: "takeoff_stamps", name: "stamps_fk" })],
+      [link()]
+    );
+    expect(drift.missing.map(l => l.table)).toEqual(["takeoff_stamps"]);
+    const message = describeForeignKeyDrift(drift);
+    expect(message).toContain("1 missing");
+    expect(message).toContain(
+      "ALTER TABLE `takeoff_stamps` ADD CONSTRAINT `stamps_fk` FOREIGN KEY (`sheetId`) REFERENCES `bid_pdf_sheets` (`id`) ON DELETE CASCADE;"
+    );
+    expect(message).not.toContain("db:push`");
+  });
+
+  it("reports a link whose delete rule differs", () => {
+    const drift = compareForeignKeys(
+      [link()],
+      [link({ onDelete: "SET NULL" })]
+    );
+    expect(drift.wrongRule).toHaveLength(1);
+    expect(describeForeignKeyDrift(drift)).toContain(
+      "schema ON DELETE CASCADE, database SET NULL"
+    );
+  });
+
+  it("treats RESTRICT and NO ACTION as the same rule, as InnoDB does", () => {
+    const drift = compareForeignKeys(
+      [link({ onDelete: "NO ACTION" })],
+      [link({ onDelete: "RESTRICT" })]
+    );
+    expect(hasForeignKeyDrift(drift)).toBe(false);
+  });
+
+  it("SHOUTS when a database has no links at all — a CREATE TABLE … LIKE copy", () => {
+    const drift = compareForeignKeys([link(), link({ table: "x" })], []);
+    const message = describeForeignKeyDrift(drift);
+    expect(message).toContain("HAS NO FOREIGN KEYS AT ALL — 0 of 2");
+    expect(message).toContain("Rebuild it from the migrations");
+    expect(hasForeignKeyDrift(drift)).toBe(true);
+  });
+
+  it("folds a live link's rows back together, column order kept", () => {
+    const row = (column: string, ref: string, position: number) => ({
+      CONSTRAINT_NAME: "two_col_fk",
+      TABLE_NAME: "t",
+      COLUMN_NAME: column,
+      REFERENCED_TABLE_NAME: "r",
+      REFERENCED_COLUMN_NAME: ref,
+      ORDINAL_POSITION: position,
+      DELETE_RULE: "CASCADE",
+    });
+    expect(liveForeignKeys([row("b", "y", 2), row("a", "x", 1)])).toEqual([
+      {
+        name: "two_col_fk",
+        table: "t",
+        columns: ["a", "b"],
+        referencedTable: "r",
+        referencedColumns: ["x", "y"],
+        onDelete: "CASCADE",
+      },
+    ]);
   });
 });
