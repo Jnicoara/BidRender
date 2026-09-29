@@ -1,0 +1,23 @@
+-- The quantity a bid line's LABOR is priced on, where it differs from the
+-- quantity bought (track-b-held-migrations-plan.md § 1, § 5; owner Q5).
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- One nullable column, no default, no UPDATE. NULL is "labor on `qty`", which
+-- is how every existing line is priced today, so no line's hours move. Old
+-- code ignores it; new code against an old database would die on a bare
+-- select(). CLAUDE.md § "THREE STEPS, NOT TWO". Step 3 is empty.
+--
+-- Hand-written, not generated, for the reason 0065 and 0067 give.
+--
+-- ── Why a second quantity ───────────────────────────────────────────────────
+-- Extra is material only: a run-type line buys traced + vertical + extra and
+-- installs traced + vertical (+ makeup on wire). Locking a bid (0073) freezes
+-- one stored quantity per line; with only `qty` frozen, labor would either
+-- keep following the drawing on a locked bid or be charged on the bought
+-- figure. Same precision as `qty`.
+--
+-- ── Why NULL rather than a copy of qty ──────────────────────────────────────
+-- A copy would be a backfill that writes every line for no reader, and
+-- "labor follows qty" would stop being something a row could say.
+ALTER TABLE `bid_line_items`
+	ADD `laborQty` decimal(10,4);

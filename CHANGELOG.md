@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-28]
 
+- **The database is ready for extra footage, typed lengths and drops from
+  marks** (not live yet). Seven new database changes add empty places to hold
+  a company's wire and conduit extra and makeup, a length typed onto a run
+  when the sheet has no scale, how a counted device drops from the run
+  height, and the hours a bid line is priced on separately from what is
+  bought. Nothing uses them yet, and every one starts empty, so no bid, total
+  or hour count changes. The screens that use them come later.
 - **A deleted drawing can no longer keep pricing a bid.** Every count and run
   length a bid is priced from now only reads marks and runs on sheets whose
   plan set still exists. On the live database this was already true, because
