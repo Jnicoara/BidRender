@@ -993,6 +993,13 @@ The owner's design, and six answers given the same day:
 - **Wobble (answer 4):** same-direction turns under 3 ft apart merge into one
   bend FIRST (a traced sweep), then anything under 15° is drawing wobble —
   neither a bend nor degrees. Fixed defaults, no setting.
+  > **Narrowed 2026-09-29 (owner asked for the check, plan § 8a):** on a run
+  > type whose 90 or 45 is a SWEEP, the 3 ft reaches that sweep's 90° chord
+  > plus 25% (√2 × radius × 1.25: 5.3 ft for 36", 3.5 ft for 24"). Measured:
+  > a 36" sweep traced by clicking its two ends sits 4.24 ft apart and
+  > counted as two 45s. Still no setting — the reach comes from the row the
+  > type already points at. Every other type keeps exactly 3 ft.
+  > `server/runBendsSweep.test.ts`.
 - **Factory or field:** a company setting, "factory elbows from" (1-1/4"
   shipped). Below it a bend is field-bent — labor only. PVC always takes
   factory elbows; flex turns itself.

@@ -42,6 +42,8 @@ const EMT: RacewayFittingSpec = {
 const BENDS = {
   method: { method: "factory" as const, why: "factory" },
   limit: 360,
+  // A type on standard elbows: the flat merge distance (runBendsSweep.test.ts).
+  mergeWithinFeet: 3,
 };
 const LEVEL: EndVertical = {
   counted: false,

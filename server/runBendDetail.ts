@@ -12,8 +12,13 @@
  * answers, and each type's raceway rule — so `runBendsFor` is arithmetic over
  * rows already in hand, like `groupRunFootage`.
  */
-import { pullPointKindFor, bendMethodFor } from "../shared/runFittingMaterials";
 import {
+  bendMergeFeetForOverrides,
+  bendMethodFor,
+  pullPointKindFor,
+} from "../shared/runFittingMaterials";
+import {
+  MERGE_WITHIN_FEET,
   describeRunBends,
   endDropOf,
   legBends,
@@ -33,10 +38,20 @@ export type BendContext = {
   settings: BendSettings;
   answers: ReadonlyMap<number, readonly PullPointAnswer[]>;
   /** By the run type id the RUNS store. */
-  byType: ReadonlyMap<
-    number,
-    { method: BendMethod; suggestedKind: PullPointKind }
-  >;
+  byType: ReadonlyMap<number, TypeBends>;
+};
+
+/** What the panel needs of one run type. */
+type TypeBends = {
+  method: BendMethod;
+  suggestedKind: PullPointKind;
+  /**
+   * How close same-direction turns must be to merge into one bend — wider
+   * than 3 ft when the type's 90 or 45 is a sweep. Required, so this path
+   * and the bid's (`fittingRowsByRunType`) cannot quietly disagree about
+   * how many bends one trace has. `bendMergeFeetForOverrides`.
+   */
+  mergeWithinFeet: number;
 };
 
 export async function bendContextForRuns(
@@ -66,14 +81,26 @@ export async function bendContextForRuns(
     storedId,
     type: resolveRunType(palette, storedId),
   }));
-  const racewayIds = types
-    .map(({ type }) => type?.racewayMaterialId ?? null)
+  // The raceway, plus the rows the 90 and 45 are pointed at: a sweep there
+  // widens the type's bend-merge distance.
+  const materialIds = types
+    .flatMap(({ type }) => [
+      type?.racewayMaterialId ?? null,
+      type?.elbow90MaterialId ?? null,
+      type?.elbow45MaterialId ?? null,
+    ])
     .filter((id): id is number => id !== null);
-  const materials = racewayIds.length
-    ? await db.getMaterialsByIds(racewayIds, userId)
+  const materials = materialIds.length
+    ? await db.getMaterialsByIds(Array.from(new Set(materialIds)), userId)
     : [];
+  const nameOf = (id: number | null | undefined): string | null =>
+    id == null ? null : (resolveMaterial(materials, id)?.name ?? null);
   const raceways = types.map(({ storedId, type }) => ({
     storedId,
+    mergeWithinFeet: bendMergeFeetForOverrides(
+      nameOf(type?.elbow90MaterialId),
+      nameOf(type?.elbow45MaterialId)
+    ),
     raceway:
       type?.racewayMaterialId == null
         ? undefined
@@ -81,16 +108,14 @@ export async function bendContextForRuns(
   }));
   const shippedName = await db.shippedNamesOf(raceways.map(r => r.raceway));
 
-  const byType = new Map<
-    number,
-    { method: BendMethod; suggestedKind: PullPointKind }
-  >();
-  for (const { storedId, raceway } of raceways) {
+  const byType = new Map<number, TypeBends>();
+  for (const { storedId, raceway, mergeWithinFeet } of raceways) {
     const baseline = shippedName(raceway);
     const own = raceway?.name ?? null;
     byType.set(storedId, {
       method: bendMethodFor(baseline, own, settings.factoryElbowFrom),
       suggestedKind: pullPointKindFor(baseline, own, settings.pullBoxFrom),
+      mergeWithinFeet,
     });
   }
   return { settings, answers, byType };
@@ -121,10 +146,11 @@ export function runBendsFor(
     answers: quantity ? [] : (context.answers.get(run.id) ?? []),
   };
   const limit = context.settings.pullPointLimit;
-  const bends = legBends(leg);
-  const walk = walkPullPoints(leg, quantity ? Infinity : limit, bends.bends);
   const type =
     run.runTypeId === null ? undefined : context.byType.get(run.runTypeId);
+  // An untyped run has no sweep to go on: the flat distance.
+  const bends = legBends(leg, type?.mergeWithinFeet ?? MERGE_WITHIN_FEET);
+  const walk = walkPullPoints(leg, quantity ? Infinity : limit, bends.bends);
   // An untyped run, or one whose raceway cannot be read, is offered a box:
   // with no size to go on, the bigger part is the safer thing to propose.
   const suggestedKind: PullPointKind = type?.suggestedKind ?? "pullBox";

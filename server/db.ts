@@ -230,6 +230,7 @@ import {
 import {
   fittingMaterialName,
   fittingRows,
+  bendMergeFeetForOverrides,
   bendMethodFor,
   lbHubsTakeConnectors,
   pickFittingMaterial,
@@ -11856,6 +11857,12 @@ export async function fittingRowsByRunType(
               bendSettings.factoryElbowFrom
             ),
             limit: bendSettings.pullPointLimit,
+            // Wider when this type's 90 or 45 is a sweep, so a traced sweep
+            // is one bend. The run panel reads the same (`runBendDetail.ts`).
+            mergeWithinFeet: bendMergeFeetForOverrides(
+              resolved(t.elbow90MaterialId)?.name ?? null,
+              resolved(t.elbow45MaterialId)?.name ?? null
+            ),
           },
           ownedTees
         )

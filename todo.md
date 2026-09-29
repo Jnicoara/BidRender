@@ -53,6 +53,12 @@ Both are timing, not wrong answers, and both touch the shared test database.
 Fix them together: a green run that sometimes lies about being red trains
 everyone to re-run instead of read.
 
+- [x] **`materialsCatalog.test.ts` "renames the reshaped rows in place"
+      timed out at 5,004 ms** in a full run, 2026-09-29, after the sweeps
+      took the catalog to 1,511 rows; 4.1–4.4 s alone, all assertions
+      passing. Given 60 s like `seedPreservesUserPrices`. A timeout, not a
+      race — but the next catalog growth will push other seed-heavy tests
+      toward 5 s the same way.
 - [ ] **`server/backup.test.ts` "restores into an empty database, table for
       table and row for row" (line ~248) came up 11 `assemblies` rows short.**
       2026-09-27. A timing race on the shared test database: something else

@@ -652,7 +652,12 @@ describe.skipIf(!hasDb)("seeding the catalog into a live database", () => {
         1
       );
     }
-  });
+    // Two queries per rename (~100 of them) against a full seed. 4.1–4.4 s
+    // alone and 5.0 s under the full suite on 2026-09-29, once the sweeps
+    // took the catalog to 1,511 — so the 5 s default timed it out with no
+    // assertion wrong. Same treatment as seedPreservesUserPrices (todo.md,
+    // "Flaky tests").
+  }, 60_000);
 
   it("withdraws retired rows from the catalog without destroying them", async () => {
     // Retiring must not delete: assemblies, kits and takeoff stamps point at

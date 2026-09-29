@@ -65,6 +65,8 @@ function leg(
 const BENDS = {
   method: { method: "factory" as const, why: 'factory elbows from 1-1/4" up' },
   limit: 360,
+  // A type on standard elbows: the flat merge distance (runBendsSweep.test.ts).
+  mergeWithinFeet: 3,
 };
 function count(legs: readonly FittingLeg[], spec: RacewayFittingSpec) {
   return countFittings(legs, spec, BENDS, []);
