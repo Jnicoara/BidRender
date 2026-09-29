@@ -31,8 +31,10 @@ import { getDb } from "./db";
 import { footageByRunType } from "./runTypeFootage";
 import { bidPdfSheets, bidPdfs, bids, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 9351;
+dropFixtureUsersAfterAll([USER]);
 const hasDb = Boolean(process.env.DATABASE_URL);
 const withDb = hasDb ? describe : describe.skip;
 

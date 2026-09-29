@@ -28,9 +28,11 @@ import {
 } from "../shared/takeoffCounts";
 import { bidPdfs, bids, symbolLinks, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 8585;
 const OTHER_USER = 8586;
+dropFixtureUsersAfterAll([USER, OTHER_USER]);
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 

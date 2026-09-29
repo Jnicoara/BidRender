@@ -44,9 +44,11 @@ import { bidPdfs, bids, symbolLinks, users } from "../drizzle/schema";
 import { PLAN_COPILOT_MODEL } from "./routers/planCopilotRouter";
 import { NAVIGATION_MODEL } from "./routers/navigationRouter";
 import type { TrpcContext } from "./_core/context";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 8611;
 const OTHER_USER = 8612;
+dropFixtureUsersAfterAll([USER, OTHER_USER]);
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 const runIf = hasDb ? describe : describe.skip;

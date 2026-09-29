@@ -27,9 +27,11 @@ import {
 } from "../shared/takeoffExport";
 import type { TrpcContext } from "./_core/context";
 import { lineNotPriced } from "../shared/lineNotPriced";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 9331;
 const OTHER_USER = 9332;
+dropFixtureUsersAfterAll([USER, OTHER_USER]);
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 

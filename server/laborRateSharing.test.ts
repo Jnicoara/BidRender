@@ -25,9 +25,11 @@ import {
 import { assemblies, bids, laborRates, users } from "../drizzle/schema";
 import { hourlyCostFor, resolveLaborRate } from "../shared/laborRateLookup";
 import type { TrpcContext } from "./_core/context";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 9191;
 const OTHER_USER = 9192;
+dropFixtureUsersAfterAll([USER, OTHER_USER]);
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 
