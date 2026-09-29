@@ -5,6 +5,11 @@ staging, AI correction logging, security basics, invite gate. Each section
 starts with what already exists, measured against the code on `local-dev` at
 `d2928ba`, because two of the five turned out to be partly done.
 
+> **Detailed plans, 2026-09-29.** Piece 5 → `references/invite-gate-plan.md`
+> (it picks a new `signup_invites` table, as leaned below). Piece 3 →
+> `references/ai-correction-log-plan.md` (it found placed AI marks are saved
+> with no group, § 1 there). Piece 1 is built on `a-email-reset`, not merged.
+
 ---
 
 ## The owner's answers (2026-09-27) — these override anything below

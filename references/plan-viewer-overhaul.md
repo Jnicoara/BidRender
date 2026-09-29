@@ -4639,6 +4639,16 @@ second. A suggestion that shows only a name is one a wrong answer passes. So:
   the `ai_usage_daily` precedent of storing sizes and never contents. That is
   what turns "is the floor right" from an argument into a number.
 
+  > **Overridden for the AI correction log, 2026-09-27 (owner, Stage 4 answer
+  > 4).** Corrections to AI marks keep the label, the kind, the point AND a
+  > small cut-out image in R2, because the log cannot be backfilled and shared
+  > symbol learning later needs the picture. The anonymised half is split out
+  > for sharing, and nothing is shared before a terms page exists.
+  > `references/stage-4-safety-plan.md` (answers 4 and 7) and
+  > `references/ai-correction-log-plan.md`. "No crops, no labels" still
+  > describes the minimum needed to measure the floor. It no longer describes
+  > what is stored.
+
 ### 9.6 Where this belongs relative to the tiling work
 
 **Question 3, answered: legend capture FIRST. This disagrees with the value
