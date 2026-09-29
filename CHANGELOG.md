@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **The plan reader no longer reads a sheet just because you opened it.** The
+  "Read each sheet as I open it" switch is gone. A sheet is read, and paid for,
+  only when you press Read sheet. With the switch on, clicking through a
+  forty-sheet set to find the electrical drawings could spend money on every
+  sheet you passed.
 - **Marks placed by the plan reader now count on the bid.** Pressing Place
   drew the marks and added their parts to the materials list, but the count
   and the bid line never moved, so the bid and the supply list disagreed with

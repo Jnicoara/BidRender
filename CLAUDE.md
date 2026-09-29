@@ -20,7 +20,7 @@ The product is **BidRidge**. It was called **BidPhase** until v5.75, **HelixBid*
 
 The `/manus-storage` route, the `helixbid:` localStorage keys and the `helixbid-` cache prefix survive from earlier names for the reasons given above and below; they are not oversights. `todo.md` and `CHANGELOG.md` entries recording past renames are historical record and stay as written.
 
-**A few `helixbid` names are kept on purpose — do not rename them.** The localStorage keys (`helixbid:trace-draft:`, `helixbid:stamp-queue:`, `helixbid.crashes`, `helixbid.planReader.autoRead`) and the service worker's `helixbid-` cache prefix, because a browser may already hold unsent work or caches under them and a renamed key never finds them. The seed lock names in `server/db.ts`, because an old and a new build must take the same lock during a deploy. And the R2 backup prefix default `helixbid` in `server/backup/config.ts`, because that is the folder the existing backups live in.
+**A few `helixbid` names are kept on purpose — do not rename them.** The localStorage keys (`helixbid:trace-draft:`, `helixbid:stamp-queue:`, `helixbid.crashes`) and the service worker's `helixbid-` cache prefix, because a browser may already hold unsent work or caches under them and a renamed key never finds them. (`helixbid.planReader.autoRead` was on this list until 2026-09-29, when the auto-read switch it stored was removed; browsers may still hold it, and nothing may read it — `server/aiCallsAreButtons.test.ts`.) The seed lock names in `server/db.ts`, because an old and a new build must take the same lock during a deploy. And the R2 backup prefix default `helixbid` in `server/backup/config.ts`, because that is the folder the existing backups live in.
 
 ## Commands
 

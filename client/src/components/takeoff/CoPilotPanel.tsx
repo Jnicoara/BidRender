@@ -37,7 +37,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { TIER_LABEL, type ConfidenceTier } from "@shared/copilotConfidence";
 import { smartSearch } from "@/lib/smartSearch";
 import type { SymbolEntry } from "@/components/takeoff/LegendPanel";
@@ -94,8 +93,6 @@ const TIER_STYLE: Record<
 export function CoPilotPanel({
   state,
   reading,
-  autoRead,
-  onAutoReadChange,
   canRead,
   onRead,
   onConfirm,
@@ -110,9 +107,6 @@ export function CoPilotPanel({
 }: {
   state: CopilotState | undefined;
   reading: boolean;
-  /** Read each sheet once as it is opened, rather than on a button press. */
-  autoRead: boolean;
-  onAutoReadChange: (on: boolean) => void;
   /** False until the page has finished rasterising — there is nothing to send. */
   canRead: boolean;
   onRead: (force: boolean) => void;
@@ -250,17 +244,6 @@ export function CoPilotPanel({
 
       {open && (
         <div className="pb-2">
-          {/* Cost control, stated rather than hidden: one sheet is read when it
-              is opened, once, and paging back to it costs nothing. */}
-          <label className="px-3 pb-2 flex items-center gap-2 text-[0.7rem] text-muted-foreground cursor-pointer">
-            <Switch
-              checked={autoRead}
-              onCheckedChange={onAutoReadChange}
-              className="scale-75 origin-left"
-            />
-            <span>Read each sheet as I open it (once per sheet)</span>
-          </label>
-
           {!state?.runId && !reading && (
             <p className="px-3 pb-3 text-xs text-muted-foreground">
               The plan reader looks at the sheet on screen, finds the symbols

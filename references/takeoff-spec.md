@@ -433,7 +433,8 @@ never be merged into one "AI" box.
 
 - **A1** — Switched off on your local copy (the `DISABLE_AI_FEATURES` setting),
   and it needs a connection. It reads each sheet you open automatically unless
-  you turn that off, which costs money per sheet (D11). Its "correct this"
+  you turn that off, which costs money per sheet (D11). _(Stale since D11:
+  since 2026-09-29 it never reads on open, and the switch is gone.)_ Its "correct this"
   control only appears on mouse hover (`CoPilotPanel.tsx:391`).
 - **A2** — The screen can show and accept a suggested route; what creates those
   suggestions was not reviewed for this spec.
@@ -729,6 +730,13 @@ against this.**
 - (c) Ask once per bid.
 - **Pick:** (a). Automatic reading costs money on every sheet opened, including
   schedules and details nobody takes off.
+
+> **Overridden 2026-09-29 by the owner: no automatic reading at all, not even
+> opt-in.** (a) kept a "Read each sheet as I open it" switch, off by default.
+> It is removed. A sheet is read only when Read sheet is pressed, per
+> CLAUDE.md § "AI features" ("a call is a button"). The guard is
+> `server/aiCallsAreButtons.test.ts`, which fails if any effect in `client/src`
+> starts a reading or anything reads the old preference back.
 
 **D12 — Should "Where do I…?" be reachable from every page? (A5)**
 

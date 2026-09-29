@@ -3053,48 +3053,22 @@ export default function TakeoffPage({
   const renderedDocId = useRef<number | null>(null);
   renderedDocId.current = doc?.id ?? null;
   const [copilotAnswer, setCopilotAnswer] = useState<string | null>(null);
-  /**
-   * Read each sheet as it is opened, rather than on a button press.
-   *
-   * ── OFF until somebody turns it on, and that is a rule not a preference ────
-   * This defaulted ON, and the reasoning written here at the time was that
-   * "each sheet is still read at most once — the server returns a stored
-   * reading unless the user asks for a re-read — so leaving it on cannot run
-   * away with the bill." That argument was about the SIZE of the bill, and it
-   * answered the wrong question. Opening a sheet spent the contractor's money
-   * on a call they had not asked for, and they found out from the invoice.
-   *
-   * CLAUDE.md now states the rule plainly: a call is a button. The default is
-   * `=== "on"` rather than `!== "off"` precisely so that "no saved preference"
-   * means off — a browser that has never been asked has never consented.
-   *
-   * The cost argument has since stopped holding anyway. At one call per sheet,
-   * clicking through a forty-sheet submission to find the electrical drawings
-   * spent forty calls. Under the tiling work (references/ai-reader-cost.md)
-   * one sheet is six, so the same click-through would spend two hundred and
-   * forty and about four dollars, all of it unasked.
-   *
-   * Still remembered per browser rather than per account: it is a preference
-   * about how this one machine works, and a contractor on a metered connection
-   * in a truck may well want it off there and on at the office.
-   */
-  // The storage key keeps the product's old name on purpose, so a choice a
-  // browser has already saved still applies.
-  const [autoRead, setAutoRead] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem("helixbid.planReader.autoRead") === "on";
-  });
-  const setAutoReadPersisted = useCallback((on: boolean) => {
-    setAutoRead(on);
-    try {
-      window.localStorage.setItem(
-        "helixbid.planReader.autoRead",
-        on ? "on" : "off"
-      );
-    } catch {
-      // Private browsing. The preference simply does not stick.
-    }
-  }, []);
+  /*
+    There is no "read each sheet as I open it". A sheet is read when the
+    estimator presses Read sheet, and at no other time.
+
+    REMOVED 2026-09-29. It started as a switch that defaulted ON, on the
+    argument that each sheet was read at most once so it "cannot run away with
+    the bill". That answered the size of the bill, not whether anyone asked.
+    It was then turned OFF by default and kept as an opt-in, which still let an
+    effect spend money on a sheet OPENING, the one thing CLAUDE.md § "AI
+    features" says never happens: a call is a button. Under the tiling work one
+    sheet is six calls, so clicking through forty sheets with it on would spend
+    two hundred and forty unasked. `server/aiCallsAreButtons.test.ts` fails if
+    any effect in client/src starts a reading again, or if anything reads the
+    old `helixbid.planReader.autoRead` key back — browsers that turned it on
+    still hold it, and reading it is how the feature would quietly return.
+  */
 
   const handlePageRendered = useCallback(
     (pageNumber: number, canvas: HTMLCanvasElement, scale: number) => {
@@ -3205,34 +3179,6 @@ export default function TakeoffPage({
     },
     [activeSheet?.id, canRead, bidId, page, readSheet, copilot?.readerModel]
   );
-
-  /**
-   * Read a sheet when it is opened — this one, not the other thirty-nine.
-   *
-   * The whole cost-control decision in one effect: reading is driven by what
-   * the estimator is actually looking at. A forty-sheet submission read up
-   * front would bill forty times before anyone had seen a drawing, and most of
-   * those sheets are schedules, details and civil work the electrician will
-   * never take off.
-   */
-  const readerFired = useRef<Set<number>>(new Set());
-  useEffect(() => {
-    if (!readerAvailable || !autoRead || !canRead || !activeSheet) return;
-    // A sheet that already has a stored reading costs nothing to show, so there
-    // is nothing to fire for. `copilot` being undefined means the query has not
-    // answered yet — firing then would race it and pay for a second read.
-    if (copilot === undefined || copilot.runId !== null) return;
-    if (readerFired.current.has(activeSheet.id)) return;
-    readerFired.current.add(activeSheet.id);
-    runReader(false);
-  }, [
-    readerAvailable,
-    autoRead,
-    canRead,
-    activeSheet?.id,
-    copilot?.runId,
-    runReader,
-  ]);
 
   /** A question is about the sheet on screen, so the answer goes with it. */
   useEffect(() => {
@@ -5999,8 +5945,6 @@ export default function TakeoffPage({
                     <CoPilotPanel
                       state={copilot}
                       reading={readSheet.isPending}
-                      autoRead={autoRead}
-                      onAutoReadChange={setAutoReadPersisted}
                       canRead={canRead}
                       onRead={runReader}
                       onConfirm={findingIds => {
