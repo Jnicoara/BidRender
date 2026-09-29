@@ -340,14 +340,24 @@ export type RunTypeMaterialRole = "raceway" | "conductor" | "ground";
 
 /** The footage a type's runs came to, already split by what it buys. */
 export type RunTypeFootage = {
+  /*
+    BOUGHT and INSTALLED for each (owner, 2026-09-28, Q5): the line's material
+    is on what is bought — extra included — and its labour on what is
+    installed. Renamed from the single `conduitFeet`-style fields on
+    2026-09-29 so every reader had to choose.
+  */
   /** Pipe. Conduit types only. */
-  conduitFeet: number;
+  conduitBoughtFeet: number;
+  conduitInstalledFeet: number;
   /** The cable itself. Cable types only. */
-  cableFeet: number;
+  cableBoughtFeet: number;
+  cableInstalledFeet: number;
   /** Insulated conductors, all circuits. Conduit types only. */
-  insulatedFeet: number;
+  insulatedBoughtFeet: number;
+  insulatedInstalledFeet: number;
   /** Bare or green ground. Conduit types only. */
-  groundFeet: number;
+  groundBoughtFeet: number;
+  groundInstalledFeet: number;
 };
 
 /** One line a run type wants on the bid. */
@@ -356,7 +366,10 @@ export type RunTypeRow = {
   /** The material this role points at, or null when the type never said. */
   materialId: number | null;
   materialName: string | null;
+  /** Feet BOUGHT — the line's `qty`, which its material is priced on. */
   feet: number;
+  /** Feet INSTALLED — the line's `laborQty`, which its hours are on. */
+  installedFeet: number;
 };
 
 /**
@@ -397,7 +410,8 @@ export function runTypeRows(type: {
         role: "conductor",
         materialId: type.conductorMaterialId,
         materialName: type.conductorMaterialName,
-        feet: feet(type.footage.cableFeet),
+        feet: feet(type.footage.cableBoughtFeet),
+        installedFeet: feet(type.footage.cableInstalledFeet),
       },
     ];
   }
@@ -408,25 +422,28 @@ export function runTypeRows(type: {
       role: "raceway",
       materialId: type.racewayMaterialId,
       materialName: type.racewayMaterialName,
-      feet: feet(type.footage.conduitFeet),
+      feet: feet(type.footage.conduitBoughtFeet),
+      installedFeet: feet(type.footage.conduitInstalledFeet),
     },
   ];
-  const insulated = feet(type.footage.insulatedFeet);
+  const insulated = feet(type.footage.insulatedBoughtFeet);
   if (type.conductorMaterialId !== null || insulated > 0) {
     rows.push({
       role: "conductor",
       materialId: type.conductorMaterialId,
       materialName: type.conductorMaterialName,
       feet: insulated,
+      installedFeet: feet(type.footage.insulatedInstalledFeet),
     });
   }
-  const ground = feet(type.footage.groundFeet);
+  const ground = feet(type.footage.groundBoughtFeet);
   if (type.groundMaterialId !== null || ground > 0) {
     rows.push({
       role: "ground",
       materialId: type.groundMaterialId,
       materialName: type.groundMaterialName,
       feet: ground,
+      installedFeet: feet(type.footage.groundInstalledFeet),
     });
   }
   return rows;

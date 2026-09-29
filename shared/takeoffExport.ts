@@ -63,16 +63,22 @@ export type TakeoffExportRuns = {
   status: RunStatus;
   /** Non-suggested runs in this group, measured or not. */
   runCount: number;
-  /** Raceway or cable, traced plus vertical. */
+  /** Raceway or cable to BUY: flat, vertical, extra (and a cable's makeup). */
   totalFeet: number;
   /** The vertical share of `totalFeet`. */
   verticalFeet: number;
   /** The share of `totalFeet` whose flat length was TYPED, not traced (§ 4c). */
   typedFeet: number;
-  /** Insulated conductors, every circuit. 0 on a cable type. */
+  /** The EXTRA share of `totalFeet` — material only. */
+  extraFeet: number;
+  /** The MAKEUP share of `totalFeet` — a cable's tails. 0 on conduit. */
+  makeupFeet: number;
+  /** Insulated conductors to buy, every circuit, extra and makeup in. */
   wireFeet: number;
-  /** Bare or green ground. 0 on a cable type. */
+  /** Bare or green ground to buy. 0 on a cable type. */
   groundFeet: number;
+  /** Measured runs with an extra nobody set — said in the note. */
+  noExtraCount: number;
   /** On a sheet with no usable scale, so not in the feet above. */
   unmeasurableCount: number;
   /**
@@ -118,9 +124,16 @@ export type TakeoffExportRow = {
   quantity: number | null;
   /** Flat footage measured off the drawing. Typed lengths are NOT in it. */
   tracedFeet: number | null;
-  /** Flat footage the estimator typed (§ 4c). Quantity = traced + typed + vertical. */
+  /**
+   * Flat footage the estimator typed (§ 4c).
+   * Quantity = traced + typed + vertical + extra + makeup.
+   */
   typedFeet: number | null;
   verticalFeet: number | null;
+  /** Extra on the raceway or cable — material only. */
+  extraFeet: number | null;
+  /** Makeup inside a cable's figure. Blank on conduit, whose makeup is wire. */
+  makeupFeet: number | null;
   wireFeet: number | null;
   groundFeet: number | null;
   note: string;
@@ -148,8 +161,15 @@ function runNote(runs: {
   unansweredCount: number;
   endsNotCountedCount: number;
   verticalFeet: number;
+  noExtraCount: number;
 }): string {
   const parts: string[] = [];
+  // An unset extra whispers (§ 2.3); in a file that leaves the app it has to
+  // be said on the row it affects.
+  if (runs.noExtraCount > 0)
+    parts.push(
+      `No extra set — ${plural(runs.noExtraCount, "run carries", "runs carry")} none`
+    );
   if (runs.endsNotCountedCount > 0)
     parts.push(
       runs.verticalFeet > 0
@@ -198,9 +218,18 @@ function runRow(
     // measured are different kinds of fact (§ 4c), and a column headed
     // "Traced" must not hold a number nobody traced.
     tracedFeet: hasFeet
-      ? round2(runs.totalFeet - runs.verticalFeet - runs.typedFeet)
+      ? round2(
+          runs.totalFeet -
+            runs.verticalFeet -
+            runs.typedFeet -
+            runs.extraFeet -
+            runs.makeupFeet
+        )
       : null,
     typedFeet: hasFeet ? round2(runs.typedFeet) : null,
+    extraFeet: hasFeet ? round2(runs.extraFeet) : null,
+    makeupFeet:
+      hasFeet && runs.pathType === "cable" ? round2(runs.makeupFeet) : null,
     // Blank when no drop was counted because an end has no height: that is
     // "not counted", and a 0 would say "counted, and there are none" — which
     // IS the answer for a run between boxes at run height, so 0 stays 0 there.
@@ -252,6 +281,8 @@ export function buildTakeoffExport(
         tracedFeet: null,
         typedFeet: null,
         verticalFeet: null,
+        extraFeet: null,
+        makeupFeet: null,
         wireFeet: null,
         groundFeet: null,
         note: "",
@@ -288,18 +319,24 @@ export function buildTakeoffExport(
       totalFeet: 0,
       verticalFeet: 0,
       typedFeet: 0,
+      extraFeet: 0,
+      makeupFeet: 0,
       wireFeet: 0,
       groundFeet: 0,
       unmeasurableCount: 0,
       branchCount: 0,
       unansweredCount: 0,
       endsNotCountedCount: 0,
+      noExtraCount: 0,
     };
     total.runCount += runs.runCount;
     total.endsNotCountedCount += runs.endsNotCountedCount;
     total.totalFeet += runs.totalFeet;
     total.verticalFeet += runs.verticalFeet;
     total.typedFeet += runs.typedFeet;
+    total.extraFeet += runs.extraFeet;
+    total.makeupFeet += runs.makeupFeet;
+    total.noExtraCount += runs.noExtraCount;
     total.wireFeet += runs.wireFeet;
     total.groundFeet += runs.groundFeet;
     total.unmeasurableCount += runs.unmeasurableCount;
@@ -323,6 +360,8 @@ export function buildTakeoffExport(
           tracedFeet: null,
           typedFeet: null,
           verticalFeet: null,
+          extraFeet: null,
+          makeupFeet: null,
           wireFeet: null,
           groundFeet: null,
           note: "",
@@ -336,11 +375,13 @@ export function buildTakeoffExport(
 
   // ── Notes: what the numbers mean, and what is not in them ──────────────────
   const notes: string[] = [
-    "Run Quantity is raceway or cable in feet: Traced ft plus Typed ft plus Vertical ft (the drops and rises at run ends). Typed ft is a flat length the estimator typed, usually on a sheet with no usable scale; it is not measured off the drawing. Wire ft is insulated conductors across every circuit; Ground ft is bare or green ground. A cable's conductors are inside its jacket, so a cable run has no Wire or Ground ft.",
+    "Run Quantity is raceway or cable to buy, in feet: Traced ft plus Typed ft plus Vertical ft (the drops and rises at run ends) plus Extra ft, plus Makeup ft on a cable. Typed ft is a flat length the estimator typed, usually on a sheet with no usable scale; it is not measured off the drawing. Wire ft is insulated conductors across every circuit; Ground ft is bare or green ground. A cable's conductors are inside its jacket, so a cable run has no Wire or Ground ft.",
     // Until 2026-09-27 this said the run totals count Finished runs only and
     // read lower while a run is a Draft. They now count what the bid prices.
     "Status: Finished runs are done; Draft runs are still being traced. The bid prices both, and so do the run totals on the Plans screen.",
-    "No extra is included — no waste, makeup or allowance is added to any footage.",
+    // Until 2026-09-29 this said "No extra is included". Extra and makeup
+    // arrived then (held-migrations plan § 1); this says what they are.
+    "Extra ft is added material — conduit extra on the run length only, cable extra on the run length and drops. Wire ft and Ground ft include the wire extra and the makeup (the tail left at each box and panel). Extra is material only: the bid puts no install hours on it. A row noted 'No extra set' carries none.",
     "Fittings counted from the runs (couplings, connectors, straps, elbows) are not in this file. They are on the Materials list.",
     "Runs the app suggested and nobody accepted are not included.",
   ];
@@ -381,6 +422,8 @@ const HEADER = [
   "Traced ft",
   "Typed ft",
   "Vertical ft",
+  "Extra ft",
+  "Makeup ft",
   "Wire ft",
   "Ground ft",
   "Note",
@@ -402,6 +445,8 @@ function rowCells(row: TakeoffExportRow): (string | number)[] {
     blankIfNull(row.tracedFeet),
     blankIfNull(row.typedFeet),
     blankIfNull(row.verticalFeet),
+    blankIfNull(row.extraFeet),
+    blankIfNull(row.makeupFeet),
     blankIfNull(row.wireFeet),
     blankIfNull(row.groundFeet),
     row.note,

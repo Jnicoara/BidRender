@@ -273,11 +273,12 @@ describe("rolling assemblies into one list", () => {
 describe("measured footage is reported as its own kind of thing", () => {
   it("says the footage is a combined total rather than inventing a size", () => {
     const measured = measuredEntries({
-      conduitFeet: 340,
-      cableFeet: 0,
-      wireFeet: 900,
+      conduitBoughtFeet: 340,
+      cableBoughtFeet: 0,
+      wireBoughtFeet: 900,
+      wireGroundBoughtFeet: 0,
     });
-    // No ground stated, so there is nothing bare to split out and the
+    // No ground (0 bare), so there is nothing bare to split out and the
     // insulated line carries the whole 900 — the number it always carried.
     expect(measured.map(m => m.label)).toEqual(["Conduit", "Wire, insulated"]);
     expect(measured[1].feet).toBe(900);
@@ -300,7 +301,12 @@ describe("measured footage is reported as its own kind of thing", () => {
 
   it("omits a category with no footage rather than listing it as zero", () => {
     expect(
-      measuredEntries({ conduitFeet: 0, cableFeet: 0, wireFeet: 0 })
+      measuredEntries({
+        conduitBoughtFeet: 0,
+        cableBoughtFeet: 0,
+        wireBoughtFeet: 0,
+        wireGroundBoughtFeet: 0,
+      })
     ).toEqual([]);
   });
 });
@@ -948,10 +954,10 @@ describe("insulated and bare are two lines on a supplier's list", () => {
    */
   it("splits the wire, and the two lines still sum to the total", () => {
     const measured = measuredEntries({
-      conduitFeet: 340,
-      cableFeet: 0,
-      wireFeet: 900,
-      wireGroundFeet: 200,
+      conduitBoughtFeet: 340,
+      cableBoughtFeet: 0,
+      wireBoughtFeet: 900,
+      wireGroundBoughtFeet: 200,
     });
     expect(measured.map(m => m.label)).toEqual([
       "Conduit",
@@ -972,18 +978,18 @@ describe("insulated and bare are two lines on a supplier's list", () => {
     // figure. A supplier who sees no bare line on a cable job should be told
     // why rather than left to wonder.
     const bare = measuredEntries({
-      conduitFeet: 0,
-      cableFeet: 120,
-      wireFeet: 0,
-      wireGroundFeet: 0,
+      conduitBoughtFeet: 0,
+      cableBoughtFeet: 120,
+      wireBoughtFeet: 0,
+      wireGroundBoughtFeet: 0,
     });
     expect(bare.map(m => m.label)).toEqual(["Cable"]);
 
     const withGround = measuredEntries({
-      conduitFeet: 100,
-      cableFeet: 0,
-      wireFeet: 300,
-      wireGroundFeet: 100,
+      conduitBoughtFeet: 100,
+      cableBoughtFeet: 0,
+      wireBoughtFeet: 300,
+      wireGroundBoughtFeet: 100,
     });
     expect(withGround.find(m => m.label === "Wire, bare ground")!.note).toMatch(
       /inside the cable/i
@@ -993,10 +999,10 @@ describe("insulated and bare are two lines on a supplier's list", () => {
   it("shows no bare line when nothing is grounded", () => {
     // Zero feet of bare copper is not a line a supplier should be asked about.
     const measured = measuredEntries({
-      conduitFeet: 100,
-      cableFeet: 0,
-      wireFeet: 300,
-      wireGroundFeet: 0,
+      conduitBoughtFeet: 100,
+      cableBoughtFeet: 0,
+      wireBoughtFeet: 300,
+      wireGroundBoughtFeet: 0,
     });
     expect(measured.some(m => m.label === "Wire, bare ground")).toBe(false);
     expect(measured.find(m => m.label === "Wire, insulated")!.feet).toBe(300);

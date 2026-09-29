@@ -39,6 +39,7 @@ import { Label } from "@/components/ui/label";
 import { HeightFields } from "@/components/HeightFields";
 import { CompanyDefaultNotice } from "@/components/CompanyDefaultNotice";
 import { BendSettingsSection } from "@/components/BendSettingsSection";
+import { ExtrasSection } from "@/components/ExtrasSection";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { formatElevation } from "@shared/takeoffHeights";
 import type { HeightRow } from "@shared/takeoffHeights";
@@ -315,6 +316,12 @@ export function HeightsSection() {
         jobs. Panels and ceiling boxes ship with no height at all, because how
         far a pipe drops into one depends on how it is set.
       </p>
+
+      {/* Extra and makeup: the other thing a traced line cannot see — what
+          the job buys beyond the measured length (held-migrations plan § 1). */}
+      <div className="border-t border-border pt-4">
+        <ExtrasSection />
+      </div>
 
       {/* Here because a drop is where most counted bends come from, and the
           pull-point limit is read along the same runs. Folded: most companies

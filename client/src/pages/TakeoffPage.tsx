@@ -2039,6 +2039,18 @@ export default function TakeoffPage({
   const { data: heightsForBid } = trpc.takeoffHeights.forBid.useQuery({
     bidId,
   });
+  /**
+   * The company's OWN height types, active — each can take its own makeup on
+   * a run type or a run (held-migrations plan § 1). Shipped types take the
+   * plain box or panel figure, so they are not listed one by one.
+   */
+  const customHeightTypes = useMemo(
+    () =>
+      (heightsForBid?.types ?? [])
+        .filter(t => !t.isShipped && t.isActive)
+        .map(t => ({ typeKey: t.typeKey, label: t.label })),
+    [heightsForBid?.types]
+  );
   const armedEndsLabel = useMemo(
     () => traceEndsLabel(traceEnds, heightsForBid?.types),
     [traceEnds, heightsForBid?.types]
@@ -3817,6 +3829,11 @@ export default function TakeoffPage({
     onError: e => toast.error(e.message),
     onSettled: refreshRuns,
   });
+  /** A run's own extra and makeup — moves its row, the totals and the bridge. */
+  const setRunExtras = trpc.takeoffRuns.setExtras.useMutation({
+    onError: e => toast.error(e.message),
+    onSettled: refreshRuns,
+  });
   /**
    * A person's answer to a proposed pull point, and taking one back.
    *
@@ -4962,6 +4979,7 @@ export default function TakeoffPage({
               <RunTypePicker
                 pathType="conduit"
                 runColors={runColors}
+                customHeightTypes={customHeightTypes}
                 types={runTypes.data ?? []}
                 armedId={armedRunType.conduit?.id ?? null}
                 onPick={type => armRunType("conduit", type, false)}
@@ -5011,6 +5029,7 @@ export default function TakeoffPage({
               <RunTypePicker
                 pathType="cable"
                 runColors={runColors}
+                customHeightTypes={customHeightTypes}
                 types={runTypes.data ?? []}
                 armedId={armedRunType.cable?.id ?? null}
                 onPick={type => armRunType("cable", type, false)}
@@ -5675,6 +5694,10 @@ export default function TakeoffPage({
               onSetTypedLength={(runId, inches) =>
                 setTypedLength.mutate({ id: runId, typedLengthInches: inches })
               }
+              onSetRunExtras={(runId, patch) =>
+                setRunExtras.mutate({ runId, ...patch })
+              }
+              customHeightTypes={customHeightTypes}
               onAnswerPullPoint={answer => answerPullPoint.mutate(answer)}
               onUndoPullPoint={id => undoPullPoint.mutate({ id })}
               pullPointBusy={
@@ -5699,6 +5722,7 @@ export default function TakeoffPage({
                       <RunTypePicker
                         pathType={run.pathType}
                         runColors={runColors}
+                        customHeightTypes={customHeightTypes}
                         types={runTypes.data ?? []}
                         armedId={run.runTypeId}
                         onPick={type =>

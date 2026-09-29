@@ -26,6 +26,7 @@ import {
   quantitiesForRun,
   runFeet,
   tracedRunOf,
+  NO_EXTRAS,
   NO_VERTICALS,
 } from "../shared/takeoffQuantities";
 import { buildTakeoffExport, takeoffExportCsv } from "../shared/takeoffExport";
@@ -166,12 +167,13 @@ describe("runFeet with a typed length", () => {
       { pathType: "conduit", points: POINTS, typedLengthInches: 720 },
       [],
       48,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
     expect(q.lengthSource).toBe("typed");
     expect(q.runFeet).toBe(60);
     expect(q.drawnFeet).toBe(40);
-    expect(q.conduitFeet).toBe(60);
+    expect(q.conduitBoughtFeet).toBe(60);
   });
 });
 
@@ -207,6 +209,9 @@ describe("the takeoff export keeps typed and traced apart", () => {
           branchCount: 0,
           unansweredCount: 0,
           endsNotCountedCount: 0,
+          extraFeet: 0,
+          makeupFeet: 0,
+          noExtraCount: 0,
         },
       ],
       untypedRunCount: 0,
@@ -241,13 +246,13 @@ withDb("a typed run on a sheet with no scale", () => {
     expect(row.quantities?.drawnFeet).toBeNull(); // no scale to draw against
 
     const totals = await caller().takeoffRuns.totals({ bidId: where.bidId });
-    expect(totals.conduitFeet).toBe(60);
+    expect(totals.conduitBoughtFeet).toBe(60);
     expect(totals.unmeasurableCount).toBe(0);
     expect(totals.typedCount).toBe(1);
 
     const footage = await footageByRunType(where.bidId, USER, null);
     const line = footage.get(where.runTypeId)!;
-    expect(line.conduitFeet).toBe(60);
+    expect(line.conduitBoughtFeet).toBe(60);
     expect(line.typedFeet).toBe(60);
     expect(line.unmeasurableCount).toBe(0);
   });
@@ -305,6 +310,52 @@ withDb("nothing recomputes a typed length", () => {
     // And the drawing's own figure moved, so the typed one is visibly apart:
     // 20 paper inches at 1/8" = 1'-0" is 160 ft.
     expect(row.quantities?.drawnFeet).toBe(160);
+  });
+});
+
+withDb("a branch that cuts a typed leg", () => {
+  it("counts the typed length ONCE — both halves go back to the drawing", async () => {
+    const where = await bidWithSheet(true);
+    const runId = await saveRun(where);
+    await caller().takeoffRuns.setTypedLength({
+      id: runId,
+      typedLengthInches: 720, // 60 ft typed; the drawing says 40
+    });
+
+    // A branch leaving the MIDDLE of the typed leg cuts it in two.
+    await caller().takeoffRuns.addLeg({
+      runId,
+      points: [
+        { x: 360, y: 0 },
+        { x: 360, y: 360 },
+      ],
+      start: {
+        kind: "tee",
+        hostRunId: runId,
+        at: { x: 360, y: 0 },
+        tolerance: 4,
+        fitting: "box",
+        stampId: null,
+      },
+      endKind: null,
+    });
+
+    const rows = await caller().takeoffRuns.listForSheet({
+      sheetId: where.sheetId,
+    });
+    // The two halves of the old leg: neither may still carry the 60 ft, or
+    // the bid would read 120 ft of it.
+    const halves = rows.filter(
+      r => r.startTee?.id !== undefined || r.id === runId
+    );
+    const typedHalves = rows.filter(r => r.typedLengthInches !== null);
+    expect(typedHalves).toEqual([]);
+    expect(halves.length).toBeGreaterThanOrEqual(2);
+    // Back to the drawing: the main measures its 40 ft again, split in two.
+    const main = rows
+      .filter(r => r.quantities?.lengthSource === "traced")
+      .reduce((sum, r) => sum + (r.quantities?.runFeet ?? 0), 0);
+    expect(main).toBeCloseTo(40 + 20, 1); // 40 ft main + a 20 ft branch
   });
 });
 

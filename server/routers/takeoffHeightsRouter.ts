@@ -38,6 +38,14 @@ import {
   PULL_POINT_LIMITS,
   resolveBendSettings,
 } from "../../shared/runBends";
+import {
+  extraNumber,
+  NO_EXTRAS_CONTEXT,
+  resolveExtraPct,
+  resolveMakeup,
+  STARTER_EXTRAS,
+} from "../../shared/runExtras";
+import { extraPctSchema, makeupInchesSchema } from "../extrasInput";
 import * as db from "../db";
 
 /** Company settings: the same gate labor rates and sales tax sit behind. */
@@ -341,4 +349,112 @@ export const takeoffHeightsRouter = router({
 
   /** The shipped list itself, for a client that wants it without a round trip. */
   shippedTypes: settings.query(() => SHIPPED_HEIGHT_TYPES),
+
+  // ── Extra and makeup (held-migrations plan § 1, 0089 / 0092) ─────────────
+  //
+  // Beside the heights because they are the same kind of setting — a measuring
+  // default, set once, inherited by every run — and behind the same gate,
+  // because changing one moves every bid still following the drawing.
+
+  /**
+   * The company's extra and makeup defaults: what is stored, what is in
+   * effect, the dated starters, and how many bids a change would move.
+   *
+   * `effective` resolves each value the way a run with no settings of its own
+   * would see it — so the screen can say "10% (starter)" or "not set" without
+   * knowing the chain. `makeupByType` is each height type's own answer.
+   */
+  extras: settings.query(async ({ ctx }) => {
+    const userId = ctx.scope.dataUserId;
+    const [row, kinds, bidsAffected] = await Promise.all([
+      db.getExtraDefaults(userId),
+      db.getMountingHeights(userId),
+      db.countBidsFollowingTracedRuns(userId),
+    ]);
+    const company = {
+      conduitExtraPct: extraNumber(row?.conduitExtraPct),
+      wireExtraPct: extraNumber(row?.wireExtraPct),
+      makeupDeviceInches: row?.makeupDeviceInches ?? null,
+      makeupPanelInches: row?.makeupPanelInches ?? null,
+      accepted: Boolean(row?.acceptedAt),
+    };
+    const ctxOnly = { ...NO_EXTRAS_CONTEXT, company };
+    return {
+      stored: company,
+      acceptedAt: row?.acceptedAt ?? null,
+      starters: STARTER_EXTRAS,
+      effective: {
+        conduitExtraPct: resolveExtraPct(
+          "conduitExtraPct",
+          null,
+          null,
+          ctxOnly
+        ),
+        wireExtraPct: resolveExtraPct("wireExtraPct", null, null, ctxOnly),
+        makeupDeviceInches: resolveMakeup(null, null, null, ctxOnly),
+        makeupPanelInches: resolveMakeup("panel", null, null, ctxOnly),
+      },
+      makeupByType: Object.fromEntries(
+        kinds.map(k => [
+          k.typeKey,
+          { makeupAt: k.makeupAt, makeupInches: k.makeupInches },
+        ])
+      ) as Record<
+        string,
+        { makeupAt: "device" | "panel" | null; makeupInches: number | null }
+      >,
+      bidsAffected,
+    };
+  }),
+
+  /**
+   * Set any of the four company values. Omitted leaves it; NULL clears it
+   * back to the starter (if accepted) or to "not set".
+   */
+  setExtras: settings
+    .input(
+      z.object({
+        conduitExtraPct: extraPctSchema.nullable().optional(),
+        wireExtraPct: extraPctSchema.nullable().optional(),
+        makeupDeviceInches: makeupInchesSchema.nullable().optional(),
+        makeupPanelInches: makeupInchesSchema.nullable().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await db.setExtraDefaults(ctx.scope.dataUserId, input);
+      return { ok: true };
+    }),
+
+  /**
+   * Accept the dated starters, or take the acceptance back (Q1). Until this
+   * is pressed the starters apply NOTHING — CLAUDE.md § Starter content.
+   */
+  acceptExtraStarters: settings
+    .input(z.object({ accept: z.boolean() }))
+    .mutation(async ({ input, ctx }) => {
+      await db.setExtraStartersAccepted(
+        ctx.scope.dataUserId,
+        input.accept ? new Date() : null
+      );
+      return { ok: true };
+    }),
+
+  /**
+   * One height type's makeup answer (0092): a panel or device end, and its
+   * own length. Omitted leaves a field; NULL clears it back to following the
+   * device or panel figure (Q4).
+   */
+  setTypeMakeup: settings
+    .input(
+      z.object({
+        typeKey: typeKeySchema,
+        makeupAt: z.enum(["device", "panel"]).nullable().optional(),
+        makeupInches: makeupInchesSchema.nullable().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { typeKey, ...patch } = input;
+      await db.setHeightTypeMakeup(ctx.scope.dataUserId, typeKey, patch);
+      return { ok: true };
+    }),
 });

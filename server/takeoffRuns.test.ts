@@ -253,7 +253,7 @@ describe.skipIf(!hasDb)("the scale gate", () => {
     });
 
     const [run] = await caller().takeoffRuns.listForSheet({ sheetId });
-    expect(run.quantities!.conduitFeet).toBe(100);
+    expect(run.quantities!.conduitBoughtFeet).toBe(100);
   });
 });
 
@@ -445,8 +445,8 @@ describe.skipIf(!hasDb)("shared runs", () => {
     }
 
     const totals = await caller().takeoffRuns.totals({ bidId });
-    expect(totals.conduitFeet).toBe(100);
-    expect(totals.wireFeet).toBe(900);
+    expect(totals.conduitBoughtFeet).toBe(100);
+    expect(totals.wireBoughtFeet).toBe(900);
   });
 
   it("does not change the conduit total as circuits are added", async () => {
@@ -464,17 +464,17 @@ describe.skipIf(!hasDb)("shared runs", () => {
     });
     const after = await caller().takeoffRuns.totals({ bidId });
 
-    expect(before.conduitFeet).toBe(100);
-    expect(after.conduitFeet).toBe(100);
-    expect(after.wireFeet).toBeGreaterThan(before.wireFeet);
+    expect(before.conduitBoughtFeet).toBe(100);
+    expect(after.conduitBoughtFeet).toBe(100);
+    expect(after.wireBoughtFeet).toBeGreaterThan(before.wireBoughtFeet);
   });
 
   it("gives a cable run no conduit and no separate wire", async () => {
     const { bidId } = await committedRun("cable");
     const totals = await caller().takeoffRuns.totals({ bidId });
-    expect(totals.cableFeet).toBe(100);
-    expect(totals.conduitFeet).toBe(0);
-    expect(totals.wireFeet).toBe(0);
+    expect(totals.cableBoughtFeet).toBe(100);
+    expect(totals.conduitBoughtFeet).toBe(0);
+    expect(totals.wireBoughtFeet).toBe(0);
   });
 
   it("refuses to assign a circuit to a cable run", async () => {
@@ -495,7 +495,7 @@ describe.skipIf(!hasDb)("shared runs", () => {
       name: "Ckt 1",
       conductorCount: 2,
     });
-    expect((await caller().takeoffRuns.totals({ bidId })).wireFeet).toBe(200);
+    expect((await caller().takeoffRuns.totals({ bidId })).wireBoughtFeet).toBe(200);
 
     const [run] = await caller().takeoffRuns.listForSheet({ sheetId });
     await caller().takeoffRuns.updateCircuit({
@@ -503,9 +503,9 @@ describe.skipIf(!hasDb)("shared runs", () => {
       conductorCount: 4,
     });
 
-    expect((await caller().takeoffRuns.totals({ bidId })).wireFeet).toBe(400);
+    expect((await caller().takeoffRuns.totals({ bidId })).wireBoughtFeet).toBe(400);
     // The pipe is unchanged — only the wire moved.
-    expect((await caller().takeoffRuns.totals({ bidId })).conduitFeet).toBe(
+    expect((await caller().takeoffRuns.totals({ bidId })).conduitBoughtFeet).toBe(
       100
     );
   });
@@ -522,14 +522,14 @@ describe.skipIf(!hasDb)("shared runs", () => {
       name: "Ckt 2",
       conductorCount: 3,
     });
-    expect((await caller().takeoffRuns.totals({ bidId })).wireFeet).toBe(600);
+    expect((await caller().takeoffRuns.totals({ bidId })).wireBoughtFeet).toBe(600);
 
     const [run] = await caller().takeoffRuns.listForSheet({ sheetId });
     await caller().takeoffRuns.removeCircuit({ id: run.circuits[0].id });
 
     const after = await caller().takeoffRuns.totals({ bidId });
-    expect(after.wireFeet).toBe(300);
-    expect(after.conduitFeet).toBe(100);
+    expect(after.wireBoughtFeet).toBe(300);
+    expect(after.conduitBoughtFeet).toBe(100);
   });
 
   /*
@@ -562,7 +562,7 @@ describe.skipIf(!hasDb)("shared runs", () => {
     });
 
     const totals = await caller().takeoffRuns.totals({ bidId });
-    expect(totals.conduitFeet).toBe(100);
+    expect(totals.conduitBoughtFeet).toBe(100);
     expect(totals.leftOut.draftCount).toBe(1);
   });
 
@@ -579,12 +579,12 @@ describe.skipIf(!hasDb)("shared runs", () => {
       status: "draft",
     });
     const draft = await caller().takeoffRuns.totals({ bidId });
-    expect(draft.conduitFeet).toBe(100);
+    expect(draft.conduitBoughtFeet).toBe(100);
     expect(draft.leftOut.draftCount).toBe(1);
 
     await caller().takeoffRuns.commit({ id: saved.id });
     const finished = await caller().takeoffRuns.totals({ bidId });
-    expect(finished.conduitFeet).toBe(100);
+    expect(finished.conduitBoughtFeet).toBe(100);
     expect(finished.leftOut.draftCount).toBe(0);
   });
 
@@ -600,7 +600,7 @@ describe.skipIf(!hasDb)("shared runs", () => {
     await caller().takeoffRuns.commit({ id: saved.id });
 
     const totals = await caller().takeoffRuns.totals({ bidId });
-    expect(totals.conduitFeet).toBe(0);
+    expect(totals.conduitBoughtFeet).toBe(0);
     expect(totals.leftOut.noType).toEqual({
       count: 1,
       conduitFeet: 100,
@@ -618,8 +618,8 @@ describe.skipIf(!hasDb)("shared runs", () => {
     await caller().takeoffRuns.setEnds({ id: runId, branchWiring: true });
 
     const totals = await caller().takeoffRuns.totals({ bidId });
-    expect(totals.conduitFeet).toBe(100);
-    expect(totals.wireFeet).toBe(0);
+    expect(totals.conduitBoughtFeet).toBe(100);
+    expect(totals.wireBoughtFeet).toBe(0);
     expect(totals.leftOut.branch.count).toBe(1);
   });
 
@@ -695,11 +695,11 @@ describe.skipIf(!hasDb)("shared runs", () => {
         Array.from(priced.values()).reduce((s, r) => s + pick(r), 0) * 100
       ) / 100;
 
-    expect(totals.conduitFeet).toBe(sum(r => r.conduitFeet));
-    expect(totals.cableFeet).toBe(sum(r => r.cableFeet));
-    expect(totals.wireFeet).toBe(sum(r => r.insulatedFeet + r.groundFeet));
+    expect(totals.conduitBoughtFeet).toBe(sum(r => r.conduitBoughtFeet));
+    expect(totals.cableBoughtFeet).toBe(sum(r => r.cableBoughtFeet));
+    expect(totals.wireBoughtFeet).toBe(sum(r => r.insulatedBoughtFeet + r.groundBoughtFeet));
     // And the sum is not trivially zero: 100 + 50 + 25 ft of pipe.
-    expect(totals.conduitFeet).toBe(175);
+    expect(totals.conduitBoughtFeet).toBe(175);
   });
 });
 
@@ -720,12 +720,12 @@ describe.skipIf(!hasDb)("a suggested home run", () => {
       isSuggestion: true,
     });
 
-    expect((await caller().takeoffRuns.totals({ bidId })).conduitFeet).toBe(0);
+    expect((await caller().takeoffRuns.totals({ bidId })).conduitBoughtFeet).toBe(0);
 
     // Accepting makes it a draft, and a draft is on the bid — so it counts
     // from here, not only once finished (2026-09-27).
     await caller().takeoffRuns.acceptSuggestion({ id: saved.id });
-    expect((await caller().takeoffRuns.totals({ bidId })).conduitFeet).toBe(
+    expect((await caller().takeoffRuns.totals({ bidId })).conduitBoughtFeet).toBe(
       100
     );
   });

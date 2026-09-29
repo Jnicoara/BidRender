@@ -45,6 +45,7 @@ import {
   type PagePoint,
 } from "./takeoffGeometry";
 import { uncountedEnds, type RunVerticals } from "./takeoffHeights";
+import type { RunExtras } from "./runExtras";
 
 /** What kind of raceway a traced run represents. */
 export const RUN_PATH_TYPES = ["conduit", "cable"] as const;
@@ -618,10 +619,48 @@ export type RunQuantities = {
    * line by line rather than showing a single vertical figure.
    */
   verticals: RunVerticals | null;
-  /** Pipe to buy: traced plus vertical. Null for a cable run — not zero. */
-  conduitFeet: number | null;
-  /** Cable to buy: traced plus vertical. Null for a conduit run — not zero. */
-  cableFeet: number | null;
+  /*
+    ── INSTALLED and BOUGHT, and every reader has to pick one ─────────────────
+    Owner, 2026-09-28 (Q5): EXTRA is material only — it is bought and carries
+    no labour — while MAKEUP carries labour at the run's own hours per foot.
+    So a run has two footages per thing it buys:
+
+      installed   flat + vertical (+ makeup, on wire and cable) — labour reads this
+      bought      installed + extra                          — the material reads this
+
+    These replaced `conduitFeet`, `cableFeet`, `groundFeet` and `totalWireFeet`
+    on 2026-09-29, renamed rather than re-meant, so every existing reader
+    stopped compiling and had to say which it meant. The FITTINGS read
+    installed pipe: extra conduit covers route uncertainty and adds no
+    couplings. `flat + vertical + extra + makeup === bought` always.
+  */
+  /** Pipe installed: flat plus vertical. Null for a cable run — not zero. */
+  conduitInstalledFeet: number | null;
+  /** Extra conduit: the FLAT length × the conduit %, never the vertical (§ 7.1). */
+  conduitExtraFeet: number;
+  /** Pipe to buy: installed plus extra. Null for a cable run. */
+  conduitBoughtFeet: number | null;
+  /** Cable installed: flat, vertical and its makeup. Null for a conduit run. */
+  cableInstalledFeet: number | null;
+  /** Cable to buy: installed plus the wire extra. Null for a conduit run. */
+  cableBoughtFeet: number | null;
+  /**
+   * Extra wire — or extra cable on a cable run — at the wire %, over flat AND
+   * vertical (§ 7.1). Material only (Q5).
+   */
+  wireExtraFeet: number;
+  /**
+   * Makeup: the tail at each counted end. Per conductor on a conduit run,
+   * grounds included; once per end in cable feet on a cable run (Q3). Carries
+   * labour (Q5). Never a percentage, never on conduit (§ 2.2).
+   */
+  makeupFeet: number;
+  /**
+   * What was applied, and which of it nobody set — so a screen says "no extra
+   * set" instead of letting a zero pass as an answer. Null when the caller
+   * passed `NO_EXTRAS`.
+   */
+  extras: RunExtras | null;
   /** Wire per circuit, flat and vertical apart. Empty for a cable run. */
   wireByCircuit: CircuitWire[];
   /**
@@ -642,8 +681,12 @@ export type RunQuantities = {
    * computed once, here, and the per-circuit field was renamed so the old
    * summation cannot compile. 0 for a cable run, never null: a conduit run
    * with no grounds really is zero bare copper.
+   *
+   * Installed and bought, like the rest (see above). A SHARE of the wire
+   * figures, not an addition to them.
    */
-  groundFeet: number;
+  groundInstalledFeet: number;
+  groundBoughtFeet: number;
   /**
    * The TRACED share of all this run's wire — shared ground included.
    *
@@ -657,14 +700,25 @@ export type RunQuantities = {
    * what it is made of changes.
    *
    * So the split is computed once, where the shared ground is known, and
-   * `wireFlatFeet + wireVerticalFeet === totalWireFeet` always.
+   * `wireFlatFeet + wireVerticalFeet + makeupFeet === wireInstalledFeet`.
    */
   wireFlatFeet: number;
   /** The VERTICAL share of all this run's wire — shared ground included. */
   wireVerticalFeet: number;
-  /** All conductors, all circuits, verticals included. 0 for a cable run. */
-  totalWireFeet: number;
+  /**
+   * All conductors, all circuits: flat, vertical and makeup. Labour reads
+   * this. 0 for a cable run.
+   */
+  wireInstalledFeet: number;
+  /** Installed plus the wire extra — what gets bought. 0 for a cable run. */
+  wireBoughtFeet: number;
 };
+
+/**
+ * "This caller applies no extra or makeup" — said out loud, like
+ * `NO_VERTICALS`, so a reader can tell a decision from an omission.
+ */
+export const NO_EXTRAS: RunExtras | null = null;
 
 /**
  * The full quantity breakdown for one run.
@@ -708,7 +762,13 @@ export function quantitiesForRun(
   run: TracedRun,
   circuits: RunCircuit[],
   ratio: number | null | undefined,
-  verticals: RunVerticals | null
+  verticals: RunVerticals | null,
+  /**
+   * REQUIRED, for the reason `verticals` is: an optional "none" is a quietly
+   * low number waiting for a caller to forget it. `NO_EXTRAS` where there are
+   * none; `extrasForRun` otherwise.
+   */
+  extras: RunExtras | null
 ): RunQuantities | null {
   const length = runFeet(run, ratio);
   if (length === null) return null;
@@ -716,8 +776,22 @@ export function quantitiesForRun(
   const verticalFeet = verticals?.feet ?? 0;
   const lengthSource = lengthSourceOf(run);
   const drawn = drawnFeet(run, ratio);
+  const conduitPct = extras?.conduitPct ?? 0;
+  const wirePct = extras?.wirePct ?? 0;
+  // Makeup per conductor for the whole run, in feet: both ends' tails.
+  const makeupPerConductor =
+    ((extras?.makeupStartInches ?? 0) + (extras?.makeupEndInches ?? 0)) / 12;
 
   if (run.pathType === "cable") {
+    /*
+      A cable is its own wire: the wire % applies to all of it, drops
+      included, and makeup is ONE tail of cable per counted end — not one per
+      conductor inside the jacket (owner, 2026-09-28, Q3).
+    */
+    const core = length + verticalFeet;
+    const makeupFeet = round2(makeupPerConductor);
+    const extraFeet = round2(core * wirePct);
+    const installed = round2(core + makeupFeet);
     return {
       pathType: "cable",
       runFeet: length,
@@ -725,16 +799,24 @@ export function quantitiesForRun(
       drawnFeet: drawn,
       verticalFeet,
       verticals,
-      conduitFeet: null,
-      cableFeet: round2(length + verticalFeet),
+      conduitInstalledFeet: null,
+      conduitExtraFeet: 0,
+      conduitBoughtFeet: null,
+      cableInstalledFeet: installed,
+      cableBoughtFeet: round2(installed + extraFeet),
+      wireExtraFeet: extraFeet,
+      makeupFeet,
+      extras,
       wireByCircuit: [],
-      // A cable's ground is inside the jacket and already paid for by
-      // `cableFeet`. Counting one here would buy it twice.
+      // A cable's ground is inside the jacket and already paid for by the
+      // cable footage. Counting one here would buy it twice.
       grounds: { sharedCount: 0, separateCount: 0, totalCount: 0 },
-      groundFeet: 0,
+      groundInstalledFeet: 0,
+      groundBoughtFeet: 0,
       wireFlatFeet: 0,
       wireVerticalFeet: 0,
-      totalWireFeet: 0,
+      wireInstalledFeet: 0,
+      wireBoughtFeet: 0,
     };
   }
 
@@ -756,17 +838,44 @@ export function quantitiesForRun(
     their own contribute. Every caller reads this rather than re-deriving it —
     see the field's comment for what happened to the three that used to.
   */
-  const groundFeet = round2(
+  const groundCore =
     (flatWire?.sharedGroundFeet ?? 0) +
-      verticalWire.sharedGroundFeet +
-      wireByCircuit.reduce((sum, c) => sum + c.ownGroundFeet, 0) +
-      // An own ground's share of that circuit's vertical: its drops, once per
-      // ground, which is exactly what `ownWiresOf` already counted for it.
-      circuits.reduce(
-        (sum, circuit) => sum + verticalFeet * ownGroundsOf(circuit),
-        0
-      )
+    verticalWire.sharedGroundFeet +
+    wireByCircuit.reduce((sum, c) => sum + c.ownGroundFeet, 0) +
+    // An own ground's share of that circuit's vertical: its drops, once per
+    // ground, which is exactly what `ownWiresOf` already counted for it.
+    circuits.reduce(
+      (sum, circuit) => sum + verticalFeet * ownGroundsOf(circuit),
+      0
+    );
+
+  /*
+    Extra and makeup, applied ONCE here, to the same conductors the wire
+    figures count.
+
+    Makeup is per CONDUCTOR per end, grounds included — every wire gets its own
+    tail (§ 2.2). It does not scale with length, so it is added, never
+    multiplied by the wire %. An empty pipe has no conductors and so no makeup.
+  */
+  const grounds = runGrounds(circuits);
+  const groundConductors =
+    grounds.sharedCount +
+    circuits.reduce((sum, circuit) => sum + ownGroundsOf(circuit), 0);
+  const conductors =
+    circuits.reduce((sum, circuit) => sum + insulatedOf(circuit), 0) +
+    groundConductors;
+
+  const wireCore = (flatWire?.totalFeet ?? 0) + verticalWire.totalFeet;
+  const makeupFeet = round2(conductors * makeupPerConductor);
+  const wireExtraFeet = round2(wireCore * wirePct);
+  const wireInstalledFeet = round2(wireCore + makeupFeet);
+  const groundInstalledFeet = round2(
+    groundCore + groundConductors * makeupPerConductor
   );
+  // Conduit extra covers route uncertainty in the FLAT length only; a drop is
+  // arithmetic between two known heights and gets none (§ 7.1).
+  const conduitExtraFeet = round2(length * conduitPct);
+  const conduitInstalledFeet = round2(length + verticalFeet);
 
   return {
     pathType: "conduit",
@@ -775,14 +884,22 @@ export function quantitiesForRun(
     drawnFeet: drawn,
     verticalFeet,
     verticals,
-    conduitFeet: round2(length + verticalFeet),
-    cableFeet: null,
+    conduitInstalledFeet,
+    conduitExtraFeet,
+    conduitBoughtFeet: round2(conduitInstalledFeet + conduitExtraFeet),
+    cableInstalledFeet: null,
+    cableBoughtFeet: null,
+    wireExtraFeet,
+    makeupFeet,
+    extras,
     wireByCircuit,
-    grounds: runGrounds(circuits),
-    groundFeet,
+    grounds,
+    groundInstalledFeet,
+    groundBoughtFeet: round2(groundInstalledFeet + groundCore * wirePct),
     wireFlatFeet: round2(flatWire?.totalFeet ?? 0),
     wireVerticalFeet: round2(verticalWire.totalFeet),
-    totalWireFeet: round2((flatWire?.totalFeet ?? 0) + verticalWire.totalFeet),
+    wireInstalledFeet,
+    wireBoughtFeet: round2(wireInstalledFeet + wireExtraFeet),
   };
 }
 
@@ -811,21 +928,30 @@ export function totalQuantities(
      * Required, so a caller has to say which run a row is part of.
      */
     runKey: number;
+    /**
+     * Required, like `verticals` — `NO_EXTRAS` where there are none, and
+     * `extrasForRun` for a real run. See `quantitiesForRun`.
+     */
+    extras: RunExtras | null;
   }[]
 ): {
-  /** Traced plus vertical. What gets bought. */
-  conduitFeet: number;
-  cableFeet: number;
-  wireFeet: number;
   /**
-   * The bare-ground share of `wireFeet`, NOT a fourth quantity beside it.
+   * What gets BOUGHT: flat, vertical, extra and (on wire and cable) makeup.
+   * Renamed from `conduitFeet` / `cableFeet` / `wireFeet` on 2026-09-29 when
+   * extra and makeup arrived, so no reader kept the old meaning by accident.
+   */
+  conduitBoughtFeet: number;
+  cableBoughtFeet: number;
+  wireBoughtFeet: number;
+  /**
+   * The bare-ground share of `wireBoughtFeet`, NOT a fourth quantity beside it.
    *
    * Bare copper and insulated conductor are separate purchases — one cannot be
    * ordered as the other — but they are both wire, so this is a share rather
-   * than an addition. A reader who adds it to `wireFeet` has double-counted,
+   * than an addition. A reader who adds it to the wire has double-counted,
    * which is why it is named for what it is a part OF.
    */
-  wireGroundFeet: number;
+  wireGroundBoughtFeet: number;
   /**
    * The vertical share of each of the three above, so the totals panel can
    * print `1,240 flat + 255 vertical` rather than one figure to be trusted.
@@ -833,6 +959,22 @@ export function totalQuantities(
   conduitVerticalFeet: number;
   cableVerticalFeet: number;
   wireVerticalFeet: number;
+  /**
+   * The EXTRA share of each — material only (Q5). Conduit's is on the flat
+   * length alone; wire's and cable's are on flat and vertical (§ 7.1).
+   */
+  conduitExtraFeet: number;
+  cableExtraFeet: number;
+  wireExtraFeet: number;
+  /** The MAKEUP share of wire and cable. Conduit has none (§ 2.2). */
+  cableMakeupFeet: number;
+  wireMakeupFeet: number;
+  /**
+   * Measured runs with an extra or a makeup figure NOBODY SET — § 5j: "23
+   * runs carry no extra". A zero because the company has not accepted or set
+   * anything whispers; this count is what makes it shout.
+   */
+  noExtraCount: number;
   /** How many runs could not be measured, and so are NOT in the totals above. */
   unmeasurableCount: number;
   /**
@@ -886,6 +1028,11 @@ export function totalQuantities(
   let conduitVertical = 0;
   let cableVertical = 0;
   let wireVertical = 0;
+  let conduitExtra = 0;
+  let cableExtra = 0;
+  let wireExtra = 0;
+  let cableMakeup = 0;
+  let wireMakeup = 0;
   // Per RUN, then counted: a run is unmeasurable, flat-only or partial as a
   // whole, whichever of its legs made it so.
   const byRun = new Map<
@@ -895,6 +1042,7 @@ export function totalQuantities(
       unanswered: boolean;
       verticalFeet: number;
       typed: boolean;
+      noExtra: boolean;
     }
   >();
   const runState = (key: number) => {
@@ -905,6 +1053,7 @@ export function totalQuantities(
         unanswered: false,
         verticalFeet: 0,
         typed: false,
+        noExtra: false,
       };
       byRun.set(key, state);
     }
@@ -916,7 +1065,8 @@ export function totalQuantities(
       entry.run,
       entry.circuits,
       entry.ratio,
-      entry.verticals
+      entry.verticals,
+      entry.extras
     );
     const state = runState(entry.runKey);
     if (!quantities) {
@@ -924,15 +1074,26 @@ export function totalQuantities(
       continue;
     }
     if (quantities.lengthSource === "typed") state.typed = true;
-    conduit += quantities.conduitFeet ?? 0;
-    cable += quantities.cableFeet ?? 0;
-    wire += quantities.totalWireFeet;
+    conduit += quantities.conduitBoughtFeet ?? 0;
+    cable += quantities.cableBoughtFeet ?? 0;
+    wire += quantities.wireBoughtFeet;
     /*
       The run's own figure, not a sum over its circuits. The shared ground does
       not belong to any circuit, so summing them would report zero bare copper
       on an ordinary run — which is every run, by default.
     */
-    wireGround += quantities.groundFeet;
+    wireGround += quantities.groundBoughtFeet;
+
+    // Extra and makeup, as their own shares — the totals print every term.
+    if (quantities.pathType === "conduit") {
+      conduitExtra += quantities.conduitExtraFeet;
+      wireExtra += quantities.wireExtraFeet;
+      wireMakeup += quantities.makeupFeet;
+    } else {
+      cableExtra += quantities.wireExtraFeet;
+      cableMakeup += quantities.makeupFeet;
+    }
+    if (carriesNoExtra(quantities)) state.noExtra = true;
 
     /*
       ASK THE ENDS, NEVER THE FOOTAGE — and ask through the same function the
@@ -968,8 +1129,10 @@ export function totalQuantities(
   let flatOnly = 0;
   let partialVertical = 0;
   let typed = 0;
+  let noExtra = 0;
   byRun.forEach(state => {
     if (state.typed && !state.unmeasurable) typed++;
+    if (state.noExtra && !state.unmeasurable) noExtra++;
     if (state.unmeasurable) {
       unmeasurable++;
       return;
@@ -980,16 +1143,37 @@ export function totalQuantities(
   });
 
   return {
-    conduitFeet: round2(conduit),
-    cableFeet: round2(cable),
-    wireFeet: round2(wire),
-    wireGroundFeet: round2(wireGround),
+    conduitBoughtFeet: round2(conduit),
+    cableBoughtFeet: round2(cable),
+    wireBoughtFeet: round2(wire),
+    wireGroundBoughtFeet: round2(wireGround),
     conduitVerticalFeet: round2(conduitVertical),
     cableVerticalFeet: round2(cableVertical),
     wireVerticalFeet: round2(wireVertical),
+    conduitExtraFeet: round2(conduitExtra),
+    cableExtraFeet: round2(cableExtra),
+    wireExtraFeet: round2(wireExtra),
+    cableMakeupFeet: round2(cableMakeup),
+    wireMakeupFeet: round2(wireMakeup),
+    noExtraCount: noExtra,
     unmeasurableCount: unmeasurable,
     flatOnlyCount: flatOnly,
     partialVerticalCount: partialVertical,
     typedCount: typed,
   };
+}
+
+/**
+ * Does this run carry an extra or makeup figure NOBODY SET?
+ *
+ * Asked of what applies to THIS run: a conduit run with no wire in it has no
+ * wire extra or makeup to be missing, so only its conduit figure is asked
+ * about. A caller that passed `NO_EXTRAS` applied nothing, which counts.
+ */
+export function carriesNoExtra(q: RunQuantities): boolean {
+  if (q.extras === null) return true;
+  const { unset } = q.extras;
+  if (q.pathType === "cable") return unset.wire || unset.makeup;
+  const hasWire = q.wireFlatFeet + q.wireVerticalFeet > 0;
+  return unset.conduit || (hasWire && (unset.wire || unset.makeup));
 }

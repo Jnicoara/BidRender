@@ -52,7 +52,7 @@ import {
   totalQuantities,
   tracedRunOf,
 } from "../../shared/takeoffQuantities";
-import { verticalsForRunRow } from "../runVerticals";
+import { extrasForRunRow, verticalsForRunRow } from "../runVerticals";
 import {
   aggregateMaterials,
   measuredEntries,
@@ -384,6 +384,7 @@ export const materialsListRouter = router({
               : [],
             ratio: usable,
             verticals: verticalsForRunRow(run, heights),
+            extras: extrasForRunRow(run, heights),
             // A branched run is several rows and ONE run in the notes (D20).
             runKey: rootOf(run),
           };
@@ -501,9 +502,47 @@ export const materialsListRouter = router({
             "ends before ordering."
         );
       }
+      /*
+        EXTRA AND MAKEUP, said in words (held-migrations plan § 1). This note
+        read "carry no allowance for waste" until 2026-09-29, which stopped
+        being true the day extras arrived. A list with extras in it says so and
+        how much; a list whose runs carry none says THAT, because an unset
+        extra is the whisper § 2.3 warns about and this page leaves the app.
+      */
+      const extraFeet =
+        Math.round(
+          (totals.conduitExtraFeet +
+            totals.cableExtraFeet +
+            totals.wireExtraFeet) *
+            100
+        ) / 100;
+      const makeupFeet =
+        Math.round((totals.cableMakeupFeet + totals.wireMakeupFeet) * 100) /
+        100;
+      const feetText = (n: number) =>
+        n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+      if (extraFeet > 0 || makeupFeet > 0) {
+        notes.push(
+          "Includes " +
+            feetText(extraFeet) +
+            " ft of extra (conduit on the run length; wire and cable on " +
+            "the run length and drops) and " +
+            feetText(makeupFeet) +
+            " ft of makeup — the tail left at each box and panel."
+        );
+      }
+      if (totals.noExtraCount > 0) {
+        notes.push(
+          "No extra is set for " +
+            totals.noExtraCount +
+            (totals.noExtraCount === 1 ? " traced run" : " traced runs") +
+            ", so those quantities carry none. Set the extra and makeup in " +
+            "Settings before ordering."
+        );
+      }
       notes.push(
-        "Quantities are taken off the drawings and carry no allowance for waste, " +
-          "spoilage or cut lengths unless the assemblies already include it."
+        "Quantities are taken off the drawings. Assemblies carry only what " +
+          "their own recipes include."
       );
 
       return {

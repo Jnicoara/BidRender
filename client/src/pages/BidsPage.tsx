@@ -1106,8 +1106,28 @@ export default function BidsPage({
                                   Not priced
                                 </span>
                               ) : (
-                                <span className="font-mono text-xs w-24 text-right shrink-0 text-muted-foreground">
+                                <span
+                                  className="font-mono text-xs w-24 text-right shrink-0 text-muted-foreground"
+                                  title={
+                                    /* Traced footage bought with extra: the
+                                       hours are on what is INSTALLED, and the
+                                       extra is material only (Q5). Said here,
+                                       where a reader would notice the hours
+                                       not following the quantity. */
+                                    line.laborQty !== null &&
+                                    Number(line.laborQty) !== Number(line.qty)
+                                      ? `Labor on ${round(Number(line.laborQty), 2)} ft installed. The other ${round(Number(line.qty) - Number(line.laborQty), 2)} ft is extra — material only, no install hours.`
+                                      : undefined
+                                  }
+                                >
                                   {round(line.breakdown.totalLaborHours, 2)} h
+                                  {line.laborQty !== null &&
+                                    Number(line.laborQty) !==
+                                      Number(line.qty) && (
+                                      <span className="block font-sans text-[0.65rem]">
+                                        on {round(Number(line.laborQty), 2)} ft
+                                      </span>
+                                    )}
                                 </span>
                               )}
                               {/*

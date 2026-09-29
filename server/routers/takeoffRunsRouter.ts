@@ -61,7 +61,19 @@ import {
   runNameParts,
 } from "../../shared/takeoffCounts";
 import * as db from "../db";
-import { EMPTY_HEIGHT_CONTEXT, verticalsForRunRow } from "../runVerticals";
+import {
+  EMPTY_HEIGHT_CONTEXT,
+  extrasForRunRow,
+  extrasViewForRunRow,
+  verticalsForRunRow,
+} from "../runVerticals";
+import {
+  extraPctSchema,
+  makeupByKindSchema,
+  makeupInchesSchema,
+  pctText,
+  refuseUnknownKinds,
+} from "../extrasInput";
 import { resolveRunType } from "../../shared/runTypeLookup";
 import { resolveMaterial } from "../../shared/materialLookup";
 import { rootOf } from "../../shared/runNetwork";
@@ -347,12 +359,19 @@ export const takeoffRunsRouter = router({
            * arithmetic reads it through `quantities`.
            */
           typedLengthInches: traced.typedLengthInches,
+          /**
+           * This run's own extra and makeup, and what it inherits without
+           * them — for the panel's fields and their placeholders. The
+           * arithmetic reads them through `quantities`.
+           */
+          extras: extrasViewForRunRow(run, heights),
           /** Null whenever the sheet cannot be measured — never a fallback 0. */
           quantities: quantitiesForRun(
             traced,
             forMaths,
             ratio,
-            verticalsForRunRow(run, heights)
+            verticalsForRunRow(run, heights),
+            extrasForRunRow(run, heights)
           ),
           /** What is at each end, so the panel can show it and change it. */
           ends: {
@@ -1309,6 +1328,7 @@ export const takeoffRunsRouter = router({
               : [],
             ratio: ratioBySheet.get(run.sheetId) ?? null,
             verticals: verticalsForRunRow(run, heights),
+            extras: extrasForRunRow(run, heights),
             // A branched run is several rows and ONE run in the counts (D20).
             runKey: rootOf(run),
           }))
@@ -1320,8 +1340,9 @@ export const takeoffRunsRouter = router({
       const leftOut: RunTotalsLeftOut = {
         noType: {
           count: roots(noType),
-          conduitFeet: untyped.conduitFeet,
-          cableFeet: untyped.cableFeet,
+          // What these runs would buy, had they a type to price them under.
+          conduitFeet: untyped.conduitBoughtFeet,
+          cableFeet: untyped.cableBoughtFeet,
         },
         branch: {
           count: roots(
@@ -1500,6 +1521,44 @@ export const takeoffRunsRouter = router({
    * Refused on a quantity-locked bid, like retyping a run: it changes what
    * the run's wire is made of, which is what the lock holds still.
    */
+  /**
+   * A run's own extra and makeup — the nearest level of the chain (held-
+   * migrations plan § 1, owner 2026-09-28: every value at every level).
+   *
+   * Written to EVERY row of the run so a leg reads the run's figure from its
+   * own row (the `traceMode` rule). Omitted leaves a value; NULL goes back to
+   * the run type's. Refused on a locked bid: it moves quantities.
+   */
+  setExtras: procedure
+    .input(
+      z.object({
+        /** Any row of the run: the root or one of its legs. */
+        runId: z.number().int().positive(),
+        conduitExtraPct: extraPctSchema.nullable().optional(),
+        wireExtraPct: extraPctSchema.nullable().optional(),
+        makeupDeviceInches: makeupInchesSchema.nullable().optional(),
+        makeupPanelInches: makeupInchesSchema.nullable().optional(),
+        makeupByKindInches: makeupByKindSchema.nullable().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const run = await requireRun(input.runId, userId);
+      await refuseIfLocked(run.bidId, userId);
+      if (input.makeupByKindInches)
+        await refuseUnknownKinds(Object.keys(input.makeupByKindInches), userId);
+      const { runId: _run, conduitExtraPct, wireExtraPct, ...rest } = input;
+      return db.setRunExtras(rootOf(run), userId, {
+        ...rest,
+        ...(conduitExtraPct !== undefined
+          ? { conduitExtraPct: pctText(conduitExtraPct) }
+          : {}),
+        ...(wireExtraPct !== undefined
+          ? { wireExtraPct: pctText(wireExtraPct) }
+          : {}),
+      });
+    }),
+
   setTraceMode: procedure
     .input(
       z.object({

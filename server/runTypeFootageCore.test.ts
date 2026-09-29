@@ -44,6 +44,11 @@ function run(over: Partial<GroupableRun> & { id: number }): GroupableRun {
     startTeeId: null,
     endTeeId: null,
     traceMode: null,
+    conduitExtraPct: null,
+    wireExtraPct: null,
+    makeupDeviceInches: null,
+    makeupPanelInches: null,
+    makeupByKindInches: null,
     ...over,
   };
 }
@@ -125,7 +130,7 @@ describe("a branched run as legs", () => {
       []
     ).get(7)!;
     // 400 points at ratio 48 is 22.22 ft, twice.
-    expect(apart.conduitFeet).toBeCloseTo(44.44, 2);
+    expect(apart.conduitBoughtFeet).toBeCloseTo(44.44, 2);
   });
 
   it("lists the tee in BOTH groups when the branch is another type (route only)", () => {
@@ -155,9 +160,9 @@ describe("a quantity trace lands in the same bucket (D21)", () => {
   it("pulls its type's wire with no circuit rows behind it", () => {
     const row = group(quantity, []).get(7)!;
     // 22.22 ft a leg. Three #12 each, one shared ground.
-    expect(row.conduitFeet).toBeCloseTo(44.44, 2);
-    expect(row.insulatedFeet).toBeCloseTo(133.32, 2);
-    expect(row.groundFeet).toBeCloseTo(44.44, 2);
+    expect(row.conduitBoughtFeet).toBeCloseTo(44.44, 2);
+    expect(row.insulatedBoughtFeet).toBeCloseTo(133.32, 2);
+    expect(row.groundBoughtFeet).toBeCloseTo(44.44, 2);
   });
 
   it("ignores circuit rows stored before it became a quantity trace", () => {
@@ -172,12 +177,12 @@ describe("a quantity trace lands in the same bucket (D21)", () => {
       },
     ];
     const row = group(quantity, [], stored).get(7)!;
-    expect(row.insulatedFeet).toBeCloseTo(133.32, 2);
+    expect(row.insulatedBoughtFeet).toBeCloseTo(133.32, 2);
   });
 
   it("shares one line with a route run of the type, and says how much is quantity", () => {
     const row = group([...quantity, route], []).get(7)!;
-    expect(row.conduitFeet).toBeCloseTo(66.66, 2);
+    expect(row.conduitBoughtFeet).toBeCloseTo(66.66, 2);
     expect(row.quantityFeet).toBeCloseTo(44.44, 2);
   });
 
@@ -186,7 +191,7 @@ describe("a quantity trace lands in the same bucket (D21)", () => {
     const row = group(answered, []).get(7)!;
     expect(row.branchCount).toBe(0);
     expect(row.unansweredCount).toBe(0);
-    expect(row.conduitFeet).toBeCloseTo(44.44, 2);
+    expect(row.conduitBoughtFeet).toBeCloseTo(44.44, 2);
   });
 
   it("takes a connector only at an approved drop — none on bare legs", () => {
@@ -231,15 +236,15 @@ describe("a run answered branch wiring (D18)", () => {
       stored
     ).get(7)!;
 
-    expect(homerun.conduitFeet).toBeCloseTo(22.22, 2);
-    expect(homerun.insulatedFeet).toBeGreaterThan(0);
+    expect(homerun.conduitBoughtFeet).toBeCloseTo(22.22, 2);
+    expect(homerun.insulatedBoughtFeet).toBeGreaterThan(0);
 
     expect(branch.branchCount).toBe(1);
-    expect(branch.conduitFeet).toBe(homerun.conduitFeet);
+    expect(branch.conduitBoughtFeet).toBe(homerun.conduitBoughtFeet);
     expect(branch.verticalFeet).toBe(homerun.verticalFeet);
     expect(branch.legs).toEqual(homerun.legs);
-    expect(branch.insulatedFeet).toBe(0);
-    expect(branch.groundFeet).toBe(0);
+    expect(branch.insulatedBoughtFeet).toBe(0);
+    expect(branch.groundBoughtFeet).toBe(0);
   });
 
   it("still leaves a cable run out entirely — the cable IS the whip", () => {
@@ -249,8 +254,8 @@ describe("a run answered branch wiring (D18)", () => {
       stored
     ).get(7)!;
     expect(cable.branchCount).toBe(1);
-    expect(cable.cableFeet).toBe(0);
-    expect(cable.conduitFeet).toBe(0);
+    expect(cable.cableBoughtFeet).toBe(0);
+    expect(cable.conduitBoughtFeet).toBe(0);
   });
 
   it("still says why when the pipe of a branch run cannot be measured", () => {

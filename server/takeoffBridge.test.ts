@@ -370,10 +370,14 @@ describe("a run type becomes one line per material", () => {
     const rows = runTypeRows({
       ...conduit,
       footage: {
-        conduitFeet: 125,
-        cableFeet: 0,
-        insulatedFeet: 250,
-        groundFeet: 125,
+        conduitBoughtFeet: 125,
+        conduitInstalledFeet: 125,
+        cableBoughtFeet: 0,
+        cableInstalledFeet: 0,
+        insulatedBoughtFeet: 250,
+        insulatedInstalledFeet: 250,
+        groundBoughtFeet: 125,
+        groundInstalledFeet: 125,
       },
     });
     expect(rows.map(r => [r.role, r.feet])).toEqual([
@@ -396,10 +400,14 @@ describe("a run type becomes one line per material", () => {
       groundMaterialId: null,
       groundMaterialName: null,
       footage: {
-        conduitFeet: 80,
-        cableFeet: 0,
-        insulatedFeet: 0,
-        groundFeet: 0,
+        conduitBoughtFeet: 80,
+        conduitInstalledFeet: 80,
+        cableBoughtFeet: 0,
+        cableInstalledFeet: 0,
+        insulatedBoughtFeet: 0,
+        insulatedInstalledFeet: 0,
+        groundBoughtFeet: 0,
+        groundInstalledFeet: 0,
       },
     });
     expect(rows).toHaveLength(1);
@@ -423,10 +431,14 @@ describe("a run type becomes one line per material", () => {
       groundMaterialId: 68,
       groundMaterialName: "#12 bare CU, solid",
       footage: {
-        conduitFeet: 0,
-        cableFeet: 210,
-        insulatedFeet: 0,
-        groundFeet: 0,
+        conduitBoughtFeet: 0,
+        conduitInstalledFeet: 0,
+        cableBoughtFeet: 210,
+        cableInstalledFeet: 210,
+        insulatedBoughtFeet: 0,
+        insulatedInstalledFeet: 0,
+        groundBoughtFeet: 0,
+        groundInstalledFeet: 0,
       },
     });
     expect(rows).toHaveLength(1);
@@ -439,10 +451,14 @@ describe("a run type becomes one line per material", () => {
     const rows = runTypeRows({
       ...conduit,
       footage: {
-        conduitFeet: 0,
-        cableFeet: 0,
-        insulatedFeet: 0,
-        groundFeet: 0,
+        conduitBoughtFeet: 0,
+        conduitInstalledFeet: 0,
+        cableBoughtFeet: 0,
+        cableInstalledFeet: 0,
+        insulatedBoughtFeet: 0,
+        insulatedInstalledFeet: 0,
+        groundBoughtFeet: 0,
+        groundInstalledFeet: 0,
       },
     });
     expect(rows).toHaveLength(3);
@@ -467,10 +483,14 @@ describe("a run type becomes one line per material", () => {
       groundMaterialId: null,
       groundMaterialName: null,
       footage: {
-        conduitFeet: 125,
-        cableFeet: 0,
-        insulatedFeet: 250,
-        groundFeet: 0,
+        conduitBoughtFeet: 125,
+        conduitInstalledFeet: 125,
+        cableBoughtFeet: 0,
+        cableInstalledFeet: 0,
+        insulatedBoughtFeet: 250,
+        insulatedInstalledFeet: 250,
+        groundBoughtFeet: 0,
+        groundInstalledFeet: 0,
       },
     });
     expect(rows.map(r => r.feet)).toEqual([125, 250]);

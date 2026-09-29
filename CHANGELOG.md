@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Traced runs can now carry extra and makeup, and the bid keeps install
+  hours honest.** Extra wire and conduit (a percentage) and makeup (the tail
+  left at each box and panel) can be set for the company, per run type and
+  per run. The shipped starting values — 5% conduit, 10% wire, 18 in at a
+  box, 5 ft at a panel — do nothing until you press Accept in Settings ›
+  Heights & extra, and the screen says how many bids that will change first.
+  Extra is bought but carries no install hours; makeup carries hours. Every
+  run and total shows each part — measured, drops, extra, makeup — and locked
+  bids freeze both the material and the labor figure.
+
 - **Conduit on a sheet with no scale can now be counted: draw the path, type
   the length.** Riser diagrams, one-lines and details drawn at another scale
   used to refuse tracing outright, so their conduit could not be counted at

@@ -163,6 +163,8 @@ import {
   aiUsageDaily,
   pricingProblemReports,
   takeoffHeightDefaults,
+  takeoffExtraDefaults,
+  type TakeoffExtraDefaults,
   takeoffBendDefaults,
   takeoffPullPoints,
   takeoffRunTees,
@@ -5252,31 +5254,55 @@ async function withTracedFootage(
       the drawing no longer shows — the failure the derived count exists to
       prevent, arriving through the door nobody was watching.
     */
-    const feet = f ? feetForRole(f, role) : 0;
-    return { ...row, qty: feet.toFixed(4) };
+    const feet = f ? feetForRole(f, role) : { bought: 0, installed: 0 };
+    /*
+      TWO quantities on a footage line (owner, 2026-09-28, Q5): the material
+      is BOUGHT footage, extra included; the labour is INSTALLED footage,
+      because extra is material only and makeup is real work. `laborQty` is
+      what `laborQtyOf` reads; a fitting line leaves it null, which reads as
+      its `qty`.
+    */
+    return {
+      ...row,
+      qty: feet.bought.toFixed(4),
+      laborQty: feet.installed.toFixed(4),
+    };
   });
 }
 
-/** Which of a type's three footages this line's role is paid in. */
+/**
+ * Which of a type's footages this line's role is paid in — BOUGHT for the
+ * material, INSTALLED for the labour. Takes the whole footage row, so a new
+ * figure on it cannot be left behind here.
+ */
 function feetForRole(
-  footage: {
-    conduitFeet: number;
-    cableFeet: number;
-    insulatedFeet: number;
-    groundFeet: number;
-  },
+  footage: RunTypeFootageRow,
   role: Exclude<RunMaterialRole, FittingKind>
-): number {
+): { bought: number; installed: number } {
   switch (role) {
     case "raceway":
-      return footage.conduitFeet;
+      return {
+        bought: footage.conduitBoughtFeet,
+        installed: footage.conduitInstalledFeet,
+      };
     case "conductor":
       // A cable type carries its cable on the conductor link, so whichever of
       // the two is non-zero is this row's footage. They are never both set:
       // quantitiesForRun returns null for the one that does not apply.
-      return footage.cableFeet > 0 ? footage.cableFeet : footage.insulatedFeet;
+      return footage.cableBoughtFeet > 0
+        ? {
+            bought: footage.cableBoughtFeet,
+            installed: footage.cableInstalledFeet,
+          }
+        : {
+            bought: footage.insulatedBoughtFeet,
+            installed: footage.insulatedInstalledFeet,
+          };
     case "ground":
-      return footage.groundFeet;
+      return {
+        bought: footage.groundBoughtFeet,
+        installed: footage.groundInstalledFeet,
+      };
   }
 }
 
@@ -5531,11 +5557,19 @@ export async function lockBidQuantities(
     if (!followsDrawing(line)) continue;
     frozen += 1;
     const before = storedById.get(line.id);
-    if (before && before.qty === line.qty) continue;
+    /*
+      BOTH quantities freeze. A traced-footage line carries its material on
+      `qty` (bought, extra included) and its labour on `laborQty` (installed,
+      no extra) — freezing only `qty` would leave the labour on a locked bid
+      following the drawing, or read off the bought figure (Q5, 0093). Every
+      other line has `laborQty` NULL, which reads as its `qty`.
+    */
+    if (before && before.qty === line.qty && before.laborQty === line.laborQty)
+      continue;
     moved += 1;
     await db
       .update(bidLineItems)
-      .set({ qty: line.qty, updatedAt: at })
+      .set({ qty: line.qty, laborQty: line.laborQty, updatedAt: at })
       .where(and(eq(bidLineItems.id, line.id), eq(bidLineItems.bidId, bidId)));
   }
 
@@ -7636,11 +7670,24 @@ export async function addBranchLeg(
         points[0] = { ...cut.point };
         // The piece after the tee takes the host's old end with it.
         const { id: _id, createdAt: _c, updatedAt: _u, ...hostColumns } = host;
+        /*
+          A TYPED LENGTH DOES NOT SURVIVE A CUT, on either half (§ 4c).
+
+          The spread below copies every column, so it used to copy the typed
+          length too — a 60 ft typed leg cut by a branch became two 60 ft
+          halves, 120 ft on the bid with nothing on screen to say why. Splitting
+          it by the drawn proportion would be a guess about where along a
+          schematic the tee really sits, which is exactly what typing replaced.
+          So both halves go back to the drawing: measured where there is a
+          scale, and asking for a length where there is not. Visible either
+          way, and never counted twice. server/typedLengthRuns.test.ts.
+        */
         const [after] = await tx.insert(takeoffRuns).values({
           ...hostColumns,
           parentRunId: root.id,
           points: cut.after,
           ...lengthFields(cut.after, ratio),
+          typedLengthInches: null,
           startKind: null,
           startHeightInches: null,
           startStampId: null,
@@ -7652,6 +7699,7 @@ export async function addBranchLeg(
           .set({
             points: cut.before,
             ...lengthFields(cut.before, ratio),
+            typedLengthInches: null,
             endKind: null,
             endHeightInches: null,
             endStampId: null,
@@ -7746,6 +7794,9 @@ export async function addBranchLeg(
       endKind: input.endKind,
       // Every row of a run carries its mode (D21, 0086).
       traceMode: root.traceMode,
+      // ...and its own extra and makeup (0091), kept equal across the run's
+      // rows like the mode, so a leg reads the run's figure from its own row.
+      ...runExtraColumns(root),
     });
     const id = created.insertId;
 
@@ -7762,6 +7813,61 @@ export async function addBranchLeg(
 
     return { id, teeId, cutRunId };
   });
+}
+
+// ── A run's own extra and makeup (0091, held-migrations plan § 1) ───────────
+
+/**
+ * The five per-run extra columns, taken off a row. ONE list, used both to
+ * copy a root's figures onto a new leg and to write a run's figures to all
+ * its rows — so the two cannot come to disagree about what "the run's
+ * extras" are.
+ */
+export function runExtraColumns(row: {
+  conduitExtraPct: string | null;
+  wireExtraPct: string | null;
+  makeupDeviceInches: number | null;
+  makeupPanelInches: number | null;
+  makeupByKindInches: Record<string, number> | null;
+}) {
+  return {
+    conduitExtraPct: row.conduitExtraPct,
+    wireExtraPct: row.wireExtraPct,
+    makeupDeviceInches: row.makeupDeviceInches,
+    makeupPanelInches: row.makeupPanelInches,
+    makeupByKindInches: row.makeupByKindInches,
+  };
+}
+
+/**
+ * Change a run's own extra and makeup, on EVERY row — root and legs — in one
+ * statement, so no leg is left reading a different figure (the `traceMode`
+ * rule, D21 trap 2). Omitted leaves a value; NULL clears it back to the type.
+ */
+export async function setRunExtras(
+  rootRunId: number,
+  userId: number,
+  patch: Partial<ReturnType<typeof runExtraColumns>>
+): Promise<{ rows: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const values = Object.fromEntries(
+    Object.entries(patch).filter(([, v]) => v !== undefined)
+  ) as Partial<ReturnType<typeof runExtraColumns>>;
+  if (Object.keys(values).length === 0) return { rows: 0 };
+  const [result] = await db
+    .update(takeoffRuns)
+    .set({ ...values, updatedAt: new Date() })
+    .where(
+      and(
+        or(
+          eq(takeoffRuns.id, rootRunId),
+          eq(takeoffRuns.parentRunId, rootRunId)
+        ),
+        eq(takeoffRuns.userId, userId)
+      )
+    );
+  return { rows: result.affectedRows };
 }
 
 // ── Quantity mode (D21) ──────────────────────────────────────────────────────
@@ -10442,6 +10548,14 @@ const lineIsPriceable = sql`(${bidLineItems.qty} >= 0 AND ${bidLineItems.snapsho
  * the engine's per-line arithmetic. `costSums` gates them; the not-priced
  * rule below needs them bare, because it asks about a priceable line's cost.
  */
+/**
+ * HOW MANY a line's labour is on, as SQL — `laborQtyOf` in
+ * shared/lineLaborQty.ts, the one other place this is written. Traced footage
+ * stores its INSTALLED feet in `laborQty` (0093) because its extra is
+ * material only (Q5); every other line leaves it NULL and reads its `qty`.
+ */
+const lineLaborQtySql = sql`COALESCE(${bidLineItems.laborQty}, ${bidLineItems.qty})`;
+
 function lineCentsSql(productivityPct: number) {
   const hours = lineHoursSql(productivityPct);
   // COALESCE for the reason lineHoursSql gives: an untyped price (drizzle/0074)
@@ -10449,7 +10563,7 @@ function lineCentsSql(productivityPct: number) {
   return {
     hours,
     materialCents: sql`ROUND(COALESCE(${bidLineItems.snapshotMaterialCost}, 0) * 100) * ${bidLineItems.qty}`,
-    laborCents: sql`ROUND(${hours} * ${bidLineItems.qty} * ${bidLineItems.snapshotLaborRate} * 100)`,
+    laborCents: sql`ROUND(${hours} * ${lineLaborQtySql} * ${bidLineItems.snapshotLaborRate} * 100)`,
   };
 }
 
@@ -10558,7 +10672,7 @@ function costSums(productivityPct: number) {
       proving material markup moved nothing.
     */
     markedUpExpenseCents: sql<string>`(SELECT COALESCE(SUM(ROUND(${bidExpenses.amount} * 100)), 0) FROM ${bidExpenses} WHERE ${bidExpenses.bidId} = ${bids.id} AND ${bidExpenses.markedUp} = 1)`,
-    totalHours: sql<string>`COALESCE(SUM(${ok(sql`${hours} * ${bidLineItems.qty}`)}), 0)`,
+    totalHours: sql<string>`COALESCE(SUM(${ok(sql`${hours} * ${lineLaborQtySql}`)}), 0)`,
   };
 }
 
@@ -11962,6 +12076,11 @@ export async function addRunTypeRowToBid(
     name: string;
     /** Feet for pipe and wire; a COUNT for a fitting — the material's unit. */
     qty: number;
+    /**
+     * INSTALLED feet — what the line's hours are on (Q5, 0093). Required so a
+     * caller says it: null on a fitting, whose labour is on its count.
+     */
+    laborQty: number | null;
   }
 ): Promise<{ id: number }> {
   const db = await getDb();
@@ -11988,6 +12107,7 @@ export async function addRunTypeRowToBid(
     runMaterialId: input.materialId,
     name: input.name,
     qty: input.qty.toFixed(4),
+    laborQty: input.laborQty === null ? null : input.laborQty.toFixed(4),
     ...runLinePricing(input.role, material, input.materialId, markupRuleSet),
     // A traced run carries no job-condition modifiers of its own. They describe
     // an operation, and this is a length of pipe.
@@ -12162,13 +12282,21 @@ export async function resnapshotRunTypeLine(
 
 export async function refreshRunTypeLineQty(
   lineId: number,
-  feet: number
+  /**
+   * Bought (material) and installed (labour) — both, always, so a line can
+   * never be stored with a fresh material figure and a stale labour one.
+   * `installed` is null on a fitting line, whose labour is on its count.
+   */
+  feet: { bought: number; installed: number | null }
 ): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   await db
     .update(bidLineItems)
-    .set({ qty: feet.toFixed(4) })
+    .set({
+      qty: feet.bought.toFixed(4),
+      laborQty: feet.installed === null ? null : feet.installed.toFixed(4),
+    })
     .where(eq(bidLineItems.id, lineId));
 }
 
@@ -12186,17 +12314,181 @@ export async function heightContextForBid(
   userId: number,
   bidDistributionInches: number | null
 ): Promise<HeightContext> {
-  const [defaults, company, job] = await Promise.all([
+  const [defaults, company, job, extraDefaults, runTypes] = await Promise.all([
     getHeightDefaults(userId),
     getMountingHeights(userId),
     getBidMountingHeights(bidId, userId),
+    // Extra and makeup ride on this context so no caller can load the heights
+    // and forget them (server/runVerticals.ts, `HeightContext.extras`).
+    getExtraDefaults(userId),
+    getRunTypesFor(userId, true),
   ]);
   return buildHeightContext({
     defaults,
     company,
     job,
     bidDistributionInches,
+    extraDefaults,
+    runTypes,
   });
+}
+
+/**
+ * The company's extra and makeup defaults (0089), or undefined when it has
+ * never saved or accepted any — which resolves every run to "no extra set".
+ */
+export async function getExtraDefaults(
+  userId: number
+): Promise<TakeoffExtraDefaults | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db
+    .select()
+    .from(takeoffExtraDefaults)
+    .where(eq(takeoffExtraDefaults.userId, userId));
+  return rows[0];
+}
+
+/**
+ * Change the company's extra and makeup defaults. Omitted leaves a value
+ * alone; NULL clears it back to "follow the starter, if accepted".
+ * Percentages are FRACTIONS (0.10 = 10%), the `productivityPct` convention.
+ */
+export async function setExtraDefaults(
+  userId: number,
+  patch: {
+    conduitExtraPct?: number | null;
+    wireExtraPct?: number | null;
+    makeupDeviceInches?: number | null;
+    makeupPanelInches?: number | null;
+  }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const values: Partial<typeof takeoffExtraDefaults.$inferInsert> = {};
+  const pct = (v: number | null) => (v === null ? null : v.toFixed(4));
+  if (patch.conduitExtraPct !== undefined)
+    values.conduitExtraPct = pct(patch.conduitExtraPct);
+  if (patch.wireExtraPct !== undefined)
+    values.wireExtraPct = pct(patch.wireExtraPct);
+  if (patch.makeupDeviceInches !== undefined)
+    values.makeupDeviceInches = patch.makeupDeviceInches;
+  if (patch.makeupPanelInches !== undefined)
+    values.makeupPanelInches = patch.makeupPanelInches;
+  try {
+    await db.insert(takeoffExtraDefaults).values({ userId, ...values });
+    return;
+  } catch (error) {
+    if (!isDuplicateKey(error)) throw error;
+  }
+  if (Object.keys(values).length === 0) return;
+  await db
+    .update(takeoffExtraDefaults)
+    .set(values)
+    .where(eq(takeoffExtraDefaults.userId, userId));
+}
+
+/**
+ * Accept the starter extras (owner, 2026-09-28, Q1) — or take the acceptance
+ * back with `at` NULL. Writes ONLY the date: the starters live in code
+ * (`STARTER_EXTRAS`), so a value the company already set keeps winning, and
+ * a later change to a starter reaches everybody who accepted without a
+ * migration.
+ */
+export async function setExtraStartersAccepted(
+  userId: number,
+  at: Date | null
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db.insert(takeoffExtraDefaults).values({ userId, acceptedAt: at });
+    return;
+  } catch (error) {
+    if (!isDuplicateKey(error)) throw error;
+  }
+  await db
+    .update(takeoffExtraDefaults)
+    .set({ acceptedAt: at })
+    .where(eq(takeoffExtraDefaults.userId, userId));
+}
+
+/**
+ * Bids an extra change would MOVE: not archived, not the sample, quantities
+ * not locked, and at least one traced run on a sheet still on the bid.
+ *
+ * Counted before anything is changed, so the settings screen can say "this
+ * changes the wire on 7 bids" first — § 5d trap 1's answer, reused. Joined
+ * through the live plan sets rather than by `bidId`, so a deleted drawing's
+ * leftover runs are not counted (see `onLivePlanSheet`).
+ */
+export async function countBidsFollowingTracedRuns(
+  userId: number
+): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const rows = await db
+    .select({ n: sql<number>`COUNT(DISTINCT ${bids.id})` })
+    .from(bids)
+    .innerJoin(bidPdfs, eq(bidPdfs.bidId, bids.id))
+    .innerJoin(bidPdfSheets, eq(bidPdfSheets.bidPdfId, bidPdfs.id))
+    .innerJoin(takeoffRuns, eq(takeoffRuns.sheetId, bidPdfSheets.id))
+    .where(
+      and(
+        eq(bids.userId, userId),
+        isNull(bids.archivedAt),
+        eq(bids.isSample, false),
+        isNull(bids.quantitiesLockedAt),
+        eq(takeoffRuns.isSuggestion, false)
+      )
+    );
+  return Number(rows[0]?.n ?? 0);
+}
+
+/**
+ * One height type's makeup answer for the company (0092): panel or device
+ * end, and its own makeup length. Omitted leaves a field alone; NULL clears
+ * it. Creates the row if this is the company's first answer about the type —
+ * with no height, which reads through to the shipped height as before
+ * (`resolveMountingHeight` skips a NULL), so a makeup edit cannot unset one.
+ */
+export async function setHeightTypeMakeup(
+  userId: number,
+  typeKey: string,
+  patch: {
+    makeupAt?: "device" | "panel" | null;
+    makeupInches?: number | null;
+  }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const values: Partial<InsertTakeoffMountingHeight> = {};
+  if (patch.makeupAt !== undefined) values.makeupAt = patch.makeupAt;
+  if (patch.makeupInches !== undefined)
+    values.makeupInches = patch.makeupInches;
+  try {
+    await db.insert(takeoffMountingHeights).values({
+      userId,
+      typeKey,
+      heightInches: null,
+      label: "",
+      isActive: true,
+      ...values,
+    });
+    return;
+  } catch (error) {
+    if (!isDuplicateKey(error)) throw error;
+  }
+  if (Object.keys(values).length === 0) return;
+  await db
+    .update(takeoffMountingHeights)
+    .set(values)
+    .where(
+      and(
+        eq(takeoffMountingHeights.userId, userId),
+        eq(takeoffMountingHeights.typeKey, typeKey)
+      )
+    );
 }
 
 // ─── Pricing problem reports ─────────────────────────────────────────────────

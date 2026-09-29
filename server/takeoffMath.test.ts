@@ -31,6 +31,7 @@ import {
   type PagePoint,
 } from "../shared/takeoffGeometry";
 import {
+  NO_EXTRAS,
   NO_VERTICALS,
   circuitWire,
   cableFeet,
@@ -596,10 +597,11 @@ describe("cable runs", () => {
       CABLE_100FT,
       [],
       QUARTER_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
-    expect(quantities.conduitFeet).toBeNull();
-    expect(quantities.cableFeet).toBe(100);
+    expect(quantities.conduitBoughtFeet).toBeNull();
+    expect(quantities.cableBoughtFeet).toBe(100);
   });
 
   it("produce no separate wire footage", () => {
@@ -614,9 +616,10 @@ describe("cable runs", () => {
         },
       ],
       QUARTER_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
-    expect(quantities.totalWireFeet).toBe(0);
+    expect(quantities.wireBoughtFeet).toBe(0);
     expect(quantities.wireByCircuit).toEqual([]);
   });
 
@@ -648,10 +651,11 @@ describe("a shared run across a whole takeoff", () => {
         ],
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
       },
     ]);
-    expect(totals.conduitFeet).toBe(100);
-    expect(totals.wireFeet).toBe(600);
+    expect(totals.conduitBoughtFeet).toBe(100);
+    expect(totals.wireBoughtFeet).toBe(600);
   });
 
   it("keeps two separate runs separate", () => {
@@ -673,6 +677,7 @@ describe("a shared run across a whole takeoff", () => {
         ],
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
       },
       {
         run: shortRun,
@@ -686,10 +691,11 @@ describe("a shared run across a whole takeoff", () => {
         ],
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
       },
     ]);
-    expect(totals.conduitFeet).toBe(150);
-    expect(totals.wireFeet).toBe(200 + 150);
+    expect(totals.conduitBoughtFeet).toBe(150);
+    expect(totals.wireBoughtFeet).toBe(200 + 150);
   });
 
   it("keeps conduit and cable in separate totals", () => {
@@ -711,17 +717,19 @@ describe("a shared run across a whole takeoff", () => {
         ],
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
       },
       {
         run: cableRun,
         circuits: [],
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
       },
     ]);
-    expect(totals.conduitFeet).toBe(100);
-    expect(totals.cableFeet).toBe(100);
-    expect(totals.wireFeet).toBe(300);
+    expect(totals.conduitBoughtFeet).toBe(100);
+    expect(totals.cableBoughtFeet).toBe(100);
+    expect(totals.wireBoughtFeet).toBe(300);
   });
 
   it("reports unmeasurable runs rather than counting them as zero", () => {
@@ -739,6 +747,7 @@ describe("a shared run across a whole takeoff", () => {
         ],
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
       },
       {
         run: RUN_100FT,
@@ -752,22 +761,30 @@ describe("a shared run across a whole takeoff", () => {
         ],
         ratio: null,
         verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
       },
     ]);
-    expect(totals.conduitFeet).toBe(100);
-    expect(totals.wireFeet).toBe(200);
+    expect(totals.conduitBoughtFeet).toBe(100);
+    expect(totals.wireBoughtFeet).toBe(200);
     expect(totals.unmeasurableCount).toBe(1);
   });
 
   it("totals nothing, and flags nothing, for an empty takeoff", () => {
     expect(totalsOf([])).toEqual({
-      conduitFeet: 0,
-      cableFeet: 0,
-      wireFeet: 0,
-      wireGroundFeet: 0,
+      conduitBoughtFeet: 0,
+      cableBoughtFeet: 0,
+      wireBoughtFeet: 0,
+      wireGroundBoughtFeet: 0,
       conduitVerticalFeet: 0,
       cableVerticalFeet: 0,
       wireVerticalFeet: 0,
+      conduitExtraFeet: 0,
+      cableExtraFeet: 0,
+      wireExtraFeet: 0,
+      cableMakeupFeet: 0,
+      wireMakeupFeet: 0,
+      // No runs, so none carries an unset extra.
+      noExtraCount: 0,
       unmeasurableCount: 0,
       flatOnlyCount: 0,
       partialVerticalCount: 0,
@@ -785,16 +802,18 @@ describe("a shared run across a whole takeoff", () => {
         circuits: [],
         ratio: QUARTER_INCH,
         verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
       },
       {
         run: { ...RUN_100FT },
         circuits: [],
         ratio: ENG_100,
         verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
       },
     ]);
     // 25 paper inches: 100ft at quarter-inch, 2500ft at 1"=100'.
-    expect(totals.conduitFeet).toBe(2600);
+    expect(totals.conduitBoughtFeet).toBe(2600);
   });
 });
 
@@ -813,7 +832,8 @@ describe("the full breakdown for one run", () => {
           },
         ],
         null,
-        NO_VERTICALS
+        NO_VERTICALS,
+        NO_EXTRAS
       )
     ).toBeNull();
   });
@@ -826,13 +846,14 @@ describe("the full breakdown for one run", () => {
         { name: "B", conductorCount: 3, groundCount: 0, separateGround: false },
       ],
       QUARTER_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
     expect(quantities.runFeet).toBe(100);
-    expect(quantities.conduitFeet).toBe(100);
-    expect(quantities.totalWireFeet).toBe(600);
+    expect(quantities.conduitBoughtFeet).toBe(100);
+    expect(quantities.wireBoughtFeet).toBe(600);
     // The two must never be the same number by construction.
-    expect(quantities.conduitFeet).not.toBe(quantities.totalWireFeet);
+    expect(quantities.conduitBoughtFeet).not.toBe(quantities.wireBoughtFeet);
   });
 
   it("names each circuit in the breakdown, and splits the ground out of it", () => {
@@ -849,7 +870,8 @@ describe("the full breakdown for one run", () => {
         },
       ],
       QUARTER_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
     expect(quantities.wireByCircuit[0]).toEqual({
       name: "Panel A-12",
@@ -868,8 +890,8 @@ describe("the full breakdown for one run", () => {
     });
     // The two purchases, apart: 300 ft of THHN and 100 ft of bare copper. The
     // bare copper is the RUN's now, and 400 is still what the run comes to.
-    expect(quantities.groundFeet).toBe(100);
-    expect(quantities.totalWireFeet).toBe(400);
+    expect(quantities.groundBoughtFeet).toBe(100);
+    expect(quantities.wireBoughtFeet).toBe(400);
   });
 });
 
@@ -916,20 +938,22 @@ describe("a realistic takeoff, checked by hand", () => {
         },
       ],
       EIGHTH_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
 
-    expect(feederQuantities.conduitFeet).toBe(80);
-    expect(feederQuantities.totalWireFeet).toBe(960);
+    expect(feederQuantities.conduitBoughtFeet).toBe(80);
+    expect(feederQuantities.wireBoughtFeet).toBe(960);
 
     const branchQuantities = quantitiesForRun(
       branch,
       [],
       EIGHTH_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
-    expect(branchQuantities.cableFeet).toBe(40);
-    expect(branchQuantities.conduitFeet).toBeNull();
+    expect(branchQuantities.cableBoughtFeet).toBe(40);
+    expect(branchQuantities.conduitBoughtFeet).toBeNull();
 
     const totals = totalsOf([
       {
@@ -956,29 +980,40 @@ describe("a realistic takeoff, checked by hand", () => {
         ],
         ratio: EIGHTH_INCH,
         verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
       },
       {
         run: branch,
         circuits: [],
         ratio: EIGHTH_INCH,
         verticals: NO_VERTICALS,
+        extras: NO_EXTRAS,
       },
     ]);
 
     expect(totals).toEqual({
-      conduitFeet: 80,
-      cableFeet: 40,
-      wireFeet: 960,
+      conduitBoughtFeet: 80,
+      cableBoughtFeet: 40,
+      wireBoughtFeet: 960,
       // Every circuit in this hand-checked example predates the ground split
       // and states no ground, so none of the 960 ft is bare — and the 960 is
       // the number it has always been.
-      wireGroundFeet: 0,
+      wireGroundBoughtFeet: 0,
       // No heights set anywhere, so this hand-checked takeoff comes to exactly
       // what it came to before verticals existed. Both runs are flat-only, and
       // the panel says so rather than leaving a low total to be noticed.
       conduitVerticalFeet: 0,
       cableVerticalFeet: 0,
       wireVerticalFeet: 0,
+      // NO_EXTRAS: no extra or makeup applied, so none is in the figures above
+      // — and both measured runs are reported as carrying none, rather than
+      // the zero passing as an answer.
+      conduitExtraFeet: 0,
+      cableExtraFeet: 0,
+      wireExtraFeet: 0,
+      cableMakeupFeet: 0,
+      wireMakeupFeet: 0,
+      noExtraCount: 2,
       flatOnlyCount: 2,
       // Neither run has ONE end answered — they have none — so nothing is
       // half-counted. This is the pair that must not be confused: flat-only
@@ -1079,13 +1114,15 @@ describe("counting the ground separately", () => {
         RUN_100FT,
         [pair.before],
         QUARTER_INCH,
-        NO_VERTICALS
+        NO_VERTICALS,
+        NO_EXTRAS
       )!;
       const after = quantitiesForRun(
         RUN_100FT,
         [pair.after],
         QUARTER_INCH,
-        NO_VERTICALS
+        NO_VERTICALS,
+        NO_EXTRAS
       )!;
       /*
         THE RUN TOTAL, not the circuit's own footage, and that changed on
@@ -1095,8 +1132,8 @@ describe("counting the ground separately", () => {
         the property this block exists for: the migration must not move a
         total. It asserts it where the total now lives.
       */
-      expect(after.totalWireFeet).toBe(before.totalWireFeet);
-      expect(after.conduitFeet).toBe(before.conduitFeet);
+      expect(after.wireBoughtFeet).toBe(before.wireBoughtFeet);
+      expect(after.conduitBoughtFeet).toBe(before.conduitBoughtFeet);
     });
   }
 
@@ -1112,7 +1149,8 @@ describe("counting the ground separately", () => {
         },
       ],
       QUARTER_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
     const [circuit] = run.wireByCircuit;
     expect(circuit.insulatedFeet).toBe(200);
@@ -1125,9 +1163,9 @@ describe("counting the ground separately", () => {
       separateCount: 0,
       totalCount: 1,
     });
-    expect(run.groundFeet).toBe(100);
-    expect(circuit.flatFeet + run.groundFeet).toBe(run.totalWireFeet);
-    expect(run.totalWireFeet).toBe(300);
+    expect(run.groundBoughtFeet).toBe(100);
+    expect(circuit.flatFeet + run.groundBoughtFeet).toBe(run.wireBoughtFeet);
+    expect(run.wireBoughtFeet).toBe(300);
   });
 
   it("reads a row the backfill has not reached as it always read", () => {
@@ -1160,10 +1198,11 @@ describe("counting the ground separately", () => {
       RUN_100FT,
       [unsplit],
       QUARTER_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
-    expect(quantities.totalWireFeet).toBe(300);
-    expect(quantities.groundFeet).toBe(0);
+    expect(quantities.wireBoughtFeet).toBe(300);
+    expect(quantities.groundBoughtFeet).toBe(0);
   });
 
   it("never guesses a ground onto an un-split row", () => {
@@ -1195,7 +1234,8 @@ describe("counting the ground separately", () => {
         },
       ],
       QUARTER_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
     const dropped = quantitiesForRun(
       RUN_100FT,
@@ -1219,15 +1259,16 @@ describe("counting the ground separately", () => {
         },
         end: { counted: false, kind: null, reason: "height-not-set" },
         feet: 10,
-      }
+      },
+      NO_EXTRAS
     )!;
     // Three conductors down a 10 ft drop is 30 ft of wire, ground included:
     // two insulated on the circuit, plus the run's one shared ground, which
     // goes down the drop once like the pipe around it.
-    expect(dropped.totalWireFeet - flat.totalWireFeet).toBe(30);
+    expect(dropped.wireBoughtFeet - flat.wireBoughtFeet).toBe(30);
     // And the ground's share of that drop is on the run's ground figure, not
     // lost between the circuit rows and the total.
-    expect(dropped.groundFeet - flat.groundFeet).toBe(10);
+    expect(dropped.groundBoughtFeet - flat.groundBoughtFeet).toBe(10);
   });
 
   it("refuses to count a ground that is not a number", () => {
@@ -1248,11 +1289,12 @@ describe("counting the ground separately", () => {
         },
       ],
       QUARTER_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
     // One bad row must not poison a total — the same rule the conductor count
     // already follows.
-    expect(quantities.totalWireFeet).toBe(400);
+    expect(quantities.wireBoughtFeet).toBe(400);
   });
 });
 
@@ -1282,7 +1324,8 @@ describe("the two purchases a conduit run makes", () => {
         },
       ],
       QUARTER_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
 
     const insulated = quantities.wireByCircuit.reduce(
@@ -1303,9 +1346,11 @@ describe("the two purchases a conduit run makes", () => {
       separateCount: 0,
       totalCount: 1,
     });
-    expect(quantities.groundFeet).toBe(100);
-    expect(insulated + quantities.groundFeet).toBe(quantities.totalWireFeet);
-    expect(quantities.totalWireFeet).toBe(600);
+    expect(quantities.groundBoughtFeet).toBe(100);
+    expect(insulated + quantities.groundBoughtFeet).toBe(
+      quantities.wireBoughtFeet
+    );
+    expect(quantities.wireBoughtFeet).toBe(600);
   });
 
   it("SIZES THE SHARED GROUND TO THE LARGEST CIRCUIT, never the smallest", () => {
@@ -1329,10 +1374,11 @@ describe("the two purchases a conduit run makes", () => {
         },
       ],
       QUARTER_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
     expect(quantities.grounds.sharedCount).toBe(2);
-    expect(quantities.groundFeet).toBe(200);
+    expect(quantities.groundBoughtFeet).toBe(200);
   });
 
   it("gives an ISOLATED GROUND circuit its own, on top of the shared one", () => {
@@ -1358,18 +1404,19 @@ describe("the two purchases a conduit run makes", () => {
         },
       ],
       QUARTER_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
     expect(quantities.grounds).toEqual({
       sharedCount: 1,
       separateCount: 1,
       totalCount: 2,
     });
-    expect(quantities.groundFeet).toBe(200);
+    expect(quantities.groundBoughtFeet).toBe(200);
     // The separate one belongs to its circuit; the shared one belongs to none.
     expect(quantities.wireByCircuit[0].ownGroundFeet).toBe(0);
     expect(quantities.wireByCircuit[1].ownGroundFeet).toBe(100);
-    expect(quantities.totalWireFeet).toBe(600); // 400 insulated + 200 ground
+    expect(quantities.wireBoughtFeet).toBe(600); // 400 insulated + 200 ground
   });
 
   it("pulls NO shared ground when every circuit runs its own", () => {
@@ -1390,14 +1437,15 @@ describe("the two purchases a conduit run makes", () => {
         },
       ],
       QUARTER_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
     expect(quantities.grounds).toEqual({
       sharedCount: 0,
       separateCount: 2,
       totalCount: 2,
     });
-    expect(quantities.groundFeet).toBe(200);
+    expect(quantities.groundBoughtFeet).toBe(200);
   });
 
   it("SPLITS INTO FLAT AND VERTICAL THAT ADD BACK TO THE TOTAL", () => {
@@ -1434,11 +1482,17 @@ describe("the two purchases a conduit run makes", () => {
         },
         end: { counted: false, kind: null, reason: "height-not-set" },
         feet: 10,
-      }
+      },
+      NO_EXTRAS
     )!;
-    expect(quantities.wireFlatFeet + quantities.wireVerticalFeet).toBe(
-      quantities.totalWireFeet
-    );
+    // The identity the panel prints is against INSTALLED wire, with makeup
+    // as its own term (held-migrations plan § 1). NO_EXTRAS makes makeup 0
+    // here; server/runExtras.test.ts holds it with real makeup and extra.
+    expect(
+      quantities.wireFlatFeet +
+        quantities.wireVerticalFeet +
+        quantities.makeupFeet
+    ).toBe(quantities.wireInstalledFeet);
     // And the shared ground is genuinely inside both halves, not missing from
     // one of them in a way the identity above would hide.
     expect(quantities.wireFlatFeet).toBe(600); // 400 insulated + 100 + 100 gnd
@@ -1459,9 +1513,10 @@ describe("the two purchases a conduit run makes", () => {
         },
       ],
       QUARTER_INCH,
-      NO_VERTICALS
+      NO_VERTICALS,
+      NO_EXTRAS
     )!;
-    expect(quantities.groundFeet).toBe(0);
-    expect(quantities.totalWireFeet).toBe(300);
+    expect(quantities.groundBoughtFeet).toBe(0);
+    expect(quantities.wireBoughtFeet).toBe(300);
   });
 });
