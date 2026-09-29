@@ -36,16 +36,23 @@ function levelOf(source: HeightRow["source"]): string {
   return "not set";
 }
 
-export function JobHeightsChip({ bidId }: { bidId: number }) {
+export function JobHeightsChip({
+  bidId,
+  onChanged,
+}: {
+  bidId: number;
+  /**
+   * The screen's own refresh for a height change. Required, so the chip
+   * cannot keep a list of its own: it used to, and that list refreshed the
+   * runs panel but not the Send preview, whose vertical feet come from these
+   * heights too. The list is @/lib/takeoffRefresh's "heights".
+   */
+  onChanged: () => void;
+}) {
   const [open, setOpen] = useState(false);
-  const utils = trpc.useUtils();
   const query = trpc.takeoffHeights.forBid.useQuery({ bidId });
 
-  const refresh = () => {
-    utils.takeoffHeights.forBid.invalidate({ bidId });
-    // The runs panel prices its verticals from these, so it has to re-read.
-    utils.takeoffRuns.invalidate();
-  };
+  const refresh = onChanged;
   const onError = (error: { message: string }) => toast.error(error.message);
 
   const setDistribution = trpc.takeoffHeights.setBidDistribution.useMutation({

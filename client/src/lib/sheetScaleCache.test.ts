@@ -18,6 +18,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { withSavedSheet, withSheetChecked } from "./sheetScaleCache";
+import { QUERIES_MOVED_BY } from "./takeoffRefresh";
 
 type Row = { id: number; name: string; scaleCheckedAt: Date | string | null };
 const sheets: Row[] = [
@@ -109,11 +110,16 @@ describe("TakeoffPage wires it in", () => {
   it("refreshes the traced lengths whenever the sheets refresh", () => {
     // A scale change re-prices every run on the sheet; the footage panel kept
     // the old scale's lengths until a reload (115.74 ft shown, 111.12 true).
-    const helper = src.slice(
-      src.indexOf("const refreshSheets = () => {"),
-      src.indexOf("\n  };\n", src.indexOf("const refreshSheets = () => {"))
-    );
-    expect(helper).toContain("refreshRuns()");
+    //
+    // Since 2026-09-28 the helper hands the "sheet" change to the one tested
+    // rule (./takeoffRefresh) rather than calling refreshRuns itself, so both
+    // halves are pinned: the helper goes through the rule, and the rule's
+    // "sheet" entry moves every run figure.
+    expect(src).toContain('const refreshSheets = () => refreshFor("sheet");');
+    const sheet = new Set(QUERIES_MOVED_BY.sheet);
+    for (const q of QUERIES_MOVED_BY.run) {
+      expect(sheet.has(q), q).toBe(true);
+    }
   });
 
   it("starts a fresh measuring layer for every Measure it / Check it", () => {

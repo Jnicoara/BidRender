@@ -391,7 +391,16 @@ export const takeoffGroupsRouter = router({
         });
       }
 
-      const warning = sendWarning(row, bridgeLines);
+      const families = await db.getAssemblyFamilies(
+        [
+          ...(group.assemblyId === null ? [] : [group.assemblyId]),
+          ...bridgeLines.flatMap(line =>
+            line.assemblyId === null ? [] : [line.assemblyId]
+          ),
+        ],
+        ctx.scope.dataUserId
+      );
+      const warning = sendWarning(row, bridgeLines, families);
       const { id } = await db.addCountToBid(
         group.bidId,
         ctx.scope.dataUserId,

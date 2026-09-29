@@ -94,6 +94,116 @@ export function countUnpricedLaborLines(lines: PricedLineLike[]): number {
   return lines.reduce((n, l) => (lineHasUnpricedLabor(l) ? n + 1 : n), 0);
 }
 
+// ─── A line frozen at a rate that has since changed ───────────────────────────
+
+/**
+ * An assembly line, as far as its frozen rate is concerned.
+ *
+ * Only ASSEMBLY lines can be compared: the line stores no role, and an
+ * assembly names one (`laborRateId`), so "what would this line be priced at
+ * today" has an answer. A hand-priced line's rate was picked on the line and
+ * a run-type line's comes from its type; neither leaves anything to compare
+ * against, so they are not in scope.
+ */
+export type RatedLineLike = PricedLineLike & {
+  id: number;
+  name: string;
+  assemblyId: number | null;
+};
+
+export type StaleRateLine = {
+  lineId: number;
+  name: string;
+  /** The rate frozen on the line when it was added. */
+  frozenRate: number;
+  /** What the assembly's role costs today. */
+  currentRate: number;
+};
+
+/**
+ * Lines priced at a labor rate that is no longer the rate of their role.
+ *
+ * ── The freeze is right; saying nothing about it is not ───────────────────────
+ * A line keeps the rate it was added at, by design (R4: the library does not
+ * move a bid behind the estimator's back). But the owner's own bid carried
+ * seven lines at $68/hr against a Journeyman rate of $43/hr, and nothing on
+ * the bid said so (`references/takeoff-spec.md` § 16). The $0 case was flagged
+ * (`lineHasUnpricedLabor`); a stale NON-zero rate was not. This flags it and
+ * changes nothing — re-pricing is a money-moving action and its own piece.
+ *
+ * Left out, each for a reason:
+ *   - a line with no hours: its rate multiplies nothing;
+ *   - a line frozen at $0: `lineHasUnpricedLabor` already says so, louder;
+ *   - a role that is $0 now: "your rate went to $0" is the unrated-role
+ *     warning's job, and flagging the line would send the estimator to the
+ *     wrong fix;
+ *   - a line whose assembly or role cannot be found (`currentRateFor` null).
+ *
+ * `currentRateFor` is given the line's stored assemblyId and answers through
+ * the same fork-following lookup that prices a new line (`hourlyCostFor` over
+ * the resolved assembly), so "current" means what adding it again would freeze.
+ */
+export function staleRateLines(
+  lines: readonly RatedLineLike[],
+  currentRateFor: (assemblyId: number) => number | null
+): StaleRateLine[] {
+  const stale: StaleRateLine[] = [];
+  for (const line of lines) {
+    if (line.assemblyId === null) continue;
+    const hours = Number(line.snapshotLaborHours ?? 0);
+    if (!Number.isFinite(hours) || hours <= 0) continue;
+    const frozenRate = Number(line.snapshotLaborRate ?? 0);
+    if (!Number.isFinite(frozenRate) || frozenRate <= 0) continue;
+    const currentRate = currentRateFor(line.assemblyId);
+    if (currentRate === null || !Number.isFinite(currentRate)) continue;
+    if (currentRate <= 0) continue;
+    // Rates are stored to 4 places; a difference under half a cent an hour
+    // is rounding, not a changed rate.
+    if (Math.abs(currentRate - frozenRate) < 0.005) continue;
+    stale.push({ lineId: line.id, name: line.name, frozenRate, currentRate });
+  }
+  return stale;
+}
+
+/** Stale lines that share a frozen rate and a current rate. */
+export type StaleRateGroup = {
+  frozenRate: number;
+  currentRate: number;
+  /** How many LINES — two lines can share a name. */
+  lineCount: number;
+  /** Line names, in bid order, each once. */
+  names: string[];
+};
+
+/**
+ * One group per (frozen rate, current rate) pair, in first-appearance order,
+ * so the bid says "4 lines use $68.00/hr" once rather than four times. A line
+ * name appearing twice at the same rates is listed once.
+ */
+export function groupStaleRates(
+  lines: readonly StaleRateLine[]
+): StaleRateGroup[] {
+  const groups: StaleRateGroup[] = [];
+  for (const line of lines) {
+    let group = groups.find(
+      g =>
+        g.frozenRate === line.frozenRate && g.currentRate === line.currentRate
+    );
+    if (!group) {
+      group = {
+        frozenRate: line.frozenRate,
+        currentRate: line.currentRate,
+        lineCount: 0,
+        names: [],
+      };
+      groups.push(group);
+    }
+    group.lineCount += 1;
+    if (!group.names.includes(line.name)) group.names.push(line.name);
+  }
+  return groups;
+}
+
 /**
  * Has this user set up labor at all?
  *

@@ -212,7 +212,14 @@ export function countsTowardTotals(bid: {
   return !bid.isSample;
 }
 
-/** Sum only what is really the contractor's. */
+/**
+ * Sum only what is really the contractor's.
+ *
+ * The Dashboard no longer calls this: its totals go through `sumBidTotals`
+ * (@shared/bidTotals), which applies the same `countsTowardTotals` rule AND
+ * adds up the lines each bid leaves unpriced. Kept for its test, which pins
+ * the sample rule on its own.
+ */
 export function realBidValue<T extends { isSample?: boolean | null }>(
   bids: readonly T[],
   value: (bid: T) => number

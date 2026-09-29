@@ -1654,6 +1654,12 @@ disagreement**: its warning only fires for a $0 rate
 (`shared/laborRatePricing.ts:86-90`). The live site may also have changed since
 Aug 19.
 
+> **Flagged since 2026-09-28** (`references/track-b-next-batch-plan.md` § 5). A
+> Draft or Active bid now says "4 lines use $68.00/hr — the role on their
+> assembly is $43.00/hr now" (`staleRateLines`, assembly lines only, since a
+> hand-priced line stores no role to compare). Flag only, by the owner's
+> answer: the lines keep their rate, and re-pricing is its own piece.
+
 **Also on the bid screen:** that $0 warning tells you to "give it a role, then
 re-add the line" (`client/src/pages/BidsPage.tsx:840-842`). The wording is right
 when a line has no role, and wrong when the role exists but its rate is $0.

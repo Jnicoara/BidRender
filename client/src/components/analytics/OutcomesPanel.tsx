@@ -66,6 +66,8 @@ type Report = {
     totalValue: number;
     /** Bids whose figures leave out a line that can't be priced. */
     incompleteBids: number;
+    /** Bids whose figures count lines or parts nobody priced as $0. */
+    notPricedBids: number;
   };
   timeline: Period[];
 };
@@ -197,6 +199,7 @@ export function OutcomesPanel({ report }: { report: Report }) {
       </div>
       <IncompleteFiguresNote
         count={totals.incompleteBids}
+        notPricedCount={totals.notPricedBids}
         noun={["bid", "bids"]}
       />
 

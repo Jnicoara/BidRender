@@ -50,6 +50,7 @@ import {
   parseScaleText,
 } from "@shared/planScale";
 import { compareToStandardScales } from "@shared/planCalibration";
+import { sheetSizeWarns, type SheetSize } from "@shared/sheetSize";
 
 const FLASH_MS = 1100;
 
@@ -72,6 +73,7 @@ export function ScaleControl({
   onCheck,
   notToScale,
   wanted,
+  pageSize = null,
 }: {
   sheet: ScaleSheet;
   onSet: (scaleText: string) => Promise<unknown>;
@@ -96,6 +98,11 @@ export function ScaleControl({
    * RIGHT NOW. Only then does this go amber and grow a warning triangle.
    */
   wanted?: boolean;
+  /**
+   * The paper size of the page on screen, read off the open PDF. NULL until
+   * the page has been drawn. See @shared/sheetSize.
+   */
+  pageSize?: SheetSize | null;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -147,6 +154,20 @@ export function ScaleControl({
    * the check overlay itself; see `commit` for why that was wrong.
    */
   const unchecked = isSet && !sheet.scaleCheckedAt;
+
+  /**
+   * The sheet-size check (S8, decided as D5 (a) in takeoff-spec.md).
+   *
+   * The "not checked" nudge above says a half-size print MIGHT read half. On
+   * a page that IS a size sets get shrunk to — 11×17, 12×18 — that stops
+   * being hypothetical, so the chip names the page size in amber instead.
+   * Same fix, same link: one known dimension. And it clears the same way, on
+   * the `scaleCheckedAt` a check writes, which a new scale always resets.
+   */
+  const sizeWarning = sheetSizeWarns(pageSize, {
+    isSet,
+    checked: Boolean(sheet.scaleCheckedAt),
+  });
 
   useEffect(
     () => () => {
@@ -233,9 +254,11 @@ export function ScaleControl({
             )}
             title={
               isSet
-                ? offStandard
-                  ? `The scale this sheet is drawn at. It is ${Math.abs(standard!.percentOff).toFixed(0)}% off the nearest standard scale (${standard!.nearestText}) — worth a check. Click to change it.`
-                  : "The scale this sheet is drawn at — click to change it"
+                ? sizeWarning && pageSize
+                  ? `This page is ${pageSize.label}. If the set was drawn on a larger sheet, this scale reads every length short. Check it against a dimension you know. Click to change the scale.`
+                  : offStandard
+                    ? `The scale this sheet is drawn at. It is ${Math.abs(standard!.percentOff).toFixed(0)}% off the nearest standard scale (${standard!.nearestText}) — worth a check. Click to change it.`
+                    : "The scale this sheet is drawn at — click to change it"
                 : wanted
                   ? "Measuring needs a scale — click to set one for this sheet"
                   : "No scale set. Counting works without one; only measuring needs it."
@@ -254,10 +277,17 @@ export function ScaleControl({
                   it is a nudge, not an alarm, and an alarm on every sheet is
                   one nobody reads by Thursday.
                 */}
-                {unchecked && (
-                  <span className="text-[0.65rem] text-muted-foreground">
-                    · not checked
+                {sizeWarning && pageSize ? (
+                  <span className="flex items-center gap-0.5 text-[0.65rem] text-[#F5C518]">
+                    · <TriangleAlert className="w-3 h-3" />
+                    {pageSize.label} page
                   </span>
+                ) : (
+                  unchecked && (
+                    <span className="text-[0.65rem] text-muted-foreground">
+                      · not checked
+                    </span>
+                  )
                 )}
               </span>
             ) : (
@@ -448,9 +478,28 @@ export function ScaleControl({
               a half-size set reads half length with nothing looking wrong. One
               line saying so, and the check beside it.
             */}
-            {unchecked && (
+            {sizeWarning && pageSize ? (
+              <p className="text-[0.7rem] text-[#F5C518] flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 shrink-0 mt-0.5" />
+                <span>
+                  This page is {pageSize.label}. If the set was drawn on a
+                  larger sheet, this scale reads every length short. Check it
+                  against a dimension you know.
+                </span>
+              </p>
+            ) : (
+              unchecked && (
+                <p className="text-[0.7rem] text-muted-foreground">
+                  Not checked — a half-size print reads half length.
+                </p>
+              )
+            )}
+
+            {/* The page size, always, once it is known — D5 (a). Quiet: on a
+                full-size sheet it is a fact, not a finding. */}
+            {pageSize && (
               <p className="text-[0.7rem] text-muted-foreground">
-                Not checked — a half-size print reads half length.
+                Page <span className="font-mono">{pageSize.label}</span> in
               </p>
             )}
 

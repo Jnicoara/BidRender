@@ -41,6 +41,12 @@ import {
   type CompanyPricingDefaults,
 } from "../shared/pricing";
 import { closeoutActualHours } from "../shared/closeout";
+import type { NotPricedTally } from "../shared/lineNotPriced";
+
+/** The bid's figures count lines or parts nobody priced as $0. */
+function leavesUnpriced(notPriced: NotPricedTally): boolean {
+  return notPriced.lines > 0 || notPriced.parts > 0;
+}
 import {
   DEFAULT_RANGE_MONTHS,
   EMPTY_OUTCOMES,
@@ -212,6 +218,15 @@ export type OutcomesReport = {
      * one is the fault the bid screen's "incomplete" tag exists to prevent.
      */
     incompleteBids: number;
+    /**
+     * Bids in the range with lines or parts nobody has priced, which every
+     * dollar figure here counts as $0. A different fact from
+     * `incompleteBids` — those lines CAN'T be priced; these simply are not
+     * yet — and said separately, the way a bid total says "+ 4 lines not
+     * priced". Missing until 2026-09-27: the figures summed these at $0 and
+     * the screen said nothing.
+     */
+    notPricedBids: number;
   };
   timeline: OutcomePeriod[];
   /**
@@ -335,6 +350,7 @@ export async function outcomesReport(
       pendingValue: roundMoney(pendingValue),
       totalValue: roundMoney(timeline.reduce((s, p) => s + p.totalValue, 0)),
       incompleteBids: costs.filter(row => row.brokenLines > 0).length,
+      notPricedBids: costs.filter(row => leavesUnpriced(row.notPriced)).length,
     },
     timeline,
     earliestBid: earliest ? asDateString(earliest) : null,
@@ -372,6 +388,11 @@ export type ProfitabilityReport = {
    * `incompleteBids`, which is the same fact for the other report.
    */
   incompleteJobs: number;
+  /**
+   * Closed jobs with lines or parts nobody priced, so their revenue counts
+   * those at $0. See OutcomesReport's `notPricedBids`.
+   */
+  notPricedJobs: number;
   /** True when more jobs closed in the range than one call will value. */
   truncated: boolean;
   /** How many jobs there really are, when truncated. */
@@ -404,7 +425,11 @@ const WORST_JOBS_SHOWN = 10;
  * because it is the rate the job was actually quoted at rather than today's.
  */
 /** A job as the report returns it: its figures, and whether they are short. */
-export type ClosedJob = JobProfit & { incomplete: boolean };
+export type ClosedJob = JobProfit & {
+  incomplete: boolean;
+  /** Lines and parts nobody priced, counted as $0 in the revenue. */
+  notPriced: NotPricedTally;
+};
 
 function toClosedJob(
   row: ClosedJobRow,
@@ -444,7 +469,7 @@ function toClosedJob(
     estimatedHours,
     actualHours,
   });
-  return { ...job, incomplete: row.brokenLines > 0 };
+  return { ...job, incomplete: row.brokenLines > 0, notPriced: row.notPriced };
 }
 
 /**
@@ -522,6 +547,7 @@ export async function profitabilityReport(
     timeline,
     worstJobs,
     incompleteJobs: jobs.filter(job => job.incomplete).length,
+    notPricedJobs: jobs.filter(job => leavesUnpriced(job.notPriced)).length,
     truncated: jobsInRange > rows.length,
     jobsInRange,
   };

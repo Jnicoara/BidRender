@@ -514,7 +514,8 @@ describeDb("a company with a bid history", () => {
     productivityPct?: string | null;
     lines?: Array<{
       qty: number;
-      materialCost: number;
+      /** NULL is a hand-priced line nobody priced — "Not priced". */
+      materialCost: number | null;
       laborHours: number;
       modifierPct?: number;
       laborRate: number;
@@ -544,7 +545,8 @@ describeDb("a company with a bid history", () => {
           bidId,
           name: `Line ${index + 1}`,
           qty: line.qty.toFixed(4),
-          snapshotMaterialCost: line.materialCost.toFixed(4),
+          snapshotMaterialCost:
+            line.materialCost === null ? null : line.materialCost.toFixed(4),
           snapshotLaborHours: line.laborHours.toFixed(4),
           snapshotModifierPct: (line.modifierPct ?? 0).toFixed(4),
           snapshotLaborRate: line.laborRate.toFixed(4),
@@ -1235,6 +1237,78 @@ describeDb("a company with a bid history", () => {
       });
       const outcomes = await callerFor(OWNER).analytics.outcomes(YEAR);
       expect(outcomes.totals.incompleteBids).toBe(0);
+    });
+  });
+
+  // ── Figures that count unpriced lines as $0 say so (2026-09-27) ───────────
+  // A different fact from the one above: these lines are IN the figures, at
+  // $0, because nobody priced them. Analytics said nothing about them, while
+  // the bid and the Dashboard card each said "+ 1 line not priced".
+
+  describe("a bid with a line nobody has priced", () => {
+    const unpriced = {
+      qty: 1,
+      materialCost: null,
+      laborHours: 0,
+      laborRate: 0,
+    };
+    const fine = { qty: 2, materialCost: 10, laborHours: 0, laborRate: 0 };
+
+    it("is counted as not priced in the outcomes report, and not as incomplete", async () => {
+      await seedBid({
+        userId: OWNER,
+        status: "Won",
+        createdAt: "2026-03-10",
+        lines: [fine, unpriced],
+      });
+      await seedBid({
+        userId: OWNER,
+        status: "Won",
+        createdAt: "2026-03-11",
+        lines: [fine],
+      });
+
+      const report = await callerFor(OWNER).analytics.outcomes(YEAR);
+      expect(report.totals.notPricedBids).toBe(1);
+      expect(report.totals.incompleteBids).toBe(0);
+    });
+
+    it("marks the closed job with its unpriced line", async () => {
+      const bidId = await seedBid({
+        userId: OWNER,
+        name: "Half-priced job",
+        status: "Won",
+        createdAt: "2026-03-10",
+        lines: [
+          { qty: 1, materialCost: 100, laborHours: 10, laborRate: 50 },
+          unpriced,
+        ],
+      });
+      await closeOut({
+        bidId,
+        userId: OWNER,
+        estimatedHours: 10,
+        actualHours: 12,
+        closedAt: "2026-04-01",
+      });
+
+      const report = await callerFor(OWNER).analytics.profitability(YEAR);
+      expect(report.notPricedJobs).toBe(1);
+      expect(report.worstJobs.find(j => j.bidId === bidId)?.notPriced).toEqual({
+        lines: 1,
+        parts: 0,
+      });
+    });
+
+    it("reports nothing not priced when every line has a price", async () => {
+      await seedBid({
+        userId: OWNER,
+        status: "Won",
+        createdAt: "2026-03-10",
+        lines: [fine],
+      });
+      const outcomes = await callerFor(OWNER).analytics.outcomes(YEAR);
+      expect(outcomes.totals.notPricedBids).toBe(0);
     });
   });
 
