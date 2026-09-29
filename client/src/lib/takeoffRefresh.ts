@@ -38,6 +38,9 @@ export type TakeoffQuery =
   | "takeoffHeights.forBid"
   | "bidPdfs.list"
   | "bidPdfs.sheetJumpList"
+  // The bid's own lines, and the materials list built from them.
+  | "bids.get"
+  | "materialsList.get"
   // Not keyed by bid on the server, so invalidated whole.
   | "bidPdfs.searchText"
   | "takeoffRuns.measurability";
@@ -48,6 +51,17 @@ export const BID_QUANTITY_QUERIES = [
   "takeoffRuns.drops",
   "takeoffRunTypes.bridgeForBid",
   "takeoffGroups.list",
+  /*
+    ADDED 2026-09-29, with deleting a selection of marks and "Undo drops". A
+    line that follows the plans takes its quantity from the marks, so the
+    BID's cached lines and the materials list move with every change here.
+    Neither was refreshed: the materials list, opened again after a delete,
+    showed its last answer until the refetch landed, and the bid screen kept
+    the page it had cached. The owner's rule is that bid lines and the
+    materials list update right after any delete or undo.
+  */
+  "bids.get",
+  "materialsList.get",
 ] as const satisfies readonly TakeoffQuery[];
 
 const RUN_QUERIES = [
@@ -63,6 +77,8 @@ const RUN_QUERIES = [
     reading is true by construction.
   */
   "takeoffGroups.list",
+  // Everything a run moves on the bid, so a new bid figure is added once.
+  ...BID_QUANTITY_QUERIES,
 ] as const satisfies readonly TakeoffQuery[];
 
 const MARK_QUERIES = [

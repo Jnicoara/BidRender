@@ -70,6 +70,20 @@ describe("what each change on the Plans screen must refresh", () => {
     expect(moves("marksPlaced").has("takeoffRuns.listForSheet")).toBe(false);
   });
 
+  /*
+    ADDED 2026-09-29 (owner): after deleting marks or undoing drops, the bid
+    lines and the materials list must update right away. Both were missing
+    from every list here, so each kept its cached answer.
+  */
+  it("deleting marks or undoing drops refreshes the bid's lines and the materials list", () => {
+    for (const change of ["markRemoved", "groupDrop"] as const) {
+      const set = moves(change);
+      for (const q of ["bids.get", "materialsList.get"] as const) {
+        expect(set.has(q), `${change} → ${q}`).toBe(true);
+      }
+    }
+  });
+
   it("changing a count's drop moves every bid quantity and the count row", () => {
     for (const q of BID_QUANTITY_QUERIES) {
       expect(moves("groupDrop").has(q), q).toBe(true);

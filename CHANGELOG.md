@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **You can now delete counted marks on the plans, one or many at once.**
+  Click a mark to select it, Shift-click or Shift-drag a box to select more,
+  then press Delete or use the Delete button. Deleting more than one asks
+  first and names what it will take off. Until now there was no way to remove
+  a mark at all, so a misplaced one stayed on the count and on the bid.
+- **"Undo drops" puts a count's drop back as it was before your last
+  change**, taking off exactly the drops that change added and nothing else.
+  After any delete or undo, the totals, the "From marks" rows, the bid's lines
+  and the materials list all update straight away. The bid and the materials
+  list used to keep showing the old number until they were reloaded.
 - **Counted devices can now carry their drop from the ceiling.** On any
   counted item — thirty receptacles, say — choose what each one drops to and
   what the drop is made of, once, and every mark gets its drop of pipe and
