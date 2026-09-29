@@ -1445,21 +1445,92 @@ in the app's settings locks every browser out again.
 local-dev  →  staging  →  main
 ```
 
+**PUSHING A BRANCH DOES NOT RUN MIGRATIONS — on staging or on live.** The
+build only builds. Every migration is a command you run by hand, and the
+additive ones run BEFORE the push (§ 5, three steps).
+
+> **Corrected 2026-09-29.** This list used to put the staging push at step 2
+> and the migrations at step 3, which is the wrong way round for an additive
+> file and read as if the push applied them. It was being read that way when
+> 0089–0095 went to staging.
+
 1. `git push origin local-dev` — as always, deploys nothing.
-2. **To try it on staging:** `git push origin local-dev:staging`. The staging
-   app rebuilds in 3–6 minutes. Check it there.
-3. **Migrations go to staging FIRST**, with the same three steps as § 5:
+2. **Additive migrations go to the staging DATABASE first**, before any push
+   (§ 5, step 1 of three):
 
    ```bash
+   DOTENV_CONFIG_PATH=.env.staging.local pnpm tsx scripts/schemaDrift.mts
    ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.staging.local pnpm tsx scripts/migrate.mts
    DOTENV_CONFIG_PATH=.env.staging.local pnpm tsx scripts/schemaDrift.mts
    ```
 
+   Drift before AND after, so the second run is an outcome rather than intent.
    `.env.staging.local` reaches the staging database over the public host,
    so the laptop's address must be on the database's trusted list (§ 10) —
    the same entry production uses.
 
-4. Then the ordinary production deploy, § 4.
+3. **Then push the code:** `git push origin local-dev:staging`. The staging
+   app rebuilds in 3–6 minutes; `/api/version` must show the commit you
+   pushed. Check the screens there.
+4. Meaning-changing backfills, if the release has any, run now (§ 5, step 3).
+5. Then production, in the same order — see the release entry below for the
+   current one, and § 5a for the full commands.
+
+### Live release: migrations 0089–0095 (written 2026-09-29, done 2026-09-29)
+
+Staging took this release on 2026-09-29: its drift check went from 6 tables
+and 2 foreign keys out of line (89 migrations) to "Database matches the
+schema" (96 migrations, 135 of 135 foreign keys), then `d9fa1d8` was pushed and
+checked. **Live is still on `45ada57` with 89 migrations** as of that day.
+
+**Pushing `main` does NOT run these migrations.** They are all additive —
+nullable columns, one new table, one index and foreign key, no `UPDATE` — so
+they go on the live database BEFORE the push, and step 3 of the three is
+empty. The order:
+
+1. **Back up the live database, and prove the backup restores.** § 5a steps 1
+   and 2: `scripts/backup.mts`, then `scripts/verifyBackup.mts` into a local
+   MySQL. Minutes before, not last night's. A backup that has not been
+   restored is not yet a backup.
+2. **Run 0089–0095 on live.** § 5a's commands against
+   `.env.production.local`, with `ALLOW_REMOTE_DATABASE=yes`, and
+   `scripts/schemaDrift.mts` before and after. Expect **seven** applied, 96
+   recorded, and "Database matches the schema". **If what it prints does not
+   match, stop and find out why before going on** — either this line is stale
+   (another migration landed since it was written) or the database is not in
+   the state you think it is, and those want opposite responses.
+3. **Confirm the OLD live code still works against the new columns — before
+   pushing anything.** `curl -s https://bidridge.com/api/version` must still
+   say `45ada57`. Then on bidridge.com open a real bid: it loads, its plans
+   open, its totals show. Old code ignores the new columns (it selects only
+   what it knows about), so nothing should change — this step is what makes
+   that a measurement rather than an expectation. If anything is broken here,
+   the push has not happened yet and nothing new is live; stop.
+4. **Push `main`** — § 4 exactly: pre-flight, `git merge --ff-only local-dev`,
+   push, `git checkout local-dev`, watch DigitalOcean → Activity.
+   `/api/version` must then show the pushed commit and a fresh `builtAt`
+   (§ 6).
+5. **Check one real bid on the new build**: it opens, plans load, totals show.
+
+When it is done, change this heading's "not yet done" to the date, and say so
+here.
+
+**Done 2026-09-29, in this order.** Backup `2026-09-29T19-00-13Z` (62 tables,
+3144 rows, 5 files) restored and VERIFIED into local MySQL with
+`KEEP_SCRATCH=1`, and 0089–0095 rehearsed on that restored copy: 7 applied,
+matches, 135/135 foreign keys; scratch dropped. Live drift before: 89
+recorded, 6 tables and 2 foreign keys out. Live migrate: 7 applied, 96
+recorded, "Database matches the schema", 135/135. Old code (`45ada57`) then
+opened bid 23 and its plans with 0 failed API calls. `main` pushed
+`45ada57..3ca33dc` at 19:05:36Z; `/api/version` reported `3ca33dc`, `builtAt`
+19:06:28Z. Bid 23 re-checked on the new bundle.
+
+**One figure moved, on purpose — do not read it as a fault.** Bid 23's
+"This bid, all sheets" read Conduit 104.52 ft on the old code and 0 ft on the
+new, with "2 runs have no type — 179.87 ft of conduit is not on the bid". That
+is the 2026-09-27 decision in `shared/runOnBid.ts`: the totals show what the
+bid prices, so untyped runs are left out and named, and a draft now counts
+(104.52 ft finished + a draft = 179.87 ft).
 
 ### What keeps it away from live data — and how to check it still does
 
