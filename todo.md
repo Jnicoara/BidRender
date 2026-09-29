@@ -80,7 +80,7 @@ everyone to re-run instead of read.
       row that shares a shipped name" lost its own row under a full run.**
       2026-09-28, once, on the local-dev + track-c merge: the company row it
       inserts was gone when read back (`Cannot read properties of undefined
-    (reading 'userId')`, line ~264). Passes alone. Nothing found that
+  (reading 'userId')`, line ~264). Passes alone. Nothing found that
       deletes it: every broad `delete(materials)` in the suite is scoped to its
       own user ids, and no other file uses 7404/7405. A race, not yet
       explained. Run it alongside the full suite several times before calling
@@ -1818,7 +1818,11 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       set zero. Production had no bid lines at deploy time, so no live bid
       carries any.
 - [ ] **PVC sweeps are not in the catalog.** Sweeps wait for an Underground
-      category (answer 2). T bodies shipped 2026-09-27 (see "T bodies at a
+      category (answer 2). **PLANNED 2026-09-29** in
+      `references/materials-track-c-plan.md` § 8, which proposes NOT waiting
+      (Conduit Fittings shelf now, S1) — awaiting the owner's answers; if
+      accepted, answer 2 here and in takeoff-spec D19 gets a line saying so.
+      T bodies shipped 2026-09-27 (see "T bodies at a
       tee" above). **LL/LR/C SHIPPED 2026-09-28** (plan § 7, 135 rows,
       overriding T6's "until the takeoff proposes them"). The takeoff still
       proposes none of them: offering them at a pull point needs a new

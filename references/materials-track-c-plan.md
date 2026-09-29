@@ -751,3 +751,218 @@ why before going on.
   It needs a new `runMaterialRole` (Track A migration, three-step deploy) and
   a way to know which side the pipe turns to, which the trace does not record.
   The rows are useful by hand without it.
+
+---
+
+## 8. PVC sweeps — plan, 2026-09-29
+
+Plan only. Nothing here is built. Track C rules: no migration, no schema
+change, no deploy.
+
+Measured on `track-c` at `d9fa1d8` (= `origin/local-dev`) by importing
+`BASELINE_MATERIALS`: **1,455 rows**, Conduit Fittings **518**. The tripwire
+is now **3,000** (`CATALOG_ROW_LIMIT`, raised in `cadcdd3`), so headroom is
+**1,545**. If a re-run prints different numbers, stop and find out why before
+acting — either this section is stale or the branch is not where it was.
+
+### This overrides an earlier answer — say so in both places when built
+
+**D19 answer 2** (`references/takeoff-spec.md`, 2026-09-26): "45° elbows only
+were added to the catalog; sweeps wait for an Underground category." The same
+line is in `todo.md` ("PVC sweeps are not in the catalog"). This plan proposes
+shipping sweeps **on the Conduit Fittings shelf now**, without waiting (S1).
+Why:
+
+- `materials.category` is a MySQL enum (`MATERIAL_CATEGORIES`). An Underground
+  shelf is a migration — Track A — and `ASSEMBLIES_PLAN.md` ties it to the
+  `parentId` release, which is not scheduled.
+- **Underground is already an axis, and it is not the category.** D8 made it a
+  LOCATION tag on runs and stamps. A sweep is a conduit fitting by its shape;
+  where it is buried is the run's location. Two axes for one fact is the
+  mistake CLAUDE.md warns against with `trade` vs `projectType`.
+- **Moving later is free.** `backfillMaterialMetadata` re-stamps `category`
+  from the seed on every start (`server/db.ts`, ~line 2051), so if an
+  Underground shelf ever lands, moving the sweeps is a one-word seed edit with
+  the same ids.
+
+When accepted, D19 answer 2 and the todo item each get a line saying this
+replaced them. The todo item already points here.
+
+### What already exists
+
+- Every PVC family (Sch 40, Sch 80) ships a **standard-radius factory 90 and
+  45** at all nine trade sizes (`2" PVC Sch 40 90-degree elbow`), from
+  `FITTINGS` in `server/seed/materials/conduit.ts`. Those stay what they are.
+- The 90's slang includes the word **`sweep`** (`"ell bend sweep factory"`).
+  Once a row NAMED "sweep" exists, that alias points one material at another's
+  name — the alias rule in CLAUDE.md, which `materialsCatalog.test.ts` checks.
+  See S5.
+- The takeoff: every traced corner and every counted end drop on a PVC run
+  becomes a factory 90 or 45 (`bendMethodFor` — "PVC always takes factory
+  elbows"), found by `elbowName(size, family, angle)`.
+- **`takeoff_run_types.elbow90MaterialId` / `elbow45MaterialId` already
+  exist** and the server honours them (`server/db.ts` ~line 11865,
+  `overrides`; `takeoffRunTypesRouter` accepts them). **The run-type editor
+  does not show them** — `RunTypePicker.tsx` exposes the coupling, connector
+  and strap overrides only. That finding shapes the takeoff half below.
+
+### Rows
+
+Name: `${size} ${family} ${angle}-degree sweep, ${radius}" radius`, e.g.
+`2" PVC Sch 40 90-degree sweep, 36" radius`. **Measured** against
+`shared/materialSizeOrder.ts`: the leading trade size is the size key (`2"` →
+`[1,6,0,…]`, the same as the elbow), the radius suffix does not trip it, and
+sorted, the sweeps sit beside that size's elbow with 24" before 36". Each
+radius is its own type group (`materialTypeName`), which is right: they are
+not interchangeable.
+
+| Axis      | Recommend                              | Why / held                                                                                                                                                                                                                                     |
+| --------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sizes     | 1", 1-1/4", 1-1/2", 2", 2-1/2", 3", 4" | At 1/2" and 3/4" the factory elbow is the bend; nobody buys large-radius sweeps there.                                                                                                                                                         |
+| Angles    | **90° and 45°**                        | 30°, 22.5° and 11.25° exist but are occasional, and the bend counter only ever produces 90 and 45 (15–67° → 45), so anything else is hand-added regardless. Held — S3.                                                                         |
+| Radii     | **24" and 36"**                        | 36" is the usual utility/service spec, 24" the usual general-underground one. 18" (small sizes) and 48" (primary, 4"+) held — S2. **Typical values, not measured here: confirm against the pricing sheet or a supplier list before building.** |
+| Schedules | **Sch 40 and Sch 80, symmetric**       | Sch 80 is where a sweep comes up out of grade exposed to damage. Symmetric keeps the generator a loop rather than a list of exceptions. Lean alternative in S4.                                                                                |
+
+**Rows: 7 sizes × 2 angles × 2 radii × 2 schedules = 56.** Catalog
+1,455 → **1,511**; Conduit Fittings 518 → **574**; pricing sheet +56 generic
+rows. Lean alternative (Sch 80 90° only): 42.
+
+Per row: `unitOfSale: "each"`, `UNPRICED`, Conduit Fittings, slang via
+`aliases()` — `sizeAliases(size)`, the family slang, plus "large radius long
+radius big bend underground stub up stubup riser utility". **Not "lr"** — that
+is the LR conduit body. Description: `Large-radius factory sweep, 36" to the
+centreline.` (per radius). Not marked `"common"` in `materialCommonness.ts`:
+the standard 90 stays what a bare "2 pvc 90" leads with.
+
+A name helper `sweepName(size, family, angle, radius)` goes in
+`shared/runFittingMaterials.ts` beside `elbowName`, and the seed calls it —
+the same rule as every other fitting name, so a lookup built later cannot
+drift from the seed.
+
+### Takeoff — what is automatic and what is by hand
+
+| Situation                                                     | Today                            | Proposed                                                                                                                                                | Needs                                                        |
+| ------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Corner or stub-up drop on a PVC run, nothing chosen           | Factory 90 / 45                  | **Unchanged.** The default stays the standard elbow.                                                                                                    | Nothing                                                      |
+| A run type the estimator treats as swept (e.g. "2\" PVC UG")  | Only by a server call; no screen | **Automatic by choice**: show "90s from" / "45s from" on the run-type editor, pick the 36" sweep, and every corner and drop on that type counts sweeps. | Client change only — columns and server exist. No migration. |
+| Degrees toward a pull point                                   | 90 per 90                        | Unchanged — a sweep is still 90°.                                                                                                                       | Nothing                                                      |
+| 30° / 22.5° / 11.25° sweeps, 48" radius, extra sweeps         | —                                | **By hand**: add the row to the bid or an assembly.                                                                                                     | The rows (30°/22.5° only if S3 says yes)                     |
+| Rigid or PVC-coated 90 at a PVC stub-up (utility requirement) | By hand (rigid 90 rows exist)    | **By hand**, or the run type's 90 override pointed at the rigid elbow.                                                                                  | Nothing new                                                  |
+| Location tag Underground switching elbows to sweeps by itself | —                                | **Not proposed.** D8's open question says a switch like that must be shown, never silent; a run type per location already does it explicitly.           | —                                                            |
+
+Both directions stay open (CLAUDE.md, "as manual or as automated"): somebody
+who never touches run-type overrides still gets factory elbows counted and can
+add sweeps by hand; somebody who sets up a "PVC underground" type once gets
+sweeps counted on every job.
+
+**Not measured, and worth checking before relying on the automatic path:**
+`runBends.ts` merges same-direction turns closer than 3 ft into one bend. A
+36"-radius 90 has about 4.7 ft of arc, so an arc traced with clicks more than
+3 ft apart may count as two 45s rather than one 90. Trace one on the fixture
+bid and read the count.
+
+### How it would be built (one commit; no schema, no migration)
+
+1. Stop `pnpm dev` (seed edits under `tsx watch`).
+2. `pnpm tsx scripts/searchSpotCheck.mts` BEFORE, saved.
+3. `sweepName` plus a sweep generator in `conduit.ts` for the two PVC
+   families; take `sweep` off the elbow slang (if S5 = yes).
+4. Tests: every sweep the matrix promises exists; pin role-ranked `sweep`,
+   `2 pvc sweep`, `36 sweep` → a sweep first, and `2 pvc 90` → the standard
+   elbow first.
+5. Spot-check AFTER, diffed — every moved line must be a sweep query. If
+   anything else moved, stop and find out why.
+6. `pnpm check`, then the catalog suites on `bidrender_test_clean`.
+7. Check the xlsx for typed prices; regenerate the pricing sheet.
+8. D19 answer 2 and the todo item say what replaced them. CHANGELOG line.
+9. (Separate commit, if S6 = yes) the run-type editor's "90s / 45s from"
+   pickers — then look at the screen, pick a sweep, and read the fitting count
+   move.
+
+Expected after step 7: catalog **1,511**, Conduit Fittings **574**. If a
+count differs, stop and find out why before going on.
+
+### Questions for the owner (recommended answer first)
+
+- **S1. Ship sweeps on Conduit Fittings now, rather than wait for an
+  Underground shelf?** _Recommend yes._ The shelf is a Track A migration with
+  no date; Underground is already a location tag; moving shelves later is a
+  seed edit.
+- **S2. Radii: 24" and 36"?** _Recommend yes._ Add 18" only if the small
+  sizes (1"–1-1/2") are routinely spec'd that way on your jobs; 48" held
+  (primary and utility jobs price from the spec).
+- **S3. Angles: 90° and 45° only?** _Recommend yes._ 30° and 22.5° would add
+  56 more rows the takeoff can never count; hand-add a custom row when a job
+  calls for one.
+- **S4. Sch 80 gets the full set (56 total) or 90° only (42)?** _Recommend
+  the full set_ — one loop, and a 45 kick into a riser is not rare.
+- **S5. Take "sweep" off the standard PVC elbows' aliases?** _Recommend yes_
+  — once sweep rows exist, a bare "sweep" should find sweeps. The cost:
+  somebody who calls every PVC 90 a sweep sees the sweeps first, with the
+  elbow one query away ("pvc 90").
+- **S6. Show the existing 90/45 overrides on the run-type editor, so a type
+  can count sweeps automatically?** _Recommend yes, as its own commit after
+  the rows._ No migration — the columns and the server path exist. It is a
+  screen change rather than catalog, so say whether Track C should take it.
+- **S7. Should the Underground location tag switch elbows to sweeps by
+  itself?** _Recommend no_ (D8: shown, never silent; S6 covers it
+  explicitly).
+
+---
+
+## 9. Boxes Tier 3 — what each group would add, concrete ring boxes first
+
+Measured at `d9fa1d8`: Boxes shelf **90** rows. The owner's B2 (2026-09-27):
+"hold Tier 3, concrete ring boxes first". Headroom is no longer the constraint
+(1,545 to the 3,000 tripwire); the reasons to hold below are about the takeoff
+and search, not size.
+
+### 9a. Concrete ring boxes — first in line, 4–5 rows
+
+For deck pours: a ring nailed to the form with a backplate, and the pipe run
+in the pour. Nothing in the catalog is one today (names searched for
+"concrete", "deck", "ring": only mud and extension rings, and
+`Concrete wedge anchor`).
+
+| #   | Proposed                     | Why                                                                                                                               |
+| --- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `Concrete ring, 4" deep`     | The common depth for a slab.                                                                                                      |
+| 2   | `Concrete ring, 6" deep`     | Thicker slabs, more pipe entries.                                                                                                 |
+| 3   | `Concrete ring, 3" deep`     | Thin toppings. Optional — B5.                                                                                                     |
+| 4   | `Concrete ring backplate`    | Sold separately; a ring without one cannot be poured.                                                                             |
+| 5   | `Concrete ring cover, blank` | **Only if the shipped `4" round blank cover` does not fit** — rings are 4" octagon; check a spec sheet before adding a duplicate. |
+
+Depths are typical, not measured here — confirm against the pricing sheet or a
+supplier list. Slang: "deck box", "pour box", "slab box", "ceiling ring",
+brand aliases "steel city", "appleton" (per F, aliases only). **Takeoff: no
+effect** — nothing proposes a box at a stamp; they are hand-added or built
+into a "light on deck" assembly. Concrete-tight EMT fittings need nothing new:
+the compression style already ships.
+
+### 9b. The rest of Tier 3 (from § 6), and what each costs beyond rows
+
+| Group                                           | Rows | What it takes beyond rows                                                               | Recommend    |
+| ----------------------------------------------- | ---- | --------------------------------------------------------------------------------------- | ------------ |
+| More pull-box sizes (10x10, 18x18, 30x30)       | 3    | **Changes `pullBoxFor`'s proposals** (1-1/2" angle pull 12x12 → 10x10). A takeoff call. | Hold (B3)    |
+| Pull-box depths (6x6x4 vs 6x6x6 …)              | 6+   | The lookup keys on side only; depth means teaching it depth.                            | Hold         |
+| Weatherproof boxes by hub size                  | 3–6  | Existing rows are unsized: a rename (`RENAMED_BASELINE_MATERIALS`) plus adds.           | Next, if any |
+| NEMA 4X steel / stainless / fiberglass / hinged | 4–8  | Spec-driven; those jobs price from the spec.                                            | Hold         |
+| FST/FDT tee-through; 1-1/4"+ FS/FD              | 4–6  | Rare.                                                                                   | Hold         |
+| Adjustable-depth device boxes                   | 2    | An ordinary box plus the shipped extender covers it.                                    | Hold         |
+| Masonry deep; old-work 4-gang; metal 4-gang     | 3–5  | Rare.                                                                                   | Hold         |
+| 4-11/16" single-device raised covers            | 2    | The 4" raised covers serve one device.                                                  | Hold         |
+
+Built the same way as Tiers 1+2 (§ 3, "How it would be built"): rows in
+`boxes.ts`, unpriced, spot-check before and after, pricing sheet regenerated,
+no schema.
+
+### Questions for the owner (recommended answer first)
+
+- **B4. What comes next: sweeps (§ 8) or concrete ring boxes (§ 9a)?**
+  _Recommend sweeps first_ — they touch every underground job and the takeoff
+  can count them (S6); ring boxes are 4–5 rows for commercial deck work only.
+  Both are small enough to ship in one commit if you prefer.
+- **B5. Ring box depths: 4" and 6", or 3"/4"/6"?** _Recommend 4" and 6"_
+  plus the backplate; add 3" if you pour thin toppings.
+- **B6. Everything else in Tier 3: keep holding?** _Recommend hold_, with
+  weatherproof-by-hub-size next after ring boxes if any.
