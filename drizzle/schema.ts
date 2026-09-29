@@ -2570,6 +2570,24 @@ export const takeoffRunTypes = mysqlTable(
       onDelete: "set null",
     }),
 
+    /**
+     * Extra and makeup for runs of this type (0090,
+     * references/track-b-held-migrations-plan.md § 1). Every one NULL means
+     * "follow the company" (`takeoff_extra_defaults`), then the ACCEPTED
+     * starter, and nothing is copied down. Percentages are fractions
+     * (0.1000 = 10%); makeup is whole inches per conductor per counted end.
+     *
+     * `makeupByKindInches` maps a height type's key to its own makeup for this
+     * type, and beats the plain device or panel figure at this level (owner
+     * Q10). NULL is no per-kind figures.
+     */
+    conduitExtraPct: decimal("conduitExtraPct", { precision: 6, scale: 4 }),
+    wireExtraPct: decimal("wireExtraPct", { precision: 6, scale: 4 }),
+    makeupDeviceInches: int("makeupDeviceInches"),
+    makeupPanelInches: int("makeupPanelInches"),
+    makeupByKindInches:
+      json("makeupByKindInches").$type<Record<string, number>>(),
+
     /** active / archived / deleted. See materials.status — same lifecycle. */
     status: mysqlEnum("status", LIBRARY_STATUSES).default("active").notNull(),
     archivedAt: timestamp("archivedAt"),
@@ -2692,6 +2710,31 @@ export const takeoffRuns = mysqlTable(
      * becomes route.
      */
     traceMode: mysqlEnum("traceMode", TRACE_MODES),
+
+    /**
+     * A length somebody TYPED for this row (0091, § 4c): the flat run along the
+     * drawing, with verticals and extra added exactly as to a traced length
+     * (owner Q6). NULL means "measured from the points", which is every run
+     * before 0091. Its own column because `lengthInches` is recomputed on
+     * every save and would overwrite a typed figure. Per row: each leg has
+     * its own.
+     */
+    typedLengthInches: decimal("typedLengthInches", {
+      precision: 14,
+      scale: 4,
+    }),
+
+    /**
+     * This run's own extra and makeup (0091). Same meaning as the columns on
+     * `takeoff_run_types`; NULL follows the type. Stored on EVERY row of a
+     * run, root and legs alike, kept equal by the server — the traceMode rule.
+     */
+    conduitExtraPct: decimal("conduitExtraPct", { precision: 6, scale: 4 }),
+    wireExtraPct: decimal("wireExtraPct", { precision: 6, scale: 4 }),
+    makeupDeviceInches: int("makeupDeviceInches"),
+    makeupPanelInches: int("makeupPanelInches"),
+    makeupByKindInches:
+      json("makeupByKindInches").$type<Record<string, number>>(),
 
     /** WHERE the raceway sits. Same axis as a stamp's; see TAKEOFF_LOCATIONS. */
     location: mysqlEnum("location", TAKEOFF_LOCATIONS),
@@ -3013,6 +3056,40 @@ export const takeoffBendDefaults = mysqlTable(
 
 export type TakeoffBendDefaults = typeof takeoffBendDefaults.$inferSelect;
 
+/**
+ * A company's extra and makeup settings for traced runs (0089,
+ * references/track-b-held-migrations-plan.md § 1). One row per company; no
+ * row, or a NULL column, means "not set" and falls through to the starter.
+ *
+ * The starter (10% wire, 5% conduit, 18 in device, 5 ft panel) applies NOTHING
+ * until `acceptedAt` is stamped — CLAUDE.md § Starter content, amended
+ * 2026-09-25, and owner Q1. Percentages are fractions (0.1000 = 10%); makeup is
+ * whole inches per conductor per counted end.
+ *
+ * Its own table, like `takeoff_bend_defaults`, so a mistake in counting
+ * settings cannot reach overhead and profit.
+ */
+export const takeoffExtraDefaults = mysqlTable(
+  "takeoff_extra_defaults",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    conduitExtraPct: decimal("conduitExtraPct", { precision: 6, scale: 4 }),
+    wireExtraPct: decimal("wireExtraPct", { precision: 6, scale: 4 }),
+    makeupDeviceInches: int("makeupDeviceInches"),
+    makeupPanelInches: int("makeupPanelInches"),
+    /** When the starter figures were accepted. NULL: they apply nothing. */
+    acceptedAt: timestamp("acceptedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [unique("takeoff_extra_defaults_user_uq").on(t.userId)]
+);
+
+export type TakeoffExtraDefaults = typeof takeoffExtraDefaults.$inferSelect;
+
 export const PULL_POINT_PLACES = ["corner", "end-drop"] as const;
 export const PULL_POINT_KIND_VALUES = ["lb", "pullBox"] as const;
 export const PULL_POINT_STATUSES = ["accepted", "dismissed"] as const;
@@ -3173,6 +3250,18 @@ export const takeoffMountingHeights = mysqlTable(
      * `18` typed for a stub-up below slab is an 11.5 ft error.
      */
     heightInches: int("heightInches"),
+
+    /**
+     * Makeup at an end of this type (0092). `makeupAt` says which class it
+     * follows when it has no number of its own — `panel` lets a
+     * "Switchboard" take the panel figure at every level. NULL is `device`,
+     * which every type is before 0092. `makeupInches` is this type's own
+     * figure at the company level; NULL follows the class. A makeup-only row
+     * leaves `heightInches` NULL, which still falls through to the shipped
+     * height.
+     */
+    makeupAt: mysqlEnum("makeupAt", ["device", "panel"]),
+    makeupInches: int("makeupInches"),
 
     /** Retire, never delete. See the header. */
     isActive: boolean("isActive").default(true).notNull(),
@@ -3345,12 +3434,30 @@ export const takeoffGroups = mysqlTable(
       onDelete: "set null",
     }),
 
+    /**
+     * The drop each mark in this group makes (Phase 8, 0094/0095;
+     * references/track-b-held-migrations-plan.md § 3). Set on the GROUP, not
+     * per mark (plan-viewer-overhaul.md § 7).
+     *
+     * `dropKind` is the height type key at the device. NULL is not answered,
+     * so no drop is counted; `distribution` answers "no drop".
+     * `dropHeightInches` NULL follows the kind, then the job, then the company.
+     * `dropRunTypeId` is what the drop is made of; NULL leaves nothing to
+     * price it, so it is flagged and left off the bid.
+     */
+    dropKind: varchar("dropKind", { length: 64 }),
+    dropHeightInches: int("dropHeightInches"),
+    dropRunTypeId: int("dropRunTypeId").references(() => takeoffRunTypes.id, {
+      onDelete: "set null",
+    }),
+
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   t => [
     index("takeoff_groups_bidId_idx").on(t.bidId),
     index("takeoff_groups_userId_idx").on(t.userId),
+    index("takeoff_groups_dropRunTypeId_idx").on(t.dropRunTypeId),
   ]
 );
 
@@ -3856,6 +3963,13 @@ export const bidLineItems = mysqlTable(
     /** Assembly name at add time — the bid reads the same after a rename. */
     name: varchar("name", { length: 255 }).notNull(),
     qty: decimal("qty", { precision: 10, scale: 4 }).default("1").notNull(),
+    /**
+     * The quantity LABOR is priced on, where it differs from the quantity
+     * bought (0093, owner Q5): a run-type line buys its extra but installs
+     * without it. NULL means "labor on `qty`", which is every line before
+     * 0093 and every line not from a run. Frozen by a lock alongside `qty`.
+     */
+    laborQty: decimal("laborQty", { precision: 10, scale: 4 }),
 
     /**
      * Which repeating unit this line belongs to, e.g. "Room 101". NULL for a
