@@ -62,6 +62,7 @@ import { extractPlanIssuer, planSourceKey } from "../../shared/planSource";
 import { symbolLookupKey } from "../../shared/takeoffCounts";
 import type { CopilotRunStatus } from "../../drizzle/schema";
 import * as db from "../db";
+import { groupForAssembly } from "../assemblyGroup";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -905,34 +906,67 @@ export const planCopilotRouter = router({
         placeable.push(row);
       }
 
-      if (placeable.length === 0) {
+      // The same rows the manual stamp tool writes, through the same rules: the
+      // mark joins the assembly's COUNT on this bid (found or made by the one
+      // function the stamp tool uses), its name comes from that count, and the
+      // assembly's Category is frozen at drop time so the System layer keeps
+      // working after the library assembly is archived or renamed.
+      //
+      // Until 2026-09-29 this wrote no groupId, and this comment claimed "the
+      // same rows the manual stamp tool writes" regardless. Every counter skips
+      // a NULL group, so a placed mark was drawn, priced by the materials list,
+      // and counted on no bid line. A finding whose assembly cannot be found
+      // is now refused rather than placed outside a count.
+      type Target = { groupId: number; label: string; category: string | null };
+      const targets = new Map<number, Target | null>();
+      const placing: { row: (typeof placeable)[number]; target: Target }[] = [];
+      for (const row of placeable) {
+        // `acceptable` already refused a finding with no assembly; this is the
+        // same check restated so the type carries it rather than a `!`.
+        if (row.assemblyId === null) continue;
+        if (!targets.has(row.assemblyId)) {
+          const assembly = await db.getAssemblyById(
+            row.assemblyId,
+            ctx.scope.dataUserId
+          );
+          if (!assembly) {
+            targets.set(row.assemblyId, null);
+          } else {
+            const group = await groupForAssembly(
+              run.bidId,
+              ctx.scope.dataUserId,
+              assembly
+            );
+            targets.set(row.assemblyId, {
+              groupId: group.id,
+              label: group.label,
+              category: assembly.category ?? null,
+            });
+          }
+        }
+        const target = targets.get(row.assemblyId) ?? null;
+        if (target === null) {
+          refusals.push(
+            `${row.rawLabel}: its assembly is no longer in your library, so there is nothing to count it as.`
+          );
+          continue;
+        }
+        placing.push({ row, target });
+      }
+
+      if (placing.length === 0) {
         return { placed: 0, refused: refusals };
       }
 
-      // The same rows the manual stamp tool writes, through the same snapshot
-      // rules — the assembly's Category frozen at drop time so the System layer
-      // keeps working after the library assembly is archived or renamed.
-      const categories = new Map<number, string | null>();
-      for (const row of placeable) {
-        if (row.assemblyId === null || categories.has(row.assemblyId)) continue;
-        const assembly = await db.getAssemblyById(
-          row.assemblyId,
-          ctx.scope.dataUserId
-        );
-        categories.set(row.assemblyId, assembly?.category ?? null);
-      }
-
       const stampIds = await db.createStampsReturningIds(
-        placeable.map(row => ({
+        placing.map(({ row, target }) => ({
           bidId: run.bidId,
           sheetId: sheet.id,
           userId: ctx.scope.dataUserId,
+          groupId: target.groupId,
           assemblyId: row.assemblyId,
-          assemblyName: row.assemblyName ?? row.rawLabel,
-          assemblyCategory:
-            row.assemblyId === null
-              ? null
-              : (categories.get(row.assemblyId) ?? null),
+          assemblyName: target.label,
+          assemblyCategory: target.category,
           location: null,
           x: Number(row.x).toFixed(4),
           y: Number(row.y).toFixed(4),
@@ -940,7 +974,7 @@ export const planCopilotRouter = router({
       );
 
       await Promise.all(
-        placeable.map((row, index) =>
+        placing.map(({ row }, index) =>
           db.setCopilotFindingStatus(
             row.id,
             ctx.scope.dataUserId,
@@ -950,7 +984,7 @@ export const planCopilotRouter = router({
         )
       );
 
-      return { placed: placeable.length, refused: refusals };
+      return { placed: placing.length, refused: refusals };
     }),
 
   /** Put a proposal aside. Touches the co-pilot's own row and nothing else. */

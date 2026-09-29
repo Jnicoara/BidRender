@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Marks placed by the plan reader now count on the bid.** Pressing Place
+  drew the marks and added their parts to the materials list, but the count
+  and the bid line never moved, so the bid and the supply list disagreed with
+  nothing on screen to say so. A placed mark now joins that assembly's count
+  (making one if the bid has none yet), exactly as a hand-placed mark does.
+
 - **Counted devices can now carry their drop from the ceiling.** On any
   counted item — thirty receptacles, say — choose what each one drops to and
   what the drop is made of, once, and every mark gets its drop of pipe and
