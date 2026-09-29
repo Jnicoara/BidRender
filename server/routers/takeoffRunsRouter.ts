@@ -74,6 +74,7 @@ import {
   pctText,
   refuseUnknownKinds,
 } from "../extrasInput";
+import { markDropEntries } from "../../shared/groupDrops";
 import { resolveRunType } from "../../shared/runTypeLookup";
 import { resolveMaterial } from "../../shared/materialLookup";
 import { rootOf } from "../../shared/runNetwork";
@@ -1317,7 +1318,25 @@ export const takeoffRunsRouter = router({
         bid.distributionHeightInches
       );
 
-      const measure = (rows: typeof runs, withWire: (id: number) => boolean) =>
+      /*
+        DROPS FROM MARKS (§ 3): in the totals exactly as on the bid, so the
+        panel and the bid line cannot disagree about them. Counted against
+        ALL runs, because any run end — typed or not — can claim a mark.
+      */
+      const drops = await db.loadGroupDrops(
+        input.bidId,
+        ctx.scope.dataUserId,
+        heights,
+        allRuns,
+        await db.getSheetScalesForBid(input.bidId, ctx.scope.dataUserId)
+      );
+      const dropEntries = markDropEntries(drops);
+
+      const measure = (
+        rows: typeof runs,
+        withWire: (id: number) => boolean,
+        markDrops: typeof dropEntries
+      ) =>
         totalQuantities(
           rows.map(run => ({
             run: tracedRunOf(run),
@@ -1331,11 +1350,14 @@ export const takeoffRunsRouter = router({
             extras: extrasForRunRow(run, heights),
             // A branched run is several rows and ONE run in the counts (D20).
             runKey: rootOf(run),
-          }))
+          })),
+          markDrops
         );
 
-      const totals = measure(runs, id => wireCounts.has(id));
-      const untyped = measure(noType, () => true);
+      const totals = measure(runs, id => wireCounts.has(id), dropEntries);
+      // Untyped RUNS only: a drop with no type is not footage anybody can
+      // price, and is counted below as its own note.
+      const untyped = measure(noType, () => true, []);
       const roots = (rows: typeof allRuns) => new Set(rows.map(rootOf)).size;
       const leftOut: RunTotalsLeftOut = {
         noType: {
@@ -1351,7 +1373,23 @@ export const takeoffRunsRouter = router({
         },
         draftCount: roots(runs.filter(r => r.status === "draft")),
       };
-      return { ...totals, quantity: quantityTraceSummary(runs), leftOut };
+      return {
+        ...totals,
+        quantity: quantityTraceSummary(runs),
+        leftOut,
+        /**
+         * What the DROPS FROM MARKS leave out, said beside the totals (§ 3):
+         * groups that want a drop but have no run type or no height, and
+         * counted drops sitting near an unlinked run end — a possible double
+         * count, flagged rather than guessed. Fittings for drops are never
+         * counted (Q8); `markDropCount` above is what that sentence counts.
+         */
+        markDropNotes: {
+          noTypeGroups: drops.filter(d => d.status === "no-type").length,
+          noHeightGroups: drops.filter(d => d.status === "no-height").length,
+          mayDoubleCount: drops.reduce((n, d) => n + d.mayDoubleCount, 0),
+        },
+      };
     }),
 
   /**
@@ -1740,7 +1778,38 @@ export const takeoffRunsRouter = router({
           });
         }
       }
-      return { drops, notMeasurable, noRunHeight };
+
+      /*
+        DROPS FROM MARKS (held-migrations plan § 3), one line per counted item
+        rather than per mark — thirty receptacles are one decision made once
+        on the group. From the same function the bid and the totals read, so
+        this list cannot disagree with them. A mark needs no scale.
+      */
+      const groups = await db.getGroupsForBid(input.bidId, userId);
+      const groupLabel = new Map(groups.map(g => [g.id, g.label]));
+      const fromMarks = (
+        await db.loadGroupDrops(input.bidId, userId, heights, allRuns, scales)
+      )
+        .filter(d => d.status === "counted" && d.perDropFeet !== null)
+        .map(d => ({
+          groupId: d.groupId,
+          groupLabel: groupLabel.get(d.groupId) ?? "Count",
+          label:
+            heightTypeLabel(
+              groups.find(g => g.id === d.groupId)?.dropKind ?? "",
+              heights.types
+            ) ?? "",
+          count: d.countedMarks.length,
+          perDropFeet: d.perDropFeet as number,
+          feet:
+            Math.round(
+              (d.perDropFeet as number) * d.countedMarks.length * 100
+            ) / 100,
+          runTypeId: d.runTypeId,
+          mayDoubleCount: d.mayDoubleCount,
+        }))
+        .filter(d => d.count > 0);
+      return { drops, notMeasurable, noRunHeight, fromMarks };
     }),
 
   /**

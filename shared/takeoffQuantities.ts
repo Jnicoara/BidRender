@@ -46,6 +46,7 @@ import {
 } from "./takeoffGeometry";
 import { uncountedEnds, type RunVerticals } from "./takeoffHeights";
 import type { RunExtras } from "./runExtras";
+import { dropsFootage, type MarkDropEntry } from "./groupDrops";
 
 /** What kind of raceway a traced run represents. */
 export const RUN_PATH_TYPES = ["conduit", "cable"] as const;
@@ -933,8 +934,21 @@ export function totalQuantities(
      * `extrasForRun` for a real run. See `quantitiesForRun`.
      */
     extras: RunExtras | null;
-  }[]
+  }[],
+  /**
+   * Drops from counted marks (held-migrations plan § 3). REQUIRED, so the
+   * totals and the materials list cannot price a bid without its drops while
+   * the bid line has them — the disagreement shared/runOnBid.ts ended for
+   * runs. `[]` where a caller has none.
+   */
+  markDrops: readonly MarkDropEntry[]
 ): {
+  /**
+   * The drops from marks inside the figures below: how many, and the pipe or
+   * cable they add. Their fittings are NOT counted (Q8).
+   */
+  markDropCount: number;
+  markDropFeet: number;
   /**
    * What gets BOUGHT: flat, vertical, extra and (on wire and cable) makeup.
    * Renamed from `conduitFeet` / `cableFeet` / `wireFeet` on 2026-09-29 when
@@ -1125,6 +1139,33 @@ export function totalQuantities(
     }
   }
 
+  /*
+    DROPS FROM MARKS, into the same sums as a run's vertical — they ARE
+    vertical footage — with their extra and makeup in the same shares. The
+    claim rule and the extras were applied once, in shared/groupDrops.ts.
+  */
+  let markDropCount = 0;
+  let markDropFeet = 0;
+  for (const entry of markDrops) {
+    const f = dropsFootage(entry.perDrop, entry.count);
+    markDropCount += entry.count;
+    markDropFeet += f.dropFeet;
+    conduit += f.conduitBoughtFeet;
+    cable += f.cableBoughtFeet;
+    wire += f.wireBoughtFeet;
+    wireGround += f.groundBoughtFeet;
+    if (f.pathType === "conduit") {
+      conduitVertical += f.dropFeet;
+      wireVertical += f.wireInstalledFeet - f.makeupFeet;
+      wireExtra += f.wireExtraFeet;
+      wireMakeup += f.makeupFeet;
+    } else {
+      cableVertical += f.dropFeet;
+      cableExtra += f.wireExtraFeet;
+      cableMakeup += f.makeupFeet;
+    }
+  }
+
   let unmeasurable = 0;
   let flatOnly = 0;
   let partialVertical = 0;
@@ -1143,6 +1184,8 @@ export function totalQuantities(
   });
 
   return {
+    markDropCount,
+    markDropFeet: round2(markDropFeet),
     conduitBoughtFeet: round2(conduit),
     cableBoughtFeet: round2(cable),
     wireBoughtFeet: round2(wire),

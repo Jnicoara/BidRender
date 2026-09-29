@@ -46,6 +46,11 @@ import {
   type totalQuantities,
 } from "@shared/takeoffQuantities";
 import type { ResolvedExtra } from "@shared/runExtras";
+import {
+  GroupDrop,
+  type GroupDropInfo,
+  type GroupDropPatch,
+} from "@/components/takeoff/GroupDrop";
 
 /** A run's own extra and makeup, as the panel sends it. Omitted = unchanged. */
 export type RunExtrasPatch = {
@@ -938,6 +943,10 @@ export function RunsPanel({
   onSetTypedLength,
   onSetRunExtras,
   customHeightTypes = [],
+  groupDrops,
+  onSetGroupDrop,
+  dropHeightTypes = [],
+  dropRunTypes = [],
   runTypeBridge,
   onSendRunType,
   sendingRunTypeId,
@@ -990,6 +999,20 @@ export function RunsPanel({
   onSetRunExtras?: (runId: number, patch: RunExtrasPatch) => void;
   /** The company's own height types, for per-type makeup on a run. */
   customHeightTypes?: readonly { typeKey: string; label: string }[];
+  /**
+   * Each counted group's drop (held-migrations plan § 3), from
+   * `takeoffGroups.list`, keyed by group id. Optional: without it and
+   * `onSetGroupDrop` the rows offer no drop.
+   */
+  groupDrops?: ReadonlyMap<number, GroupDropInfo>;
+  onSetGroupDrop?: (groupId: number, patch: GroupDropPatch) => void;
+  /** What a drop can go to, and be made of. */
+  dropHeightTypes?: readonly {
+    typeKey: string;
+    label: string;
+    heightInches: number | null;
+  }[];
+  dropRunTypes?: readonly { id: number; label: string; pathType: string }[];
   /** What each traced type would put on the bid. Undefined while loading. */
   runTypeBridge?: RunTypeBridgeEntry[];
   onSendRunType?: (runTypeId: number) => void;
@@ -1060,6 +1083,12 @@ export function RunsPanel({
         quantity?: { traceCount: number; openEnds: number };
         /** What the bid does not price, said under the figures. */
         leftOut?: RunTotalsLeftOut;
+        /** What drops from marks leave out (held-migrations plan § 3). */
+        markDropNotes?: {
+          noTypeGroups: number;
+          noHeightGroups: number;
+          mayDoubleCount: number;
+        };
       })
     | undefined;
   /** Switch a run between route and quantity (D21) — root and legs. */
@@ -1249,6 +1278,21 @@ export function RunsPanel({
                 </button>
               );
             })()}
+            {/* The drop to each of these devices (held-migrations plan § 3):
+                set once on the count, shown once set. */}
+            {group.groupId !== null &&
+              groupDrops?.get(group.groupId) &&
+              onSetGroupDrop && (
+                <GroupDrop
+                  info={groupDrops.get(group.groupId)!}
+                  heightTypes={dropHeightTypes}
+                  runTypes={dropRunTypes}
+                  locked={quantitiesLocked}
+                  onSet={patch =>
+                    onSetGroupDrop(group.groupId as number, patch)
+                  }
+                />
+              )}
             {/* Walk the instances: each chip jumps the viewer to that mark. */}
             <div className="flex flex-wrap gap-1 mt-1.5">
               {group.stamps.map((placed, index) => (
@@ -2628,6 +2672,41 @@ export function RunsPanel({
             makeup={totals.wireMakeupFeet}
             total={totals.wireBoughtFeet}
           />
+          {/* Drops from marks (§ 3): what they add, and what is not counted
+              for them — fittings (Q8), a count with no run type or height,
+              and marks near an unlinked run end that may count twice. */}
+          {totals.markDropCount > 0 && (
+            <p className="text-[0.7rem] text-muted-foreground pt-1">
+              Includes {totals.markDropCount} drop
+              {totals.markDropCount === 1 ? "" : "s"} to counted devices (
+              {totals.markDropFeet.toFixed(2)} ft). Connectors and elbows for
+              them are not counted.
+            </p>
+          )}
+          {(totals.markDropNotes?.noTypeGroups ?? 0) +
+            (totals.markDropNotes?.noHeightGroups ?? 0) >
+            0 && (
+            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+              {(totals.markDropNotes?.noTypeGroups ?? 0) +
+                (totals.markDropNotes?.noHeightGroups ?? 0)}{" "}
+              counted item
+              {(totals.markDropNotes?.noTypeGroups ?? 0) +
+                (totals.markDropNotes?.noHeightGroups ?? 0) ===
+              1
+                ? " asks"
+                : "s ask"}{" "}
+              for a drop that is not counted — see the item for why.
+            </p>
+          )}
+          {(totals.markDropNotes?.mayDoubleCount ?? 0) > 0 && (
+            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+              {totals.markDropNotes?.mayDoubleCount} marked device
+              {totals.markDropNotes?.mayDoubleCount === 1 ? "" : "s"} near a
+              run's end may have its drop counted twice.
+            </p>
+          )}
           {totals.conduitExtraFeet +
             totals.cableExtraFeet +
             totals.wireExtraFeet >

@@ -103,7 +103,13 @@ export type TakeoffChange =
    */
   | "planRemoved"
   /** A job height. Heights decide vertical footage, which Send puts on the bid. */
-  | "heights";
+  | "heights"
+  /**
+   * A counted group's DROP set or changed (held-migrations plan § 3). Its
+   * footage lands on run-type lines, so every bid quantity moves, and the
+   * group row shows the result.
+   */
+  | "groupDrop";
 
 function unique(list: readonly TakeoffQuery[]): readonly TakeoffQuery[] {
   return Array.from(new Set(list));
@@ -113,7 +119,14 @@ export const QUERIES_MOVED_BY: Readonly<
   Record<TakeoffChange, readonly TakeoffQuery[]>
 > = {
   run: unique(RUN_QUERIES),
-  marksPlaced: unique(MARK_QUERIES),
+  /*
+    Marks placed move BID QUANTITIES since 2026-09-29: a mark in a count with
+    a drop (§ 3) adds that drop's pipe and wire to the totals, the Send
+    preview and the drops readout. Refreshing only the mark queries left those
+    showing the old footage — the staleness CLAUDE.md warns about, and the
+    server tests cannot see it.
+  */
+  marksPlaced: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
   markRemoved: unique([...MARK_QUERIES, ...RUN_QUERIES]),
   sheet: unique(SHEET_QUERIES),
   planRemoved: unique([
@@ -123,4 +136,5 @@ export const QUERIES_MOVED_BY: Readonly<
     ...RUN_QUERIES,
   ]),
   heights: unique(["takeoffHeights.forBid", ...RUN_QUERIES]),
+  groupDrop: unique([...MARK_QUERIES, ...RUN_QUERIES]),
 };

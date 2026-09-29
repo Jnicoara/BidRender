@@ -61,7 +61,11 @@ import {
 function totalsOf(
   runs: Omit<Parameters<typeof totalQuantities>[0][number], "runKey">[]
 ) {
-  return totalQuantities(runs.map((entry, i) => ({ ...entry, runKey: i })));
+  // No drops from marks here — those have their own suite (groupDrops).
+  return totalQuantities(
+    runs.map((entry, i) => ({ ...entry, runKey: i })),
+    []
+  );
 }
 
 const QUARTER_INCH = 48; // 1/4" = 1'-0"
@@ -739,14 +743,17 @@ describe("a bid with no heights set reads exactly as it did before", () => {
       runKey: 40,
       extras: NO_EXTRAS,
     };
-    const flat = totalQuantities([leg, leg, leg]);
+    const flat = totalQuantities([leg, leg, leg], []);
     expect(flat.conduitBoughtFeet).toBe(300);
     expect(flat.flatOnlyCount).toBe(1);
 
-    const unscaled = totalQuantities([
-      { ...leg, ratio: null },
-      { ...leg, ratio: null },
-    ]);
+    const unscaled = totalQuantities(
+      [
+        { ...leg, ratio: null },
+        { ...leg, ratio: null },
+      ],
+      []
+    );
     expect(unscaled.unmeasurableCount).toBe(1);
   });
 });

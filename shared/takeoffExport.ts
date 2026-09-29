@@ -79,6 +79,13 @@ export type TakeoffExportRuns = {
   groundFeet: number;
   /** Measured runs with an extra nobody set — said in the note. */
   noExtraCount: number;
+  /**
+   * Drops from counted marks on this sheet (§ 3), and their feet — INSIDE
+   * `verticalFeet` and `totalFeet` already. Said in the row's note, with the
+   * fittings for them NOT counted (Q8).
+   */
+  markDropCount: number;
+  markDropFeet: number;
   /** On a sheet with no usable scale, so not in the feet above. */
   unmeasurableCount: number;
   /**
@@ -162,8 +169,16 @@ function runNote(runs: {
   endsNotCountedCount: number;
   verticalFeet: number;
   noExtraCount: number;
+  markDropCount: number;
+  markDropFeet: number;
 }): string {
   const parts: string[] = [];
+  // Drops from marks, and the fittings NOT counted for them (Q8) — said on
+  // the row, because this file leaves the app.
+  if (runs.markDropCount > 0)
+    parts.push(
+      `Includes ${plural(runs.markDropCount, "drop", "drops")} to counted devices (${round2(runs.markDropFeet)} ft) — connectors and elbows for them are not counted`
+    );
   // An unset extra whispers (§ 2.3); in a file that leaves the app it has to
   // be said on the row it affects.
   if (runs.noExtraCount > 0)
@@ -206,7 +221,9 @@ function runRow(
     runs.runCount -
     runs.unmeasurableCount -
     (runs.pathType === "cable" ? runs.branchCount : 0);
-  const hasFeet = measured > 0;
+  // Drops from marks are footage too — a type whose only feet on this sheet
+  // are drops still has a quantity, not a blank.
+  const hasFeet = measured > 0 || runs.markDropCount > 0;
   return {
     ...where,
     kind: "Run",
@@ -328,6 +345,8 @@ export function buildTakeoffExport(
       unansweredCount: 0,
       endsNotCountedCount: 0,
       noExtraCount: 0,
+      markDropCount: 0,
+      markDropFeet: 0,
     };
     total.runCount += runs.runCount;
     total.endsNotCountedCount += runs.endsNotCountedCount;
@@ -337,6 +356,8 @@ export function buildTakeoffExport(
     total.extraFeet += runs.extraFeet;
     total.makeupFeet += runs.makeupFeet;
     total.noExtraCount += runs.noExtraCount;
+    total.markDropCount += runs.markDropCount;
+    total.markDropFeet += runs.markDropFeet;
     total.wireFeet += runs.wireFeet;
     total.groundFeet += runs.groundFeet;
     total.unmeasurableCount += runs.unmeasurableCount;

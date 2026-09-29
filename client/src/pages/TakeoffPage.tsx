@@ -2836,6 +2836,21 @@ export default function TakeoffPage({
   const bidCounts = trpc.takeoffGroups.list.useQuery({ bidId });
 
   /**
+   * Each count's DROP (held-migrations plan § 3), from the same bid-wide
+   * list — so a drop set on one sheet shows on every sheet's row for that
+   * count, and moves with the "groupDrop" refresh.
+   */
+  const groupDropsById = useMemo(
+    () =>
+      new Map((bidCounts.data?.groups ?? []).map(g => [g.id, g.drop] as const)),
+    [bidCounts.data?.groups]
+  );
+  const setGroupDrop = trpc.takeoffGroups.setDrop.useMutation({
+    onError: e => toast.error(e.message),
+    onSettled: () => refreshFor("groupDrop"),
+  });
+
+  /**
    * Whether this bid's quantities are frozen (shared/quantityLock.ts).
    *
    * Read off the count list rather than from a query of its own, because that
@@ -5673,6 +5688,14 @@ export default function TakeoffPage({
                     : (circuitDefaultsByRunType.get(r.runTypeId) ?? null),
               }))}
               stampGroups={stampGroups}
+              groupDrops={groupDropsById}
+              onSetGroupDrop={(groupId, patch) =>
+                setGroupDrop.mutate({ id: groupId, ...patch })
+              }
+              dropHeightTypes={(heightsForBid?.types ?? []).filter(
+                t => t.isActive
+              )}
+              dropRunTypes={runTypes.data ?? []}
               bridge={bridgeByGroup}
               quantitiesLocked={quantitiesLocked}
               waitingToSend={bidCounts.data?.waitingToSend}

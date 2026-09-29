@@ -212,6 +212,8 @@ describe("the takeoff export keeps typed and traced apart", () => {
           extraFeet: 0,
           makeupFeet: 0,
           noExtraCount: 0,
+          markDropCount: 0,
+          markDropFeet: 0,
         },
       ],
       untypedRunCount: 0,

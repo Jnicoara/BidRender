@@ -43,7 +43,16 @@ export function BidDropsReadout({
   const [open, setOpen] = useState(false);
   const [openKind, setOpenKind] = useState<string | null>(null);
   if (!data) return null;
-  const { groups, count, feet } = groupDrops(data.drops);
+  const grouped = groupDrops(data.drops);
+  const { groups } = grouped;
+  /*
+    Drops from counted marks (held-migrations plan § 3) join the summary line,
+    so "how much vertical pipe is on this job" still has one answer.
+  */
+  const markCount = data.fromMarks.reduce((n, d) => n + d.count, 0);
+  const markFeet = data.fromMarks.reduce((n, d) => n + d.feet, 0);
+  const count = grouped.count + markCount;
+  const feet = grouped.feet + markFeet;
   // Nothing to report and nothing left out: stay out of the way entirely.
   if (count === 0 && data.noRunHeight === 0 && data.notMeasurable === 0)
     return null;
@@ -138,6 +147,37 @@ export function BidDropsReadout({
               </div>
             );
           })}
+          {/* From marks: one line per counted item, since the drop is set
+              once on the count, not per mark. */}
+          {data.fromMarks.length > 0 && (
+            <div className="pt-1">
+              <div className="text-[0.65rem] uppercase tracking-wide text-muted-foreground px-1">
+                From marks
+              </div>
+              {data.fromMarks.map(d => (
+                <div
+                  key={d.groupId}
+                  className="flex items-baseline justify-between gap-2 px-1 py-0.5"
+                >
+                  <span className="text-xs truncate">
+                    {d.groupLabel}
+                    <span className="text-[0.7rem] text-muted-foreground">
+                      {" "}
+                      · {d.count} to {d.label || "device"},{" "}
+                      {d.perDropFeet.toFixed(2)} ft each
+                    </span>
+                  </span>
+                  <span className="text-[0.7rem] font-mono tabular-nums shrink-0">
+                    {d.feet.toFixed(2)} ft
+                  </span>
+                </div>
+              ))}
+              <p className="text-[0.7rem] text-muted-foreground px-1">
+                Connectors and elbows for drops from marks are not counted — add
+                them by hand.
+              </p>
+            </div>
+          )}
           {/* What is NOT in the number above, counted rather than dropped. */}
           {data.noRunHeight > 0 && (
             <p className="text-[0.7rem] text-[#F5C518]">

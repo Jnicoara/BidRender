@@ -119,9 +119,27 @@ export const takeoffExportRouter = router({
           list.push(run);
           partitions.set(key, list);
         }
+        /*
+          DROPS FROM MARKS (§ 3) belong to the sheet their marks are on, and a
+          mark has no draft state — so they join that sheet's FINISHED rows,
+          and a sheet with drops but no runs still gets a partition.
+        */
+        for (const drop of footageInput.markDrops) {
+          const key = `${drop.sheetId}|committed`;
+          if (!partitions.has(key)) partitions.set(key, []);
+        }
         partitions.forEach((partRuns, key) => {
           const [sheetIdText, status] = key.split("|");
-          const grouped = groupRunFootage({ ...footageInput, runs: partRuns });
+          const grouped = groupRunFootage({
+            ...footageInput,
+            runs: partRuns,
+            markDrops:
+              status === "committed"
+                ? footageInput.markDrops.filter(
+                    d => d.sheetId === Number(sheetIdText)
+                  )
+                : [],
+          });
           grouped.forEach((row, runTypeId) => {
             runs.push({
               sheetId: Number(sheetIdText),
@@ -142,6 +160,8 @@ export const takeoffExportRouter = router({
               wireFeet: row.insulatedBoughtFeet,
               groundFeet: row.groundBoughtFeet,
               noExtraCount: row.noExtraCount,
+              markDropCount: row.markDropCount,
+              markDropFeet: row.markDropFeet,
               unmeasurableCount: row.unmeasurableCount,
               branchCount: row.branchCount,
               unansweredCount: row.unansweredCount,

@@ -212,6 +212,12 @@ import { appliedModifiers } from "../shared/modifierLookup";
 import { resolveMaterial, materialIdsToFetch } from "../shared/materialLookup";
 import { resolveAssembly } from "../shared/assemblyLookup";
 import { buildHeightContext, type HeightContext } from "./runVerticals";
+import {
+  groupDrops,
+  markDropEntries,
+  notAnsweredDrop,
+  type GroupDrop,
+} from "../shared/groupDrops";
 import { groupRunFootage, type RunTypeFootageRow } from "./runTypeFootageCore";
 import { resolveRunType } from "../shared/runTypeLookup";
 import {
@@ -5224,6 +5230,10 @@ async function withTracedFootage(
     ),
     // A tee joins three conduit ends and buys a box (D20).
     teesById: await getTeesForRuns(runs.map(rootOf), bid.userId),
+    // Drops from counted marks land on the same run-type lines (§ 3).
+    markDrops: markDropEntries(
+      await loadGroupDrops(bidId, bid.userId, heights, runs, scales)
+    ),
   });
   // Only when a fitting line is actually on the bid: it costs three queries.
   const fittings = rows.some(row => isFittingRole(row.runMaterialRole))
@@ -12331,6 +12341,101 @@ export async function heightContextForBid(
     extraDefaults,
     runTypes,
   });
+}
+
+/**
+ * Every counted group's DROPS on one bid (held-migrations plan § 3) — loaded
+ * here, computed in shared/groupDrops.ts.
+ *
+ * Takes the runs and scales the caller already has, because every caller also
+ * prices runs: the claim rule needs the runs (a mark a run end claims carries
+ * no drop of its own), and the proximity flag needs the scales. The drop's run
+ * type is resolved through `heights.dropTypeFor`, which follows forks with
+ * `resolveRunType`.
+ */
+export async function loadGroupDrops(
+  bidId: number,
+  userId: number,
+  heights: HeightContext,
+  runs: readonly {
+    sheetId: number;
+    points: { x: number; y: number }[] | null;
+    startStampId: number | null;
+    endStampId: number | null;
+    isSuggestion: boolean;
+  }[],
+  scales: ReadonlyMap<
+    number,
+    { scaleRatio: number | null; scaleSource: string; notToScale: boolean }
+  >
+): Promise<GroupDrop[]> {
+  const groups = await getGroupsForBid(bidId, userId);
+  if (!groups.some(g => g.dropKind !== null)) {
+    // Nothing asked for a drop: the common case, and one query.
+    return groups.map(group => notAnsweredDrop(group.id, group.dropRunTypeId));
+  }
+  const stamps = await getStampsForBid(bidId, userId);
+  return groupDrops({
+    groups: groups.map(g => ({
+      id: g.id,
+      dropKind: g.dropKind,
+      dropHeightInches: g.dropHeightInches,
+      dropRunTypeId: g.dropRunTypeId,
+    })),
+    marks: stamps.map(s => ({
+      id: s.id,
+      groupId: s.groupId,
+      sheetId: s.sheetId,
+      x: Number(s.x),
+      y: Number(s.y),
+    })),
+    // A suggestion is nobody's claim and nobody's end yet.
+    runs: runs
+      .filter(r => !r.isSuggestion)
+      .map(r => ({
+        sheetId: r.sheetId,
+        points: r.points ?? [],
+        startStampId: r.startStampId,
+        endStampId: r.endStampId,
+      })),
+    heights: {
+      layers: heights.layers,
+      companyInches: heights.companyInches,
+      jobInches: heights.jobInches,
+    },
+    extras: heights.extras,
+    typeFor: id => heights.dropTypeFor(id),
+    ratioFor: sheetId => {
+      const sheet = scales.get(sheetId);
+      if (!sheet || (sheet.notToScale && sheet.scaleSource !== "manual"))
+        return null;
+      return sheet.scaleRatio;
+    },
+  });
+}
+
+/** Set a group's drop. Omitted leaves a field; NULL clears it. */
+export async function setGroupDrop(
+  groupId: number,
+  userId: number,
+  patch: {
+    dropKind?: string | null;
+    dropHeightInches?: number | null;
+    dropRunTypeId?: number | null;
+  }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const values = Object.fromEntries(
+    Object.entries(patch).filter(([, v]) => v !== undefined)
+  );
+  if (Object.keys(values).length === 0) return;
+  await db
+    .update(takeoffGroups)
+    .set({ ...values, updatedAt: new Date() })
+    .where(
+      and(eq(takeoffGroups.id, groupId), eq(takeoffGroups.userId, userId))
+    );
 }
 
 /**

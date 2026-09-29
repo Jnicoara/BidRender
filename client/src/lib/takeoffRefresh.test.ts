@@ -56,10 +56,24 @@ describe("what each change on the Plans screen must refresh", () => {
     }
   });
 
-  it("placing marks leaves the runs alone", () => {
-    // Marks are placed a click at a time; refetching every run figure on
-    // each batch would cost for nothing, since placing never moves an end.
-    expect(moves("marksPlaced").has("takeoffRuns.totals")).toBe(false);
-    expect(moves("marksPlaced").has("takeoffGroups.list")).toBe(true);
+  /*
+    CHANGED 2026-09-29 (held-migrations plan § 3). This asserted that placing
+    marks did NOT refresh the totals, on the reasoning that placing never
+    moves a run's end. That reasoning still holds for the per-sheet run list,
+    which is still left alone — but a mark in a count with a DROP adds pipe
+    and wire to the bid, so every bid quantity now has to move with it.
+  */
+  it("placing marks moves the bid's quantities, not the sheet's run list", () => {
+    for (const q of BID_QUANTITY_QUERIES) {
+      expect(moves("marksPlaced").has(q), q).toBe(true);
+    }
+    expect(moves("marksPlaced").has("takeoffRuns.listForSheet")).toBe(false);
+  });
+
+  it("changing a count's drop moves every bid quantity and the count row", () => {
+    for (const q of BID_QUANTITY_QUERIES) {
+      expect(moves("groupDrop").has(q), q).toBe(true);
+    }
+    expect(moves("groupDrop").has("takeoffGroups.list")).toBe(true);
   });
 });

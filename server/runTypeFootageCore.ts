@@ -42,6 +42,7 @@ import {
   type HeightContext,
 } from "./runVerticals";
 import type { ExtrasRow } from "../shared/runExtras";
+import { dropsFootage, type MarkDropEntry } from "../shared/groupDrops";
 import type { TraceMode, WireCircuits } from "../shared/traceMode";
 
 export type RunTypeFootageRow = {
@@ -81,6 +82,14 @@ export type RunTypeFootageRow = {
   makeupFeet: number;
   /** Measured runs of this type carrying an extra NOBODY SET (§ 5j). */
   noExtraCount: number;
+  /**
+   * DROPS FROM MARKS on this type (held-migrations plan § 3): the pipe or
+   * cable of the drops themselves, already INSIDE the raceway figures above,
+   * and how many drops. Shown apart as "from marks"; fittings for them are
+   * NOT counted (Q8), and every screen showing this says so.
+   */
+  markDropFeet: number;
+  markDropCount: number;
   /** Runs of this type that could not be measured, so are NOT in the above. */
   unmeasurableCount: number;
   /** Runs of this type nobody has answered the branch question for. */
@@ -210,6 +219,13 @@ export function groupRunFootage(input: {
    * and the tee box is never bought.
    */
   teesById: ReadonlyMap<number, TeeRef>;
+  /**
+   * Drops from counted marks (held-migrations plan § 3), per group per sheet.
+   * REQUIRED, like every input here that adds footage: a caller that could
+   * leave it out would price a bid without its drops and say nothing.
+   * `[]` where a caller genuinely has none.
+   */
+  markDrops: readonly MarkDropEntry[];
 }): Map<number, RunTypeFootageRow> {
   const byType = new Map<number, RunTypeFootageRow>();
 
@@ -221,35 +237,7 @@ export function groupRunFootage(input: {
     const runTypeId = run.runTypeId;
     if (runTypeId === null) continue; // runOnBid said noType; this narrows it.
 
-    let row = byType.get(runTypeId);
-    if (!row) {
-      row = {
-        runTypeId,
-        pathType: run.pathType,
-        conduitBoughtFeet: 0,
-        conduitInstalledFeet: 0,
-        cableBoughtFeet: 0,
-        cableInstalledFeet: 0,
-        insulatedBoughtFeet: 0,
-        insulatedInstalledFeet: 0,
-        groundBoughtFeet: 0,
-        groundInstalledFeet: 0,
-        racewayExtraFeet: 0,
-        wireExtraFeet: 0,
-        makeupFeet: 0,
-        noExtraCount: 0,
-        unmeasurableCount: 0,
-        unansweredCount: 0,
-        branchCount: 0,
-        quantityFeet: 0,
-        verticalFeet: 0,
-        typedFeet: 0,
-        endsNotCountedCount: 0,
-        legs: [],
-        tees: [],
-      };
-      byType.set(runTypeId, row);
-    }
+    const row = rowFor(byType, runTypeId, run.pathType);
 
     /*
       The guard, applied before anything is added. A run the estimator called
@@ -391,7 +379,40 @@ export function groupRunFootage(input: {
     }
   }
 
+  /*
+    DROPS FROM MARKS (held-migrations plan § 3), onto the same run-type row
+    as the traced footage of that type — one purchase, one bid line, the way
+    D21 puts quantity and route footage of one type on one line. A drop is
+    vertical footage, so it adds to `verticalFeet` too; the claim rule and the
+    extras were applied in shared/groupDrops.ts, once.
+  */
+  for (const entry of input.markDrops) {
+    const f = dropsFootage(entry.perDrop, entry.count);
+    const row = rowFor(byType, entry.runTypeId, f.pathType);
+    row.markDropFeet += f.dropFeet;
+    row.markDropCount += entry.count;
+    row.verticalFeet += f.dropFeet;
+    row.conduitBoughtFeet += f.conduitBoughtFeet;
+    row.conduitInstalledFeet += f.conduitInstalledFeet;
+    row.cableBoughtFeet += f.cableBoughtFeet;
+    row.cableInstalledFeet += f.cableInstalledFeet;
+    row.groundBoughtFeet += f.groundBoughtFeet;
+    row.groundInstalledFeet += f.groundInstalledFeet;
+    row.insulatedBoughtFeet += Math.max(
+      0,
+      f.wireBoughtFeet - f.groundBoughtFeet
+    );
+    row.insulatedInstalledFeet += Math.max(
+      0,
+      f.wireInstalledFeet - f.groundInstalledFeet
+    );
+    row.makeupFeet += f.makeupFeet;
+    if (f.pathType === "cable") row.racewayExtraFeet += f.wireExtraFeet;
+    else row.wireExtraFeet += f.wireExtraFeet;
+  }
+
   for (const row of Array.from(byType.values())) {
+    row.markDropFeet = round2(row.markDropFeet);
     row.conduitBoughtFeet = round2(row.conduitBoughtFeet);
     row.conduitInstalledFeet = round2(row.conduitInstalledFeet);
     row.cableBoughtFeet = round2(row.cableBoughtFeet);
@@ -412,4 +433,44 @@ export function groupRunFootage(input: {
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+/** The row for a run type, created empty the first time — runs and drops alike. */
+function rowFor(
+  byType: Map<number, RunTypeFootageRow>,
+  runTypeId: number,
+  pathType: RunPathType
+): RunTypeFootageRow {
+  let row = byType.get(runTypeId);
+  if (!row) {
+    row = {
+      runTypeId,
+      pathType,
+      conduitBoughtFeet: 0,
+      conduitInstalledFeet: 0,
+      cableBoughtFeet: 0,
+      cableInstalledFeet: 0,
+      insulatedBoughtFeet: 0,
+      insulatedInstalledFeet: 0,
+      groundBoughtFeet: 0,
+      groundInstalledFeet: 0,
+      racewayExtraFeet: 0,
+      wireExtraFeet: 0,
+      makeupFeet: 0,
+      noExtraCount: 0,
+      markDropFeet: 0,
+      markDropCount: 0,
+      unmeasurableCount: 0,
+      unansweredCount: 0,
+      branchCount: 0,
+      quantityFeet: 0,
+      verticalFeet: 0,
+      typedFeet: 0,
+      endsNotCountedCount: 0,
+      legs: [],
+      tees: [],
+    };
+    byType.set(runTypeId, row);
+  }
+  return row;
 }

@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Counted devices can now carry their drop from the ceiling.** On any
+  counted item — thirty receptacles, say — choose what each one drops to and
+  what the drop is made of, once, and every mark gets its drop of pipe and
+  wire on the bid (30 receptacles at 18 in under a 10 ft run height is 255 ft).
+  A device a traced run already ends on is not counted twice, and one sitting
+  near a run's end without being linked is flagged. Wire extra and makeup
+  apply to the drops; conduit extra does not. Connectors and elbows for these
+  drops are not counted, and every screen and the materials list say so.
+
 - **Traced runs can now carry extra and makeup, and the bid keeps install
   hours honest.** Extra wire and conduit (a percentage) and makeup (the tail
   left at each box and panel) can be set for the company, per run type and

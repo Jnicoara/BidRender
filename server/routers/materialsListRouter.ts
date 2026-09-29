@@ -53,6 +53,7 @@ import {
   tracedRunOf,
 } from "../../shared/takeoffQuantities";
 import { extrasForRunRow, verticalsForRunRow } from "../runVerticals";
+import { markDropEntries } from "../../shared/groupDrops";
 import {
   aggregateMaterials,
   measuredEntries,
@@ -370,6 +371,17 @@ export const materialsListRouter = router({
         ctx.scope.dataUserId,
         bid.distributionHeightInches
       );
+      // Drops from counted marks (§ 3) — what the bid prices, so the list a
+      // supplier orders from has them too. Claimed against every run.
+      const markDrops = markDropEntries(
+        await db.loadGroupDrops(
+          input.bidId,
+          ctx.scope.dataUserId,
+          heights,
+          runs,
+          scales
+        )
+      );
       const totals = totalQuantities(
         realRuns.map(run => {
           const sheet = scales.get(run.sheetId);
@@ -388,11 +400,23 @@ export const materialsListRouter = router({
             // A branched run is several rows and ONE run in the notes (D20).
             runKey: rootOf(run),
           };
-        })
+        }),
+        markDrops
       );
 
       // ── Notes: everything the reader needs to read the list correctly ──────
       const notes: string[] = [];
+      // Drops to counted devices, and the fittings NOT counted for them (Q8):
+      // this list is what somebody orders from, so it says what is missing.
+      if (totals.markDropCount > 0) {
+        notes.push(
+          `Includes ${totals.markDropCount} ${
+            totals.markDropCount === 1 ? "drop" : "drops"
+          } to counted devices (${totals.markDropFeet.toLocaleString("en-US", {
+            maximumFractionDigits: 2,
+          })} ft of raceway or cable). Connectors and elbows for those drops are NOT counted — add them by hand.`
+        );
+      }
       if (untypedRuns > 0) {
         notes.push(
           `${untypedRuns} traced ${

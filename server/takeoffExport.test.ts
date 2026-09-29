@@ -66,6 +66,8 @@ function runs(
     extraFeet: 0,
     makeupFeet: 0,
     noExtraCount: 0,
+    markDropCount: 0,
+    markDropFeet: 0,
     ...over,
   };
 }

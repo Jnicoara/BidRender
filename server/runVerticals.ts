@@ -38,8 +38,10 @@ import {
   NO_EXTRAS_CONTEXT,
   type ExtrasContext,
   type ExtrasRow,
+  type ExtraSettings,
   type RunExtras,
 } from "../shared/runExtras";
+import type { DropTypeSpec } from "../shared/groupDrops";
 import {
   resolveRunType,
   type ResolvableRunType,
@@ -78,6 +80,14 @@ export type HeightContext = {
    * thing to remember at a dozen call sites. See `extrasForRunRow`.
    */
   extras: ExtrasContext;
+  /**
+   * What a counted group's DROP is made of (held-migrations plan § 3): the
+   * run type a stored `takeoff_groups.dropRunTypeId` means, followed through
+   * any fork with `resolveRunType` — so a drop on a shipped type the user has
+   * forked prices from the fork, exactly as a traced run does. Null when the
+   * type is gone.
+   */
+  dropTypeFor: (runTypeId: number) => DropTypeSpec | null;
 };
 
 /**
@@ -124,6 +134,9 @@ export function buildHeightContext(input: {
    * directly would miss every setting on the fork.
    */
   runTypes: readonly (ResolvableRunType & {
+    pathType: "conduit" | "cable";
+    conductorCount: number | null;
+    groundCount: number | null;
     conduitExtraPct: string | null;
     wireExtraPct: string | null;
     makeupDeviceInches: number | null;
@@ -139,7 +152,24 @@ export function buildHeightContext(input: {
     extraDefaults,
     runTypes,
   } = input;
+  const typeExtras = (type: (typeof runTypes)[number]): ExtraSettings => ({
+    conduitExtraPct: extraNumber(type.conduitExtraPct),
+    wireExtraPct: extraNumber(type.wireExtraPct),
+    makeupDeviceInches: type.makeupDeviceInches,
+    makeupPanelInches: type.makeupPanelInches,
+    makeupByKindInches: type.makeupByKindInches,
+  });
   return {
+    dropTypeFor: runTypeId => {
+      const type = resolveRunType(runTypes, runTypeId);
+      if (!type) return null;
+      return {
+        pathType: type.pathType,
+        conductorCount: type.conductorCount,
+        groundCount: type.groundCount,
+        extras: typeExtras(type),
+      };
+    },
     extras: {
       company: extraDefaults
         ? {
@@ -158,14 +188,7 @@ export function buildHeightContext(input: {
       ),
       typeFor: runTypeId => {
         const type = resolveRunType(runTypes, runTypeId);
-        if (!type) return null;
-        return {
-          conduitExtraPct: extraNumber(type.conduitExtraPct),
-          wireExtraPct: extraNumber(type.wireExtraPct),
-          makeupDeviceInches: type.makeupDeviceInches,
-          makeupPanelInches: type.makeupPanelInches,
-          makeupByKindInches: type.makeupByKindInches,
-        };
+        return type ? typeExtras(type) : null;
       },
     },
     companyInches: defaults?.distributionHeightInches ?? null,
@@ -196,6 +219,7 @@ export const EMPTY_HEIGHT_CONTEXT: HeightContext = {
   // does get named must still be named rather than slugged.
   types: heightList({ company: [] }),
   extras: NO_EXTRAS_CONTEXT,
+  dropTypeFor: () => null,
 };
 
 /**

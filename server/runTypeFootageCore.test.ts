@@ -79,6 +79,7 @@ function group(
     heights: EMPTY_HEIGHT_CONTEXT,
     pullPointAnswersByRun: new Map(),
     teesById: new Map(tees.map(t => [t.id, t])),
+    markDrops: [],
   });
 }
 
