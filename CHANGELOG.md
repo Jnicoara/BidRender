@@ -14,6 +14,9 @@ This is the human-readable companion to the git history — read this to see wha
   the new shapes in, the rarely used C body had jumped to the top on
   alphabetical order alone. The LB now counts as a common part, so it also
   shows a little higher on a plain pipe search like "1-1/4 rigid".
+- **Searching "c body" now finds the C conduit body.** A single letter used to
+  count the same as the start of any word, so "c" matched "conduit" in every
+  body and the C body could not be asked for by name.
 
 ## [2026-09-27]
 

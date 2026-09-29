@@ -509,6 +509,11 @@ describe("conduit bodies: the LB for the generic words, each shape by name", () 
     ["1 rigid lr", '1" rigid conduit LR conduit body'],
     ["1/2 emt ll", '1/2" EMT LL conduit body'],
     ["tee body", '1/2" EMT T conduit body'],
+    // A one-letter shape code, finished (plan § 7, L1): smartSearch's
+    // finishedLetter rule, which is what lets the C be asked for at all.
+    ["c body", '1/2" EMT C conduit body'],
+    ["2 pvc c body", '2" PVC Sch 40 C conduit body'],
+    ["t body", '1/2" EMT T conduit body'],
   ])('"%s" leads with %s', (query, expected) => {
     expect(first(query)).toBe(expected);
   });
