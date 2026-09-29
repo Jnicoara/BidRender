@@ -43,12 +43,16 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { CrosshairGuides, type CrosshairHandle } from "./CrosshairGuides";
 import { CROSSHAIR_COLORS, crosshairCursorStyle } from "@/lib/crosshairCursor";
-import { useCrosshairColor, useCrosshairSize } from "@/hooks/useCrosshairColor";
+import {
+  useCrosshairColor,
+  useCrosshairSize,
+  useShowNextSegment,
+} from "@/hooks/useCrosshairColor";
 import { Check, Ruler, TriangleAlert, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { traceReadout } from "@/lib/traceReadout";
 import {
   formatFeetInches,
-  pathRealInches,
   screenToPagePoints,
   type PagePoint,
 } from "@shared/takeoffGeometry";
@@ -489,17 +493,16 @@ export function TraceLayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [box !== null, clientToPage, snapReach, stamps, onBoxSelect]);
 
-  /** Live length of what is being traced, including the rubber-band segment. */
-  const liveInches = useMemo(() => {
-    if (!tracing || ratio === null) return null;
-    const withHover = hover && points.length > 0 ? [...points, hover] : points;
-    return pathRealInches(withHover, ratio);
-  }, [tracing, points, hover, ratio]);
-
-  const committedInches = useMemo(() => {
-    if (ratio === null) return null;
-    return pathRealInches(points, ratio);
-  }, [points, ratio]);
+  /**
+   * Run total (clicked points only — the pill) and Next (last point to the
+   * cursor — the label at the cursor). @/lib/traceReadout keeps the cursor
+   * out of the total; its test is what says so.
+   */
+  const readout = useMemo(
+    () => traceReadout(points, tracing ? hover : null, ratio),
+    [tracing, points, hover, ratio]
+  );
+  const [showNext] = useShowNextSegment();
 
   // Escape backs out one vertex at a time, then cancels — the same shape as
   // Escape everywhere else in the app: abandon the smallest thing first.
@@ -1234,8 +1237,10 @@ export function TraceLayer({
               strokeLinejoin="round"
               strokeLinecap="round"
             />
-            {/* Rubber band to the pointer, so the length updates before the
-                click rather than after it. */}
+            {/* Rubber band to the pointer: where the next click goes. A third
+                of the run's stroke and faint, so it cannot be mistaken for
+                traced run (it was two thirds at 0.75 until 2026-09-29). It
+                stays when the Next label is switched off. */}
             {hover && (
               <line
                 x1={toScreen(points[points.length - 1]).x}
@@ -1243,10 +1248,27 @@ export function TraceLayer({
                 x2={toScreen(hover).x}
                 y2={toScreen(hover).y}
                 stroke={RUN_COLOR[pathType]}
-                strokeWidth={runStroke * (2 / 3)}
+                strokeWidth={runStroke * (1 / 3)}
                 strokeDasharray="6 5"
-                strokeOpacity={0.75}
+                strokeOpacity={0.45}
               />
+            )}
+            {/* "Next": this segment's length alone, at the cursor. Dim and
+                small, because it is a preview; the run total is in the pill.
+                Settings → Display turns it off. */}
+            {hover && showNext && readout.next !== null && (
+              <text
+                x={toScreen(hover).x + runWidthInOverlay(zoom, 14)}
+                y={toScreen(hover).y - runWidthInOverlay(zoom, 10)}
+                fontSize={runWidthInOverlay(zoom, 11)}
+                fill="#94A3B8"
+                stroke="#0b0b0b"
+                strokeWidth={runWidthInOverlay(zoom, 11) * 0.18}
+                paintOrder="stroke"
+                pointerEvents="none"
+              >
+                Next {formatFeetInches(readout.next)}
+              </text>
             )}
             {points.map((point, index) => {
               const screen = toScreen(point);
@@ -1387,7 +1409,7 @@ export function TraceLayer({
                 {pathType === "conduit" ? "Conduit run" : "Cable run"}
               </span>
               {/*
-                TWO NUMBERS, EACH SAYING WHICH IT IS.
+                ONE NUMBER: THE RUN TOTAL.
 
                 This pill showed the length INCLUDING the rubber-band segment
                 to the cursor, while the Finish button showed only the placed
@@ -1396,10 +1418,12 @@ export function TraceLayer({
                 move the mouse and it changes, and what gets saved is the
                 other one. Reported from bid 23 on 2026-09-21.
 
-                Placed comes first and stays put, because it is the number
-                that will exist after the next click. "To cursor" appears only
-                while there IS a rubber band, so a finished path shows one
-                figure rather than the same figure twice.
+                The 2026-09-21 fix labelled both ("placed" and "to cursor"),
+                but "to cursor" was still the whole path plus the preview, so a
+                stray mouse still made a big number appear. Since 2026-09-29
+                the pill holds only the clicked points, which never move with
+                the mouse, and the preview segment alone is a dim "Next" label
+                at the cursor (@/lib/traceReadout).
               */}
               {/*
                 ── EVERY SLOT IN THIS PILL HAS A FIXED WIDTH ─────────────────
@@ -1416,35 +1440,17 @@ export function TraceLayer({
                 The pill is the same width for the whole run, and nothing in
                 it can push or cover anything else.
               */}
-              <span className="font-mono text-sm tabular-nums inline-block min-w-[9ch] text-right">
-                {committedInches === null
-                  ? "—"
-                  : formatFeetInches(committedInches)}
-              </span>
               <span className="text-[0.7rem] text-muted-foreground">
                 {/* No scale: the path is still worth drawing, and its length
                     is typed in the run panel once it is finished (§ 4c). */}
                 {ratio === null
                   ? "no scale — type the length when finished"
-                  : "placed"}
+                  : "Run total"}
               </span>
-              <span
-                className={cn(
-                  "flex items-center gap-2",
-                  !(
-                    liveInches !== null &&
-                    committedInches !== null &&
-                    Math.abs(liveInches - committedInches) > 0.5
-                  ) && "invisible"
-                )}
-                aria-hidden={liveInches === null}
-              >
-                <span className="font-mono text-sm tabular-nums text-muted-foreground inline-block min-w-[9ch] text-right">
-                  {liveInches === null ? "" : formatFeetInches(liveInches)}
-                </span>
-                <span className="text-[0.7rem] text-muted-foreground">
-                  to cursor
-                </span>
+              <span className="font-mono text-sm tabular-nums inline-block min-w-[9ch] text-right">
+                {readout.runTotal === null
+                  ? "—"
+                  : formatFeetInches(readout.runTotal)}
               </span>
               <span className="text-[0.7rem] text-muted-foreground inline-block min-w-[4.5rem] tabular-nums">
                 {points.length} {points.length === 1 ? "point" : "points"}
@@ -1518,8 +1524,8 @@ export function TraceLayer({
               >
                 <Check className="w-3 h-3" /> Finish
                 <span className="font-mono inline-block min-w-[9ch] text-left">
-                  {committedInches !== null && points.length >= 2
-                    ? formatFeetInches(committedInches)
+                  {readout.runTotal !== null && points.length >= 2
+                    ? formatFeetInches(readout.runTotal)
                     : ""}
                 </span>
               </Button>

@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **While tracing, the top readout shows only the run total.** It used to
+  show a second, bigger "to cursor" figure that jumped whenever the mouse
+  moved, which read as the run's length. The pill now holds only the clicked
+  points, the same length that gets saved. A small dim "Next" label at the
+  cursor gives the segment you are about to click, and the preview line is
+  thinner and fainter. Settings → Display can turn the "Next" label off.
 - **Finishing a run with a double-click no longer adds a phantom elbow.** The
   second click of the double-click added a tiny extra point. If the mouse had
   moved even a pixel, the elbow count read the turn onto it as a corner and
