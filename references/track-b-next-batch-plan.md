@@ -353,17 +353,17 @@ bid.
 
 ## Looked at and left out
 
-| Item                                                                                    | Why not in this batch                                                                                                    |
-| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| § 5j extra, R7 makeup, § 4c typed-length runs, Phase 8 verticals on stamps              | Each needs columns, and three of them touch `takeoff_runs` or `bid_line_items`. They are the biggest short numbers left. |
-| T bodies at a tee, locknuts and bushings                                                | New `bid_line_items.runMaterialRole` values (the role is in a unique key, so no role can be reused).                     |
-| MC connectors and straps, flex straps, `5/6"` wafer                                     | Need catalog rows first: Track C.                                                                                        |
-| Per-line markup override, route A/B, price bands                                        | Schema.                                                                                                                  |
-| C14 schedule cross-check, V19 sheets not started                                        | Schema.                                                                                                                  |
-| Undo, move and remove-all for marks (C6/C7/C13, D6); drag a point, extend a run (T8/T9) | No schema, but each is its own piece on the most fragile screen. Good candidates for the batch after this.               |
-| C10 location tags (no UI sets them)                                                     | No schema, but not beta-blocking.                                                                                        |
-| Plans Phase 2 (sidebar entry)                                                           | Deferred by the owner: "Phase 1 first, left-menu tab later".                                                             |
-| Orphan-plan sweep against production                                                    | Built; running it is an owner step, dry run first.                                                                       |
+| Item                                                                                    | Why not in this batch                                                                                                                                                             |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| § 5j extra, R7 makeup, § 4c typed-length runs, Phase 8 verticals on stamps              | Each needs columns, and three of them touch `takeoff_runs` or `bid_line_items`. They are the biggest short numbers left. Planned 2026-09-28 in `track-b-held-migrations-plan.md`. |
+| T bodies at a tee, locknuts and bushings                                                | New `bid_line_items.runMaterialRole` values (the role is in a unique key, so no role can be reused).                                                                              |
+| MC connectors and straps, flex straps, `5/6"` wafer                                     | Need catalog rows first: Track C.                                                                                                                                                 |
+| Per-line markup override, route A/B, price bands                                        | Schema.                                                                                                                                                                           |
+| C14 schedule cross-check, V19 sheets not started                                        | Schema.                                                                                                                                                                           |
+| Undo, move and remove-all for marks (C6/C7/C13, D6); drag a point, extend a run (T8/T9) | No schema, but each is its own piece on the most fragile screen. Good candidates for the batch after this.                                                                        |
+| C10 location tags (no UI sets them)                                                     | No schema, but not beta-blocking.                                                                                                                                                 |
+| Plans Phase 2 (sidebar entry)                                                           | Deferred by the owner: "Phase 1 first, left-menu tab later".                                                                                                                      |
+| Orphan-plan sweep against production                                                    | Built; running it is an owner step, dry run first.                                                                                                                                |
 
 ---
 

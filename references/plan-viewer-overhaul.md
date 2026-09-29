@@ -2343,6 +2343,9 @@ price:**
   becomes asking the user to re-count.
 - **Phase 8's stamp verticals**, which § 7 already decided belong to the group.
   The table pays for itself twice, and Phase 8 stops needing its own migration.
+  > **Wrong, found 2026-09-28:** `takeoff_groups` has no height columns, so
+  > Phase 8 still needs three (and an FK). The row made the migration SMALLER,
+  > not absent. See `references/track-b-held-migrations-plan.md` § 3.
 
 ```
 takeoff_groups          one row per counted thing per BID
