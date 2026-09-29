@@ -1392,11 +1392,15 @@ path is ever revived, give it the same treatment first.
 
 - [ ] **PLANNED 2026-09-29 (Track B), not built: prices in the takeoff CSV
       (opt-in, off every time) and the "For your quote app" panel (five
-      buckets per scope, pre-tax, a copy button per number).** Plan, mapping
-      proposal and seven questions for the owner in
-      `references/quote-app-panel-plan.md`. No migration for v1. Three schema
-      handoffs for Track A there (§ 10): an expense's quote bucket, the
-      example-price flag with a line snapshot, and optional per-line scopes.
+      buckets per scope, pre-tax, a copy button per number).** Plan in
+      `references/quote-app-panel-plan.md`. **Owner answered all seven
+      questions the same day** (§ 1a). The panel shows the price TO THE
+      CUSTOMER (markup, overhead and profit inside Material and Labor), with a
+      worked example checked against the engine. With any unpriced line it
+      lists them and shows no totals and no copy buttons. Subs go in Misc,
+      attached items stay out. No migration for v1. **Handoff for Track A**
+      (§ 10): H1 a quote bucket per expense, and H2 the example-price flag
+      with a saved copy on each bid line.
 
 - [x] **BUILT 2026-09-27 (Track B), owner's answers as recommended in
       `references/track-b-beta-plan.md` § 1.** `storageDelete` on both

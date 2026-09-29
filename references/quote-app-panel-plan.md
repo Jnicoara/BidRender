@@ -1,16 +1,19 @@
 # Priced takeoff CSV and the "For your quote app" panel: plan
 
 **PLAN ONLY, 2026-09-29, on `track-b` at `977b789` (local-dev merged in). Not
-built.** Every file:line below was read at that commit. The questions in § 11
-come before any code. Each question gives its recommendation first.
+built.** Every file:line below was read at that commit. **The owner answered
+all seven questions the same day** (§ 1a), and made two changes that this file
+now carries: the panel shows the price TO THE CUSTOMER, with a worked example
+(§ 5, "What the panel shows"), and unpriced lines no longer refuse the panel
+(§ 5, "When lines are not priced").
 
 Source: the owner's Stage 5 notes, pasted into the session on 2026-09-29.
 Nothing about them was in the repo. The parts this plan depends on are quoted
 in § 1 so the next reader does not have to find that conversation.
 
-**Schema verdict: neither piece needs a migration.** Three things would need
-one to reach their best version. They are listed as handoffs for Track A in
-§ 10, and each has a working v1 without it.
+**Schema verdict: neither piece needs a migration.** Two things need one to
+reach their best version. They are written up for Track A in § 10, and each has
+a working v1 without it.
 
 ---
 
@@ -40,6 +43,44 @@ one to reach their best version. They are listed as handoffs for Track A in
   shop's own. This needs the parent/variant work first. **Rule now:** an
   unpriced line is never shown as $0, and the CSV and the panel mark unpriced
   and example-priced lines plainly.
+
+## 1a. The owner's answers and changes (2026-09-29, second round)
+
+| #   | Question                      | Answer                                                                                     |
+| --- | ----------------------------- | ------------------------------------------------------------------------------------------ |
+| Q1  | One scope per bid for v1      | **Yes**                                                                                    |
+| Q2  | Every charge in Misc until H1 | **Yes**                                                                                    |
+| Q3  | Copy exact cents              | **Yes**                                                                                    |
+| Q4  | Internal tier first           | **Yes**                                                                                    |
+| Q5  | Subs and Attached items       | Defined below. **Subs go in Misc for now, Attached items stay out**, and the panel says so |
+| Q6  | CSV carries cost, not sell    | **Yes**. "It is a takeoff"                                                                 |
+| Q7  | Prices on whole-bid rows only | **Yes**                                                                                    |
+
+**The owner's definitions:**
+
+- **Subs**: subcontractor lines (fire alarm, trenching, controls). Each has its
+  own markup, usually lower than on self-performed work.
+- **Attached items**: alternates, unit prices, allowances, exclusions and
+  acknowledged addenda. **They are not in the money column.**
+
+**Two changes:**
+
+1. **The panel shows the bid's price TO THE CUSTOMER.** Material and labor are
+   shown with markup, overhead and profit included, before tax, never as raw
+   cost, and the panel says so in plain words. **Confirmed: that is what § 5
+   already specified** (the charge split, as the QuickBooks export does). This
+   round adds the on-screen wording and a worked example that adds up to the
+   cent.
+2. **Unpriced lines no longer refuse the panel.** It opens, lists each unpriced
+   line as "Not priced", and shows **no totals and no copy buttons** until they
+   are fixed. **This replaces the first draft's rule** that the panel refuses to
+   open when a line cannot be priced (the `refuseIfIncomplete` behaviour copied
+   from QuickBooks) and its "shown, not blocked" rule for unpriced lines. Both
+   are struck through in § 5 below rather than deleted.
+
+**And one check (owner):** the five buckets, every charge in Misc included,
+must add up **exactly** to the bid's pre-tax total, meaning Total due minus
+tax. That is T1 in § 8, and the worked example in § 5 shows it to the cent.
 
 ---
 
@@ -74,11 +115,12 @@ one to reach their best version. They are listed as handoffs for Track A in
   | Labor            | hours × rate × modifiers × productivity, per line                                                                                    |
   | Direct job costs | **Additional expenses**: `bid_expenses`, from the `expense_items` library. Each has `taxable` and `markedUp`, and **no kind column** |
   | Bottom of bid    | overhead + profit (`calculateBidPrice`, `bottomOfBidRatio`)                                                                          |
-  | Subs             | **Not found** on any branch (track-b, track-c, a-email-reset, main, staging)                                                         |
-  | Attached items   | **Not found** on any branch                                                                                                          |
+  | Subs             | **Not built** on any branch (track-b, track-c, a-email-reset, main, staging). Subcontractor lines with their own markup (§ 1a)       |
+  | Attached items   | **Not built** on any branch. Alternates, unit prices, allowances, exclusions, addenda: not money (§ 1a)                              |
 
   The quoted line type (`references/material-markup.md` D4, "supplier-quoted
-  gear") is also not built. See Q5.
+  gear") is also not built. It is the nearest existing decision to Subs, since
+  both are lines with their own markup.
 
 - **Unpriced lines.** `lineNotPriced` / `lineHoursUnset`
   (`shared/lineNotPriced.ts`) are the rule, and `LineCost` is the one cell that
@@ -195,8 +237,10 @@ Overhead, profit, markup and tax are not in it, so tax never touches it.
 
 ### Scopes: how a bid becomes scopes. Recommendation first
 
-**Recommended for v1: one scope, the whole bid,** named after the bid (with a
-copy button, since the quote app asks for the name too).
+**Decided (owner, Q1): one scope, the whole bid,** named after the bid (with a
+copy button, since the quote app asks for the name too). Option D below is
+**not planned** for now. Its schema handoff was dropped from § 10 at the
+owner's request.
 
 Options considered:
 
@@ -205,13 +249,14 @@ Options considered:
 | **A. One scope = the bid** (rec.)      | Exact by construction. No split to explain. Matches the owner's example: one job, one scope | A multi-part job is one lump                                                                                                                                                                                         |
 | B. One scope per `unitLabel`           | The field exists, and `unitTotals` already rolls up by it                                   | Units are repeats ("Room 101"), not scopes. Charges belong to no unit, so a "Rest of the job" scope appears. Each unit needs its own material/labor split, and cents need a largest-remainder pass to sum to the bid |
 | C. One scope per kit (`sourceKitName`) | "Panel change out" reads like a kit name                                                    | Provenance only (schema comment: "never a live link"). Lines are edited after they arrive, so the grouping would be a guess wearing a label                                                                          |
-| D. A real scope field on lines         | Right, if multi-scope quotes are common                                                     | A migration (**handoff H3**) plus a way to assign lines on the bid screen. Its own piece                                                                                                                             |
+| D. A real scope field on lines         | Right, if multi-scope quotes are common                                                     | A migration plus a way to assign lines on the bid screen. Its own piece. Not planned now (owner, 2026-09-29)                                                                                                         |
 
-### Buckets: how BidRidge maps into the five. Recommendation first
+### Buckets: how BidRidge maps into the five
 
-Shown in the quote app's order:
+Shown in the quote app's order. Tasks and Equipment fill only once H1 exists.
+Until then every charge is in Misc (owner, Q2):
 
-| Bucket        | Recommended source                                                                                                                                                                                 |
+| Bucket        | Source                                                                                                                                                                                             |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Tasks**     | Additional expenses the estimator marks as a **task** (permit $85, inspection)                                                                                                                     |
 | **Material**  | The **material share of the work price**: `apportionWorkPrice(...).materialCents`. Material cost + material markup + its share of overhead and profit. The same split sales tax and QuickBooks use |
@@ -239,24 +284,128 @@ expensesTotal`). A test holds that (T1).
     after that sorts itself. NULL still means Misc. This is the "build it once,
     one click every job" end of the manual-to-automated rule (CLAUDE.md), and
     v1 is the manual end. Both work.
-- **Subs and Attached items**, if and when they exist: Subs go to **Misc** as a
-  named line, and Attached items are unknown (Q5). The builder takes a list of
-  named charges with a target bucket, so a new BidRidge section is a new entry
-  in one mapping table, not a new builder.
+- **Subs (owner, Q5): Misc for now.** When subcontractor lines are built, each
+  one enters Misc as its own named row, at its price **to the customer** (its
+  own markup, then overhead and profit, as the bid prices it), never at what
+  the sub charges. It is one entry in the builder's mapping table, not a new
+  builder.
+- **Attached items (owner, Q5): left out.** Alternates, unit prices,
+  allowances, exclusions and addenda are not in the money column, so they are
+  not in any bucket.
+- **The panel says both on screen**, in one line under the buckets: "Subcontract
+  lines are under Misc. Alternates, allowances, unit prices, exclusions and
+  addenda are not in these figures; they are on the proposal." (The last
+  clause holds only once attached items exist. Until then the line reads
+  "Subcontract lines, when you add them, go under Misc.")
 
-### Marking what the figure leaves out
+### What the panel shows: the customer's price, before tax
 
-- **`incomplete`** (a line the engine cannot price): **the panel refuses**,
-  exactly as `refuseIfIncomplete` does for QuickBooks. It names the line and
-  gives a link to it. A number that is missing a line would be keyed into a
-  quote as if it were whole.
-- **Not priced** (`notPriced.lines > 0`): shown, not blocked. A strip at the
-  top: "3 lines are not priced and are not in these figures." The bucket they
-  fall in says so under its number. A NULL material cost counts against
-  Material, and NULL hours count against Labor (`lineNotPriced` /
-  `lineHoursUnset`, tallied per bucket in the builder). A bucket whose only
-  content is unpriced lines shows **"Not priced"**, never $0, and has no copy
-  button.
+**Every figure is what the customer pays**, never what the work costs the
+shop. Material and Labor each carry their markup and their share of overhead
+and profit, and each charge carries what the bid bills for it. That is the
+QuickBooks export's split (`apportionWorkPrice`), for the same reason: the
+quote app has no line for overhead or profit, so they have to be inside the
+two numbers. Leaving them out would under-quote the job by exactly the margin.
+
+**On screen, in plain words**, directly under the heading:
+
+> **What you charge the customer, before tax.** Material and labor include
+> your markup, overhead and profit. These are not your costs.
+
+#### Worked example, to the cent
+
+This is the engine's own arithmetic (`calculateLineItem`, `calculateBidPrice`,
+`billTheBid`), not a new formula. **Measured, not worked by hand:** on
+2026-09-29 these inputs were run through those functions at `977b789`
+(`calculateLineItem` → `calculateBidPrice` → `bottomOfBidRatio` →
+`priceExpenses` → `apportionWorkPrice`). They returned every figure below:
+finalPrice 2601.5, ratio 1.21, charged [242, 85], workPrice 2359.5, material
+90750¢, labor 145200¢, subtotal 2686.5. T1a keeps it that way.
+
+| Input         | Value                                              |
+| ------------- | -------------------------------------------------- |
+| Material cost | $600.00, material markup 25%                       |
+| Labor         | 20 h × $60.00 = $1,200.00                          |
+| Lift rental   | $200.00, **marked up** (takes overhead and profit) |
+| Permit        | $85.00, **flat** (billed at cost)                  |
+| Overhead      | 10% (percentage)                                   |
+| Profit        | 10%, **markup** method                             |
+
+| Step                                               | Figure       |
+| -------------------------------------------------- | ------------ |
+| Direct cost = 600 + 1,200 + 200 (marked-up charge) | 2,000.00     |
+| + material markup 25% × 600                        | 150.00       |
+| = cost with markup                                 | 2,150.00     |
+| + overhead 10% × 2,150                             | 215.00       |
+| = cost with overhead                               | 2,365.00     |
+| + profit 10% × 2,365                               | 236.50       |
+| = **bid price** (`finalPrice`)                     | **2,601.50** |
+| Bottom-of-bid ratio = 2,601.50 ÷ 2,150.00          | 1.21         |
+| Lift rental charged = 200.00 × 1.21                | 242.00       |
+| **Work price** = 2,601.50 − 242.00                 | **2,359.50** |
+| Material share = 2,359.50 × 750 ÷ (750 + 1,200)    | 907.50       |
+| Labor = remainder, 2,359.50 − 907.50               | 1,452.00     |
+| Permit charged (flat)                              | 85.00        |
+| **Subtotal (pre-tax)** = 2,359.50 + 242.00 + 85.00 | **2,686.50** |
+
+What the panel shows (v1, with every charge under Misc):
+
+| Bucket               | Shown                                                 | Copies                      |
+| -------------------- | ----------------------------------------------------- | --------------------------- |
+| Tasks                | None                                                  | nothing                     |
+| Material             | $907.50                                               | `907.50`                    |
+| Equipment            | None                                                  | nothing                     |
+| Labor                | $1,452.00                                             | `1452.00`                   |
+| Misc                 | Lift rental $242.00, Permit $85.00 (Misc $327.00)     | `242.00`, `85.00`, `327.00` |
+| **Total before tax** | **$2,686.50**, shown to check against, no copy button | —                           |
+
+**It adds up:** 907.50 + 1,452.00 + 327.00 = **2,686.50** = the bid's subtotal.
+
+**And it equals Total due minus tax.** Suppose the bid taxes material at 8% on
+the price: tax = 907.50 × 8% = 72.60, and Total due = 2,686.50 + 72.60 =
+2,759.10. Then 2,759.10 − 72.60 = 2,686.50. The tax figure is only an
+illustration, since it depends on the company's tax settings. The identity
+does not depend on it: `billTheBid` defines `totalDue = subtotal + tax`
+(`server/bidPricing.ts` ~777), so buckets = subtotal = Total due − tax for any
+tax setting. T1 asserts both halves against real rollups.
+
+**The raw costs appear nowhere in the panel:** $600, $1,200, $2,000 and the
+$200 lift. T3b in § 8 checks that.
+
+### When lines are not priced: list them, no totals, no copy buttons
+
+**Owner, 2026-09-29. This REPLACES the first draft's two rules**, which are
+kept here so the change is visible:
+
+> ~~`incomplete`: the panel refuses, exactly as `refuseIfIncomplete` does for
+> QuickBooks.~~ ~~Not priced: shown, not blocked, with a strip saying how many
+> lines are not in the figures.~~
+
+**The rule now:**
+
+- **The panel always opens.** If any line is not priced (`lineNotPriced` or
+  `lineHoursUnset`), or any line cannot be priced (`incomplete`, a
+  `priceLineGuarded` problem), it shows **only**:
+  - a heading: "This bid has lines without a price. Price them on the bid, then
+    come back for the figures.";
+  - **each such line by name**, with **"Not priced"** (or **"Can't price"**
+    for an engine problem) in the place a figure would go, and a link to the
+    line on the bid;
+  - **no bucket figures, no total, no copy buttons**, not even for buckets the
+    unpriced lines do not touch. A partial set of figures keyed into a quote
+    reads as a whole one.
+- **Never $0 for a line with no price.** Not in the list, and not as a bucket.
+- Once the last line is priced, the figures appear. The staleness rule below
+  is what makes that happen without reopening the panel.
+- The router therefore does **not** call `refuseIfIncomplete`. It returns a
+  doc in one of two states, `{ state: "blocked", lines }` or
+  `{ state: "ready", scopes }`. That is a union, so the client cannot render a
+  figure from a blocked doc: the ready fields do not exist on it.
+- **Example-priced lines do not block.** They are priced. The panel shows the
+  figures with the § 6 line above them.
+
+### Other states
+
 - **An empty bucket** (no charges in Tasks) shows **"None"** with no copy
   button. The quote app field stays blank, which is not the same as typing 0.
 - **The sample bid** gets the QuickBooks export's treatment: a warning that it
@@ -274,7 +423,8 @@ expensesTotal`). A test holds that (T1).
   that pastes into a numeric field on a phone. The screen shows `$1,050.00`. A
   brief "Copied" flashes on the row (the green-flash idiom from § Editing
   fields rule 4) with an `aria-live` announcement.
-- **Pre-tax, said twice:** the heading reads "Before tax", and the footer reads
+- **Pre-tax, said twice:** the heading reads "What you charge the customer,
+  before tax" (above), and the footer reads
   "Before tax. Your quote app adds its own tax, on labor as well as material."
   When the bid has tax on, it adds: "so its total will not match this bid's
   Total due ($X)." Silence there would look like an error when the two totals
@@ -317,14 +467,14 @@ quietly stay wrong:
 
 **New**
 
-| File                                             | What                                                                                                                                                                                                                                                                            |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `shared/quoteAppExport.ts`                       | Pure builder. `QuoteAppSource` in (rollup totals, priced expense lines, per-bucket not-priced and example tallies, `tax: { shown: false }`), and `QuoteAppDoc` out (scopes → five buckets, named Misc rows, notes). `BUCKET_ORDER` constant. `clipboardAmount(n)` → `"1050.00"` |
-| `server/routers/quoteAppRouter.ts`               | `quoteApp.get({ bidId })`. Same loads as `accountingRouter`, same `bidRollup`, same `refuseIfIncomplete`. Scoped by `ctx.scope.dataUserId`. Gated by `internalProcedure("quoteApp.panel", "bids.view")` plus `pricing.view`                                                     |
-| `server/quoteAppPanel.test.ts`                   | T1–T6 (§ 8). Beside the rollup, as `accountingExport.test.ts` is, so the builder is tested against real `bidRollup` output                                                                                                                                                      |
-| `shared/examplePrice.ts`                         | § 6                                                                                                                                                                                                                                                                             |
-| `client/src/components/QuoteAppPanel.tsx`        | The dialog/sheet. Copy rows use one small `CopyAmountRow` inside the file, so the scope rows and Misc rows are one component                                                                                                                                                    |
-| `client/src/components/TakeoffExportPopover.tsx` | Checkbox + Download. Used by **both** TakeoffPage and the bid's Send menu: one component, not two copies (CLAUDE.md § Copying a layout)                                                                                                                                         |
+| File                                             | What                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `shared/quoteAppExport.ts`                       | Pure builder. `QuoteAppSource` in (rollup totals, priced expense lines, per-bucket not-priced and example tallies, `tax: { shown: false }`), and `QuoteAppDoc` out (scopes → five buckets, named Misc rows, notes). `BUCKET_ORDER` constant. `clipboardAmount(n)` → `"1050.00"`            |
+| `server/routers/quoteAppRouter.ts`               | `quoteApp.get({ bidId })`. Same loads as `accountingRouter`, same `bidRollup`. **No `refuseIfIncomplete`**: returns `blocked` with the unpriced lines, or `ready` (§ 5). Scoped by `ctx.scope.dataUserId`. Gated by `internalProcedure("quoteApp.panel", "bids.view")` plus `pricing.view` |
+| `server/quoteAppPanel.test.ts`                   | T1–T6 (§ 8). Beside the rollup, as `accountingExport.test.ts` is, so the builder is tested against real `bidRollup` output                                                                                                                                                                 |
+| `shared/examplePrice.ts`                         | § 6                                                                                                                                                                                                                                                                                        |
+| `client/src/components/QuoteAppPanel.tsx`        | The dialog/sheet. Copy rows use one small `CopyAmountRow` inside the file, so the scope rows and Misc rows are one component                                                                                                                                                               |
+| `client/src/components/TakeoffExportPopover.tsx` | Checkbox + Download. Used by **both** TakeoffPage and the bid's Send menu: one component, not two copies (CLAUDE.md § Copying a layout)                                                                                                                                                    |
 
 **Changed**
 
@@ -353,18 +503,20 @@ Nothing else. No change to the bid, proposal, totals or Settings.
 
 ## 8. Tests: the forcing functions
 
-| #   | File                    | Asserts                                                                                                                                                                                                                |
-| --- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T1  | `quoteAppPanel.test.ts` | **Sum of all buckets in all scopes = `bidRollup` subtotal, to the cent**, on a bid with material markup, overhead, profit, one flat and one marked-up charge, and a unit label. Material + Labor = `workPrice` exactly |
-| T2  | same                    | Material equals `apportionWorkPrice`'s material share, the same split the tax base and QuickBooks use                                                                                                                  |
-| T3  | same                    | Unpriced: one NULL-cost hand line and one NULL-hours line give "Not priced" in the right bucket, the tally is correct, and **no bucket shows 0 for them**. `incomplete` refuses                                        |
-| T4  | same                    | Example tally > 0 renders the example note (fixture tally, § 6)                                                                                                                                                        |
-| T5  | same                    | The sample bid carries its warning. An empty bucket is "None", not 0                                                                                                                                                   |
-| T6  | same                    | Source scan: `shared/quoteAppExport.ts` does not import `calculateSalesTax` or `salesTax`. The builder cannot work out tax                                                                                             |
-| T7  | `takeoffExport.test.ts` | With prices: **the footer's Direct cost = the bid's direct cost**, and the per-row line costs + "other lines" = it                                                                                                     |
-| T8  | same                    | Without prices: the file is **byte-identical** to today's. A scan of the file finds no `$`, and no cost or price header                                                                                                |
-| T9  | same                    | `includePrices` without `pricing.view` is refused. Not-on-bid, not-priced and part-priced rows have blank cost cells                                                                                                   |
-| —   | **when tax is shown**   | `quoteAppPanel.test.ts` "sales tax changes the tax line and nothing else" (§ 3)                                                                                                                                        |
+| #   | File                    | Asserts                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1  | `quoteAppPanel.test.ts` | **The owner's check. "the five buckets add up to Total due minus tax".** Every bucket, every charge in Misc included, summed in cents, equals `totals.totalDue − totals.salesTaxAmount` **and** `totals.subtotal`, to the cent. Run on a bid with material markup, overhead, profit, one flat and one marked-up charge and a unit label, **with sales tax ON** (so "minus tax" subtracts something), and again with it off. Also checks Material + Labor = `workPrice` exactly. Asserted against the real `bidRollup`, not a figure computed in the test |
+| T1a | same                    | **The worked example in § 5, literally**: those inputs give Material 907.50, Labor 1,452.00, Misc rows 242.00 and 85.00, and a total of 2,686.50. A reader can check the plan against the code, and a change to the engine that moves any of them goes red with the numbers in front of it                                                                                                                                                                                                                                                               |
+| T2  | same                    | Material equals `apportionWorkPrice`'s material share, the same split the tax base and QuickBooks use                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| T3  | same                    | **Blocked state**: a NULL-cost hand line, a NULL-hours line and an engine problem give `state: "blocked"` listing all three by name ("Not priced", "Not priced", "Can't price"). The doc has **no bucket, total or copy value at all**, and no 0 appears anywhere in it. Pricing the lines flips it to `ready`                                                                                                                                                                                                                                           |
+| T3b | same                    | **Customer price, not cost**: on the worked example, none of the raw costs (600.00, 1200.00, 2000.00, 200.00) appears in the ready doc, and `INTERNAL_FIELDS` from the accounting export finds nothing                                                                                                                                                                                                                                                                                                                                                   |
+| T4  | same                    | Example tally > 0 renders the example note (fixture tally, § 6)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| T5  | same                    | The sample bid carries its warning. An empty bucket is "None", not 0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| T6  | same                    | Source scan: `shared/quoteAppExport.ts` does not import `calculateSalesTax` or `salesTax`. The builder cannot work out tax                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| T7  | `takeoffExport.test.ts` | With prices: **the footer's Direct cost = the bid's direct cost**, and the per-row line costs + "other lines" = it                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| T8  | same                    | Without prices: the file is **byte-identical** to today's. A scan of the file finds no `$`, and no cost or price header                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| T9  | same                    | `includePrices` without `pricing.view` is refused. Not-on-bid, not-priced and part-priced rows have blank cost cells                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| —   | **when tax is shown**   | `quoteAppPanel.test.ts` "sales tax changes the tax line and nothing else" (§ 3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 Plus the look-at-it check (CLAUDE.md): open the panel at 390px wide on "Bar
 layout check", copy each number, paste it into a numeric field, then edit a
@@ -401,19 +553,61 @@ price and watch it move.
 
 ---
 
-## 10. Handoffs for Track A (schema)
+## 10. Handoff for Track A (schema)
 
-| #   | Change                                                                                                                                                                                                           | Unlocks                             | Kind                                                                                                         |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| H1  | `expense_items.quoteBucket` and `bid_expenses.quoteBucket`: nullable enum `task` / `equipment` / `misc`, no default. Copied library → bid when a charge is added, like `taxable` and `markedUp`                  | Tasks and Equipment fill themselves | Additive. NULL = Misc, the v1 meaning, so there is no window either way                                      |
-| H2  | Example price: on `materials`, a price source + date (or an "example" marker), and on `bid_line_items` a **snapshot** that the line's cost was an example. Part of the parentId/variant work already on A's list | § 6 goes live                       | Additive columns. The meaning of `costPerUnit === 0` changes; see CLAUDE.md § "Where a priced catalog lands" |
-| H3  | Only if Q1 is answered D: `bid_line_items.scopeName` (nullable), and on `bid_expenses`                                                                                                                           | Multi-scope quotes                  | Additive                                                                                                     |
+**Two items, and neither blocks v1.** Track B builds everything in this plan
+without them. Each one, when it lands, is an additive migration that B then
+reads. Per-line scopes (the first draft's H3) were **dropped** by the owner on
+2026-09-29 and are not handed off.
 
-None blocks v1.
+### H1. A quote bucket on each expense
+
+- **Columns:** `expense_items.quoteBucket` and `bid_expenses.quoteBucket`, a
+  nullable enum `task` / `equipment` / `misc`, **no default**.
+- **Meaning of NULL:** Misc, which is exactly what v1 does with every charge.
+  So there is no window in either order: old code ignores the column, and new
+  code reads NULL as today's meaning. It is **additive**, applied at step 1 of
+  the three-step deploy (CLAUDE.md § "Deploying a migration").
+- **Copied, not linked:** when a library charge is added to a bid, the bucket is
+  copied onto `bid_expenses` the same way `taxable` and `markedUp` are, so
+  changing the library later does not re-sort an old bid's quote.
+- **Who sets it:** the expense library screen and the bid's Additional expenses
+  row, each with a three-way choice. That is UI, so it is Track B's after A
+  lands the columns. Say which track owns the screens when handing over.
+- **B's side once it lands:** the builder reads the bucket instead of forcing
+  Misc, T1 gains a charge in each bucket, and the "Charges are all under Misc"
+  line comes off the panel.
+
+### H2. The example-price flag, with a saved copy on each bid line
+
+- **On `materials`:** a marker that the price is an example, plus its **source**
+  and **date** (the 2026-09-21 decision: an "EXAMPLE PRICE" labelled with
+  source and date). Editing the price clears the marker, which is what "makes
+  it the shop's own".
+- **On `bid_line_items`:** a **snapshot** that this line's frozen cost was an
+  example when it was added, nullable (NULL = not recorded, which is every line
+  before the migration), with its source and date if the label needs them
+  later. It is frozen with the other `snapshot*` fields and **never recomputed**
+  from the library, for the reason in § 6: a live read would relabel an old
+  bid's frozen number when someone edits the library.
+- **Depends on** the parent/variant (`parentId`) work already on A's list, as
+  the owner said. Sequence it inside that work, not before it.
+- **The meaning change to watch:** once shipped rows carry prices,
+  `costPerUnit === 0` stops meaning "nobody priced this"
+  (`shared/materialPricing.ts`, and CLAUDE.md § "Where a priced catalog
+  lands", which already flags this). The marker is what replaces that
+  reading. If any `UPDATE` in H2 writes an existing column, it is a **meaning
+  migration**: code first, backfill after.
+- **B's side once it lands:** `lineUsesExamplePrice` takes the new field, and
+  the compile errors (§ 6) show every place that must pass it. The CSV status
+  and the panel line are already built and tested.
 
 ---
 
-## 11. Questions for the owner (recommendation first)
+## 11. Questions for the owner: ANSWERED 2026-09-29, all as recommended
+
+See § 1a for the answers and the owner's definitions. The questions are kept
+as asked.
 
 1. **Scopes: one per bid for v1?** _Recommended: yes (option A)._ Multi-scope is
    option D later, if quotes often have more than one.
