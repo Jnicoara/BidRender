@@ -31,8 +31,11 @@ import { countNeedingPricing, needsPricing } from "../shared/materialPricing";
 import { smartSearch } from "../client/src/lib/smartSearch";
 import { wordsInName } from "../shared/aliasSuggestions";
 import {
+  cBodyName,
   elbowName,
   lbName,
+  llName,
+  lrName,
   parseRacewayName,
   pullBoxFor,
   tBodyName,
@@ -151,7 +154,7 @@ describe("every part the bend count can ask for is shipped", () => {
     expect(raceways).toHaveLength(53);
   });
 
-  it("ships a 90, a 45, an LB and a T body for every rigid raceway", () => {
+  it("ships a 90, a 45 and every body shape for every rigid raceway", () => {
     const missing: string[] = [];
     for (const { size, family } of raceways) {
       if (family.includes("flexible")) continue;
@@ -160,6 +163,9 @@ describe("every part the bend count can ask for is shipped", () => {
         elbowName(size, family, 45),
         lbName(size, family),
         tBodyName(size, family),
+        llName(size, family),
+        lrName(size, family),
+        cBodyName(size, family),
       ]) {
         if (!names.has(want)) missing.push(want);
       }
@@ -174,7 +180,9 @@ describe("every part the bend count can ask for is shipped", () => {
     const bodies = BASELINE_MATERIALS.filter(m =>
       m.name.endsWith(" conduit body")
     );
-    expect(bodies.length).toBeGreaterThanOrEqual(90);
+    // LB, T, LL, LR and C × 5 families × 9 sizes (2026-09-28). A floor, so a
+    // shape that stops generating goes red here as well as above.
+    expect(bodies.length).toBeGreaterThanOrEqual(225);
     const undescribed = bodies
       .filter(m => m.description !== "Priced with its cover and gasket.")
       .map(m => m.name);

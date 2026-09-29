@@ -307,6 +307,28 @@ export function tBodyName(size: string, family: string): string {
   return `${size} ${family} T conduit body`;
 }
 
+/*
+  LL, LR and C bodies (2026-09-28, materials-track-c-plan.md § 7). Shipped
+  per rigid family and trade size like the LB, for adding by hand or in an
+  assembly. Nothing in the takeoff asks for them: a pull point is an LB or a
+  pull box, and offering these there needs a new bid-line role (L5).
+*/
+
+/** `1/2" EMT LL conduit body`. */
+export function llName(size: string, family: string): string {
+  return `${size} ${family} LL conduit body`;
+}
+
+/** `1/2" EMT LR conduit body`. */
+export function lrName(size: string, family: string): string {
+  return `${size} ${family} LR conduit body`;
+}
+
+/** `1/2" EMT C conduit body` — the straight-through body. */
+export function cBodyName(size: string, family: string): string {
+  return `${size} ${family} C conduit body`;
+}
+
 /**
  * The strap a family is held with. PVC 40 and 80 share an outside diameter,
  * as do rigid and IMC, so each pair shares a strap. Flex has none yet.

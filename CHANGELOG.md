@@ -4,6 +4,13 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-28]
+
+- **LL, LR and C conduit bodies are in the catalog**: all three shapes for
+  EMT, rigid, IMC and both PVC schedules, 1/2" to 4" — 135 rows, each priced
+  with its cover and gasket like the LB and T. They are for adding by hand or
+  in an assembly; the takeoff still suggests only LBs and pull boxes.
+
 ## [2026-09-27]
 
 - **The pricing spreadsheet has a Notes column next to each item's name**,

@@ -129,15 +129,20 @@ const FAMILIES: Family[] = [
  * The T body was added 2026-09-27 (references/materials-track-c-plan.md § 4,
  * owner's answers T1–T6): all nine sizes, one row per family, matching the LB
  * so a body chosen at any tee has a row to price against. Its name comes from
- * `tBodyName`. LL, LR and C bodies are held (T6): nothing in the takeoff
- * proposes them.
+ * `tBodyName`.
+ *
+ * LL, LR and C bodies were added 2026-09-28 (plan § 7). This overrides T6,
+ * which held them "until the takeoff proposes them": the owner asked for the
+ * rows anyway, for adding by hand. The takeoff still proposes none of them.
+ * Same five families and nine sizes; names from `llName`, `lrName` and
+ * `cBodyName`. No brand aliases (L4), to match the LB.
  *
  * EVERY conduit body is priced WITH its cover and gasket, and says so (owner,
  * 2026-09-27, plan § 5, C1). The catalog ships no separate cover row and the
  * takeoff adds no cover line for an LB or a T, so a bare-body price would
  * leave the cover off every bid with nothing to show it. The LB rows said
  * nothing either way until then. `BODY_DESCRIPTION` is shared so the shapes
- * cannot drift apart; LL, LR and C take it too when they come, and
+ * cannot drift apart; LL, LR and C take it too, and
  * `materialsCatalog.test.ts` fails on any "conduit body" row without it.
  */
 const BODY_DESCRIPTION = "Priced with its cover and gasket.";
@@ -156,6 +161,21 @@ const FITTINGS: { suffix: string; slang: string; description?: string }[] = [
     // Not "tee body": "body" is in the name, so the phrase is "tee" + name.
     suffix: "T conduit body",
     slang: "tee condulet access fitting pull branch split",
+    description: BODY_DESCRIPTION,
+  },
+  {
+    suffix: "LL conduit body",
+    slang: "condulet access fitting pull left",
+    description: BODY_DESCRIPTION,
+  },
+  {
+    suffix: "LR conduit body",
+    slang: "condulet access fitting pull right",
+    description: BODY_DESCRIPTION,
+  },
+  {
+    suffix: "C conduit body",
+    slang: "condulet access fitting pull straight through",
     description: BODY_DESCRIPTION,
   },
 ];
