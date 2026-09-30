@@ -3733,6 +3733,8 @@ counts nothing becomes setup work with no payoff, which is the exact failure the
 > § 15's gate; only scanning the SET is. The legend half now goes ahead,
 > confirmed once per plan set (§ 9.4) and sent to Read sheet as pictures.
 > The set scan stays where this table puts it. This agrees with § 9.6.
+> **Amended the same day by the owner:** the build ORDER between the two is
+> now decided by the accuracy test (see § 15.4's note), not by this argument.
 
 **(b) is small and it is the one that removes a precondition.** A reader finding
 is a proposal about a SHAPE on a drawing; it does not need a library entry to
@@ -5515,6 +5517,13 @@ and two hours, and would settle the largest question (is the default good enough
 to build tiling on) while leaving the variance question open.
 
 ### 15.4 DECIDED 2026-09-18: the small version, and not yet
+
+> **OVERRIDDEN 2026-09-29 by the owner — see `references/legend-reading-plan.md`
+> § 0 B.** The test now runs BEFORE choosing what to build first. It compares
+> four methods (today's, legend first, zoomed-in tiles, and both), not two,
+> because its answer now decides between legend reading and tiling rather
+> than only gating tiling. The method below (hand counts first, unseen) still
+> applies.
 
 **Not authorised tonight, and deliberately so.** When Phase 10 is actually the
 next thing to build, run the SMALL version:

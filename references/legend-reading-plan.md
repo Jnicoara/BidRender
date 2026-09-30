@@ -14,6 +14,77 @@ plan agrees with all of them. It changes one thing, the order in § 5l's
 
 ---
 
+## 0. The owner's answers (2026-09-29) — these override anything below
+
+1. **The legend is read from a box you drag around it.** One drag, not one per
+   symbol. A "whole sheet" option stays as the fallback for a legend spread
+   across the page (§ 4, step 1).
+2. **An addendum or second PDF always gets the OFFER "use set X's legend?",
+   and it is never applied on its own.** One click to accept, and nothing
+   happens without that click (§ 4, "When the legend is somewhere else").
+3. **Still open: plain name counts.** See § 7 Q3.
+
+### Two things that must happen BEFORE this ships
+
+**A. The AI correction log must be live first, so every legend fix is logged.**
+This is piece 3 of `references/stage-4-safety-plan.md` (`ai_correction_log`,
+planned there as "0099, or whatever is next when written"; after the
+0098–0105 batch it becomes 0106 or later). The legend flow adds edits the
+AI made and a person changed, and each one must write a row, on the same
+rules as that plan (written after the edit commits, cannot block it, stores
+no drawing content):
+
+- a legend label the model read and the user **fixed**;
+- a legend entry the user **rejected** ("not a symbol");
+- a **remembered** suggestion the user turned down for this set;
+- a box the user **moved or resized**;
+- a Read sheet finding re-pointed to a different legend entry (today's
+  `planCopilot.correct`, already on that plan's list).
+
+The stage-4 plan names four writers today. **Add these five to its list when
+it is built**, or the log will silently miss the edits this feature makes. If
+the log has shipped before this is built, add them in this feature's own
+commit. The test is that each of the five produces a row.
+
+**B. Run the reader accuracy test BEFORE choosing what to build first.** It
+compares three ways of reading on the same real sheets, against hand counts
+made first and unseen (§ 15.2's method):
+
+| Method                          | What is sent                                                    |
+| ------------------------------- | --------------------------------------------------------------- |
+| 1. Today's method               | Whole sheet as one picture, symbol names as words               |
+| 2. Legend first                 | Whole sheet as one picture, plus the confirmed legend pictures  |
+| 3. Zoomed-in pieces             | The sheet cut into about 6 tiles at 150 px/in, names as words   |
+| 4. Both (optional, recommended) | Tiles plus legend pictures, which is what would ship eventually |
+
+- **Sheets:** 5, weighted to dense ones: the four drawing sheets of the Old
+  Blueridge fixture set plus one pine st drawing sheet. Legend entries for
+  each set are captured by hand first, so method 2 is not also testing v1's
+  legend reader. Whether pine st has a legend sheet at all is not checked
+  yet. If it has none, capture its symbols off the floor plan and say so in
+  the results.
+- **Per method it reports:** how many real devices it found, how many it
+  invented, and a breakdown by symbol type (§ 15.2).
+- **Cost, indicative, from § 11.5:** about 5c a sheet for methods 1 and 2 and
+  about 10c for 3 and 4. 5 sheets across four methods, run twice, is **about
+  $3**. **The real cost is the hand counts: about two hours of the owner's
+  time**, done before any reading is seen.
+- **It needs a small script** (under `scripts/`, AI calls made on purpose,
+  never from the app), because method 3 needs tiles and the app cannot make
+  them yet. `shared/visionImageLimits.ts` already has `largestSquareTile`.
+  Run it against the local fixture files with a real key.
+- **What each result means:** if legend-first closes most of the gap, build
+  this plan first. If only tiles do, tiling (Phase 10) goes first and this
+  follows. If method 4 is far ahead of both, build both, legend first,
+  because it is cheaper and tiling needs it anyway (§ 9.6). If none is
+  accurate enough, the reader is a first pass that speeds up a hand count,
+  and the product says so (§ 15.5).
+
+This overrides § 15.4's "not yet" in `plan-viewer-overhaul.md`, and a line
+there says so.
+
+---
+
 ## 1. What Read sheet does today, in plain words
 
 Checked against the code on `local-dev` at `90a286c`, 2026-09-29.
@@ -117,10 +188,9 @@ picture of the whole sheet, so a symbol is still about 11 pixels across. The
 legend makes it much better at saying **which** symbol a mark is. It does not
 make it better at **seeing** small marks on a dense sheet. That needs tiles, and
 nobody has yet measured how well the reader counts (§ 15). **So v1 should be
-described as better matching, not as accurate counting.** Run § 15.4's small
-bake-off (5 sheets, about $3 and two hours of hand counting) once v1 is in, with
-"legend pictures sent / not sent" as one of the things compared. It will tell us
-how much of the gap v1 closed.
+described as better matching, not as accurate counting.** Whether that
+matters more than tiling is what the accuracy test in § 0 decides, and the
+owner has ruled that it runs BEFORE anything is built.
 
 ---
 
@@ -206,6 +276,9 @@ bid_pdf_legend_entries
   id, userId (company owner, as everywhere)
   bidPdfId       -> bid_pdfs, cascade          the plan set
   symbolLinkId   -> symbol_links, set null     the account symbol it confirmed as
+  groupId        -> takeoff_groups, set null, NULLABLE
+                                               a plain name count on this bid, when
+                                               the symbol has no assembly (§ 7 Q3)
   status         enum: confirmed | rejected
   source         enum: ai | manual | remembered
   sheetId        -> bid_pdf_sheets, set null   where on the set it was read
@@ -218,9 +291,10 @@ bid_pdf_legend_entries
 - **Additive, step 1 of the three steps** (CLAUDE.md § "Deploying a migration").
   It is a new table, no `UPDATE`, and nothing existing changes meaning. Old code
   ignores it.
-- **Number:** the next free number after the 0098–0105 batch planned on
-  `a-migrations-plan`, so **0106 if that batch lands as planned. Check
-  `drizzle/` at write time**; if the batch has moved, so does this.
+- **Number:** after the 0098–0105 batch planned on `a-migrations-plan` AND
+  after the AI correction log (§ 0, which must land first and was planned as
+  "0099, or whatever is next"). So probably **0107**, not 0106. **Check
+  `drizzle/` at write time**; if either has moved, so does this.
 - **Hand-write the `.sql`** and read every statement (CLAUDE.md § "Never run
   generated migration output without reading what it adds").
 - No change to `symbol_links`. `capturedFromSheetId` already exists and
@@ -282,9 +356,9 @@ and that the "matched against" count is right after a confirm.
 ### What v1 leaves out, on purpose
 
 - **Tiling.** It is still Phase 10, still gated on § 15.
-- **A legend row pointing at a plain name or a material** rather than an
-  assembly. That is § 5l (b) and § 16's "mark first, name it after". v1 keeps
-  today's rule: a symbol links to an assembly or stays unlinked.
+- **A legend row pointing at a material** rather than an assembly or a plain
+  name. Plain names are IN v1 if the owner agrees (§ 7 Q3); materials wait
+  for § 16's "mark first, name it after".
 - **The cheap shape ranking** of § 9.3 stage 2. The model compares the pictures
   in the call it is already making. Add the ranking only if remembered
   suggestions turn out noisy.
@@ -299,8 +373,13 @@ and that the "matched against" count is right after a confirm.
 then the set"** together in row (c), blocked on § 15's bake-off. **This plan
 splits that row.** Reading the legend is one call on one region, needs no
 tiling, and does not depend on how well the reader counts a dense sheet. Only
-the scan of the set does. So the legend half moves ahead of the gate, and the
-set scan stays behind it. That agrees with § 9.6 ("legend capture FIRST").
+the scan of the set does. That agrees with § 9.6 ("legend capture FIRST").
+
+**Amended the same day by the owner (§ 0):** nothing is built until the
+accuracy test has compared all three ways of reading. So the split still
+stands, since the legend read does not need tiling, but the build ORDER is
+now set by the test, not by this argument. § 15.4's "not yet" is overridden
+too; a line in § 15.4 points here.
 
 A line saying this goes into § 5l, pointing here, **in the same commit as this
 file**, so a reader who opens either one finds the other (CLAUDE.md § "Where
@@ -308,11 +387,19 @@ decisions live").
 
 ## 7. Questions for the owner
 
-1. **One drag around the legend, or read the whole legend sheet?**
-   Recommended: the drag, with whole-sheet as the fallback. It is sharper,
-   cheaper, and skips title blocks and notes.
-2. **Should an addendum with no legend offer the main set's legend?**
-   Recommended: yes, as a one-click offer, never automatic.
-3. **Does v1 wait for § 5l (b)** (a symbol that counts as a plain name, with no
-   assembly), or ship with assembly-or-unlinked as today? Recommended: ship
-   without it. (b) is its own small piece and does not block this one.
+1. **ANSWERED 2026-09-29: drag a box around the legend.** See § 0.
+2. **ANSWERED 2026-09-29: always offer "use set X's legend?", never apply it
+   on its own.** See § 0.
+3. **STILL OPEN: "plain name" counts.** In plain words: today a symbol can only
+   be counted if you link it to an assembly from your library. A plain name
+   count would let you confirm it as just "Floor box", count it, and price it
+   later, with no library entry needed.
+
+   **Recommendation, REVERSED from the first draft of this file: build plain
+   names into v1, do not ship without them.** The first draft said to ship
+   without it. That fails CLAUDE.md's test for a new feature ("could somebody
+   who has never opened the library screen use this?"): a new user could
+   confirm a whole legend and still not place a single mark. It is small and
+   needs no extra migration. The new table carries a nullable `groupId`
+   pointing at a plain count on the bid (see § 5), and plain counts already
+   exist (`takeoff_groups` kind `plain`, § 5e). This is § 5l (b).
