@@ -841,6 +841,18 @@ rule in `ASSEMBLIES_PLAN.md`.
 > `scripts/fittingsImpact.mts` reports what the counted fittings change.
 > Elbows and pull points were the next build, and landed 2026-09-26 as D19.
 
+> **OVERRIDDEN IN PART 2026-09-29, by the owner: the run's per-foot rate
+> covers couplings, connectors and straps.** This entry, and the retirement
+> note above, had every fitting carry "its own labour unit" so that "the run
+> is just pipe". With hours set on both the pipe and those three, that paid
+> for them twice. Now a coupling, connector or strap line carries its part's
+> COST and **zero hours**, and Send again never fills hours in on one
+> (`LABOR_IN_RUN_RATE` in `shared/runFittings.ts`, read by `runLineLaborUnit`
+> in `server/db.ts`, `resendPlan` and `lineHoursUnset`). **Elbows, field
+> bends, LBs, pull boxes and tee boxes and covers are NOT covered** and keep
+> their own hours. The per-end drop amount is unchanged. No stored line was
+> rewritten: a line already sent keeps its snapshot (R4).
+
 - (a) A vertical foot costs the same as a flat foot.
 - (b) Per foot, plus **a fixed amount per counted end**.
 - (c) Verticals priced per foot at their own higher rate — which is how the

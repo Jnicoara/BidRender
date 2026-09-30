@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Couplings, connectors and straps on a traced run are no longer paid for
+  twice.** A run's labor hours per foot already cover them, so their bid lines
+  now carry the part's cost and no hours of their own — they read "in run
+  rate" — and Send again never adds hours to them. Before, setting hours on
+  both the pipe and its couplings billed that labor once in every foot and
+  again per coupling. Elbows, field bends, LBs, pull boxes and tee boxes still
+  carry their own hours. The run type's labor line now says what it covers.
 - **The plan reader no longer reads a sheet just because you opened it.** The
   "Read each sheet as I open it" switch is gone. A sheet is read, and paid for,
   only when you press Read sheet. With the switch on, clicking through a

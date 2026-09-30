@@ -27,6 +27,11 @@
  * Hours refill for every traced line since 2026-09-26, when a part with no
  * labor unit stopped freezing as 0 h. Before that only a field bend kept a
  * NULL, and this had a field-bend-only branch for it.
+ *
+ * EXCEPT couplings, connectors and straps, since 2026-09-29: the run's
+ * per-foot rate pays their labor (`LABOR_IN_RUN_RATE`, shared/runFittings.ts),
+ * so their hours never refill. A line of theirs sent with NULL hours before
+ * that rule keeps its NULL, and `lineHoursUnset` stops calling it unpriced.
  */
 import { needsPricing } from "./materialPricing";
 
@@ -53,6 +58,12 @@ export function resendPlan(input: {
    * labor line — so its price never refills. Required, so a caller has to say.
    */
   laborOnly: boolean;
+  /**
+   * A coupling, connector or strap: its labor is in the run's per-foot rate,
+   * so its hours never refill (`laborInRunRate`). Required, so a caller has to
+   * say — the same reason `laborOnly` is.
+   */
+  laborInRunRate: boolean;
   /**
    * What the line holds. NULL when nobody can say (sent before 0083 and not
    * recoverable). For a fitting that means "leave its part alone"; for pipe
@@ -89,7 +100,9 @@ export function resendPlan(input: {
       ? Number(currentPart.costPerUnit)
       : null;
   const hours =
-    input.lineHours === null && input.currentHours !== null
+    !input.laborInRunRate &&
+    input.lineHours === null &&
+    input.currentHours !== null
       ? Number(input.currentHours)
       : null;
   return price === null && hours === null

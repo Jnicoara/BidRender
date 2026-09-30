@@ -49,7 +49,7 @@ import {
   pickIsPriced,
 } from "../../shared/runFittingMaterials";
 import { materialItemKey } from "../../shared/materialMarkup";
-import { isFittingRole } from "../../shared/runFittings";
+import { isFittingRole, laborInRunRate } from "../../shared/runFittings";
 import { resendPlan, swapText, type ResendPlan } from "../../shared/resendLine";
 import { footageByRunType } from "../runTypeFootage";
 import { MARK_COLORS } from "../../shared/takeoffMarks";
@@ -178,6 +178,9 @@ async function resendPlans(
       candidate.role,
       resendPlan({
         isFitting: isFittingRole(candidate.role),
+        // Couplings, connectors and straps: the run's per-foot rate pays
+        // their labor, so Send again never fills hours in on them.
+        laborInRunRate: laborInRunRate(candidate.role),
         // A field bend is priced by hours on its raceway, never by cost.
         laborOnly: candidate.role === "fieldBend",
         linePart: part(line.runMaterialId),

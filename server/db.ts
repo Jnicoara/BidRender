@@ -225,6 +225,7 @@ import {
   FITTING_KINDS,
   isFittingRole,
   isStickJoint,
+  laborInRunRate,
   type FittingCount,
   type FittingKind,
   type RacewayFittingSpec,
@@ -12206,11 +12207,21 @@ function runLinePricing(
   };
 }
 
-/** The labor unit a run-type line of this role reads from its part. */
+/**
+ * The labor unit a run-type line of this role reads from its part.
+ *
+ * A coupling, connector or strap freezes ZERO, whatever its part says: the
+ * run's per-foot rate pays for them (`LABOR_IN_RUN_RATE`, owner 2026-09-29).
+ * Zero rather than NULL because it is an answer, not a gap: NULL would read
+ * "Not priced" and ask somebody to set hours that must never be used here.
+ * A swap and a refill both come through this function, so neither can put the
+ * part's own hours back.
+ */
 function runLineLaborUnit(
   role: RunMaterialRole,
   material: Material
 ): string | null {
+  if (laborInRunRate(role)) return "0.0000";
   const unit =
     role === "fieldBend" ? material.fieldBendLaborHours : material.laborHours;
   return unit === null ? null : Number(unit).toFixed(4);

@@ -244,7 +244,26 @@ describe("the sentence a screen shows", () => {
   };
 
   it("states the figure when nothing is missing", () => {
-    expect(laborPerFootSentence(costed)).toBe("0.0605 h per ft");
+    expect(laborPerFootSentence(costed)).toBe(
+      "0.0605 h per ft · covers couplings, connectors and straps"
+    );
+  });
+
+  it("says what a conduit rate covers, and a cable rate does not", () => {
+    // Owner, 2026-09-29: the per-foot rate pays for couplings, connectors and
+    // straps. Elbows, bends, LBs and boxes keep their own hours, so the
+    // sentence names only these three. A cable has none of them.
+    expect(laborPerFootSentence(costed)).toMatch(
+      /covers couplings, connectors and straps$/
+    );
+    expect(laborPerFootSentence(costed)).not.toMatch(/elbow|bend|LB|box/i);
+    expect(
+      laborPerFootSentence({
+        pathType: "cable",
+        conductorMaterialId: 2,
+        conductorLaborHours: 0.0125,
+      })
+    ).not.toMatch(/covers/);
   });
 
   it("keeps four decimals, because that is what the column stores", () => {
@@ -269,13 +288,15 @@ describe("the sentence a screen shows", () => {
       conductorLaborHours: null,
       groundLaborHours: null,
     });
-    expect(sentence).toBe("0.04 h per ft so far — 2 of 3 have no labor unit");
-    expect(sentence).not.toBe("0.04 h per ft");
+    expect(sentence).toBe(
+      "0.04 h per ft so far — 2 of 3 have no labor unit · covers couplings, connectors and straps"
+    );
+    expect(sentence).not.toMatch(/^0\.04 h per ft( ·|$)/);
   });
 
   it("agrees with itself about one", () => {
     expect(laborPerFootSentence({ ...costed, conductorLaborHours: null })).toBe(
-      "0.044 h per ft so far — 1 of 3 has no labor unit"
+      "0.044 h per ft so far — 1 of 3 has no labor unit · covers couplings, connectors and straps"
     );
   });
 

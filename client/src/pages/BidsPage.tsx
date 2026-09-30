@@ -94,6 +94,7 @@ import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { lineHoursUnset, lineNotPriced } from "@shared/lineNotPriced";
+import { laborInRunRate } from "@shared/runFittings";
 import { bidNotPricedCount } from "@/lib/notPricedTotal";
 import { planCountLabel } from "@shared/planCounts";
 
@@ -1134,6 +1135,20 @@ export default function BidsPage({
                                 <span className="text-xs w-24 text-right shrink-0 text-[#F5C518]">
                                   Not priced
                                 </span>
+                              ) : line.takeoffRunTypeId !== null &&
+                                laborInRunRate(line.runMaterialRole) ? (
+                                /* A coupling, connector or strap: its labor is
+                                   in the run's per-foot rate (owner,
+                                   2026-09-29). Said in words, because "0 h"
+                                   beside a counted fitting reads as a figure
+                                   somebody chose — the unset-is-not-zero rule
+                                   from the other side. */
+                                <span
+                                  className="text-xs w-24 text-right shrink-0 text-muted-foreground"
+                                  title="The run's hours per foot pay for couplings, connectors and straps, so they carry no hours of their own."
+                                >
+                                  in run rate
+                                </span>
                               ) : (
                                 <span
                                   className="font-mono text-xs w-24 text-right shrink-0 text-muted-foreground"
@@ -1385,7 +1400,8 @@ export default function BidsPage({
                     total above. Set the hours on the Materials screen, then
                     press Send again on the <PlansLink bidId={bidId} /> — it
                     fills in labor on a line that has none, and never changes
-                    hours that are set.
+                    hours that are set. Couplings, connectors and straps never
+                    need hours here: the run&apos;s hours per foot pay for them.
                   </p>
                 </div>
               )}

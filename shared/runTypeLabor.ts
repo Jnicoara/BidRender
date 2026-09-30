@@ -236,11 +236,20 @@ export function laborPerFootSentence(type: RunTypeSpec): string {
   const labor = laborPerFootForRunType(type);
   const total = runTypeComponentsPerFoot(type).length;
   const hours = trimHours(labor.hours);
+  // What the per-foot figure pays for beyond the pipe and wire (owner,
+  // 2026-09-29, `LABOR_IN_RUN_RATE`): a conduit type's couplings, connectors
+  // and straps carry no hours of their own on the bid. Said here, where the
+  // rate is read, so nobody adds hours to those parts expecting them to count.
+  // A cable type has none of them, so it says nothing.
+  const covers =
+    type.pathType === "conduit"
+      ? " · covers couplings, connectors and straps"
+      : "";
 
-  if (labor.complete) return `${hours} h per ft`;
+  if (labor.complete) return `${hours} h per ft${covers}`;
   if (labor.hours <= 0) return "No labor units yet — priced at material only";
   const verb = labor.unsetCount === 1 ? "has" : "have";
-  return `${hours} h per ft so far — ${labor.unsetCount} of ${total} ${verb} no labor unit`;
+  return `${hours} h per ft so far — ${labor.unsetCount} of ${total} ${verb} no labor unit${covers}`;
 }
 
 /**
