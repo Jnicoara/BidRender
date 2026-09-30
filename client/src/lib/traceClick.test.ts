@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { REPEAT_CLICK_PX, addsTracePoint } from "./traceClick";
+import {
+  DOUBLE_PRESS_MS,
+  DOUBLE_PRESS_PX,
+  REPEAT_CLICK_PX,
+  addsTracePoint,
+} from "./traceClick";
 
 describe("a click while tracing", () => {
   const path = [
@@ -20,6 +25,38 @@ describe("a click while tracing", () => {
   it("keeps a deliberate short segment at high zoom", () => {
     // At 600% one screen pixel is a sixth of a point: 2 points is 12 px away.
     expect(addsTracePoint(path, { x: 302, y: 0 }, 1 / 6)).toBe(true);
+  });
+
+  /*
+    2026-09-29: the 4 px rule let a double-click that drifted 6 px at 19% zoom
+    through — a ~32-point stub, past the 3-point backstop, bought as an elbow.
+    Time tells that drift from a short segment clicked on purpose.
+  */
+  it("ignores a double-click that drifted past 4 px at low zoom", () => {
+    const perPx = 5.3; // 19% zoom
+    const drifted = { x: 300 + 6 * perPx, y: 0 };
+    expect(addsTracePoint(path, drifted, perPx, 180)).toBe(false);
+    expect(
+      addsTracePoint(
+        path,
+        { x: 300, y: (DOUBLE_PRESS_PX - 1) * perPx },
+        perPx,
+        400
+      )
+    ).toBe(false);
+  });
+
+  it("keeps the same short segment when it was clicked on purpose", () => {
+    const perPx = 5.3;
+    const near = { x: 300 + 6 * perPx, y: 0 };
+    // A separate click, after the double-click window.
+    expect(addsTracePoint(path, near, perPx, DOUBLE_PRESS_MS + 300)).toBe(true);
+    // No previous press to compare with.
+    expect(addsTracePoint(path, near, perPx)).toBe(true);
+    // Quick, but far: a fast second point along the run is still a point.
+    expect(
+      addsTracePoint(path, { x: 300 + 40 * perPx, y: 0 }, perPx, 150)
+    ).toBe(true);
   });
 
   it("draws the line at REPEAT_CLICK_PX on screen, whatever the zoom", () => {

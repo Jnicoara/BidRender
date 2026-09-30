@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Slipped double-clicks no longer add stray elbows, and old ones are
+  flagged.** Finishing a run with a double-click could leave a tiny extra
+  segment when the mouse moved slightly, especially zoomed out, and that
+  turn was counted as an elbow. The trace tool now ignores the second click
+  of a double-click at any zoom. Runs traced before this that may have such
+  an end show "Check this elbow" with a Show button; nothing is changed on
+  them — you decide.
 - **Marks can no longer be counted as the wrong thing after a failed save.**
   If saving marks failed (a dropped connection) and you then switched to
   counting something else, the next save could file both sets under the first

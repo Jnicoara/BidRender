@@ -343,6 +343,8 @@ export function TraceLayer({
   chromeTarget?: HTMLElement | null;
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  /** When the last press while tracing landed — see @/lib/traceClick. */
+  const lastTracePress = useRef(Number.NEGATIVE_INFINITY);
   const [crosshairColor] = useCrosshairColor();
   const [crosshairSize] = useCrosshairSize();
   /** Moved directly, never through a render. See CrosshairGuides. */
@@ -842,10 +844,15 @@ export function TraceLayer({
               legs.onNewLeg(at);
               return;
             }
-            // The second press of a double-click lands on the point the
-            // first one placed; adding it drew a stub the bend counter read
-            // as an elbow. @/lib/traceClick.
-            if (!addsTracePoint(points, page, pagePerScreenPx())) return;
+            // The second press of a double-click lands on or near the point
+            // the first one placed; adding it drew a stub the bend counter
+            // read as an elbow. Judged by distance AND by the time since the
+            // previous press, so a drifting double-click at low zoom is
+            // caught too. @/lib/traceClick.
+            const now = e.timeStamp;
+            const since = now - lastTracePress.current;
+            lastTracePress.current = now;
+            if (!addsTracePoint(points, page, pagePerScreenPx(), since)) return;
             onPointsChange([...points, page]);
             return;
           }

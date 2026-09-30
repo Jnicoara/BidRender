@@ -26,7 +26,7 @@ import {
   PULL_POINT_PLACES,
   PULL_POINT_STATUSES,
 } from "../../drizzle/schema";
-import { placeAnswer } from "../../shared/runBends";
+import { placeAnswer, stubsToReview } from "../../shared/runBends";
 import {
   RUN_PATH_TYPES,
   RUN_STATUSES,
@@ -425,6 +425,13 @@ export const takeoffRunsRouter = router({
            * same function the bid's warning counts with (shared/runNoWire.ts).
            */
           noWire: runCarriesNoWire(run, wire),
+          /**
+           * An end that may be a double-click stub which bought an elbow —
+           * listed for the estimator to check, never changed (owner,
+           * 2026-09-29). shared/runBends.ts `stubsToReview`, the same rule
+           * `scripts/stubReview.mts` lists across a database.
+           */
+          stubsToReview: stubsToReview(run.points ?? []),
           /**
            * What the estimator typed, in inches, or null for "measured from
            * the drawing" (§ 4c). Raw, for the field that edits it; the

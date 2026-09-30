@@ -286,6 +286,78 @@ export function directionalVertices(points: readonly Point[]): number[] {
   return kept;
 }
 
+/**
+ * AN END THAT MAY BE A DOUBLE-CLICK STUB, FOR A PERSON TO REVIEW.
+ *
+ * Owner, 2026-09-29: flag, don't change. Runs traced before the trace tool
+ * learned to ignore a drifting double-click (@/lib/traceClick, same day) can
+ * end in a short segment that the bend counter reads as a corner — an elbow
+ * nobody drew. STUB_POINTS already hides the tiny ones; longer ones cannot be
+ * told apart from a short run into a box by geometry alone, so they are
+ * LISTED, never removed: the stored points are the estimator's.
+ *
+ * An end is listed when its first or last segment (after STUB_POINTS
+ * collapsing) is shorter than `reviewBelow` page points AND the turn onto it
+ * is at least MIN_BEND_DEGREES — i.e. it could have bought a fitting.
+ *
+ * ── Where 40 comes from: REASONED, not yet measured on real data ──────────
+ * The old guard let through a drift of more than 4 screen px. A hand drifts
+ * up to about 8 px between two presses; at 19% zoom a pixel is ~5.3 page
+ * points, so ~40 points is the longest stub the old tool could plausibly have
+ * left at the lowest common zoom. Measured 2026-09-29 on the local database
+ * only: 14 runs, one listed (17.3 pt, turning 131°). `scripts/stubReview.mts`
+ * prints the length distribution — run it against production (read-only)
+ * before trusting this number.
+ */
+export const STUB_REVIEW_POINTS = 40;
+
+export type StubToReview = {
+  end: "start" | "end";
+  /** The corner the stub turns at — an ORIGINAL index into the points. */
+  vertex: number;
+  /** Length of the short end segment, in page points. */
+  segmentPoints: number;
+  /** The turn onto it, unsigned. */
+  degrees: number;
+  /** Where that corner is, for "Show". */
+  point: Point;
+};
+
+export function stubsToReview(
+  points: readonly Point[],
+  reviewBelow: number = STUB_REVIEW_POINTS
+): StubToReview[] {
+  const kept = directionalVertices(points);
+  if (kept.length < 3) return [];
+  const at = (k: number) => points[kept[k]];
+  const len = (a: number, b: number) =>
+    Math.hypot(at(b).x - at(a).x, at(b).y - at(a).y);
+  const out: StubToReview[] = [];
+  const check = (
+    end: "start" | "end",
+    outer: number,
+    corner: number,
+    beyond: number
+  ) => {
+    const segmentPoints = len(outer, corner);
+    if (segmentPoints >= reviewBelow) return;
+    const t = turnDegrees(at(beyond), at(corner), at(outer));
+    if (t === null || Math.abs(t) < MIN_BEND_DEGREES) return;
+    out.push({
+      end,
+      vertex: kept[corner],
+      segmentPoints,
+      degrees: Math.abs(t),
+      point: at(corner),
+    });
+  };
+  check("start", 0, 1, 2);
+  const n = kept.length;
+  // With three points both ends share one corner; one entry says it.
+  if (n > 3 || out.length === 0) check("end", n - 1, n - 2, n - 3);
+  return out;
+}
+
 /** A turn this small is straight on — not a bend, and not wobble either. */
 const STRAIGHT_DEGREES = 0.5;
 

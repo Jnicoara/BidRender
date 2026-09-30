@@ -20,6 +20,8 @@ import {
   legBends,
   placeAnswer,
   resolveBendSettings,
+  STUB_REVIEW_POINTS,
+  stubsToReview,
   turnDegrees,
   walkPullPoints,
   type BendLeg,
@@ -824,5 +826,53 @@ describe("a near-duplicate end point from a double-click", () => {
   it("does the same at the START, where a double-click can also land", () => {
     const r = legBends(bendLeg([{ x: 0.5, y: 0.7 }, ...straight]));
     expect(r.bends).toEqual([]);
+  });
+});
+
+/*
+  OLD RUNS WHOSE END MAY BE A STUB — listed for review, never changed (owner,
+  2026-09-29). The trace tool now ignores a drifting double-click; runs traced
+  before that can end in a short turning segment that bought an elbow.
+*/
+describe("ends to review as possible double-click stubs", () => {
+  const L = (...xy: number[]) =>
+    Array.from({ length: xy.length / 2 }, (_, i) => ({
+      x: xy[2 * i],
+      y: xy[2 * i + 1],
+    }));
+
+  it("lists a short end segment that turns enough to buy a fitting", () => {
+    const points = L(0, 0, 300, 0, 300, 20);
+    const [stub, ...more] = stubsToReview(points);
+    expect(more).toEqual([]);
+    expect(stub).toMatchObject({ end: "end", vertex: 1, degrees: 90 });
+    expect(stub.segmentPoints).toBeCloseTo(20, 6);
+    expect(stub.point).toEqual({ x: 300, y: 0 });
+  });
+
+  it("lists a short START segment too", () => {
+    expect(stubsToReview(L(0, 20, 0, 0, 300, 0, 300, 300))).toMatchObject([
+      { end: "start", vertex: 1 },
+    ]);
+  });
+
+  it("does not list an end long enough to be drawn on purpose", () => {
+    expect(stubsToReview(L(0, 0, 300, 0, 300, STUB_REVIEW_POINTS + 1))).toEqual(
+      []
+    );
+  });
+
+  it("does not list a turn too small to buy anything, or a sub-3-point stub", () => {
+    // 10 degrees: under MIN_BEND_DEGREES.
+    expect(stubsToReview(L(0, 0, 300, 0, 320, 3.5))).toEqual([]);
+    // 2 points: already collapsed by STUB_POINTS, bought nothing.
+    expect(stubsToReview(L(0, 0, 300, 0, 300, 2))).toEqual([]);
+  });
+
+  it("reads the points and never changes them", () => {
+    const points = L(0, 0, 300, 0, 300, 20);
+    const before = JSON.stringify(points);
+    stubsToReview(points);
+    expect(JSON.stringify(points)).toBe(before);
   });
 });

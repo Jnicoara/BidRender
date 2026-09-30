@@ -398,6 +398,14 @@ export type PanelRun = {
    * server, through shared/runNoWire.ts, so the row and the bid agree.
    */
   noWire?: boolean;
+  /** Ends that may be double-click stubs, to check (shared/runBends.ts). */
+  stubsToReview?: {
+    end: "start" | "end";
+    vertex: number;
+    segmentPoints: number;
+    degrees: number;
+    point: { x: number; y: number };
+  }[];
   pathType: "conduit" | "cable";
   status: "draft" | "committed";
   isSuggestion: boolean;
@@ -2487,6 +2495,36 @@ export function RunsPanel({
                         />
                       )}
 
+                      {/*
+                        A possible double-click stub that bought an elbow
+                        (owner, 2026-09-29): LISTED for the estimator to
+                        check, never changed — the points are theirs. Amber,
+                        because if it is a stub the elbow on the bid is one
+                        nobody drew. shared/runBends.ts `stubsToReview`.
+                      */}
+                      {(run.stubsToReview ?? []).map(stub => (
+                        <div
+                          key={`${stub.end}-${stub.vertex}`}
+                          className="flex items-start gap-1.5 text-xs text-amber-400"
+                        >
+                          <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                          <span className="flex-1">
+                            Check this elbow: the run&apos;s {stub.end} is a
+                            very short segment that turns{" "}
+                            {Math.round(stub.degrees)}°. It may be a slipped
+                            double-click rather than a corner.
+                          </span>
+                          <button
+                            className="underline shrink-0 hover:text-amber-200"
+                            onClick={e => {
+                              e.stopPropagation();
+                              onJumpTo(stub.point);
+                            }}
+                          >
+                            Show
+                          </button>
+                        </div>
+                      ))}
                       {/*
                       An incomplete total has to shout, and a HALF total is
                       incomplete. An unset height makes a run quietly low and
