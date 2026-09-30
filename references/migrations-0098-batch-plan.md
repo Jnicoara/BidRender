@@ -12,6 +12,24 @@ the code), and step 3 is empty** (CLAUDE.md § "Deploying a migration: THREE
 STEPS"). That has been checked per FILE below, as the rule requires, not
 asserted for the batch.
 
+## The owner's answers (2026-09-29) — these override anything below
+
+1. **Q1: all three shelves in one step.** 0098 appends **Surface Raceway,
+   Underground and Service Entrance** in one `MODIFY` (§ 1). It is renamed
+   `0098_new_material_categories`.
+2. **Q2: C's extras (A2 locknut/insulated-throat flags, A3 what box a run end
+   lands in) are skipped** until C answers its own Q3. Not in this batch.
+3. **Q3: preferred brand, the per-bid brand override and the example-price
+   flag are a SECOND small batch**, with a shape for the owner to pick from.
+   The proposal is § 10. Nothing in it is written until the owner picks.
+4. **Q4: HOLD the quote-bucket columns (H1)** until B's screens for them are
+   planned. Not in this batch (§ 6).
+5. **Q5: the column is `dropExcluded`** (§ 4).
+
+**When:** the owner has said Track B, Track C and `a-fitting-labor` all merge
+only AFTER the live release from `90a286c`. This batch rides with or after
+them, so nothing here is written before that release is out.
+
 ---
 
 ## 0. Numbering depends on `a-email-reset` landing first
@@ -35,15 +53,15 @@ asserted for the batch.
   with "whatever is next when written". If this batch lands first, they become
   0104 and later. Their text already covers that case.
 
-| File (proposed)                     | For                        | What it adds                                           |
-| ----------------------------------- | -------------------------- | ------------------------------------------------------ |
-| `0098_surface_raceway_category`     | C                          | `'Surface Raceway'` appended to `materials.category`   |
-| `0099_locknut_bushing_roles`        | C (A1)                     | `'locknut'`, `'bushing'` appended to `runMaterialRole` |
-| `0100_materials_parent_id`          | C, before the priced sheet | `materials.parentId int NULL`                          |
-| `0101_materials_parent_id_fk`       | C, before the priced sheet | the self-referencing FK, `ON DELETE RESTRICT`          |
-| `0102_materials_brand`              | C, before the priced sheet | `materials.brand varchar(64) NULL`                     |
-| `0103_takeoff_stamps_drop_excluded` | B (H3)                     | `takeoff_stamps.dropExcluded boolean NULL`             |
-| — (none)                            | B, drops per run end       | **No migration.** See § 6.                             |
+| File (proposed)                     | For                        | What it adds                                                                                |
+| ----------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------- |
+| `0098_new_material_categories`      | C                          | `'Surface Raceway'`, `'Underground'`, `'Service Entrance'` appended to `materials.category` |
+| `0099_locknut_bushing_roles`        | C (A1)                     | `'locknut'`, `'bushing'` appended to `runMaterialRole`                                      |
+| `0100_materials_parent_id`          | C, before the priced sheet | `materials.parentId int NULL`                                                               |
+| `0101_materials_parent_id_fk`       | C, before the priced sheet | the self-referencing FK, `ON DELETE RESTRICT`                                               |
+| `0102_materials_brand`              | C, before the priced sheet | `materials.brand varchar(64) NULL`                                                          |
+| `0103_takeoff_stamps_drop_excluded` | B (H3)                     | `takeoff_stamps.dropExcluded boolean NULL`                                                  |
+| — (none)                            | B, drops per run end       | **No migration.** See § 6.                                                                  |
 
 **One statement per file**, as `deploying.md` § 5a prefers: when a file fails
 halfway, it is either applied or not, never half. That is why the FK is its own
@@ -51,18 +69,24 @@ file.
 
 ---
 
-## 1. `0098_surface_raceway_category` — Track C
+## 1. `0098_new_material_categories` — Track C
 
 ```sql
 ALTER TABLE `materials`
-	MODIFY COLUMN `category` enum(<the 19 values in MATERIAL_CATEGORIES, in order>,'Surface Raceway');
+	MODIFY COLUMN `category` enum(<the 19 values in MATERIAL_CATEGORIES, in order>,'Surface Raceway','Underground','Service Entrance');
 ```
 
-- **What it adds:** one shelf. `materials.category` is a MySQL enum
-  (`drizzle/schema.ts:720`), so a category is a migration, not a text edit.
-  Track C's ask: `track-c-retail-catalog-plan.md` § R3 and RQ2 (on
-  `origin/track-c`). About 23 rows, the 700 and 500 series, are seeded after
-  it lands.
+- **What it adds:** three shelves, in one step (owner, Q1).
+  `materials.category` is a MySQL enum (`drizzle/schema.ts:720`), so a
+  category is a migration, not a text edit.
+  - **Surface Raceway** is Track C's ask: `track-c-retail-catalog-plan.md`
+    § R3 and RQ2 (on `origin/track-c`). About 23 rows, the 700 and 500 series,
+    are seeded after it lands.
+  - **Underground** and **Service Entrance** are the pricing sheet's other two
+    missing categories (`ASSEMBLIES_PLAN.md` § "Three new categories ride
+    along").
+  - A shelf with no rows yet is empty in the enum and never shown, so adding
+    all three now costs nothing on screen.
 - **Code that lands with it:** `MATERIAL_CATEGORIES` gets the value **at the
   end**, and `MATERIAL_CATEGORY_ORDER` (`shared/materialOrder.ts`) gets it
   **wherever it should display**. `server/materialOrder.test.ts` compares the
@@ -76,11 +100,8 @@ ALTER TABLE `materials`
   database today. A **column missing** from the database is never expected.
   Say so in the release entry, so nobody stops a rollout over the expected
   message or waves through the other one.
-- **Question Q1:** `ASSEMBLIES_PLAN.md` § "Three new categories ride along"
-  names **Underground** and **Service Entrance** as well, for the same pricing
-  sheet. Add all three in this one `MODIFY` (recommended: they are the sheet's
-  categories, and a second enum migration later costs a whole release step),
-  or Surface Raceway only, as asked?
+- **Answered (Q1):** all three in this one `MODIFY`, in that order.
+  `MATERIAL_CATEGORY_ORDER` places each where it should display.
 
 ## 2. `0099_locknut_bushing_roles` — Track C (A1)
 
@@ -101,11 +122,10 @@ ALTER TABLE `bid_line_items`
   order, because `schemaCheck` compares the whole list.
 - **Not in this file, and waiting on the owner (C's A2 and A3):** two nullable
   booleans on `materials` (`includesLocknut`, `insulatedThroat`) and a per-end
-  "what box the end lands in" on `takeoff_runs`. **Question Q2.** C lists a
-  no-schema alternative for A2, a flag on the seed rows, and measured that no
-  connector row today says it includes either. Recommendation: **leave both
-  out** until C's Q3 findings are answered. Each is its own additive file if
-  wanted, so nothing here blocks them.
+  "what box the end lands in" on `takeoff_runs`. **Skipped (owner, Q2)**
+  until C answers its Q3 findings. C lists a no-schema alternative for A2, a
+  flag on the seed rows. Each is its own additive file if wanted later, so
+  nothing here blocks them.
 
 ## 3. `0100`–`0102`: parent items and brand variants — Track C, BEFORE THE PRICED SHEET
 
@@ -159,12 +179,10 @@ ALTER TABLE `materials` ADD `brand` varchar(64);
     [the parentId] work, not before it". **This is the "nobody priced this"
     signal `todo.md` says blocks the priced upload.**
 
-  **All three are additive** as described, and each would be its own file
-  after 0103. But their shape is not decided, and a migration is the wrong
-  place to decide it. Recommendation: **ship 0100–0102 now** (they are decided
-  and unblock C's seeding work), and write the three as a second small batch
-  once the owner picks their shapes. **Both batches must land before the
-  priced sheet.**
+  **Answered (Q3): a second small batch**, with shapes for the owner to pick
+  from in **§ 10**. 0100–0102 stay in this batch because they are decided and
+  unblock C's seeding work. **Both batches must land before the priced
+  sheet.**
 
 ## 4. `0103_takeoff_stamps_drop_excluded` — Track B (H3)
 
@@ -176,7 +194,8 @@ ALTER TABLE `takeoff_stamps` ADD `dropExcluded` boolean;
   (`quote-app-panel-plan.md` § H3, commit `5f14947`): "boolean, **nullable, no
   default** — NULL means 'follows the count', the only meaning today, so it is
   **additive**".
-- **The name, which B left to A: `dropExcluded`.** It reads as the exception
+- **The name, which B left to A: `dropExcluded`, confirmed by the owner (Q5).**
+  It reads as the exception
   it is. `noDrop` reads like a drop _kind_, which is a different field on the
   count (`takeoff_groups.dropKind`), and two names that sound alike on one
   screen are how a mapping picks the wrong one.
@@ -195,12 +214,13 @@ height override (`startHeightInches`/`endHeightInches`). The held batch
 (0089–0095) is already on `local-dev` and live. **If B finds it needs a column
 after all, it is a new file after 0103, not a change to this batch.**
 
-## 6. Also waiting on Track A, not in this batch unless the owner says (Q4)
+## 6. Also waiting on Track A, and HELD
 
 - **H1**: `expense_items.quoteBucket` and `bid_expenses.quoteBucket`, a
   nullable enum `task`/`equipment`/`misc`, no default (NULL = Misc).
-  Additive, and fully specified. It could ride as **0104–0105** at no extra
-  risk.
+  Additive, and fully specified. **HELD by the owner (Q4) until B's screens
+  for it are planned.** Then it is its own small file pair, numbered at write
+  time.
 - `track-b-beta-plan.md` (optional): a deleted-bids log and
   `bid_pdfs.lastOpenedAt`. Marked optional there. Not recommended now.
 
@@ -289,7 +309,10 @@ on a test database that lacks a column the schema declares.
 - **None of this touches `a-email-reset`'s files**, but it depends on them
   (§ 0).
 
-## 9. Questions for the owner
+## 9. Questions for the owner — ANSWERED 2026-09-29
+
+All five are answered; see "The owner's answers" at the top. The questions
+are kept below as they were asked.
 
 1. **Q1.** Add **Underground** and **Service Entrance** in 0098 too?
    Recommendation: yes, one enum step for all three sheet categories.
@@ -304,3 +327,124 @@ on a test database that lacks a column the schema declares.
    specified and additive. Recommendation: yes, if B is ready to build the
    screens. Otherwise hold it.
 5. **Q5.** The name `dropExcluded` (recommended) or `noDrop`?
+
+---
+
+## 10. SECOND BATCH — shape proposal for the owner to pick from (NOT a plan to build yet)
+
+Three things block the priced starter sheet and have no decided shape:
+the company's preferred brand, a per-bid override of it, and the
+example-price flag (H2). **Nothing here is written until the owner picks.**
+Every option below is ADDITIVE (new nullable columns or a new table, no
+`UPDATE` to an existing column), so whichever is picked is step 1 of the
+three-step deploy. Numbers are given at write time, after 0103.
+
+**Read first:** CLAUDE.md § Brands (brand exists on PANELS and BREAKERS only;
+an assembly points at the parent), `ASSEMBLIES_PLAN.md` § "Parent items and
+brand variants" step 5 (parent → preferred variant → fork of that variant;
+with no preference, a parent "prices from nothing and says so"), CLAUDE.md
+§ "Company defaults vs per-bid overrides" (a bid stores NULL to mean "follow
+the company"), and `quote-app-panel-plan.md` § H2.
+
+### 10a. Preferred brand, and the per-bid override
+
+**Option A (recommended): two columns on each level, the productivity-factor
+pattern.**
+
+```sql
+ALTER TABLE `pricing_defaults` ADD `panelBrand` varchar(64);   -- company
+ALTER TABLE `pricing_defaults` ADD `breakerBrand` varchar(64);
+ALTER TABLE `bids` ADD `panelBrand` varchar(64);               -- per bid, NULL = follow the company
+ALTER TABLE `bids` ADD `breakerBrand` varchar(64);
+```
+
+- **Why it fits:** brand exists on exactly two shelves, so two columns hold
+  every preference there can be. It is exactly how `productivityPct` works
+  (`pricing_defaults` for the company, a nullable column on `bids` that
+  inherits), so it reuses the inheritance that `companyDefaults.test.ts`
+  already guards. The warning panel (`CompanyDefaultNotice`) goes on the
+  company setting and not on the bid, as that section says.
+- **NULL at company level means "no preference"**, and a parent then prices
+  from nothing and says so. It never means "cheapest".
+- **The values are brand LINES** ("Square D QO", "Eaton BR"), matching
+  `materials.brand` on the variants (0102). They are validated against one TS
+  list in `shared/`, the way categories are, but stored as varchar, so a new
+  line is a code change, not a migration.
+- **Weak spot:** a panel line and its breakers must match (a QO panel takes
+  QO breakers). Two independent columns let someone pick QO panels with
+  Homeline breakers. See Option A′.
+
+**Option A′: one column per level, `brandLine`,** covering both panels and
+breakers. It cannot pick a mismatched pair, which is simpler and safer. It
+cannot express a bolt-on line (QOB) chosen separately from the panel, unless
+the brand list maps a panel line to its breaker lines (a code fact, not a
+column).
+
+**Option B: a table**, `brand_preferences (ownerUserId, bidId NULL, family
+varchar(64), brand varchar(64))`, one row per family, with a bid row
+overriding the company row.
+
+- Scales to any number of families. That is not needed while brand lives on
+  two shelves, and CLAUDE.md narrows rather than widens that.
+- **MySQL trap:** a UNIQUE key over a nullable `bidId` does not stop two
+  company rows for one family, because NULLs never collide. It needs a
+  generated column or a separate company table. More machinery for a case
+  that does not exist yet.
+
+**Recommendation: A′ if the owner confirms panels and breakers always follow
+one line on a job; otherwise A.** B only if brand is ever widened beyond those
+two shelves.
+
+### 10b. The example-price flag (H2)
+
+**Option A (recommended): source and date on the material, one frozen flag on
+the line.**
+
+```sql
+ALTER TABLE `materials` ADD `examplePriceSource` varchar(128);  -- e.g. "Supplier list, Spokane"
+ALTER TABLE `materials` ADD `examplePriceAsOf` date;
+ALTER TABLE `bid_line_items` ADD `snapshotPriceWasExample` boolean;
+```
+
+- **"Is this an example price?" is ONE fact:** `examplePriceSource IS NOT
+NULL`. There is no separate boolean that could disagree with the source.
+  The "EXAMPLE PRICE, source, date" label (the 2026-09-21 decision) reads both
+  columns.
+- **Editing the price clears both**, in the same update. That is what "makes
+  it the shop's own" (H2). This is code, not migration.
+- **On the line: `snapshotPriceWasExample`**, frozen with the other
+  `snapshot*` fields when the line is added and never recomputed. NULL = "not
+  recorded" (every line before the migration), true or false after it. It sits
+  beside `snapshotUnpricedParts`, which is the same kind of frozen fact.
+- **The seeder fills `examplePriceSource`/`examplePriceAsOf` on baseline rows
+  from the seed file.** That writes the NEW columns only, so it is still
+  additive. It never touches a fork, the same `isNull(userId)` scope as today
+  (`seedPreservesUserPrices.test.ts`).
+
+**Option B: a `priceKind` enum (`example` / `own`) plus source and date.** It
+has a third state (NULL), and two fields that must agree. Rejected for the
+same reason `whenUnset` exists: two ways to say one thing drift.
+
+**Option C: no column. Compare `costPerUnit` against the seed value at read
+time** (`todo.md` floated this). A shop that agrees with the example price
+looks unpriced forever. More importantly, a bid LINE cannot be answered
+later, because the seed value it was compared against has moved on. Not
+recommended.
+
+**The meaning change to watch, whichever is picked:** once shipped rows carry
+real prices, `costPerUnit === 0` stops meaning "nobody priced this"
+(`shared/materialPricing.ts`, the Materials screen's unpriced filter). The
+columns above are additive, but **the seed file gaining prices is a meaning
+change to an existing column**. So the order is: this batch's columns (step
+1), then the code that reads `examplePriceSource` as the new "unpriced"
+signal, then the seed file with prices. Never the prices first.
+
+### 10c. Questions for the owner (second batch)
+
+1. **B1.** Do panels and breakers on one job always follow one brand line?
+   Yes → Option A′ (one `brandLine`). No → Option A (two columns).
+2. **B2.** Example-price flag: Option A (source + date on the material, a
+   frozen flag on the line)? Recommended.
+3. **B3.** What should the source say for the shipped prices — a supplier
+   name and city, or just "BidRidge example"? It is shown on every priced
+   starter row.
