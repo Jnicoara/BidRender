@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Marks can no longer be counted as the wrong thing after a failed save.**
+  If saving marks failed (a dropped connection) and you then switched to
+  counting something else, the next save could file both sets under the first
+  item. Each count now saves separately, and marks recovered after a crash are
+  put back under the count they were placed with. Checked by making saves fail
+  on purpose: each count kept exactly its own marks.
 - **Traced runs that never reached the bid are now called out.** A run only
   reaches the bid once its run type is sent, and nothing used to say when that
   had not happened, so a bid and its quote could look finished with hundreds of

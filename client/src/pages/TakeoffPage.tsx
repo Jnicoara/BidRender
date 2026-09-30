@@ -243,6 +243,7 @@ import {
   type UndoState,
 } from "@/lib/undoStack";
 import { emptiedCountCard } from "@/lib/emptiedCountCard";
+import { nextMarkBatch, splitRecoveredMarks } from "@/lib/markBatches";
 import type { PageTextLayer } from "@/lib/textSelection";
 import { TextSelectLayer } from "@/components/takeoff/TextSelect";
 import { useUploadSpeeds } from "@/lib/useUploadSpeeds";
@@ -270,7 +271,6 @@ import {
 } from "@/components/takeoff/RunsPanel";
 import {
   clearDraft,
-  clearStampQueue,
   hasUnsavedWork,
   loadDraft,
   loadStampQueue,
@@ -3657,46 +3657,59 @@ export default function TakeoffPage({
   const flushTimer = useRef<number | null>(null);
 
   /**
-   * Send every click that has not been sent yet.
+   * Send every click that has not been sent yet — one batch per sheet and
+   * count, never two counts in one.
    *
    * Its own function rather than only a timer body, because two things must
    * not wait for the timer: the armed count changing and the sheet changing.
-   * A batch goes over under ONE group id and one sheet id, so a click made
-   * after the tool changed hands would otherwise be counted as the previous
-   * thing — correct-looking, and wrong.
+   *
+   * ── The batch is decided by `nextMarkBatch`, not by the first mark ────────
+   * A batch goes over under ONE group id and one sheet id. This used to send
+   * EVERY unsent mark under the first one's ids, which the flush-on-tool-change
+   * kept safe only while no send ever failed: a failed batch goes back to
+   * unsent, and the next flush then carried count A's leftovers and count B's
+   * new marks together, all as A (audit #4, fixed 2026-09-29). Now each
+   * (sheet, count) goes as its own request; see @/lib/markBatches.
+   *
+   * ── `mutateAsync`, not `mutate` with callbacks ────────────────────────────
+   * Several batches can now be in flight at once, and React Query runs a
+   * `mutate` call's own onSuccess only for the LATEST call — so an earlier
+   * batch would never clear its drawn copy. Each promise settles its own.
    */
   const flushStamps = useCallback(() => {
     if (flushTimer.current !== null) {
       window.clearTimeout(flushTimer.current);
       flushTimer.current = null;
     }
-    const batch = pendingStamps.current.filter(m => !m.sent);
-    if (batch.length === 0) return;
+    for (;;) {
+      const batch = nextMarkBatch(pendingStamps.current);
+      if (batch.length === 0) return;
 
-    const sheetId = batch[0].sheetId;
-    const keys = new Set(batch.map(m => m.key));
-    // Still drawn, no longer waiting to be sent.
-    setPending(
-      pendingStamps.current.map(m =>
-        keys.has(m.key) ? { ...m, sent: true } : m
-      )
-    );
+      const sheetId = batch[0].sheetId;
+      const groupId = batch[0].groupId;
+      const keys = new Set(batch.map(m => m.key));
+      // Still drawn, no longer waiting to be sent — which is also what stops
+      // the next turn of this loop picking the same marks up again.
+      setPending(
+        pendingStamps.current.map(m =>
+          keys.has(m.key) ? { ...m, sent: true } : m
+        )
+      );
 
-    dropStamps.mutate(
-      {
-        bidId,
-        sheetId,
-        groupId: batch[0].groupId,
-        at: batch.map(m => ({ x: m.x, y: m.y })),
-      },
-      {
+      dropStamps
+        .mutateAsync({
+          bidId,
+          sheetId,
+          groupId,
+          at: batch.map(m => ({ x: m.x, y: m.y })),
+        })
         /*
           The drawn copy goes only once the refetch has LANDED, which is what
           `invalidate` resolves on. Dropping it when the response arrives
           instead would blank the marks for the length of one refetch and paint
           them again — a flicker in exactly the place a count is being read.
         */
-        onSuccess: async result => {
+        .then(async result => {
           // One batch, one undo step. No ids back means the server could not
           // confirm which marks it wrote, and an undo guessing would be worse.
           if (result.ids.length > 0)
@@ -3705,26 +3718,26 @@ export default function TakeoffPage({
               sheetId,
               undo: { kind: "removeMarks", ids: result.ids },
               redo: null,
-              subject: { kind: "count", id: batch[0].groupId },
+              subject: { kind: "count", id: groupId },
             });
           await utils.takeoffStamps.listForSheet.invalidate({ sheetId });
           setPending(pendingStamps.current.filter(m => !keys.has(m.key)));
           mirrorQueue(sheetId);
-        },
+        })
         /*
-          Back in the queue, and still on the drawing. A failed request must not
-          take a count off the screen: it rides the next flush, and survives a
-          reload in the mirror either way.
+          Back in the queue, and still on the drawing. A failed request must
+          not take a count off the screen: it rides the next flush — as ITS
+          OWN batch, whatever is queued behind it — and survives a reload in
+          the mirror either way. The hook's onError has already said why.
         */
-        onError: () => {
+        .catch(() => {
           setPending(
             pendingStamps.current.map(m =>
               keys.has(m.key) ? { ...m, sent: false } : m
             )
           );
-        },
-      }
-    );
+        });
+    }
   }, [bidId, dropStamps, mirrorQueue, setPending, utils, pushUndo]);
   /**
    * Take a click: draw it now, send it shortly after.
@@ -3807,52 +3820,68 @@ export default function TakeoffPage({
     if (!queued || queued.stamps.length === 0) return;
 
     const sheetId = activeSheet.id;
-    const at = queued.stamps.map(st => ({ x: st.x, y: st.y }));
-    const announce = () => {
-      clearStampQueue(sheetId);
-      toast.success(
-        `Recovered ${queued.stamps.length} mark${queued.stamps.length === 1 ? "" : "s"} from your last session.`
-      );
-    };
+    type Stored = (typeof queued.stamps)[number];
 
-    const first = queued.stamps[0];
-    if (typeof first.groupId === "number" && first.groupId > 0) {
-      dropStamps.mutate(
-        { bidId: queued.bidId, sheetId, groupId: first.groupId, at },
-        { onSuccess: announce }
-      );
-      return;
-    }
+    /*
+      ONE PART PER COUNT. This used to send the whole stored queue under its
+      FIRST entry's count, so a crash with two counts' clicks waiting put all of
+      them on one (audit #4, fixed 2026-09-29 — @/lib/markBatches).
+    */
+    const keyOf = (st: Stored) =>
+      typeof st.groupId === "number" && st.groupId > 0
+        ? `group:${st.groupId}`
+        : typeof st.assemblyId === "number" && st.assemblyId > 0
+          ? `assembly:${st.assemblyId}`
+          : `name:${st.assemblyName?.trim() || "Recovered count"}`;
+    const parts = splitRecoveredMarks(queued.stamps, keyOf);
 
     // Older shape. The assembly is the honest reading of what was counted; a
     // queue with only a name becomes a plain count under that name, reusing
     // one if the bid already has it rather than making a second.
-    const resolve =
-      typeof first.assemblyId === "number" && first.assemblyId > 0
-        ? groupForAssembly.mutateAsync({
-            bidId: queued.bidId,
-            assemblyId: first.assemblyId,
-          })
-        : createGroup.mutateAsync({
-            bidId: queued.bidId,
-            label: first.assemblyName?.trim() || "Recovered count",
-            reuseExisting: true,
-          });
+    const groupFor = (first: Stored): Promise<{ id: number }> =>
+      typeof first.groupId === "number" && first.groupId > 0
+        ? Promise.resolve({ id: first.groupId })
+        : typeof first.assemblyId === "number" && first.assemblyId > 0
+          ? groupForAssembly.mutateAsync({
+              bidId: queued.bidId,
+              assemblyId: first.assemblyId,
+            })
+          : createGroup.mutateAsync({
+              bidId: queued.bidId,
+              label: first.assemblyName?.trim() || "Recovered count",
+              reuseExisting: true,
+            });
 
-    resolve
-      .then(group =>
-        dropStamps.mutateAsync({
-          bidId: queued.bidId,
-          sheetId,
-          groupId: group.id,
-          at,
-        })
-      )
-      .then(announce)
-      .catch(() => {
+    void (async () => {
+      let remaining = parts;
+      let recovered = 0;
+      try {
+        for (const part of parts) {
+          const group = await groupFor(part[0]);
+          await dropStamps.mutateAsync({
+            bidId: queued.bidId,
+            sheetId,
+            groupId: group.id,
+            at: part.map(st => ({ x: st.x, y: st.y })),
+          });
+          recovered += part.length;
+          /*
+            Written back after EACH part, so a failure half way leaves only
+            what did not go. Rewriting it only at the end would re-send the
+            parts that had already landed on the next visit — counted twice.
+          */
+          remaining = remaining.slice(1);
+          saveStampQueue(sheetId, queued.bidId, remaining.flat());
+        }
+      } catch {
         // Left in storage on purpose: a failed recovery must not be a silent
         // deletion. The next visit to this sheet tries again.
-      });
+      }
+      if (recovered > 0)
+        toast.success(
+          `Recovered ${recovered} mark${recovered === 1 ? "" : "s"} from your last session.`
+        );
+    })();
   }, [activeSheet?.id]);
 
   /**
