@@ -47,6 +47,19 @@ left as written rather than rewritten to match the rename.
       least off the main thread. The scale test's budgets are the alarm; do
       not loosen them to get past it.
 
+### Before beta: the Plans screen at phone width — side panels become drawers
+
+- [ ] **Owner, 2026-09-29: its own piece, later, before beta.** At a 390 px
+      window the sheet list (240 px) and the counts panel (a fixed 400 px, its
+      own `shrink-0`) do not fit beside the drawing: measured, the counts panel
+      starts at x=276 and runs 286 px off screen, taking its card buttons
+      (undo, trash, "Add a drop") with it. Fix is structural, not a row that
+      wraps: at phone width both panels become drawers pulled over the
+      drawing, one at a time. Touch panning and pinch belong to the same piece
+      — and with them the guard that a finger landing to pan must not place a
+      mark or a point (place on TAP, on touch only). See
+      `references/track-b-panning-plan.md` § 3, guard 3.
+
 ### Flaky tests — fix in a batch before beta
 
 Both are timing, not wrong answers, and both touch the shared test database.

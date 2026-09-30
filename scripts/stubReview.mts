@@ -19,6 +19,7 @@
  */
 import "dotenv/config";
 import mysql from "mysql2/promise";
+import { mysqlConnection } from "../server/databaseConnection";
 import {
   STUB_POINTS,
   STUB_REVIEW_POINTS,
@@ -30,10 +31,20 @@ if (!url) {
   console.error("DATABASE_URL is not set.");
   process.exit(1);
 }
+// Which database this read — host and name only, never the credentials — so
+// the person running it can see it was the one they meant.
+try {
+  const u = new URL(url);
+  console.log(`Database: ${u.hostname}:${u.port}${u.pathname}`);
+} catch {
+  console.log("Database: (URL could not be parsed for display)");
+}
 const bidArg = process.argv.indexOf("--bid");
 const bidId = bidArg > 0 ? Number(process.argv[bidArg + 1]) : null;
 
-const conn = await mysql.createConnection(url);
+// Through the app's own connection settings, so a DigitalOcean URL with
+// `ssl-mode=REQUIRED` connects over TLS with DATABASE_CA_CERT, as the app does.
+const conn = await mysql.createConnection(mysqlConnection(url));
 const [rows] = (await conn.query(
   `select r.id, r.bidId, b.name bidName, s.pageNumber, r.name, r.points,
           r.createdAt, r.isSuggestion

@@ -135,13 +135,84 @@ Ranked:
    live transform at the press; there is no momentum and no animation. Guard 4
    pins it.
 
-## Questions for the owner
+## Owner's answers, 2026-09-29 — what is being built
 
-1. **Mouse wheel: zoom (as now) or pan?** A mouse wheel and a trackpad scroll
-   arrive as the same event, and there is no reliable way to tell them apart.
-   _Recommendation: pan on a plain wheel and zoom on Ctrl+wheel, like Figma
-   and Google Maps._ The fallback is to guess from the size of each step: a
-   mouse notch is 100 or 120 px with no sideways part. That guess should be
-   measured on your mouse and your trackpad before anything relies on it.
-2. **How much slack?** _Recommendation: build it at 15% of the pane, drag it on
-   your laptop and phone, and change the one constant if it feels wrong._
+1. **The mouse wheel stays ZOOM**, like Bluebeam. Panning is click-drag on
+   empty sheet, plus the two-finger trackpad **if it can be done safely**.
+   So the trackpad pans only when a wheel event is recognisably a
+   trackpad's (§ 6); anything that looks like a mouse notch zooms, as today.
+2. **Slack: build it at 15%, then measure it.**
+3. **Touch and phone move to their own piece**, with the drawer layout
+   (`todo.md`, "Before beta: the Plans screen at phone width"). Guard 3 goes
+   with it.
+4. **"If drag-to-pan clashes with the drawing tools, say so before building."**
+   It does not, because armed tools are unchanged. With Count or a trace
+   armed, a left press still places at once, on pointerdown, as today; pan
+   then with right-drag, middle-drag, Space+drag or the trackpad. With no
+   tool armed, a left drag on empty sheet pans. Changing armed tools to
+   "place on release" WOULD clash, and is not being done.
+
+## 6. Two-finger trackpad pan, safely
+
+A wheel event does not say where it came from. What is recognisable:
+
+- **ctrlKey**: a trackpad PINCH (and Ctrl+wheel on a mouse). Zoom, as today.
+- **Sideways movement** (`deltaX` not 0): a trackpad. A mouse wheel has none.
+- **Fractional or small steps in pixel mode**: a trackpad. A mouse notch
+  arrives as a whole number, usually 100 or 120 px in pixel mode, or as lines
+  (`deltaMode` 1).
+
+A gesture is a stream of events, so the decision is made ONCE per gesture, at
+the first event, and held until the wheel has been quiet for 150 ms. That way
+a trackpad scroll does not flip to zooming halfway through.
+
+**Why this is safe for the numbers:** a pan is a CSS transform. It cannot move
+a mark, change a length or change a scale, and a click during a scroll is still
+read from the live transform. Misreading a trackpad as a mouse zooms, which is
+the behaviour today. Misreading a smooth-scrolling mouse as a trackpad pans,
+which is annoying but moves nothing. **Measure it on your own mouse and
+trackpad after it ships.** The rule is `client/src/lib/wheelIntent.ts`, and
+its tests say what it assumes.
+
+## 7. Stub review on production — steps for Track A (read-only)
+
+Owner, 2026-09-29: **Track A runs this, not Track B.** It reads and writes
+nothing. It lists traced runs whose end may be a slipped double-click that
+bought an elbow (`stubsToReview` in `shared/runBends.ts`), and prints how long
+those end segments are, so that `STUB_REVIEW_POINTS` (40, reasoned but not
+measured) can be set from real data.
+
+1. **Get a checkout that has `scripts/stubReview.mts`** (on `track-b` from
+   2026-09-29). Either merge first, or run
+   `git worktree add ../stub-check origin/track-b` and work there.
+   `node_modules` must be installed.
+2. **Confirm `.env.production.local` holds both `DATABASE_URL` and
+   `DATABASE_CA_CERT`.** The script connects through
+   `server/databaseConnection.ts`, as the app does, so the DigitalOcean URL
+   uses TLS.
+3. **From the repo root, run:**
+
+   ```bash
+   DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/stubReview.mts > stub-review-prod.txt
+   ```
+
+   Only `DOTENV_CONFIG_PATH` changes which file is read. **It needs no
+   `ALLOW_REMOTE_DATABASE`,** because it only SELECTs. If a version of it ever
+   asks for that word, stop: it is not the read-only script described here.
+
+4. **Check the first line.** It must read
+   `Database: bidrender-db-do-user-44374734-0.a.db.ondigitalocean.com:25060/bidrender`.
+   If it names `127.0.0.1` or anything else, the wrong file was read: stop,
+   and do not report the numbers.
+5. **Check the rest of the output.** Expect `Runs checked: N`, where N is the
+   number of non-suggestion runs in production. Then a histogram of turning
+   end segments by length, then a list headed `To review`. If the counts look
+   wrong (for example 0 runs checked on a database known to have runs), stop
+   and find out why before reporting. A mismatch means either this step is
+   stale or the database is not the one you think.
+6. **Hand back `stub-review-prod.txt`.** It holds bid and run names, which are
+   customer data, so share it the way bid data is shared, never anywhere
+   public. Track B sets `STUB_REVIEW_POINTS` from the histogram. The owner
+   reviews the listed runs on the Plans screen, where each shows "Check this
+   elbow" with a Show button.
+7. **Delete `stub-review-prod.txt`** once it has been handed over.
