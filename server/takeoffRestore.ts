@@ -286,7 +286,7 @@ export async function restoreStamps(
  */
 export async function confirmPlacedIds(
   ids: readonly number[],
-  where: { userId: number; bidId: number; sheetId: number; groupId: number }
+  where: { userId: number; sheetId: number; groupId: number }
 ): Promise<number[]> {
   if (ids.length === 0) return [];
   const db = await database();
@@ -297,7 +297,8 @@ export async function confirmPlacedIds(
       and(
         inArray(takeoffStamps.id, [...ids]),
         eq(takeoffStamps.userId, where.userId),
-        eq(takeoffStamps.bidId, where.bidId),
+        // By SHEET, which names the bid; not a bid-wide read, so it has no
+        // business in quantitiesIgnoreDeletedPlans' list of them.
         eq(takeoffStamps.sheetId, where.sheetId),
         eq(takeoffStamps.groupId, where.groupId)
       )

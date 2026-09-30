@@ -290,7 +290,17 @@ withDb("undoing a mark delete", () => {
   it("refuses an edited packet, and one sealed for another company", async () => {
     const s = await scenario();
     const del = await caller().takeoffStamps.removeMany({ ids: s.markIds });
-    const edited = { ...del.undo!, data: del.undo!.data.replace("12", "13") };
+    // Point the packet at a different mark id — the forgery that matters.
+    // It used to replace "12" with "13", which did nothing when no id held a
+    // 12, so the test passed or failed on whatever ids the run was given.
+    const edited = {
+      ...del.undo!,
+      data: del.undo!.data.replace(
+        `"id":${s.markIds[0]},`,
+        `"id":${s.markIds[0] + 100000},`
+      ),
+    };
+    expect(edited.data).not.toBe(del.undo!.data);
     await expect(
       caller().takeoffStamps.restore({ undo: edited })
     ).rejects.toThrow(/not valid/);

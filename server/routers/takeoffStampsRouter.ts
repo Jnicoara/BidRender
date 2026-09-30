@@ -214,7 +214,6 @@ export const takeoffStampsRouter = router({
       */
       const confirmed = await confirmPlacedIds(ids, {
         userId: ctx.scope.dataUserId,
-        bidId: input.bidId,
         sheetId: input.sheetId,
         groupId: group.id,
       });
