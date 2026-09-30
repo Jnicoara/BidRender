@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **A backup check that fails no longer leaves a half-restored copy
+  behind.** When a backup would not restore, the test copy it was loading
+  into stayed on the database server until the next check cleared it. It is
+  now removed straight away. One slow test was also rewritten to ask the
+  database once rather than two hundred times, instead of just being given
+  longer to finish.
+
 - **Eleven parts the new starter assemblies needed are in the catalog.** A
   commercial smoke detector head, well-pump drop cable, mini-split cable, a
   meter hub, mast flashing and riser strap, an SE cable connector, a roof

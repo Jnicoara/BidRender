@@ -676,6 +676,19 @@ runIf("verifying a backup end to end", () => {
     expect(result.ok, "a corrupted dump must not verify").toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
     expect(summariseVerify(result)).toContain("NOT VERIFIED");
+
+    // A failed restore cleans up after itself. It used to leave the
+    // half-loaded schema on the scratch server until the next run dropped it.
+    const connection = await mysql.createConnection({ uri: databaseUrl });
+    try {
+      const [left] = await connection.query<mysql.RowDataPacket[]>(
+        "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
+        [SCRATCH_SCHEMAS!.verifyCorrupt]
+      );
+      expect(left, "the failed restore's schema was left behind").toEqual([]);
+    } finally {
+      await connection.end();
+    }
   }, 120_000);
 
   it("notices when the restore does not match the manifest", async () => {

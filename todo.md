@@ -53,12 +53,49 @@ Both are timing, not wrong answers, and both touch the shared test database.
 Fix them together: a green run that sometimes lies about being red trains
 everyone to re-run instead of read.
 
+- [ ] **HANDOFF to whoever owns `server/db.ts` — the root cause of every
+      seed-heavy timeout below, including `materialsLibrary.test.ts`'s four
+      failures on `a-fitting-labor` (73c349e).** Found and measured
+      2026-09-29 on track-c; NOT committed there because A and B are working
+      in `db.ts`. `dedupeBaselineRows` checks for duplicates with a self-join
+      on `name`, and `name` has no index, so MySQL runs a nested loop over
+      every baseline row against every other: **1,473 ms of a 2,000 ms seed**
+      at 1,554 rows, and quadratic, so each catalog sweep makes it worse.
+      Seven tests in `materialsLibrary.test.ts` call the seed inside the test
+      body at 1.5–2.1 s each against the 5 s default.
+      **Reproduced:** four connections of the same query on ANOTHER database on
+      the same server (standing in for another worktree's suite) put exactly
+      four of those tests over 5 s — "Test timed out in 5000ms" — which is the
+      shape of the 73c349e failure. (That branch also predates the one-run
+      lock, `d4f4821`, so a second run on `bidrender_test_clean` is a
+      possible second cause; the lock covers that one already.)
+      **The fix, one statement, same answer** — the check only asks whether
+      any baseline name appears twice:
+      ```sql
+      SELECT 1 FROM `${table}` WHERE userId IS NULL
+      GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
+      ```
+      4 ms instead of 1,473. Applied temporarily: a full seed 2,000 ms → 20
+      ms; `materialsLibrary` + `materialsCatalog` + `seedPreservesUserPrices`,
+      101 tests, 2.8 s instead of ~40 s, none over 300 ms; `materialsLibrary`
+      5 of 5 clean under the same load that failed it. It also takes ~1.5 s
+      off every server start. The DELETE below it keeps the join — it only
+      runs when a duplicate exists. **Once it lands, drop the 60 s
+      `vi.setConfig` in `seedPreservesUserPrices.test.ts`** — that limit was
+      covering this, not a slow test — and consider an index on
+      `materials.name` (a migration) for the ~20 other per-name lookups.
+
 - [x] **`materialsCatalog.test.ts` "renames the reshaped rows in place"
       timed out at 5,004 ms** in a full run, 2026-09-29, after the sweeps
       took the catalog to 1,511 rows; 4.1–4.4 s alone, all assertions
       passing. Given 60 s like `seedPreservesUserPrices`. A timeout, not a
       race — but the next catalog growth will push other seed-heavy tests
       toward 5 s the same way.
+      **REAL FIX 2026-09-29, 60 s removed:** the test ran two queries per
+      rename — ~200 full-table scans, since `materials.name` has no index.
+      It now reads the baseline rows once and counts names in memory; the
+      same two assertions per rename, under 300 ms. 20 of 20 repeat runs
+      passed.
 - [x] **`server/backup.test.ts` "restores into an empty database, table for
       table and row for row" (line ~248) came up 11 `assemblies` rows short.**
       2026-09-27. A timing race on the shared test database: something else
@@ -90,6 +127,11 @@ everyone to re-run instead of read.
       Leftover: the corrupt-dump verify case never drops its scratch schema
       (the restore fails before the drop), so `<db>__verify_corrupt` lingers
       between runs — harmless, dropped on the next run's start.
+      **Leftover FIXED 2026-09-29, in `verifyBackup` itself:** it was not a
+      test quirk — a failed restore left its half-loaded schema on the
+      scratch server in real use too. The restore now drops it on the way
+      out (kept or not: nothing can be rehearsed on a failed restore). The
+      corrupt-dump case asserts the schema is gone — red on the old code.
 - [x] **`server/seedPreservesUserPrices.test.ts` "keeps the fork's price…"
       flakes on the 5 s default timeout.** 2026-09-27: failed in a full run
       (5010 ms), then run alone it passed once and failed once — it seeds the
