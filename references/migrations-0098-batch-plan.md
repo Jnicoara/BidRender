@@ -1,4 +1,4 @@
-# Migrations 0098–0104 — one additive batch for Tracks B and C. PLAN ONLY, 2026-09-29
+# Migrations 0098–0105 — one additive batch for Tracks B and C. PLAN ONLY, 2026-09-29
 
 **Status: nothing here is written or run.** No `.sql` file exists yet, and
 no database has been touched. Measured against `local-dev` at `90a286c`, which
@@ -6,10 +6,12 @@ ends at **0095**, and `a-email-reset` at `af82b2f`, which holds **0096**
 (`teeBody`) and **0097** (password reset).
 
 **Every file in this batch is ADDITIVE**: new nullable columns, one foreign key
-on an all-NULL column, and values appended to the END of three enums. There is
-no `UPDATE`. So every file is **step 1 of the three-step deploy (migrate BEFORE
-the code), and step 3 is empty** (CLAUDE.md § "Deploying a migration: THREE
-STEPS"). That has been checked per FILE below, as the rule requires, not
+on an all-NULL column, values appended to the END of three enums, and one
+column made nullable. There is no `UPDATE`. So every file is **step 1 of the
+three-step deploy (migrate BEFORE the code), and step 3 is empty for this
+batch** (CLAUDE.md § "Deploying a migration: THREE STEPS"). The one step-3
+file in sight, clearing the starters' hours, is deliberately **outside** this
+batch (§ 11 (c)). That has been checked per FILE below, as the rule requires, not
 asserted for the batch.
 
 ## The owner's answers (2026-09-29) — these override anything below
@@ -27,6 +29,10 @@ asserted for the batch.
 5. **Q5: the column is `dropExcluded`** (§ 4).
 6. **Added later the same day: two ASSEMBLY categories, "Demo & Retrofit" and
    "General"**, for Track C's starter assemblies. They are `0104` (§ 4a).
+7. **Added later again: "Hours not set" on assemblies**, in three ordered
+   steps (§ 11). Only step (a), `0105`, is in this batch. The `UPDATE` that
+   clears the 8 starters is **not** in this batch and must not be.
+8. **Pack sizes on materials are needed later** (§ 12). Not in this batch.
 
 **When:** the owner has said Track B, Track C and `a-fitting-labor` all merge
 only AFTER the live release from `90a286c`. This batch rides with or after
@@ -53,7 +59,7 @@ them, so nothing here is written before that release is out.
   only if 0096 is withdrawn.
 - **The invite gate and the AI correction log plans** said "0098" and "0099"
   with "whatever is next when written". If this batch lands first, they become
-  0105 and later. Their text already covers that case.
+  0106 and later. Their text already covers that case.
 
 | File (proposed)                     | For                        | What it adds                                                                                |
 | ----------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------- |
@@ -64,6 +70,7 @@ them, so nothing here is written before that release is out.
 | `0102_materials_brand`              | C, before the priced sheet | `materials.brand varchar(64) NULL`                                                          |
 | `0103_takeoff_stamps_drop_excluded` | B (H3)                     | `takeoff_stamps.dropExcluded boolean NULL`                                                  |
 | `0104_assembly_categories`          | C (starter assemblies)     | `'Demo & Retrofit'`, `'General'` appended to `assemblies.category`                          |
+| `0105_assembly_hours_nullable`      | C (starter assemblies)     | `assemblies.baseLaborHours` may be NULL ("Hours not set"). § 11, step (a)                   |
 | — (none)                            | B, drops per run end       | **No migration.** See § 6.                                                                  |
 
 **One statement per file**, as `deploying.md` § 5a prefers: when a file fails
@@ -248,7 +255,7 @@ line 10, "No migration is needed for any of the four parts. Nothing goes to
 Track A." Every leg end already stores `startKind`/`endKind` and a per-end
 height override (`startHeightInches`/`endHeightInches`). The held batch
 (0089–0095) is already on `local-dev` and live. **If B finds it needs a column
-after all, it is a new file after 0104, not a change to this batch.**
+after all, it is a new file after 0105, not a change to this batch.**
 
 ## 6. Also waiting on Track A, and HELD
 
@@ -282,8 +289,8 @@ on a test database that lacks a column the schema declares.
    DATABASE_URL=<test db> pnpm tsx scripts/schemaDrift.mts   # after
    ```
 
-   Expect **7 applied** (0098–0104, on a database already at 0097) and
-   "Database matches the schema". **If the applied count is not 7, stop and
+   Expect **8 applied** (0098–0105, on a database already at 0097) and
+   "Database matches the schema". **If the applied count is not 8, stop and
    find out why before going on**: either this line is stale (a migration
    landed since it was written) or the database is not where you think it is.
    Then run the full suite. **Run every file TWICE** (a second `migrate.mts`
@@ -312,7 +319,7 @@ on a test database that lacks a column the schema declares.
    DOTENV_CONFIG_PATH=.env.staging.local pnpm tsx scripts/schemaDrift.mts
    ```
 
-   After: expect the two category enums and the role enum to **disagree** (database ahead)
+   After: expect the two category enums, the role enum and the hours column's nullability to **disagree** (database ahead)
    until the code is pushed, and nothing else. Then push the code to staging
    and run drift again. Expect "Database matches the schema".
 
@@ -339,7 +346,7 @@ on a test database that lacks a column the schema declares.
   Never retype it.
 - **Account deletion and test cleanup** once `parentId` is set (§ 3).
 - **`schemaDrift` "disagrees" between migrate and push** is expected for the
-  three enums and nothing else (§ 1).
+  three enums and the hours column (§ 1, § 11) and nothing else.
 - **Nothing reads the new columns until B's and C's code ships**, so no
   screen, price or bid total moves when this batch runs.
 - **None of this touches `a-email-reset`'s files**, but it depends on them
@@ -373,7 +380,7 @@ the company's preferred brand, a per-bid override of it, and the
 example-price flag (H2). **Nothing here is written until the owner picks.**
 Every option below is ADDITIVE (new nullable columns or a new table, no
 `UPDATE` to an existing column), so whichever is picked is step 1 of the
-three-step deploy. Numbers are given at write time, after 0104.
+three-step deploy. Numbers are given at write time, after 0105.
 
 ### The owner's answers (2026-09-29, later) — these override 10a–10c below
 
@@ -569,10 +576,16 @@ bid can say "priced as Homeline, panel is now QO" beside the line.
 
 **Two things to decide before the code, not the migration:**
 
-1. **Changing a panel's brand with breakers already on it.** Recommend: the
-   breaker lines show the mismatch and offer ONE "re-price to QO" action.
-   Re-pricing silently would break the snapshot rule, and doing nothing would
-   leave a bid quoting the wrong breakers without a word.
+1. **Changing a panel's brand with breakers already on it — DECIDED by the
+   owner, 2026-09-29.** Every breaker line whose `snapshotBrandLine` no longer
+   matches its panel's brand is **flagged**, and the bid offers **one
+   "re-price to [brand]" button** (e.g. "Re-price to QO"). **Never re-price
+   silently.** Re-pricing rewrites that line's snapshot only because a person
+   pressed the button, which keeps the snapshot rule: nothing moves a frozen
+   price on its own. Doing nothing is ruled out too, because it would leave a
+   bid quoting the wrong breakers without a word. No extra column is needed:
+   the flag is `snapshotBrandLine` compared with the panel's resolved brand
+   at read time.
 2. **Do counts on the plans need a panel too?** A breaker is rarely counted
    off a drawing, so recommend NOT adding `panelId` to `takeoff_groups` now. A
    panel's MARK could later link to its `bid_panels` row. That is a separate
@@ -588,3 +601,139 @@ columns, the table and its three FKs, `panelId` and its FK,
 `snapshotBrandLine`, and B2's three columns. **The exact count is fixed when
 the files are written.** If the rehearsal's applied count does not match the
 number written then, stop and find out why.
+
+---
+
+## 11. "Hours not set" on assemblies — Track C's handoff H2, in the SAFE ORDER
+
+**Source:** `references/track-a-handoff-starter-assemblies.md` § H2, on
+`origin/track-c`. **Owner decision (2026-09-29):** a starter with no real hours
+stores "not set" and shows **"Hours not set"**, never 0, and the 8 shipped
+starters lose their placeholder hours. **Owner's order: (a) the migration
+allows empty hours, (b) the code shows "Hours not set" and never prices blank
+as 0, (c) only then clear the 8 starters.**
+
+**Checked against the code on this branch, 2026-09-29, rather than taken from
+the handoff:**
+
+- `assemblies.baseLaborHours` is `decimal(10,4) NOT NULL DEFAULT '0'` (created
+  in `0007`, line 10, never changed since). So "not set" has no value of its
+  own today. Zero is taking that role, and zero is what the owner ruled out.
+- **The starter seeder never rewrites hours on a row that already exists.**
+  `seedBaselineAssemblies` (`server/db.ts`) inserts only missing starters, and
+  its update passes fill a role and branch-whip flags, never hours. So a seed
+  file change alone reaches new databases only. **Existing databases need the
+  one-time `UPDATE` in step (c)**, as the handoff says.
+- There are 8 starters in `server/seed/baselineAssemblies.ts`, from "Duplex
+  receptacle standard" to "200A main panel furnish and install".
+
+### (a) `0105_assembly_hours_nullable` — ADDITIVE, in this batch, BEFORE the code
+
+```sql
+ALTER TABLE `assemblies` MODIFY COLUMN `baseLaborHours` decimal(10,4) NULL DEFAULT NULL;
+```
+
+- **No existing value changes.** Every row keeps its number, so this is step 1.
+- **Dropping the default is safe with the old code, measured rather than
+  assumed.** All four `insert(assemblies)` sites in `server/db.ts` supply the
+  column: create takes it from `hoursSchema`, which is required, the seeder
+  writes `toFixed(4)`, and fork and duplicate spread the whole source row
+  (`contentFields`). So nothing the old code does can write NULL. **Re-check
+  this at write time**, since an insert added before then would change the
+  answer. `0075` kept `DEFAULT '0'` on the bid-line column. Here the default
+  goes, because a value somebody forgot to supply should read as "not set",
+  never as a considered zero (CLAUDE.md § three steps, "A `DEFAULT 0` throws
+  that away").
+- **`overheadLaborHours` is left as it is.** It ships at 0 on purpose as "no
+  extra time", and the owner's decision covers only base hours.
+- **Watch:** `schemaDrift` reports the nullability as disagreeing between
+  migrate and push, the same expected message as the enums (§ 7, § 8).
+
+### (b) The code — ships SECOND. It must read NULL as "not set" everywhere
+
+This is Track C's (or the starter builder's), listed so the order is visible.
+`drizzle/schema.ts` loses `.default("0").notNull()` **in the same commit as the
+`.sql`**, and `pnpm check` then marks every reader that assumed a number.
+
+- **Every reader treats NULL as NOT SET, never `Number(null)`**, which is 0 and
+  is exactly the silent zero this removes. Measured today, readers that coerce
+  with `Number(...)` include `server/db.ts:5810`, `assembliesRouter.ts:436`,
+  `closeoutRouter.ts:409`, `kitsRouter.ts:99`, `QuickBidPage.tsx:356`, and many
+  in `AssembliesLibraryPage.tsx`, several of them `Number(x) || 0`. **That list
+  came from searching for `baseLaborHours` beside `Number(`, which is a shape.**
+  At write time, search the column name and read every hit (CLAUDE.md § "A grep
+  is a measurement"). The handoff counts ten files.
+- **On a bid:** adding a not-set assembly snapshots `snapshotLaborHours = NULL`,
+  which the bid already reads as "not typed yet" (`0075`). The line shows
+  **"Hours not set"**, and the total says how many lines it leaves out, like
+  "Not priced".
+- **In the builder:** an empty field with the placeholder "Hours not set", via
+  `InlineNumberField`'s `whenUnset` (CLAUDE.md § Editing fields, rule 6).
+- **The seed file:** `BaselineAssembly.baseLaborHours` becomes `number | null`,
+  and new starters ship `null`. A brand-new database is then right from its
+  first boot. Existing databases still hold the placeholders until (c).
+- **The router:** `hoursSchema` accepts `null` on update, so a person can clear
+  hours back to "not set" as well as type them.
+- **Rehearse (b) before (c):** on a local copy, set one starter's hours to
+  NULL by hand and check the Library, a bid line from it, Quick bid and the
+  closeout suggestion. Every one should say "Hours not set", and none should
+  show 0.
+
+### (c) Clear the 8 starters' placeholders — MEANING, AFTER the code is live
+
+```sql
+UPDATE `assemblies` SET `baseLaborHours` = NULL
+WHERE `userId` IS NULL
+  AND `name` IN (<the 8 names from server/seed/baselineAssemblies.ts, copied, never retyped>);
+```
+
+- **An `UPDATE` to a column older than the batch, so this is the exception:
+  code first, then this** (CLAUDE.md § "Deploying a migration: THREE STEPS",
+  step 3). If it ran first, every one of the 8 starters would price at zero
+  hours on every new bid, with nothing on screen to say so. That is the fault
+  this whole change exists to remove.
+- **It must NOT sit in `drizzle/` until (b) is live.** `migrate.mts` applies
+  every pending file in order, so a step-3 file committed alongside `0105`
+  would run at step 1. Write it, and commit it **after** the code is on the
+  live site. That is the 2026-09-20 outage's lesson from the other side.
+- **Scope, and why it is safe:**
+  - `userId IS NULL` means shared starter rows only. A company that edited a
+    starter holds a fork with its own `userId`, and those hours are the
+    company's.
+  - The name list limits it to the 8. A starter the owner has since given
+    real hours is not on the list.
+  - Existing bid lines are safe by construction. Their hours are a snapshot,
+    and a snapshot is never rewritten.
+- **Measure both sides (CLAUDE.md § "A count taken before the change is
+  intent"):** count starters with `userId IS NULL AND baseLaborHours IS NULL`
+  before and after. **Expect 0 → 8.** If the second number is not 8, stop and
+  find out why: either a name changed since this was written, or the database
+  is not the one you think. Run it twice, and the second run must change 0
+  rows.
+- **Still open for the owner (from the handoff):** whether
+  `shared/laborHourDefaults.ts` should still pre-fill hours on a user's own
+  NEW assembly. The decision above covers the shipped starters only.
+
+---
+
+## 12. Pack sizes on materials — needed LATER, not in either batch
+
+**Recorded 2026-09-29 so it is not rediscovered.** The purchase list will need
+to round up to **whole packs** (a box of 25, a 250 ft roll, a 10 ft stick),
+and `materials` has no pack size today.
+
+- **What exists:** Track C's `shared/materialsList.ts` (`orderQty`, on
+  `origin/track-c`) rounds pieces and boxes up to whole units **after** the
+  sum, with no schema. Whole packs wait on a pack size.
+- **Already decided elsewhere, so cite it rather than re-deciding:**
+  `references/material-markup.md` **D3** (2026-09-25). Price bands use the pack
+  or purchase price, and "Piece 2" of that plan adds a pack size and pack price
+  to `materials`. **The purchase list and the price bands should read the same
+  column**, not one each. Two pack sizes for one material is two chances to
+  disagree (CLAUDE.md § "Copying a layout does not copy the behaviour").
+- **When it is written:** additive (nullable, no default, NULL = "sold singly /
+  not known"), so it is step 1 like the rest. Numbered at write time.
+- **Seeding it is a seed-file change** (`server/seed/materials/*.ts`), and it
+  reaches existing databases through the startup re-stamp, the same way prices
+  will, **once `backfillMaterialMetadata` is taught the new column**. It
+  re-stamps only the fields it names. A contractor's own pack size lives on their fork and is never touched.
