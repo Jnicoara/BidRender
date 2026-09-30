@@ -710,9 +710,25 @@ WHERE `userId` IS NULL
   find out why: either a name changed since this was written, or the database
   is not the one you think. Run it twice, and the second run must change 0
   rows.
-- **Still open for the owner (from the handoff):** whether
-  `shared/laborHourDefaults.ts` should still pre-fill hours on a user's own
-  NEW assembly. The decision above covers the shipped starters only.
+- **Was open (from the handoff), ANSWERED by the owner 2026-09-29: YES, a
+  user's own NEW assembly starts blank too.** It opens with hours "not set",
+  exactly like a cleared starter, and `shared/laborHourDefaults.ts` no longer
+  pre-fills the field. Instead the builder shows **the sum of its parts'
+  hours as a hint the user can tap to use**. The hint is **never applied on
+  its own**: not on create, not on save, not when a part is added. Until the
+  user taps it or types a number, the assembly stays "Hours not set" and
+  prices as such.
+  - **Where the sum comes from:** the parts' labor units, added up by
+    `shared/materialLabor.ts` (`laborForAssembly`), which is the one place
+    allowed to add these up. Do not write a second sum in the builder.
+  - **When no part has a labor unit**, there is no hint. Never show a 0 hint,
+    since tapping it would store the considered zero this change removes.
+  - **This lands with step (b), the code.** It is a builder change and needs
+    no migration of its own beyond `0105`.
+  - **`laborHourDefaults.ts`** loses its job as a pre-fill. Whether it is
+    deleted or kept for something else is decided when (b) is written; its
+    comment ("Never zero, never blank") must change in the same commit,
+    because blank is now the ruled answer.
 
 ---
 
