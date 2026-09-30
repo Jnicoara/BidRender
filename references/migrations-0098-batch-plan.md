@@ -375,6 +375,19 @@ Every option below is ADDITIVE (new nullable columns or a new table, no
 `UPDATE` to an existing column), so whichever is picked is step 1 of the
 three-step deploy. Numbers are given at write time, after 0104.
 
+### The owner's answers (2026-09-29, later) — these override 10a–10c below
+
+1. **B1: brand works at THREE levels, not two.** Company default, per-bid
+   override, and **per PANEL**: any single panel on a bid can be a different
+   brand, including an **existing** panel on a retrofit. **Breakers follow the
+   brand of the panel they go in**, not just the bid setting, so a mismatched
+   pair cannot be picked. Options A, A′ and B in § 10a are all superseded by
+   this. The shape it needs is **§ 10d**.
+2. **B2: Option A of § 10b.** Source and date on the material, both cleared on
+   any edit of the price, and the example flag frozen on each bid line.
+3. **B3: the source reads "BidRidge example", plus the date.** Not a supplier
+   name.
+
 **Read first:** CLAUDE.md § Brands (brand exists on PANELS and BREAKERS only;
 an assembly points at the parent), `ASSEMBLIES_PLAN.md` § "Parent items and
 brand variants" step 5 (parent → preferred variant → fork of that variant;
@@ -475,7 +488,7 @@ change to an existing column**. So the order is: this batch's columns (step
 1), then the code that reads `examplePriceSource` as the new "unpriced"
 signal, then the seed file with prices. Never the prices first.
 
-### 10c. Questions for the owner (second batch)
+### 10c. Questions for the owner (second batch) — ANSWERED, see above
 
 1. **B1.** Do panels and breakers on one job always follow one brand line?
    Yes → Option A′ (one `brandLine`). No → Option A (two columns).
@@ -484,3 +497,94 @@ signal, then the seed file with prices. Never the prices first.
 3. **B3.** What should the source say for the shipped prices — a supplier
    name and city, or just "BidRidge example"? It is shown on every priced
    starter row.
+
+### 10d. What the owner's B1 needs — a SHAPE, not written yet
+
+**Measured against `drizzle/schema.ts` today: there is no panel on a bid.** A
+panel is a bid line (an assembly such as "200A main panel furnish and
+install", `qty` possibly above 1) or a count on the plans (`takeoff_groups`,
+one mark per panel). The only other trace is free text, a circuit named
+"Panel A-3" (`takeoff_run_circuits.name`). **An existing panel on a retrofit
+is not a line at all**, because nothing is bought. So "this panel is QO"
+has nowhere to live, and a breaker has nothing to point at.
+
+**So yes, breakers need a link to their panel.** Without one, "follow the
+panel it goes in" cannot be computed, and the app would fall back to the bid
+setting, which is exactly what B1 rules out.
+
+**Columns and table, all ADDITIVE (step 1, no `UPDATE`), one statement per
+file:**
+
+```sql
+-- company default and per-bid override: one brand LINE each (panels and breakers together)
+ALTER TABLE `pricing_defaults` ADD `brandLine` varchar(64);   -- NULL = no preference
+ALTER TABLE `bids` ADD `brandLine` varchar(64);               -- NULL = follow the company
+
+-- the panels on a bid, new or existing
+CREATE TABLE `bid_panels` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`bidId` int NOT NULL,            -- FK bids, ON DELETE cascade
+	`userId` int NOT NULL,           -- FK users, ON DELETE cascade (the company owner, like every table)
+	`name` varchar(64) NOT NULL,     -- "Panel A", "MDP", "Existing LP-1"
+	`brandLine` varchar(64),         -- NULL = follow the bid, then the company
+	`isExisting` boolean,            -- true = already on site, nothing to buy; NULL/false = furnished on this bid
+	`lineItemId` int,                -- FK bid_line_items, ON DELETE set null: the line that furnishes it (NULL when existing)
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `bid_panels_id` PRIMARY KEY(`id`)
+);
+
+-- which panel a breaker line goes in
+ALTER TABLE `bid_line_items` ADD `panelId` int;               -- NULL = not in a named panel
+ALTER TABLE `bid_line_items` ADD CONSTRAINT `bid_line_items_panelId_bid_panels_id_fk`
+	FOREIGN KEY (`panelId`) REFERENCES `bid_panels`(`id`) ON DELETE set null ON UPDATE no action;
+
+-- what brand a line was PRICED as, frozen with the other snapshot fields
+ALTER TABLE `bid_line_items` ADD `snapshotBrandLine` varchar(64);
+```
+
+Plus 10b Option A (B2): `materials.examplePriceSource`,
+`materials.examplePriceAsOf`, `bid_line_items.snapshotPriceWasExample`.
+
+**How a breaker resolves its brand** (code, not migration): the line's
+`panelId` → that panel's `brandLine` → the bid's `brandLine` → the company's
+`brandLine` → none, when the parent "prices from nothing and says so"
+(`ASSEMBLIES_PLAN.md` step 5). **A breaker line has no brand field of its
+own, and that is the guard**: there is no control that could pick Homeline
+breakers for a QO panel. Which breaker lines a panel line takes (QO panel → QO,
+or QOB for bolt-on) is a fact in one TS list in `shared/`, not a column, so a
+new line is a code change.
+
+**Why a table and not a column on the line:** an existing panel has no line to
+hang a column on, and one panel line with `qty` 3 cannot say "two are QO, one
+is Eaton". A `bid_panels` row is one physical panel. The new-panel case links
+back to its line through `lineItemId` so the panel is still priced where it is
+priced today.
+
+**Why `snapshotBrandLine`:** a line's price is frozen at add time (CLAUDE.md,
+"never mutate a snapshot field"). So changing a panel from Homeline to QO
+**after** its breakers are on the bid does NOT re-price them, and without a
+record of what they were priced as, nothing could even notice. With it, the
+bid can say "priced as Homeline, panel is now QO" beside the line.
+
+**Two things to decide before the code, not the migration:**
+
+1. **Changing a panel's brand with breakers already on it.** Recommend: the
+   breaker lines show the mismatch and offer ONE "re-price to QO" action.
+   Re-pricing silently would break the snapshot rule, and doing nothing would
+   leave a bid quoting the wrong breakers without a word.
+2. **Do counts on the plans need a panel too?** A breaker is rarely counted
+   off a drawing, so recommend NOT adding `panelId` to `takeoff_groups` now. A
+   panel's MARK could later link to its `bid_panels` row. That is a separate
+   additive column if B's plans screen wants it.
+
+**Manual-first check (CLAUDE.md § "As manual or as automated"):** a
+contractor who never names a panel still works. Breakers with no `panelId`
+follow the bid, then the company, which is today's behaviour. Naming panels
+is only needed when one differs.
+
+**Size of the second batch: roughly ten statements.** That is two brand-line
+columns, the table and its three FKs, `panelId` and its FK,
+`snapshotBrandLine`, and B2's three columns. **The exact count is fixed when
+the files are written.** If the rehearsal's applied count does not match the
+number written then, stop and find out why.
