@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **You can move the sheet when zoomed out.** At "Fit" and below, dragging
+  the sheet did nothing — it snapped back to the middle. It now moves a
+  little (up to about a sixth of the view either way) so you can slide a
+  detail out from under a panel. "Fit" and the 0 key still put it back in the
+  middle.
 - **Dragging the sheet no longer picks or nudges things by accident.** A drag
   that started on a mark used to move the sheet AND select that mark, so the
   next Delete could remove something you never chose; it now just moves the
