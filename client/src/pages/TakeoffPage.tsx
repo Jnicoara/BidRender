@@ -163,7 +163,24 @@ import { runTypeSpec } from "@shared/takeoffCounts";
 import { CalibrateLayer } from "@/components/takeoff/CalibrateLayer";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
 import { JobHeightsChip } from "@/components/takeoff/JobHeightsChip";
-import { RunEndsEditor, TraceEndsPickers } from "@/components/takeoff/runEnds";
+import {
+  RunEndsEditor,
+  RunEndsSection,
+  TraceEndsPickers,
+  type RunEndsLeg,
+  type RunEndsValue,
+} from "@/components/takeoff/runEnds";
+
+/** A run row with no ends answered yet. */
+const NO_ENDS: RunEndsValue = {
+  startKind: null,
+  endKind: null,
+  startHeightInches: null,
+  endHeightInches: null,
+  distributionHeightInches: null,
+  startStampId: null,
+  endStampId: null,
+};
 import { TraceModeToggle } from "@/components/takeoff/TraceModeToggle";
 import {
   QuantityDropsReview,
@@ -218,6 +235,7 @@ import {
   settleUndo,
   undoForSubject,
   undoTitle,
+  type EndsPatch,
   type Packet,
   type UndoEntry,
   type UndoOp,
@@ -2456,6 +2474,7 @@ export default function TakeoffPage({
   const undoRemoveRun = trpc.takeoffRuns.remove.useMutation();
   const undoRestoreRun = trpc.takeoffRuns.restore.useMutation();
   const undoSetPoints = trpc.takeoffRuns.setPoints.useMutation();
+  const undoSetEnds = trpc.takeoffRuns.setEnds.useMutation();
   /** Ops whose mutations are declared further down the page. */
   const runUndoOpLater = useRef<(op: UndoOp) => Promise<UndoOp | null>>(
     async () => null
@@ -2500,6 +2519,23 @@ export default function TakeoffPage({
         case "restorePoints":
           await undoRestoreRun.mutateAsync({ undo: op.packet });
           return { kind: "setPoints", runId: op.runId, points: op.points };
+        case "setEnds": {
+          const r = await undoSetEnds.mutateAsync({
+            id: op.runId,
+            ...op.patch,
+          });
+          return r.undo
+            ? {
+                kind: "restoreEnds",
+                packet: r.undo,
+                runId: op.runId,
+                patch: op.patch,
+              }
+            : null;
+        }
+        case "restoreEnds":
+          await undoRestoreRun.mutateAsync({ undo: op.packet });
+          return { kind: "setEnds", runId: op.runId, patch: op.patch };
         case "restoreSheet":
         case "clearSheet":
           // Wired with the tool that makes them (clear sheet), further down.
@@ -2516,6 +2552,7 @@ export default function TakeoffPage({
       undoRemoveRun,
       undoRestoreRun,
       undoSetPoints,
+      undoSetEnds,
     ]
   );
 
@@ -4194,6 +4231,110 @@ export default function TakeoffPage({
     quantitiesLocked,
     deleteSelection,
   ]);
+
+  /**
+   * What sits at a run's ends, and their heights — the DROP.
+   *
+   * On the page rather than inside the ends editor, for two reasons. The
+   * editor used to refresh `takeoffRuns` only, so the Send preview, the bid's
+   * lines and the materials list showed the old drop until something else
+   * moved them ("runEnds" in @/lib/takeoffRefresh is the rule now, tested).
+   * And an end change is an undo step, which only the page's stack can hold.
+   */
+  const saveEnds = trpc.takeoffRuns.setEnds.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: (result, vars) => {
+      const { id, ...patch } = vars;
+      if (result.undo && activeSheet)
+        pushUndo({
+          label: "run ends changed",
+          sheetId: activeSheet.id,
+          undo: {
+            kind: "restoreEnds",
+            packet: result.undo,
+            runId: id,
+            patch,
+          },
+          redo: null,
+          subject: { kind: "run", id: rootOfRun(id) },
+        });
+    },
+    onSettled: () => refreshFor("runEnds"),
+  });
+  const onSetEnds = useCallback(
+    (runId: number, patch: EndsPatch) =>
+      saveEnds.mutate({ id: runId, ...patch }),
+    [saveEnds]
+  );
+
+  /** The end clicked on the plan, lit in the Run ends section. */
+  const [endHighlight, setEndHighlight] = useState<{
+    runId: number;
+    end: "start" | "end";
+  } | null>(null);
+  // Brought into view when it changes; the section lists it by data attribute.
+  useEffect(() => {
+    if (!endHighlight) return;
+    const id = window.setTimeout(() => {
+      document
+        .querySelector(
+          `[data-run-end="${endHighlight.runId}-${endHighlight.end}"]`
+        )
+        ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [endHighlight]);
+
+  /**
+   * "Set ends": select the first run on this sheet with one end counted and
+   * the other not answered — the totals' `partialVerticalCount` rule
+   * (shared/takeoffQuantities.ts: unanswered, with some vertical) — and light
+   * the unanswered end. The count is bid-wide; if none is on this sheet, say
+   * so rather than open nothing.
+   */
+  const openPartialEnds = () => {
+    for (const r of runs) {
+      const v = r.quantities?.verticals;
+      if (!v) continue;
+      for (const end of ["start", "end"] as const) {
+        const other = end === "start" ? v.end : v.start;
+        const here = v[end];
+        const onTee = end === "start" ? r.startTee : r.endTee;
+        if (
+          !onTee &&
+          !here.counted &&
+          here.reason === "no-kind" &&
+          other.counted
+        ) {
+          setSelectedRunId(r.id);
+          setEndHighlight({ runId: r.id, end });
+          return;
+        }
+      }
+    }
+    toast.message(
+      "The runs with one end counted are on other sheets of this bid — open them there."
+    );
+  };
+
+  /** Every leg of a run as the Run ends section lists them: root first. */
+  const runEndsLegs = (rootId: number): RunEndsLeg[] => {
+    const legs = runs
+      .filter(r => (r.parentRunId ?? r.id) === rootId)
+      .sort(
+        (a, b) =>
+          Number(a.parentRunId !== null) - Number(b.parentRunId !== null) ||
+          a.id - b.id
+      );
+    return legs.map((r, i) => ({
+      id: r.id,
+      label: legs.length > 1 ? `Leg ${i + 1}` : "Run",
+      ends: r.ends ?? NO_ENDS,
+      verticals: r.quantities?.verticals ?? null,
+      teeEnds: { start: Boolean(r.startTee), end: Boolean(r.endTee) },
+      points: r.points,
+    }));
+  };
 
   /**
    * Dragging, adding or removing a run's points (T8, D7a).
@@ -6264,6 +6405,9 @@ export default function TakeoffPage({
                       editableRunId={
                         quantitiesLocked || selectingText ? null : selectedRunId
                       }
+                      onPickEnd={(runId, end) =>
+                        setEndHighlight({ runId, end })
+                      }
                       onEditPoints={(id, points) =>
                         editPoints.mutate({ id, points })
                       }
@@ -6538,27 +6682,32 @@ export default function TakeoffPage({
                     busy={answerDrops.isPending}
                   />
                 ) : (
-                  <RunEndsEditor
-                    bidId={bidId}
-                    runId={run.id}
-                    ends={
-                      run.ends ?? {
-                        startKind: null,
-                        endKind: null,
-                        startHeightInches: null,
-                        endHeightInches: null,
-                        distributionHeightInches: null,
-                        startStampId: null,
-                        endStampId: null,
-                      }
-                    }
-                    verticals={run.quantities?.verticals ?? null}
-                    suggestion={suggestionForRun(run.id)}
-                    teeEnds={{
-                      start: Boolean(run.startTee),
-                      end: Boolean(run.endTee),
-                    }}
-                  />
+                  <>
+                    {/* Every end of every leg of this run (owner, 2026-09-29). */}
+                    <RunEndsSection
+                      bidId={bidId}
+                      legs={runEndsLegs(run.parentRunId ?? run.id)}
+                      onSave={onSetEnds}
+                      onJumpTo={at => {
+                        setFocusPoint(at);
+                        window.setTimeout(() => setFocusPoint(null), 2200);
+                      }}
+                      highlight={endHighlight}
+                      locked={quantitiesLocked}
+                    />
+                    <RunEndsEditor
+                      bidId={bidId}
+                      ends={run.ends ?? NO_ENDS}
+                      verticals={run.quantities?.verticals ?? null}
+                      suggestion={suggestionForRun(run.id)}
+                      teeEnds={{
+                        start: Boolean(run.startTee),
+                        end: Boolean(run.endTee),
+                      }}
+                      onSave={patch => onSetEnds(run.id, patch)}
+                      endsElsewhere
+                    />
+                  </>
                 )
               }
               legend={
@@ -6671,6 +6820,7 @@ export default function TakeoffPage({
               onSelectRun={setSelectedRunId}
               onRemoveRun={id => removeRun.mutate({ id })}
               onDeleteCountMarks={deleteMarks}
+              onOpenPartialEnds={openPartialEnds}
               cardUndo={subject => undoForSubject(undoState, subject)}
               // Only ever enabled for the NEWEST step, so it is the ordinary
               // undo — never an out-of-order one (@/lib/undoStack).

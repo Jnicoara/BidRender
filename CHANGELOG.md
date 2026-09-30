@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Drops are set in the run card, end by end.** Selecting a run (on the plan
+  or its card) opens "Run ends", listing every end of every leg, branch ends
+  included. Each end has one-tap answers (Device box, Panel, J-box, Fixture,
+  Stub-up, Nothing) that take the drop from heights you already have, and a
+  height you can change for that end alone. Clicking an end on the plan
+  highlights it in the list. The "only one end counted" warning is now a
+  "Set ends" button that takes you to the run. Every end change can be
+  undone.
+- **Fixed: changing a run's end did not update the bid until something else
+  did.** The Send preview, the bid's lines and the materials list kept
+  showing the old drop footage after an end changed. They now update at once.
 - **Trash and undo on every count card, and undo on every run card.** A
   count card's trash deletes that count's marks on the sheet you are looking
   at, asking first when there is more than one. The count itself stays, and

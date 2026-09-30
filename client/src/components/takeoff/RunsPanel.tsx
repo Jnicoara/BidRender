@@ -963,6 +963,7 @@ export function RunsPanel({
   onSelectRun,
   onRemoveRun,
   onDeleteCountMarks,
+  onOpenPartialEnds,
   cardUndo,
   onCardUndo,
   onCommitRun,
@@ -1149,6 +1150,8 @@ export function RunsPanel({
    * itself stays, and its bid line follows. More than one asks first.
    */
   onDeleteCountMarks?: (marks: { id: number; name: string }[]) => void;
+  /** "Set ends": open the first run with one end not counted. */
+  onOpenPartialEnds?: () => void;
   /**
    * A card's own undo arrow (@/lib/undoStack `undoForSubject`): the step it
    * would take back, named, or null when the newest step is not about it.
@@ -2863,12 +2866,33 @@ export function RunsPanel({
             situations need opposite actions and a single number covering both
             could not say which one to take.
           */}
-          {totals.partialVerticalCount > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {`${totals.partialVerticalCount} run${totals.partialVerticalCount === 1 ? " has" : "s have"} only one end counted — ${totals.partialVerticalCount === 1 ? "its" : "their"} drops are short by whatever is missing.`}
-            </p>
-          )}
+          {/*
+            A BUTTON since 2026-09-29 (owner): the sentence said what was
+            wrong and left the estimator to go and find the run. It opens the
+            first such run's Run ends section; the number stays, because it is
+            what says how much is missing.
+          */}
+          {totals.partialVerticalCount > 0 &&
+            (onOpenPartialEnds ? (
+              <button
+                type="button"
+                onClick={onOpenPartialEnds}
+                className="mt-1 w-full text-left text-[0.7rem] text-[#F5C518] flex items-start gap-1.5 rounded border border-[#F5C518]/40 px-2 py-1 hover:bg-[#F5C518]/10"
+              >
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                <span>
+                  <span className="font-medium underline underline-offset-2">
+                    Set ends
+                  </span>
+                  {` — ${totals.partialVerticalCount} run${totals.partialVerticalCount === 1 ? " has" : "s have"} only one end counted, so ${totals.partialVerticalCount === 1 ? "its" : "their"} drops are short.`}
+                </span>
+              </button>
+            ) : (
+              <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {`${totals.partialVerticalCount} run${totals.partialVerticalCount === 1 ? " has" : "s have"} only one end counted — ${totals.partialVerticalCount === 1 ? "its" : "their"} drops are short by whatever is missing.`}
+              </p>
+            ))}
           {totals.unmeasurableCount > 0 && (
             <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
               <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />

@@ -115,3 +115,19 @@ describe("undo and clearing a sheet (Track B, 2026-09-29)", () => {
     expect(sheetsToRefresh(4, undefined)).toEqual([4]);
   });
 });
+
+describe("a change to a run's ends (the drop)", () => {
+  it("moves the bid's lines, the materials list and the Send preview", () => {
+    // The gap found 2026-09-29: the ends editor refreshed takeoffRuns only.
+    const set = moves("runEnds");
+    for (const q of [
+      "bids.get",
+      "materialsList.get",
+      "takeoffRunTypes.bridgeForBid",
+      "takeoffRuns.totals",
+      "takeoffRuns.drops",
+      "takeoffRuns.listForSheet",
+    ] as const)
+      expect(set.has(q), q).toBe(true);
+  });
+});

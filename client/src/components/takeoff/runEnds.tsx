@@ -29,7 +29,6 @@
  * number rather than a broken screen — see CLAUDE.md § Copying a layout.
  */
 import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
 import { ArrowDown, ArrowUp, Check, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +39,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { HeightFields } from "@/components/HeightFields";
+import { availablePicks } from "@/lib/runEndPicks";
+import { cn } from "@/lib/utils";
 import {
   DISTRIBUTION_KIND,
   NOT_ANSWERED_LABEL,
@@ -245,14 +246,26 @@ function TeeEnd() {
 
 export function RunEndsEditor({
   bidId,
-  runId,
   ends,
   verticals,
   suggestion,
   teeEnds = { start: false, end: false },
+  onSave,
+  endsElsewhere = false,
 }: {
   bidId: number;
-  runId: number;
+  /**
+   * Save through the PAGE, never a mutation of this component's own. The one
+   * this had refreshed `takeoffRuns` only, so the bid's lines, the Send
+   * preview and the materials list kept the old drop on screen; the page's
+   * save goes through @/lib/takeoffRefresh "runEnds" and onto the undo stack.
+   */
+  onSave: (patch: Partial<RunEndsValue>) => void;
+  /**
+   * The ends themselves are listed in `RunEndsSection` above, for every leg;
+   * this then shows only this leg's link suggestion and its own run height.
+   */
+  endsElsewhere?: boolean;
   /**
    * Which ends sit on a branch tee (D20). A tee end carries on at run height
    * and belongs to no mark, so it gets a statement instead of a picker — the
@@ -264,58 +277,57 @@ export function RunEndsEditor({
   /** A stamp sitting on this run's end that nothing has claimed yet. */
   suggestion: { stampId: number; label: string; typeKey: string | null } | null;
 }) {
-  const utils = trpc.useUtils();
-  const setEnds = trpc.takeoffRuns.setEnds.useMutation({
-    onSuccess: () => {
-      void utils.takeoffRuns.invalidate();
-    },
-    onError: error => toast.error(error.message),
-  });
-
-  const save = (patch: Partial<RunEndsValue>) =>
-    setEnds.mutate({ id: runId, ...patch });
+  const save = onSave;
 
   return (
     <div className="mt-2 pt-2 border-t border-border/60 space-y-2">
-      <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">
-        Ends
-      </div>
+      {!endsElsewhere && (
+        <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">
+          Ends
+        </div>
+      )}
 
-      {verticals && (
+      {!endsElsewhere && verticals && (
         <div className="space-y-0.5">
           <VerticalLine vertical={verticals.start} which="start" />
           <VerticalLine vertical={verticals.end} which="end" />
         </div>
       )}
 
-      <div className="flex items-center gap-1.5">
-        <span className="text-[0.7rem] text-muted-foreground w-8">From</span>
-        {teeEnds.start ? (
-          <TeeEnd />
-        ) : (
-          <EndKindSelect
-            bidId={bidId}
-            value={ends.startKind}
-            onChange={startKind => save({ startKind })}
-            ariaLabel="What this run starts at"
-            className="h-6 flex-1 text-xs"
-          />
-        )}
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span className="text-[0.7rem] text-muted-foreground w-8">To</span>
-        {teeEnds.end ? (
-          <TeeEnd />
-        ) : (
-          <EndKindSelect
-            bidId={bidId}
-            value={ends.endKind}
-            onChange={endKind => save({ endKind })}
-            ariaLabel="What this run ends at"
-            className="h-6 flex-1 text-xs"
-          />
-        )}
-      </div>
+      {!endsElsewhere && (
+        <>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[0.7rem] text-muted-foreground w-8">
+              From
+            </span>
+            {teeEnds.start ? (
+              <TeeEnd />
+            ) : (
+              <EndKindSelect
+                bidId={bidId}
+                value={ends.startKind}
+                onChange={startKind => save({ startKind })}
+                ariaLabel="What this run starts at"
+                className="h-6 flex-1 text-xs"
+              />
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[0.7rem] text-muted-foreground w-8">To</span>
+            {teeEnds.end ? (
+              <TeeEnd />
+            ) : (
+              <EndKindSelect
+                bidId={bidId}
+                value={ends.endKind}
+                onChange={endKind => save({ endKind })}
+                ariaLabel="What this run ends at"
+                className="h-6 flex-1 text-xs"
+              />
+            )}
+          </div>
+        </>
+      )}
 
       {/*
         The one-tap suggestion. The app proposes; the estimator accepts.
@@ -377,6 +389,192 @@ export function RunEndsEditor({
           setLabel="Override"
         />
       </div>
+    </div>
+  );
+}
+
+/** One end of one leg, as the Run ends section lists it. */
+export type RunEndsLeg = {
+  id: number;
+  /** "Leg 2", or the run's name when it has one leg. */
+  label: string;
+  ends: RunEndsValue;
+  verticals: RunVerticals | null;
+  teeEnds: { start: boolean; end: boolean };
+  points: readonly { x: number; y: number }[];
+};
+
+/**
+ * RUN ENDS — every end of every leg, in the run's card (owner, 2026-09-29).
+ *
+ * Opens with the run, on the plan or its card. Each open end gets one-tap
+ * answers (@/lib/runEndPicks), each a kind the app ships, so the drop comes
+ * from a height already set; the number is editable per end, and emptying it
+ * goes back to the kind's height. A branch-tee end is said, not asked (D20).
+ * Each end jumps the plan to it, and an end clicked on the plan is
+ * highlighted here.
+ *
+ * Nothing new is stored — an end already has a kind and a height of its own —
+ * so no migration. Saves go through the page (`onSave`): one refresh rule,
+ * one undo stack.
+ */
+export function RunEndsSection({
+  bidId,
+  legs,
+  onSave,
+  onJumpTo,
+  highlight,
+  locked,
+}: {
+  bidId: number;
+  legs: RunEndsLeg[];
+  onSave: (runId: number, patch: Partial<RunEndsValue>) => void;
+  onJumpTo: (point: { x: number; y: number }) => void;
+  highlight: { runId: number; end: "start" | "end" } | null;
+  locked: boolean;
+}) {
+  const { data } = trpc.takeoffHeights.forBid.useQuery({ bidId });
+  const types = (data?.types ?? []).filter(row => row.isActive);
+  const picks = availablePicks(new Set(types.map(t => t.typeKey)));
+  const heightOf = (kind: string | null) =>
+    kind === null
+      ? null
+      : (types.find(t => t.typeKey === kind)?.heightInches ?? null);
+
+  return (
+    <div className="mt-2 pt-2 border-t border-border/60 space-y-2">
+      <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">
+        Run ends
+      </div>
+      {locked && (
+        <p className="text-[0.7rem] text-muted-foreground">
+          This bid's quantities are locked, so its ends cannot be changed.
+        </p>
+      )}
+      {legs.map(leg =>
+        (["start", "end"] as const).map(which => {
+          const kind =
+            which === "start" ? leg.ends.startKind : leg.ends.endKind;
+          const own =
+            which === "start"
+              ? leg.ends.startHeightInches
+              : leg.ends.endHeightInches;
+          const vertical = leg.verticals?.[which] ?? null;
+          const onTee = leg.teeEnds[which];
+          const point =
+            which === "start"
+              ? leg.points[0]
+              : leg.points[leg.points.length - 1];
+          const lit = highlight?.runId === leg.id && highlight.end === which;
+          const kindField = which === "start" ? "startKind" : "endKind";
+          const heightField =
+            which === "start" ? "startHeightInches" : "endHeightInches";
+          const effective = own ?? heightOf(kind);
+          return (
+            <div
+              key={`${leg.id}-${which}`}
+              data-run-end={`${leg.id}-${which}`}
+              className={cn(
+                "rounded border px-2 py-1.5 space-y-1",
+                lit ? "border-[#F5C518] bg-[#F5C518]/5" : "border-border/60"
+              )}
+            >
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground underline-offset-2 hover:underline disabled:no-underline"
+                  disabled={!point}
+                  onClick={() => point && onJumpTo(point)}
+                  title="Show this end on the plan"
+                >
+                  {leg.label} · {which}
+                </button>
+                <span className="text-[0.7rem] text-muted-foreground text-right">
+                  {onTee
+                    ? "branch tee — no drop"
+                    : vertical?.counted
+                      ? `${vertical.direction === "drop" ? "Drop" : "Rise"} ${vertical.feet.toFixed(2)} ft`
+                      : kind === DISTRIBUTION_KIND
+                        ? "no drop — carries on"
+                        : "not set — no drop counted"}
+                </span>
+              </div>
+              {onTee ? (
+                <TeeEnd />
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-1">
+                    {picks.map(pick => (
+                      <button
+                        key={pick.kind}
+                        type="button"
+                        disabled={locked}
+                        aria-pressed={kind === pick.kind}
+                        onClick={() =>
+                          onSave(leg.id, {
+                            [kindField]: pick.kind,
+                            // A new kind takes ITS height, not the old override.
+                            [heightField]: null,
+                          })
+                        }
+                        className={cn(
+                          "h-6 rounded-full border px-2 text-[0.7rem] transition-colors disabled:opacity-50",
+                          kind === pick.kind
+                            ? "border-[#F5C518] bg-[var(--bp-yellow-dim)] text-foreground"
+                            : "border-border text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {pick.label}
+                      </button>
+                    ))}
+                    <EndKindSelect
+                      bidId={bidId}
+                      value={kind}
+                      onChange={next =>
+                        onSave(leg.id, {
+                          [kindField]: next,
+                          [heightField]: null,
+                        })
+                      }
+                      ariaLabel={`Something else at the ${which} of ${leg.label}`}
+                      className="h-6 w-28 text-[0.7rem]"
+                    />
+                  </div>
+                  {kind !== null && kind !== DISTRIBUTION_KIND && !locked && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[0.7rem] text-muted-foreground">
+                        Height here
+                      </span>
+                      <HeightFields
+                        compact
+                        value={own}
+                        belowFloor={(effective ?? 0) < 0}
+                        ariaPrefix={`Height at the ${which} of ${leg.label}`}
+                        onSave={inches =>
+                          onSave(leg.id, { [heightField]: inches })
+                        }
+                        onClear={
+                          own !== null
+                            ? () => onSave(leg.id, { [heightField]: null })
+                            : undefined
+                        }
+                        clearLabel="Use the type's height"
+                        // Empty means the kind's own height IS in effect.
+                        unsetLabel={
+                          effective === null
+                            ? "not set — no drop counted"
+                            : `the type's ${formatElevation(effective)}`
+                        }
+                        setLabel="This end only"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }

@@ -134,7 +134,13 @@ export type TakeoffChange =
    */
   | "undo"
   /** Every mark and run on one sheet removed (or put back) in one step. */
-  | "sheetCleared";
+  | "sheetCleared"
+  /**
+   * What sits at a run's end, or its height: the DROP. Until 2026-09-29 the
+   * ends editor refreshed `takeoffRuns` only, so the Send preview, the bid's
+   * lines and the materials list kept the old drop footage on screen.
+   */
+  | "runEnds";
 
 /**
  * Which sheets' own lists (marks, runs) a change must refresh.
@@ -182,4 +188,5 @@ export const QUERIES_MOVED_BY: Readonly<
   groupDrop: unique([...MARK_QUERIES, ...RUN_QUERIES]),
   undo: unique([...MARK_QUERIES, ...RUN_QUERIES]),
   sheetCleared: unique([...MARK_QUERIES, ...RUN_QUERIES]),
+  runEnds: unique(RUN_QUERIES),
 };

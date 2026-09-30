@@ -1611,10 +1611,14 @@ export const takeoffRunsRouter = router({
       for (const field of fields) {
         if (input[field] !== undefined) patch[field] = input[field];
       }
-      if (Object.keys(patch).length === 0) return { ok: true };
+      if (Object.keys(patch).length === 0) return { ok: true, undo: null };
 
-      await db.updateRun(input.id, userId, patch);
-      return { ok: true };
+      // The run's network as it was, so an end change is one undo step
+      // (server/takeoffRestore.ts, as for a drag).
+      const { snapshot } = await withNetworkSnapshot(run, userId, () =>
+        db.updateRun(input.id, userId, patch)
+      );
+      return { ok: true, undo: sealPacket(RUN_PACKET, userId, snapshot) };
     }),
 
   /**

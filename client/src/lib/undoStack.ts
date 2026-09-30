@@ -29,6 +29,19 @@ export const UNDO_LIMIT = 50;
 /** A sealed server packet: opaque here. */
 export type Packet = { kind: string; data: string; sig: string };
 
+/** What an end change sends to `takeoffRuns.setEnds` — omitted is unchanged. */
+export type EndsPatch = {
+  startKind?: string | null;
+  endKind?: string | null;
+  startHeightInches?: number | null;
+  endHeightInches?: number | null;
+  distributionHeightInches?: number | null;
+  startStampId?: number | null;
+  endStampId?: number | null;
+  /** Whose wire this run is (D18) — travels through the same procedure. */
+  branchWiring?: boolean | null;
+};
+
 export type UndoOp =
   /** Delete these marks (undo of placing them). */
   | { kind: "removeMarks"; ids: number[] }
@@ -50,6 +63,10 @@ export type UndoOp =
       runId: number;
       points: { x: number; y: number }[];
     }
+  /** Set a run's ends again (redo of an end change). */
+  | { kind: "setEnds"; runId: number; patch: EndsPatch }
+  /** Put a run's ends back as they were: the whole network, from a packet. */
+  | { kind: "restoreEnds"; packet: Packet; runId: number; patch: EndsPatch }
   /** Put a cleared sheet back (marks and runs). */
   | { kind: "restoreSheet"; packet: Packet }
   /** Clear the sheet again (redo of an undone clear). */

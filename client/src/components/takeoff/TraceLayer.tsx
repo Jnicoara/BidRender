@@ -255,6 +255,7 @@ export function TraceLayer({
   runColors,
   editableRunId = null,
   onEditPoints,
+  onPickEnd,
 }: {
   /**
    * The run whose points can be dragged (T8, D7a) — the selected one, when
@@ -263,6 +264,8 @@ export function TraceLayer({
   editableRunId?: number | null;
   /** A drag, an added point or a removed one, finished: save these points. */
   onEditPoints?: (runId: number, points: PagePoint[]) => void;
+  /** An end of the selected run clicked (not dragged): show it in Run ends. */
+  onPickEnd?: (runId: number, end: "start" | "end") => void;
   /** Which colour each run type gets on this bid — `takeoffRuns.typeColors`. */
   runColors: RunTypeColors;
   /** Branch legs while tracing (D20). Omitted, "New leg" does not exist. */
@@ -612,7 +615,13 @@ export function TraceLayer({
       if (!d.moved) {
         // A press with no movement picks the point, so Delete can remove it.
         // A "+" pressed and not dragged adds nothing.
-        if (!d.inserted) setPickedVertex({ runId: d.runId, index: d.index });
+        if (!d.inserted) {
+          setPickedVertex({ runId: d.runId, index: d.index });
+          // An END pressed and let go shows that end in the Run ends section.
+          const last = d.origin.length - 1;
+          if (d.index === 0 || d.index === last)
+            onPickEnd?.(d.runId, d.index === 0 ? "start" : "end");
+        }
         return;
       }
       const final = snapEnd(d, d.points);
@@ -638,7 +647,14 @@ export function TraceLayer({
     };
     // Re-bound only when a drag starts or ends, not on every move.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drag !== null, clientToPage, snapEnd, existingRuns, commitEdit]);
+  }, [
+    drag !== null,
+    clientToPage,
+    snapEnd,
+    existingRuns,
+    commitEdit,
+    onPickEnd,
+  ]);
 
   /** Delete or Backspace removes the picked point; Escape lets go of it. */
   useEffect(() => {
@@ -1548,7 +1564,12 @@ export function TraceLayer({
                         fill="#94A3B8"
                         stroke="#0b0b0b"
                         strokeWidth={stroke}
-                        className="cursor-not-allowed"
+                        className="cursor-pointer"
+                        // Cannot move, but can still be looked up in Run ends.
+                        onPointerDown={e => e.stopPropagation()}
+                        onClick={() =>
+                          onPickEnd?.(run.id, index === 0 ? "start" : "end")
+                        }
                       >
                         <title>
                           This end is on a branch tee, so it stays where the
