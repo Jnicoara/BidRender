@@ -71,12 +71,12 @@ for any sheet, so there is no way today to say whether the reader misses 2% or
 
 ### The four ways of reading
 
-| Method                    | What the AI is sent                                                                                                                                                                   |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **(a) Today**             | Exactly what Read sheet sends now: one picture of the whole sheet shrunk to the model's limit (about 65 px per paper inch), the sheet's text, and the legend symbols' NAMES as words. |
-| **(b) Legend first**      | The same, plus the confirmed legend symbols' PICTURES, numbered, each with its label. The AI answers "legend entry 7" instead of copying a name.                                      |
-| **(c) Zoomed in, pieces** | The sheet cut into 6 overlapping pieces at 150 px per paper inch (the planned default, `ai-reader-cost.md` § 5), each read separately. Legend names as words, as today.               |
-| **(d) Both**              | The pieces from (c), each sent with the legend pictures from (b).                                                                                                                     |
+| Method                    | What the AI is sent                                                                                                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **(a) Today**             | Exactly what Read sheet sends now: one picture of the whole sheet shrunk to the model's limit (about 65 px per paper inch), the sheet's text, and the legend symbols' NAMES as words.      |
+| **(b) Legend first**      | The same, plus the confirmed legend symbols' PICTURES, numbered, each with its label. The AI answers "legend entry 7" instead of copying a name.                                           |
+| **(c) Zoomed in, pieces** | The sheet cut into overlapping pieces (6 on a 36x24 sheet) at 150 px per paper inch (the planned default, `ai-reader-cost.md` § 5), each read separately. Legend names as words, as today. |
+| **(d) Both**              | The pieces from (c), each sent with the legend pictures from (b).                                                                                                                          |
 
 (b) is what Track A's plan would ship. (c) is what Phase 10 would ship. (d) is
 both. The test uses stand-ins for them (see § 3); the point is to learn how
@@ -155,7 +155,7 @@ one suggestion per mark:
 | **Found**        | Right place, right symbol.                                                                                                                                                                         |
 | **Wrong symbol** | Right place, wrong symbol (called a duplex when it is a GFCI).                                                                                                                                     |
 | **Missed**       | Your mark with no suggestion near it.                                                                                                                                                              |
-| **Extra**        | A suggestion with no mark of yours near it. Includes the same symbol reported twice where two pieces overlap.                                                                                      |
+| **Extra**        | A suggestion with no mark of yours near it, or reported twice for one mark.                                                                                                                        |
 | **Flagged**      | The AI said "can't make this out" at one of your marks. Still counted as missed, since nothing was found, but shown on its own: pointing at a spot it is unsure of is allowed and useful (§ 10.3). |
 
 Found + Wrong symbol + Missed = By hand, always. That is the check the numbers
@@ -220,10 +220,14 @@ of `scripts/aiSmokeTest.mts`. It:
 5. **Writes its results to a git-ignored folder.** It writes nothing to any
    bid, sheet, mark or reading table.
 
-**One app-side change, very small:** the reader's instructions and answer
-format live inside `server/routers/planCopilotRouter.ts` and are not exported.
-Exporting them (two words) lets (a) use the app's real instructions instead of
-a copy. A copy would test a different reader.
+**The app-side change, AS BUILT (2026-09-29): a move, not an export.** A bare
+export of the instructions was not enough: the request (thinking off, the
+output cap, how the text and picture are laid out) and the reply parsing also
+lived inline in the router, and copying those would have tested a copy. So all
+of it moved to `server/planReading.ts`, which the router and the script both
+import. No change in behaviour: the 77 existing reader tests pass unchanged,
+and `server/planReading.test.ts` adds 7, including the token-ceiling case that
+had no test. `legendFor` is exported from the router for the legend names.
 
 **Honest limits of the stand-ins:**
 
@@ -233,15 +237,60 @@ a copy. A copy would test a different reader.
 - **(c)'s pieces are a simple grid with overlap.** Phase 10 will decide the real
   cutting and the handling of symbols on a seam (§ 10.4). The test answers
   "does zooming in help, and by how much", not "is this the right tiling".
+- **Pieces overlap by at least half an inch, and each point of the sheet is
+  owned by exactly one piece.** A piece's findings are kept only inside the
+  part it owns, so a symbol in an overlap is not counted twice. Without that,
+  the extras column would show a fault in the stand-in, not in the reader
+  (`scripts/readerAccuracyTiles.ts`, tested).
+- **Piece count follows sheet size.** A 36x24 sheet is 3x2 = 6 pieces; UNCC's
+  42x30 is 4x3 = 12, so its zoomed readings cost about double.
+- **Today's picture is the best case of today.** The script renders the sheet
+  at the most the model will take (2352x1568 on a 36x24 sheet, 65 px per paper
+  inch). Read sheet sends that or less, depending on the viewer's zoom.
+- **Learned corrections are not applied.** Read sheet also applies fixes you
+  have made on the same architect's drawings before. The test account has
+  none, so this changes nothing today, but it means the test measures the
+  reader, not the reader plus your past corrections.
 
-Writing and checking the script: roughly half a day to a day.
+**How a mark is matched:** a suggestion within 24 points (a third of a paper
+inch) of one of your marks, nearest first, each used once, with a right-symbol
+suggestion claiming a mark before a wrong-symbol one. Symbol names are compared
+ignoring case and spacing, so **your count names must match your legend
+labels**; the script prints a warning naming any that do not
+(`scripts/readerAccuracyScore.ts`, tested).
+
+### Running it
+
+```bash
+pnpm tsx scripts/readerAccuracy.mts --bid <id> --runs 2
+# one sheet, one method, to try it:
+pnpm tsx scripts/readerAccuracy.mts --bid <id> --pages 4 --methods a
+```
+
+With no `--pages`, it reads every sheet of the bid that has hand marks on it.
+Results, and every picture that was sent, land in
+`reader-accuracy/results/<time>-bid<id>/` (git-ignored). Look at the pictures:
+a wrong picture is a wrong test.
+
+### The proof run, 2026-09-29
+
+Old Blueridge E1.02 (bid 870001, a local copy), method (a) only, no hand count
+yet: **63 suggestions, 23 of them flagged unreadable. 7,095 tokens in, 4,049
+out, $0.055, 29 seconds.** The picture sent was checked by eye: the right
+sheet, whole, at 2352x1568. This proves the pipeline, not accuracy: with no
+hand count there is nothing to score.
+
+**One early signal, not a result:** the reader flagged over a third of what it
+saw on E1.02 as unreadable at today's picture size. That is what § 10.3 asks
+of it, and it is also a hint that (c) may matter. The hand count will say.
 
 ### Keeping it off staging and live
 
 - **The local database only.** The script uses the guard every writing script
   already uses (`scripts/databaseGuard.ts`) and refuses any database not on
-  this machine. Its only database write is the AI usage counter, the same row
-  any local AI call writes.
+  this machine — and, unlike the others, it ignores `ALLOW_REMOTE_DATABASE`,
+  so there is no way to point it at staging or live. Its only database write
+  is the AI usage counter, the same row any local AI call writes.
 - **Only the AI key is borrowed** from `.env.production.local`, by name, as
   `aiSmokeTest.mts` does. Nothing else in that file is read, the live database
   address above all.
@@ -251,24 +300,24 @@ Writing and checking the script: roughly half a day to a day.
 
 ### Cost per run
 
-Indicative, from `ai-reader-cost.md` § 5 (Sonnet 5, thinking off). The script
-prints the real figure for each call.
+**Revised 2026-09-29 from the one measured call** (5.5c for (a) on E1.02,
+against the 4.5c estimated at plan time — the reply was 4,049 tokens, not the
+3,270 assumed). The other rows are still estimates scaled from it; the script
+prints the real figure for every call.
 
-| Method              | Calls per sheet | Per sheet |
-| ------------------- | --------------- | --------- |
-| (a) Today           | 1               | ~4.5c     |
-| (b) Legend first    | 1               | ~5c       |
-| (c) Zoomed in       | 6               | ~10c      |
-| (d) Legend + zoomed | 6               | ~11c      |
-| **All four**        | 14              | **~31c**  |
+| Method              | Calls per sheet | Per sheet           |
+| ------------------- | --------------- | ------------------- |
+| (a) Today           | 1               | **5.5c measured**   |
+| (b) Legend first    | 1               | ~6c                 |
+| (c) Zoomed in       | 6 (12 on UNCC)  | ~13c (~25c on UNCC) |
+| (d) Legend + zoomed | 6 (12 on UNCC)  | ~15c (~28c on UNCC) |
 
-- **One full run, 4 sheets, all four methods: about $1.25.** 5 sheets: about
-  $1.55.
-- **Twice, as planned: about $2.50 to $3.10.**
-- **With re-runs after fixing the script: under $6.**
-- 56 to 70 AI calls per full run, inside the daily allowance of 150 reader
-  calls per person (`shared/aiLimits.ts`), so two runs may span two days or use
-  a second test account.
+- **One full run, the 4 fixed sheets, all four methods: about $1.80.**
+- **Twice, as planned: about $3.60.** With your retail sheet added, about $4.50.
+- **With re-runs after fixing something: under $10.**
+- **68 AI calls per full run** of the 4 fixed sheets. The daily allowance is
+  150 reader calls per person (`shared/aiLimits.ts`), so two runs fit in one
+  day on 4 sheets; with a fifth sheet, run the second pass the next day.
 
 **The real price is your time, not the API bill:** about 2 to 3 hours of
 counting, once. Every later run (a new model, Track A's v1, Phase 10) costs a
@@ -286,7 +335,7 @@ dollar or two and no counting.
 
 ---
 
-## SHORT SUMMARY
+## SHORT SUMMARY (as planned, de5343a — costs revised in § 3)
 
 - **We have real sets but no answer key.** Old Blueridge (legend on E0.01,
   78 symbols on E1.02) is the best test set; pine st and one public vector set

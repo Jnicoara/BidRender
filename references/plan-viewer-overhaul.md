@@ -5528,6 +5528,12 @@ measurement is only worth taking when its answer changes what gets built next,
 and the answer goes stale if the model, the detail level or the prompt moves in
 between. Running it early buys a number that has to be re-earned.
 
+> **Superseded 2026-09-29 by `references/reader-accuracy-test-plan.md`**, on the
+> owner's go-ahead: the bake-off now compares legend and zoom (today, legend
+> pictures, zoomed-in pieces, both) instead of detail levels, and runs before
+> Phase 10 because its answer decides whether Phase 10 is built. The hand counts
+> are reused for every later re-run; `scripts/readerAccuracy.mts` runs it.
+
 ### 15.5 The gate
 
 **Phase 10 should not start until this is run.** Not because the answer is
