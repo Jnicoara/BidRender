@@ -404,19 +404,21 @@ function rootOf(run: Pick<TakeoffRun, "id" | "parentRunId">): number {
 }
 
 /**
- * Snapshot the network, run `remove`, and fingerprint what it left.
+ * Snapshot the network, run `change`, and fingerprint what it left.
  *
- * `remove` is `db.removeLeg`, passed in so the tee tidying stays in one place.
+ * `change` is the real edit — `db.removeLeg` for a delete, a points update
+ * for a drag — passed in so its rules stay in one place. The snapshot is what
+ * `restoreNetwork` puts back.
  */
-export async function removeRunWithSnapshot<R>(
+export async function withNetworkSnapshot<R>(
   run: Pick<TakeoffRun, "id" | "parentRunId" | "bidId">,
   userId: number,
-  remove: () => Promise<R>
+  change: () => Promise<R>
 ): Promise<{ result: R; snapshot: NetworkSnapshot }> {
   const db = await database();
   const rootId = rootOf(run);
   const before = await networkRows(db, rootId, userId);
-  const result = await remove();
+  const result = await change();
   const after = await networkRows(db, rootId, userId);
   return {
     result,

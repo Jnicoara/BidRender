@@ -4259,8 +4259,10 @@ the screen around it, and drop it first if Phase 5 runs long.
 **Dragging a vertex stays last and is cuttable.** Undo-and-re-click already
 works. If it competes with anything in Phases 5–8, it loses.
 
-> **Moved forward 2026-09-29 (proposed):** the owner asked for it with 5–8
-> built. Planned in `references/track-b-plans-screen-edits-plan.md` Part 1.
+> **Moved forward and BUILT 2026-09-29:** the owner asked for it with 5–8
+> built. Drag a point, drag a "+" to add one, right-click or Delete to
+> remove one; refused on a locked bid; undoable. `takeoffRuns.setPoints`,
+> `client/src/lib/runPointEdit.ts`, plan Part 1.
 
 **NEVER CALIBRATE OFF THE GRAPHIC SCALE BAR.** Decided 2026-09-18, and this one
 is filed here because it is the single most likely thing in this document to be

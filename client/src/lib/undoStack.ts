@@ -38,8 +38,18 @@ export type UndoOp =
   | { kind: "removeRun"; id: number }
   /** Put a deleted run back, whole network. `id` is the row redo removes. */
   | { kind: "restoreRun"; packet: Packet; id: number }
-  /** Put a run's points back (a drag, an added or removed point). */
+  /** Write these points onto a run again (redo of a drag). */
   | { kind: "setPoints"; runId: number; points: { x: number; y: number }[] }
+  /**
+   * Put a run back as it was before a drag: its points AND any pull-point
+   * answer the move cleared. `points` is the edit, for redo.
+   */
+  | {
+      kind: "restorePoints";
+      packet: Packet;
+      runId: number;
+      points: { x: number; y: number }[];
+    }
   /** Put a cleared sheet back (marks and runs). */
   | { kind: "restoreSheet"; packet: Packet }
   /** Clear the sheet again (redo of an undone clear). */

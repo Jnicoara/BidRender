@@ -62,6 +62,15 @@ import { stampsInBox } from "@/lib/stampSelection";
 import { projectOntoPath } from "@shared/runNetwork";
 import { JOINED_WITHIN_POINTS } from "@shared/quantityDrops";
 import { addsTracePoint } from "@/lib/traceClick";
+import {
+  insertPoint,
+  isPinned,
+  movePoint,
+  removePoint,
+  samePoints,
+  segmentMidpoints,
+  type PinnedEnds,
+} from "@/lib/runPointEdit";
 
 /**
  * How wide a run's invisible click target is, in SCREEN pixels.
@@ -244,7 +253,16 @@ export function TraceLayer({
   drops,
   onSelectDrop,
   runColors,
+  editableRunId = null,
+  onEditPoints,
 }: {
+  /**
+   * The run whose points can be dragged (T8, D7a) — the selected one, when
+   * nothing else is armed and the bid is not locked. Null shows no handles.
+   */
+  editableRunId?: number | null;
+  /** A drag, an added point or a removed one, finished: save these points. */
+  onEditPoints?: (runId: number, points: PagePoint[]) => void;
   /** Which colour each run type gets on this bid — `takeoffRuns.typeColors`. */
   runColors: RunTypeColors;
   /** Branch legs while tracing (D20). Omitted, "New leg" does not exist. */
@@ -493,6 +511,168 @@ export function TraceLayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [box !== null, clientToPage, snapReach, stamps, onBoxSelect]);
 
+  /*
+    ── EDITING A RUN'S POINTS (T8, D7a) ────────────────────────────────────────
+    The selected run shows a round handle per point and a faint "+" on each
+    segment. Drag a handle to move it, drag a "+" to add a point there,
+    right-click a handle (or click it, then Delete) to remove it. The line
+    follows the pointer live and saves on release; Escape during a drag puts
+    it back and saves nothing. The rules are @/lib/runPointEdit.
+
+    A handle's press calls stopPropagation: the viewport pans on a plain
+    left-drag, and a React event raised here bubbles to it (CLAUDE.md § "a
+    comment claiming that SOMETHING ELSE handles it").
+  */
+  type Drag = {
+    runId: number;
+    index: number;
+    /** The points before the drag, with an inserted point already in. */
+    origin: PagePoint[];
+    points: PagePoint[];
+    pinned: PinnedEnds;
+    moved: boolean;
+    /** Started on a "+": the point exists only if the drag goes somewhere. */
+    inserted: boolean;
+  };
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const dragRef = useRef(drag);
+  dragRef.current = drag;
+  const [pickedVertex, setPickedVertex] = useState<{
+    runId: number;
+    index: number;
+  } | null>(null);
+  useEffect(() => {
+    setPickedVertex(null);
+    setDrag(null);
+  }, [editableRunId]);
+
+  /*
+    The points just saved, held until the run list catches up. Without it the
+    line jumps back to where it was for the length of the save and then
+    forward again, on the one thing the person is watching. Cleared by ANY
+    change to the list: the page writes the new points into its cache at once,
+    and restores the old ones if the save fails, and both arrive here as a new
+    list.
+  */
+  const [settled, setSettled] = useState<{
+    runId: number;
+    points: PagePoint[];
+  } | null>(null);
+  useEffect(() => setSettled(null), [existingRuns]);
+  /** Where a run's points are drawn: mid-drag, just saved, or as stored. */
+  const pointsNow = (run: ExistingRun): PagePoint[] =>
+    drag && drag.runId === run.id
+      ? drag.points
+      : settled && settled.runId === run.id
+        ? settled.points
+        : run.points;
+  const commitEdit = useCallback(
+    (runId: number, points: PagePoint[]) => {
+      setSettled({ runId, points });
+      onEditPoints?.(runId, points);
+    },
+    [onEditPoints]
+  );
+
+  /** An END let go near a mark lands on it, as tracing does. */
+  const snapEnd = useCallback(
+    (d: Drag, points: PagePoint[]): PagePoint[] => {
+      if (d.index !== 0 && d.index !== points.length - 1) return points;
+      const p = points[d.index];
+      const reach = snapReach();
+      let best: PlacedStamp | null = null;
+      let bestD = reach;
+      for (const s of stamps) {
+        if (s.pending) continue;
+        const dist = Math.hypot(s.x - p.x, s.y - p.y);
+        if (dist <= bestD) {
+          best = s;
+          bestD = dist;
+        }
+      }
+      if (!best) return points;
+      return movePoint(points, d.index, best, d.pinned) ?? points;
+    },
+    [snapReach, stamps]
+  );
+
+  useEffect(() => {
+    if (!drag) return;
+    const move = (e: PointerEvent) => {
+      const page = clientToPage(e.clientX, e.clientY);
+      const d = dragRef.current;
+      if (!page || !d) return;
+      const next = movePoint(d.origin, d.index, page, d.pinned);
+      if (next) setDrag({ ...d, points: next, moved: true });
+    };
+    const end = () => {
+      const d = dragRef.current;
+      setDrag(null);
+      if (!d) return;
+      if (!d.moved) {
+        // A press with no movement picks the point, so Delete can remove it.
+        // A "+" pressed and not dragged adds nothing.
+        if (!d.inserted) setPickedVertex({ runId: d.runId, index: d.index });
+        return;
+      }
+      const final = snapEnd(d, d.points);
+      const run = existingRuns.find(r => r.id === d.runId);
+      if (run && !samePoints(run.points, final)) commitEdit(d.runId, final);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      dragRef.current = null;
+      setDrag(null);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    window.addEventListener("keydown", key, true);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      window.removeEventListener("keydown", key, true);
+    };
+    // Re-bound only when a drag starts or ends, not on every move.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drag !== null, clientToPage, snapEnd, existingRuns, commitEdit]);
+
+  /** Delete or Backspace removes the picked point; Escape lets go of it. */
+  useEffect(() => {
+    if (!pickedVertex) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable)
+      )
+        return;
+      if (e.key === "Escape") {
+        setPickedVertex(null);
+        return;
+      }
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const run = existingRuns.find(r => r.id === pickedVertex.runId);
+      if (!run) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const next = removePoint(run.points, pickedVertex.index, {
+        start: !!run.startTee,
+        end: !!run.endTee,
+      });
+      setPickedVertex(null);
+      if (next) commitEdit(run.id, next);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [pickedVertex, existingRuns, commitEdit]);
+
   /**
    * Run total (clicked points only — the pill) and Next (last point to the
    * cursor — the label at the cursor). @/lib/traceReadout keeps the cursor
@@ -679,7 +859,9 @@ export function TraceLayer({
 
         {/* Runs already traced */}
         {existingRuns.map(run => {
-          const screen = run.points.map(toScreen);
+          // While a point is being dragged the line follows the pointer.
+          const livePoints = pointsNow(run);
+          const screen = livePoints.map(toScreen);
           if (screen.length < 2) return null;
           const isSelected = run.id === selectedRunId;
           /*
@@ -1286,6 +1468,126 @@ export function TraceLayer({
             })}
           </>
         )}
+
+        {/* Point handles on the selected run — last, so they sit on top. */}
+        {!tracing &&
+          !stamping &&
+          editableRunId !== null &&
+          onEditPoints &&
+          (() => {
+            const run = existingRuns.find(r => r.id === editableRunId);
+            if (!run || run.points.length < 2) return null;
+            const pts = pointsNow(run);
+            const pinned = { start: !!run.startTee, end: !!run.endTee };
+            const color = runAppearance(runColors, run).color;
+            const r = runWidthInOverlay(zoom, 5);
+            const stroke = runWidthInOverlay(zoom, 1.5);
+            const begin = (
+              e: React.PointerEvent,
+              index: number,
+              origin: PagePoint[],
+              inserted: boolean
+            ) => {
+              if (e.button !== 0) return;
+              e.stopPropagation();
+              e.preventDefault();
+              setPickedVertex(null);
+              setDrag({
+                runId: run.id,
+                index,
+                origin,
+                points: origin,
+                pinned,
+                moved: false,
+                inserted,
+              });
+            };
+            return (
+              <g className="pointer-events-auto">
+                {!drag &&
+                  segmentMidpoints(run.points).map(({ segment, at }) => {
+                    const s = toScreen(at);
+                    const origin = insertPoint(run.points, segment, at);
+                    if (!origin) return null;
+                    return (
+                      <g
+                        key={`add-${segment}`}
+                        className="cursor-copy"
+                        onPointerDown={e => begin(e, segment + 1, origin, true)}
+                      >
+                        <circle
+                          cx={s.x}
+                          cy={s.y}
+                          r={r * 0.8}
+                          fill="#0b0b0b"
+                          fillOpacity={0.55}
+                          stroke={color}
+                          strokeOpacity={0.6}
+                          strokeWidth={stroke}
+                        />
+                        <path
+                          d={`M${s.x - r * 0.45},${s.y}H${s.x + r * 0.45}M${s.x},${s.y - r * 0.45}V${s.y + r * 0.45}`}
+                          stroke={color}
+                          strokeOpacity={0.8}
+                          strokeWidth={stroke}
+                        />
+                        <title>Drag to add a point here</title>
+                      </g>
+                    );
+                  })}
+                {pts.map((p, index) => {
+                  const s = toScreen(p);
+                  if (isPinned(index, pts.length, pinned))
+                    return (
+                      <rect
+                        key={`pt-${index}`}
+                        x={s.x - r * 0.8}
+                        y={s.y - r * 0.8}
+                        width={r * 1.6}
+                        height={r * 1.6}
+                        fill="#94A3B8"
+                        stroke="#0b0b0b"
+                        strokeWidth={stroke}
+                        className="cursor-not-allowed"
+                      >
+                        <title>
+                          This end is on a branch tee, so it stays where the
+                          branch leaves the run.
+                        </title>
+                      </rect>
+                    );
+                  const picked =
+                    pickedVertex?.runId === run.id &&
+                    pickedVertex.index === index;
+                  return (
+                    <circle
+                      key={`pt-${index}`}
+                      cx={s.x}
+                      cy={s.y}
+                      r={r}
+                      fill={picked ? "#F5C518" : "#ffffff"}
+                      stroke={color}
+                      strokeWidth={stroke * 1.4}
+                      className="cursor-move"
+                      onPointerDown={e => begin(e, index, run.points, false)}
+                      onContextMenu={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const next = removePoint(run.points, index, pinned);
+                        if (next) commitEdit(run.id, next);
+                      }}
+                    >
+                      <title>
+                        {run.points.length > 2
+                          ? "Drag to move · right-click (or click, then Delete) to remove"
+                          : "Drag to move · a run needs at least two points"}
+                      </title>
+                    </circle>
+                  );
+                })}
+              </g>
+            );
+          })()}
       </svg>
 
       {withChrome(

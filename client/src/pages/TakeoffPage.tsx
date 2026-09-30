@@ -2410,6 +2410,7 @@ export default function TakeoffPage({
   const undoRestoreMarks = trpc.takeoffStamps.restore.useMutation();
   const undoRemoveRun = trpc.takeoffRuns.remove.useMutation();
   const undoRestoreRun = trpc.takeoffRuns.restore.useMutation();
+  const undoSetPoints = trpc.takeoffRuns.setPoints.useMutation();
   /** Ops whose mutations are declared further down the page. */
   const runUndoOpLater = useRef<(op: UndoOp) => Promise<UndoOp | null>>(
     async () => null
@@ -2437,10 +2438,26 @@ export default function TakeoffPage({
         case "restoreRun":
           await undoRestoreRun.mutateAsync({ undo: op.packet });
           return { kind: "removeRun", id: op.id };
-        case "setPoints":
+        case "setPoints": {
+          const r = await undoSetPoints.mutateAsync({
+            id: op.runId,
+            points: op.points,
+          });
+          return r.undo
+            ? {
+                kind: "restorePoints",
+                packet: r.undo,
+                runId: op.runId,
+                points: op.points,
+              }
+            : null;
+        }
+        case "restorePoints":
+          await undoRestoreRun.mutateAsync({ undo: op.packet });
+          return { kind: "setPoints", runId: op.runId, points: op.points };
         case "restoreSheet":
         case "clearSheet":
-          // Wired with the tools that make them (drag points, clear sheet).
+          // Wired with the tool that makes them (clear sheet), further down.
           return runUndoOpLater.current(op);
         default: {
           const unhandled: never = op;
@@ -2448,7 +2465,13 @@ export default function TakeoffPage({
         }
       }
     },
-    [undoRemoveMarks, undoRestoreMarks, undoRemoveRun, undoRestoreRun]
+    [
+      undoRemoveMarks,
+      undoRestoreMarks,
+      undoRemoveRun,
+      undoRestoreRun,
+      undoSetPoints,
+    ]
   );
 
   const stepBack = useCallback(
@@ -3988,6 +4011,60 @@ export default function TakeoffPage({
       if (result.keptAsBox.length > 0)
         toast.message(
           "The box at that tee stays — the two sides carry different circuits or types, so they were not joined back into one leg."
+        );
+    },
+    onSettled: refreshRuns,
+  });
+
+  /**
+   * Dragging, adding or removing a run's points (T8, D7a).
+   *
+   * Optimistic, per the responsiveness rule: the new points go into the
+   * sheet's run list at once and the save follows; a refusal puts the old
+   * ones back. Everything the points decide — length, bends, pull points, the
+   * bid — moves through `refreshRuns` when the save lands.
+   */
+  const editPoints = trpc.takeoffRuns.setPoints.useMutation({
+    onMutate: async vars => {
+      if (!activeSheet) return undefined;
+      const key = { sheetId: activeSheet.id };
+      await utils.takeoffRuns.listForSheet.cancel(key);
+      const before = utils.takeoffRuns.listForSheet.getData(key);
+      utils.takeoffRuns.listForSheet.setData(key, old =>
+        old?.map(r => (r.id === vars.id ? { ...r, points: vars.points } : r))
+      );
+      return { key, before };
+    },
+    onError: (e, _vars, context) => {
+      if (context)
+        utils.takeoffRuns.listForSheet.setData(context.key, context.before);
+      toast.error(e.message);
+    },
+    onSuccess: (result, vars) => {
+      if (result.undo && activeSheet)
+        pushUndo({
+          label: "run points edited",
+          sheetId: activeSheet.id,
+          undo: {
+            kind: "restorePoints",
+            packet: result.undo,
+            runId: vars.id,
+            points: result.points,
+          },
+          redo: null,
+        });
+      /*
+        Said, not left to be found (Track B plan, Part 1 § 2): a corner that
+        moved has lost its LB or pull-box answer and will be proposed again.
+      */
+      if (result.clearedAnswers > 0)
+        toast.message(
+          `${result.clearedAnswers} pull-point ${result.clearedAnswers === 1 ? "answer" : "answers"} cleared — the corner moved. Ctrl+Z puts ${result.clearedAnswers === 1 ? "it" : "them"} back.`
+        );
+      const run = runs.find(r => r.id === vars.id);
+      if (run?.typedLengthInches != null)
+        toast.message(
+          "This run has a typed length, and that is still what the bid uses — the drawing changed, the bid did not."
         );
     },
     onSettled: refreshRuns,
@@ -5924,6 +6001,18 @@ export default function TakeoffPage({
                       onCancel={cancelTrace}
                       selectedRunId={selectedRunId}
                       onSelectRun={setSelectedRunId}
+                      /*
+                        Points are editable on the selected run only, with no
+                        other tool armed — and never on a locked bid, where
+                        the handles are not drawn at all (the server refuses
+                        too). A drag is the thing the lock exists to stop.
+                      */
+                      editableRunId={
+                        quantitiesLocked || selectingText ? null : selectedRunId
+                      }
+                      onEditPoints={(id, points) =>
+                        editPoints.mutate({ id, points })
+                      }
                       stamping={Boolean(armedGroup) && !tracing}
                       armedGroupName={armedGroup?.label ?? null}
                       zoom={size.zoom}

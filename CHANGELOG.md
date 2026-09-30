@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **A finished run's points can now be dragged.** Select a run and its
+  points show as handles. Drag one to move it, drag the faint "+" on a
+  segment to add a point, and right-click a point (or click it, then press
+  Delete) to remove it. The length, elbows and bid follow when you let go,
+  and Ctrl+Z puts the run back. A finished run stays finished and keeps its
+  location. A branch-tee end stays on its tee. If a moved corner loses an LB
+  or pull-box answer, the screen says so. Not available on a locked bid.
 - **Undo and redo on the Plans screen.** Placing marks, deleting marks,
   finishing a run and deleting a run can each be undone with the new arrow in
   the toolbar or Ctrl+Z, and redone with Ctrl+Shift+Z. The tooltip names the

@@ -68,7 +68,7 @@ import {
   sealPacket,
 } from "../restorePacket";
 import {
-  removeRunWithSnapshot,
+  withNetworkSnapshot,
   restoreNetwork,
   type NetworkSnapshot,
 } from "../takeoffRestore";
@@ -179,6 +179,32 @@ async function refuseIfLocked(bidId: number, userId: number) {
       message:
         "This bid's quantities are locked, so its runs cannot be changed. Unlock them on the bid first.",
     });
+}
+
+/**
+ * An end on a TEE stays on the tee (D20): the tee is where three legs meet,
+ * and a leg that drifted off it would still be joined in the counts while
+ * visibly apart on the drawing. Pinned here, by construction, rather than
+ * trusted to the client.
+ *
+ * One helper for `save` and `setPoints`, so the two cannot pin differently.
+ * Returns the SAME array when nothing is pinned.
+ */
+async function pinTeeEnds<P extends { x: number; y: number }>(
+  run: Pick<Awaited<ReturnType<typeof requireRun>>, "startTeeId" | "endTeeId">,
+  points: P[],
+  userId: number
+): Promise<P[] | { x: number; y: number }[]> {
+  if (points.length < 2) return points;
+  const [start, end] = await Promise.all([
+    run.startTeeId === null ? null : db.getTeeById(run.startTeeId, userId),
+    run.endTeeId === null ? null : db.getTeeById(run.endTeeId, userId),
+  ]);
+  if (!start && !end) return points;
+  const pinned = points.map(p => ({ x: p.x, y: p.y }));
+  if (start) pinned[0] = { x: start.x, y: start.y };
+  if (end) pinned[pinned.length - 1] = { x: end.x, y: end.y };
+  return pinned;
 }
 
 /** The sheet's scale as the pure functions want it. */
@@ -581,25 +607,12 @@ export const takeoffRunsRouter = router({
             message: "That run belongs to another sheet.",
           });
         }
-        /*
-          An end on a TEE stays on the tee (D20): the tee is where three legs
-          meet, and a leg that drifted off it would still be joined in the
-          counts while visibly apart on the drawing. Pinned here, by
-          construction, rather than trusted to the client.
-        */
-        const pins = [
-          existing.startTeeId === null
-            ? null
-            : await db.getTeeById(existing.startTeeId, ctx.scope.dataUserId),
-          existing.endTeeId === null
-            ? null
-            : await db.getTeeById(existing.endTeeId, ctx.scope.dataUserId),
-        ];
-        if ((pins[0] || pins[1]) && input.points.length >= 2) {
-          const points = input.points.map(p => ({ x: p.x, y: p.y }));
-          if (pins[0]) points[0] = { x: pins[0].x, y: pins[0].y };
-          if (pins[1])
-            points[points.length - 1] = { x: pins[1].x, y: pins[1].y };
+        const points = await pinTeeEnds(
+          existing,
+          input.points,
+          ctx.scope.dataUserId
+        );
+        if (points !== input.points) {
           const pinned = ratio === null ? null : pathRealInches(points, ratio);
           values.points = points;
           values.lengthInches = pinned === null ? null : pinned.toFixed(4);
@@ -608,11 +621,7 @@ export const takeoffRunsRouter = router({
         // New points: an answered pull point whose corner moved or went is
         // dropped, so that corner is proposed afresh. Answers whose corner is
         // still there are kept (owner, 2026-09-26, decision 5).
-        await db.dropOrphanedPullPoints(
-          input.id,
-          ctx.scope.dataUserId,
-          input.points
-        );
+        await db.dropOrphanedPullPoints(input.id, ctx.scope.dataUserId, points);
         return {
           id: input.id,
           measured: inches !== null,
@@ -1035,7 +1044,7 @@ export const takeoffRunsRouter = router({
       const measurability = measurabilityOf(sheetScale(sheet));
       // The whole network is snapshotted, because a leg delete can re-join
       // the pieces either side of a tee (server/takeoffRestore.ts).
-      const { result, snapshot } = await removeRunWithSnapshot(
+      const { result, snapshot } = await withNetworkSnapshot(
         run,
         ctx.scope.dataUserId,
         () =>
@@ -1074,6 +1083,63 @@ export const takeoffRunsRouter = router({
       await refuseIfLocked(snapshot.bidId, userId);
       await restoreNetwork(snapshot, userId);
       return { restored: snapshot.rootId };
+    }),
+
+  /**
+   * Move, add or remove a run's points — the drag-to-edit path (T8, D7a).
+   *
+   * ── NOT `save`, on purpose ───────────────────────────────────────────────
+   * `save` defaults `status` to draft, `isSuggestion` to false and `location`
+   * to null, so saving new points through it would demote a finished run to a
+   * draft and clear its location — every other field of the run silently
+   * reset by an edit that was only about geometry. This writes the points and
+   * the length they measure, and nothing else. `typedLengthInches` is never
+   * touched: a typed length keeps pricing the bid, and the drawing moves.
+   *
+   * Tee ends are pinned (`pinTeeEnds`, shared with `save`). An answered pull
+   * point whose corner moved is dropped so it is proposed again, and the
+   * count is returned so the screen can say so. Refused on a locked bid.
+   *
+   * Returns `undo`: the run's whole network as it was, which puts back the
+   * points AND any pull-point answer the move cleared.
+   */
+  setPoints: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        points: pointsSchema.min(2),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const run = await requireRun(input.id, userId);
+      await refuseIfLocked(run.bidId, userId);
+      const sheet = await requireSheet(run.sheetId, userId);
+      const measurability = measurabilityOf(sheetScale(sheet));
+      const ratio = measurability.ok ? measurability.ratio : null;
+      const points = (await pinTeeEnds(run, input.points, userId)).map(p => ({
+        x: p.x,
+        y: p.y,
+      }));
+      const inches = ratio === null ? null : pathRealInches(points, ratio);
+
+      const { result: clearedAnswers, snapshot } = await withNetworkSnapshot(
+        run,
+        userId,
+        async () => {
+          await db.updateRun(input.id, userId, {
+            points,
+            lengthInches: inches === null ? null : inches.toFixed(4),
+            scaleRatioUsed: ratio === null ? null : String(ratio),
+          });
+          return db.dropOrphanedPullPoints(input.id, userId, points);
+        }
+      );
+      return {
+        points,
+        clearedAnswers,
+        undo: sealPacket(RUN_PACKET, userId, snapshot),
+      };
     }),
 
   /**
