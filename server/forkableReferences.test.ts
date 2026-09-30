@@ -206,8 +206,9 @@ const REGISTRY: Record<string, Entry> = {
   "bid_line_items.assemblyId": {
     kind: "resolver",
     resolver: "getAssemblyFamilies",
-    readBy:
-      "server/routers/bidsRouter.ts, server/routers/takeoffGroupsRouter.ts",
+    // server/planAttention.ts since 2026-09-29: the R3 check moved there
+    // from bidsRouter, so the bid page and the quote panel share it.
+    readBy: "server/planAttention.ts, server/routers/takeoffGroupsRouter.ts",
     note: "Pricing is snapshotted, so money was always safe. What was not: R3's double-count check matched this id literally, so a hand-added line on a fork and a plan line on the baseline were two different things to it. Matched by family since 2026-09-27; server/takeoffBridgeFlow.test.ts 'SEES THE SAME ASSEMBLY TWICE' is the red.",
   },
   "kit_assemblies.assemblyId": {
