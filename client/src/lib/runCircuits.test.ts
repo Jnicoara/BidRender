@@ -13,9 +13,27 @@ import {
   newCircuitFor,
   nextCircuitName,
   suggestAfter,
+  typeCarriesWire,
 } from "./runCircuits";
 
 const named = (...names: string[]) => names.map(name => ({ name }));
+
+/*
+  The one-tap "Use the run type's wire" on a run with no wire (2026-09-29).
+  It must only be offered when the TYPE describes wire: offering it on a type
+  that has not said would put NEW_CIRCUIT's fallback on the bid under the
+  type's name — wire no type described.
+*/
+describe("typeCarriesWire", () => {
+  it("is true only for a positive conductor count", () => {
+    expect(typeCarriesWire({ conductorCount: 2, groundCount: 1 })).toBe(true);
+    expect(typeCarriesWire({ conductorCount: 0, groundCount: 1 })).toBe(false);
+    expect(typeCarriesWire({ conductorCount: null, groundCount: 1 })).toBe(
+      false
+    );
+    expect(typeCarriesWire(null)).toBe(false);
+  });
+});
 
 describe("newCircuitFor", () => {
   it("takes the counts the run's type says it pulls", () => {

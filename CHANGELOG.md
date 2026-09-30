@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **A conduit run with no wire in it now says so, in amber.** A traced pipe
+  starts with no wire until wire is added, so it could reach the bid empty with
+  only a grey "none" to show for it. The run now reads "No wire on the bid for
+  this pipe" with a one-tap "Use the run type's wire", and the bid page warns
+  "N conduit runs have no wire". Nothing is added without you pressing it.
 - **A locked bid now refuses the last ways its numbers could still move.**
   Sending counts or runs to it, changing or clearing a sheet's scale (and
   applying one read automatically from the sheet), removing a plan set, and

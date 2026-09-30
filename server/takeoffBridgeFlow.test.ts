@@ -481,6 +481,7 @@ withDb("what the screens are told", () => {
       waitingToSend: 0,
       countedWithNoPrice: 0,
       doubleCounted: [],
+      runsWithNoWire: 0,
     });
   });
 });

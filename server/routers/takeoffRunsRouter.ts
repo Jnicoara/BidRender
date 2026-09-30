@@ -56,6 +56,7 @@ import {
 import { runWireOwnership } from "../../shared/branchWire";
 import { runOnBid, type RunTotalsLeftOut } from "../../shared/runOnBid";
 import { lockedEditRefusal } from "../../shared/quantityLock";
+import { runCarriesNoWire } from "../../shared/runNoWire";
 import {
   runDisplayName,
   runName,
@@ -418,6 +419,12 @@ export const takeoffRunsRouter = router({
           isSuggestion: run.isSuggestion,
           location: run.location,
           circuits: runCircuits,
+          /**
+           * The bid would price this run's wire and there is none — amber on
+           * the row. Read from `wire`, the circuits the arithmetic uses, by the
+           * same function the bid's warning counts with (shared/runNoWire.ts).
+           */
+          noWire: runCarriesNoWire(run, wire),
           /**
            * What the estimator typed, in inches, or null for "measured from
            * the drawing" (§ 4c). Raw, for the field that edits it; the

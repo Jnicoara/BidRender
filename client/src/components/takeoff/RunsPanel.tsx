@@ -137,6 +137,7 @@ import {
   groundSentence,
   newCircuitFor,
   nextCircuitName,
+  typeCarriesWire,
   suggestAfter,
 } from "@/lib/runCircuits";
 import { runAppearance, type RunTypeColors } from "@shared/takeoffMarks";
@@ -392,6 +393,11 @@ export type PanelRun = {
     conductorCount: number | null;
     groundCount: number | null;
   } | null;
+  /**
+   * The bid would price this run's wire and there is none — from the
+   * server, through shared/runNoWire.ts, so the row and the bid agree.
+   */
+  noWire?: boolean;
   pathType: "conduit" | "cable";
   status: "draft" | "committed";
   isSuggestion: boolean;
@@ -2301,11 +2307,33 @@ export function RunsPanel({
                           />
                         ) : (
                           <div className="flex items-baseline justify-between text-xs gap-2">
-                            <span className="text-muted-foreground shrink-0">
-                              Wires in this pipe
+                            {/* Amber for the same reason as the route row
+                                below; no one-tap here, because the type is
+                                what says "no wire" and has none to offer. */}
+                            <span
+                              className={cn(
+                                "shrink-0",
+                                run.noWire
+                                  ? "text-amber-400 flex items-center gap-1"
+                                  : "text-muted-foreground"
+                              )}
+                            >
+                              {run.noWire && (
+                                <TriangleAlert className="w-3 h-3" />
+                              )}
+                              {run.noWire
+                                ? "No wire on the bid for this pipe"
+                                : "Wires in this pipe"}
                             </span>
-                            <span className="font-mono text-muted-foreground/70">
-                              none — the type says no wire
+                            <span
+                              className={cn(
+                                "font-mono",
+                                run.noWire
+                                  ? "text-amber-400/80"
+                                  : "text-muted-foreground/70"
+                              )}
+                            >
+                              the type says no wire
                             </span>
                           </div>
                         ))}
@@ -2313,13 +2341,58 @@ export function RunsPanel({
                         run.traceMode !== "quantity" &&
                         (run.circuits.length === 0 ? (
                           <div className="flex items-baseline justify-between text-xs gap-2">
-                            <span className="text-muted-foreground shrink-0">
-                              Wires in this pipe
+                            {/*
+                              AMBER when the bid would price this run's wire
+                              and there is none (shared/runNoWire.ts). It used
+                              to be a grey "none", which read as a quiet fact
+                              rather than as pipe going on the bid empty. Grey
+                              stays for a run whose wire is left out on
+                              purpose (branch wiring, no type).
+                            */}
+                            <span
+                              className={cn(
+                                "shrink-0",
+                                run.noWire
+                                  ? "text-amber-400 flex items-center gap-1"
+                                  : "text-muted-foreground"
+                              )}
+                            >
+                              {run.noWire ? (
+                                <>
+                                  <TriangleAlert className="w-3 h-3" />
+                                  No wire on the bid for this pipe
+                                </>
+                              ) : (
+                                "Wires in this pipe"
+                              )}
                             </span>
                             <span className="flex items-baseline gap-2">
-                              <span className="font-mono text-muted-foreground/70">
-                                none
-                              </span>
+                              {!run.noWire && (
+                                <span className="font-mono text-muted-foreground/70">
+                                  none
+                                </span>
+                              )}
+                              {/*
+                                The one-tap fix (owner, 2026-09-29): the type's
+                                own wire as one circuit. Offered, never done by
+                                itself — no silent default — and only when the
+                                type says what wire it carries.
+                              */}
+                              {run.noWire &&
+                                typeCarriesWire(run.typeDefaults ?? null) && (
+                                  <button
+                                    className="underline text-amber-300 hover:text-amber-200"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      addOneCircuit(
+                                        run,
+                                        nextCircuitName(run.circuits)
+                                      );
+                                    }}
+                                  >
+                                    Use the run type's wire
+                                  </button>
+                                )}
                               <button
                                 className="underline text-muted-foreground hover:text-foreground"
                                 onClick={e => {

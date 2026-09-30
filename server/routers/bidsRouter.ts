@@ -68,6 +68,7 @@ import {
   typedQuantityRefusal,
   unlockChanges,
 } from "../../shared/quantityLock";
+import { countRunsWithNoWire } from "../../shared/runNoWire";
 import {
   canPriceByHand,
   saveAsAssemblyRefusal,
@@ -125,6 +126,11 @@ async function planAttentionFor(
   waitingToSend: number;
   countedWithNoPrice: number;
   doubleCounted: string[];
+  /**
+   * Conduit RUNS whose wire the bid would price and that carry none
+   * (shared/runNoWire.ts). Counted in runs, a branched run once.
+   */
+  runsWithNoWire: number;
 }> {
   const bridgeLines: BridgeLine[] = lines.map(line => ({
     id: line.id,
@@ -155,10 +161,20 @@ async function planAttentionFor(
     count: counts.get(group.id) ?? 0,
   }));
 
+  /*
+    Runs, loaded once for the whole bid. The wire is read through the same
+    `getWireCircuitsForRuns` the bid's arithmetic uses, so "no wire" here is
+    exactly "no wire in the total" — a quantity trace pulling its type's
+    circuit is not flagged.
+  */
+  const runs = await db.getRunsForBid(bidId, userId);
+  const wire = await db.getWireCircuitsForRuns(runs, userId);
+
   return {
     waitingToSend: countsWaitingToSend(bridgeGroups, bridgeLines),
     countedWithNoPrice: countsWithNoPrice(bridgeGroups, bridgeLines),
     doubleCounted,
+    runsWithNoWire: countRunsWithNoWire(runs, wire),
   };
 }
 

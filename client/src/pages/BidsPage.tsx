@@ -1520,6 +1520,27 @@ export default function BidsPage({
                 </div>
               )}
 
+              {/*
+                Pipe on the bid with no wire in it (owner, 2026-09-29). The
+                rule is shared/runNoWire.ts, the same one the run's own row
+                on the Plans screen reads, where the one-tap fix is.
+              */}
+              {fromPlans.runsWithNoWire > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {fromPlans.runsWithNoWire} conduit run
+                      {fromPlans.runsWithNoWire === 1 ? " has" : "s have"} no
+                      wire
+                    </span>{" "}
+                    — the pipe is in the total above and nothing is pulled
+                    through it. Add the wire on the <PlansLink bidId={bidId} />;
+                    each run offers its type&apos;s wire in one tap.
+                  </p>
+                </div>
+              )}
+
               {fromPlans.doubleCounted.length > 0 && (
                 <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
                   <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />

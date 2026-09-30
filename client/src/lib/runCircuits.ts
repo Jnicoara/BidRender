@@ -17,6 +17,17 @@ export type CircuitDefaults = {
   groundCount: number | null;
 } | null;
 
+/**
+ * Does the run type say what wire it carries? True only for a positive
+ * conductor count: NULL is a type that has not said, and zero is one that
+ * says no wire — neither has anything to offer as "the run type's wire", and
+ * offering `NEW_CIRCUIT`'s fallback under that name would put wire on the bid
+ * that no type described.
+ */
+export function typeCarriesWire(defaults: CircuitDefaults): boolean {
+  return (defaults?.conductorCount ?? 0) > 0;
+}
+
 /** Just enough of a circuit to name the next one without clashing. */
 export type NamedCircuit = { name: string };
 
