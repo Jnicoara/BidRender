@@ -259,6 +259,19 @@ used for a while.
 
 **Recommend:** build the six parents.
 
+> **BUILT 2026-09-29 — 6 rows, on the Panels shelf,** named
+> `225A panelboard, 3-phase main, 42-space` and so on. Two names were tried
+> first and measured: "…main-breaker…" put them on the Breakers shelf (a
+> catalog test requires every name with "breaker" to be there), and
+> "225A 3-phase main panelboard, …" won every search TIE against the
+> everyday panels, because ties fall to display order and "3-phase" sorts
+> before "main panel". So "panel", "42 space" and "225a" led with
+> three-phase rows. With "panelboard" first those queries read exactly as
+> before, and "3 phase panel", "208 panel" and "panelboard" lead with the
+> sized rows instead of the unsized placeholder. The placeholder is kept and
+> now says "Unsized placeholder: one price for every size. Prefer a sized
+> 3-phase panelboard." (RQ4). No brand variants until `parentId`.
+
 ---
 
 ## R6. No #12 or #14 THHN stranded

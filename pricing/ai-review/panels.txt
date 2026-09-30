@@ -1,5 +1,5 @@
 Category: Panels
-Items: 78
+Items: 84
 
 Category | Name | Size
 Panels | 30A cartridge fuse | 30A
@@ -80,3 +80,9 @@ Panels | Panel cover, surface | -
 Panels | Panel neutral bar | -
 Panels | Panel trim ring | -
 Panels | Panelboard interior only | -
+Panels | 225A panelboard, 3-phase main, 42-space | 225A
+Panels | 400A panelboard, 3-phase main, 42-space | 400A
+Panels | 100A panelboard, 3-phase main-lug, 24-space | 100A
+Panels | 125A panelboard, 3-phase main-lug, 30-space | 125A
+Panels | 225A panelboard, 3-phase main-lug, 42-space | 225A
+Panels | 400A panelboard, 3-phase main-lug, 42-space | 400A

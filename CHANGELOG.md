@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Three-phase panels now come in sizes.** Six 208Y/120V panelboards,
+  100A to 400A, main-lug and main-breaker. Before, one unsized
+  "208V 3-phase panelboard" row stood for every size, so a 100A and a 400A
+  panel got the same price. That row stays for old bids and now says to
+  prefer a sized one.
+
 - **Occupancy sensor power packs and 18/3 control wire are in the
   catalog.** A low-voltage ceiling sensor needs a power pack per zone and
   18/3 cable to it; the catalog had the sensor only, so the pack was easy to
