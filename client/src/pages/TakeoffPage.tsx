@@ -5555,7 +5555,10 @@ export default function TakeoffPage({
       */}
       {!focusMode && (
         <div className="border-b border-border px-6 py-2 shrink-0">
-          <div className="flex items-center gap-3">
+          {/* Wraps (2026-09-29): on one line at phone width "Add PDF" sat
+              76px past the edge, measured. The title keeps the first line
+              (basis-56) and the buttons drop below it whole. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <Button
               size="sm"
               variant="ghost"
@@ -5564,7 +5567,7 @@ export default function TakeoffPage({
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Bid
             </Button>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 basis-56">
               <h1 className="text-lg font-semibold truncate">
                 Plans{bid?.bid?.name ? ` — ${bid.bid.name}` : ""}
               </h1>
@@ -5612,7 +5615,7 @@ export default function TakeoffPage({
             {docs.length > 0 && (
               <Button
                 size="sm"
-                className="h-8 gap-1.5 text-xs"
+                className="h-8 gap-1.5 text-xs shrink-0"
                 onClick={() => fileInput.current?.click()}
                 disabled={uploading}
               >

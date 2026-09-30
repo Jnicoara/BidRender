@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **The sheet list's header no longer cuts off its buttons.** When the sheet
+  panel was narrow (or the app's text size was larger), the list/picture
+  buttons were half hidden past the panel's edge. The header now moves them
+  to a second line instead. On a phone-width window, "Add PDF" at the top of
+  the Plans screen was also off the edge; that row now wraps too.
 - **Undo on the Plans screen now survives leaving it.** Going to the bid and
   back used to wipe the undo history. It now lasts as long as the browser tab
   (including a reload); a new tab starts with its own empty history, and the

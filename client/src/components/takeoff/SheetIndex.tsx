@@ -451,67 +451,84 @@ export function SheetIndex({
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="px-3 py-2 border-b border-border shrink-0">
-        <div className="flex items-center gap-1.5 text-[0.7rem] uppercase tracking-wide text-muted-foreground">
-          <FileText className="w-3 h-3" /> Sheets
-          <span className="ml-auto normal-case tracking-normal">
-            {sheets.length === 0 ? "" : `${scaled}/${sheets.length} scaled`}
+        {/*
+          WRAPS rather than clipping (owner, 2026-09-29). The panel can be
+          dragged to 180px and the UI scale enlarges everything in it, while
+          this row needs ~230px with the read-again icon — so on one line the
+          view buttons were cut in half by the panel's edge, measured 7-29px
+          hidden at 180px. Now the buttons are one unit that never shrinks and
+          drops to its own line, right-aligned, when there is not room.
+        */}
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.7rem] uppercase tracking-wide text-muted-foreground">
+          <span className="flex items-center gap-1.5 shrink-0">
+            <FileText className="w-3 h-3" /> Sheets
           </span>
-          {/*
+          {/* The count and the buttons are ONE right-hand unit, so they stay
+              side by side and wrap together; inside it the buttons wrap
+              under the count only if even that does not fit. */}
+          <span className="ml-auto flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1">
+            <span className="normal-case tracking-normal whitespace-nowrap">
+              {sheets.length === 0 ? "" : `${scaled}/${sheets.length} scaled`}
+            </span>
+            <span className="flex items-center shrink-0">
+              {/*
             Reading again is rare — after a set is re-issued, or to pick up a
             better reader — so once a plan is read it is one quiet icon, not a
             line of text. Hand-typed numbers survive it.
           */}
-          {fullyRead && !reading && (
-            <button
-              type="button"
-              onClick={onReadNumbers}
-              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
-              aria-label="Read sheet numbers again"
-              title={`Read sheet numbers and titles again${
-                readStatus.byteSize
-                  ? ` (reads the whole ${formatMb(readStatus.byteSize)} file)`
-                  : ""
-              }. Numbers you typed are kept.`}
-            >
-              <RotateCw className="w-3 h-3" />
-            </button>
-          )}
-          <div
-            className="flex items-center rounded border border-border ml-1"
-            role="group"
-            aria-label="Show sheets as"
-          >
-            <button
-              type="button"
-              onClick={() => chooseMode("names")}
-              aria-pressed={!pictures}
-              aria-label="Show sheets as names"
-              title="Names"
-              className={cn(
-                "p-1 rounded-l transition-colors",
-                !pictures
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+              {fullyRead && !reading && (
+                <button
+                  type="button"
+                  onClick={onReadNumbers}
+                  className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
+                  aria-label="Read sheet numbers again"
+                  title={`Read sheet numbers and titles again${
+                    readStatus.byteSize
+                      ? ` (reads the whole ${formatMb(readStatus.byteSize)} file)`
+                      : ""
+                  }. Numbers you typed are kept.`}
+                >
+                  <RotateCw className="w-3 h-3" />
+                </button>
               )}
-            >
-              <List className="w-3 h-3" />
-            </button>
-            <button
-              type="button"
-              onClick={() => chooseMode("pictures")}
-              aria-pressed={pictures}
-              aria-label="Show sheets as pictures"
-              title="Pictures"
-              className={cn(
-                "p-1 rounded-r transition-colors",
-                pictures
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <ImageIcon className="w-3 h-3" />
-            </button>
-          </div>
+              <div
+                className="flex items-center rounded border border-border ml-1"
+                role="group"
+                aria-label="Show sheets as"
+              >
+                <button
+                  type="button"
+                  onClick={() => chooseMode("names")}
+                  aria-pressed={!pictures}
+                  aria-label="Show sheets as names"
+                  title="Names"
+                  className={cn(
+                    "p-1 rounded-l transition-colors",
+                    !pictures
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <List className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chooseMode("pictures")}
+                  aria-pressed={pictures}
+                  aria-label="Show sheets as pictures"
+                  title="Pictures"
+                  className={cn(
+                    "p-1 rounded-r transition-colors",
+                    pictures
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <ImageIcon className="w-3 h-3" />
+                </button>
+              </div>
+            </span>
+          </span>
         </div>
       </div>
 
