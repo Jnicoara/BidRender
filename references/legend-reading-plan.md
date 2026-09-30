@@ -80,6 +80,15 @@ made first and unseen (§ 15.2's method):
   the results.
 - **Per method it reports:** how many real devices it found, how many it
   invented, and a breakdown by symbol type (§ 15.2).
+- **And WHERE it put them: position error per mark, in inches of paper.**
+  Added 2026-09-29 after staging's E-100: the reader named symbols it was
+  sure of, then placed them up to about 2.4 in off, mostly downward and
+  growing toward the bottom of the sheet (branch a-reader-fixes,
+  `client/src/lib/readerPicks.ts`). A method that finds every fixture but
+  puts it by the wrong door is not usable, and "found" alone cannot see
+  that. Worth adding as a fifth method if cheap: ask for positions in the
+  image's own PIXELS rather than 0–1 fractions, since the error looked like
+  a stretch, not a shift. Unmeasured; it is a candidate, not a fix.
 - **Cost, indicative, from § 11.5:** about 5c a sheet for methods 1 and 2 and
   about 10c for 3 and 4. 5 sheets across four methods, run twice, is **about
   $3**. **The real cost is the hand counts: about two hours of the owner's
