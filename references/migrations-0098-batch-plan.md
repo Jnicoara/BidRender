@@ -1,4 +1,4 @@
-# Migrations 0098–0103 — one additive batch for Tracks B and C. PLAN ONLY, 2026-09-29
+# Migrations 0098–0104 — one additive batch for Tracks B and C. PLAN ONLY, 2026-09-29
 
 **Status: nothing here is written or run.** No `.sql` file exists yet, and
 no database has been touched. Measured against `local-dev` at `90a286c`, which
@@ -6,7 +6,7 @@ ends at **0095**, and `a-email-reset` at `af82b2f`, which holds **0096**
 (`teeBody`) and **0097** (password reset).
 
 **Every file in this batch is ADDITIVE**: new nullable columns, one foreign key
-on an all-NULL column, and values appended to the END of two enums. There is
+on an all-NULL column, and values appended to the END of three enums. There is
 no `UPDATE`. So every file is **step 1 of the three-step deploy (migrate BEFORE
 the code), and step 3 is empty** (CLAUDE.md § "Deploying a migration: THREE
 STEPS"). That has been checked per FILE below, as the rule requires, not
@@ -25,6 +25,8 @@ asserted for the batch.
 4. **Q4: HOLD the quote-bucket columns (H1)** until B's screens for them are
    planned. Not in this batch (§ 6).
 5. **Q5: the column is `dropExcluded`** (§ 4).
+6. **Added later the same day: two ASSEMBLY categories, "Demo & Retrofit" and
+   "General"**, for Track C's starter assemblies. They are `0104` (§ 4a).
 
 **When:** the owner has said Track B, Track C and `a-fitting-labor` all merge
 only AFTER the live release from `90a286c`. This batch rides with or after
@@ -51,7 +53,7 @@ them, so nothing here is written before that release is out.
   only if 0096 is withdrawn.
 - **The invite gate and the AI correction log plans** said "0098" and "0099"
   with "whatever is next when written". If this batch lands first, they become
-  0104 and later. Their text already covers that case.
+  0105 and later. Their text already covers that case.
 
 | File (proposed)                     | For                        | What it adds                                                                                |
 | ----------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------- |
@@ -61,6 +63,7 @@ them, so nothing here is written before that release is out.
 | `0101_materials_parent_id_fk`       | C, before the priced sheet | the self-referencing FK, `ON DELETE RESTRICT`                                               |
 | `0102_materials_brand`              | C, before the priced sheet | `materials.brand varchar(64) NULL`                                                          |
 | `0103_takeoff_stamps_drop_excluded` | B (H3)                     | `takeoff_stamps.dropExcluded boolean NULL`                                                  |
+| `0104_assembly_categories`          | C (starter assemblies)     | `'Demo & Retrofit'`, `'General'` appended to `assemblies.category`                          |
 | — (none)                            | B, drops per run end       | **No migration.** See § 6.                                                                  |
 
 **One statement per file**, as `deploying.md` § 5a prefers: when a file fails
@@ -205,6 +208,39 @@ ALTER TABLE `takeoff_stamps` ADD `dropExcluded` boolean;
   "not yet decided" and "deliberately included" the same value. NULL is "follows
   the count", which B's code reads as today's meaning.
 
+## 4a. `0104_assembly_categories` — Track C (starter assemblies)
+
+```sql
+ALTER TABLE `assemblies`
+	MODIFY COLUMN `category` enum('Devices','Lighting','Panels','Equipment Connections','Low Voltage/EMS','Demo & Retrofit','General') NOT NULL;
+```
+
+- **What it adds:** two assembly shelves. The ask is Track C's
+  `starter-assemblies-plan.md` Q3 (on `origin/track-c`, `2d30463`): the
+  demo/retrofit and miscellaneous starters "cannot seed" without a slot.
+- **Not the materials enum.** C suggested riding along with 0098 "so it is one
+  additive `ALTER`, not two". It cannot: 0098 is `materials.category` and this
+  is `assemblies.category` (`ASSEMBLY_CATEGORIES`, `drizzle/schema.ts:457`), a
+  different table. It is still one step of the same batch, which is what that
+  ask was for.
+- **The list is copied from the only migration that set it**, `0007`, line 8,
+  verbatim, with the two appended. **Keep `NOT NULL`.** A `MODIFY` restates the
+  whole column, and leaving it off would quietly make the column nullable.
+- **Safe before the code?** Yes. Appended at the end, so every stored value
+  keeps its index. Old code never writes either value, and the old code's zod
+  (`z.enum(ASSEMBLY_CATEGORIES)` in `assembliesRouter.ts`, `bidsRouter.ts`)
+  never accepts them until the code ships.
+- **Code that lands with it (C's change, not this file):** the list is copied
+  in **three** places besides schema.ts, and all must gain both values:
+  `client/src/components/HandPricedLineFields.tsx:51`,
+  `client/src/pages/AssembliesLibraryPage.tsx:107`, and the shape map in
+  `shared/takeoffMarks.ts` (`SHAPE_BY_CATEGORY`), whose comment says "the five
+  library categories". A category missing from that map gets a shape from its
+  id, so it works, but the comment and the "one shape per shelf" promise do
+  not.
+- **Watch:** the same expected "disagrees" from `schemaDrift` as § 1, between
+  migrate and push.
+
 ## 5. Per-run-end drops — **no migration**
 
 B's own plan says so: `origin/track-b:references/track-b-plans-screen-edits-plan.md`
@@ -212,7 +248,7 @@ line 10, "No migration is needed for any of the four parts. Nothing goes to
 Track A." Every leg end already stores `startKind`/`endKind` and a per-end
 height override (`startHeightInches`/`endHeightInches`). The held batch
 (0089–0095) is already on `local-dev` and live. **If B finds it needs a column
-after all, it is a new file after 0103, not a change to this batch.**
+after all, it is a new file after 0104, not a change to this batch.**
 
 ## 6. Also waiting on Track A, and HELD
 
@@ -246,8 +282,8 @@ on a test database that lacks a column the schema declares.
    DATABASE_URL=<test db> pnpm tsx scripts/schemaDrift.mts   # after
    ```
 
-   Expect **6 applied** (0098–0103, on a database already at 0097) and
-   "Database matches the schema". **If the applied count is not 6, stop and
+   Expect **7 applied** (0098–0104, on a database already at 0097) and
+   "Database matches the schema". **If the applied count is not 7, stop and
    find out why before going on**: either this line is stale (a migration
    landed since it was written) or the database is not where you think it is.
    Then run the full suite. **Run every file TWICE** (a second `migrate.mts`
@@ -276,7 +312,7 @@ on a test database that lacks a column the schema declares.
    DOTENV_CONFIG_PATH=.env.staging.local pnpm tsx scripts/schemaDrift.mts
    ```
 
-   After: expect the category and role enums to **disagree** (database ahead)
+   After: expect the two category enums and the role enum to **disagree** (database ahead)
    until the code is pushed, and nothing else. Then push the code to staging
    and run drift again. Expect "Database matches the schema".
 
@@ -303,7 +339,7 @@ on a test database that lacks a column the schema declares.
   Never retype it.
 - **Account deletion and test cleanup** once `parentId` is set (§ 3).
 - **`schemaDrift` "disagrees" between migrate and push** is expected for the
-  two enums and nothing else (§ 1).
+  three enums and nothing else (§ 1).
 - **Nothing reads the new columns until B's and C's code ships**, so no
   screen, price or bid total moves when this batch runs.
 - **None of this touches `a-email-reset`'s files**, but it depends on them
@@ -337,7 +373,7 @@ the company's preferred brand, a per-bid override of it, and the
 example-price flag (H2). **Nothing here is written until the owner picks.**
 Every option below is ADDITIVE (new nullable columns or a new table, no
 `UPDATE` to an existing column), so whichever is picked is step 1 of the
-three-step deploy. Numbers are given at write time, after 0103.
+three-step deploy. Numbers are given at write time, after 0104.
 
 **Read first:** CLAUDE.md § Brands (brand exists on PANELS and BREAKERS only;
 an assembly points at the parent), `ASSEMBLIES_PLAN.md` § "Parent items and
