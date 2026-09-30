@@ -2058,6 +2058,17 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       **BUILT 2026-09-29 (retail plan § R7):** `<size> flexible conduit
     one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
       `server/raceStrapCatalog.test.ts` checks every raceway's strap ships.
+- [ ] **MC above a lay-in ceiling defaults to the ceiling-wire clip** (owner,
+      2026-09-29). An MC run counted today buys `MC one-hole strap` every
+      6 ft (§ R1), but above a T-bar ceiling MC is hung on the support wire
+      with `Independent support wire clip`, not strapped. Wanted: when the run
+      is above a lay-in ceiling, the strap line defaults to the wire clip, and
+      a QUICK way to set that (one control on the run or run type, not a trip
+      to the run-type editor per run). The type's strap override column can
+      already hold the clip; what is missing is knowing "above lay-in" and the
+      fast toggle. Decide where "above lay-in" lives (run, run type, or sheet
+      area) before building — check `references/takeoff-spec.md` D3 first,
+      which rejected a form on every run.
 - [ ] **Double counting from a user's own box assembly.** No starter assembly
       carries a connector or strap, so nothing overlaps today. A company
       whose own box or device assembly includes an EMT connector will count
