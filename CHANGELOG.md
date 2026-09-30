@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Undo on the Plans screen now survives leaving it.** Going to the bid and
+  back used to wipe the undo history. It now lasts as long as the browser tab
+  (including a reload); a new tab starts with its own empty history, and the
+  button says "Nothing to undo in this tab yet".
 - **Slipped double-clicks no longer add stray elbows, and old ones are
   flagged.** Finishing a run with a double-click could leave a tiny extra
   segment when the mouse moved slightly, especially zoomed out, and that

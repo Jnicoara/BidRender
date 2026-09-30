@@ -20,8 +20,9 @@
  * - A step the server refuses is DROPPED, not kept: its target has changed
  *   (the count was deleted, the run edited), and offering it again would only
  *   refuse again.
- * - The stack is per bid and lives in the page. A reload, another tab or a
- *   colleague's change is not on it, and the screen says so.
+ * - The stack is per bid. Since 2026-09-29 it is kept for the life of the
+ *   browser TAB (@/lib/undoPersist) — leaving the Plans screen or reloading
+ *   keeps it; another tab or a colleague's change is not on it.
  */
 
 export const UNDO_LIMIT = 50;
@@ -184,7 +185,9 @@ export function dropStep(state: UndoState, entry: UndoEntry): UndoState {
 /** "Undo: 3 marks placed", or why there is nothing. */
 export function undoTitle(state: UndoState): string {
   const e = nextUndo(state);
-  return e ? `Undo: ${e.label} (Ctrl+Z)` : "Nothing to undo on this bid yet";
+  // "in this tab": the history is the tab's (@/lib/undoPersist), so a new tab
+  // starts empty on a bid with plenty done to it.
+  return e ? `Undo: ${e.label} (Ctrl+Z)` : "Nothing to undo in this tab yet";
 }
 
 export function redoTitle(state: UndoState): string {

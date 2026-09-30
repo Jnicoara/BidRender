@@ -225,7 +225,6 @@ import {
   type TakeoffQuery,
 } from "@/lib/takeoffRefresh";
 import {
-  EMPTY_UNDO,
   countLabel,
   dropStep,
   nextRedo,
@@ -244,6 +243,7 @@ import {
 } from "@/lib/undoStack";
 import { emptiedCountCard } from "@/lib/emptiedCountCard";
 import { nextMarkBatch, splitRecoveredMarks } from "@/lib/markBatches";
+import { loadUndo, saveUndo, tabStorage } from "@/lib/undoPersist";
 import type { PageTextLayer } from "@/lib/textSelection";
 import { TextSelectLayer } from "@/components/takeoff/TextSelect";
 import { useUploadSpeeds } from "@/lib/useUploadSpeeds";
@@ -2454,18 +2454,23 @@ export default function TakeoffPage({
     ── UNDO AND REDO (takeoff-spec.md D6; Track B plan, Part 3) ───────────────
     The stack is @/lib/undoStack, pure and tested; this carries it out.
 
-    Per bid (the page is keyed by bid), in the page: a reload, another tab and
-    a colleague's change are not on it. Every step names what it undoes in the
-    button's tooltip, and a step the server refuses (its target changed since)
-    is dropped with the server's sentence rather than retried.
+    Per bid (the page is keyed by bid), and kept for the life of the browser
+    TAB since 2026-09-29 (@/lib/undoPersist): leaving for the bid and coming
+    back, or reloading, keeps it. Another tab and a colleague's change are not
+    on it. Every step names what it undoes in the button's tooltip, and a step
+    the server refuses (its target changed since) is dropped with the
+    server's sentence rather than retried.
 
     The undo calls are their own mutations, not the ones the tools use: those
     push a NEW step on success, and an undo that pushed a step would clear the
     redo it had just made.
   */
-  const [undoState, setUndoState] = useState<UndoState>(EMPTY_UNDO);
+  const [undoState, setUndoState] = useState<UndoState>(() =>
+    loadUndo(tabStorage(), bidId)
+  );
   const undoRef = useRef(undoState);
   undoRef.current = undoState;
+  useEffect(() => saveUndo(tabStorage(), bidId, undoState), [bidId, undoState]);
   const [undoBusy, setUndoBusy] = useState(false);
   const pushUndo = useCallback(
     (entry: UndoEntry) => setUndoState(s => pushStep(s, entry)),
