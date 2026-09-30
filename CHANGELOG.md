@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **12-4 and 14-4 MC cable, and 12-2 isolated-ground MC, are in the
+  catalog.** Three-phase branch circuits are commonly run in 12-4 MC, and
+  without it an estimator picked 12-3 and priced one wire in four too few.
+  The isolated-ground cable is what feeds cash-register receptacles.
+
 - **An MC cable run now buys its connectors and straps.** Each traced MC
   run adds a connector at each end and a strap near each box and every 6 ft,
   sized to the cable (3/8" connector and small strap for 12-2, and so on).

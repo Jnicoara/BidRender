@@ -1,5 +1,5 @@
 Category: Wire & Cable
-Items: 101
+Items: 104
 
 Category | Name | Size
 Wire & Cable | #14 bare CU, solid | #14
@@ -19,8 +19,10 @@ Wire & Cable | #18 fixture wire | #18
 Wire & Cable | #16 fixture wire | #16
 Wire & Cable | 14-2 MC cable | -
 Wire & Cable | 14-3 MC cable | -
+Wire & Cable | 14-4 MC cable | -
 Wire & Cable | 12-2 MC cable | -
 Wire & Cable | 12-3 MC cable | -
+Wire & Cable | 12-4 MC cable | -
 Wire & Cable | 10-2 MC cable | -
 Wire & Cable | 10-3 MC cable | -
 Wire & Cable | 10-4 MC cable | -
@@ -36,6 +38,7 @@ Wire & Cable | 3-3 MC cable | -
 Wire & Cable | 3-4 MC cable | -
 Wire & Cable | 2-2 MC cable | -
 Wire & Cable | 2-3 MC cable | -
+Wire & Cable | 12-2 MC cable, isolated ground | -
 Wire & Cable | 14-2 NM-B | -
 Wire & Cable | 14-3 NM-B | -
 Wire & Cable | 12-2 NM-B | -

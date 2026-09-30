@@ -134,6 +134,15 @@ two plain rows and hold the IG row.
 **Recommend:** build with R1. Fix the comment in the same change, so it
 stops claiming the list is complete.
 
+> **BUILT 2026-09-29 — 3 rows as planned:** `14-4 MC cable`, `12-4 MC cable`,
+> `12-2 MC cable, isolated ground`. The `MC_SIZES` comment now says it was
+> incomplete. **RQ5 turned out moot:** a cable's conductors and grounds feed
+> no arithmetic (it is priced by the foot, and its ground is in the jacket,
+> `quantitiesForRun`), so the IG row needed nothing more. All three take the
+> 3/8" MC connector and small strap. Search: "12/4", "12-4 mc", "14/4",
+> "ig mc" found nothing before; the IG cable is 3rd for "12-2", after NM-B
+> and plain MC.
+
 ---
 
 ## R3. Surface raceway: none at all — NEEDS TRACK A
