@@ -530,3 +530,41 @@ a. `setEnds` lock gap (fix + red test). b. Toolbar Delete. c. Count card
 trash (server `removeForGroupOnSheet`) + card undo arrows. d. Run ends
 section, quick picks, Set ends button, end undo. e. Wrong-number tests,
 full suite, on-screen check.
+
+---
+
+## Part 4 § 2 — MEASURED 2026-09-29 (before changing anything in upload)
+
+`Decant Facility.pdf`, 52.6 MB, one PUT (under the 64 MB pieces threshold).
+**Local disk storage, `pnpm dev`, localhost** — NOT `pnpm dev:r2`: that would
+write a 52 MB test file into the live plans bucket under keys built from local
+bid ids that can collide with production's, and that was not done without the
+owner's say-so. Driven Chrome tab was `hidden` (timers throttled; worker
+renders and network are not). Logged by `client/src/lib/uploadTiming.ts`.
+
+| Phase                          | Time                | From pick |
+| ------------------------------ | ------------------- | --------- |
+| Upload ticket                  | 29 ms               | 29 ms     |
+| Transfer, one PUT (localhost)  | 128 ms              | 156 ms    |
+| Attach                         | 27 ms               | 183 ms    |
+| Viewer opened the file         | 338 ms              | 521 ms    |
+| Sheet 1 drawn (render 1177 ms) | 1224 ms             | 1745 ms   |
+| Sheet names read (parallel)    | 752 ms after attach | —         |
+
+**What this says, and what it cannot.** Everything the APP does between the
+pick and sheet 1 on screen is about 1.6 s, and 1.2 s of that is pdf.js drawing
+a 3672x2376 raster. So on the live site the wait is the NETWORK: 52.6 MB up to
+R2 (about 21 s at 20 Mbit/s upload), then the viewer pulling byte ranges back
+down. The transfer rate above is localhost and means nothing for that.
+
+**Re-ranked recommendations (nothing changed yet — owner to choose):**
+
+1. **Open the viewer from the file on this machine** instead of re-reading it
+   from R2 (recommendation 1 above). Removes the download half entirely and
+   could show sheet 1 while the upload is still going. Biggest win.
+2. **Pieces for 50 MB** (4 in parallel) only if a real upload shows the one
+   PUT is slow on the owner's connection. Needs one timed upload on
+   `pnpm dev:r2` or the live site — the one thing still unmeasured.
+3. Thumbnails already wait for sheet 1 (piece g, part 1). Throttling the
+   progress re-renders is not worth doing on this evidence: the transfer is
+   network-bound, not render-bound.
