@@ -196,6 +196,52 @@ from one that misses 8% evenly, and only the first has a fix (§ 15.2).
   first pass that speeds up a hand count, and should be described that way in
   the product (§ 15.5).
 
+### Where the marks land — added 2026-09-29
+
+**Why it was added.** Track A measured the AI's marks landing up to ~2.4 in
+of paper away from the symbol, and worse toward the bottom of the sheet. That
+is a STRETCH, not a shift. The table above cannot see it: a suggestion 2 in
+off is simply "missed" there, because counting only accepts a third of an
+inch.
+
+**What is measured** (`scripts/readerAccuracyPositions.ts`). Each of your
+marks is paired with the nearest AI suggestion of the SAME symbol within 3 in,
+each suggestion used once. For those pairs, in inches of paper:
+
+| Number                          | Meaning                                                                                                                           |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Paired**                      | Marks with a same-symbol suggestion within 3 in. The rest have nothing to measure.                                                |
+| **Median / 90% / worst**        | How far off, in inches.                                                                                                           |
+| **Stretch down / across**       | A straight-line fit per sheet. x1.000 is none. x1.05 puts a mark 20 in down the sheet 1 in low. Shown as the range across sheets. |
+| **Offset** (per sheet, console) | The shift left over once the stretch is taken out. A pure shift is x1.000 with an offset.                                         |
+| **By third** (per sheet)        | Median distance for your marks in the top, middle and bottom third. "Worse toward the bottom" shows up here.                      |
+
+**One limit.** Where the same symbol repeats more closely than the error, a
+mark can pair with its neighbour's suggestion, and then the distance reads
+smaller than it really is. The stretch fit is the better witness, because
+mixing up neighbours does not bend a straight line. Every pair is saved in
+`results.json` (`placementPairs`), so a sheet can be plotted when a number
+looks odd.
+
+**Fractions against pixels** (`--positions fraction,pixels`,
+`scripts/readerAccuracyPixels.ts`). Today's request asks for a position as a
+fraction (0–1) of the picture. The pixel variant asks for pixels of that
+picture, with its size stated. That means three sentences of today's request,
+swapped in the script, with nothing else changed. It stops with an error
+if `server/planReading.ts` rewords them, and its test goes red first.
+Replies are divided back by the picture's size, so both variants are scored
+the same way.
+
+- **Pixels clearly tighter**: the model places better than it converts to a
+  fraction. Changing Read sheet is then a two-sentence edit plus a divide.
+  That edit belongs to Track A, in `planReading.ts`.
+- **Both stretch the same way**: it is not the question's wording. Look at
+  the picture instead: its size, whether it was resized, and whether the
+  zoomed-in methods (c) and (d) stretch less.
+- **Zoomed pieces stretch less than the whole sheet**: consistent with an
+  error that grows with distance across the picture. Tiling also fixes
+  placement.
+
 ---
 
 ## 3. What is needed to run it
@@ -265,7 +311,14 @@ labels**; the script prints a warning naming any that do not
 pnpm tsx scripts/readerAccuracy.mts --bid <id> --runs 2
 # one sheet, one method, to try it:
 pnpm tsx scripts/readerAccuracy.mts --bid <id> --pages 4 --methods a
+# fractions against pixels, fitted inside one day's allowance (see Cost):
+pnpm tsx scripts/readerAccuracy.mts --bid <id> --methods a,c --positions fraction,pixels --runs 2
 ```
+
+`--positions fraction,pixels` runs every chosen method BOTH ways, which
+**doubles the calls and the cost**. All four methods, both ways, twice is
+about 272 calls. That is more than the 150-a-day reader allowance, so do it
+over two days, or use the `a,c` line above: about 136 calls and about $3.50.
 
 With no `--pages`, it reads every sheet of the bid that has hand marks on it.
 Results, and every picture that was sent, land in

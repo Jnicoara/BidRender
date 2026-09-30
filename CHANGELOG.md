@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **The AI reading test now measures WHERE the AI puts its marks, not just
+  whether it found them.** It reports how many inches off each mark lands,
+  whether the error is a stretch or a shift, and whether it is worse toward
+  the bottom of the sheet. It can also ask the AI for positions in pixels
+  instead of fractions of the picture, to see which is more accurate. This
+  follows the marks found landing up to 2.4 inches off.
+
 - **The pricing spreadsheet puts every Home Depot row first.** All 1,867
   store rows sit in one unbroken block ahead of the 330 supply-house rows,
   so the store pricing can be done in one sitting. It already held every

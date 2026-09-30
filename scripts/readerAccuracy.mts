@@ -41,6 +41,25 @@
  *   --pdf      with a bid holding several plan sets, the file name to use.
  *   --methods  default a,b,c,d.
  *   --runs     default 1. The plan asks for 2.
+ *   --positions  fraction (default: today's request, 0-1 of the picture),
+ *              pixels (asks for pixel positions in the picture instead), or
+ *              fraction,pixels to run every method both ways and compare.
+ *              Two ways doubles the cost.
+ *
+ * ── Where the marks land ─────────────────────────────────────────────────────
+ * Besides found/missed, every reading is scored on PLACEMENT, in inches of
+ * paper: each hand mark paired with the nearest same-symbol suggestion within
+ * 3 in, then median, 90% and worst distance, a straight-line fit per axis
+ * (stretch against shift), and the error by third of the sheet. Added
+ * 2026-09-29 after Track A measured AI marks up to ~2.4 in off, worse toward
+ * the bottom. The rules are in scripts/readerAccuracyPositions.ts.
+ *
+ * The pixel variant (scripts/readerAccuracyPixels.ts) rewrites today's request
+ * — the position sentence of the prompt and the x/y descriptions of the tool —
+ * and changes nothing else. It throws if the words it replaces are no longer
+ * in server/planReading.ts, and its test goes red first. Replies are divided
+ * by the picture's own size, so both variants go through buildFindings on the
+ * same 0-1 footing.
  */
 import "dotenv/config";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -103,6 +122,15 @@ const methods = (arg("methods") ?? "a,b,c,d")
   .map(m => m.trim())
   .filter((m): m is Method => ["a", "b", "c", "d"].includes(m));
 const runs = Math.max(1, Number(arg("runs") ?? 1));
+type Positions = "fraction" | "pixels";
+const positionModes = (arg("positions") ?? "fraction")
+  .split(",")
+  .map(p => p.trim())
+  .filter((p): p is Positions => p === "fraction" || p === "pixels");
+if (positionModes.length === 0) {
+  console.error("--positions takes fraction, pixels, or fraction,pixels.");
+  process.exit(1);
+}
 const saveImages = !process.argv.includes("--no-images");
 
 // ── The app's own modules, after the environment is settled ────────────────
@@ -127,10 +155,16 @@ const { diskStorageRoot, diskRelativePath } = await import(
   "../server/diskStorage"
 );
 const { scoreReading, unmatchedLabels } = await import("./readerAccuracyScore");
+const { pairForPosition, positionStats, describePlacement, POINTS_PER_INCH } =
+  await import("./readerAccuracyPositions");
+const { askForPixels, pixelsToFractions } = await import(
+  "./readerAccuracyPixels"
+);
 const { tileGrid, ownedBy } = await import("./readerAccuracyTiles");
 const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
 type Score = ReturnType<typeof scoreReading>;
+type Placement = ReturnType<typeof positionStats>;
 type Finding = ReturnType<typeof buildFindings>[number];
 
 /** A third of a paper inch, in points: a symbol and a little margin. */
@@ -139,6 +173,8 @@ const MATCH_RADIUS_POINTS = 24;
 const TILE_PX_PER_INCH = 150;
 /** Neighbouring pieces share at least half an inch. */
 const TILE_MIN_OVERLAP_POINTS = 36;
+/** How far a placement pair may be apart: above the ~2.4 in Track A saw. */
+const PLACEMENT_RADIUS_POINTS = 3 * 72;
 
 // ── Find the bid and its owner ──────────────────────────────────────────────
 const handle = await getDb();
@@ -244,14 +280,22 @@ async function readOnce(opts: {
   heightPoints: number;
   legendPictures: LegendPicture[];
   pieceNote: string | null;
+  /** The picture's own size in pixels, which the pixel variant is told. */
+  imageWidth: number;
+  imageHeight: number;
+  positions: Positions;
 }): Promise<{ findings: Finding[]; call: Call }> {
-  const request = sheetReadingRequest({
+  const today = sheetReadingRequest({
     model,
     symbols: accountLegend,
     sheetName: opts.sheetName,
     pageText: opts.pageText,
     pageImage: opts.image,
   });
+  const request =
+    opts.positions === "pixels"
+      ? askForPixels(today, opts.imageWidth, opts.imageHeight)
+      : today;
 
   // The stand-ins add to the user message and change nothing else.
   const user = request.messages[1];
@@ -294,7 +338,11 @@ async function readOnce(opts: {
       call: { micros, inTok, outTok, note: `reading ${reading.kind}` },
     };
   }
-  const findings = buildFindings(reading.detections, {
+  const detections =
+    opts.positions === "pixels"
+      ? pixelsToFractions(reading.detections, opts.imageWidth, opts.imageHeight)
+      : reading.detections;
+  const findings = buildFindings(detections, {
     symbols: accountLegend,
     corrections: [],
     pageWidthPoints: opts.widthPoints,
@@ -315,8 +363,13 @@ async function readOnce(opts: {
 type Row = {
   sheet: string;
   method: Method;
+  positions: Positions;
   run: number;
   score: Score | null;
+  /** Where the marks landed. Null with no hand count, or nothing paired. */
+  placement: Placement;
+  /** Every paired distance, in inches, so the table can pool sheets. */
+  pairInches: number[];
   suggestions: number;
   micros: number;
   calls: number;
@@ -399,9 +452,13 @@ for (const pdf of pdfs) {
     const big = TILE_PX_PER_INCH / 72;
     const fit = fitToModel(Math.round(W * big), Math.round(H * big), limits);
     let wholeImage: string | null = null;
+    // The size actually rendered, which the pixel variant is told.
+    const wholeSize = { width: 0, height: 0 };
     const whole = async () => {
       if (!wholeImage) {
         const canvas = await renderPage(page, factory, fit.width / W);
+        wholeSize.width = canvas.width;
+        wholeSize.height = canvas.height;
         wholeImage = jpegDataUrl(canvas, `${safe}-whole.jpg`);
         console.log(
           `  whole-sheet picture: ${canvas.width}x${canvas.height} px, ` +
@@ -415,6 +472,7 @@ for (const pdf of pdfs) {
     const tilePoints = (largestSquareTile(limits) / TILE_PX_PER_INCH) * 72;
     const tiles = tileGrid(W, H, tilePoints, TILE_MIN_OVERLAP_POINTS);
     let tileImages: string[] | null = null;
+    const tileSizes: Array<{ width: number; height: number }> = [];
     const pieces = async () => {
       if (!tileImages) {
         const scale = TILE_PX_PER_INCH / 72;
@@ -422,6 +480,7 @@ for (const pdf of pdfs) {
         tileImages = tiles.map((t, i) => {
           const w = Math.round(t.width * scale);
           const h = Math.round(t.height * scale);
+          tileSizes[i] = { width: w, height: h };
           const { canvas, context } = factory.create(w, h);
           context.fillStyle = "#ffffff";
           context.fillRect(0, 0, w, h);
@@ -454,106 +513,138 @@ for (const pdf of pdfs) {
         );
         continue;
       }
-      for (let run = 1; run <= runs; run++) {
-        let findings: Finding[] = [];
-        let micros = 0;
-        let calls = 0;
-        const notes: string[] = [];
-        try {
-          if (method === "a" || method === "b") {
-            const r = await readOnce({
-              image: await whole(),
-              sheetName: sheet.name,
-              pageText: text,
-              widthPoints: W,
-              heightPoints: H,
-              legendPictures: withLegend ? setLegend : [],
-              pieceNote: null,
-            });
-            findings = r.findings;
-            micros += r.call.micros;
-            calls += 1;
-            if (r.call.note) notes.push(r.call.note);
-          } else {
-            const images = await pieces();
-            for (let i = 0; i < tiles.length; i++) {
-              const t = tiles[i];
+      for (const positions of positionModes)
+        for (let run = 1; run <= runs; run++) {
+          let findings: Finding[] = [];
+          let micros = 0;
+          let calls = 0;
+          const notes: string[] = [];
+          try {
+            if (method === "a" || method === "b") {
+              const image = await whole();
               const r = await readOnce({
-                image: images[i],
+                image,
                 sheetName: sheet.name,
                 pageText: text,
-                widthPoints: t.width,
-                heightPoints: t.height,
+                widthPoints: W,
+                heightPoints: H,
                 legendPictures: withLegend ? setLegend : [],
-                pieceNote:
-                  `This picture is piece ${i + 1} of ${tiles.length} of the sheet ` +
-                  `(row ${t.row + 1}, column ${t.col + 1}), cut up so it can be seen close up. ` +
-                  "Pieces overlap a little. Report what is in THIS picture; positions are fractions of this picture.",
+                pieceNote: null,
+                imageWidth: wholeSize.width,
+                imageHeight: wholeSize.height,
+                positions,
               });
+              findings = r.findings;
               micros += r.call.micros;
               calls += 1;
-              if (r.call.note) notes.push(`piece ${i + 1}: ${r.call.note}`);
-              for (const f of r.findings) {
-                const placed =
-                  f.x === null || f.y === null
-                    ? f
-                    : { ...f, x: f.x + t.x, y: f.y + t.y };
-                // Keep a piece's finding only inside the area it owns.
-                if (
-                  placed.x === null ||
-                  placed.y === null ||
-                  ownedBy(t, placed.x, placed.y, W, H)
-                ) {
-                  findings.push(placed);
+              if (r.call.note) notes.push(r.call.note);
+            } else {
+              const images = await pieces();
+              for (let i = 0; i < tiles.length; i++) {
+                const t = tiles[i];
+                const r = await readOnce({
+                  image: images[i],
+                  sheetName: sheet.name,
+                  pageText: text,
+                  widthPoints: t.width,
+                  heightPoints: t.height,
+                  legendPictures: withLegend ? setLegend : [],
+                  pieceNote:
+                    `This picture is piece ${i + 1} of ${tiles.length} of the sheet ` +
+                    `(row ${t.row + 1}, column ${t.col + 1}), cut up so it can be seen close up. ` +
+                    "Pieces overlap a little. Report what is in THIS picture; positions are " +
+                    (positions === "pixels"
+                      ? "pixels of this picture."
+                      : "fractions of this picture."),
+                  imageWidth: tileSizes[i].width,
+                  imageHeight: tileSizes[i].height,
+                  positions,
+                });
+                micros += r.call.micros;
+                calls += 1;
+                if (r.call.note) notes.push(`piece ${i + 1}: ${r.call.note}`);
+                for (const f of r.findings) {
+                  const placed =
+                    f.x === null || f.y === null
+                      ? f
+                      : { ...f, x: f.x + t.x, y: f.y + t.y };
+                  // Keep a piece's finding only inside the area it owns.
+                  if (
+                    placed.x === null ||
+                    placed.y === null ||
+                    ownedBy(t, placed.x, placed.y, W, H)
+                  ) {
+                    findings.push(placed);
+                  }
                 }
               }
             }
+          } catch (error) {
+            notes.push(
+              `FAILED: ${error instanceof Error ? error.message : String(error)}`
+            );
           }
-        } catch (error) {
-          notes.push(
-            `FAILED: ${error instanceof Error ? error.message : String(error)}`
-          );
-        }
 
-        const suggestions = findings.map(f => ({
-          label: f.symbolLabel ?? f.rawLabel,
-          x: f.x,
-          y: f.y,
-          unreadable: f.confidence === "unreadable",
-        }));
-        const score = marks.length
-          ? scoreReading(marks, suggestions, MATCH_RADIUS_POINTS)
-          : null;
-        rows.push({
-          sheet: label,
-          method,
-          run,
-          score,
-          suggestions: suggestions.length,
-          micros,
-          calls,
-          notes,
-        });
-        record.push({
-          sheet: label,
-          method,
-          run,
-          micros,
-          calls,
-          notes,
-          marks,
-          suggestions,
-        });
-        const tallies = score
-          ? `found ${score.found}, wrong ${score.wrong}, missed ${score.missed}, ` +
-            `extra ${score.extra}, flagged ${score.flagged}`
-          : `${suggestions.length} suggestions ` +
-            `(${suggestions.filter(s => s.unreadable).length} flagged unreadable)`;
-        console.log(
-          `  (${method}) run ${run}: ${tallies} · ${calls} call(s) · ` +
-            `${formatMicros(micros)}${notes.length ? ` · ${notes.join("; ")}` : ""}`
-        );
-      }
+          const suggestions = findings.map(f => ({
+            label: f.symbolLabel ?? f.rawLabel,
+            x: f.x,
+            y: f.y,
+            unreadable: f.confidence === "unreadable",
+          }));
+          const score = marks.length
+            ? scoreReading(marks, suggestions, MATCH_RADIUS_POINTS)
+            : null;
+          const pairs = pairForPosition(
+            marks,
+            suggestions,
+            PLACEMENT_RADIUS_POINTS
+          );
+          const placement = marks.length
+            ? positionStats(pairs, marks.length, H)
+            : null;
+          rows.push({
+            sheet: label,
+            method,
+            positions,
+            run,
+            score,
+            placement,
+            pairInches: pairs.map(p => p.distance / POINTS_PER_INCH),
+            suggestions: suggestions.length,
+            micros,
+            calls,
+            notes,
+          });
+          record.push({
+            sheet: label,
+            method,
+            positions,
+            run,
+            micros,
+            calls,
+            notes,
+            marks,
+            suggestions,
+            // Each pair, so a stretch can be plotted from results.json.
+            placementPairs: pairs.map(p => ({
+              label: p.mark.label,
+              yours: { x: p.mark.x, y: p.mark.y },
+              ai: p.ai,
+              inches: p.distance / POINTS_PER_INCH,
+            })),
+          });
+          const tallies = score
+            ? `found ${score.found}, wrong ${score.wrong}, missed ${score.missed}, ` +
+              `extra ${score.extra}, flagged ${score.flagged}`
+            : `${suggestions.length} suggestions ` +
+              `(${suggestions.filter(s => s.unreadable).length} flagged unreadable)`;
+          console.log(
+            `  (${method}, ${positions}) run ${run}: ${tallies} · ${calls} call(s) · ` +
+              `${formatMicros(micros)}${notes.length ? ` · ${notes.join("; ")}` : ""}`
+          );
+          if (marks.length)
+            console.log(`      ${describePlacement(placement)}`);
+        }
     }
   }
 }
@@ -566,13 +657,25 @@ const NAMES: Record<Method, string> = {
   d: "(d) Legend + zoomed",
 };
 
+/** One table line per method and way of asking for positions. */
+const lines = methods.flatMap(method =>
+  positionModes.map(positions => ({
+    method,
+    positions,
+    name:
+      positionModes.length > 1
+        ? `${NAMES[method]}, ${positions}`
+        : NAMES[method],
+    mine: rows.filter(r => r.method === method && r.positions === positions),
+  }))
+);
+
 console.log("\n══ All sheets together ══");
 console.log(
   "| Method | By hand | Found | Wrong symbol | Missed | Extra | Flagged | Cost per sheet |"
 );
 console.log("| --- | --- | --- | --- | --- | --- | --- | --- |");
-for (const method of methods) {
-  const mine = rows.filter(r => r.method === method);
+for (const { name, mine } of lines) {
   if (mine.length === 0) continue;
   const perRun = Array.from({ length: runs }, (_, i) => {
     const these = mine.filter(r => r.run === i + 1);
@@ -598,10 +701,46 @@ for (const method of methods) {
       perRun.reduce((n, r) => n + r.sheets, 0)
     );
   console.log(
-    `| ${NAMES[method]} | ${perRun[0].byHand} | ${cell("found")} | ${cell("wrong")} | ` +
+    `| ${name} | ${perRun[0].byHand} | ${cell("found")} | ${cell("wrong")} | ` +
       `${cell("missed")} | ${cell("extra")} | ${cell("flagged")} | ${formatMicros(perSheet)} |`
   );
 }
+
+// Where the marks land, every sheet and run pooled. The stretch is per sheet
+// (sheets differ in size), so it is shown as the range of per-sheet scales.
+console.log(
+  "\n══ Where the marks land (inches of paper; same-symbol pairs within 3 in) ══"
+);
+console.log(
+  "| Method | Paired | Median | 90% | Worst | Stretch down (per sheet) | Stretch across (per sheet) |"
+);
+console.log("| --- | --- | --- | --- | --- | --- | --- |");
+for (const { name, mine } of lines) {
+  const scored = mine.filter(r => r.score);
+  if (scored.length === 0) continue;
+  const all = scored.flatMap(r => r.pairInches).sort((a, b) => a - b);
+  const byHand = scored.reduce((n, r) => n + (r.score?.byHand ?? 0), 0);
+  const at = (q: number) =>
+    all.length
+      ? all[Math.min(all.length - 1, Math.ceil(q * all.length) - 1)].toFixed(2)
+      : "–";
+  const range = (axis: "fitX" | "fitY") => {
+    const scales = scored
+      .map(r => r.placement?.[axis]?.scale)
+      .filter((s): s is number => s !== undefined);
+    if (scales.length === 0) return "–";
+    const lo = Math.min(...scales).toFixed(3);
+    const hi = Math.max(...scales).toFixed(3);
+    return lo === hi ? `x${lo}` : `x${lo} to x${hi}`;
+  };
+  console.log(
+    `| ${name} | ${all.length} of ${byHand} | ${at(0.5)} | ${at(0.9)} | ` +
+      `${all.length ? all[all.length - 1].toFixed(2) : "–"} | ${range("fitY")} | ${range("fitX")} |`
+  );
+}
+console.log(
+  "x1.000 is no stretch. A mark a stretch of x1.05 puts 20 in down the sheet lands 1 in low."
+);
 
 const total = rows.reduce((n, r) => n + r.micros, 0);
 const callCount = rows.reduce((n, r) => n + r.calls, 0);
@@ -616,8 +755,10 @@ writeFileSync(
       bidId,
       model,
       methods,
+      positions: positionModes,
       runs,
       matchRadiusPoints: MATCH_RADIUS_POINTS,
+      placementRadiusPoints: PLACEMENT_RADIUS_POINTS,
       rows: rows.map(r => ({
         ...r,
         score: r.score && {
