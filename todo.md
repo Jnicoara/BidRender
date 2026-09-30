@@ -59,6 +59,14 @@ left as written rather than rewritten to match the rename.
       — and with them the guard that a finger landing to pan must not place a
       mark or a point (place on TAP, on touch only). See
       `references/track-b-panning-plan.md` § 3, guard 3.
+- [ ] **Owner, 2026-09-29: a readability pass on the Plans right-hand panel,
+      before beta, alongside the phone layout above.** Counted items, the Plan
+      reader, the Legend and the totals are too small and too muted to read at
+      a glance. Wanted: bigger text, stronger contrast, warnings that stand out
+      from ordinary rows (amber that reads as amber, not as another grey), and
+      less scrolling to reach the totals. Do it with the drawer work, since
+      both reshape the same panel — and look at it at the size it ships, at
+      UI scale 1.0 and on a laptop screen, before calling it done.
 
 ### Flaky tests — fix in a batch before beta
 
