@@ -3727,6 +3727,13 @@ nothing at all. Shipping the blocked half first is how a captured legend that
 counts nothing becomes setup work with no payoff, which is the exact failure the
 2026-09-19 rewrite was written to avoid — arriving from the other direction.
 
+> **Row (c) SPLIT, 2026-09-29 — see `references/legend-reading-plan.md`.**
+> Reading the LEGEND is one call on one region, needs no tiling and does not
+> depend on how well the reader counts a dense sheet, so it is not behind
+> § 15's gate; only scanning the SET is. The legend half now goes ahead,
+> confirmed once per plan set (§ 9.4) and sent to Read sheet as pictures.
+> The set scan stays where this table puts it. This agrees with § 9.6.
+
 **(b) is small and it is the one that removes a precondition.** A reader finding
 is a proposal about a SHAPE on a drawing; it does not need a library entry to
 become a count. Level 1 already exists for exactly this (§ 5e), and the four-way
