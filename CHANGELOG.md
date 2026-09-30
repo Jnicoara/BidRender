@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **No more white square when a plan opens.** Opening a plan showed a small
+  blank white box in the corner until the first sheet was drawn. The loading
+  panel now stays up ("Opening plan set…", then "Drawing sheet 1…") until
+  the sheet can be shown whole and already fitted to the screen.
 - **You can clear one sheet, and put it back.** The new "…" menu beside the
   sheet picker has "Clear all marks and runs on this sheet". It first asks
   with the exact numbers, for example "Remove 12 runs and 40 marks in 5

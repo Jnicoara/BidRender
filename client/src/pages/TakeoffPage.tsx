@@ -95,6 +95,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { sheetClearQuestion } from "@/lib/sheetClearQuestion";
+import { planLoadState } from "@/lib/planLoadState";
 import {
   BUTTON_ZOOM_STEP,
   REGION_SETTLE_MS,
@@ -840,8 +841,12 @@ function PlanPane({
    *
    * Still waits for a raster, because fitting needs the sheet's dimensions. The
    * ref is what stops a re-render refitting a page the user has since zoomed.
+   *
+   * A LAYOUT effect since 2026-09-29, so the fit lands before the browser
+   * paints. As a plain effect there was one painted frame of the full raster
+   * at zoom 1, top-left, before the fit moved it (Track B plan, Part 4 § 1).
    */
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (canvasSize.width === 0) return;
     const key = `${doc.id}:${page}`;
     if (fittedFor.current === key) return;
@@ -1090,6 +1095,12 @@ function PlanPane({
   const [pageCount, setPageCount] = useState(doc.pageCount ?? 0);
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
+  /** Opening → drawing sheet N → the sheet. @/lib/planLoadState. */
+  const loadState = planLoadState({
+    documentLoading: loading,
+    drawn: canvasSize.width > 0,
+    page,
+  });
   const [error, setError] = useState<string | null>(null);
   /** Pages already sent for scale detection, so it runs once each. */
   const detected = useRef(new Set<number>());
@@ -1448,6 +1459,9 @@ function PlanPane({
   const wantsKey = (thumbnailWants ?? []).join(",");
   useEffect(() => {
     if (loading || error || pageCount === 0) return;
+    // Sheet 1 first: the worker is one queue, and a thumbnail ahead of the
+    // first sheet is the reader waiting on a picture they did not ask for.
+    if (canvasSize.width === 0) return;
     // Already running: it will see the new wants before its next render.
     if (thumbnailLoopRunning.current) return;
     if (nextThumbnail(wantsRef.current, thumbnailsDone.current) === null)
@@ -1496,7 +1510,7 @@ function PlanPane({
           thumbnailLoopRunning.current = false;
       }
     })();
-  }, [wantsKey, loading, error, pageCount, hash, render]);
+  }, [wantsKey, loading, error, pageCount, hash, render, canvasSize.width]);
 
   // Pull the page's text once, for scale detection.
   useEffect(() => {
@@ -1649,13 +1663,22 @@ function PlanPane({
         )}
         onPointerDown={beginPlainPan}
       >
-        {loading ? (
-          <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
+        {/*
+          Opening, then drawing sheet N, then the sheet — one panel for both
+          waits, so nothing shows until the sheet can be shown whole and fitted
+          (@/lib/planLoadState). The empty canvas used to show between the two
+          as a white 300x150 square at the top-left.
+        */}
+        {loadState.show !== "sheet" && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 text-muted-foreground bg-muted/20">
             <Loader2 className="w-6 h-6 animate-spin" />
-            <p className="text-sm">Opening {doc.filename}…</p>
-            <p className="text-xs">Large drawings can take a few seconds.</p>
+            <p className="text-sm">{loadState.message}</p>
+            <p className="text-xs">
+              {doc.filename} · large drawings can take a few seconds.
+            </p>
           </div>
-        ) : (
+        )}
+        {loading ? null : (
           /*
             ONE transform, wrapping the page and the overlay together.
 
@@ -1672,7 +1695,12 @@ function PlanPane({
             which already reflects the transform.
           */
           <div
-            className="absolute top-0 left-0 origin-top-left will-change-transform"
+            className={cn(
+              "absolute top-0 left-0 origin-top-left will-change-transform",
+              // Mounted (the render needs the canvas) but not seen until the
+              // first raster is on it and fitted.
+              loadState.show !== "sheet" && "invisible"
+            )}
             style={{
               /*
                 Snapped to whole DEVICE pixels, not left as the raw offset.
