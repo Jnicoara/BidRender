@@ -270,6 +270,7 @@ import {
   boxSelection,
   clickSelection,
   deleteNeedsConfirm,
+  toolbarDelete,
   deleteQuestion,
   pruneSelection,
 } from "@/lib/stampSelection";
@@ -3789,7 +3790,8 @@ export default function TakeoffPage({
   useEffect(() => {
     if (selectedStampIds.size === 0 || tracing || armedGroup) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // A picked run point claims Delete first (TraceLayer, capture phase).
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
       if (
         el &&
@@ -4105,6 +4107,64 @@ export default function TakeoffPage({
     },
     onSettled: refreshRuns,
   });
+
+  /**
+   * What the toolbar Delete and the Delete key remove: the selected marks if
+   * there are any (more than one asks first), otherwise the selected run.
+   * One function for both, so the key can never delete something the button
+   * did not name (@/lib/stampSelection, toolbarDelete).
+   */
+  const deleteSelection = useCallback(() => {
+    if (selectedStamps.length > 0) {
+      deleteSelected(false);
+      return;
+    }
+    if (selectedRunId !== null && !removeRun.isPending) {
+      removeRun.mutate({ id: selectedRunId });
+      setSelectedRunId(null);
+    }
+  }, [selectedStamps.length, deleteSelected, selectedRunId, removeRun]);
+
+  /**
+   * The Delete key for a selected RUN (marks have their own handler above).
+   * `defaultPrevented` is checked because a picked run POINT claims the same
+   * key first (TraceLayer, capture phase) — deleting the point must not also
+   * delete the run it is on.
+   */
+  useEffect(() => {
+    if (
+      selectedRunId === null ||
+      selectedStampIds.size > 0 ||
+      tracing ||
+      armedGroup ||
+      quantitiesLocked
+    )
+      return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key !== "Delete") return;
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable)
+      )
+        return;
+      e.preventDefault();
+      deleteSelection();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [
+    selectedRunId,
+    selectedStampIds,
+    tracing,
+    armedGroup,
+    quantitiesLocked,
+    deleteSelection,
+  ]);
 
   /**
    * Dragging, adding or removing a run's points (T8, D7a).
@@ -5640,6 +5700,37 @@ export default function TakeoffPage({
               >
                 <Redo2 className="w-3.5 h-3.5" />
               </Button>
+              {/*
+                DELETE, beside the arrows that take it back. It names what it
+                will delete ("Delete 3 marks") and is greyed out until
+                something is selected; more than one mark asks first
+                (@/lib/stampSelection, toolbarDelete).
+              */}
+              {(() => {
+                const run = runs.find(r => r.id === selectedRunId) ?? null;
+                const state = toolbarDelete(
+                  selectedStamps.length,
+                  run ? { isLeg: run.parentRunId != null } : null
+                );
+                const locked = quantitiesLocked && state.enabled;
+                return (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive"
+                    disabled={!state.enabled || locked}
+                    title={
+                      locked
+                        ? "This bid's quantities are locked — unlock them on the bid to delete."
+                        : state.title
+                    }
+                    onClick={deleteSelection}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {state.label}
+                  </Button>
+                );
+              })()}
             </>
           )}
 

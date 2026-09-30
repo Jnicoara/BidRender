@@ -106,3 +106,37 @@ export function deleteQuestion(selected: readonly { groupName: string }[]): {
     confirm: `Delete ${selected.length} marks`,
   };
 }
+
+/**
+ * The toolbar Delete button: what it will delete, in its own words.
+ *
+ * Marks win over a run, because the Delete KEY does the same (the marks
+ * handler runs first) and a button that disagreed with its key would delete
+ * something the label did not name. Nothing selected is disabled, with a
+ * title saying how to select.
+ */
+export function toolbarDelete(
+  marks: number,
+  run: { isLeg: boolean } | null
+): { enabled: boolean; label: string; title: string } {
+  if (marks > 0)
+    return {
+      enabled: true,
+      label: `Delete ${marks} ${marks === 1 ? "mark" : "marks"}`,
+      title:
+        marks > 1
+          ? "Asks first, then deletes them (Delete). Ctrl+Z puts them back."
+          : "Deletes it (Delete). Ctrl+Z puts it back.",
+    };
+  if (run)
+    return {
+      enabled: true,
+      label: run.isLeg ? "Delete leg" : "Delete run",
+      title: "Deletes it (Delete). Ctrl+Z puts it back.",
+    };
+  return {
+    enabled: false,
+    label: "Delete",
+    title: "Select marks (click, or Shift-drag a box) or a run to delete",
+  };
+}

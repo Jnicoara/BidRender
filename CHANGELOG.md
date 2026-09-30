@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **A Delete button on the Plans toolbar.** It sits beside Undo and Redo and
+  says what it will delete ("Delete 3 marks", "Delete run"). It is greyed
+  out until something is selected, and asks first when more than one mark
+  is selected. The Delete key does the same for a selected run.
 - **A locked bid no longer lets drops change.** What sits at a run's end
   (and a quantity trace's drop answers) decides how much drop pipe and wire
   the run needs, and those could still be changed on a locked bid. They are

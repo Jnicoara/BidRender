@@ -6,6 +6,7 @@ import {
   deleteQuestion,
   pruneSelection,
   stampsInBox,
+  toolbarDelete,
 } from "./stampSelection";
 
 const set = (...ids: number[]) => new Set(ids);
@@ -71,5 +72,27 @@ describe("deleting a selection", () => {
     expect(q.title).toBe("Delete 3 marks?");
     expect(q.confirm).toBe("Delete 3 marks");
     expect(q.detail).toMatch(/^2 × Receptacle, 1 × Switch\./);
+  });
+});
+
+describe("the toolbar Delete button", () => {
+  it("says how many marks it will delete", () => {
+    expect(toolbarDelete(3, null).label).toBe("Delete 3 marks");
+    expect(toolbarDelete(1, null).label).toBe("Delete 1 mark");
+  });
+
+  it("names a run or a leg when no marks are selected", () => {
+    expect(toolbarDelete(0, { isLeg: false }).label).toBe("Delete run");
+    expect(toolbarDelete(0, { isLeg: true }).label).toBe("Delete leg");
+  });
+
+  it("prefers marks, as the Delete key does", () => {
+    expect(toolbarDelete(2, { isLeg: false }).label).toBe("Delete 2 marks");
+  });
+
+  it("is disabled with nothing selected, and says how to select", () => {
+    const off = toolbarDelete(0, null);
+    expect(off.enabled).toBe(false);
+    expect(off.title).toMatch(/Select/);
   });
 });
