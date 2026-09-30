@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **The pricing spreadsheet puts every Home Depot row first.** All 1,867
+  store rows sit in one unbroken block ahead of the 330 supply-house rows,
+  so the store pricing can be done in one sitting. It already held every
+  catalog row (1,554), plus 124 new rows and 519 brand variants.
+
 - **A backup check that fails no longer leaves a half-restored copy
   behind.** When a backup would not restore, the test copy it was loading
   into stayed on the database server until the next check cleared it. It is
