@@ -6,6 +6,21 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **The plan reader's Link button now always opens where you can see it.**
+  It used to be invisible until the mouse was over it, and pressing it opened
+  the "what is this really?" picker below the whole list of suggestions, often
+  cut off by the bottom of the pane, so it looked like nothing happened. The
+  picker now opens directly under the suggestion you pressed, and says plainly
+  when you have no legend symbols to pick from yet.
+- **Plan reader suggestions are no longer ticked for you, and ticking one
+  shows you where it is.** Checked on a real sheet, the reader's idea of WHERE
+  a symbol sits can be off by a couple of inches of paper (several feet at
+  1/4" scale), even when it is sure WHAT the symbol is. That is how a mark
+  ended up beside a keynote tag by a door instead of on the light fixture.
+  The app was placing marks exactly where the reader said; the reader was
+  wrong about where. Now nothing is placed until you tick it, and ticking it
+  (or pressing Link) moves the drawing to that spot so you can check it first.
+
 - **The plan reader no longer reads a sheet just because you opened it.** The
   "Read each sheet as I open it" switch is gone. A sheet is read, and paid for,
   only when you press Read sheet. With the switch on, clicking through a

@@ -3857,6 +3857,16 @@ real job.
   asymmetry is the design: accepting a confident batch is one press, accepting
   an uncertain one is a decision somebody made rather than one they failed to
   undo.
+  **REVERSED 2026-09-29 (branch a-reader-fixes): nothing arrives ticked, and
+  ticking a proposal takes the drawing to it.** Measured on staging's E-100:
+  the reader's POSITIONS are off by up to about 2.4 in of paper, mostly
+  downward and growing toward the bottom of the sheet, so not a fixed offset.
+  A placed mark sat beside keynote tag 7 instead of on the A1 fixture it
+  named. The app put it exactly where the reader said, to four decimals.
+  "Confident" is about WHAT a mark is, never WHERE. See
+  `client/src/lib/readerPicks.ts`. The accuracy test in
+  `references/legend-reading-plan.md` § 0 B (branch a-plans-reader) should
+  measure position error as well as what was found.
 - **Bulk place and bulk dismiss**, over whatever is ticked.
 - **Click a row and the viewer jumps to it** and rings the spot (`focusPoint`).
 - **Nothing is placed until Place is pressed**, and the server re-checks every
