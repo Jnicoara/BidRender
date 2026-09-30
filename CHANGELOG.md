@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Eleven parts the new starter assemblies needed are in the catalog.** A
+  commercial smoke detector head, well-pump drop cable, mini-split cable, a
+  meter hub, mast flashing and riser strap, an SE cable connector, a roof
+  flashing boot for conduit, a Cat6 RJ45 end, and a temporary pole and light
+  string. All unpriced, like every shipped part.
+
+- **The supplier materials list no longer asks for a fraction of an item.**
+  A recipe may use a quarter tube of firestop per hole; the list now adds
+  those up and rounds pieces and boxes UP to whole, so one to four holes
+  order one tube. Footage is unchanged.
+
 - **Flex runs now buy their straps, and #12 and #14 stranded THHN are in
   the catalog.** A traced flexible metal or liquidtight run used to say "No
   catalog strap"; it now counts one-hole straps sized to the flex (four new

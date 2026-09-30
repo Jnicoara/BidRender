@@ -492,6 +492,19 @@ const meterBases: BaselineMaterial[] = ["100", "200", "400"].map(amps => ({
   ),
 }));
 
+/*
+  The hub an overhead mast threads into on top of a meter base (starter
+  assemblies plan § Gaps, 2026-09-29). The pricing sheet listed it unsized as
+  "Meter socket hub" under its pending Service Entrance shelf; it ships here,
+  beside the meter bases, until that shelf exists (see
+  references/track-a-handoff-starter-assemblies.md).
+*/
+const meterHub: BaselineMaterial = {
+  ...gear("Panels"),
+  name: '2" meter hub',
+  searchAliases: aliases("2in socket mast overhead service threaded top"),
+};
+
 /**
  * Disconnects come fused and non-fused at every size and the two are NOT
  * interchangeable — a fused switch needs fuses bought with it and a non-fused
@@ -807,6 +820,7 @@ export const PANELS_AND_BREAKERS: BaselineMaterial[] = [
   ...outdoorPanels,
   ...panelParts,
   ...meterBases,
+  meterHub,
   ...disconnects,
   acDisconnect,
   ...fuses,

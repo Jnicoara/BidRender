@@ -520,4 +520,48 @@ export const CONDUIT: BaselineMaterial[] = [
     category: "Conduit Fittings",
     searchAliases: aliases("reducer knockout ko step down enclosure hole pair"),
   },
+  /*
+    Roof and mast parts (starter assemblies plan § Gaps, 2026-09-29). The
+    first two were on the pricing sheet under its pending Service Entrance
+    shelf ("Mast roof flashing", "Riser strap, 2 in"); they ship here until
+    that shelf exists — references/track-a-handoff-starter-assemblies.md.
+
+    The mast parts are SIZED, 2" like the meter hub they go with: every row
+    on this shelf must carry a size (materialSizeOrder.test.ts), and a mast
+    flashing is bought to fit the mast. The roof boot is the one exception,
+    a cone cut to fit, and is listed there as genuinely unsized.
+
+    The boot is NOT named "Conduit …" and does not alias "conduit": built
+    first as "Conduit roof flashing boot", it took the top result for
+    "conduit" (materialSearchRank.test.ts, same day).
+  */
+  {
+    name: '2" mast roof flashing',
+    unitOfSale: "each",
+    costPerUnit: UNPRICED,
+    category: "Conduit Fittings",
+    searchAliases: aliases("2in boot roof jack service neoprene seal overhead"),
+    description: "Seals a service mast where it passes through the roof.",
+  },
+  {
+    name: '2" riser strap',
+    unitOfSale: "each",
+    costPerUnit: UNPRICED,
+    category: "Conduit Fittings",
+    searchAliases: aliases(
+      "2in service mast support clamp two-hole bracket overhead"
+    ),
+    description: "Holds a service mast to the wall below the roof line.",
+  },
+  {
+    name: "Roof flashing boot",
+    unitOfSale: "each",
+    costPerUnit: UNPRICED,
+    category: "Conduit Fittings",
+    searchAliases: aliases(
+      "roof jack penetration rtu rooftop pipe seal neoprene cone"
+    ),
+    description:
+      "Seals a conduit through a roof, as at a rooftop unit. Cut to fit. Not a pitch pocket.",
+  },
 ];

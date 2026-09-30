@@ -227,7 +227,22 @@ const clips: BaselineMaterial[] = [
   category: "Strut & Supports" as const,
 }));
 
+/*
+  The post a temporary service is built on (starter assemblies plan § Gaps,
+  2026-09-29, owner Q6): an ordinary row, not a rental line type.
+*/
+const temporaryPole: BaselineMaterial = {
+  name: "Temporary pole, 6x6 post",
+  unitOfSale: "each",
+  costPerUnit: UNPRICED,
+  category: "Strut & Supports",
+  searchAliases: aliases(
+    "temp construction power saw service pole treated lumber wood jobsite"
+  ),
+};
+
 export const STRUT: BaselineMaterial[] = [
+  temporaryPole,
   ...channel,
   ...strutStraps,
   ...strutAccessories,

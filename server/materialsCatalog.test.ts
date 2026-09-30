@@ -497,6 +497,13 @@ describe("searching the enlarged catalog", () => {
     expect(search("ground rod", 1)[0]).toBe("Ground rod, 8 ft");
   });
 
+  it('answers "plug" with a receptacle first', () => {
+    // An estimator's "plug" is a receptacle. The expectHit above only asks
+    // for the top eight, and a Cat6 RJ45 end first built as "Cat6 plug" took
+    // the top spot while passing it (2026-09-29, starter assemblies plan).
+    expect(search("plug", 1)[0]).toBe("Duplex receptacle");
+  });
+
   it("ranks a product above its own accessories", () => {
     // The same failure wearing different clothes, and the one the enlarged
     // catalog actually introduced: "Cable staple" carried a "romex" alias, so

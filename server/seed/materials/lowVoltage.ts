@@ -104,6 +104,19 @@ export const LOW_VOLTAGE: BaselineMaterial[] = [
     ),
   },
   {
+    // The crimp-on male end, for a drop that terminates at a camera or an
+    // access point rather than a jack. Starter assemblies plan § Gaps,
+    // 2026-09-29. NOT named "plug", and no "plug" alias: "plug" is what an
+    // estimator types for a receptacle, and the first build of this row as
+    // "Cat6 plug" took the top result for it (search sweep, same day).
+    // No "connector" either, which answers the cable connectors.
+    ...lv("each"),
+    name: "Cat6 RJ45 end",
+    searchAliases: aliases(
+      "cat 6 rj-45 8p8c modular crimp ends termination camera ap"
+    ),
+  },
+  {
     ...lv("each"),
     name: "Cat6 patch panel",
     searchAliases: aliases(

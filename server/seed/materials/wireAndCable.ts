@@ -347,6 +347,29 @@ const trayCable: BaselineMaterial[] = [
   cable("12-3 tray cable", "tc tc-er power control cable tray industrial"),
 ];
 
+/*
+  Two cables the starter assemblies needed and the catalog lacked (plan
+  § Gaps, 2026-09-29). Neither is MC, so `mcFittingNames` must not read
+  either one as MC and buy MC connectors for it; its pattern needs
+  "MC cable" in the name, which these do not have.
+*/
+const equipmentCable: BaselineMaterial[] = [
+  {
+    ...cable(
+      "12-2 submersible pump cable",
+      "well drop flat jacketed direct burial 600v ground"
+    ),
+    description: "Well-pump drop cable: two conductors and a ground.",
+  },
+  {
+    ...cable(
+      "14-4 mini-split cable",
+      "minisplit ductless split system interconnect communication stranded heat pump"
+    ),
+    description: "Between a mini-split's outdoor and indoor units. Not MC.",
+  },
+];
+
 // ─── Bare copper ground ───────────────────────────────────────────────────────
 
 const bareCopper: BaselineMaterial[] = [
@@ -549,6 +572,7 @@ export const WIRE_AND_CABLE: BaselineMaterial[] = [
   ...fireAlarmCable,
   ...portableCord,
   ...trayCable,
+  ...equipmentCable,
   ...bareCopper,
   ...serCopper,
   ...serAluminum,

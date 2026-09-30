@@ -2056,7 +2056,7 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       `strapFamily` returns null for flex, so flex straps say "No catalog
       strap" until sized flex straps ship.
       **BUILT 2026-09-29 (retail plan § R7):** `<size> flexible conduit
-    one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
+  one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
       `server/raceStrapCatalog.test.ts` checks every raceway's strap ships.
 - [ ] **MC above a lay-in ceiling defaults to the ceiling-wire clip** (owner,
       2026-09-29). An MC run counted today buys `MC one-hole strap` every
@@ -2069,6 +2069,18 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       fast toggle. Decide where "above lay-in" lives (run, run type, or sheet
       area) before building — check `references/takeoff-spec.md` D3 first,
       which rejected a form on every run.
+- [ ] **Purchase list rounds to whole PACKS, not only whole pieces** (owner,
+      2026-09-29, starter assemblies plan D5). Built: `orderQty` in
+      `shared/materialsList.ts` rounds a piece or box UP to whole after the
+      sum, so a quarter tube never reaches a supplier. Not built: rounding to
+      the pack a part is sold in (a box of 100 wire nuts), because the catalog
+      has no pack size yet — `references/material-markup.md` D3. When pack
+      sizes land, round there too, in the same function.
+- [ ] **Starter assemblies: build the 168 once Track A lands H1 and H2**
+      (`references/starter-assemblies-plan.md`,
+      `references/track-a-handoff-starter-assemblies.md`). Order matters for
+      H2: the null-hours code ships BEFORE the migration that clears the 8
+      starters' placeholder hours, or every one prices at zero hours.
 - [ ] **Double counting from a user's own box assembly.** No starter assembly
       carries a connector or strap, so nothing overlaps today. A company
       whose own box or device assembly includes an EMT connector will count

@@ -431,10 +431,28 @@ export const CONSUMABLES: BaselineMaterial[] = [
   },
 ];
 
+/**
+ * The connector an SER or SEU service cable lands through (starter
+ * assemblies plan § Gaps, 2026-09-29). The 3/8"–1" cable connectors above
+ * are NM clamps and do not take a 4/0 service cable; before this row the
+ * catalog shipped SER with nothing to terminate it. One size, named by the
+ * knockout it fits, because the service assemblies use one.
+ */
+const seConnector: BaselineMaterial = {
+  ...CONN,
+  name: '2" SE cable connector',
+  searchAliases: aliases(
+    "2in ser seu service entrance watertight raintight fitting clamp"
+  ),
+  description:
+    "For SER/SEU into a box or meter base. Check the cable's diameter against the connector's range.",
+};
+
 export const CONNECTORS: BaselineMaterial[] = [
   ...wireNuts,
   ...cableConnectors,
   ...mcConnectors,
+  seConnector,
   ...lugs,
   ...terminations,
 ];

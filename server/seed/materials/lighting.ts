@@ -559,6 +559,15 @@ export const LIGHTING: BaselineMaterial[] = [
   ...securityLights,
   ...lamps,
   {
+    // Construction lighting (starter assemblies plan § Gaps, 2026-09-29,
+    // owner Q6): an ordinary row, not a rental line type.
+    ...fixture,
+    name: "Temporary light string, 100 ft",
+    searchAliases: aliases(
+      "temp construction stringer string lights work lighting cage led jobsite"
+    ),
+  },
+  {
     ...fixture,
     name: "Surface-mount ceiling fixture",
     searchAliases: aliases("flush mount drum dome closet utility round led"),
