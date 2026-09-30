@@ -6,6 +6,19 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **A locked bid's plans can no longer change at all.** Before, a locked
+  bid refused deletes but still let you place new marks, trace new runs, type
+  a run's length, add a leg, answer a pull point or change a run's wires. The
+  quoted numbers held, but the drawing behind them moved, and unlocking later
+  would have pulled those changes onto the bid unnoticed. All of these are now
+  refused with one plain sentence ("This bid's quantities are locked, so new
+  marks cannot be placed. Unlock them on the bid first."). The Count and trace
+  buttons say it before anything starts.
+- **Undo stays where you deleted, even when the count card empties.**
+  Deleting the last mark of a count on a sheet used to make its card (and its
+  undo arrow) disappear, leaving only the toolbar Undo. The card now stays in
+  place, greyed, reading "None left on this sheet", with its undo arrow, until
+  you do something else.
 - **Drops are set in the run card, end by end.** Selecting a run (on the plan
   or its card) opens "Run ends", listing every end of every leg, branch ends
   included. Each end has one-tap answers (Device box, Panel, J-box, Fixture,

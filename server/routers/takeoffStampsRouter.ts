@@ -45,6 +45,7 @@ import {
   runFeet,
   tracedRunOf,
 } from "../../shared/takeoffQuantities";
+import { lockedEditRefusal } from "../../shared/quantityLock";
 import { TAKEOFF_LOCATIONS } from "../../drizzle/schema";
 import * as db from "../db";
 import {
@@ -108,9 +109,14 @@ async function requireBid(bidId: number, userId: number) {
  *
  * The locked line reads its stored `qty`, so the number would not move — but
  * the drawing it was priced from would, and unlocking later re-reads that
- * drawing. Placing a mark stays allowed on purpose (the send toast says further
- * marks will not change a locked line); taking one away removes evidence the
- * frozen number was counted from. Whole selection or nothing.
+ * drawing. Whole selection or nothing.
+ *
+ * This comment used to say "placing a mark stays allowed on purpose (the send
+ * toast says further marks will not change a locked line)". That was reversed
+ * on 2026-09-29 by the owner — a locked bid must not change — because a mark
+ * placed after the lock is the same disagreement in the other direction: the
+ * sheet shows more than the quote, and unlocking silently adds it. `drop` now
+ * refuses too, and the toast no longer promises otherwise.
  */
 async function refuseIfAnyLocked(ids: readonly number[], userId: number) {
   if ((await db.countStampsOnLockedBids(ids, userId)) > 0)
@@ -159,7 +165,12 @@ export const takeoffStampsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("new marks cannot be placed"),
+        });
       await requireSheet(input.sheetId, ctx.scope.dataUserId);
 
       const group = await db.getGroupById(input.groupId, ctx.scope.dataUserId);

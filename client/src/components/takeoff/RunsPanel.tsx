@@ -26,6 +26,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { UndoSubject } from "@/lib/undoStack";
+import {
+  emptiedCardIndex,
+  type EmptiedCountCard,
+} from "@/lib/emptiedCountCard";
 
 /**
  * A card's undo arrow. Always drawn, so the card does not change shape as the
@@ -61,6 +65,63 @@ function CardUndo({
     >
       <Undo2 className="w-3 h-3" />
     </Button>
+  );
+}
+/**
+ * A count card whose last mark on this sheet was just deleted. Same swatch,
+ * same name and same undo arrow as the live card, in the same place, so the
+ * way back is where the delete was (@/lib/emptiedCountCard). It goes as soon
+ * as anything newer happens.
+ */
+function EmptiedCountRow({
+  card,
+  cardUndo,
+  onCardUndo,
+}: {
+  card: EmptiedCountCard;
+  cardUndo?: (subject: UndoSubject) => { label: string } | null;
+  onCardUndo?: () => void;
+}) {
+  const { shape, color } = markAppearance({
+    groupId: card.groupId,
+    assemblyId: card.assemblyId,
+    assemblyCategory: card.assemblyCategory,
+  });
+  return (
+    <div className="border-b border-border px-3 py-2 bg-muted/30">
+      <div className="flex items-center gap-2">
+        <svg
+          width={20}
+          height={20}
+          viewBox="0 0 20 20"
+          className="shrink-0 opacity-50"
+          aria-hidden="true"
+        >
+          <path
+            d={markPath(shape, 10, 10, 8)}
+            fill={color}
+            fillOpacity={0.22}
+            stroke={color}
+            strokeWidth={2}
+            strokeLinejoin="round"
+          />
+        </svg>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm truncate text-muted-foreground">{card.label}</p>
+          <p className="text-[0.7rem] text-muted-foreground">
+            None left on this sheet — undo puts them back
+          </p>
+        </div>
+        <span className="font-mono text-sm tabular-nums text-muted-foreground">
+          0
+        </span>
+        <CardUndo
+          subject={{ kind: "count", id: card.groupId }}
+          cardUndo={cardUndo}
+          onCardUndo={onCardUndo}
+        />
+      </div>
+    </div>
   );
 }
 import {
@@ -966,6 +1027,7 @@ export function RunsPanel({
   onOpenPartialEnds,
   cardUndo,
   onCardUndo,
+  emptiedCount = null,
   onCommitRun,
   onAcceptSuggestion,
   onAddCircuit,
@@ -1158,6 +1220,11 @@ export function RunsPanel({
    */
   cardUndo?: (subject: UndoSubject) => { label: string } | null;
   onCardUndo?: () => void;
+  /**
+   * The count whose last mark on this sheet was just deleted, kept in its
+   * place with its undo arrow (@/lib/emptiedCountCard). Null otherwise.
+   */
+  emptiedCount?: EmptiedCountCard | null;
   onCommitRun: (id: number) => void;
   onAcceptSuggestion: (id: number) => void;
   onAddCircuit: (
@@ -1178,6 +1245,7 @@ export function RunsPanel({
 }) {
   const [addingTo, setAddingTo] = useState<number | null>(null);
   const [circuitName, setCircuitName] = useState("");
+  const emptiedAt = emptiedCardIndex(stampGroups.length, emptiedCount);
 
   /**
    * Add one circuit and stay ready for the next one.
@@ -1226,13 +1294,18 @@ export function RunsPanel({
         {/* Stamped assemblies first: an estimator drops dozens per sheet and
             traces a handful of runs, so the thing they are actively adding to
             stays where they can watch it climb. */}
-        {stampGroups.map(group => (
-          <div
-            key={group.groupId ?? group.assemblyId ?? group.name}
-            className="border-b border-border px-3 py-2 hover:bg-muted/40 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              {/*
+        {stampGroups.map((group, cardIndex) => (
+          <Fragment key={group.groupId ?? group.assemblyId ?? group.name}>
+            {emptiedAt === cardIndex && emptiedCount && (
+              <EmptiedCountRow
+                card={emptiedCount}
+                cardUndo={cardUndo}
+                onCardUndo={onCardUndo}
+              />
+            )}
+            <div className="border-b border-border px-3 py-2 hover:bg-muted/40 transition-colors">
+              <div className="flex items-center gap-2">
+                {/*
                 The swatch IS the legend. It draws the same shape in the same
                 colour as the marks on the drawing, from the same function —
                 a panel that showed a yellow circle for every count would be
@@ -1242,71 +1315,71 @@ export function RunsPanel({
                 Fixed at 20px here rather than clamped: this one is on the
                 screen, not on the paper, so it has no zoom to fight.
               */}
-              {(() => {
-                const { shape, color } = markAppearance({
-                  groupId: group.groupId,
-                  assemblyId: group.assemblyId,
-                  assemblyCategory: group.stamps[0]?.assemblyCategory ?? null,
-                });
-                return (
-                  <svg
-                    width={20}
-                    height={20}
-                    viewBox="0 0 20 20"
-                    className="shrink-0"
-                    aria-hidden="true"
+                {(() => {
+                  const { shape, color } = markAppearance({
+                    groupId: group.groupId,
+                    assemblyId: group.assemblyId,
+                    assemblyCategory: group.stamps[0]?.assemblyCategory ?? null,
+                  });
+                  return (
+                    <svg
+                      width={20}
+                      height={20}
+                      viewBox="0 0 20 20"
+                      className="shrink-0"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d={markPath(shape, 10, 10, 8)}
+                        fill={color}
+                        fillOpacity={0.22}
+                        stroke={color}
+                        strokeWidth={2}
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  );
+                })()}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate">{group.name}</p>
+                  <p className="text-[0.7rem] text-muted-foreground">
+                    {group.count} placed
+                  </p>
+                </div>
+                <span className="font-mono text-sm tabular-nums">
+                  {group.count}
+                </span>
+                {/* Undo and trash, as on a run card (owner, 2026-09-29). */}
+                {group.groupId !== null && (
+                  <CardUndo
+                    subject={{ kind: "count", id: group.groupId }}
+                    cardUndo={cardUndo}
+                    onCardUndo={onCardUndo}
+                  />
+                )}
+                {onDeleteCountMarks && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                    disabled={quantitiesLocked || group.stamps.length === 0}
+                    onClick={() =>
+                      onDeleteCountMarks(
+                        group.stamps.map(s => ({ id: s.id, name: group.name }))
+                      )
+                    }
+                    title={
+                      quantitiesLocked
+                        ? "This bid's quantities are locked — unlock them on the bid to delete."
+                        : `Delete the ${group.count} ${group.name} ${group.count === 1 ? "mark" : "marks"} on this sheet — the count stays`
+                    }
+                    aria-label={`Delete ${group.name} marks on this sheet`}
                   >
-                    <path
-                      d={markPath(shape, 10, 10, 8)}
-                      fill={color}
-                      fillOpacity={0.22}
-                      stroke={color}
-                      strokeWidth={2}
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                );
-              })()}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm truncate">{group.name}</p>
-                <p className="text-[0.7rem] text-muted-foreground">
-                  {group.count} placed
-                </p>
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                )}
               </div>
-              <span className="font-mono text-sm tabular-nums">
-                {group.count}
-              </span>
-              {/* Undo and trash, as on a run card (owner, 2026-09-29). */}
-              {group.groupId !== null && (
-                <CardUndo
-                  subject={{ kind: "count", id: group.groupId }}
-                  cardUndo={cardUndo}
-                  onCardUndo={onCardUndo}
-                />
-              )}
-              {onDeleteCountMarks && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive"
-                  disabled={quantitiesLocked || group.stamps.length === 0}
-                  onClick={() =>
-                    onDeleteCountMarks(
-                      group.stamps.map(s => ({ id: s.id, name: group.name }))
-                    )
-                  }
-                  title={
-                    quantitiesLocked
-                      ? "This bid's quantities are locked — unlock them on the bid to delete."
-                      : `Delete the ${group.count} ${group.name} ${group.count === 1 ? "mark" : "marks"} on this sheet — the count stays`
-                  }
-                  aria-label={`Delete ${group.name} marks on this sheet`}
-                >
-                  <Trash2 className="w-3 h-3" />
-                </Button>
-              )}
-            </div>
-            {/*
+              {/*
               Where this count stands with the bid.
 
               Three states and three different things worth saying, all of them
@@ -1319,14 +1392,16 @@ export function RunsPanel({
               a badge on the drawing, which is what level 1's promise of a quiet
               count actually forbids.
             */}
-            {(() => {
-              const state =
-                group.groupId === null ? undefined : bridge?.get(group.groupId);
-              if (!state) return null;
-              if (state.onBid) {
-                return (
-                  <p className="mt-1 text-[0.7rem] text-muted-foreground">
-                    {/*
+              {(() => {
+                const state =
+                  group.groupId === null
+                    ? undefined
+                    : bridge?.get(group.groupId);
+                if (!state) return null;
+                if (state.onBid) {
+                  return (
+                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                      {/*
                       LOCKED IS SAID HERE, not left to the bid screen.
 
                       This is the screen somebody is standing on while they
@@ -1338,61 +1413,69 @@ export function RunsPanel({
                       did not move. CLAUDE.md § a label describing the OLD
                       meaning.
                     */}
-                    {quantitiesLocked
-                      ? "On the bid — locked, so these marks no longer change it"
-                      : "On the bid — the line follows these marks"}
-                  </p>
-                );
-              }
-              if (!state.sendable || !onSendToBid) return null;
-              const busy = sendingGroupId === group.groupId;
-              return (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onSendToBid(group.groupId as number)}
-                  className="mt-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
-                >
-                  {/*
+                      {quantitiesLocked
+                        ? "On the bid — locked, so these marks no longer change it"
+                        : "On the bid — the line follows these marks"}
+                    </p>
+                  );
+                }
+                if (!state.sendable || !onSendToBid) return null;
+                const busy = sendingGroupId === group.groupId;
+                return (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onSendToBid(group.groupId as number)}
+                    className="mt-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
+                  >
+                    {/*
                     The BID's count, not this sheet's. A count marked across
                     five sheets sends all of them, and a control reading "Send 5
                     to bid" beside a panel showing five of fourteen would be
                     telling the truth about the wrong number.
                   */}
-                  {busy ? "Sending…" : `Send ${state.bidCount} to bid`}
-                </button>
-              );
-            })()}
-            {/* The drop to each of these devices (held-migrations plan § 3):
+                    {busy ? "Sending…" : `Send ${state.bidCount} to bid`}
+                  </button>
+                );
+              })()}
+              {/* The drop to each of these devices (held-migrations plan § 3):
                 set once on the count, shown once set. */}
-            {group.groupId !== null &&
-              groupDrops?.get(group.groupId) &&
-              onSetGroupDrop && (
-                <GroupDrop
-                  info={groupDrops.get(group.groupId)!}
-                  heightTypes={dropHeightTypes}
-                  runTypes={dropRunTypes}
-                  locked={quantitiesLocked}
-                  onSet={patch =>
-                    onSetGroupDrop(group.groupId as number, patch)
-                  }
-                />
-              )}
-            {/* Walk the instances: each chip jumps the viewer to that mark. */}
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {group.stamps.map((placed, index) => (
-                <button
-                  key={placed.id}
-                  onClick={() => onJumpTo({ x: placed.x, y: placed.y })}
-                  className="px-1.5 py-0.5 rounded text-[0.65rem] font-mono bg-muted hover:bg-[#F5C518]/20 hover:text-[#F5C518] transition-colors"
-                  title="Show this one on the drawing"
-                >
-                  {index + 1}
-                </button>
-              ))}
+              {group.groupId !== null &&
+                groupDrops?.get(group.groupId) &&
+                onSetGroupDrop && (
+                  <GroupDrop
+                    info={groupDrops.get(group.groupId)!}
+                    heightTypes={dropHeightTypes}
+                    runTypes={dropRunTypes}
+                    locked={quantitiesLocked}
+                    onSet={patch =>
+                      onSetGroupDrop(group.groupId as number, patch)
+                    }
+                  />
+                )}
+              {/* Walk the instances: each chip jumps the viewer to that mark. */}
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {group.stamps.map((placed, index) => (
+                  <button
+                    key={placed.id}
+                    onClick={() => onJumpTo({ x: placed.x, y: placed.y })}
+                    className="px-1.5 py-0.5 rounded text-[0.65rem] font-mono bg-muted hover:bg-[#F5C518]/20 hover:text-[#F5C518] transition-colors"
+                    title="Show this one on the drawing"
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          </Fragment>
         ))}
+        {emptiedAt === stampGroups.length && emptiedCount && (
+          <EmptiedCountRow
+            card={emptiedCount}
+            cardUndo={cardUndo}
+            onCardUndo={onCardUndo}
+          />
+        )}
 
         {/*
           Where the takeoff stands with the bid — one line, in one place.

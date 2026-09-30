@@ -159,6 +159,7 @@ import {
 } from "@/components/takeoff/RunTypePicker";
 import { RunSpecEditor } from "@/components/takeoff/RunSpecEditor";
 import { resolveRunType } from "@shared/runTypeLookup";
+import { lockedEditRefusal } from "@shared/quantityLock";
 import { runTypeSpec } from "@shared/takeoffCounts";
 import { CalibrateLayer } from "@/components/takeoff/CalibrateLayer";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
@@ -241,6 +242,7 @@ import {
   type UndoOp,
   type UndoState,
 } from "@/lib/undoStack";
+import { emptiedCountCard } from "@/lib/emptiedCountCard";
 import type { PageTextLayer } from "@/lib/textSelection";
 import { TextSelectLayer } from "@/components/takeoff/TextSelect";
 import { useUploadSpeeds } from "@/lib/useUploadSpeeds";
@@ -3196,9 +3198,14 @@ export default function TakeoffPage({
         the hand-added line turns up afterwards.
       */
       toast.success(
+        /*
+          The locked wording used to end "so further marks will not change
+          it", which was true while marks could still be placed on a locked
+          bid. Since 2026-09-29 they cannot, so it says what actually happens.
+        */
         (quantitiesLocked
           ? `${result.count} on the bid, frozen at that number — this bid's ` +
-            `quantities are locked, so further marks will not change it.`
+            `quantities are locked, so the plans cannot change until you unlock.`
           : `${result.count} on the bid. The line follows your marks from here.`) +
           // A free count arrives blank. Saying where the price goes, now,
           // beats the estimator finding a $0 line later.
@@ -3213,6 +3220,16 @@ export default function TakeoffPage({
   /** Pick the tool up. One function, so both doors leave the same state. */
   const armGroup = useCallback(
     (group: { id: number; label: string }, assemblyId: number | null) => {
+      /*
+        A locked bid takes no new marks (the server refuses them too). Said
+        HERE, on picking the tool up, rather than on the first click: a click
+        is drawn at once and sent later, so a refusal arriving then would
+        leave marks on the screen that were never counted.
+      */
+      if (quantitiesLocked) {
+        toast.error(lockedEditRefusal("new marks cannot be placed"));
+        return;
+      }
       setSelectingText(false);
       setArmedGroup({
         groupId: group.id,
@@ -3221,7 +3238,7 @@ export default function TakeoffPage({
       });
       toast.success(`Counting ${group.label} — click to place.`);
     },
-    []
+    [quantitiesLocked]
   );
   /** A mark delete as an undo step: the packet puts them back, same ids. */
   const pushMarksDeleted = (
@@ -3235,6 +3252,14 @@ export default function TakeoffPage({
       stamps.filter(s => ids.includes(s.id)).map(s => s.groupId)
     );
     const [only] = Array.from(groups);
+    /*
+      The card as it stands now, before the delete lands. If these were its
+      last marks on the sheet the card is about to vanish, and with it the
+      undo arrow; remembering it lets the panel keep it in place, empty, with
+      the arrow still there (@/lib/emptiedCountCard).
+    */
+    const position = stampGroups.findIndex(g => g.groupId === only);
+    const card = position >= 0 ? stampGroups[position] : null;
     pushUndo({
       label: countLabel(removed, "mark", "marks", "deleted"),
       sheetId: activeSheet.id,
@@ -3242,7 +3267,21 @@ export default function TakeoffPage({
       redo: null,
       subject:
         groups.size === 1 && only != null
-          ? { kind: "count", id: only }
+          ? {
+              kind: "count",
+              id: only,
+              ...(card
+                ? {
+                    card: {
+                      label: card.name,
+                      assemblyId: card.assemblyId,
+                      assemblyCategory:
+                        card.stamps[0]?.assemblyCategory ?? null,
+                      position,
+                    },
+                  }
+                : {}),
+            }
           : undefined,
     });
   };
@@ -4727,6 +4766,12 @@ export default function TakeoffPage({
 
   const startTracing = useCallback(
     (pathType: RunPathType) => {
+      // Same reason as `armGroup`: a trace autosaves as it goes, and every
+      // save of it would be refused on a locked bid.
+      if (quantitiesLocked) {
+        toast.error(lockedEditRefusal("new runs cannot be traced"));
+        return;
+      }
       setTracePathType(pathType);
       setTracePoints([]);
       draftRunId.current = null;
@@ -4736,7 +4781,7 @@ export default function TakeoffPage({
       setTracing(true);
       setSelectedRunId(null);
     },
-    [resetLegs]
+    [resetLegs, quantitiesLocked]
   );
 
   /**
@@ -4909,6 +4954,10 @@ export default function TakeoffPage({
       pathType: RunPathType;
       traceMode: TraceMode;
     }) => {
+      if (quantitiesLocked) {
+        toast.error(lockedEditRefusal("legs cannot be added"));
+        return;
+      }
       setTracePathType(run.pathType);
       setTracePoints([]);
       draftRunId.current = null;
@@ -4921,7 +4970,7 @@ export default function TakeoffPage({
       setTracing(true);
       setSelectedRunId(null);
     },
-    []
+    [quantitiesLocked]
   );
 
   const finishTrace = useCallback(async () => {
@@ -5011,6 +5060,18 @@ export default function TakeoffPage({
     savedPointCount.current = 0;
     resetLegs();
   }, [activeSheet?.id, legRootId, commitRun, resetLegs]);
+
+  /*
+    The doors above refuse to pick a tool up on a locked bid, but the lock is
+    read from a query: a tool picked up in the moment before it arrives would
+    otherwise stay in hand, placing marks the server then refuses. So the
+    moment the lock is known, whatever is in hand is put down.
+  */
+  useEffect(() => {
+    if (!quantitiesLocked) return;
+    setArmedGroup(null);
+    if (tracing) cancelTrace();
+  }, [quantitiesLocked, tracing, cancelTrace]);
 
   const handleSheetVisible = useCallback(
     (pageNumber: number, text: string) => {
@@ -5654,6 +5715,14 @@ export default function TakeoffPage({
                   category: a.category ?? null,
                 }))}
                 disabled={allAssemblies.length === 0}
+                onRefused={
+                  quantitiesLocked
+                    ? () =>
+                        toast.error(
+                          lockedEditRefusal("new marks cannot be placed")
+                        )
+                    : undefined
+                }
                 onPick={assembly => {
                   groupForAssembly
                     .mutateAsync({ bidId, assemblyId: assembly.id })
@@ -5702,7 +5771,11 @@ export default function TakeoffPage({
                 aria-disabled={!measurability}
                 onClick={() => {
                   if (!measurability) return;
-                  if (traceCondition) toast.info(traceCondition);
+                  // Not on a locked bid: `startTracing` refuses there, and a
+                  // "trace the path" hint beside that refusal contradicts it
+                  // (seen on screen, 2026-09-29).
+                  if (traceCondition && !quantitiesLocked)
+                    toast.info(traceCondition);
                   startTracing("conduit");
                 }}
                 onMouseEnter={() => setReachingForMeasure(true)}
@@ -5761,7 +5834,8 @@ export default function TakeoffPage({
                 aria-disabled={!measurability}
                 onClick={() => {
                   if (!measurability) return;
-                  if (traceCondition) toast.info(traceCondition);
+                  if (traceCondition && !quantitiesLocked)
+                    toast.info(traceCondition);
                   startTracing("cable");
                 }}
                 onMouseEnter={() => setReachingForMeasure(true)}
@@ -6822,6 +6896,11 @@ export default function TakeoffPage({
               onDeleteCountMarks={deleteMarks}
               onOpenPartialEnds={openPartialEnds}
               cardUndo={subject => undoForSubject(undoState, subject)}
+              emptiedCount={emptiedCountCard(
+                undoState,
+                activeSheet?.id ?? null,
+                stampGroups.map(g => g.groupId)
+              )}
               // Only ever enabled for the NEWEST step, so it is the ordinary
               // undo — never an out-of-order one (@/lib/undoStack).
               onCardUndo={() => void stepBack("undo")}

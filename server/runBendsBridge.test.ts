@@ -29,6 +29,7 @@ import {
   users,
 } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { behindTheLock } from "./behindTheLock.testHelper";
 import { lineHoursUnset, lineNotPriced } from "../shared/lineNotPriced";
 
 const USER = 8795;
@@ -111,13 +112,7 @@ async function trace(
   sheetId: number,
   runTypeId: number,
   points: { x: number; y: number }[],
-  id?: number,
-  /**
-   * False for a run traced AFTER the bid was locked: since 2026-09-29 a
-   * locked bid refuses end changes (they move drop footage), while tracing
-   * itself is still allowed.
-   */
-  setEnds = true
+  id?: number
 ) {
   const run = await caller().takeoffRuns.save({
     ...(id ? { id } : {}),
@@ -129,7 +124,7 @@ async function trace(
     status: "committed",
     points,
   });
-  if (!id && setEnds) {
+  if (!id) {
     await caller().takeoffRuns.setEnds({
       id: run.id,
       startKind: "distribution",
@@ -383,7 +378,9 @@ withDb("factory elbows from the company size up", () => {
     await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
     await caller().bids.lockQuantities({ bidId });
 
-    await trace(bidId, sheetId, type.id, L, undefined, false);
+    // Behind the lock: a locked bid refuses tracing since 2026-09-29; this
+    // is a drawing that moved before that rule.
+    await behindTheLock(bidId, () => trace(bidId, sheetId, type.id, L));
     await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
     const elbow = line((await detail(bidId)).lines, "elbow90")!;
     expect(Number(elbow.qty)).toBe(1);

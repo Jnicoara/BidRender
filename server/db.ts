@@ -8227,6 +8227,27 @@ export async function updateRunCircuit(
     );
 }
 
+/**
+ * The run a circuit hangs on, or null when the circuit is not this user's.
+ * Asked so a circuit edit can be refused on a locked bid: the circuit is
+ * addressed by its own id, and the lock lives on the run's bid.
+ */
+export async function getRunIdOfCircuit(
+  id: number,
+  userId: number
+): Promise<number | null> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select({ runId: takeoffRunCircuits.runId })
+    .from(takeoffRunCircuits)
+    .where(
+      and(eq(takeoffRunCircuits.id, id), eq(takeoffRunCircuits.userId, userId))
+    )
+    .limit(1);
+  return row?.runId ?? null;
+}
+
 export async function deleteRunCircuit(id: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -11573,6 +11594,26 @@ export async function answerPullPoint(
       answeredBy: actorUserId,
     });
   });
+}
+
+/** The run a pull-point answer belongs to, or null when it is not this user's. */
+export async function getRunIdOfPullPoint(
+  answerId: number,
+  userId: number
+): Promise<number | null> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select({ runId: takeoffPullPoints.runId })
+    .from(takeoffPullPoints)
+    .where(
+      and(
+        eq(takeoffPullPoints.id, answerId),
+        eq(takeoffPullPoints.userId, userId)
+      )
+    )
+    .limit(1);
+  return row?.runId ?? null;
 }
 
 /** Withdraw one answer, so the spot is proposed afresh. */

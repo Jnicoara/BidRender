@@ -40,6 +40,7 @@ import {
   users,
 } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { behindTheLock } from "./behindTheLock.testHelper";
 import {
   followsDrawing,
   lockedBannerCopy,
@@ -357,7 +358,11 @@ withDb("a locked bid holds still; a draft beside it does not", () => {
     expect(locked.frozen).toBe(1);
 
     // Two more of the same thing found on the drawing, on both bids.
-    await mark(sent.bidId, sent.sheetId, sentGroup.id, 2);
+    // Behind the lock: the app refuses new marks on a locked bid since
+    // 2026-09-29, and this pins the read side for a drawing that moved anyway.
+    await behindTheLock(sent.bidId, () =>
+      mark(sent.bidId, sent.sheetId, sentGroup.id, 2)
+    );
     await mark(draft.bidId, draft.sheetId, draftGroup.id, 2);
 
     expect(Number((await detail(sent.bidId)).lines[0].qty)).toBe(14);
@@ -385,7 +390,7 @@ withDb("a locked bid holds still; a draft beside it does not", () => {
     const group = await countOf(bidId, sheetId, assemblyId, 14);
     await caller().takeoffGroups.sendToBid({ id: group.id });
     await caller().bids.lockQuantities({ bidId });
-    await mark(bidId, sheetId, group.id, 2);
+    await behindTheLock(bidId, () => mark(bidId, sheetId, group.id, 2));
 
     expect(Number((await detail(bidId)).lines[0].qty)).toBe(14);
 
@@ -431,7 +436,7 @@ withDb("a locked bid holds still; a draft beside it does not", () => {
     expect(pipe((await detail(bidId)).lines)).toBeCloseTo(100, 0);
 
     await caller().bids.lockQuantities({ bidId });
-    await trace("Homerun 2");
+    await behindTheLock(bidId, () => trace("Homerun 2"));
 
     // A second hundred feet on the drawing, and the bid does not know.
     expect(pipe((await detail(bidId)).lines)).toBeCloseTo(100, 0);
@@ -475,7 +480,7 @@ withDb("a locked bid holds still; a draft beside it does not", () => {
     await caller().bids.lockQuantities({ bidId });
     const before = await storedQty(bidId);
 
-    await trace("Homerun 2");
+    await behindTheLock(bidId, () => trace("Homerun 2"));
     const again = await caller().takeoffRunTypes.sendToBid({
       bidId,
       runTypeId: type.id,
@@ -542,7 +547,7 @@ withDb("what the confirmation is allowed to say", () => {
     // Locked an instant ago and nobody has drawn since: a real, common answer.
     expect(quiet.changes).toEqual([]);
 
-    await mark(bidId, sheetId, group.id, 2);
+    await behindTheLock(bidId, () => mark(bidId, sheetId, group.id, 2));
 
     const moved = await caller().bids.quantityLock({ bidId });
     expect(moved.changes).toHaveLength(1);
@@ -627,11 +632,13 @@ withDb("a count sent to a locked bid", () => {
       like everything else there. Refusing would be a second lock rule in a
       second place, and the one an estimator would meet with no way through.
     */
-    const late = await countOf(bidId, sheetId, second, 6);
+    const late = await behindTheLock(bidId, () =>
+      countOf(bidId, sheetId, second, 6)
+    );
     const crossed = await caller().takeoffGroups.sendToBid({ id: late.id });
     expect(crossed.count).toBe(6);
 
-    await mark(bidId, sheetId, late.id, 3);
+    await behindTheLock(bidId, () => mark(bidId, sheetId, late.id, 3));
 
     const { lines } = await detail(bidId);
     const lateLine = lines.find(l => l.takeoffGroupId === late.id)!;

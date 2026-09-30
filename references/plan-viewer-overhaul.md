@@ -2513,6 +2513,16 @@ made.
 
 #### OVERRIDE 3 — a sent bid can be LOCKED, and then nothing follows the drawing
 
+> **Narrowed 2026-09-29 (owner: "a locked bid must not change").** As built
+> below, the lock froze the bid's numbers while the drawing behind them could
+> still gain marks, runs, legs, typed lengths, pull points and circuits
+> (`takeoffStampsRouter` said placing stayed allowed "on purpose"). Now the
+> drawing is frozen too: every one of those is refused with "This bid's
+> quantities are locked, so … Unlock them on the bid first."
+> (`shared/quantityLock.ts` `lockedEditRefusal`, `server/lockedEdits.test.ts`).
+> Sending to a locked bid is unchanged for now — see
+> `references/track-b-deletes-summary-pan-plan.md` Question 1.
+
 **Decided and built 2026-09-24. This amends D2(a) a second time, and it amends
 OVERRIDE 2's own sentence — "after that the count is live for ever" — which was
 true of every bid until this existed.** `references/takeoff-spec.md` D2 carries a

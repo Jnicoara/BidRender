@@ -55,6 +55,7 @@ import {
 } from "../../shared/takeoffQuantities";
 import { runWireOwnership } from "../../shared/branchWire";
 import { runOnBid, type RunTotalsLeftOut } from "../../shared/runOnBid";
+import { lockedEditRefusal } from "../../shared/quantityLock";
 import {
   runDisplayName,
   runName,
@@ -165,20 +166,46 @@ async function requireRun(id: number, userId: number) {
 }
 
 /**
- * Refuse to change what a run IS on a bid whose quantities are locked.
+ * Refuse to change a run on a bid whose quantities are locked.
  * shared/quantityLock.ts says what the lock means; this is where changing a
- * run's materials stops at it.
+ * run stops at it.
+ *
+ * ── Every write, since 2026-09-29 (owner: "a locked bid must not change") ───
+ * It used to guard only what a run IS — its type, its points, its ends —
+ * while a new run could still be traced, a typed length typed, a leg added
+ * and a pull point answered. The locked line did not move (it reads its
+ * stored `qty`), but the drawing behind it did, so unlocking later re-read a
+ * drawing nobody had checked against the quote. Now nothing on a locked bid's
+ * runs changes; `server/lockedEdits.test.ts` has each refusal and its
+ * unlocked twin.
+ *
+ * `what` finishes the sentence, so the refusal names the thing that was tried.
  */
-async function refuseIfLocked(bidId: number, userId: number) {
+async function refuseIfLocked(
+  bidId: number,
+  userId: number,
+  what = "its runs cannot be changed"
+) {
   const bid = await db.getBidById(bidId, userId);
   if (!bid)
     throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
   if (bid.quantitiesLockedAt !== null)
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message:
-        "This bid's quantities are locked, so its runs cannot be changed. Unlock them on the bid first.",
+      message: lockedEditRefusal(what),
     });
+}
+
+/** The same refusal, for something addressed through its run's id. */
+async function refuseIfRunLocked(
+  runId: number | null,
+  userId: number,
+  what?: string
+) {
+  if (runId === null)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Run not found." });
+  const run = await requireRun(runId, userId);
+  await refuseIfLocked(run.bidId, userId, what);
 }
 
 /**
@@ -528,9 +555,17 @@ export const takeoffRunsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const sheet = await requireSheet(input.sheetId, ctx.scope.dataUserId);
-      const bid = await db.getBidById(input.bidId, ctx.scope.dataUserId);
-      if (!bid)
-        throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
+      /*
+        Both a new run and a re-save of an existing one. The autosave of a
+        trace in progress goes through here too, which is why the Plans screen
+        will not arm the trace tool on a locked bid: an autosave refused every
+        few seconds would be a stream of errors for work the screen let begin.
+      */
+      await refuseIfLocked(
+        input.bidId,
+        ctx.scope.dataUserId,
+        input.id ? "its runs cannot be changed" : "new runs cannot be traced"
+      );
 
       /*
         What this run IS, resolved from the palette rather than trusted.
@@ -660,6 +695,8 @@ export const takeoffRunsRouter = router({
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const run = await requireRun(input.id, ctx.scope.dataUserId);
+      // Finishing re-measures every leg against the sheet's scale today.
+      await refuseIfLocked(run.bidId, ctx.scope.dataUserId);
       const sheet = await requireSheet(run.sheetId, ctx.scope.dataUserId);
       const measurability = measurabilityOf(sheetScale(sheet));
       const ratio = measurability.ok ? measurability.ratio : null;
@@ -749,6 +786,8 @@ export const takeoffRunsRouter = router({
           message: "That run is not a suggestion.",
         });
       }
+      // An accepted suggestion becomes a draft, and drafts count on the bid.
+      await refuseIfLocked(run.bidId, ctx.scope.dataUserId);
       await requireMeasurableSheet(run.sheetId, ctx.scope.dataUserId);
       // Accepting a suggestion accepts every leg of it (D20).
       const group = await db.getRunGroup(
@@ -804,7 +843,12 @@ export const takeoffRunsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      await requireRun(input.id, ctx.scope.dataUserId);
+      const run = await requireRun(input.id, ctx.scope.dataUserId);
+      await refuseIfLocked(
+        run.bidId,
+        ctx.scope.dataUserId,
+        "a run's length cannot be typed or cleared"
+      );
       await db.updateRun(input.id, ctx.scope.dataUserId, {
         typedLengthInches:
           input.typedLengthInches === null
@@ -1187,6 +1231,7 @@ export const takeoffRunsRouter = router({
         from.parentRunId === null
           ? from
           : await requireRun(from.parentRunId, userId);
+      await refuseIfLocked(root.bidId, userId, "legs cannot be added");
       const group = await db.getRunGroup(root.id, userId);
 
       const start = input.start;
@@ -1316,6 +1361,12 @@ export const takeoffRunsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const run = await requireRun(input.runId, ctx.scope.dataUserId);
+      // A circuit is wire the length of the run.
+      await refuseIfLocked(
+        run.bidId,
+        ctx.scope.dataUserId,
+        "circuits cannot be changed"
+      );
       if (run.pathType !== "conduit") {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -1359,14 +1410,26 @@ export const takeoffRunsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const { id, ...patch } = input;
-      await db.updateRunCircuit(id, ctx.scope.dataUserId, patch);
+      const userId = ctx.scope.dataUserId;
+      await refuseIfRunLocked(
+        await db.getRunIdOfCircuit(id, userId),
+        userId,
+        "circuits cannot be changed"
+      );
+      await db.updateRunCircuit(id, userId, patch);
       return { success: true };
     }),
 
   removeCircuit: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
-      await db.deleteRunCircuit(input.id, ctx.scope.dataUserId);
+      const userId = ctx.scope.dataUserId;
+      await refuseIfRunLocked(
+        await db.getRunIdOfCircuit(input.id, userId),
+        userId,
+        "circuits cannot be changed"
+      );
+      await db.deleteRunCircuit(input.id, userId);
       return { success: true };
     }),
 
@@ -1643,6 +1706,12 @@ export const takeoffRunsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const run = await requireRun(input.runId, ctx.scope.dataUserId);
+      // An LB or a pull box is a fitting on the bid.
+      await refuseIfLocked(
+        run.bidId,
+        ctx.scope.dataUserId,
+        "pull points cannot be answered"
+      );
       const where = placeAnswer(
         { points: run.points ?? [], endDrop: { state: "unknown" } },
         { id: 0, ...input }
@@ -1665,7 +1734,13 @@ export const takeoffRunsRouter = router({
   clearPullPointAnswer: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
-      await db.clearPullPointAnswer(ctx.scope.dataUserId, input.id);
+      const userId = ctx.scope.dataUserId;
+      await refuseIfRunLocked(
+        await db.getRunIdOfPullPoint(input.id, userId),
+        userId,
+        "pull points cannot be answered"
+      );
+      await db.clearPullPointAnswer(userId, input.id);
       return { ok: true };
     }),
 

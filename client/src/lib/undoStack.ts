@@ -88,7 +88,25 @@ export type UndoEntry = {
   subject?: UndoSubject;
 };
 
-export type UndoSubject = { kind: "count" | "run"; id: number };
+export type UndoSubject = {
+  kind: "count" | "run";
+  id: number;
+  /**
+   * The count's card as it stood when its marks were deleted — enough to draw
+   * it again with nothing in it. Only on a mark delete; see
+   * @/lib/emptiedCountCard for why.
+   */
+  card?: CountCardSnapshot;
+};
+
+/** A count card, remembered: its name, its swatch, and where it sat. */
+export type CountCardSnapshot = {
+  label: string;
+  assemblyId: number | null;
+  assemblyCategory: string | null;
+  /** Its index in the sheet's list of count cards. */
+  position: number;
+};
 
 export type UndoState = { past: UndoEntry[]; future: UndoEntry[] };
 
