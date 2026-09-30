@@ -342,19 +342,39 @@ const STRAP_FAMILIES = [
   { label: "rigid", slang: "rmc grc imc galvanized" },
 ];
 
-const straps: BaselineMaterial[] = STRAP_FAMILIES.flatMap(family =>
-  TRADE_SIZES.map(size => ({
-    name: oneHoleStrapName(size, family.label),
+const straps: BaselineMaterial[] = [
+  ...STRAP_FAMILIES.flatMap(family =>
+    TRADE_SIZES.map(size => ({
+      name: oneHoleStrapName(size, family.label),
+      unitOfSale: "each" as const,
+      costPerUnit: UNPRICED,
+      category: "Conduit Fittings" as const,
+      searchAliases: aliases(
+        sizeAliases(size),
+        family.slang,
+        "1 hole clamp conduit pipe hanger support"
+      ),
+    }))
+  ),
+  /*
+    Flex straps (retail catalog plan § R7, 2026-09-29), one per flex size.
+    FMC and liquidtight share them, as strapFamily says: until these the
+    count said "No catalog strap" on every flex run, which was honest and
+    left the estimator to add them by hand at every rooftop unit and cooler.
+  */
+  ...FLEX_SIZES.map(size => ({
+    name: oneHoleStrapName(size, "flexible conduit"),
     unitOfSale: "each" as const,
     costPerUnit: UNPRICED,
     category: "Conduit Fittings" as const,
     searchAliases: aliases(
       sizeAliases(size),
-      family.slang,
-      "1 hole clamp conduit pipe hanger support"
+      "greenfield fmc liquidtight lfmc sealtite seal tite",
+      "1 hole clamp conduit hanger support"
     ),
-  }))
-);
+    description: "Fits flexible metal and liquidtight conduit of this size.",
+  })),
+];
 
 // ─── Flex ─────────────────────────────────────────────────────────────────────
 

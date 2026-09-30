@@ -428,7 +428,9 @@ export function cBodyName(size: string, family: string): string {
 
 /**
  * The strap a family is held with. PVC 40 and 80 share an outside diameter,
- * as do rigid and IMC, so each pair shares a strap. Flex has none yet.
+ * as do rigid and IMC, so each pair shares a strap. So do flexible metal and
+ * liquidtight, since 2026-09-29 (retail plan § R7) — until then flex had no
+ * strap and its count said "No catalog strap".
  */
 export function strapFamily(family: RacewayFamilyLabel): string | null {
   switch (family) {
@@ -440,6 +442,11 @@ export function strapFamily(family: RacewayFamilyLabel): string | null {
     case "rigid conduit":
     case "IMC":
       return "rigid";
+    // "flexible conduit", not "flex": named `1/2" flex one-hole strap` it led
+    // a search for "1/2 flex", above the flex conduit itself.
+    case "flexible metal conduit":
+    case "liquidtight flexible conduit":
+      return "flexible conduit";
     default:
       return null;
   }

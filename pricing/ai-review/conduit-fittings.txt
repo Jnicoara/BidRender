@@ -1,5 +1,5 @@
 Category: Conduit Fittings
-Items: 581
+Items: 585
 
 Category | Name | Size
 Conduit Fittings | 1/2" EMT 45-degree elbow | 1/2"
@@ -521,6 +521,10 @@ Conduit Fittings | 1/2" liquidtight flexible conduit coupling | 1/2"
 Conduit Fittings | 3/4" liquidtight flexible conduit coupling | 3/4"
 Conduit Fittings | 1" liquidtight flexible conduit coupling | 1"
 Conduit Fittings | 1-1/4" liquidtight flexible conduit coupling | 1-1/4"
+Conduit Fittings | 1/2" flexible conduit one-hole strap | 1/2"
+Conduit Fittings | 3/4" flexible conduit one-hole strap | 3/4"
+Conduit Fittings | 1" flexible conduit one-hole strap | 1"
+Conduit Fittings | 1-1/4" flexible conduit one-hole strap | 1-1/4"
 Conduit Fittings | 1/2" flexible metal conduit connector | 1/2"
 Conduit Fittings | 3/4" flexible metal conduit connector | 3/4"
 Conduit Fittings | 1" flexible metal conduit connector | 1"

@@ -1,5 +1,5 @@
 Category: Wire & Cable
-Items: 104
+Items: 106
 
 Category | Name | Size
 Wire & Cable | #14 bare CU, solid | #14
@@ -84,6 +84,8 @@ Wire & Cable | 300 kcmil THHN | 300 kcmil
 Wire & Cable | 350 kcmil THHN | 350 kcmil
 Wire & Cable | 400 kcmil THHN | 400 kcmil
 Wire & Cable | 500 kcmil THHN | 500 kcmil
+Wire & Cable | #14 THHN stranded | #14
+Wire & Cable | #12 THHN stranded | #12
 Wire & Cable | #10 THHN stranded | #10
 Wire & Cable | 12-3 tray cable | -
 Wire & Cable | 14-2 UF-B | -

@@ -286,6 +286,12 @@ what they buy.
 
 **Recommend:** build. Two rows, no risk.
 
+> **BUILT 2026-09-29 — 2 rows:** `#14 THHN stranded`, `#12 THHN stranded`.
+> The wire file's header said "there is no stranded 14"; corrected there,
+> with the old claim kept. The solid #14 and #12 now say "Solid. The
+> stranded version is a separate item." "12 thhn" still leads with the
+> solid row.
+
 ---
 
 ## R7. Flex runs say "No catalog strap"
@@ -302,6 +308,14 @@ flex rows come in), plus the `strapFamily` entry that lets the counter pick
 them.
 
 **Recommend:** build with R1, since it is the same kind of work.
+
+> **BUILT 2026-09-29 — 4 rows:** `1/2" flexible conduit one-hole strap`
+> through 1-1/4", shared by FMC and liquidtight (`strapFamily`). First
+> named "flex one-hole strap", which led "1/2 flex" above the conduit
+> itself; "flexible conduit" puts the conduit first again.
+> `server/raceStrapCatalog.test.ts` fails if any raceway's strap name is not
+> a shipped row, or if flex has none; red with the `strapFamily` case
+> removed.
 
 ---
 

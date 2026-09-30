@@ -2052,9 +2052,12 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       `cableLegs`, parts by `mcFittingNames`, 4 MC connectors + 2 MC straps.
       The type's existing connector/strap columns hold an override. NM still
       counts none (plastic box: none needed; box kind not known).
-- [ ] **FMC/LFMC straps.** Flex carries a strap spacing (4.5 ft / 1 ft) but
+- [x] **FMC/LFMC straps.** Flex carries a strap spacing (4.5 ft / 1 ft) but
       `strapFamily` returns null for flex, so flex straps say "No catalog
       strap" until sized flex straps ship.
+      **BUILT 2026-09-29 (retail plan § R7):** `<size> flexible conduit
+    one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
+      `server/raceStrapCatalog.test.ts` checks every raceway's strap ships.
 - [ ] **Double counting from a user's own box assembly.** No starter assembly
       carries a connector or strap, so nothing overlaps today. A company
       whose own box or device assembly includes an EMT connector will count

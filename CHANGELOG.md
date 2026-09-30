@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Flex runs now buy their straps, and #12 and #14 stranded THHN are in
+  the catalog.** A traced flexible metal or liquidtight run used to say "No
+  catalog strap"; it now counts one-hole straps sized to the flex (four new
+  parts). Stranded #12 and #14, common in commercial pipe, sit beside the
+  solid rows.
+
 - **Three-phase panels now come in sizes.** Six 208Y/120V panelboards,
   100A to 400A, main-lug and main-breaker. Before, one unsized
   "208V 3-phase panelboard" row stood for every size, so a 100A and a 400A

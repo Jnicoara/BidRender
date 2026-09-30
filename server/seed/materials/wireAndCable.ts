@@ -8,6 +8,12 @@
  * no stranded 14, so "#4/0 THHN" is unambiguous and a "(stranded)" suffix would
  * be noise on 30 rows to disambiguate one.
  *
+ * **Corrected 2026-09-29 (retail catalog plan § R6):** "no stranded 14" was
+ * wrong. #14 and #12 THHN are stocked stranded as well — commercial pulls in
+ * EMT commonly use it — so 14, 12 and 10 all exist both ways and all three
+ * name the stranded row. The plain "#14 THHN" and "#12 THHN" stay the solid
+ * rows, under the names the starter assemblies use.
+ *
  * ── Aluminum is flagged, deliberately ────────────────────────────────────────
  * Aluminum feeder is priced on a different commodity curve than copper and
  * moves independently of it, sometimes sharply. Every aluminum row says so in
@@ -79,9 +85,16 @@ const copperThhn: BaselineMaterial[] = [
     costPerUnit: UNPRICED,
     category: "Wire & Cable" as const,
     searchAliases: aliases(gaugeAliases(gauge), BUILDING_WIRE, "solid"),
-    ...(gauge === "#10"
-      ? { description: "Solid. The stranded version is a separate item." }
-      : {}),
+    description: "Solid. The stranded version is a separate item.",
+  })),
+  // The two stranded sizes added 2026-09-29 (§ R6); #10's is below.
+  ...["#14", "#12"].map(gauge => ({
+    name: `${gauge} THHN stranded`,
+    unitOfSale: "foot" as const,
+    costPerUnit: UNPRICED,
+    category: "Wire & Cable" as const,
+    searchAliases: aliases(gaugeAliases(gauge), BUILDING_WIRE),
+    description: "Stranded. The solid version is a separate item.",
   })),
   ...COPPER_STRANDED.map(gauge => ({
     // Only 10 AWG needs the suffix — it is the single size stocked both ways.
