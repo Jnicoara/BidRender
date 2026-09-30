@@ -86,24 +86,41 @@ much each one helps before building either.
 replaced it with (c) and (d). If it is wanted back, it is one more row and
 about 5 cents a sheet.
 
-### Pick 4 sheets (5 if one vector set qualifies)
+### Step 0 — which sets have a symbol legend. DONE 2026-09-29
+
+Checked by rendering the first pages of each set and looking at them (text
+search alone cannot answer it: Old Blueridge's text is poor OCR and pine st has
+none). Page numbers are the PDF's own, 1 = first page.
+
+| Set                      | Legend?                                                                                                                   | Countable drawings                                                                                                  | Verdict                                                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Old Blueridge** (scan) | **Yes.** p1, E0.01: a symbol schedule down the right side (power, devices, lighting, switching, fire alarm, low voltage). | p3 E1.01 lighting, p4 E1.02 power, p5 E1.03 fire alarm and low voltage. p2 E1.00 is panel schedules, not countable. | **Use.** Each drawing has a NEW plan on top and a DEMOLITION plan below; see the counting rule in the hand-count instructions. |
+| **UNCC** (vector)        | **Yes.** p1, E001: a very large electrical symbol schedule.                                                               | p5 E111 "Level 2 floor plan, power and special systems" — the densest sheet seen. p3, p6 also plans.                | **Use** p5.                                                                                                                    |
+| **Weld 1** (vector)      | **Yes.** p1, E-001: a full electrical symbols list.                                                                       | p5 E-200 power plan (with a small security plan and a demolition plan on the same sheet).                           | **Use** p5, as the moderate-density vector sheet.                                                                              |
+| Weld 2 (vector)          | Yes. p1, E1.0: the same engineer's symbols list as Weld 1.                                                                | 18 pages, not looked through.                                                                                       | Spare. Same office as Weld 1, so it adds little variety.                                                                       |
+| Colusa (vector)          | Yes. p1, E0.1: electrical symbol list.                                                                                    | 4 pages only, mostly schedules and notes.                                                                           | Spare.                                                                                                                         |
+| Dundas (vector)          | Yes. p2: electrical symbols.                                                                                              | Australian school, schematic design stage, metric and Australian symbols.                                           | **Skip.** Not the drawings the product is for.                                                                                 |
+| pine st (scan)           | A small street-lighting legend (about 7 entries) on each sheet.                                                           | 11x17 civil street-lighting plans: poles, junction boxes, conduit. Sparse.                                          | **Skip.** A legend, but not an electrician's building sheet; it would measure a job the product does not do.                   |
+
+### The sheets: 4 fixed, plus 1 of yours
 
 Dense drawings, not title sheets. The dense sheet is where the reader earns its
 keep or does not (§ 15.2).
 
-1. **Old Blueridge E1.02** — 78 symbols, a scan. The known dense one.
-2. **Old Blueridge, sheet 5 (E1.3)** — another dense scan, same legend.
-3. **pine st, its densest drawing** — a scan with no text. Only if it has a
-   legend; if not, swap in another set that does.
-4. **One vector set's densest power or lighting plan** — Weld, UNCC, Colusa or
-   Dundas, whichever has a device legend.
-5. _(Optional)_ a second vector sheet, if the counting time allows.
+1. **Old Blueridge p4, E1.02 power** — 78 symbols, a scan. The known dense one.
+2. **Old Blueridge p3, E1.01 lighting** — a scan, fixtures rather than devices.
+3. **UNCC p5, E111 power and special systems** — vector, the densest found.
+4. **Weld 1 p5, E-200 power** — vector, moderate density.
+5. **Yours: one sheet from your own retail job**, with its legend. The only
+   one that is the kind of work the product is actually for. Optional, but the
+   most telling.
 
-**Step 0, about 10 minutes:** open pine st and the five public sets and note
-which have a symbol legend and a busy floor plan. A set with no legend cannot
-run (b) or (d), so it is not used.
+(The overhaul document calls Old Blueridge's sheet 5 "E1.3". Its title block
+says E1.03, and it is the fire alarm sheet, not a power sheet.)
 
 ### You count by hand, once
+
+Step-by-step instructions: `references/reader-accuracy-hand-count.md`.
 
 **Before any AI run is seen.** A count made after seeing the AI's answer is not
 an independent count (§ 15.2).
