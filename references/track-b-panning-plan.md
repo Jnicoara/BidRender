@@ -1,6 +1,14 @@
-# Track B: panning at every zoom — PLAN ONLY
+# Track B: panning at every zoom
 
-**Planned 2026-09-29 on `track-b`. Nothing here is built.** Owner's brief: pan at
+> **BUILT 2026-09-29 on `track-b`, except touch and phone** (moved to their
+> own piece, `todo.md` "Before beta"). Three commits: the guards (§ 3, guards
+> 1, 2, 4 and 5; `client/src/lib/dragThreshold.ts`), the slack at Fit (§ 2,
+> `FIT_SLACK_FRACTION` 0.15), and the trackpad (§ 6,
+> `client/src/lib/wheelIntent.ts`). Each was measured on screen; the numbers
+> are in the commit messages. Still to measure: whether 15% feels like "a
+> little", and whether the wheel rule tells YOUR mouse from YOUR trackpad.
+
+**Planned 2026-09-29 on `track-b`.** Owner's brief: pan at
 every zoom, pinch to zoom, two-finger scroll pans, and a pan never selects or
 edits anything. It follows `references/track-b-deletes-summary-pan-plan.md` § 6,
 which read the code; this adds the measurement that section asked for.

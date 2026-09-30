@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Two-finger scrolling on a trackpad now moves the sheet.** It used to zoom.
+  A mouse wheel still zooms (like Bluebeam), and pinching still zooms. The app
+  tells the two apart by how the scroll arrives; if your mouse ever pans
+  instead of zooming, say so — that is the one guess in this.
 - **You can move the sheet when zoomed out.** At "Fit" and below, dragging
   the sheet did nothing — it snapped back to the middle. It now moves a
   little (up to about a sixth of the view either way) so you can slide a

@@ -245,6 +245,7 @@ import { emptiedCountCard } from "@/lib/emptiedCountCard";
 import { nextMarkBatch, splitRecoveredMarks } from "@/lib/markBatches";
 import { loadUndo, saveUndo, tabStorage } from "@/lib/undoPersist";
 import { pastDragThreshold, swallowNextClick } from "@/lib/dragThreshold";
+import { wheelIntent, type WheelGesture } from "@/lib/wheelIntent";
 import type { PageTextLayer } from "@/lib/textSelection";
 import { TextSelectLayer } from "@/components/takeoff/TextSelect";
 import { useUploadSpeeds } from "@/lib/useUploadSpeeds";
@@ -926,10 +927,32 @@ function PlanPane({
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp) return;
+    /*
+      ZOOM OR PAN (owner, 2026-09-29): the mouse wheel stays zoom, like
+      Bluebeam; a two-finger trackpad scroll pans; a pinch zooms. Decided per
+      gesture by @/lib/wheelIntent, which says what it can and cannot tell
+      apart. A pan here goes through the same clamp as a drag.
+    */
+    let gesture: WheelGesture = null;
     const onWheel = (e: WheelEvent) => {
       const bounds = readBounds();
       if (!bounds) return;
       e.preventDefault();
+      const decided = wheelIntent(e, gesture);
+      gesture = decided.gesture;
+      if (decided.intent === "pan") {
+        aimView(current =>
+          clampView(
+            {
+              zoom: current.zoom,
+              x: current.x - e.deltaX,
+              y: current.y - e.deltaY,
+            },
+            bounds
+          )
+        );
+        return;
+      }
       const rect = vp.getBoundingClientRect();
       const anchor = { x: e.clientX - rect.left, y: e.clientY - rect.top };
       aimView(current =>
