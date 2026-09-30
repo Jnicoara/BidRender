@@ -1414,12 +1414,15 @@ export function RunsPanel({
                       meaning.
                     */}
                       {quantitiesLocked
-                        ? "On the bid — locked, so these marks no longer change it"
+                        ? "On the bid — locked"
                         : "On the bid — the line follows these marks"}
                     </p>
                   );
                 }
-                if (!state.sendable || !onSendToBid) return null;
+                // No Send on a locked bid: the server refuses it (lockGuard),
+                // and the locked notice below says why.
+                if (!state.sendable || !onSendToBid || quantitiesLocked)
+                  return null;
                 const busy = sendingGroupId === group.groupId;
                 return (
                   <button
@@ -1519,9 +1522,8 @@ export function RunsPanel({
         */}
         {quantitiesLocked ? (
           <p className="px-3 py-2 text-[0.7rem] text-muted-foreground border-b border-border">
-            This bid's quantities are locked, so nothing you mark or trace
-            changes what is on it. Unlock it on the bid to let the lines follow
-            again.
+            This bid's quantities are locked, so its plans cannot be marked,
+            traced, changed or sent to it. Unlock it on the bid first.
           </p>
         ) : null}
 
@@ -1784,11 +1786,7 @@ export function RunsPanel({
                     <p className="mt-1 text-[0.7rem] text-muted-foreground">
                       {onBidCount} on the bid
                       {quantitiesLocked ? (
-                        <>
-                          {" "}
-                          — locked, so tracing no longer changes{" "}
-                          {onBidCount === 1 ? "it" : "them"}
-                        </>
+                        <> — locked</>
                       ) : (
                         <>
                           {" "}
@@ -1801,7 +1799,9 @@ export function RunsPanel({
                       )}
                     </p>
                   )}
-                  {(sendable.length > 0 || toUpdate > 0) && onSendRunType ? (
+                  {(sendable.length > 0 || toUpdate > 0) &&
+                  onSendRunType &&
+                  !quantitiesLocked ? (
                     <button
                       type="button"
                       disabled={busy}

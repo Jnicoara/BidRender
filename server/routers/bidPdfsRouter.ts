@@ -53,6 +53,7 @@ import {
 } from "../../shared/planScale";
 import { checkPdfUpload } from "../../shared/uploadLimits";
 import { sheetDisplay } from "../../shared/sheetIdentity";
+import { lockedEditRefusal } from "../../shared/quantityLock";
 import {
   MIN_SEARCH_LENGTH,
   findInText,
@@ -84,6 +85,32 @@ async function requirePdf(bidPdfId: number, userId: number) {
   if (!pdf)
     throw new TRPCError({ code: "NOT_FOUND", message: "Plan not found." });
   return pdf;
+}
+
+/** True when the bid this plan belongs to has its quantities locked. */
+async function planIsLocked(bidPdfId: number, userId: number) {
+  const pdf = await requirePdf(bidPdfId, userId);
+  const bid = await requireBid(pdf.bidId, userId);
+  return bid.quantitiesLockedAt !== null;
+}
+
+/**
+ * Refuse a change to a locked bid's plans — owner, 2026-09-29: "a locked bid
+ * must not change". A scale multiplies every run measured on its sheet, and
+ * removing a plan set cascades away its marks and runs, so either one moves
+ * the drawing a frozen line was counted from; unlocking later would re-read
+ * it. `server/lockedPlans.test.ts`.
+ */
+async function refuseIfPlanLocked(
+  bidPdfId: number,
+  userId: number,
+  what: string
+) {
+  if (await planIsLocked(bidPdfId, userId))
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: lockedEditRefusal(what),
+    });
 }
 
 /**
@@ -488,6 +515,11 @@ export const bidPdfsRouter = router({
       const row = await db.getBidPdf(input.id, ctx.scope.dataUserId);
       if (!row)
         throw new TRPCError({ code: "NOT_FOUND", message: "Sheet not found." });
+      await refuseIfPlanLocked(
+        input.id,
+        ctx.scope.dataUserId,
+        "its plan sets cannot be removed"
+      );
       await deleteBidPdfWithFile(input.id, ctx.scope.dataUserId);
       return { success: true };
     }),
@@ -857,6 +889,11 @@ export const bidPdfsRouter = router({
       if (!sheet)
         throw new TRPCError({ code: "NOT_FOUND", message: "Sheet not found." });
 
+      await refuseIfPlanLocked(
+        sheet.bidPdfId,
+        ctx.scope.dataUserId,
+        "a sheet's scale cannot be changed"
+      );
       const parsed = parseScaleText(input.scaleText);
       if (!parsed) {
         throw new TRPCError({
@@ -918,6 +955,11 @@ export const bidPdfsRouter = router({
       const sheet = await db.getBidPdfSheet(input.id, ctx.scope.dataUserId);
       if (!sheet)
         throw new TRPCError({ code: "NOT_FOUND", message: "Sheet not found." });
+      await refuseIfPlanLocked(
+        sheet.bidPdfId,
+        ctx.scope.dataUserId,
+        "a sheet's scale cannot be cleared"
+      );
       await db.updateBidPdfSheet(input.id, ctx.scope.dataUserId, {
         scaleRatio: null,
         scaleText: null,
@@ -965,8 +1007,17 @@ export const bidPdfsRouter = router({
 
       const detection = detectScaleFromText(input.sheetText);
       const suggestion = detection.best;
+      /*
+        A locked bid's scales do not move — not even by detection, which runs
+        on its own whenever a sheet is shown. So on a locked bid a reading is
+        remembered as a suggestion and never applied, and no error is raised:
+        nobody pressed anything.
+      */
+      const locked = await planIsLocked(sheet.bidPdfId, ctx.scope.dataUserId);
+      const applies =
+        !locked && Boolean(suggestion) && isAutoApplicable(detection);
 
-      if (suggestion && isAutoApplicable(detection)) {
+      if (suggestion && applies) {
         await db.updateBidPdfSheet(input.id, ctx.scope.dataUserId, {
           scaleRatio: String(suggestion.ratio),
           scaleText: suggestion.text,
@@ -982,7 +1033,7 @@ export const bidPdfsRouter = router({
 
       const updated = await db.getBidPdfSheet(input.id, ctx.scope.dataUserId);
       return {
-        applied: Boolean(suggestion) && isAutoApplicable(detection),
+        applied: applies,
         confidence: detection.confidence,
         notToScale: detection.notToScale,
         candidates: detection.candidates.map(c => ({

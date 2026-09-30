@@ -63,6 +63,7 @@ import {
 } from "../../shared/laborRatePricing";
 import {
   followsDrawing,
+  lockedEditRefusal,
   quantitySource,
   typedQuantityRefusal,
   unlockChanges,
@@ -1396,7 +1397,22 @@ export const bidsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      /*
+        A line FROM THE PLANS is part of what the lock holds, so a locked bid
+        keeps it (owner, 2026-09-29). A hand-typed line is not a quantity from
+        the plans and stays removable — the lock was never about it.
+      */
+      if (bid.quantitiesLockedAt !== null) {
+        const line = await db.getBidLineItem(input.id, input.bidId);
+        if (line && followsDrawing(line))
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: lockedEditRefusal(
+              "lines from the plans cannot be removed"
+            ),
+          });
+      }
       await db.deleteBidLineItem(input.id, input.bidId);
       return { success: true };
     }),
@@ -1506,7 +1522,36 @@ export const bidsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      /*
+        The bulk way to take lines off, so the same rule as `removeLine`: on a
+        locked bid, refused if any line it would archive came from the plans.
+        Whole or nothing, like a selection of marks.
+      */
+      if (bid.quantitiesLockedAt !== null) {
+        const links = await db.getBidUnitLinks(input.bidId);
+        const units = new Set(
+          links
+            .filter(l => l.templateLabel === input.templateLabel && !l.forkedAt)
+            .map(l => l.unitLabel)
+        );
+        const lines = await db.getBidLineItems(input.bidId);
+        if (
+          lines.some(
+            l =>
+              l.unitLabel !== null &&
+              units.has(l.unitLabel) &&
+              l.archivedAt === null &&
+              followsDrawing(l)
+          )
+        )
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: lockedEditRefusal(
+              "lines from the plans cannot be removed"
+            ),
+          });
+      }
       return db.archiveLinkedCopies(input.bidId, input.templateLabel);
     }),
 

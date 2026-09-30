@@ -3199,14 +3199,11 @@ export default function TakeoffPage({
       */
       toast.success(
         /*
-          The locked wording used to end "so further marks will not change
-          it", which was true while marks could still be placed on a locked
-          bid. Since 2026-09-29 they cannot, so it says what actually happens.
+          No locked wording: since 2026-09-29 a locked bid refuses the send
+          itself (server/lockGuard.ts), so a success is always on a bid whose
+          line follows the marks.
         */
-        (quantitiesLocked
-          ? `${result.count} on the bid, frozen at that number — this bid's ` +
-            `quantities are locked, so the plans cannot change until you unlock.`
-          : `${result.count} on the bid. The line follows your marks from here.`) +
+        `${result.count} on the bid. The line follows your marks from here.` +
           // A free count arrives blank. Saying where the price goes, now,
           // beats the estimator finding a $0 line later.
           (result.unpriced
@@ -6073,6 +6070,14 @@ export default function TakeoffPage({
                 }
                 notToScale={notToScaleBySheet[activeSheet.id] ?? false}
                 pageSize={activePageSize}
+                onRefused={
+                  quantitiesLocked
+                    ? () =>
+                        toast.error(
+                          lockedEditRefusal("a sheet's scale cannot be changed")
+                        )
+                    : undefined
+                }
                 onSet={scaleText =>
                   setSheetScale.mutateAsync({ id: activeSheet.id, scaleText })
                 }
@@ -6259,11 +6264,23 @@ export default function TakeoffPage({
                     className="h-11 w-11 -my-2 -mr-2 p-0 shrink-0 self-center text-muted-foreground hover:text-destructive"
                     onClick={e => {
                       e.stopPropagation();
+                      // Refused before the dialog, not after it: a confirm
+                      // for something that will be refused is noise.
+                      if (quantitiesLocked) {
+                        toast.error(
+                          lockedEditRefusal("its plan sets cannot be removed")
+                        );
+                        return;
+                      }
                       setConfirmRemove(d);
                     }}
                     onKeyDown={e => e.stopPropagation()}
                     aria-label={`Remove ${d.filename}`}
-                    title={`Remove ${d.filename}`}
+                    title={
+                      quantitiesLocked
+                        ? "This bid's quantities are locked — unlock them on the bid to remove a plan set."
+                        : `Remove ${d.filename}`
+                    }
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>

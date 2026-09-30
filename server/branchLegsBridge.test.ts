@@ -284,11 +284,11 @@ withDb("sent, marked up, locked and listed", () => {
         endKind: null,
       })
     );
-    const again = await caller().takeoffRunTypes.sendToBid({
-      bidId,
-      runTypeId: type.id,
-    });
-    expect(again.updated).toEqual([]);
+    // Since 2026-09-29 a locked bid refuses the send outright (server/lockGuard.ts),
+    // which is a stronger form of "Send-again does not move a frozen line".
+    await expect(
+      caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id })
+    ).rejects.toThrow(/locked/);
     expect(Number(line((await detail(bidId)).lines, "teeBox")!.qty)).toBe(1);
 
     await caller().bids.unlockQuantities({ bidId });

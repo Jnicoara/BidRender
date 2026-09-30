@@ -29,6 +29,7 @@ import { router, scoped } from "../_core/trpc";
 import * as db from "../db";
 import { groupForAssembly } from "../assemblyGroup";
 import { refuseUnknownKinds } from "../extrasInput";
+import { refuseSendIfLocked } from "../lockGuard";
 import { DISTRIBUTION_KIND } from "../../shared/takeoffHeights";
 import { resolveRunType } from "../../shared/runTypeLookup";
 import { whipFeetOf } from "../../shared/branchWire";
@@ -457,6 +458,12 @@ export const takeoffGroupsRouter = router({
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const group = await requireGroup(input.id, ctx.scope.dataUserId);
+      /*
+        Refused on a locked bid since 2026-09-29 (owner). It used to be
+        allowed on purpose — the line arrived frozen at the number it crossed
+        with — but a locked bid must not change, and a new line is a change.
+      */
+      await refuseSendIfLocked(group.bidId, ctx.scope.dataUserId);
       const [counts, lines] = await Promise.all([
         db.countStampsByGroup(group.bidId, ctx.scope.dataUserId),
         db.getBidLineItems(group.bidId),

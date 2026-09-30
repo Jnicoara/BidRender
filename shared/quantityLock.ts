@@ -162,8 +162,8 @@ export function lockedBannerCopy(
             followingLines === 1 ? "s" : ""
           } your plans — ${
             followingLines === 1 ? "it holds" : "they hold"
-          } the quantity the drawing said when you locked it. Marking, tracing and deleting on the plans wait until you unlock. Prices are a separate thing and were already frozen on each line the day it was added.`
-        : `Nothing on this bid takes its quantity from the plans, so the lock is holding nothing today. Anything you send from the plans while it is locked arrives frozen at the number it came over with. Prices are a separate thing and were already frozen on each line the day it was added.`,
+          } the quantity the drawing said when you locked it. Marking, tracing, deleting and sending from the plans wait until you unlock. Prices are a separate thing and were already frozen on each line the day it was added.`
+        : `Nothing on this bid takes its quantity from the plans, so the lock is holding nothing today. Nothing can be sent to it from the plans until you unlock. Prices are a separate thing and were already frozen on each line the day it was added.`,
   };
 }
 

@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **A locked bid now refuses the last ways its numbers could still move.**
+  Sending counts or runs to it, changing or clearing a sheet's scale (and
+  applying one read automatically from the sheet), removing a plan set, and
+  removing a bid line that came from the plans are all refused with the same
+  plain "unlock it on the bid first" sentence. Lines you typed in by hand can
+  still be removed. The Send links, the scale chip and the plan's remove
+  button say so before anything happens.
 - **A locked bid's plans can no longer change at all.** Before, a locked
   bid refused deletes but still let you place new marks, trace new runs, type
   a run's length, add a leg, answer a pull point or change a run's wires. The

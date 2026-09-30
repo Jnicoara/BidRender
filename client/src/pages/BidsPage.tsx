@@ -1173,17 +1173,26 @@ export default function BidsPage({
                               />
                             </>
                           )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                            onClick={() =>
-                              removeLine.mutate({ bidId, id: line.id })
-                            }
-                            aria-label={`Remove ${line.name}`}
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </Button>
+                          {/*
+                            A locked line from the plans cannot be removed
+                            (server: bids.removeLine). The slot stays so the
+                            row keeps its shape; a hand-typed line keeps its X.
+                          */}
+                          {source === "locked" ? (
+                            <span className="w-7 shrink-0" aria-hidden />
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                              onClick={() =>
+                                removeLine.mutate({ bidId, id: line.id })
+                              }
+                              aria-label={`Remove ${line.name}`}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
                         </div>
                       );
                     })}

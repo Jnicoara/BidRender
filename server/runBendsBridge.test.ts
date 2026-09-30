@@ -381,7 +381,11 @@ withDb("factory elbows from the company size up", () => {
     // Behind the lock: a locked bid refuses tracing since 2026-09-29; this
     // is a drawing that moved before that rule.
     await behindTheLock(bidId, () => trace(bidId, sheetId, type.id, L));
-    await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+    // Since 2026-09-29 a locked bid refuses the send outright (server/lockGuard.ts),
+    // which is a stronger form of "Send-again does not move a frozen line".
+    await expect(
+      caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id })
+    ).rejects.toThrow(/locked/);
     const elbow = line((await detail(bidId)).lines, "elbow90")!;
     expect(Number(elbow.qty)).toBe(1);
     const database = await getDb();

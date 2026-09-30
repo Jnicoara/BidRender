@@ -2520,8 +2520,13 @@ made.
 > drawing is frozen too: every one of those is refused with "This bid's
 > quantities are locked, so … Unlock them on the bid first."
 > (`shared/quantityLock.ts` `lockedEditRefusal`, `server/lockedEdits.test.ts`).
-> Sending to a locked bid is unchanged for now — see
-> `references/track-b-deletes-summary-pan-plan.md` Question 1.
+> **Widened the same evening, by the owner's answers to that plan's
+> questions 1, 3 and 4:** a locked bid also refuses Send to bid (the count
+> send and the run-type send, through one check, `server/lockGuard.ts` —
+> reversing "a count sent to a locked bid arrives frozen"), setting, clearing
+> or auto-applying a sheet's scale, removing a plan set, and removing a bid
+> line that came from the plans. A hand-typed line stays removable.
+> `server/lockedPlans.test.ts`.
 
 **Decided and built 2026-09-24. This amends D2(a) a second time, and it amends
 OVERRIDE 2's own sentence — "after that the count is live for ever" — which was
