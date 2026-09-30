@@ -3735,6 +3735,9 @@ counts nothing becomes setup work with no payoff, which is the exact failure the
 > The set scan stays where this table puts it. This agrees with § 9.6.
 > **Amended the same day by the owner:** the build ORDER between the two is
 > now decided by the accuracy test (see § 15.4's note), not by this argument.
+> **Row (b) is built WITH the legend work** (owner, 2026-09-29): a legend
+> symbol can be confirmed as a plain name and counted with no library entry.
+> See that file, § 0 item 3.
 
 **(b) is small and it is the one that removes a precondition.** A reader finding
 is a proposal about a SHAPE on a drawing; it does not need a library entry to

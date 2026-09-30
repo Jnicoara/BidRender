@@ -22,7 +22,22 @@ plan agrees with all of them. It changes one thing, the order in § 5l's
 2. **An addendum or second PDF always gets the OFFER "use set X's legend?",
    and it is never applied on its own.** One click to accept, and nothing
    happens without that click (§ 4, "When the legend is somewhere else").
-3. **Still open: plain name counts.** See § 7 Q3.
+3. **Plain name counts are IN v1.** A legend symbol can be confirmed as just
+   a name ("Floor box") with no library entry, counted, and priced later.
+   What that adds to the build:
+   - the new table's nullable `groupId`, pointing at a plain count
+     (`takeoff_groups` kind `plain`) on the bid. It is in the same migration,
+     so there is no extra one;
+   - `planCopilot.confirm` and `isAcceptable` (`shared/copilotDetection.ts`)
+     accept a finding whose legend entry has a plain count, not only an
+     assembly. Today both refuse a finding with no assembly;
+   - the Legend list's picker offers "just a name" beside the assembly search
+     (§ 5l step 3, level 1);
+   - a test that a plain-name symbol found by Read sheet can be placed and
+     lands on that plain count.
+
+   This is `plan-viewer-overhaul.md` § 5l (b), built as part of this plan.
+   Reasoning in § 7 Q3.
 
 ### Two things that must happen BEFORE this ships
 
@@ -357,7 +372,7 @@ and that the "matched against" count is right after a confirm.
 
 - **Tiling.** It is still Phase 10, still gated on § 15.
 - **A legend row pointing at a material** rather than an assembly or a plain
-  name. Plain names are IN v1 if the owner agrees (§ 7 Q3); materials wait
+  name. Plain names ARE in v1 (owner, 2026-09-29, § 0); materials wait
   for § 16's "mark first, name it after".
 - **The cheap shape ranking** of § 9.3 stage 2. The model compares the pictures
   in the call it is already making. Add the ranking only if remembered
@@ -390,13 +405,13 @@ decisions live").
 1. **ANSWERED 2026-09-29: drag a box around the legend.** See § 0.
 2. **ANSWERED 2026-09-29: always offer "use set X's legend?", never apply it
    on its own.** See § 0.
-3. **STILL OPEN: "plain name" counts.** In plain words: today a symbol can only
-   be counted if you link it to an assembly from your library. A plain name
-   count would let you confirm it as just "Floor box", count it, and price it
-   later, with no library entry needed.
+3. **ANSWERED 2026-09-29: YES, plain name counts are in v1.** See § 0. In
+   plain words: today a symbol can only be counted if you link it to an
+   assembly from your library. A plain name count lets you confirm it as just
+   "Floor box", count it, and price it later, with no library entry needed.
 
-   **Recommendation, REVERSED from the first draft of this file: build plain
-   names into v1, do not ship without them.** The first draft said to ship
+   **Why, as recommended: build plain names into v1, do not ship without
+   them.** The first draft of this file said to ship
    without it. That fails CLAUDE.md's test for a new feature ("could somebody
    who has never opened the library screen use this?"): a new user could
    confirm a whole legend and still not place a single mark. It is small and
