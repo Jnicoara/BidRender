@@ -13,6 +13,7 @@ import { describe, it, expect } from "vitest";
 import {
   runTypeComponentsPerFoot,
   laborPerFootForRunType,
+  laborPerFootCoverage,
   laborPerFootSentence,
 } from "../shared/runTypeLabor";
 
@@ -245,18 +246,16 @@ describe("the sentence a screen shows", () => {
 
   it("states the figure when nothing is missing", () => {
     expect(laborPerFootSentence(costed)).toBe(
-      "0.0605 h per ft · covers couplings, connectors and straps"
+      "0.0605 h per ft, covers fittings"
     );
   });
 
-  it("says what a conduit rate covers, and a cable rate does not", () => {
+  it("says briefly that a conduit rate covers fittings, and a cable rate does not", () => {
     // Owner, 2026-09-29: the per-foot rate pays for couplings, connectors and
-    // straps. Elbows, bends, LBs and boxes keep their own hours, so the
-    // sentence names only these three. A cable has none of them.
-    expect(laborPerFootSentence(costed)).toMatch(
-      /covers couplings, connectors and straps$/
-    );
-    expect(laborPerFootSentence(costed)).not.toMatch(/elbow|bend|LB|box/i);
+    // straps. The list is ~161px wide, so the caption says it in three words
+    // (the full wording wrapped to four lines) and the tooltip names them.
+    expect(laborPerFootSentence(costed)).toMatch(/, covers fittings$/);
+    expect(laborPerFootSentence(costed).length).toBeLessThanOrEqual(40);
     expect(
       laborPerFootSentence({
         pathType: "cable",
@@ -264,6 +263,16 @@ describe("the sentence a screen shows", () => {
         conductorLaborHours: 0.0125,
       })
     ).not.toMatch(/covers/);
+  });
+
+  it("names exactly what is covered in the tooltip, and what is not", () => {
+    const tip = laborPerFootCoverage(costed)!;
+    expect(tip).toMatch(/couplings, connectors and straps/);
+    // "Covers fittings" read literally would include these; the tip says not.
+    expect(tip).toMatch(
+      /Elbows, field bends, LBs, pull boxes and tee boxes keep their own hours/
+    );
+    expect(laborPerFootCoverage({ pathType: "cable" })).toBeUndefined();
   });
 
   it("keeps four decimals, because that is what the column stores", () => {
@@ -288,15 +297,15 @@ describe("the sentence a screen shows", () => {
       conductorLaborHours: null,
       groundLaborHours: null,
     });
-    expect(sentence).toBe(
-      "0.04 h per ft so far — 2 of 3 have no labor unit · covers couplings, connectors and straps"
-    );
-    expect(sentence).not.toMatch(/^0\.04 h per ft( ·|$)/);
+    // Unchanged by the fitting-labor rule: a rate still being filled in covers
+    // nothing yet, and its warning is not shortened (RunTypePicker.tsx).
+    expect(sentence).toBe("0.04 h per ft so far — 2 of 3 have no labor unit");
+    expect(sentence).not.toBe("0.04 h per ft");
   });
 
   it("agrees with itself about one", () => {
     expect(laborPerFootSentence({ ...costed, conductorLaborHours: null })).toBe(
-      "0.044 h per ft so far — 1 of 3 has no labor unit · covers couplings, connectors and straps"
+      "0.044 h per ft so far — 1 of 3 has no labor unit"
     );
   });
 

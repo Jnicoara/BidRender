@@ -72,7 +72,10 @@ import { compareBySize } from "@shared/materialSizeOrder";
 export const CONDUIT_SHELF = ["Conduit"];
 export const CABLE_SHELF = ["Wire & Cable"];
 import { runTypeSpec } from "@shared/takeoffCounts";
-import { laborPerFootSentence } from "@shared/runTypeLabor";
+import {
+  laborPerFootCoverage,
+  laborPerFootSentence,
+} from "@shared/runTypeLabor";
 import {
   isMarkColor,
   MARK_COLOR_NAMES,
@@ -1211,7 +1214,10 @@ export function RunTypePicker({
               </button>
             )}
 
-            <p className="text-[0.7rem] text-muted-foreground mt-2.5">
+            <p
+              className="text-[0.7rem] text-muted-foreground mt-2.5"
+              title={laborPerFootCoverage({ ...draft, pathType })}
+            >
               Labor {laborPerFootSentence({ ...draft, pathType })}
             </p>
 
@@ -1397,7 +1403,10 @@ export function RunTypePicker({
                             cannot fail that way, and it costs a second line
                             only on the types that have something to warn about.
                           */}
-                          <span className="block text-[0.7rem] text-muted-foreground">
+                          <span
+                            className="block text-[0.7rem] text-muted-foreground"
+                            title={laborPerFootCoverage(type)}
+                          >
                             {laborPerFootSentence(type)}
                           </span>
                         </>
