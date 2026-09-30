@@ -482,6 +482,7 @@ withDb("what the screens are told", () => {
       countedWithNoPrice: 0,
       doubleCounted: [],
       runsWithNoWire: 0,
+      runsNotOnBid: { notSent: 0, noType: 0 },
     });
   });
 });

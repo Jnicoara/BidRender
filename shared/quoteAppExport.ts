@@ -35,6 +35,7 @@
  * can render a figure from it.
  */
 import { apportionWorkPrice, toCents } from "./pricing";
+import { runsNotOnBidText } from "./runsNotOnBid";
 import {
   lineHoursUnset,
   lineNotPriced,
@@ -187,6 +188,14 @@ export type QuoteAppSource = {
    * built and tested now so it is ready the day it is fed.
    */
   examplePricedLines: number;
+  /**
+   * What the Plans screen has that is not on the bid — traced runs never
+   * sent, counts not sent, pipe with no wire. Shown in BOTH states: a
+   * quote that looks finished while takeoff is missing from it is the
+   * silent failure the owner ruled out on 2026-09-29. Warnings, not gaps:
+   * the figures are right for what IS on the bid, so they do not block it.
+   */
+  planWarnings: readonly string[];
 };
 
 // ─── Output ──────────────────────────────────────────────────────────────────
@@ -210,6 +219,7 @@ export type QuoteAppDoc =
       bidName: string;
       isSample: boolean;
       gaps: QuoteGap[];
+      planWarnings: string[];
     }
   | {
       state: "ready";
@@ -226,6 +236,8 @@ export type QuoteAppDoc =
       examplePricedLines: number;
       /** What the figures mean and what is not in them, one line each. */
       notes: string[];
+      /** Takeoff not on the bid — see QuoteAppSource.planWarnings. */
+      planWarnings: string[];
     };
 
 // ─── Building it ─────────────────────────────────────────────────────────────
@@ -237,6 +249,7 @@ export function buildQuoteAppDoc(source: QuoteAppSource): QuoteAppDoc {
       bidName: source.bidName,
       isSample: source.isSample,
       gaps: [...source.gaps],
+      planWarnings: [...source.planWarnings],
     };
   }
 
@@ -303,7 +316,35 @@ export function buildQuoteAppDoc(source: QuoteAppSource): QuoteAppDoc {
     totalDueCents: toCents(t.totalDue),
     examplePricedLines: source.examplePricedLines,
     notes,
+    planWarnings: [...source.planWarnings],
   };
+}
+
+/**
+ * The takeoff-not-on-the-bid sentences, one per kind, in the order that
+ * costs most: runs not on the bid, counts not sent, pipe with no wire. Empty
+ * when the plans and the bid agree. One builder, so the panel cannot word the
+ * same fact differently from the bid page.
+ */
+export function quotePlanWarnings(attention: {
+  waitingToSend: number;
+  runsWithNoWire: number;
+  runsNotOnBid: { notSent: number; noType: number };
+}): string[] {
+  const out: string[] = [];
+  const runs = runsNotOnBidText(attention.runsNotOnBid);
+  if (runs) out.push(`${runs} Their footage is not in these figures.`);
+  const n = attention.waitingToSend;
+  if (n > 0)
+    out.push(
+      `${n} count${n === 1 ? "" : "s"} not on the bid — marked on the plans and not in these figures.`
+    );
+  const w = attention.runsWithNoWire;
+  if (w > 0)
+    out.push(
+      `${w} conduit run${w === 1 ? " has" : "s have"} no wire — the pipe is in these figures and nothing is pulled through it.`
+    );
+  return out;
 }
 
 // ─── Showing and copying a figure ────────────────────────────────────────────

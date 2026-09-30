@@ -49,13 +49,7 @@ import {
   rangeIsBackwards,
   toPage,
 } from "../../shared/bidSearch";
-import {
-  countsWaitingToSend,
-  countsWithNoPrice,
-  doubleCountedAssemblies,
-  type BridgeGroup,
-  type BridgeLine,
-} from "../../shared/takeoffBridge";
+import { planAttentionFor } from "../planAttention";
 import {
   staleRateLines,
   type RatedLineLike,
@@ -68,7 +62,6 @@ import {
   typedQuantityRefusal,
   unlockChanges,
 } from "../../shared/quantityLock";
-import { countRunsWithNoWire } from "../../shared/runNoWire";
 import {
   canPriceByHand,
   saveAsAssemblyRefusal,
@@ -86,21 +79,6 @@ import { footageByRunType } from "../runTypeFootage";
 import * as db from "../db";
 import { deleteBidWithFiles } from "../storedFiles";
 
-/**
- * The three things a takeoff can be telling a bid that its money does not say.
- *
- * ── Why all three live under the totals and none on the drawing ─────────────
- * The warning strip's rule is that it sits directly under the number it
- * contradicts, which is exactly the relationship each of these has with the
- * material total. A marker on the drawing would break level 1's promise of a
- * quiet count on the screen where that promise was made — see
- * references/plan-viewer-overhaul.md § 5f.
- *
- * ── `doubleCounted` is the half a warning at send time cannot cover ─────────
- * The hand-added line can arrive AFTER the count was sent, so this is read
- * every time the bid is shown rather than fired once at the crossing. That is
- * what makes R3 a rule in the code instead of a note in a document.
- */
 /** Lines priced at an older labor rate than their role has now. */
 async function staleRatesFor(
   lines: readonly RatedLineLike[],
@@ -111,71 +89,6 @@ async function staleRatesFor(
   );
   const current = await db.currentAssemblyRates(candidates, userId);
   return staleRateLines(lines, id => current.get(id) ?? null);
-}
-
-async function planAttentionFor(
-  bidId: number,
-  userId: number,
-  lines: readonly {
-    id: number;
-    name: string;
-    takeoffGroupId: number | null;
-    assemblyId: number | null;
-  }[]
-): Promise<{
-  waitingToSend: number;
-  countedWithNoPrice: number;
-  doubleCounted: string[];
-  /**
-   * Conduit RUNS whose wire the bid would price and that carry none
-   * (shared/runNoWire.ts). Counted in runs, a branched run once.
-   */
-  runsWithNoWire: number;
-}> {
-  const bridgeLines: BridgeLine[] = lines.map(line => ({
-    id: line.id,
-    name: line.name,
-    takeoffGroupId: line.takeoffGroupId,
-    assemblyId: line.assemblyId,
-  }));
-
-  const families = await db.getAssemblyFamilies(
-    bridgeLines.flatMap(line =>
-      line.assemblyId === null ? [] : [line.assemblyId]
-    ),
-    userId
-  );
-  const doubleCounted = doubleCountedAssemblies(bridgeLines, families);
-
-  const [groups, counts] = await Promise.all([
-    db.getGroupsForBid(bidId, userId),
-    db.countStampsByGroup(bidId, userId),
-  ]);
-  const bridgeGroups: BridgeGroup[] = groups.map(group => ({
-    id: group.id,
-    label: group.label,
-    kind: group.kind,
-    assemblyId: group.assemblyId,
-    materialId: group.materialId,
-    unitCost: group.unitCost === null ? null : Number(group.unitCost),
-    count: counts.get(group.id) ?? 0,
-  }));
-
-  /*
-    Runs, loaded once for the whole bid. The wire is read through the same
-    `getWireCircuitsForRuns` the bid's arithmetic uses, so "no wire" here is
-    exactly "no wire in the total" — a quantity trace pulling its type's
-    circuit is not flagged.
-  */
-  const runs = await db.getRunsForBid(bidId, userId);
-  const wire = await db.getWireCircuitsForRuns(runs, userId);
-
-  return {
-    waitingToSend: countsWaitingToSend(bridgeGroups, bridgeLines),
-    countedWithNoPrice: countsWithNoPrice(bridgeGroups, bridgeLines),
-    doubleCounted,
-    runsWithNoWire: countRunsWithNoWire(runs, wire),
-  };
 }
 
 /**

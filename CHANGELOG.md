@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Traced runs that never reached the bid are now called out.** A run only
+  reaches the bid once its run type is sent, and nothing used to say when that
+  had not happened, so a bid and its quote could look finished with hundreds of
+  feet of pipe missing. The bid page and the quote panel now both say, for
+  example, "3 traced runs not on the bid — not sent yet", and name runs that
+  have no run type. The quote panel also mentions counts not yet sent and pipe
+  with no wire.
 - **A conduit run with no wire in it now says so, in amber.** A traced pipe
   starts with no wire until wire is added, so it could reach the bid empty with
   only a grey "none" to show for it. The run now reads "No wire on the bid for

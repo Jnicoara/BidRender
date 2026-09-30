@@ -141,6 +141,7 @@ function panelFor(
       })),
     },
     examplePricedLines: 0,
+    planWarnings: [],
   };
   return { doc: buildQuoteAppDoc(source), totals: t, source };
 }
