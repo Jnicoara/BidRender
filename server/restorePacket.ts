@@ -27,6 +27,8 @@ import { z } from "zod";
 export const STAMPS_PACKET = "stamps";
 /** One run's network: `NetworkSnapshot`. */
 export const RUN_PACKET = "runNetwork";
+/** Everything on one sheet: `SheetSnapshot`. */
+export const SHEET_PACKET = "sheet";
 
 /** A packet as a procedure accepts it. Capped: a sheet clear is the biggest. */
 export const packetSchema = z.object({

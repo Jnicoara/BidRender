@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **You can clear one sheet, and put it back.** The new "…" menu beside the
+  sheet picker has "Clear all marks and runs on this sheet". It first asks
+  with the exact numbers, for example "Remove 12 runs and 40 marks in 5
+  counts from E1.01?", and warns when a count will have no marks left
+  anywhere. One Ctrl+Z puts the whole sheet back as it was. The sheet, its
+  scale and the counts stay. Not available on a locked bid.
+- **"Select text" is now called "Copy text".** It reads words off the drawing
+  for you to copy, and "select" was easily confused with selecting marks.
 - **A finished run's points can now be dragged.** Select a run and its
   points show as handles. Drag one to move it, drag the faint "+" on a
   segment to add a point, and right-click a point (or click it, then press

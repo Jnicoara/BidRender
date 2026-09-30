@@ -511,3 +511,166 @@ export async function restoreNetwork(
   const db = await database();
   await db.transaction(tx => restoreNetworkIn(tx, snapshot, userId));
 }
+
+// ── A whole sheet ────────────────────────────────────────────────────────────
+
+export type SheetSnapshot = {
+  sheetId: number;
+  bidId: number;
+  stamps: StampSnapshot;
+  networks: NetworkSnapshot[];
+};
+
+/** Every run network with a row on this sheet, by root id. */
+async function rootsOnSheet(
+  tx: Tx | Db,
+  sheetId: number,
+  userId: number
+): Promise<number[]> {
+  const rows = await tx
+    .select({ id: takeoffRuns.id, parentRunId: takeoffRuns.parentRunId })
+    .from(takeoffRuns)
+    .where(
+      and(eq(takeoffRuns.sheetId, sheetId), eq(takeoffRuns.userId, userId))
+    );
+  return Array.from(new Set(rows.map(rootOf))).sort((a, b) => a - b);
+}
+
+async function stampIdsOnSheet(
+  tx: Tx | Db,
+  sheetId: number,
+  userId: number
+): Promise<number[]> {
+  const rows = await tx
+    .select({ id: takeoffStamps.id })
+    .from(takeoffStamps)
+    .where(
+      and(eq(takeoffStamps.sheetId, sheetId), eq(takeoffStamps.userId, userId))
+    );
+  return rows.map(r => r.id);
+}
+
+/** What a clear would remove, counted from the rows — for the question. */
+export async function previewSheetClear(
+  sheetId: number,
+  userId: number
+): Promise<{
+  runs: number;
+  runsWithLegs: number;
+  marks: number;
+  counts: number;
+  /** Counts whose every mark on the bid is on this sheet: they go to 0. */
+  countsLeftEmpty: number;
+}> {
+  const db = await database();
+  const roots = await rootsOnSheet(db, sheetId, userId);
+  let runsWithLegs = 0;
+  for (const root of roots) {
+    const rows = await networkRows(db, root, userId);
+    if (rows.runs.length > 1) runsWithLegs++;
+  }
+  const marks = await db
+    .select({ groupId: takeoffStamps.groupId, bidId: takeoffStamps.bidId })
+    .from(takeoffStamps)
+    .where(
+      and(eq(takeoffStamps.sheetId, sheetId), eq(takeoffStamps.userId, userId))
+    );
+  const groupIds = Array.from(
+    new Set(marks.map(m => m.groupId).filter((g): g is number => g !== null))
+  );
+  let countsLeftEmpty = 0;
+  if (groupIds.length > 0) {
+    const elsewhere = await db
+      .select({ groupId: takeoffStamps.groupId })
+      .from(takeoffStamps)
+      .where(
+        and(
+          inArray(takeoffStamps.groupId, groupIds),
+          eq(takeoffStamps.userId, userId),
+          sql`${takeoffStamps.sheetId} <> ${sheetId}`
+        )
+      )
+      .groupBy(takeoffStamps.groupId);
+    countsLeftEmpty = groupIds.length - elsewhere.length;
+  }
+  return {
+    runs: roots.length,
+    runsWithLegs,
+    marks: marks.length,
+    counts: groupIds.length,
+    countsLeftEmpty,
+  };
+}
+
+/**
+ * Remove every mark and every run on a sheet, in ONE transaction, and return
+ * exactly what went. Keeps the sheet, its scale, the counts themselves (they
+ * are bid-wide) and legend captures (they belong to the company).
+ */
+export async function clearSheetWithSnapshot(
+  sheet: { id: number; bidId: number },
+  userId: number
+): Promise<{
+  removedRuns: number;
+  removedMarks: number;
+  snapshot: SheetSnapshot;
+}> {
+  const db = await database();
+  return db.transaction(async tx => {
+    const roots = await rootsOnSheet(tx, sheet.id, userId);
+    const networks: NetworkSnapshot[] = [];
+    const empty = fingerprint({
+      runs: [],
+      tees: [],
+      circuits: [],
+      pullPoints: [],
+    });
+    for (const rootId of roots) {
+      const rows = await networkRows(tx, rootId, userId);
+      networks.push({ ...rows, rootId, bidId: sheet.bidId, after: empty });
+    }
+    const stamps = await snapshotStampsIn(
+      tx,
+      await stampIdsOnSheet(tx, sheet.id, userId),
+      userId
+    );
+    if (roots.length > 0)
+      await tx
+        .delete(takeoffRuns)
+        .where(
+          and(inArray(takeoffRuns.id, roots), eq(takeoffRuns.userId, userId))
+        );
+    if (stamps.stamps.length > 0)
+      await tx.delete(takeoffStamps).where(
+        and(
+          inArray(
+            takeoffStamps.id,
+            stamps.stamps.map(s => s.id)
+          ),
+          eq(takeoffStamps.userId, userId)
+        )
+      );
+    return {
+      removedRuns: roots.length,
+      removedMarks: stamps.stamps.length,
+      snapshot: { sheetId: sheet.id, bidId: sheet.bidId, stamps, networks },
+    };
+  });
+}
+
+/**
+ * Put a cleared sheet back in one step: the marks first (runs end on them),
+ * then every run network. All or nothing — a sheet half put back is a
+ * drawing nobody had.
+ */
+export async function restoreSheet(
+  snapshot: SheetSnapshot,
+  userId: number
+): Promise<void> {
+  const db = await database();
+  await db.transaction(async tx => {
+    await restoreStampsIn(tx, snapshot.stamps, userId);
+    for (const network of snapshot.networks)
+      await restoreNetworkIn(tx, network, userId);
+  });
+}

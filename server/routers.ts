@@ -31,6 +31,7 @@ import { takeoffRunsRouter } from "./routers/takeoffRunsRouter";
 import { takeoffGroupsRouter } from "./routers/takeoffGroupsRouter";
 import { takeoffRunTypesRouter } from "./routers/takeoffRunTypesRouter";
 import { takeoffStampsRouter } from "./routers/takeoffStampsRouter";
+import { takeoffSheetRouter } from "./routers/takeoffSheetRouter";
 import { kitsRouter } from "./routers/kitsRouter";
 import { onboardingRouter } from "./routers/onboardingRouter";
 import { navigationRouter } from "./routers/navigationRouter";
@@ -91,6 +92,7 @@ export const appRouter = router({
   takeoffGroups: takeoffGroupsRouter,
   takeoffRunTypes: takeoffRunTypesRouter,
   takeoffStamps: takeoffStampsRouter,
+  takeoffSheet: takeoffSheetRouter,
   kits: kitsRouter,
   onboarding: onboardingRouter,
   navigation: navigationRouter,

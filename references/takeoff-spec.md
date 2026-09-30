@@ -673,10 +673,13 @@ against this.**
 - **Leave out:** the old "Clear page". Undo covers mistakes, and a one-tap wipe
   is how a whole takeoff gets lost.
 
-> **PROPOSED OVERRIDE, 2026-09-29, awaiting the owner:** the owner asked for
-> "Clear all marks on this sheet". `references/track-b-plans-screen-edits-plan.md`
-> Part 3 proposes it as never one tap (it lists exactly what goes and asks) and
-> undoable in one step, which is how it answers the reason above.
+> **OVERRIDDEN 2026-09-29, confirmed by the owner, and built.** "Clear all
+> marks and runs on this sheet" is in the sheet's "…" menu. It answers the
+> reason above rather than ignoring it: it is never one tap (the question
+> lists exactly what goes, counted from the rows, and the button names the
+> number), and the whole clear is one undo step with the same ids. Refused on a
+> locked bid. No plan-set-wide clear. `server/routers/takeoffSheetRouter.ts`,
+> `references/track-b-plans-screen-edits-plan.md` Part 3.
 
 **D7 — How much run editing (T8–T11).**
 

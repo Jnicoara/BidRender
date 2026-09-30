@@ -73,6 +73,7 @@ import {
   Trash2,
   Upload,
   X,
+  MoreHorizontal,
   Redo2,
   Undo2,
 } from "lucide-react";
@@ -87,6 +88,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { sheetClearQuestion } from "@/lib/sheetClearQuestion";
 import {
   BUTTON_ZOOM_STEP,
   REGION_SETTLE_MS,
@@ -690,7 +698,7 @@ function PlanPane({
     chromeTarget: HTMLElement | null;
     /**
      * This page's text with positions, read from the open document when
-     * asked — for "Select text". A function rather than data, so a sheet
+     * asked — for "Copy text". A function rather than data, so a sheet
      * nobody selects text on is never read for it.
      */
     loadTextLayer: () => Promise<PageTextLayer>;
@@ -2205,7 +2213,7 @@ export default function TakeoffPage({
   );
   const [capturingSymbol, setCapturingSymbol] = useState(false);
   /**
-   * "Select text" is picked up. ONE tool at a time, and it is kept that way in
+   * "Copy text" is picked up. ONE tool at a time, and it is kept that way in
    * two places rather than by a comment: picking this up puts the others down
    * (`startSelectingText`), picking any of them up puts this down (their own
    * arm functions), and the layer itself is not rendered while another tool is
@@ -2506,6 +2514,48 @@ export default function TakeoffPage({
     },
     [undoBusy, runUndoOp, refreshFor]
   );
+
+  /*
+    ── CLEAR THIS SHEET (overrides takeoff-spec.md D6, owner 2026-09-29) ──────
+    In the sheet's "…" menu, never a toolbar button. The question counts what
+    goes from the server's rows (@/lib/sheetClearQuestion), fetched fresh each
+    time it opens, and the whole clear is one undo step.
+  */
+  const [confirmClear, setConfirmClear] = useState(false);
+  const clearPreview = trpc.takeoffSheet.clearPreview.useQuery(
+    { sheetId: activeSheet?.id ?? 0 },
+    { enabled: confirmClear && Boolean(activeSheet), staleTime: 0, gcTime: 0 }
+  );
+  const clearSheet = trpc.takeoffSheet.clear.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: (r, vars) => {
+      const name = activeSheet?.name ?? "this sheet";
+      if (r.undo)
+        pushUndo({
+          label: `${name} cleared`,
+          sheetId: vars.sheetId,
+          undo: { kind: "restoreSheet", packet: r.undo },
+          redo: null,
+        });
+      toast.success(
+        `Cleared ${name}: ${countLabel(r.removedRuns, "run", "runs", "and")} ${countLabel(r.removedMarks, "mark", "marks", "removed")}. Ctrl+Z puts them back.`
+      );
+    },
+    onSettled: (_r, _e, vars) => refreshFor("sheetCleared", vars.sheetId),
+  });
+  const undoClearSheet = trpc.takeoffSheet.clear.useMutation();
+  const undoRestoreSheet = trpc.takeoffSheet.restore.useMutation();
+  runUndoOpLater.current = async (op: UndoOp): Promise<UndoOp | null> => {
+    if (op.kind === "restoreSheet") {
+      const r = await undoRestoreSheet.mutateAsync({ undo: op.packet });
+      return { kind: "clearSheet", sheetId: r.sheetId };
+    }
+    if (op.kind === "clearSheet") {
+      const r = await undoClearSheet.mutateAsync({ sheetId: op.sheetId });
+      return r.undo ? { kind: "restoreSheet", packet: r.undo } : null;
+    }
+    return null;
+  };
 
   const createTicket = trpc.bidPdfs.createUploadTicket.useMutation();
   const confirmAttach = trpc.bidPdfs.confirmAttach.useMutation();
@@ -3665,7 +3715,7 @@ export default function TakeoffPage({
   }, [activeSheet?.id]);
 
   /**
-   * T picks "Select text" up or puts it down. Not while tracing — the button
+   * T picks "Copy text" up or puts it down. Not while tracing — the button
    * is hidden then too — and never while typing, or a T in a search box would
    * change tools.
    */
@@ -5251,6 +5301,37 @@ export default function TakeoffPage({
             disabled={!doc}
           />
 
+          {/* The sheet's own menu: where a destructive action lives, rather
+              than as a button always on show (Clear this sheet, D6 override). */}
+          {activeSheet && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 px-0"
+                  title="More for this sheet"
+                  aria-label="More for this sheet"
+                  disabled={tracing}
+                >
+                  <MoreHorizontal className="w-3.5 h-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem
+                  disabled={quantitiesLocked}
+                  onSelect={() => setConfirmClear(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  {quantitiesLocked
+                    ? "Clear this sheet — unlock the bid first"
+                    : "Clear all marks and runs on this sheet…"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           <div className="w-px h-4 bg-border" />
 
           {/*
@@ -5449,11 +5530,16 @@ export default function TakeoffPage({
           )}
 
           {/*
-            ── SELECT TEXT ──────────────────────────────────────────────────
+            ── COPY TEXT ────────────────────────────────────────────────────
             Its own group, after Measure: it reads the sheet rather than
             counting or measuring it, and it needs no scale, so it is never
             dimmed with the Measure tools. Hidden while tracing, like Count and
             Measure, rather than cancelling a trace somebody is halfway through.
+
+            Called "Select text" until 2026-09-29 (owner). Selecting marks is
+            a real thing on this screen now (click, Shift-drag), and two
+            "select"s doing different things was the confusion. It saves
+            nothing and puts nothing on the sheet; it reads words to copy.
           */}
           {activeSheet && !tracing && (
             <>
@@ -5469,7 +5555,7 @@ export default function TakeoffPage({
                 title="Drag a box to copy part numbers and notes (T)"
               >
                 <TextSelect className="w-3.5 h-3.5" />
-                Select text
+                Copy text
                 {selectingText && <X className="w-3 h-3" />}
               </Button>
             </>
@@ -6478,6 +6564,54 @@ export default function TakeoffPage({
               {deleteAsked.confirm}
             </AlertDialogAction>
           </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Clear this sheet: the exact counts, then one button naming them. */}
+      <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
+        <AlertDialogContent>
+          {(() => {
+            const name = activeSheet?.name ?? "this sheet";
+            const q = clearPreview.data
+              ? sheetClearQuestion(name, clearPreview.data)
+              : null;
+            return (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {q?.title ?? `Clear ${name}?`}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-2">
+                      {q ? (
+                        q.lines.map(line => <p key={line}>{line}</p>)
+                      ) : clearPreview.isError ? (
+                        <p>{clearPreview.error.message}</p>
+                      ) : (
+                        <p>Counting what is on {name}…</p>
+                      )}
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep them</AlertDialogCancel>
+                  {q && !q.empty && (
+                    <AlertDialogAction
+                      disabled={clearSheet.isPending}
+                      className="bg-destructive text-white hover:bg-destructive/90"
+                      onClick={() => {
+                        if (activeSheet)
+                          clearSheet.mutate({ sheetId: activeSheet.id });
+                        setConfirmClear(false);
+                      }}
+                    >
+                      {q.confirm}
+                    </AlertDialogAction>
+                  )}
+                </AlertDialogFooter>
+              </>
+            );
+          })()}
         </AlertDialogContent>
       </AlertDialog>
 
