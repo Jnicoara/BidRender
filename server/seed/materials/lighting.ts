@@ -489,6 +489,9 @@ const moreFixtures: BaselineMaterial[] = [
   {
     name: "Emergency battery backup pack",
     slang: "driver ballast emergency inverter bodine integral",
+    // Retail plan § R9: an LED troffer on emergency is the common case now.
+    description:
+      "Goes inside a fixture: an LED emergency driver for LED troffers and strips, or an emergency ballast for fluorescent.",
   },
   {
     name: "Emergency light remote head",
@@ -531,10 +534,11 @@ const moreFixtures: BaselineMaterial[] = [
   },
   { name: "Landscape hub connector", slang: "low voltage splice hub" },
   { name: "Landscape light stake", slang: "ground spike mount path spot" },
-].map(({ name, slang }) => ({
+].map((item: { name: string; slang: string; description?: string }) => ({
   ...fixture,
-  name,
-  searchAliases: aliases(slang),
+  name: item.name,
+  searchAliases: aliases(item.slang),
+  ...(item.description ? { description: item.description } : {}),
 }));
 
 export const LIGHTING: BaselineMaterial[] = [

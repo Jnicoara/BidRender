@@ -217,6 +217,16 @@ are and that the low-voltage kind needs a pack.
 natural next step, but it is its own decision (starter content ships
 unpriced).
 
+> **BUILT 2026-09-29 — 2 rows + descriptions.** Named `Sensor power pack,
+120/277V`, not "Occupancy sensor power pack": with "occupancy sensor" in
+> its name it ranked 2nd for "occupancy sensor", above two real sensors, so
+> "occupancy" is an alias instead. `18/3 control wire`. Both ceiling sensors
+> now say the low-voltage kind needs a pack and 18/3 and the line-voltage
+> kind neither (aliases unchanged, since they already named both). R9's
+> emergency-pack description is in the same change; the contactor and time
+> clock already say they are placeholders. Standard search sweep did not
+> move.
+
 ---
 
 ## R5. Every sized panel is single-phase; three-phase is one unsized row

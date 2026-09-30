@@ -148,6 +148,15 @@ export const LOW_VOLTAGE: BaselineMaterial[] = [
   },
   {
     ...lv("foot"),
+    // Retail catalog plan § R4: what an occupancy sensor is wired in.
+    name: "18/3 control wire",
+    searchAliases: aliases(
+      "18-3 18 gauge occupancy sensor power pack signal class 2 three conductor"
+    ),
+    description: "Class 2. Runs from a low-voltage sensor to its power pack.",
+  },
+  {
+    ...lv("foot"),
     name: "18/4 control wire",
     searchAliases: aliases(
       "18-4 18 gauge thermostat signal class 2 four conductor hvac"

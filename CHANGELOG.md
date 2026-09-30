@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Occupancy sensor power packs and 18/3 control wire are in the
+  catalog.** A low-voltage ceiling sensor needs a power pack per zone and
+  18/3 cable to it; the catalog had the sensor only, so the pack was easy to
+  leave off. The ceiling sensors now say which kind needs the extra parts.
+
 - **12-4 and 14-4 MC cable, and 12-2 isolated-ground MC, are in the
   catalog.** Three-phase branch circuits are commonly run in 12-4 MC, and
   without it an estimator picked 12-3 and priced one wire in four too few.

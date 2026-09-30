@@ -1,11 +1,12 @@
 Category: Low Voltage
-Items: 64
+Items: 65
 
 Category | Name | Size
 Low Voltage | 14/2 speaker wire | -
 Low Voltage | 150W landscape transformer | -
 Low Voltage | 16/2 speaker wire | -
 Low Voltage | 18/2 control wire | -
+Low Voltage | 18/3 control wire | -
 Low Voltage | 18/4 control wire | -
 Low Voltage | 18/5 control wire | -
 Low Voltage | 18/8 control wire | -

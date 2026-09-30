@@ -1,5 +1,5 @@
 Category: Switches
-Items: 33
+Items: 34
 
 Category | Name | Size
 Switches | 0-10V dimmer | -
@@ -27,6 +27,7 @@ Switches | Motor-rated toggle switch | -
 Switches | Occupancy sensor switch | -
 Switches | Photocell | -
 Switches | Pilot-light switch | -
+Switches | Sensor power pack, 120/277V | -
 Switches | 20A single-pole switch | 20A
 Switches | Single-pole switch | -
 Switches | Smart dimmer | -
