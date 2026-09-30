@@ -97,6 +97,11 @@ import {
 import { sheetClearQuestion } from "@/lib/sheetClearQuestion";
 import { planLoadState } from "@/lib/planLoadState";
 import {
+  endUploadTiming,
+  markUpload,
+  startUploadTiming,
+} from "@/lib/uploadTiming";
+import {
   BUTTON_ZOOM_STEP,
   REGION_SETTLE_MS,
   clampView,
@@ -1186,6 +1191,7 @@ function PlanPane({
           }
         );
         if (cancelled) return;
+        markUpload("viewer opened the file");
         setPageCount(pages);
         setLoading(false);
         if (doc.pageCount !== pages) onPageCount(pages);
@@ -1247,6 +1253,7 @@ function PlanPane({
         canvas.width = bitmap.width;
         canvas.height = bitmap.height;
         canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+        endUploadTiming(`sheet ${page} drawn`);
         setCanvasSize({ width: bitmap.width, height: bitmap.height });
         // The scale this canvas was ACTUALLY drawn at, kept beside the canvas
         // it describes. Anything that converts between canvas pixels and page
@@ -2729,6 +2736,7 @@ export default function TakeoffPage({
   const beginSheetRead = useCallback(
     (bidPdfId: number, source: SheetReadSource) => {
       sheetReadJobs.current.get(bidPdfId)?.cancel();
+      const readStarted = performance.now();
       const job = startSheetRead({
         source,
         send: async pages => {
@@ -2741,8 +2749,12 @@ export default function TakeoffPage({
         },
         onProgress: progress => {
           setSheetReads(prev => ({ ...prev, [bidPdfId]: progress }));
-          if (progress.state !== "reading")
+          if (progress.state !== "reading") {
             sheetReadJobs.current.delete(bidPdfId);
+            console.info(
+              `[upload] sheet names read (${progress.state}): ${Math.round(performance.now() - readStarted)} ms after attach`
+            );
+          }
         },
         onBatchSaved: () => {
           void utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId });
@@ -4972,6 +4984,7 @@ export default function TakeoffPage({
 
       try {
         setState({ state: "uploading", sent: 0 });
+        startUploadTiming(file.name, file.size);
 
         const handle = {
           onProgress: (sent: number) => setState({ sent }),
@@ -4997,6 +5010,7 @@ export default function TakeoffPage({
         if (shouldUseMultipart(file.size)) {
           const sent = await uploadLargeFile(file);
           if (sent) {
+            markUpload("transfer (pieces)", file.size);
             storageKey = sent;
             xhrRef.current = null;
             setState({ state: "finishing", sent: file.size });
@@ -5006,6 +5020,7 @@ export default function TakeoffPage({
               storageKey,
               byteSize: file.size,
             });
+            markUpload("attach");
             setState({ state: "done" });
             setSelectedDocId(attached.id);
             setPage(1);
@@ -5025,7 +5040,9 @@ export default function TakeoffPage({
             filename: file.name,
             byteSize: file.size,
           });
+          markUpload("ticket");
           await putDirectToStorage(ticket.uploadUrl, file, handle);
+          markUpload("transfer (one PUT, direct)", file.size);
           storageKey = ticket.storageKey;
         } catch (directError) {
           // Only a `blocked` failure is worth another attempt. It means zero
@@ -5043,6 +5060,7 @@ export default function TakeoffPage({
 
           setState({ sent: 0 });
           storageKey = await postViaServer(bidId, file, handle);
+          markUpload("transfer (through the server)", file.size);
         }
         xhrRef.current = null;
 
@@ -5054,6 +5072,7 @@ export default function TakeoffPage({
           storageKey,
           byteSize: file.size,
         });
+        markUpload("attach");
 
         setState({ state: "done" });
         setSelectedDocId(attached.id);

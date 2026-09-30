@@ -457,3 +457,76 @@ fault another fix was for).
 3. Rename "Select text" to **"Copy text"**? (Recommend yes.)
 4. Fix the existing **lock gaps** (delete marks/runs, add legs on a locked bid)
    as a separate small piece? (Recommend yes, separately.)
+
+---
+
+## ADDED 2026-09-29 (owner, mid-build): delete button, card controls, run ends
+
+Planned before building, as asked. **No migration.** Every end of every leg
+row already stores `startKind`/`endKind` and a per-end height override
+(`startHeightInches`/`endHeightInches`), and every quick pick below maps onto
+a kind that already ships (`shared/takeoffHeights.ts`). Nothing goes to Track A.
+
+**Read before approving: one premise in the request was not true.** Run cards
+do NOT have an undo arrow today, only a trash can. So item 2 adds the undo
+arrow to BOTH kinds of card, not just to count cards.
+
+### 1. Toolbar Delete
+
+- Beside Undo/Redo. Disabled with nothing selected. With marks selected it
+  reads "Delete 3 marks"; with a run selected, "Delete run" (or "Delete leg").
+- More than one mark confirms (the existing `deleteNeedsConfirm` question).
+  One mark or one run does not, because both are one Ctrl+Z away.
+- Keys: Delete removes the selection (marks first, else the selected run;
+  a picked run POINT still wins, as now). Ctrl+Z undoes, Ctrl+Y and
+  Ctrl+Shift+Z redo — already built in piece d.
+
+### 2. Count cards: trash and undo
+
+- **Trash = delete this count's marks on THIS sheet.** The count stays, and
+  its bid line follows the marks. Decided this way because it matches what
+  the run card's trash does (removes something drawn on this sheet), and
+  because deleting the COUNT reaches other sheets and the bid line itself,
+  which is a different act with its own rules (`takeoffGroups.remove`).
+  Confirm when more than one mark; undoable.
+- **Undo arrow on every count card and run card**, enabled only when the
+  NEWEST step on the undo stack is about that card. Its tooltip names it.
+  Undoing out of order ("the step before last, but only for this count")
+  would restore a state the rest of the drawing has moved on from, so it
+  is not offered. Each undo entry gains a `subject` (a count id or a run's
+  root id) so a card can ask.
+
+### 3. Run ends, in the run card
+
+- Selecting a run, on the plan or its card, shows a **Run ends** section
+  listing EVERY end of every leg: branch ends show as "branch tee, carries
+  on", read-only (D20).
+- Each open end has one-tap picks, mapped to kinds that ship:
+  device box → Receptacle, panel → Panel, J-box → Junction box (wall),
+  fixture → Ceiling box / fixture, stub-up → Underground / slab,
+  nothing → carries on at run height. The drop comes from that kind's
+  existing height, and the height is editable per end through the existing
+  `HeightFields` (the per-end override columns).
+- Clicking an end dot on the plan selects the run and scrolls its end
+  into view, highlighted.
+- The yellow "N runs have only one end counted" line becomes a **Set ends**
+  button that selects the first such run and opens its Run ends section.
+- Undo: `setEnds` returns a sealed network packet (as `setPoints` does), and
+  every end change is one step.
+
+### 4. Wrong-number checks (each fails without its change)
+
+- `setEnds` does NOT check the lock today. Fixed first, with a test that
+  goes red without it (same class as piece a).
+- Server: after an end change, and after its undo, `takeoffRuns.totals`, the
+  bid's line quantity (`bids.get`) and `materialsList.get` all move, measured
+  before and after. Same for a count card's sheet delete.
+- Client: `takeoffRefresh` test that an end change and a card delete move
+  `bids.get` and `materialsList.get` (they ride on "run" and "markRemoved").
+
+### Build order
+
+a. `setEnds` lock gap (fix + red test). b. Toolbar Delete. c. Count card
+trash (server `removeForGroupOnSheet`) + card undo arrows. d. Run ends
+section, quick picks, Set ends button, end undo. e. Wrong-number tests,
+full suite, on-screen check.
