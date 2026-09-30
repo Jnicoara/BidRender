@@ -6198,6 +6198,9 @@ export async function addCountToBid(
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
 
+  // Before either insert below — see releaseArchivedPlanSlot.
+  await releaseArchivedPlanSlot(bidId, { groupId: group.id });
+
   /*
     A FREE COUNT — a name and some marks, nothing from the library.
 
@@ -6355,6 +6358,44 @@ export async function saveLineAsAssembly(input: {
     snapshotUnpricedParts: 0,
   });
   return { assemblyId, materialId };
+}
+
+/**
+ * Delete an ARCHIVED from-plans line that still holds the slot a send is about
+ * to fill.
+ *
+ * The unique indexes on (bidId, takeoffGroupId) and (bidId, takeoffRunTypeId,
+ * runMaterialRole) include archived rows, while every send decides "is it on
+ * the bid?" from LIVE lines. So a count whose line had been archived passed
+ * the check and then died on the index with a raw database error — found
+ * 2026-09-29 by `server/sendAll.test.ts` before Send all was built on it.
+ *
+ * Deleting is right rather than restoring: an archived line is out of every
+ * total already, its snapshot is from whenever it was sent, and the send
+ * about to run writes a fresh one from the same count. Since 2026-09-29 a
+ * plan line cannot be archived at all (`archiveLinkedCopies` refuses), so
+ * this only ever meets rows archived before that.
+ */
+async function releaseArchivedPlanSlot(
+  bidId: number,
+  slot: { groupId: number } | { runTypeId: number; role: RunMaterialRole }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .delete(bidLineItems)
+    .where(
+      and(
+        eq(bidLineItems.bidId, bidId),
+        isNotNull(bidLineItems.archivedAt),
+        "groupId" in slot
+          ? eq(bidLineItems.takeoffGroupId, slot.groupId)
+          : and(
+              eq(bidLineItems.takeoffRunTypeId, slot.runTypeId),
+              eq(bidLineItems.runMaterialRole, slot.role)
+            )
+      )
+    );
 }
 
 /** The live bid line for a counted group, if it has one. */
@@ -12207,6 +12248,10 @@ export async function addRunTypeRowToBid(
 
   const laborRate = hourlyCostFor(rates, defaults?.defaultLaborRateId ?? null);
 
+  await releaseArchivedPlanSlot(bidId, {
+    runTypeId: input.runTypeId,
+    role: input.role,
+  });
   const [result] = await db.insert(bidLineItems).values({
     bidId,
     takeoffRunTypeId: input.runTypeId,
