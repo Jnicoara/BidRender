@@ -29,6 +29,7 @@ import type {
   ProposalLayout,
   ProposalSectionId,
 } from "@shared/proposal";
+import { clientFigure } from "@shared/proposal";
 import { money } from "@/lib/money";
 
 const qty = (value: number) =>
@@ -534,7 +535,7 @@ export function ProposalSheet({
                         fontVariantNumeric: "tabular-nums",
                       }}
                     >
-                      {money(unit.price)}
+                      {clientFigure(doc.investment, unit.price, money)}
                     </td>
                   </tr>
                 ))}
@@ -578,7 +579,11 @@ export function ProposalSheet({
                 >
                   <span>Work</span>
                   <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                    {money(doc.investment.workTotal)}
+                    {clientFigure(
+                      doc.investment,
+                      doc.investment.workTotal,
+                      money
+                    )}
                   </span>
                 </div>
                 {expenses.lines.map((line, i) => (
@@ -616,7 +621,11 @@ export function ProposalSheet({
                 >
                   <span>Subtotal</span>
                   <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                    {money(doc.investment.subtotal)}
+                    {clientFigure(
+                      doc.investment,
+                      doc.investment.subtotal,
+                      money
+                    )}
                   </span>
                 </div>
                 <div
@@ -654,7 +663,11 @@ export function ProposalSheet({
                     )}
                   </span>
                   <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                    {money(tax.amount)}
+                    {/* An exempt line is an exact $0 and says so; a
+                        charged tax sits on the short subtotal. */}
+                    {tax.exempt
+                      ? money(tax.amount)
+                      : clientFigure(doc.investment, tax.amount, money)}
                   </span>
                 </div>
               </div>
@@ -709,7 +722,7 @@ export function ProposalSheet({
                   whiteSpace: "nowrap",
                 }}
               >
-                {money(doc.investment.total)}
+                {clientFigure(doc.investment, doc.investment.total, money)}
               </div>
             </div>
           </section>

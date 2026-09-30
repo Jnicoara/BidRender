@@ -1949,6 +1949,13 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       anyway / Back to the bid"), and "Your figures" shows the count beside
       Materials, Direct cost and Bid price. Scope-only prints no money and
       asks nothing.
+      **OVERRIDDEN 2026-09-29 by the owner (branch a-proposal-zero):** "a
+      client document must never show $0 or a short total". Staging's bid 2
+      printed TOTAL INVESTMENT $0.00 with one unpriced line. Now every figure
+      worked out from the bid's price reads "Price pending" on the document
+      (`clientFigure`, shared/proposal.ts), and Print / Save PDF / Ctrl+P is
+      a BLOCK listing the unpriced lines by name, with no "Print anyway".
+      Scope-only is unchanged.
 - [x] **BUILT 2026-09-26 (Track B): bid totals say how many lines they leave
       out** — "$4,210.00 + 4 lines not priced", "$0.00 + 4 …" when every line
       is unpriced. Materials, Direct cost and Bid price on the bid screen and

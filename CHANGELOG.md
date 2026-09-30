@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **A proposal can no longer show a client $0.00 or a short total.** If any
+  line on the bid is not priced, the proposal shows "Price pending" where the
+  total (and any subtotal, tax or per-unit price) would be, and Print / Save
+  PDF is blocked with a list of the lines to price first. Before this it
+  asked "Print anyway?" and printed the short total; on a bid with one
+  unpriced line that was $0.00. A scope-only proposal, which shows no money,
+  is unchanged.
+
 - **The plan reader no longer reads a sheet just because you opened it.** The
   "Read each sheet as I open it" switch is gone. A sheet is read, and paid for,
   only when you press Read sheet. With the switch on, clicking through a
