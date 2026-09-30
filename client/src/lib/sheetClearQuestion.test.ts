@@ -56,3 +56,23 @@ describe("the question before clearing a sheet", () => {
     expect(q.empty).toBe(true);
   });
 });
+
+describe("the totals a clear loses (plan § 1.1, 2026-09-29)", () => {
+  const p = {
+    runs: 6,
+    runsWithLegs: 0,
+    marks: 38,
+    counts: 5,
+    countsLeftEmpty: 0,
+  };
+  it("names the feet of run that goes", () => {
+    expect(sheetClearQuestion("E1.2", p, 412.004).lines[0]).toBe(
+      "Remove 6 runs (412 ft) and 38 marks in 5 counts from E1.2?"
+    );
+  });
+  it("claims no feet when the sheet has no scale", () => {
+    expect(sheetClearQuestion("E1.2", p, null).lines[0]).toBe(
+      "Remove 6 runs and 38 marks in 5 counts from E1.2?"
+    );
+  });
+});

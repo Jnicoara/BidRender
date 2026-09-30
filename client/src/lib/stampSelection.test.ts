@@ -58,9 +58,15 @@ describe("selecting marks", () => {
 });
 
 describe("deleting a selection", () => {
-  it("asks first for more than one mark, never for one", () => {
-    expect(deleteNeedsConfirm(1)).toBe(false);
-    expect(deleteNeedsConfirm(2)).toBe(true);
+  it("asks first when the marks span more than one count, never within one", () => {
+    const m = (groupName: string) => ({ groupName });
+    expect(deleteNeedsConfirm([m("Recep")])).toBe(false);
+    // One count's marks — a card's trash — go at once, with Undo (plan § 1.2 c).
+    expect(deleteNeedsConfirm([m("Recep"), m("Recep"), m("Recep")])).toBe(
+      false
+    );
+    // A box that caught another count's mark asks.
+    expect(deleteNeedsConfirm([m("Recep"), m("Switch")])).toBe(true);
   });
 
   it("names the counts a delete would touch", () => {

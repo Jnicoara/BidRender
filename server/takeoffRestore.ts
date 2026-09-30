@@ -40,6 +40,7 @@ import {
   type TakeoffRunCircuit,
   type TakeoffRunTee,
   type TakeoffStamp,
+  type TakeoffGroup,
 } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -266,6 +267,96 @@ async function restoreStampsIn(
         )
       );
   return ids.length;
+}
+
+// ── A whole count ────────────────────────────────────────────────────────────
+
+/**
+ * A count and every mark in it, on every sheet — what "Delete count" loses.
+ * Only marks reference a count (`takeoff_stamps.groupId`, cascade; a bid line
+ * is RESTRICT and refused before this), so the row plus its marks is all of it.
+ */
+export type GroupSnapshot = { group: TakeoffGroup; marks: StampSnapshot };
+
+/** Delete a count and its marks, and return exactly what went. */
+export async function deleteGroupWithSnapshot(
+  groupId: number,
+  userId: number
+): Promise<{ removed: number; snapshot: GroupSnapshot } | null> {
+  const db = await database();
+  return db.transaction(async tx => {
+    const [group] = await tx
+      .select()
+      .from(takeoffGroups)
+      .where(
+        and(eq(takeoffGroups.id, groupId), eq(takeoffGroups.userId, userId))
+      )
+      .limit(1);
+    if (!group) return null;
+    const ids = (
+      await tx
+        .select({ id: takeoffStamps.id })
+        .from(takeoffStamps)
+        .where(
+          and(
+            eq(takeoffStamps.groupId, groupId),
+            eq(takeoffStamps.userId, userId)
+          )
+        )
+    ).map(r => r.id);
+    const marks = await snapshotStampsIn(tx, ids, userId);
+    // The marks go with the row, by the foreign key's cascade.
+    await tx
+      .delete(takeoffGroups)
+      .where(
+        and(eq(takeoffGroups.id, groupId), eq(takeoffGroups.userId, userId))
+      );
+    return { removed: marks.stamps.length, snapshot: { group, marks } };
+  });
+}
+
+/** Put a deleted count back — same id, same marks, links re-attached. */
+export async function restoreGroup(
+  snapshot: GroupSnapshot,
+  userId: number
+): Promise<number> {
+  if (snapshot.group.userId !== userId)
+    refuse("That undo step is not valid here.");
+  const db = await database();
+  return db.transaction(async tx => {
+    const [already] = await tx
+      .select({ id: takeoffGroups.id })
+      .from(takeoffGroups)
+      .where(eq(takeoffGroups.id, snapshot.group.id))
+      .limit(1);
+    if (already) refuse("That count is already back.");
+    // Two counts with one name on one bid is what `create` refuses; a count
+    // started since under the same name would make one here.
+    const [sameName] = await tx
+      .select({ id: takeoffGroups.id })
+      .from(takeoffGroups)
+      .where(
+        and(
+          eq(takeoffGroups.bidId, snapshot.group.bidId),
+          eq(takeoffGroups.label, snapshot.group.label)
+        )
+      )
+      .limit(1);
+    if (sameName)
+      refuse(
+        `A count called "${snapshot.group.label}" has been started since, so this one cannot be put back beside it.`
+      );
+    try {
+      await tx.insert(takeoffGroups).values(snapshot.group);
+    } catch (error) {
+      if (isMissingParent(error))
+        refuse(
+          "The bid or assembly that count belonged to has gone since, so it cannot be put back."
+        );
+      throw error;
+    }
+    return restoreStampsIn(tx, snapshot.marks, userId);
+  });
 }
 
 /** Put deleted marks back, same ids, links re-attached. All or nothing. */

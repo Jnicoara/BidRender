@@ -227,6 +227,7 @@ import {
 import {
   countLabel,
   dropStep,
+  isNewestStep,
   nextRedo,
   nextUndo,
   pushStep,
@@ -272,6 +273,12 @@ import {
   type GroupBridgeState,
 } from "@/components/takeoff/RunsPanel";
 import { TakeoffSummaryPanel } from "@/components/takeoff/TakeoffSummaryPanel";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import {
+  countDeleteQuestion,
+  runDeleteQuestion,
+  type DeleteQuestion,
+} from "@/lib/deleteQuestions";
 import {
   clearDraft,
   hasUnsavedWork,
@@ -2527,16 +2534,19 @@ export default function TakeoffPage({
   undoRef.current = undoState;
   useEffect(() => saveUndo(tabStorage(), bidId, undoState), [bidId, undoState]);
   const [undoBusy, setUndoBusy] = useState(false);
-  const pushUndo = useCallback(
-    (entry: UndoEntry) => setUndoState(s => pushStep(s, entry)),
-    []
-  );
+  const pushUndo = useCallback((entry: UndoEntry): UndoEntry => {
+    setUndoState(s => pushStep(s, entry));
+    // Handed back so a toast can take back exactly this step (deletedToast).
+    return entry;
+  }, []);
   const undoRemoveMarks = trpc.takeoffStamps.removeMany.useMutation();
   const undoRestoreMarks = trpc.takeoffStamps.restore.useMutation();
   const undoRemoveRun = trpc.takeoffRuns.remove.useMutation();
   const undoRestoreRun = trpc.takeoffRuns.restore.useMutation();
   const undoSetPoints = trpc.takeoffRuns.setPoints.useMutation();
   const undoSetEnds = trpc.takeoffRuns.setEnds.useMutation();
+  const undoRestoreGroup = trpc.takeoffGroups.restore.useMutation();
+  const undoRemoveGroup = trpc.takeoffGroups.remove.useMutation();
   /** Ops whose mutations are declared further down the page. */
   const runUndoOpLater = useRef<(op: UndoOp) => Promise<UndoOp | null>>(
     async () => null
@@ -2598,6 +2608,15 @@ export default function TakeoffPage({
         case "restoreEnds":
           await undoRestoreRun.mutateAsync({ undo: op.packet });
           return { kind: "setEnds", runId: op.runId, patch: op.patch };
+        case "restoreGroup":
+          await undoRestoreGroup.mutateAsync({ undo: op.packet });
+          return { kind: "removeGroup", id: op.id };
+        case "removeGroup": {
+          const r = await undoRemoveGroup.mutateAsync({ id: op.id });
+          return r.undo
+            ? { kind: "restoreGroup", packet: r.undo, id: op.id }
+            : null;
+        }
         case "restoreSheet":
         case "clearSheet":
           // Wired with the tool that makes them (clear sheet), further down.
@@ -2615,6 +2634,8 @@ export default function TakeoffPage({
       undoRestoreRun,
       undoSetPoints,
       undoSetEnds,
+      undoRestoreGroup,
+      undoRemoveGroup,
     ]
   );
 
@@ -2651,6 +2672,37 @@ export default function TakeoffPage({
     [undoBusy, runUndoOp, refreshFor]
   );
 
+  /**
+   * A delete's toast, with an Undo BUTTON (plan § 1.1) rather than the words
+   * "Ctrl+Z puts it back". It takes back its OWN step and only while that is
+   * still the newest (@/lib/undoStack `isNewestStep`): pressed after more
+   * work, a plain "undo the newest" would take back the wrong thing.
+   */
+  const deletedToast = useCallback(
+    (message: string, entry: UndoEntry | null) => {
+      toast.success(
+        message,
+        entry
+          ? {
+              action: {
+                label: "Undo",
+                onClick: () => {
+                  if (!isNewestStep(undoRef.current, entry)) {
+                    toast.error(
+                      "Something newer is on the undo list, so this cannot be taken back from here. Use Undo in the toolbar."
+                    );
+                    return;
+                  }
+                  void stepBack("undo");
+                },
+              },
+            }
+          : undefined
+      );
+    },
+    [stepBack]
+  );
+
   /*
     ── CLEAR THIS SHEET (overrides takeoff-spec.md D6, owner 2026-09-29) ──────
     In the sheet's "…" menu, never a toolbar button. The question counts what
@@ -2666,15 +2718,17 @@ export default function TakeoffPage({
     onError: e => toast.error(e.message),
     onSuccess: (r, vars) => {
       const name = activeSheet?.name ?? "this sheet";
-      if (r.undo)
-        pushUndo({
-          label: `${name} cleared`,
-          sheetId: vars.sheetId,
-          undo: { kind: "restoreSheet", packet: r.undo },
-          redo: null,
-        });
-      toast.success(
-        `Cleared ${name}: ${countLabel(r.removedRuns, "run", "runs", "and")} ${countLabel(r.removedMarks, "mark", "marks", "removed")}. Ctrl+Z puts them back.`
+      const entry = r.undo
+        ? pushUndo({
+            label: `${name} cleared`,
+            sheetId: vars.sheetId,
+            undo: { kind: "restoreSheet", packet: r.undo },
+            redo: null,
+          })
+        : null;
+      deletedToast(
+        `Cleared ${name}: ${countLabel(r.removedRuns, "run", "runs", "and")} ${countLabel(r.removedMarks, "mark", "marks", "removed")}.`,
+        entry
       );
     },
     onSettled: (_r, _e, vars) => refreshFor("sheetCleared", vars.sheetId),
@@ -3277,6 +3331,64 @@ export default function TakeoffPage({
   });
 
   /*
+    DELETING A WHOLE COUNT — every mark, every sheet (plan § 1.2 c′). The
+    procedure existed with no control; it now sits behind a confirm naming
+    what goes, refuses a locked bid (server and here), and is one undo step.
+  */
+  const [countDeleteAsk, setCountDeleteAsk] = useState<{
+    id: number;
+    q: DeleteQuestion;
+  } | null>(null);
+  const removeGroup = trpc.takeoffGroups.remove.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: (r, vars) => {
+      const label =
+        bidCounts.data?.groups.find(g => g.id === vars.id)?.label ?? "count";
+      const entry =
+        r.undo && activeSheet
+          ? pushUndo({
+              label: `count "${label}" deleted`,
+              sheetId: activeSheet.id,
+              undo: { kind: "restoreGroup", packet: r.undo, id: vars.id },
+              redo: null,
+            })
+          : null;
+      deletedToast(
+        `Deleted count "${label}" and its ${countLabel(r.removed, "mark", "marks", "")}`.trim() +
+          ".",
+        entry
+      );
+    },
+    // Every sheet's marks moved, not only this one's.
+    onSettled: () => {
+      refreshFor("markRemoved");
+      void utils.takeoffStamps.listForSheet.invalidate();
+    },
+  });
+  const askDeleteCount = useCallback(
+    (groupId: number) => {
+      if (quantitiesLocked) {
+        toast.error(lockedEditRefusal("its counts cannot be deleted"));
+        return;
+      }
+      const row = bidCounts.data?.groups.find(g => g.id === groupId);
+      if (!row) return;
+      // On the bid: say so now; the server refuses the same way.
+      if (bridgeByGroup.get(groupId)?.onBid) {
+        toast.error(
+          `"${row.label}" is on the bid as a line. Remove that line from the bid first, then this count can go.`
+        );
+        return;
+      }
+      setCountDeleteAsk({
+        id: groupId,
+        q: countDeleteQuestion({ label: row.label, marks: row.count }),
+      });
+    },
+    [quantitiesLocked, bidCounts.data, bridgeByGroup]
+  );
+
+  /*
     THE WHOLE PLAN SET, ON THE BID OR NOT (plan § 2), and Send all (§ 3).
     Refreshed through @/lib/takeoffRefresh — it is in BID_QUANTITY_QUERIES,
     so every change kind on this screen moves it.
@@ -3332,8 +3444,8 @@ export default function TakeoffPage({
     undo: Packet | null,
     ids: number[],
     removed: number
-  ) => {
-    if (!undo || !activeSheet || removed === 0) return;
+  ): UndoEntry | null => {
+    if (!undo || !activeSheet || removed === 0) return null;
     // A card's own undo arrow can offer this when every mark was one count.
     const groups = new Set(
       stamps.filter(s => ids.includes(s.id)).map(s => s.groupId)
@@ -3347,7 +3459,7 @@ export default function TakeoffPage({
     */
     const position = stampGroups.findIndex(g => g.groupId === only);
     const card = position >= 0 ? stampGroups[position] : null;
-    pushUndo({
+    return pushUndo({
       label: countLabel(removed, "mark", "marks", "deleted"),
       sheetId: activeSheet.id,
       undo: { kind: "restoreMarks", packet: undo, ids },
@@ -3373,7 +3485,8 @@ export default function TakeoffPage({
     });
   };
   const removeStamp = trpc.takeoffStamps.remove.useMutation({
-    onSuccess: (r, vars) => pushMarksDeleted(r.undo, [vars.id], 1),
+    onSuccess: (r, vars) =>
+      deletedToast("Deleted 1 mark.", pushMarksDeleted(r.undo, [vars.id], 1)),
     onError: e => toast.error(e.message),
     // Not `refreshStamps`: a run that ended on this mark loses that end
     // (ON DELETE SET NULL), so its drops, connectors and Send preview move.
@@ -3391,9 +3504,10 @@ export default function TakeoffPage({
   */
   const removeStamps = trpc.takeoffStamps.removeMany.useMutation({
     onSuccess: (r, vars) => {
-      pushMarksDeleted(r.undo, vars.ids, r.removed);
-      toast.success(
-        `Deleted ${r.removed} ${r.removed === 1 ? "mark" : "marks"}. Ctrl+Z puts ${r.removed === 1 ? "it" : "them"} back.`
+      // The toast carries an Undo BUTTON for this step (plan § 1.1).
+      deletedToast(
+        `Deleted ${r.removed} ${r.removed === 1 ? "mark" : "marks"}.`,
+        pushMarksDeleted(r.undo, vars.ids, r.removed)
       );
     },
     onError: e => toast.error(e.message),
@@ -3422,8 +3536,9 @@ export default function TakeoffPage({
   const deleteMarks = useCallback(
     (marks: readonly { id: number; name: string }[]) => {
       if (marks.length === 0 || removeStamps.isPending) return;
-      if (deleteNeedsConfirm(marks.length)) {
-        setDeleteAsked(deleteQuestion(marks.map(s => ({ groupName: s.name }))));
+      const named = marks.map(s => ({ groupName: s.name }));
+      if (deleteNeedsConfirm(named)) {
+        setDeleteAsked(deleteQuestion(named));
         setDeleteTargets(marks.map(s => s.id));
         setConfirmingDelete(true);
         return;
@@ -3460,8 +3575,16 @@ export default function TakeoffPage({
   });
   const removeSymbol = trpc.takeoffStamps.removeSymbol.useMutation({
     onError: e => toast.error(e.message),
+    onSuccess: () => toast.success("Legend symbol deleted."),
     onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
   });
+  /*
+    A legend symbol is asked about (plan § 1.2 l): deleting it also deletes
+    every correction the reader learned from it (planCopilotCorrections,
+    ON DELETE CASCADE), and there is no undo for that. Marks placed from it
+    do not reference it and stay.
+  */
+  const [symbolDeleteId, setSymbolDeleteId] = useState<number | null>(null);
 
   // ── Plan reader (AI co-pilot) ─────────────────────────────────────────────
   /**
@@ -4022,6 +4145,12 @@ export default function TakeoffPage({
         return;
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
+        // Said here rather than left to the server's refusal: the key used
+        // to send a request that could only come back refused (§ 1.2 a).
+        if (quantitiesLocked) {
+          toast.error(lockedEditRefusal("its marks cannot be deleted"));
+          return;
+        }
         deleteSelected(false);
       } else if (e.key === "Escape" && !confirmingDelete) {
         e.preventDefault();
@@ -4030,7 +4159,14 @@ export default function TakeoffPage({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedStampIds, tracing, armedGroup, deleteSelected, confirmingDelete]);
+  }, [
+    selectedStampIds,
+    tracing,
+    armedGroup,
+    deleteSelected,
+    confirmingDelete,
+    quantitiesLocked,
+  ]);
 
   /**
    * Ctrl/⌘+Z undoes, Ctrl/⌘+Shift+Z and Ctrl+Y redo. Not while tracing,
@@ -4311,14 +4447,26 @@ export default function TakeoffPage({
   const removeRun = trpc.takeoffRuns.remove.useMutation({
     onError: e => toast.error(e.message),
     onSuccess: (result, vars) => {
-      if (result.undo && activeSheet)
-        pushUndo({
-          label: "run deleted",
-          sheetId: activeSheet.id,
-          undo: { kind: "restoreRun", packet: result.undo, id: vars.id },
-          redo: null,
-          subject: { kind: "run", id: rootOfRun(vars.id) },
-        });
+      // Read before the refresh drops the row from the cache.
+      const gone = runs.find(r => r.id === vars.id);
+      const isLeg = gone?.parentRunId != null;
+      const entry =
+        result.undo && activeSheet
+          ? pushUndo({
+              label: isLeg ? "leg deleted" : "run deleted",
+              sheetId: activeSheet.id,
+              undo: { kind: "restoreRun", packet: result.undo, id: vars.id },
+              redo: null,
+              subject: { kind: "run", id: rootOfRun(vars.id) },
+            })
+          : null;
+      // Until 2026-09-29 a run delete said nothing at all (plan § 1.2 d).
+      deletedToast(
+        isLeg
+          ? "Deleted one leg."
+          : `Deleted run ${gone?.name ?? ""}`.trim() + ".",
+        entry
+      );
       // A tee the last branch left behind that could not be joined back is
       // still a box on the drawing — said, not left to be discovered (D20).
       if (result.keptAsBox.length > 0)
@@ -4335,16 +4483,43 @@ export default function TakeoffPage({
    * One function for both, so the key can never delete something the button
    * did not name (@/lib/stampSelection, toolbarDelete).
    */
+  /*
+    DELETING A RUN, scaled to what is lost (plan § 1.1). A whole run asks
+    first and names its length ("Delete run Homerun — 84 ft?"); one leg of a
+    branched run goes at once. Both leave a toast with Undo. A locked bid is
+    refused here, before any question — asking about something that will be
+    refused is its own small lie.
+  */
+  const [runDeleteAsk, setRunDeleteAsk] = useState<{
+    id: number;
+    q: DeleteQuestion;
+  } | null>(null);
+  const askRemoveRun = useCallback(
+    (id: number) => {
+      if (removeRun.isPending) return;
+      if (quantitiesLocked) {
+        toast.error(lockedEditRefusal("its runs cannot be deleted"));
+        return;
+      }
+      const row = runs.find(r => r.id === id);
+      if (!row) return;
+      if (row.parentRunId != null) {
+        removeRun.mutate({ id });
+        return;
+      }
+      const network = runs.filter(r => r.id === id || r.parentRunId === id);
+      setRunDeleteAsk({ id, q: runDeleteQuestion(network) });
+    },
+    [removeRun, quantitiesLocked, runs]
+  );
+
   const deleteSelection = useCallback(() => {
     if (selectedStamps.length > 0) {
       deleteSelected(false);
       return;
     }
-    if (selectedRunId !== null && !removeRun.isPending) {
-      removeRun.mutate({ id: selectedRunId });
-      setSelectedRunId(null);
-    }
-  }, [selectedStamps.length, deleteSelected, selectedRunId, removeRun]);
+    if (selectedRunId !== null) askRemoveRun(selectedRunId);
+  }, [selectedStamps.length, deleteSelected, selectedRunId, askRemoveRun]);
 
   /**
    * The Delete key for a selected RUN (marks have their own handler above).
@@ -6067,14 +6242,15 @@ export default function TakeoffPage({
               {/*
                 DELETE, beside the arrows that take it back. It names what it
                 will delete ("Delete 3 marks") and is greyed out until
-                something is selected; more than one mark asks first
-                (@/lib/stampSelection, toolbarDelete).
+                something is selected; marks of more than one count, or a
+                whole run, ask first (@/lib/stampSelection, toolbarDelete).
               */}
               {(() => {
                 const run = runs.find(r => r.id === selectedRunId) ?? null;
                 const state = toolbarDelete(
                   selectedStamps.length,
-                  run ? { isLeg: run.parentRunId != null } : null
+                  run ? { isLeg: run.parentRunId != null } : null,
+                  new Set(selectedStamps.map(s => s.groupId)).size
                 );
                 const locked = quantitiesLocked && state.enabled;
                 return (
@@ -7019,7 +7195,7 @@ export default function TakeoffPage({
                       linkSymbol.mutate({ id: symbolId, assemblyId })
                     }
                     onUnlink={id => unlinkSymbol.mutate({ id })}
-                    onRemove={id => removeSymbol.mutate({ id })}
+                    onRemove={id => setSymbolDeleteId(id)}
                     onUseSymbol={symbol => {
                       const assembly = allAssemblies.find(
                         a => a.id === symbol.assemblyId
@@ -7038,8 +7214,9 @@ export default function TakeoffPage({
               totals={totals}
               selectedRunId={selectedRunId}
               onSelectRun={setSelectedRunId}
-              onRemoveRun={id => removeRun.mutate({ id })}
+              onRemoveRun={askRemoveRun}
               onDeleteCountMarks={deleteMarks}
+              onDeleteCount={askDeleteCount}
               onOpenPartialEnds={openPartialEnds}
               cardUndo={subject => undoForSubject(undoState, subject)}
               emptiedCount={emptiedCountCard(
@@ -7091,7 +7268,67 @@ export default function TakeoffPage({
         </div>
       )}
 
-      {/* "Delete N marks?" — asked for more than one, never for one. */}
+      {/* "Delete run Homerun — 84 ft?" — a whole run, named (plan § 1.1). */}
+      <ConfirmDialog
+        open={runDeleteAsk !== null}
+        onOpenChange={open => !open && setRunDeleteAsk(null)}
+        title={runDeleteAsk?.q.title ?? ""}
+        actionLabel={runDeleteAsk?.q.action ?? "Delete run"}
+        tone="destructive"
+        disabled={removeRun.isPending}
+        onConfirm={() => {
+          if (runDeleteAsk) {
+            removeRun.mutate({ id: runDeleteAsk.id });
+            if (selectedRunId === runDeleteAsk.id) setSelectedRunId(null);
+          }
+          setRunDeleteAsk(null);
+        }}
+      >
+        {runDeleteAsk?.q.lines.map(line => (
+          <p key={line}>{line}</p>
+        ))}
+      </ConfirmDialog>
+
+      {/* "Delete count …?" — the whole count, every sheet (plan § 1.2 c′). */}
+      <ConfirmDialog
+        open={countDeleteAsk !== null}
+        onOpenChange={open => !open && setCountDeleteAsk(null)}
+        title={countDeleteAsk?.q.title ?? ""}
+        actionLabel={countDeleteAsk?.q.action ?? "Delete count"}
+        tone="destructive"
+        disabled={removeGroup.isPending}
+        onConfirm={() => {
+          if (countDeleteAsk) removeGroup.mutate({ id: countDeleteAsk.id });
+          setCountDeleteAsk(null);
+        }}
+      >
+        {countDeleteAsk?.q.lines.map(line => (
+          <p key={line}>{line}</p>
+        ))}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={symbolDeleteId !== null}
+        onOpenChange={open => !open && setSymbolDeleteId(null)}
+        title="Delete this legend symbol?"
+        actionLabel="Delete symbol"
+        tone="destructive"
+        disabled={removeSymbol.isPending}
+        onConfirm={() => {
+          if (symbolDeleteId !== null)
+            removeSymbol.mutate({ id: symbolDeleteId });
+          setSymbolDeleteId(null);
+        }}
+      >
+        <p>
+          It comes off the legend on this job and every other job, and the
+          corrections the plan reader learned from it go with it. This cannot be
+          undone.
+        </p>
+        <p>Marks already placed stay where they are.</p>
+      </ConfirmDialog>
+
+      {/* "Delete N marks?" — asked when they span more than one count. */}
       <AlertDialog
         open={confirmingDelete}
         onOpenChange={open => !open && setConfirmingDelete(false)}
@@ -7121,7 +7358,15 @@ export default function TakeoffPage({
           {(() => {
             const name = activeSheet?.name ?? "this sheet";
             const q = clearPreview.data
-              ? sheetClearQuestion(name, clearPreview.data)
+              ? sheetClearQuestion(
+                  name,
+                  clearPreview.data,
+                  // The open sheet's runs are the sheet being cleared. A run
+                  // with no scale has no length, so none are claimed then.
+                  runs.some(r => r.quantities !== null)
+                    ? runs.reduce((s, r) => s + (r.quantities?.runFeet ?? 0), 0)
+                    : null
+                )
               : null;
             return (
               <>

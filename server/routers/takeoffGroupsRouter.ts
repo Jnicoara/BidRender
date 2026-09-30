@@ -30,6 +30,18 @@ import * as db from "../db";
 import { groupForAssembly } from "../assemblyGroup";
 import { refuseUnknownKinds } from "../extrasInput";
 import { refuseSendIfLocked } from "../lockGuard";
+import {
+  deleteGroupWithSnapshot,
+  restoreGroup,
+  type GroupSnapshot,
+} from "../takeoffRestore";
+import {
+  GROUP_PACKET,
+  openPacket,
+  packetSchema,
+  sealPacket,
+} from "../restorePacket";
+import { lockedEditRefusal } from "../../shared/quantityLock";
 import { DISTRIBUTION_KIND } from "../../shared/takeoffHeights";
 import { resolveRunType } from "../../shared/runTypeLookup";
 import { whipFeetOf } from "../../shared/branchWire";
@@ -538,6 +550,17 @@ export const takeoffGroupsRouter = router({
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const group = await requireGroup(input.id, ctx.scope.dataUserId);
+      /*
+        A locked bid must not change (owner, 2026-09-29) — and this takes
+        every mark of the count off every sheet. It had no lock check at all
+        until then; a count NOT on the bid was removable from a locked one.
+      */
+      const bid = await requireBid(group.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("its counts cannot be deleted"),
+        });
 
       const onBid = await db.getBidLineForGroup(group.id);
       if (onBid) {
@@ -549,12 +572,45 @@ export const takeoffGroupsRouter = router({
         });
       }
 
-      const counts = await db.countStampsByGroup(
-        group.bidId,
+      /*
+        Snapshot and delete in one transaction, so Undo can put the count
+        back with the same id and every mark where it was (plan § 1.1:
+        "Toast with Undo" after the confirm).
+      */
+      const result = await deleteGroupWithSnapshot(
+        group.id,
         ctx.scope.dataUserId
       );
-      const removed = counts.get(group.id) ?? 0;
-      await db.deleteTakeoffGroup(input.id, ctx.scope.dataUserId);
-      return { removed };
+      return {
+        removed: result?.removed ?? 0,
+        undo: result
+          ? sealPacket(GROUP_PACKET, ctx.scope.dataUserId, result.snapshot)
+          : null,
+      };
+    }),
+
+  /** Undo of `remove`: the count and its marks, same ids. Not on a locked bid. */
+  restore: procedure
+    .input(z.object({ undo: packetSchema }))
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const snapshot = openPacket<GroupSnapshot>(
+        GROUP_PACKET,
+        userId,
+        input.undo
+      );
+      if (!snapshot)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "That undo step is not valid here.",
+        });
+      const bid = await requireBid(snapshot.group.bidId, userId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("its counts cannot be put back"),
+        });
+      const restored = await restoreGroup(snapshot, userId);
+      return { restored };
     }),
 });

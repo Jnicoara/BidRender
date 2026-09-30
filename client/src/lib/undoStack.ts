@@ -71,7 +71,11 @@ export type UndoOp =
   /** Put a cleared sheet back (marks and runs). */
   | { kind: "restoreSheet"; packet: Packet }
   /** Clear the sheet again (redo of an undone clear). */
-  | { kind: "clearSheet"; sheetId: number };
+  | { kind: "clearSheet"; sheetId: number }
+  /** Put a deleted count back — the row and its marks on every sheet. */
+  | { kind: "restoreGroup"; packet: Packet; id: number }
+  /** Delete the count again (redo of an undone count delete). */
+  | { kind: "removeGroup"; id: number };
 
 export type UndoEntry = {
   /** What the step was, as the button's tooltip names it: "3 marks placed". */
@@ -138,6 +142,16 @@ export function pushStep(state: UndoState, entry: UndoEntry): UndoState {
 
 export function nextUndo(state: UndoState): UndoEntry | null {
   return state.past[state.past.length - 1] ?? null;
+}
+
+/**
+ * Whether this step is still the newest — the only step a toast's "Undo"
+ * button may take back. The toast outlives the moment: press it after
+ * placing three more marks and a plain "undo the newest" would take back the
+ * marks, not the delete the toast was about. Same rule as a card's arrow.
+ */
+export function isNewestStep(state: UndoState, entry: UndoEntry): boolean {
+  return nextUndo(state) === entry;
 }
 
 export function nextRedo(state: UndoState): UndoEntry | null {

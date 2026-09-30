@@ -31,6 +31,7 @@ import {
   EMPTY_UNDO,
   UNDO_LIMIT,
   type UndoEntry,
+  type UndoOp,
   type UndoState,
 } from "./undoStack";
 
@@ -38,18 +39,27 @@ export const UNDO_STORAGE_PREFIX = "bidrender:undo:";
 
 type Store = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
-const UNDO_KINDS = new Set([
-  "removeMarks",
-  "restoreMarks",
-  "removeRun",
-  "restoreRun",
-  "setPoints",
-  "restorePoints",
-  "setEnds",
-  "restoreEnds",
-  "restoreSheet",
-  "clearSheet",
-]);
+/*
+  A RECORD keyed by every op kind, not a hand-kept list: a kind added to
+  UndoOp and forgotten here is a compile error. As a list, it would have
+  been read back as "not a history" and the whole stack dropped on reload
+  (found adding the count delete, 2026-09-29).
+*/
+const KNOWN_KINDS: Record<UndoOp["kind"], true> = {
+  removeMarks: true,
+  restoreMarks: true,
+  removeRun: true,
+  restoreRun: true,
+  setPoints: true,
+  restorePoints: true,
+  setEnds: true,
+  restoreEnds: true,
+  restoreSheet: true,
+  clearSheet: true,
+  restoreGroup: true,
+  removeGroup: true,
+};
+const UNDO_KINDS = new Set<string>(Object.keys(KNOWN_KINDS));
 
 function isOp(value: unknown): boolean {
   return (

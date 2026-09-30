@@ -104,3 +104,22 @@ describe("undo history kept for the life of the tab", () => {
     ).not.toThrow();
   });
 });
+
+describe("a deleted count on the kept history (2026-09-29)", () => {
+  it("comes back after a reload, rather than dropping the whole history", () => {
+    const store = tab();
+    const countDeleted: UndoEntry = {
+      label: 'Count "Exit sign" deleted',
+      sheetId: 7,
+      undo: {
+        kind: "restoreGroup",
+        packet: { kind: "group", data: "a", sig: "b" },
+        id: 40,
+      },
+      redo: null,
+    };
+    const state = pushStep(pushStep(EMPTY_UNDO, deleted), countDeleted);
+    saveUndo(store, 12, state);
+    expect(loadUndo(store, 12)).toEqual(state);
+  });
+});

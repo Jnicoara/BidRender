@@ -76,12 +76,20 @@ export function pruneSelection(
 }
 
 /**
- * Whether deleting asks first. One mark is the misclick path and goes at
- * once; more than one is asked about (owner, 2026-09-29), because a box can
- * catch marks nobody meant to include.
+ * Whether deleting marks asks first: when they belong to MORE THAN ONE count.
+ *
+ * NARROWED 2026-09-29 by references/track-b-deletes-summary-pan-plan.md
+ * § 1.2 rows b and c ("delete rules scaled to what is lost"). It used to ask
+ * for any delete of more than one mark (owner, earlier the same day), because
+ * a box can catch marks nobody meant to include. That reason is about a box
+ * reaching into OTHER counts, and it still asks then. Marks of one count —
+ * a card's trash, a box inside one count — go at once with a toast whose
+ * Undo button puts them back: one count, one undo, nothing hidden.
  */
-export function deleteNeedsConfirm(count: number): boolean {
-  return count > 1;
+export function deleteNeedsConfirm(
+  marks: readonly { groupName: string }[]
+): boolean {
+  return new Set(marks.map(m => m.groupName)).size > 1;
 }
 
 /**
@@ -117,22 +125,27 @@ export function deleteQuestion(selected: readonly { groupName: string }[]): {
  */
 export function toolbarDelete(
   marks: number,
-  run: { isLeg: boolean } | null
+  run: { isLeg: boolean } | null,
+  /** How many counts the selected marks belong to. */
+  counts = 1
 ): { enabled: boolean; label: string; title: string } {
   if (marks > 0)
     return {
       enabled: true,
       label: `Delete ${marks} ${marks === 1 ? "mark" : "marks"}`,
       title:
-        marks > 1
+        counts > 1
           ? "Asks first, then deletes them (Delete). Ctrl+Z puts them back."
-          : "Deletes it (Delete). Ctrl+Z puts it back.",
+          : `Deletes ${marks === 1 ? "it" : "them"} (Delete). Ctrl+Z puts ${marks === 1 ? "it" : "them"} back.`,
     };
   if (run)
     return {
       enabled: true,
       label: run.isLeg ? "Delete leg" : "Delete run",
-      title: "Deletes it (Delete). Ctrl+Z puts it back.",
+      // A whole run is confirmed first (plan § 1.1); a leg is not.
+      title: run.isLeg
+        ? "Deletes it (Delete). Ctrl+Z puts it back."
+        : "Asks first, then deletes the run (Delete). Ctrl+Z puts it back.",
     };
   return {
     enabled: false,

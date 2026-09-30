@@ -3,6 +3,7 @@ import {
   EMPTY_UNDO,
   UNDO_LIMIT,
   dropStep,
+  isNewestStep,
   nextRedo,
   nextUndo,
   pushStep,
@@ -117,5 +118,16 @@ describe("a card's own undo arrow", () => {
   it("offers nothing for a step with no single subject", () => {
     const s = pushStep(EMPTY_UNDO, placed(1));
     expect(undoForSubject(s, { kind: "count", id: 1 })).toBeNull();
+  });
+});
+
+describe("a toast's Undo button", () => {
+  it("takes back only its own step, while it is still the newest", () => {
+    const first = placed(1);
+    let s = pushStep(EMPTY_UNDO, first);
+    expect(isNewestStep(s, first)).toBe(true);
+    // Three more marks placed after the toast appeared.
+    s = pushStep(s, placed(2));
+    expect(isNewestStep(s, first)).toBe(false);
   });
 });

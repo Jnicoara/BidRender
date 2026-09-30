@@ -29,6 +29,8 @@ export const STAMPS_PACKET = "stamps";
 export const RUN_PACKET = "runNetwork";
 /** Everything on one sheet: `SheetSnapshot`. */
 export const SHEET_PACKET = "sheet";
+/** A whole count and its marks on every sheet: `GroupSnapshot`. */
+export const GROUP_PACKET = "group";
 
 /** A packet as a procedure accepts it. Capped: a sheet clear is the biggest. */
 export const packetSchema = z.object({

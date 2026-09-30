@@ -28,6 +28,28 @@ measurement, the measurement is the first step of that piece.
 
 ## 1. Delete rules that scale with what is lost
 
+> **BUILT 2026-09-29, except rows f and m.** One `ConfirmDialog`
+> (client/src/components) for every confirm: Cancel focused, the action
+> never pressed by Enter (`@/lib/confirmKeys`), red for a loss. Every
+> Plans-screen delete toast carries an **Undo button** that takes back its
+> own step only while it is the newest (`isNewestStep`), else says to use
+> the toolbar. Row by row: **a** toast + Undo, the Delete key refuses on a
+> locked bid before sending; **b/c** a confirm only when the marks span more
+> than one count — this NARROWS the owner's earlier "more than one mark asks
+> first" (the reason given was a box reaching other counts, and that still
+> asks), recorded in `stampSelection.ts`; **c′** "Delete count…" on the card
+> (hidden on a locked bid or when the count is on the bid), confirm naming
+> marks on every sheet, **the server had no lock check — added, with a test
+> red without it** — and a new undo step (`restoreGroup`/`removeGroup`, same
+> id and marks); **d** a whole run confirms "Delete run Homerun — 88.89 ft?"
+> with legs, drops and circuits, a single leg does not, both toast with
+> Undo, the bin is off on a locked bid; **g** "Take back"; **i** feet in the
+> clear question, Undo button in its toast; **l** confirm (its learned
+> corrections cascade and cannot be undone). **Not built:** **f** (circuit
+> remove needs a restore packet) and **m** (a bid line's Undo, on the bid
+> screen). `undoPersist`'s list of kinds is now a typed record, so a new
+> kind cannot be silently dropped on reload.
+
 ### 1.1 The rule — one look everywhere
 
 | What is lost                                                  | Confirm?                                                                                                                                                                             | After                                                   |

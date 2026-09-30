@@ -327,7 +327,9 @@ function RunPullPoints({
             disabled={busy}
             onClick={() => onUndo(a.answerId)}
           >
-            Undo
+            {/* Not "Undo": that word is the toolbar's stack, and this only
+                takes back this one answer (plan § 1.2 g, audit #26). */}
+            Take back
           </Button>
         </div>
       ))}
@@ -349,7 +351,7 @@ function RunPullPoints({
               disabled={busy}
               onClick={() => onUndo(p.answer!.id)}
             >
-              Undo
+              Take back
             </Button>
           </div>
         ))}
@@ -1038,6 +1040,7 @@ export function RunsPanel({
   onSelectRun,
   onRemoveRun,
   onDeleteCountMarks,
+  onDeleteCount,
   onOpenPartialEnds,
   cardUndo,
   onCardUndo,
@@ -1233,6 +1236,8 @@ export function RunsPanel({
    * itself stays, and its bid line follows. More than one asks first.
    */
   onDeleteCountMarks?: (marks: { id: number; name: string }[]) => void;
+  /** Delete the whole count, every sheet — the page asks first. */
+  onDeleteCount?: (groupId: number) => void;
   /** "Set ends": open the first run with one end not counted. */
   onOpenPartialEnds?: () => void;
   /**
@@ -1489,6 +1494,25 @@ export function RunsPanel({
                     {index + 1}
                   </button>
                 ))}
+                {/*
+                  The WHOLE count — every mark on every sheet (plan § 1.2
+                  c′). Words, not a second bin beside the first: two bins on
+                  one card, one for this sheet and one for all of them, is a
+                  coin toss. It asks first and names what goes.
+                */}
+                {onDeleteCount &&
+                  group.groupId !== null &&
+                  !quantitiesLocked &&
+                  !bridge?.get(group.groupId)?.onBid && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteCount(group.groupId as number)}
+                      className="ml-auto text-[0.65rem] text-muted-foreground hover:text-destructive underline-offset-2 hover:underline"
+                      title="Delete this count and its marks on every sheet — asks first"
+                    >
+                      Delete count…
+                    </button>
+                  )}
               </div>
             </div>
           </Fragment>
@@ -2146,6 +2170,12 @@ export function RunsPanel({
                             : `Delete leg ${place.index} only`
                           : undefined
                       }
+                      /*
+                        A locked bid refuses a run delete (server); the bin
+                        says so by being off, rather than offering a click
+                        that will only be refused (plan § 1.2 row d).
+                      */
+                      disabled={quantitiesLocked}
                     >
                       <Trash2 className="w-3 h-3" />
                     </Button>

@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Deleting on the Plans screen now asks in proportion to what you lose.**
+  One mark, or one count's marks on a sheet, goes at once with an "Undo"
+  button in the message. A whole run asks first and names it ("Delete run
+  Homerun — 88.89 ft?"); a new "Delete count…" removes a count from every
+  sheet after asking, and can be undone too. Clearing a sheet now says how
+  many feet of run go. In these questions Enter never deletes — it has to be
+  a click. A locked bid refuses all of it; deleting a whole count on a
+  locked bid used to be allowed, and is not any more.
 - **The Plans screen now says what is on the bid and what is not, for the
   whole plan set.** An amber "Not on the bid yet" list names every count and
   traced run that has not reached the bid, with the reason — not sent, no run
