@@ -271,6 +271,7 @@ import {
   RunsPanel,
   type GroupBridgeState,
 } from "@/components/takeoff/RunsPanel";
+import { TakeoffSummaryPanel } from "@/components/takeoff/TakeoffSummaryPanel";
 import {
   clearDraft,
   hasUnsavedWork,
@@ -2462,6 +2463,9 @@ export default function TakeoffPage({
         case "takeoffGroups.list":
           void utils.takeoffGroups.list.invalidate({ bidId });
           return;
+        case "takeoffSummary.forBid":
+          void utils.takeoffSummary.forBid.invalidate({ bidId });
+          return;
         case "takeoffHeights.forBid":
           void utils.takeoffHeights.forBid.invalidate({ bidId });
           return;
@@ -3242,7 +3246,9 @@ export default function TakeoffPage({
   const sendToBid = trpc.takeoffGroups.sendToBid.useMutation({
     onError: e => toast.error(e.message),
     onSuccess: result => {
-      void bidCounts.refetch();
+      // The bid's lines, the materials list and the summary move too — the
+      // count list alone left them stale until 2026-09-29.
+      refreshFor("sentToBid");
       /*
         The warning is shown as its own message rather than folded into the
         success line, and it does not block.
@@ -3268,6 +3274,34 @@ export default function TakeoffPage({
       );
       if (result.warning) toast.warning(result.warning);
     },
+  });
+
+  /*
+    THE WHOLE PLAN SET, ON THE BID OR NOT (plan § 2), and Send all (§ 3).
+    Refreshed through @/lib/takeoffRefresh — it is in BID_QUANTITY_QUERIES,
+    so every change kind on this screen moves it.
+  */
+  const bidSummary = trpc.takeoffSummary.forBid.useQuery(
+    { bidId },
+    { enabled: Number.isFinite(bidId) }
+  );
+  const sendAll = trpc.takeoffSummary.sendAll.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: result => {
+      const sent = result.sent.length;
+      if (result.notSent.length === 0) {
+        toast.success(
+          `Sent ${sent} to the bid. The lines follow your plans from here.`
+        );
+      } else {
+        // A partial send is a warning, never a green tick (audit #15).
+        toast.warning(
+          `Sent ${sent}. ${result.notSent.length} did not go: ` +
+            result.notSent.map(n => `${n.name} — ${n.why}`).join("; ")
+        );
+      }
+    },
+    onSettled: () => refreshFor("sentToBid"),
   });
 
   /** Pick the tool up. One function, so both doors leave the same state. */
@@ -6722,6 +6756,13 @@ export default function TakeoffPage({
                 window.setTimeout(() => setFocusPoint(null), 2200);
               }}
               onRemoveStamp={id => removeStamp.mutate({ id })}
+              summary={
+                <TakeoffSummaryPanel
+                  summary={bidSummary.data}
+                  sending={sendAll.isPending}
+                  onSendAll={expect => sendAll.mutate({ bidId, expect })}
+                />
+              }
               onAnswerBranchWiring={(runId, answer) =>
                 setBranchWiring.mutate({ id: runId, branchWiring: answer })
               }

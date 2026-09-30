@@ -115,6 +115,21 @@ screen change and a reload in the same tab. Across tabs stays out of scope.
 
 ## 2. Whole-plan-set summary
 
+> **BUILT 2026-09-29.** `takeoffSummary.forBid` (server/routers/
+> takeoffSummaryRouter.ts) composes `takeoffGroups.list` and
+> `takeoffRunTypes.bridgeForBid` through server-side callers, so nothing is
+> computed twice; the sorting rule is shared/takeoffSummary.ts. Differences
+> from the text below: it sits in the counted-items panel where the grey
+> "N counts are not on the bid yet" line was, not in the pinned totals (which
+> the owner wants SHORTER — todo.md, readability pass); reasons `noMaterial`
+> and `untypedPrice` arrive as the row's own sentence (`cannotSend`,
+> `unsupported`); `suggestion` is not listed (runsNotOnBid already leaves
+> suggestions out); and a reason the plan missed was added — **`noWire`**,
+> conduit with nothing pulled through it, found by looking at the screen. It
+> is in `BID_QUANTITY_QUERIES`, and a new `sentToBid` change kind refreshes it
+> (the single count send used to refetch the count list only). **Not
+> measured:** the 500-sheet timing asked for below.
+
 **What exists.** Counts are already whole-bid (`takeoffGroups.list`: count,
 `sendability`, `waitingToSend`). Run footage is whole-bid
 (`takeoffRuns.totals`, with `leftOut`). The per-type bridge is whole-bid
@@ -168,6 +183,16 @@ every run on the bid. Time it before choosing where it is cached.
 ---
 
 ## 3. "Send all to bid"
+
+> **BUILT 2026-09-29.** `takeoffSummary.sendAll({ bidId, expect })`. It calls
+> the single `sendToBid` procedures themselves rather than functions moved out
+> of them, which gets the same "cannot drift" with less churn. **Not one
+> transaction** — the helpers take the shared connection; the unique indexes
+> make a repeat or a half-finished send harmless, and the router says so.
+> Run types are sent per ROW (`role`), so Send all never swaps or refills a
+> line already on the bid. The archived-index question was real:
+> ER_DUP_ENTRY on a re-send, fixed first (`releaseArchivedPlanSlot`).
+> Locked: refused by `refuseSendIfLocked`, owner's answer 1.
 
 **Shape.** A button in the summary's "Not on the bid yet" heading: **"Send
 N to bid…"**. It opens one dialog, the § 1.1 component in its non-destructive

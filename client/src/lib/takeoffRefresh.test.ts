@@ -131,3 +131,24 @@ describe("a change to a run's ends (the drop)", () => {
       expect(set.has(q), q).toBe(true);
   });
 });
+
+describe("the whole-set summary and sending to the bid (2026-09-29)", () => {
+  it("every change kind moves the summary, since it states every quantity", () => {
+    for (const change of Object.keys(QUERIES_MOVED_BY) as TakeoffChange[])
+      expect(moves(change).has("takeoffSummary.forBid"), change).toBe(true);
+  });
+
+  it("a send moves the bid's lines, the materials list, the counts and the summary", () => {
+    // The gap found 2026-09-29: a single count send refetched the count list
+    // only, so the bid and the materials list kept their old answer.
+    const set = moves("sentToBid");
+    for (const q of [
+      "bids.get",
+      "materialsList.get",
+      "takeoffGroups.list",
+      "takeoffRunTypes.bridgeForBid",
+      "takeoffSummary.forBid",
+    ] as const)
+      expect(set.has(q), q).toBe(true);
+  });
+});

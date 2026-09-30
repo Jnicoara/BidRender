@@ -6,6 +6,19 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **The Plans screen now says what is on the bid and what is not, for the
+  whole plan set.** An amber "Not on the bid yet" list names every count and
+  traced run that has not reached the bid, with the reason — not sent, no run
+  type, no scale, an assembly that was deleted, or conduit with no wire in
+  it. "Send N to bid…" shows a preview of what will go and what cannot, then
+  sends it in one press. Sending again never adds a second line, a locked bid
+  refuses, and if the drawing changed while the preview was open it asks you
+  to check again rather than sending something you did not see. Pressing
+  Enter in the preview never sends; it has to be a click.
+- **Sending a count or a run type again, after its bid line had been
+  archived, no longer fails with a database error.** The archived copy was
+  still holding the count's place on the bid; it is now cleared and a fresh
+  line goes on. This had to work before "Send all to bid" could be built.
 - **Two-finger scrolling on a trackpad now moves the sheet.** It used to zoom.
   A mouse wheel still zooms (like Bluebeam), and pinching still zooms. The app
   tells the two apart by how the scroll arrives; if your mouse ever pans

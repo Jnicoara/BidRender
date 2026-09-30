@@ -245,3 +245,160 @@ withDb("re-sending after a from-plans line was archived", () => {
     expect(await allLines(s.bidId)).toHaveLength(roles.length);
   });
 });
+
+// ── The summary ──────────────────────────────────────────────────────────────
+
+const summary = (bidId: number) => caller().takeoffSummary.forBid({ bidId });
+
+const byKey = (items: { key: string }[]) => items.map(i => i.key).sort();
+
+withDb("the whole-set summary", () => {
+  it("lists every count and run row as not on the bid, with why, until sent", async () => {
+    const s = await aBid();
+    const before = await summary(s.bidId);
+    expect(before.onBid).toEqual([]);
+    const exit = before.notOnBid.find(i => i.key === `count:${s.exitId}`)!;
+    expect(exit).toMatchObject({ qty: 3, reason: "notSent" });
+    expect(exit.why).toMatch(/not sent yet/);
+    const pipe = before.notOnBid.find(
+      i => i.key === `run:${s.runTypeId}:raceway`
+    )!;
+    expect(pipe).toMatchObject({ qty: 100, unit: "ft", reason: "notSent" });
+
+    await caller().takeoffGroups.sendToBid({ id: s.exitId });
+    const after = await summary(s.bidId);
+    expect(after.onBid.map(i => i.key)).toEqual([`count:${s.exitId}`]);
+    expect(after.notOnBid.map(i => i.key)).not.toContain(`count:${s.exitId}`);
+  });
+
+  it("names runs with no type and runs on a sheet with no scale", async () => {
+    const s = await aBid();
+    await s.trace(s.sheetId, null);
+    await s.trace(s.unscaledId, s.runTypeId);
+    const { notOnBid } = await summary(s.bidId);
+    expect(notOnBid.find(i => i.reason === "noType")).toMatchObject({
+      qty: 1,
+      send: null,
+    });
+    expect(notOnBid.find(i => i.reason === "noScale")).toMatchObject({
+      key: `noScale:${s.runTypeId}`,
+      qty: 1,
+      send: null,
+    });
+  });
+
+  it("names the conduit run that carries no wire", async () => {
+    const s = await aBid();
+    const { notOnBid } = await summary(s.bidId);
+    expect(notOnBid.find(i => i.reason === "noWire")).toMatchObject({
+      qty: 1,
+      send: null,
+    });
+  });
+
+  it("says locked, and offers nothing to send, on a locked bid", async () => {
+    const s = await aBid();
+    await s.lock();
+    const { sendable, notOnBid } = await summary(s.bidId);
+    expect(sendable).toEqual([]);
+    expect(notOnBid.find(i => i.key === `count:${s.exitId}`)!.reason).toBe(
+      "locked"
+    );
+  });
+});
+
+// ── Send all ─────────────────────────────────────────────────────────────────
+
+const sendAll = async (bidId: number) => {
+  const { sendable } = await summary(bidId);
+  return caller().takeoffSummary.sendAll({ bidId, expect: sendable });
+};
+
+const lineShape = async (bidId: number) =>
+  (await liveLines(bidId)).map(l => [
+    l.takeoffGroupId,
+    l.takeoffRunTypeId,
+    l.runMaterialRole,
+    Number(l.qty),
+  ]);
+
+withDb("send all to bid", () => {
+  it("sends everything the preview listed, and a second send changes nothing", async () => {
+    const s = await aBid();
+    const first = await sendAll(s.bidId);
+    expect(first.notSent).toEqual([]);
+    const once = await lineShape(s.bidId);
+    expect(once).toContainEqual([s.exitId, null, null, 3]);
+    expect(once).toContainEqual([s.freeId, null, null, 2]);
+    expect(once).toContainEqual([null, s.runTypeId, "raceway", 100]);
+    expect((await summary(s.bidId)).sendable).toEqual([]);
+
+    const second = await sendAll(s.bidId);
+    expect(second).toEqual({ sent: [], notSent: [] });
+    expect(await lineShape(s.bidId)).toEqual(once);
+  });
+
+  it("a locked bid refuses and writes nothing", async () => {
+    const s = await aBid();
+    const { sendable } = await summary(s.bidId);
+    await s.lock();
+    await expect(
+      caller().takeoffSummary.sendAll({ bidId: s.bidId, expect: sendable })
+    ).rejects.toThrow(/locked/i);
+    expect(await liveLines(s.bidId)).toEqual([]);
+  });
+
+  it("leaves out what cannot go, with its reason, and never prices anything at $0", async () => {
+    const s = await aBid();
+    // The exit sign's assembly is deleted from the library after counting.
+    await (await database())
+      .delete(assemblies)
+      .where(eq(assemblies.id, s.assemblyId));
+    const before = await summary(s.bidId);
+    const gone = before.notOnBid.find(i => i.key === `count:${s.exitId}`)!;
+    expect(gone).toMatchObject({ reason: "assemblyGone", send: null });
+    expect(before.sendable).not.toContain(`count:${s.exitId}`);
+
+    await sendAll(s.bidId);
+    const lines = await liveLines(s.bidId);
+    expect(lines.map(l => l.takeoffGroupId)).not.toContain(s.exitId);
+    // The free count crossed with its price BLANK, not zero.
+    const doorbell = lines.find(l => l.takeoffGroupId === s.freeId)!;
+    expect(doorbell.snapshotMaterialCost).toBeNull();
+    // And it is still listed afterwards, with the same reason.
+    expect(
+      (await summary(s.bidId)).notOnBid.find(i => i.key === `count:${s.exitId}`)
+        ?.reason
+    ).toBe("assemblyGone");
+  });
+
+  it("refuses a list that changed since the preview, and writes nothing", async () => {
+    const s = await aBid();
+    const { sendable } = await summary(s.bidId);
+    const late = await caller().takeoffGroups.create({
+      bidId: s.bidId,
+      label: `Late count ${Math.random()}`,
+    });
+    await caller().takeoffStamps.drop({
+      bidId: s.bidId,
+      sheetId: s.sheetId,
+      groupId: late.id,
+      at: [{ x: 5, y: 5 }],
+    });
+    await expect(
+      caller().takeoffSummary.sendAll({ bidId: s.bidId, expect: sendable })
+    ).rejects.toThrow(/Something changed/);
+    expect(await liveLines(s.bidId)).toEqual([]);
+  });
+
+  it("re-sends a count whose line had been archived", async () => {
+    const s = await aBid();
+    await sendAll(s.bidId);
+    await archiveAll(s.bidId);
+    const again = await sendAll(s.bidId);
+    expect(again.notSent).toEqual([]);
+    expect(
+      (await liveLines(s.bidId)).filter(l => l.takeoffGroupId === s.exitId)
+    ).toHaveLength(1);
+  });
+});

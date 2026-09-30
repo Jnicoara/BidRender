@@ -9,6 +9,12 @@ const t = initTRPC.context<TrpcContext>().create({
 
 export const router = t.router;
 export const publicProcedure = t.procedure;
+/**
+ * For a procedure that is built out of OTHER procedures — so the bulk send
+ * runs the single send itself rather than a copy that could drift from it
+ * (server/routers/takeoffSummaryRouter.ts).
+ */
+export const createCallerFactory = t.createCallerFactory;
 
 const requireUser = t.middleware(async opts => {
   const { ctx, next } = opts;

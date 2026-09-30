@@ -1056,6 +1056,7 @@ export function RunsPanel({
   onJumpTo,
   onRemoveStamp,
   legend,
+  summary,
   renderRunEnds,
   renderRunType,
   onAnswerBranchWiring,
@@ -1167,6 +1168,12 @@ export function RunsPanel({
   onRemoveStamp: (id: number) => void;
   /** The legend panel, rendered beneath the list. */
   legend?: React.ReactNode;
+  /**
+   * The whole-set summary (TakeoffSummaryPanel), where the one grey "N counts
+   * are not on the bid yet" line used to be. A node, like `legend`: it owns
+   * its query and the Send all mutation.
+   */
+  summary?: React.ReactNode;
   /**
    * The ends editor for the open run. A render prop for the same reason
    * `legend` is one: this panel takes data and gives back clicks, and the
@@ -1541,7 +1548,9 @@ export function RunsPanel({
           </p>
         ) : null}
 
-        {stampGroups.length > 0 && waitingToSend !== undefined ? (
+        {summary ? (
+          summary
+        ) : stampGroups.length > 0 && waitingToSend !== undefined ? (
           <p className="px-3 py-2 text-[0.7rem] text-muted-foreground border-b border-border">
             {waitingToSend > 0
               ? `${waitingToSend} count${waitingToSend === 1 ? " is" : "s are"} not on the bid yet.`

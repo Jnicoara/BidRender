@@ -35,6 +35,7 @@ export type TakeoffQuery =
   | "takeoffRuns.typeColors"
   | "takeoffRunTypes.bridgeForBid"
   | "takeoffGroups.list"
+  | "takeoffSummary.forBid"
   | "takeoffHeights.forBid"
   | "bidPdfs.list"
   | "bidPdfs.sheetJumpList"
@@ -62,6 +63,13 @@ export const BID_QUANTITY_QUERIES = [
   */
   "bids.get",
   "materialsList.get",
+  /*
+    ADDED 2026-09-29 with the whole-set summary. It states every quantity on
+    the plan set as on the bid or not, so anything that moves a quantity or a
+    line moves it — which is why it lives in this list and not beside one
+    mutation (CLAUDE.md, the staleness class).
+  */
+  "takeoffSummary.forBid",
 ] as const satisfies readonly TakeoffQuery[];
 
 const RUN_QUERIES = [
@@ -140,7 +148,13 @@ export type TakeoffChange =
    * ends editor refreshed `takeoffRuns` only, so the Send preview, the bid's
    * lines and the materials list kept the old drop footage on screen.
    */
-  | "runEnds";
+  | "runEnds"
+  /**
+   * A count or run type sent to the bid, singly or by Send all. Until
+   * 2026-09-29 the single count send refetched the count list only, so the
+   * bid's cached lines and the materials list kept the old answer.
+   */
+  | "sentToBid";
 
 /**
  * Which sheets' own lists (marks, runs) a change must refresh.
@@ -189,4 +203,5 @@ export const QUERIES_MOVED_BY: Readonly<
   undo: unique([...MARK_QUERIES, ...RUN_QUERIES]),
   sheetCleared: unique([...MARK_QUERIES, ...RUN_QUERIES]),
   runEnds: unique(RUN_QUERIES),
+  sentToBid: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
 };

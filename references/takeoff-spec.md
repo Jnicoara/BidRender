@@ -1229,8 +1229,12 @@ Checked against the deleted `PlanPanel.tsx`. These may have been forgotten.
   an installed app (section 7).
 - **Stamps that failed to send are not retried when the connection returns** —
   only with the next stamp placed, or when the sheet is reopened (C8).
-- **Stamp counts are never totalled across the whole bid** on this screen — only
-  per sheet (section 8 item 7).
+- ~~**Stamp counts are never totalled across the whole bid** on this screen — only
+  per sheet (section 8 item 7).~~ **Stale, and superseded 2026-09-29:** counts
+  were already whole-bid in `takeoffGroups.list`, and the counted-items panel
+  now carries a whole-set summary — on the bid / not on the bid yet, with a
+  reason for each — and "Send all to bid". See
+  `references/track-b-deletes-summary-pan-plan.md` §§ 2–3.
 - **The PDF drawing fix is on GitHub on `local-dev`, but not merged to `main` or
   deployed** (V6).
 - **Pages are drawn once at 1.5× size** — the sharpness limit once zoom exists

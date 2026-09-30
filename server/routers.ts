@@ -29,6 +29,7 @@ import { bidPdfsRouter } from "./routers/bidPdfsRouter";
 import { takeoffHeightsRouter } from "./routers/takeoffHeightsRouter";
 import { takeoffRunsRouter } from "./routers/takeoffRunsRouter";
 import { takeoffGroupsRouter } from "./routers/takeoffGroupsRouter";
+import { takeoffSummaryRouter } from "./routers/takeoffSummaryRouter";
 import { takeoffRunTypesRouter } from "./routers/takeoffRunTypesRouter";
 import { takeoffStampsRouter } from "./routers/takeoffStampsRouter";
 import { takeoffSheetRouter } from "./routers/takeoffSheetRouter";
@@ -90,6 +91,7 @@ export const appRouter = router({
   takeoffRuns: takeoffRunsRouter,
   takeoffHeights: takeoffHeightsRouter,
   takeoffGroups: takeoffGroupsRouter,
+  takeoffSummary: takeoffSummaryRouter,
   takeoffRunTypes: takeoffRunTypesRouter,
   takeoffStamps: takeoffStampsRouter,
   takeoffSheet: takeoffSheetRouter,
