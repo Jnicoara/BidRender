@@ -68,6 +68,25 @@ left as written rather than rewritten to match the rename.
       both reshape the same panel — and look at it at the size it ships, at
       UI scale 1.0 and on a laptop screen, before calling it done.
 
+### Before beta: speed of the summary, and two missing Undos
+
+- [ ] **Owner, 2026-09-30: measure the whole-plan-set summary on a 500-sheet
+      set.** `takeoffSummary.forBid` runs `takeoffGroups.list` and
+      `takeoffRunTypes.bridgeForBid` for the whole bid on every refresh, and
+      `sendAll` rebuilds it again before sending. It has only been looked at on
+      a scratch bid with 7 items. Time it (server ms and the panel's first
+      paint) on a real 500-sheet set with marks and runs spread across it, and
+      write the numbers next to the code. No number is claimed here yet.
+- [ ] **Owner, 2026-09-30: Undo for removing a circuit.** The delete rules
+      (bf88f5c) put Undo in every toast, but removing a circuit from a traced
+      run still has none: `removeCircuit` in `TakeoffPage.tsx` shows only an
+      error toast and refreshes.
+- [ ] **Owner, 2026-09-30: Undo for removing a bid line.** Same gap on the
+      bid: `bids.removeLine` in `BidsPage.tsx` and `QuickBidPage.tsx` drops the
+      line optimistically and offers no way back. A line carries frozen
+      snapshot prices, so Undo must restore the row, not re-add it at today's
+      prices.
+
 ### Flaky tests — fix in a batch before beta
 
 Both are timing, not wrong answers, and both touch the shared test database.
