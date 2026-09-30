@@ -427,3 +427,203 @@ decisions live").
    needs no extra migration. The new table carries a nullable `groupId`
    pointing at a plain count on the bid (see § 5), and plain counts already
    exist (`takeoff_groups` kind `plain`, § 5e). This is § 5l (b).
+
+---
+
+## 8. AI counts with no assembly, labor-only counts, supplier packages, whole-set reading — PLAN ONLY, 2026-09-29
+
+**Asked by the owner on 2026-09-29, after the staging E-100 findings.** Four
+additions. Nothing here is built. Checked against `local-dev` at `0af50a6`
+before writing, so each part says what already exists.
+
+### 8a. AI-made counts with no assembly, attachable later, on the CSV and materials list
+
+**What the owner wants:** the reader can make a count that is just a name
+("A1 luminaire: 38"), with no assembly behind it. An assembly can be attached
+later. The count shows on the takeoff CSV and the materials list, so a
+supplier can price lighting and gear packages from it.
+
+**What exists (measured, not assumed):**
+
+- **The count itself.** `takeoff_groups` kind `plain` is a name and a count,
+  per bid (`drizzle/schema.ts`). It is live today for hand-made counts.
+- **The takeoff CSV already lists it.** `shared/takeoffExport.ts` writes every
+  count by name, with or without an assembly.
+- **The materials list does NOT.** `server/routers/materialsListRouter.ts`
+  only names such counts in a note ("Counted on this job but not itemised").
+  A supplier gets no line to price.
+- **Nothing attaches an assembly to an existing count.** The groups router has
+  `rename`, `setDrop`, `sendToBid` and `remove`, and no way to change what a
+  count IS. This is the one-way-door rule in CLAUDE.md, and § 16 of
+  `plan-viewer-overhaul.md` ("mark first, name it after") has planned it.
+
+**What it needs:**
+
+1. **Place lands on a plain count** when the legend entry has no assembly
+   (already in v1, § 0 item 3). `confirm` and `isAcceptable` accept a plain
+   count, not only an assembly.
+2. **A `takeoffGroups.setSource` procedure:** turn a plain count into a
+   typed, material or assembly count, and back, with every mark kept. The
+   columns already exist.
+3. **The materials list gets a section, "Supplier to price".** Each count
+   with no assembly is a row: name, quantity, "each", and no price. It sits
+   apart from the itemised parts, so nobody reads it as a price the app
+   worked out.
+
+**Migration: none.** **Track:** B for the screens and the materials list,
+server work included. **Order:** first of the four. It has no AI in it, so
+it is useful even if the accuracy test says the reader cannot count.
+
+### 8b. "Labor only" counts, and a lump-sum "supplier package" line
+
+**What the owner wants:** a count that carries the install labor per item
+(hang 38 troffers), while the fixtures themselves come in one supplier
+package priced as a single lump sum on the bid. **Never $0, never missing
+labor.**
+
+**What exists:**
+
+- **A typed count** (`takeoff_groups` kind `typed`) carries `unitCost`,
+  `unitHours` and `laborRateId`. So "hours per item" is there. What is
+  missing is a way to say "the material is in a package", which is not the
+  same as "nobody priced it".
+- **The supplier package line has a slot but no code.**
+  `references/material-markup.md` D4 (2026-09-25): "Quoted" is a LINE TYPE,
+  with its own markup, placed in the markup order between item override and
+  category.
+- **The never-$0 rule for bid lines** is `shared/lineNotPriced.ts`. Since
+  today, a proposal is also blocked while anything is not priced (branch
+  a-proposal-zero, merged to local-dev).
+
+**What it needs:**
+
+1. **The package line (D4).** A bid line with a supplier name, an optional
+   quote reference, a lump-sum amount, and D4's markup.
+   - The amount is **NULL until typed**, and then the line is "Not priced",
+     never $0. It blocks the proposal like any other unpriced line.
+   - A typed 0 is refused. A package that costs nothing is not a package.
+2. **Labor-only counts point at their package.** A count marked labor-only
+   names the package line that supplies its material. Its material cell then
+   reads "In package: _name_", never $0.
+   - **Its hours are required.** With no hours it is "Hours not set" and
+     counts as not priced, the same rule as a field bend.
+   - A labor-only count with no package named is not priced either. The
+     material has to come from somewhere the bid can show.
+3. **The proposal** keeps one total, and the package is folded into it like
+   any other line. The proposal never itemises cost.
+
+**Migration: YES, additive, one file, written by Track A in the batch style:**
+
+```
+bid_line_items   + quotedSupplier  varchar(255) NULL
+                 + quotedRef       varchar(128) NULL
+                 + quotedAmount    decimal(12,2) NULL   -- NULL = not priced
+                 + a way to mark the line as 'quoted' (a kind value or a
+                   nullable flag; decide at write time against how lines
+                   are told apart today)
+takeoff_groups   + packageLineId   int NULL -> bid_line_items, set null
+```
+
+- **Additive, step 1:** new nullable columns only, no `UPDATE`, and nothing
+  existing changes meaning.
+- **Number:** after 0098–0105, the correction log and the legend table.
+  **Check `drizzle/` at write time.**
+- **`set null` on `packageLineId`:** deleting the package line leaves the
+  count labor-only with no package, which is "not priced". That is the safe
+  direction.
+
+**Track:** A writes the migration, B builds the bid screen and the count.
+**Order:** second. It has no AI in it either, so it does not wait for the
+test.
+
+### 8c. Read the whole plan set, then review one symbol type at a time
+
+**What the owner wants:** one button reads every sheet in a set. Then you
+review ONE symbol type at a time across all sheets ("A1 luminaire, 38 on
+5 sheets"). It shows the cost per sheet, stops at a per-bid spending cap,
+and shows progress.
+
+**What exists:**
+
+- **One sheet at a time,** on a button (`planCopilot.read`). A stored reading
+  is reused, never bought twice.
+- **A per-person daily limit** (`shared/aiLimits.ts`) and a per-person, per-day
+  cost record (`ai_usage_daily`). **Nothing records spend per BID**, so a
+  per-bid cap has nothing to read today.
+- **Cost per sheet** can be worked out before sending, from
+  `shared/visionImageLimits.ts` and `shared/aiPricing.ts` (indicative).
+
+**What it needs:**
+
+1. **"Read all sheets" is a button, never automatic** (CLAUDE.md § AI
+   features).
+   - It first shows: N sheets, about X cents each, about $Y in all, and your
+     cap. It starts only when you press it.
+   - Sheets already read are skipped and cost nothing.
+2. **Progress as it goes:** "12 of 40 read, $0.61 so far". Results appear as
+   each sheet answers (§ 11.3 of the overhaul plan). Stop is always there.
+3. **The per-bid cap:**
+   - It stops BEFORE a sheet that would pass the cap, and says so in its own
+     sentence: which sheets were not read, and why.
+   - Never a partial reading that looks complete. That is the same rule as
+     the token ceiling in `planCopilotRouter.ts`.
+   - The cap is a company default with a per-bid override, inherited not
+     copied (CLAUDE.md § "Company defaults vs per-bid overrides").
+4. **Review by symbol type:** one list per legend entry, across all sheets.
+   - Step through the marks one at a time. Each step moves the drawing to the
+     spot, since positions cannot be trusted unseen (§ 0 B,
+     `client/src/lib/readerPicks.ts`).
+   - Tick, fix or dismiss. Nothing is pre-ticked.
+   - "Place the ticked ones" works across sheets.
+
+**Migration: YES, additive:**
+
+```
+plan_copilot_runs  + costMicros       bigint NULL   -- what this reading cost
+bids               + aiSpendCapMicros bigint NULL   -- NULL = follow company
+company default    + the default cap, wherever company pricing defaults
+                     live (decide at write time)
+```
+
+- **A run's cost goes in its own row**, so a bid's spend is a SUM. That is
+  the number the cap reads: measured, not estimated.
+- **NULL cost on an old run means "not recorded".** The cap counts it as
+  unknown and says so, never as $0.
+
+**Track:** C for the server (it owns `server/planReading.ts` since the move),
+B for the review screen, A for the migration.
+
+**Order: after the accuracy test (§ 0 B), and only if the test says the
+reader is worth running across a whole set.** Reading forty sheets multiplies
+whatever the test finds, good or bad.
+
+### 8d. AI-routed runs — OUT OF SCOPE until the accuracy test proves counting
+
+Routing wire between devices (`plan-viewer-overhaul.md` § 5m.2) depends on
+the reader first finding the devices and putting them in the right place.
+Neither is measured, and the staging E-100 positions were up to about 2.4 in
+off. So nothing in this plan builds it, and it is not reopened until the
+accuracy test shows that counting AND position are good enough. Tracing a
+run by hand stays the way to do it.
+
+### The order, in one place
+
+| #   | What                                        | Migration                    | Track          | Waits on              |
+| --- | ------------------------------------------- | ---------------------------- | -------------- | --------------------- |
+| 0   | AI correction log (§ 0 A)                   | yes (stage-4 plan)           | A              | nothing               |
+| 1   | 8a: counts with no assembly, materials list | none                         | B              | nothing               |
+| 2   | 8b: supplier package and labor-only counts  | yes, additive                | A, then B      | nothing               |
+| 3   | Accuracy test (§ 0 B), with position error  | none (a script)              | A, owner's 2 h | nothing               |
+| 4   | Legend reading v1 (§§ 3–5), plain names in  | yes, additive (legend table) | A, C, B        | 0 and 3               |
+| 5   | 8c: whole-set read, cap, review by type     | yes, additive                | A, C, B        | 3 says it is worth it |
+| —   | 8d: AI-routed runs                          | —                            | —              | out of scope          |
+
+**Why this order.** 1 and 2 are manual-mode features: they make a
+supplier-priced lighting package workable today, AI or not ("manual mode is
+the product"). 3 decides whether 4 and 5 are worth their cost. 0 must be
+live before any legend fix can be made, so the fix is logged.
+
+**If anything here does not match the code when it is built** (a migration
+number, the correction log's list of writers, the router's procedures),
+**stop and find out why before going on.** Either this section is stale or
+the code moved, and those want opposite responses.
