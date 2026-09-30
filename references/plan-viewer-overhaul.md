@@ -2147,6 +2147,13 @@ and vertical drags are ignored. One gesture, two behaviours.
 — that behaviour is deliberate and stays. If EITHER axis overflows, apply the
 overlap rule to both.
 
+> **Overridden by the owner, 2026-09-29 — planned, not yet built.** "Centre
+> both" is what makes the sheet feel stuck from Fit downwards (measured: an
+> 80×60 px drag at Fit moves nothing). The owner wants panning at every zoom.
+> The per-VIEW decision stays; a sheet that fits gets a small, measured slack
+> instead of a forced centre. See `references/track-b-panning-plan.md`. When
+> it is built, this note says so.
+
 **Why, and this is the part worth keeping:** the code's own comment justifies
 the centring with _"a sheet small enough to see whole is not one anybody is
 repositioning"_. That reasoning is true when the whole sheet fits and false in
