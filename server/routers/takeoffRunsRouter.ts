@@ -1545,6 +1545,8 @@ export const takeoffRunsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.scope.dataUserId;
       const run = await requireRun(input.id, userId);
+      // An end decides the run's drop footage, which is on the bid.
+      await refuseIfLocked(run.bidId, userId);
 
       /*
         A GUARD (CLAUDE.md rule 7): a tee end carries straight on at run
@@ -1759,6 +1761,7 @@ export const takeoffRunsRouter = router({
       const root = group.find(r => r.id === input.rootRunId);
       if (!root || root.parentRunId !== null)
         throw new TRPCError({ code: "NOT_FOUND", message: "Run not found." });
+      await refuseIfLocked(root.bidId, userId);
       if (traceModeOf(root) !== "quantity")
         throw new TRPCError({
           code: "BAD_REQUEST",

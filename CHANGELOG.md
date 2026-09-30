@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **A locked bid no longer lets drops change.** What sits at a run's end
+  (and a quantity trace's drop answers) decides how much drop pipe and wire
+  the run needs, and those could still be changed on a locked bid. They are
+  now refused with "unlock them on the bid first", like the other locked
+  edits. A run traced after locking can still be drawn, but its ends wait
+  until the bid is unlocked.
 - **No more white square when a plan opens.** Opening a plan showed a small
   blank white box in the corner until the first sheet was drawn. The loading
   panel now stays up ("Opening plan set…", then "Drawing sheet 1…") until

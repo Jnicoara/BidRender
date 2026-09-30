@@ -20,7 +20,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
-import { bidPdfs, bids, users } from "../drizzle/schema";
+import { bidPdfs, bids, takeoffRuns, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 
 const USER = 9931;
@@ -172,5 +172,69 @@ withDb("deleting on a locked bid", () => {
     );
     expect(await open.markIds()).toHaveLength(3);
     expect(await locked.markIds()).toHaveLength(3);
+  });
+});
+
+/*
+  DROPS ON A LOCKED BID (added 2026-09-29, with the run-ends section). An
+  end's kind and height decide the run's drop footage, which goes on the bid.
+  Neither `setEnds` nor `answerDrops` checked the lock.
+*/
+withDb("changing a drop on a locked bid", () => {
+  const endsOf = async (runId: number) => {
+    const database = (await getDb())!;
+    const [row] = await database
+      .select()
+      .from(takeoffRuns)
+      .where(eq(takeoffRuns.id, runId));
+    return {
+      endKind: row.endKind,
+      endHeightInches: row.endHeightInches,
+    };
+  };
+
+  it("refuses an end change, and leaves the end as it was", async () => {
+    const f = await aBid();
+    const before = await endsOf(f.runId);
+    await caller().bids.lockQuantities({ bidId: f.bidId });
+    await expect(
+      caller().takeoffRuns.setEnds({
+        id: f.runId,
+        endKind: "receptacle",
+        endHeightInches: 18,
+      })
+    ).rejects.toThrow(/locked/);
+    expect(await endsOf(f.runId)).toEqual(before);
+  });
+
+  it("lets the same change through once unlocked", async () => {
+    const f = await aBid();
+    await caller().bids.lockQuantities({ bidId: f.bidId });
+    await caller().bids.unlockQuantities({ bidId: f.bidId });
+    await caller().takeoffRuns.setEnds({ id: f.runId, endKind: "receptacle" });
+    expect((await endsOf(f.runId)).endKind).toBe("receptacle");
+  });
+
+  it("refuses a quantity trace's drop answers", async () => {
+    const f = await aBid();
+    const q = await caller().takeoffRuns.save({
+      bidId: f.bidId,
+      sheetId: f.sheetId,
+      name: "Quantity",
+      pathType: "conduit",
+      status: "committed",
+      traceMode: "quantity",
+      points: [
+        { x: 0, y: 50 },
+        { x: 180, y: 50 },
+      ],
+    });
+    await caller().bids.lockQuantities({ bidId: f.bidId });
+    await expect(
+      caller().takeoffRuns.answerDrops({
+        rootRunId: q.id,
+        answers: [{ runId: q.id, end: "end", kind: "receptacle" }],
+      })
+    ).rejects.toThrow(/locked/);
   });
 });

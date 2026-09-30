@@ -111,7 +111,13 @@ async function trace(
   sheetId: number,
   runTypeId: number,
   points: { x: number; y: number }[],
-  id?: number
+  id?: number,
+  /**
+   * False for a run traced AFTER the bid was locked: since 2026-09-29 a
+   * locked bid refuses end changes (they move drop footage), while tracing
+   * itself is still allowed.
+   */
+  setEnds = true
 ) {
   const run = await caller().takeoffRuns.save({
     ...(id ? { id } : {}),
@@ -123,7 +129,7 @@ async function trace(
     status: "committed",
     points,
   });
-  if (!id) {
+  if (!id && setEnds) {
     await caller().takeoffRuns.setEnds({
       id: run.id,
       startKind: "distribution",
@@ -377,7 +383,7 @@ withDb("factory elbows from the company size up", () => {
     await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
     await caller().bids.lockQuantities({ bidId });
 
-    await trace(bidId, sheetId, type.id, L);
+    await trace(bidId, sheetId, type.id, L, undefined, false);
     await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
     const elbow = line((await detail(bidId)).lines, "elbow90")!;
     expect(Number(elbow.qty)).toBe(1);

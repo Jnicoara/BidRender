@@ -89,7 +89,13 @@ async function trace(
   bidId: number,
   sheetId: number,
   runTypeId: number,
-  ft: number
+  ft: number,
+  /**
+   * False for a run traced AFTER the bid was locked: since 2026-09-29 a
+   * locked bid refuses end changes (they move drop footage), while tracing
+   * itself is still allowed.
+   */
+  setEnds = true
 ) {
   const run = await caller().takeoffRuns.save({
     bidId,
@@ -103,6 +109,7 @@ async function trace(
       { x: feet(ft), y: 0 },
     ],
   });
+  if (!setEnds) return run;
   await caller().takeoffRuns.setEnds({
     id: run.id,
     startKind: "distribution",
@@ -292,7 +299,7 @@ withDb(
       await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
       await caller().bids.lockQuantities({ bidId });
 
-      await trace(bidId, sheetId, type.id, 25);
+      await trace(bidId, sheetId, type.id, 25, false);
       const again = await caller().takeoffRunTypes.sendToBid({
         bidId,
         runTypeId: type.id,
@@ -310,7 +317,11 @@ withDb(
         .where(eq(bidLineItems.id, coupling.id));
       expect(Number(stored.qty)).toBe(9);
       // The sentence says it describes the drawing, not the frozen number.
-      expect(coupling.fittingNote).toMatch(/^On the drawing now: 11 couplings/);
+      // "At least": the run traced after the lock could not have its ends
+      // set (a locked bid refuses end changes), so its drops are unknown.
+      expect(coupling.fittingNote).toMatch(
+        /^On the drawing now: At least 11 couplings/
+      );
 
       await caller().bids.unlockQuantities({ bidId });
       expect(Number(line((await detail(bidId)).lines, "coupling")!.qty)).toBe(
