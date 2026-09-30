@@ -9,6 +9,7 @@ import {
   redoTitle,
   settleRedo,
   settleUndo,
+  undoForSubject,
   undoTitle,
   type UndoEntry,
 } from "./undoStack";
@@ -80,5 +81,41 @@ describe("the undo stack", () => {
     expect(undoTitle(s)).toMatch(/^Undo: 3 marks placed/);
     expect(undoTitle(EMPTY_UNDO)).toMatch(/Nothing to undo/);
     expect(redoTitle(EMPTY_UNDO)).toMatch(/Nothing to redo/);
+  });
+});
+
+describe("a card's own undo arrow", () => {
+  const onCount = (id: number, label: string): UndoEntry => ({
+    label,
+    sheetId: 7,
+    undo: { kind: "removeMarks", ids: [id] },
+    redo: null,
+    subject: { kind: "count", id },
+  });
+
+  it("offers the newest step when it is about that card", () => {
+    const s = pushStep(EMPTY_UNDO, onCount(4, "2 marks placed"));
+    expect(undoForSubject(s, { kind: "count", id: 4 })?.label).toBe(
+      "2 marks placed"
+    );
+  });
+
+  it("offers nothing when the newest step is about another card", () => {
+    // Undoing count 4's older step would skip over count 9's newer one.
+    const s = pushStep(
+      pushStep(EMPTY_UNDO, onCount(4, "count 4")),
+      onCount(9, "count 9")
+    );
+    expect(undoForSubject(s, { kind: "count", id: 4 })).toBeNull();
+  });
+
+  it("does not confuse a count with a run of the same id", () => {
+    const s = pushStep(EMPTY_UNDO, onCount(4, "count 4"));
+    expect(undoForSubject(s, { kind: "run", id: 4 })).toBeNull();
+  });
+
+  it("offers nothing for a step with no single subject", () => {
+    const s = pushStep(EMPTY_UNDO, placed(1));
+    expect(undoForSubject(s, { kind: "count", id: 1 })).toBeNull();
   });
 });

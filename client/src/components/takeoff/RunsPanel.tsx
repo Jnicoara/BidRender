@@ -21,9 +21,48 @@ import {
   Sparkles,
   Trash2,
   TriangleAlert,
+  Undo2,
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { UndoSubject } from "@/lib/undoStack";
+
+/**
+ * A card's undo arrow. Always drawn, so the card does not change shape as the
+ * stack moves; enabled only when the newest step on the bid is about this
+ * card, and its tooltip names that step.
+ */
+function CardUndo({
+  subject,
+  cardUndo,
+  onCardUndo,
+}: {
+  subject: UndoSubject;
+  cardUndo?: (subject: UndoSubject) => { label: string } | null;
+  onCardUndo?: () => void;
+}) {
+  if (!cardUndo || !onCardUndo) return null;
+  const step = cardUndo(subject);
+  const title = step
+    ? `Undo: ${step.label}`
+    : "Nothing to undo here — the last change was somewhere else";
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      className="h-6 w-6 p-0 shrink-0 text-muted-foreground"
+      disabled={!step}
+      onClick={e => {
+        e.stopPropagation();
+        onCardUndo();
+      }}
+      title={title}
+      aria-label={title}
+    >
+      <Undo2 className="w-3 h-3" />
+    </Button>
+  );
+}
 import {
   CableIcon,
   ConduitIcon,
@@ -923,6 +962,9 @@ export function RunsPanel({
   selectedRunId,
   onSelectRun,
   onRemoveRun,
+  onDeleteCountMarks,
+  cardUndo,
+  onCardUndo,
   onCommitRun,
   onAcceptSuggestion,
   onAddCircuit,
@@ -1102,6 +1144,17 @@ export function RunsPanel({
   selectedRunId: number | null;
   onSelectRun: (id: number | null) => void;
   onRemoveRun: (id: number) => void;
+  /**
+   * A count card's trash: delete that count's marks on THIS sheet. The count
+   * itself stays, and its bid line follows. More than one asks first.
+   */
+  onDeleteCountMarks?: (marks: { id: number; name: string }[]) => void;
+  /**
+   * A card's own undo arrow (@/lib/undoStack `undoForSubject`): the step it
+   * would take back, named, or null when the newest step is not about it.
+   */
+  cardUndo?: (subject: UndoSubject) => { label: string } | null;
+  onCardUndo?: () => void;
   onCommitRun: (id: number) => void;
   onAcceptSuggestion: (id: number) => void;
   onAddCircuit: (
@@ -1220,6 +1273,35 @@ export function RunsPanel({
               <span className="font-mono text-sm tabular-nums">
                 {group.count}
               </span>
+              {/* Undo and trash, as on a run card (owner, 2026-09-29). */}
+              {group.groupId !== null && (
+                <CardUndo
+                  subject={{ kind: "count", id: group.groupId }}
+                  cardUndo={cardUndo}
+                  onCardUndo={onCardUndo}
+                />
+              )}
+              {onDeleteCountMarks && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                  disabled={quantitiesLocked || group.stamps.length === 0}
+                  onClick={() =>
+                    onDeleteCountMarks(
+                      group.stamps.map(s => ({ id: s.id, name: group.name }))
+                    )
+                  }
+                  title={
+                    quantitiesLocked
+                      ? "This bid's quantities are locked — unlock them on the bid to delete."
+                      : `Delete the ${group.count} ${group.name} ${group.count === 1 ? "mark" : "marks"} on this sheet — the count stays`
+                  }
+                  aria-label={`Delete ${group.name} marks on this sheet`}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              )}
             </div>
             {/*
               Where this count stands with the bid.
@@ -1916,6 +1998,18 @@ export function RunsPanel({
                           )}
                       </div>
                     </div>
+                    {/* One undo arrow per run, on its first row: every
+                        leg's steps are the run's (D20). */}
+                    {(!multi || place.index === 1) && (
+                      <CardUndo
+                        subject={{
+                          kind: "run",
+                          id: run.parentRunId ?? run.id,
+                        }}
+                        cardUndo={cardUndo}
+                        onCardUndo={onCardUndo}
+                      />
+                    )}
                     <Button
                       size="sm"
                       variant="ghost"

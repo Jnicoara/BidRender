@@ -216,6 +216,7 @@ import {
   redoTitle,
   settleRedo,
   settleUndo,
+  undoForSubject,
   undoTitle,
   type Packet,
   type UndoEntry,
@@ -2860,6 +2861,9 @@ export default function TakeoffPage({
     { sheetId: activeSheet?.id ?? 0 },
     { enabled: Boolean(activeSheet) }
   );
+  /** The root of the run a row belongs to — what a run card is keyed by. */
+  const rootOfRun = (id: number) =>
+    runs.find(r => r.id === id)?.parentRunId ?? id;
   const { data: totals } = trpc.takeoffRuns.totals.useQuery({ bidId });
   /*
     Which colour each run type gets on THIS bid (T14): first used, first
@@ -3189,11 +3193,20 @@ export default function TakeoffPage({
     removed: number
   ) => {
     if (!undo || !activeSheet || removed === 0) return;
+    // A card's own undo arrow can offer this when every mark was one count.
+    const groups = new Set(
+      stamps.filter(s => ids.includes(s.id)).map(s => s.groupId)
+    );
+    const [only] = Array.from(groups);
     pushUndo({
       label: countLabel(removed, "mark", "marks", "deleted"),
       sheetId: activeSheet.id,
       undo: { kind: "restoreMarks", packet: undo, ids },
       redo: null,
+      subject:
+        groups.size === 1 && only != null
+          ? { kind: "count", id: only }
+          : undefined,
     });
   };
   const removeStamp = trpc.takeoffStamps.remove.useMutation({
@@ -3234,26 +3247,39 @@ export default function TakeoffPage({
   useEffect(() => {
     setSelectedStampIds(current => pruneSelection(current, stamps));
   }, [stamps]);
-  const deleteSelected = useCallback(
-    (confirmed: boolean) => {
-      if (selectedStamps.length === 0 || removeStamps.isPending) return;
-      if (!confirmed && deleteNeedsConfirm(selectedStamps.length)) {
-        /*
-          The question is FROZEN when it is asked. Derived live, it re-read
-          the selection as the dialog closed and said "Delete 0 marks?" for
-          the length of the fade (seen 2026-09-29) — the wrong number, on the
-          one dialog whose job is the number.
-        */
-        setDeleteAsked(
-          deleteQuestion(selectedStamps.map(s => ({ groupName: s.name })))
-        );
+  /**
+   * Delete these marks — a selection, or a count card's marks on this sheet.
+   * More than one asks first. The question AND the ids are FROZEN when it is
+   * asked: derived live, it re-read the selection as the dialog closed and
+   * said "Delete 0 marks?" for the length of the fade (seen 2026-09-29) — the
+   * wrong number, on the one dialog whose job is the number — and the confirm
+   * must delete exactly what the question named.
+   */
+  const [deleteTargets, setDeleteTargets] = useState<number[]>([]);
+  const deleteMarks = useCallback(
+    (marks: readonly { id: number; name: string }[]) => {
+      if (marks.length === 0 || removeStamps.isPending) return;
+      if (deleteNeedsConfirm(marks.length)) {
+        setDeleteAsked(deleteQuestion(marks.map(s => ({ groupName: s.name }))));
+        setDeleteTargets(marks.map(s => s.id));
         setConfirmingDelete(true);
         return;
       }
-      setConfirmingDelete(false);
-      removeStamps.mutate({ ids: selectedStamps.map(s => s.id) });
+      removeStamps.mutate({ ids: marks.map(s => s.id) });
     },
-    [selectedStamps, removeStamps]
+    [removeStamps]
+  );
+  const deleteSelected = useCallback(
+    (confirmed: boolean) => {
+      if (!confirmed) {
+        deleteMarks(selectedStamps);
+        return;
+      }
+      setConfirmingDelete(false);
+      if (deleteTargets.length > 0 && !removeStamps.isPending)
+        removeStamps.mutate({ ids: deleteTargets });
+    },
+    [selectedStamps, deleteMarks, deleteTargets, removeStamps]
   );
   const captureSymbol = trpc.takeoffStamps.captureSymbol.useMutation({
     onError: e => toast.error(e.message),
@@ -3606,6 +3632,7 @@ export default function TakeoffPage({
               sheetId,
               undo: { kind: "removeMarks", ids: result.ids },
               redo: null,
+              subject: { kind: "count", id: batch[0].groupId },
             });
           await utils.takeoffStamps.listForSheet.invalidate({ sheetId });
           setPending(pendingStamps.current.filter(m => !keys.has(m.key)));
@@ -4069,6 +4096,7 @@ export default function TakeoffPage({
           sheetId: activeSheet.id,
           undo: { kind: "removeRun", id: vars.id },
           redo: null,
+          subject: { kind: "run", id: vars.id },
         });
       // "traced", because this is the FLAT length and the panel two inches
       // away may already be showing a larger number with the drops added.
@@ -4097,6 +4125,7 @@ export default function TakeoffPage({
           sheetId: activeSheet.id,
           undo: { kind: "restoreRun", packet: result.undo, id: vars.id },
           redo: null,
+          subject: { kind: "run", id: rootOfRun(vars.id) },
         });
       // A tee the last branch left behind that could not be joined back is
       // still a box on the drawing — said, not left to be discovered (D20).
@@ -4202,6 +4231,7 @@ export default function TakeoffPage({
             points: result.points,
           },
           redo: null,
+          subject: { kind: "run", id: rootOfRun(vars.id) },
         });
       /*
         Said, not left to be found (Track B plan, Part 1 § 2): a corner that
@@ -6640,6 +6670,11 @@ export default function TakeoffPage({
               selectedRunId={selectedRunId}
               onSelectRun={setSelectedRunId}
               onRemoveRun={id => removeRun.mutate({ id })}
+              onDeleteCountMarks={deleteMarks}
+              cardUndo={subject => undoForSubject(undoState, subject)}
+              // Only ever enabled for the NEWEST step, so it is the ordinary
+              // undo — never an out-of-order one (@/lib/undoStack).
+              onCardUndo={() => void stepBack("undo")}
               onCommitRun={id => commitRun.mutate({ id })}
               onAcceptSuggestion={id => acceptSuggestion.mutate({ id })}
               onAddCircuit={(runId, name, conductorCount, groundCount) =>

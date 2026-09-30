@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Trash and undo on every count card, and undo on every run card.** A
+  count card's trash deletes that count's marks on the sheet you are looking
+  at, asking first when there is more than one. The count itself stays, and
+  its bid line follows. Each card's undo arrow takes back the latest change
+  when that change was to this card, and its tooltip names it. It is greyed
+  out when the latest change was somewhere else, so it can never undo out
+  of order.
 - **A Delete button on the Plans toolbar.** It sits beside Undo and Redo and
   says what it will delete ("Delete 3 marks", "Delete run"). It is greyed
   out until something is selected, and asks first when more than one mark

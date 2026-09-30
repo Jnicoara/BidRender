@@ -63,9 +63,35 @@ export type UndoEntry = {
   undo: UndoOp;
   /** Null until the undo has run and said how to redo it. */
   redo: UndoOp | null;
+  /**
+   * The card this step is about, so that card's own undo arrow can offer it:
+   * a count (group id) or a run (its ROOT id). Absent when a step touched
+   * several (a sheet cleared, a box of marks across counts).
+   */
+  subject?: UndoSubject;
 };
 
+export type UndoSubject = { kind: "count" | "run"; id: number };
+
 export type UndoState = { past: UndoEntry[]; future: UndoEntry[] };
+
+/**
+ * The step a card's undo arrow would take back — only the NEWEST step, and
+ * only if it is about this card. Undoing an older step for one card would
+ * restore a state the rest of the drawing has since moved on from, so a card
+ * whose last change is not the newest simply has nothing to offer.
+ */
+export function undoForSubject(
+  state: UndoState,
+  subject: UndoSubject
+): UndoEntry | null {
+  const top = nextUndo(state);
+  return top?.subject &&
+    top.subject.kind === subject.kind &&
+    top.subject.id === subject.id
+    ? top
+    : null;
+}
 
 export const EMPTY_UNDO: UndoState = { past: [], future: [] };
 
