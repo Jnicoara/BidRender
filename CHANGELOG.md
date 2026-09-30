@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **Dragging the sheet no longer picks or nudges things by accident.** A drag
+  that started on a mark used to move the sheet AND select that mark, so the
+  next Delete could remove something you never chose; it now just moves the
+  sheet. A small wobble while clicking no longer moves the sheet, and a click
+  on a run's point handle no longer shifts the point by a hair. Setting a
+  scale by measuring no longer nudges the sheet between the two clicks.
 - **The sheet list's header no longer cuts off its buttons.** When the sheet
   panel was narrow (or the app's text size was larger), the list/picture
   buttons were half hidden past the panel's edge. The header now moves them

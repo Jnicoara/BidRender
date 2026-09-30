@@ -244,6 +244,7 @@ import {
 import { emptiedCountCard } from "@/lib/emptiedCountCard";
 import { nextMarkBatch, splitRecoveredMarks } from "@/lib/markBatches";
 import { loadUndo, saveUndo, tabStorage } from "@/lib/undoPersist";
+import { pastDragThreshold, swallowNextClick } from "@/lib/dragThreshold";
 import type { PageTextLayer } from "@/lib/textSelection";
 import { TextSelectLayer } from "@/components/takeoff/TextSelect";
 import { useUploadSpeeds } from "@/lib/useUploadSpeeds";
@@ -1088,13 +1089,39 @@ function PlanPane({
     };
   }, [startPan]);
 
-  /** The drag itself, on the window so it survives leaving the viewport. */
+  /**
+   * The drag itself, on the window so it survives leaving the viewport.
+   *
+   * ── Nothing moves until the pointer has (2026-09-29) ─────────────────────
+   * Below DRAG_THRESHOLD_PX a press is a click, and the sheet stays exactly
+   * where it was — including its "fitted" state, which a zero-length pan used
+   * to clear.
+   *
+   * ── And a real pan never selects what it started on ─────────────────────
+   * The `click` that follows a pan lands on whatever is under the pointer.
+   * Marks and run bodies select on click and are not draggable, so a drag
+   * that started on one panned the sheet AND picked it — and the next Delete
+   * removed a count nobody chose. After an ENGAGED pan the next click is
+   * swallowed, in the capture phase before anything sees it, for at most
+   * 400 ms. A guard, not a comment: see CLAUDE.md § "a comment claiming that
+   * SOMETHING ELSE handles it".
+   */
   useEffect(() => {
     if (!panning) return;
+    let engaged = false;
     const move = (e: PointerEvent) => {
       const from = panFrom.current;
       const bounds = readBounds();
       if (!from || !bounds) return;
+      if (
+        !engaged &&
+        !pastDragThreshold(
+          { x: from.pointerX, y: from.pointerY },
+          { x: e.clientX, y: e.clientY }
+        )
+      )
+        return;
+      engaged = true;
       aimView(
         clampView(
           {
@@ -1109,6 +1136,7 @@ function PlanPane({
     const end = () => {
       panFrom.current = null;
       setPanning(false);
+      if (engaged) swallowNextClick();
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", end);

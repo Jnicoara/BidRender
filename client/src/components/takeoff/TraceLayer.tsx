@@ -62,6 +62,7 @@ import { stampsInBox } from "@/lib/stampSelection";
 import { projectOntoPath } from "@shared/runNetwork";
 import { JOINED_WITHIN_POINTS } from "@shared/quantityDrops";
 import { addsTracePoint } from "@/lib/traceClick";
+import { pastDragThreshold } from "@/lib/dragThreshold";
 import {
   insertPoint,
   isPinned,
@@ -538,6 +539,8 @@ export function TraceLayer({
     moved: boolean;
     /** Started on a "+": the point exists only if the drag goes somewhere. */
     inserted: boolean;
+    /** Where the press began, on screen — for the drag threshold. */
+    start: { x: number; y: number };
   };
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef(drag);
@@ -607,6 +610,16 @@ export function TraceLayer({
       const page = clientToPage(e.clientX, e.clientY);
       const d = dragRef.current;
       if (!page || !d) return;
+      /*
+        A press is a CLICK until the pointer has moved DRAG_THRESHOLD_PX
+        (2026-09-29). It used to become a move on ANY movement, so a click
+        meant to pick a point committed a hair's shift to the run's length.
+      */
+      if (
+        !d.moved &&
+        !pastDragThreshold(d.start, { x: e.clientX, y: e.clientY })
+      )
+        return;
       const next = movePoint(d.origin, d.index, page, d.pinned);
       if (next) setDrag({ ...d, points: next, moved: true });
     };
@@ -1523,6 +1536,7 @@ export function TraceLayer({
                 pinned,
                 moved: false,
                 inserted,
+                start: { x: e.clientX, y: e.clientY },
               });
             };
             return (
