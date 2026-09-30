@@ -197,6 +197,29 @@ const clips: BaselineMaterial[] = [
     searchAliases: aliases("caddy ceiling tie attach grid hanger"),
     defaultQty: 4,
   },
+  /*
+    MC cable straps (retail catalog plan § R1, 2026-09-29). What an MC run
+    type buys by default: within 12 in of each box, then every 6 ft (NEC
+    330.30, `MC_STRAP_SPACING` in shared/runFittings.ts). Two sizes by cable
+    diameter, the split `mcFittingNames` uses. Above a lay-in ceiling MC is
+    often held with the wire clip above instead; a run type can choose that.
+  */
+  {
+    name: "MC one-hole strap, small",
+    searchAliases: aliases(
+      "bx armored armoured metal clad cable support fastener"
+    ),
+    description: "For 14 and 12 AWG cable, and 10-2 and 10-3.",
+    defaultQty: 4,
+  },
+  {
+    name: "MC one-hole strap, large",
+    searchAliases: aliases(
+      "bx armored armoured metal clad cable support fastener"
+    ),
+    description: "For 10-4 and larger cable.",
+    defaultQty: 4,
+  },
 ].map(item => ({
   ...item,
   unitOfSale: "each" as const,

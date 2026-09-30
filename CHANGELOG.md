@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **An MC cable run now buys its connectors and straps.** Each traced MC
+  run adds a connector at each end and a strap near each box and every 6 ft,
+  sized to the cable (3/8" connector and small strap for 12-2, and so on).
+  Before, every MC run was short these parts with nothing saying so. Six new
+  catalog parts: four MC connectors and two MC straps (unpriced, like every
+  shipped item).
 - **A branch on an MC or NM cable run now buys its box.** A tee on a cable
   run counted the cable but no box at the split; it now adds a 4" square
   box and blank cover, the same pair a small-pipe tee buys.

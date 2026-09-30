@@ -221,8 +221,10 @@ import {
 import { groupRunFootage, type RunTypeFootageRow } from "./runTypeFootageCore";
 import { resolveRunType } from "../shared/runTypeLookup";
 import {
+  countCableFittings,
   countFittings,
   FITTING_KINDS,
+  MC_STRAP_SPACING,
   isFittingRole,
   isStickJoint,
   type FittingCount,
@@ -241,7 +243,9 @@ import {
   bendMergeFeetForOverrides,
   bendMethodFor,
   bendWordsFor,
+  cableRunRows,
   cableTeeRows,
+  mcFittingNames,
   SMALL_TEE_BOX,
   lbHubsTakeConnectors,
   pickFittingMaterial,
@@ -11897,6 +11901,7 @@ export async function fittingRowsByRunType(
         type!.elbow45MaterialId,
         type!.lbMaterialId,
         type!.pullBoxMaterialId,
+        type!.conductorMaterialId,
       ].filter((id): id is number => id !== null)
     ),
     userId
@@ -11909,12 +11914,31 @@ export async function fittingRowsByRunType(
   const racewayBaselineName = await shippedNamesOf(
     entries.map(({ type }) => resolved(type!.racewayMaterialId))
   );
+  // The same for a cable type's cable: its MC connector and strap are read
+  // from the shipped name (`mcFittingNames`), so a renamed fork still finds
+  // them. A company's own cable with no baseline falls back to its own name.
+  const cableBaselineName = await shippedNamesOf(
+    entries
+      .filter(({ type }) => type!.pathType === "cable")
+      .map(({ type }) => resolved(type!.conductorMaterialId))
+  );
+  const mcPartsOf = (t: NonNullable<(typeof entries)[number]["type"]>) => {
+    const cable = resolved(t.conductorMaterialId);
+    return cable
+      ? mcFittingNames(cableBaselineName(cable) ?? cable.name)
+      : null;
+  };
 
   const wantedNames = Array.from(
     new Set(
       entries.flatMap(({ type }) => {
         if (type!.pathType === "cable") {
-          return [SMALL_TEE_BOX.box, SMALL_TEE_BOX.cover];
+          const mc = mcPartsOf(type!);
+          return [
+            SMALL_TEE_BOX.box,
+            SMALL_TEE_BOX.cover,
+            ...(mc ? [mc.connector, mc.strap] : []),
+          ];
         }
         const name = racewayBaselineName(resolved(type!.racewayMaterialId));
         if (name === null) return [];
@@ -11981,11 +12005,35 @@ export async function fittingRowsByRunType(
     const t = type!;
     const raceway = resolved(t.racewayMaterialId);
     if (t.pathType === "cable") {
-      // The box at each tee it owns, and nothing else — no pipe to fit.
+      // The box at each tee it owns, and — on MC — a connector at each end
+      // and its straps (§ R1). No pipe to fit. NM gets no connector here: into
+      // a plastic box it takes none, and which box it is is not known.
       const ownedByCable = row.tees.filter(
         tee => cableOwners.get(tee.id) === storedId
       );
-      out.set(storedId, cableTeeRows(ownedByCable, found));
+      const mc = mcPartsOf(t);
+      const cable = resolved(t.conductorMaterialId);
+      const runRows =
+        mc && cable
+          ? cableRunRows(
+              countCableFittings(row.cableLegs, {
+                name: cable.name,
+                ...MC_STRAP_SPACING,
+              }),
+              {
+                connector: {
+                  override: resolved(t.connectorMaterialId) ?? null,
+                  wanted: mc.connector,
+                },
+                strap: {
+                  override: resolved(t.strapMaterialId) ?? null,
+                  wanted: mc.strap,
+                },
+              },
+              found
+            )
+          : [];
+      out.set(storedId, [...runRows, ...cableTeeRows(ownedByCable, found)]);
       continue;
     }
     const ownedTees = row.tees.filter(

@@ -194,7 +194,11 @@ withDb("a tee on a cable run", () => {
     await branchedRun(bidId, sheetId, "cable", mc.id);
 
     const [entry] = await caller().takeoffRunTypes.bridgeForBid({ bidId });
+    // Its connectors and straps too since § R1 (mcCableFittings.test.ts) —
+    // but nothing a pipe buys: no coupling, elbow, LB or pull box.
     expect(entry.fittings.map(f => f.role).sort()).toEqual([
+      "connector",
+      "strap",
       "teeBox",
       "teeCover",
     ]);
@@ -239,7 +243,13 @@ withDb("a tee on a cable run", () => {
     });
     await level(run.id, ["start", "end"]);
     const [entry] = await caller().takeoffRunTypes.bridgeForBid({ bidId });
-    expect(entry.fittings.every(f => f.qty === 0)).toBe(true);
+    // Only the tee rows: the run's connectors and straps are counted since
+    // § R1 (mcCableFittings.test.ts).
+    const teeRows = entry.fittings.filter(
+      f => f.role === "teeBox" || f.role === "teeCover"
+    );
+    expect(teeRows).toHaveLength(2);
+    expect(teeRows.every(f => f.qty === 0)).toBe(true);
   });
 });
 

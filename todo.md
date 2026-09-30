@@ -2044,10 +2044,14 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       these are the owner's "fix as a separate change" (Q5). When they are
       clean, switch the report to a failure like the shared-row guard.
 - [ ] **PVC expansion fittings** on long exposed PVC runs.
-- [ ] **MC cable connectors and straps.** MC needs the same counting — a
+- [x] **MC cable connectors and straps.** MC needs the same counting — a
       connector at each end, straps at 6 ft and within 12 in of a box — and
       `countFittings` can serve it; the catalog has no MC connector rows by
       size yet, and cable types have no fitting slot.
+      **BUILT 2026-09-29 (retail plan § R1):** `countCableFittings` over
+      `cableLegs`, parts by `mcFittingNames`, 4 MC connectors + 2 MC straps.
+      The type's existing connector/strap columns hold an override. NM still
+      counts none (plastic box: none needed; box kind not known).
 - [ ] **FMC/LFMC straps.** Flex carries a strap spacing (4.5 ft / 1 ft) but
       `strapFamily` returns null for flex, so flex straps say "No catalog
       strap" until sized flex straps ship.

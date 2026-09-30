@@ -688,8 +688,9 @@ export function fittingRowSpeaks(row: {
 }
 
 /**
- * A CABLE run's fitting rows: the box and cover at each tee it owns, and
- * nothing else — a cable has no couplings, straps or elbows to buy.
+ * A CABLE run's tee rows: the box and cover at each tee it owns. Its
+ * connectors and straps are `cableRunRows` (MC only, since 2026-09-29); a
+ * cable has no couplings or elbows to buy.
  *
  * Until 2026-09-29 a cable type got no fitting rows at all, so a branch on an
  * MC or NM run counted its footage and drops and bought no box at the split:
@@ -726,6 +727,78 @@ export function cableTeeRows(
     };
   });
 }
+
+/**
+ * The MC connector and strap for one MC cable, by its SHIPPED name — or null
+ * when the cable is not MC (retail catalog plan § R1, 2026-09-29).
+ *
+ * Sized by the cable's outside diameter, which follows conductor size and
+ * count: 14 and 12 AWG and 10-2/10-3 take a 3/8" connector and the small
+ * strap; 10-4 and 8 AWG a 1/2"; 6 and 4 AWG a 3/4"; 3 and 2 AWG a 1". The
+ * connector rows' descriptions say the same (seed/materials/connectors.ts).
+ *
+ * Read from the name, like `parseRacewayName`: the size is the leading
+ * `<gauge>-<count>`, and a suffix ("12-2 MC cable, isolated ground") does not
+ * change the part.
+ */
+export function mcFittingNames(
+  cableName: string | null
+): { connector: string; strap: string } | null {
+  if (cableName === null) return null;
+  const match = /^(\d+)-(\d) MC cable\b/.exec(cableName);
+  if (!match) return null;
+  const gauge = Number(match[1]);
+  const conductors = Number(match[2]);
+  const small = gauge >= 12 || (gauge === 10 && conductors <= 3);
+  const connector = small
+    ? '3/8"'
+    : gauge >= 8
+      ? '1/2"'
+      : gauge >= 4
+        ? '3/4"'
+        : '1"';
+  return {
+    connector: `${connector} MC connector`,
+    strap: small ? "MC one-hole strap, small" : "MC one-hole strap, large",
+  };
+}
+
+/**
+ * A CABLE run's connector and strap rows (§ R1): the type's own choice of
+ * part wins, as on a conduit type; otherwise the catalog part `mcFittingNames`
+ * names. The count is `countCableFittings`.
+ */
+export function cableRunRows(
+  counts: { connector: FittingCount; strap: FittingCount },
+  parts: {
+    connector: { override: FittingPart | null; wanted: string };
+    strap: { override: FittingPart | null; wanted: string };
+  },
+  found: (name: string) => FittingPart | undefined
+): FittingRow[] {
+  return (["connector", "strap"] as const).map(kind => {
+    const { override, wanted } = parts[kind];
+    const row = override ?? found(wanted);
+    const count = counts[kind];
+    return {
+      role: kind,
+      count,
+      pick: row
+        ? {
+            ok: true as const,
+            materialId: row.id,
+            name: row.name,
+            costPerUnit: row.costPerUnit,
+            override: override !== null,
+          }
+        : { ok: false as const, why: `No catalog match for ${wanted}` },
+      qty: count.status === "counted" ? count.qty : 0,
+    };
+  });
+}
+
+/** A part as a pick needs it. */
+type FittingPart = { id: number; name: string; costPerUnit: string | number };
 
 export function fittingRows(
   counts: Record<FittingKind, FittingCount>,

@@ -1,7 +1,9 @@
 # Track C — the catalog for commercial retail work (2026-09-29)
 
-**Status: PLAN ONLY. No catalog rows are built from this yet.** Written on
-`track-c` after merging `local-dev` at `5c8c7b5`.
+**Status: BUILDING (owner, 2026-09-29): R1, R2, R4, R5, R6, R7 and R9's
+descriptions, in that order. R3 and R8 HELD for Track A.** Built pieces are
+marked BUILT in their section. Written on `track-c` after merging
+`local-dev` at `5c8c7b5`.
 
 The job it is measured against: a small electrical contractor on a
 Dollar Tree–style retrofit or remodel. Lay-in ceiling, new or relocated
@@ -45,6 +47,21 @@ handful of description edits. R3 adds about 23 once A lands its enum.
 ---
 
 ## R1. MC runs count no connectors and no straps — the most frequent wrong number
+
+> **BUILT 2026-09-29 — 6 rows, not the 4 planned.** `3/8"`, `1/2"`, `3/4"`
+> and `1" MC connector` (the planned two left 6 AWG and larger MC with no
+> connector to name), `MC one-hole strap, small` and `, large`. Every shipped
+> MC cable maps to a connector and strap that ship (`mcFittingNames`, pinned
+> in `server/mcCableFittings.test.ts` against the catalog). A cable type now
+> gets `connector` and `strap` rows from `countCableFittings`, over new
+> `cableLegs` (runTypeFootageCore): one per cable end, straps within 1 ft of a
+> box then every 6 ft (`MC_STRAP_SPACING`, a constant: the materials screen
+> edits spacing only on Conduit rows). The type's own connector/strap choice
+> wins, as on conduit. NM is unchanged. The panel, the stored bid line, the
+> bid screen's re-derived qty and the materials list all read the same count
+> (one test through the real routers); red with the rows disabled.
+> The generic `cable connector` rows lost their "mc" alias, so "mc connector"
+> finds MC connectors. The standard search sweep did not move.
 
 **How often.** Every MC run on every job. On this kind of remodel most
 branch circuits are MC, so it is most of the traced footage.

@@ -901,8 +901,9 @@ export type RunTypeBridgeEntry = {
   pathType: "conduit" | "cable";
   rows: RunTypeBridgeRow[];
   /**
-   * Every conduit fitting on a conduit type; on a cable type, only the box
-   * and cover at its tees (`cableTeeRows`, since 2026-09-29).
+   * Every conduit fitting on a conduit type; on a cable type, the box and
+   * cover at its tees (`cableTeeRows`) and, on MC, its connectors and straps
+   * (`cableRunRows`) — both since 2026-09-29.
    */
   fittings: RunTypeBridgeFitting[];
   /** Runs of this type nobody has answered the branch-wiring question for. */

@@ -58,11 +58,43 @@ const cableConnectors: BaselineMaterial[] = ['3/8"', '1/2"', '3/4"', '1"'].map(
   size => ({
     ...CONN,
     name: `${size} cable connector`,
+    // No "mc" since 2026-09-29: MC has connectors of its own below, and this
+    // row answering "mc connector" first sent MC runs to the NM clamp.
     searchAliases: aliases(
       size.replace('"', ""),
-      "romex nm mc ser se clamp box fitting snap in duplex saddle two screw"
+      "romex nm ser se clamp box fitting snap in duplex saddle two screw"
     ),
     description: "Sized by cable outside diameter, not by conductor gauge.",
+    defaultQty: 2,
+  })
+);
+
+/**
+ * MC cable connectors, by knockout size (retail catalog plan § R1,
+ * 2026-09-29).
+ *
+ * What the counter sells as "MC connectors" (snap-in, squeeze, set-screw) and
+ * prices apart from the NM clamp above. Sized by the cable's outside diameter
+ * like any cable connector; which cable takes which is `mcFittingNames`
+ * (shared/runFittingMaterials.ts), and each description says the same.
+ * An MC run counts one at each end, so these are what its type buys.
+ */
+const MC_CONNECTORS: Array<{ size: string; fits: string }> = [
+  { size: '3/8"', fits: "14 and 12 AWG cable, and 10-2 and 10-3" },
+  { size: '1/2"', fits: "10-4 and 8 AWG cable" },
+  { size: '3/4"', fits: "6 and 4 AWG cable" },
+  { size: '1"', fits: "3 and 2 AWG cable" },
+];
+
+const mcConnectors: BaselineMaterial[] = MC_CONNECTORS.map(
+  ({ size, fits }) => ({
+    ...CONN,
+    name: `${size} MC connector`,
+    searchAliases: aliases(
+      size.replace('"', ""),
+      "bx armored armoured metal clad ac snap in squeeze tite bite fitting"
+    ),
+    description: `Fits ${fits}. Sized by cable outside diameter.`,
     defaultQty: 2,
   })
 );
@@ -402,6 +434,7 @@ export const CONSUMABLES: BaselineMaterial[] = [
 export const CONNECTORS: BaselineMaterial[] = [
   ...wireNuts,
   ...cableConnectors,
+  ...mcConnectors,
   ...lugs,
   ...terminations,
 ];
