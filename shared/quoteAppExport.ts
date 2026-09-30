@@ -333,7 +333,11 @@ export function quotePlanWarnings(attention: {
 }): string[] {
   const out: string[] = [];
   const runs = runsNotOnBidText(attention.runsNotOnBid);
-  if (runs) out.push(`${runs} Their footage is not in these figures.`);
+  const r = attention.runsNotOnBid.notSent + attention.runsNotOnBid.noType;
+  if (runs)
+    out.push(
+      `${runs} ${r === 1 ? "Its" : "Their"} footage is not in these figures.`
+    );
   const n = attention.waitingToSend;
   if (n > 0)
     out.push(
@@ -342,7 +346,7 @@ export function quotePlanWarnings(attention: {
   const w = attention.runsWithNoWire;
   if (w > 0)
     out.push(
-      `${w} conduit run${w === 1 ? " has" : "s have"} no wire — the pipe is in these figures and nothing is pulled through it.`
+      `${w} conduit run${w === 1 ? " has" : "s have"} no wire — nothing is pulled through the pipe, so no wire for it is priced.`
     );
   return out;
 }

@@ -106,6 +106,34 @@ describe("which traced runs are not on the bid", () => {
       })
     ).toEqual([]);
   });
+
+  /*
+    Read on the quote panel, 2026-09-29: "1 traced run … Their footage", and
+    "the pipe is in these figures" for a run never sent — where it was not.
+    The no-wire sentence now says only what is true sent or unsent.
+  */
+  it("words the quote panel's warnings for one and for several, truthfully", () => {
+    expect(
+      quotePlanWarnings({
+        waitingToSend: 1,
+        runsWithNoWire: 1,
+        runsNotOnBid: { notSent: 1, noType: 0 },
+      })
+    ).toEqual([
+      "1 traced run not on the bid — not sent yet. Its footage is not in these figures.",
+      "1 count not on the bid — marked on the plans and not in these figures.",
+      "1 conduit run has no wire — nothing is pulled through the pipe, so no wire for it is priced.",
+    ]);
+    expect(
+      quotePlanWarnings({
+        waitingToSend: 0,
+        runsWithNoWire: 0,
+        runsNotOnBid: { notSent: 3, noType: 0 },
+      })
+    ).toEqual([
+      "3 traced runs not on the bid — not sent yet. Their footage is not in these figures.",
+    ]);
+  });
 });
 
 // ── Through the routers ──────────────────────────────────────────────────────

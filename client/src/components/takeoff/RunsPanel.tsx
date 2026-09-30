@@ -2340,7 +2340,16 @@ export function RunsPanel({
                       {run.pathType === "conduit" &&
                         run.traceMode !== "quantity" &&
                         (run.circuits.length === 0 ? (
-                          <div className="flex items-baseline justify-between text-xs gap-2">
+                          <div
+                            className={cn(
+                              "flex items-baseline justify-between text-xs gap-2",
+                              // The warning takes its own line and the two
+                              // fixes sit under it: side by side in a 400px
+                              // panel the one-tap wrapped in two (seen on
+                              // screen, 2026-09-29).
+                              run.noWire && "flex-wrap justify-start gap-y-1"
+                            )}
+                          >
                             {/*
                               AMBER when the bid would price this run's wire
                               and there is none (shared/runNoWire.ts). It used
@@ -2353,7 +2362,7 @@ export function RunsPanel({
                               className={cn(
                                 "shrink-0",
                                 run.noWire
-                                  ? "text-amber-400 flex items-center gap-1"
+                                  ? "text-amber-400 flex items-center gap-1 basis-full"
                                   : "text-muted-foreground"
                               )}
                             >

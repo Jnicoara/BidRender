@@ -1553,8 +1553,12 @@ export default function BidsPage({
                       {fromPlans.runsWithNoWire === 1 ? " has" : "s have"} no
                       wire
                     </span>{" "}
-                    — the pipe is in the total above and nothing is pulled
-                    through it. Add the wire on the <PlansLink bidId={bidId} />;
+                    {/* Not "the pipe is in the total": a run whose type
+                        was never sent has its pipe off the bid too, and
+                        that sentence was false for it (seen on screen,
+                        2026-09-29). This says only what is true of both. */}
+                    — nothing is pulled through its pipe, so no wire for it is
+                    priced. Add the wire on the <PlansLink bidId={bidId} />;
                     each run offers its type&apos;s wire in one tap.
                   </p>
                 </div>
