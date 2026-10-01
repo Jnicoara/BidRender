@@ -49,6 +49,11 @@ export type Score = {
   flagsOnNothing: number;
   /** Of the extras: how many came with no position. */
   unplaced: number;
+  /**
+   * The extras themselves: indexes into `suggestions`, flags excluded. For
+   * listing each one so a person can say whose mistake it was.
+   */
+  unmatched: number[];
   /** By symbol type, keyed on the normalised label. */
   byType: Map<string, TypeTally>;
 };
@@ -170,6 +175,7 @@ export function scoreReading(
   let extra = 0;
   let unplaced = 0;
   let flagsOnNothing = 0;
+  const unmatched: number[] = [];
   suggestions.forEach((g, i) => {
     if (usedGuesses.has(i)) return;
     if (g.unreadable) {
@@ -177,6 +183,7 @@ export function scoreReading(
       return;
     }
     extra += 1;
+    unmatched.push(i);
     if (g.x === null || g.y === null) unplaced += 1;
     tally(labelKey(g.label) || "(no label)").extra += 1;
   });
@@ -190,6 +197,7 @@ export function scoreReading(
     flagged: flagged.length,
     flagsOnNothing,
     unplaced,
+    unmatched,
     byType,
   };
 }

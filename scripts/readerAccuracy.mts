@@ -161,6 +161,11 @@ const { askForPixels, pixelsToFractions } = await import(
   "./readerAccuracyPixels"
 );
 const { tileGrid, ownedBy } = await import("./readerAccuracyTiles");
+const { sheetKeyName } = await import("./readerAccuracyAnswerKey");
+const { buildReport, formatReport, lineName, METHOD_NAMES } = await import(
+  "./readerAccuracyReport"
+);
+const { readAnswerKeyFile } = await import("./readerAccuracyFiles");
 const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
 type Score = ReturnType<typeof scoreReading>;
@@ -617,6 +622,12 @@ for (const pdf of pdfs) {
           });
           record.push({
             sheet: label,
+            // Where it came from, so readerAccuracyReview.mts can re-score
+            // against today's hand count and link to each spot (2026-10-01).
+            sheetKey: sheetKeyName(pdf.filename, sheet.pageNumber),
+            sheetId: sheet.id,
+            pdfId: pdf.id,
+            page: sheet.pageNumber,
             method,
             positions,
             run,
@@ -650,12 +661,7 @@ for (const pdf of pdfs) {
 }
 
 // ── The table ───────────────────────────────────────────────────────────────
-const NAMES: Record<Method, string> = {
-  a: "(a) Today",
-  b: "(b) Legend first",
-  c: "(c) Zoomed in",
-  d: "(d) Legend + zoomed",
-};
+const NAMES: Record<Method, string> = METHOD_NAMES;
 
 /** One table line per method and way of asking for positions. */
 const lines = methods.flatMap(method =>
@@ -670,7 +676,57 @@ const lines = methods.flatMap(method =>
   }))
 );
 
-console.log("\n══ All sheets together ══");
+/*
+  THE SMALLER ANSWER KEY (2026-10-01): only the types he picked on each sheet
+  are scored, data / telecom apart, and every AI find not in his count is
+  listed for his verdict. readerAccuracyReview.mts re-scores these same
+  readings at no cost after he corrects the count. The all-types table below
+  is kept for the cost column and for comparison with runs before this.
+*/
+const answerKeyFile = readAnswerKeyFile();
+const report = buildReport(
+  record.flatMap(raw => {
+    const r = raw as {
+      sheet: string;
+      sheetKey: string;
+      pdfId: number;
+      page: number;
+      method: Method;
+      positions: Positions;
+      run: number;
+      marks: { label: string; x: number; y: number }[];
+      suggestions: {
+        label: string | null;
+        x: number | null;
+        y: number | null;
+        unreadable: boolean;
+      }[];
+    };
+    return r.marks.length
+      ? [
+          {
+            sheet: r.sheetKey,
+            sheetLabel: r.sheet,
+            pdfId: r.pdfId,
+            page: r.page,
+            line: lineName(r.method, r.positions, positionModes.length > 1),
+            run: r.run,
+            marks: r.marks,
+            suggestions: r.suggestions,
+          },
+        ]
+      : [];
+  }),
+  answerKeyFile,
+  MATCH_RADIUS_POINTS
+);
+for (const line of formatReport(report)) console.log(line);
+console.log(
+  `Review each one (pictures, a link to the spot, "my miss" / "AI wrong"):\n` +
+    `  pnpm tsx scripts/readerAccuracyReview.mts --run "${outDir}"`
+);
+
+console.log("\n══ All types, as before the smaller key (for comparison) ══");
 console.log(
   "| Method | By hand | Found | Wrong symbol | Missed | Extra | Flagged | Cost per sheet |"
 );
@@ -679,7 +735,7 @@ for (const { name, mine } of lines) {
   if (mine.length === 0) continue;
   const perRun = Array.from({ length: runs }, (_, i) => {
     const these = mine.filter(r => r.run === i + 1);
-    const sum = (k: keyof Omit<Score, "byType">) =>
+    const sum = (k: keyof Omit<Score, "byType" | "unmatched">) =>
       these.reduce((n, r) => n + (r.score ? r.score[k] : 0), 0);
     return {
       byHand: sum("byHand"),
@@ -766,6 +822,8 @@ writeFileSync(
           byType: Object.fromEntries(r.score.byType),
         },
       })),
+      // The bid's id and the files' names, so the review needs nothing else.
+      pdfs: pdfs.map(p => ({ id: p.id, filename: p.filename })),
       detail: record,
     },
     null,

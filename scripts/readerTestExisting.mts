@@ -141,7 +141,12 @@ const measure = async () =>
 const before = await measure();
 const byKey = new Map(library.map(a => [symbolLookupKey(a.name), a] as const));
 
-type Plan = { base: string; twin: string; status: string; category: string };
+type Plan = {
+  base: string;
+  twin: string;
+  status: string;
+  category: (typeof library)[number]["category"];
+};
 const plans: Plan[] = bases.map(base => {
   const twin = existingToRemainName(base);
   const original = byKey.get(symbolLookupKey(base));

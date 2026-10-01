@@ -18,6 +18,16 @@ This is the human-readable companion to the git history — read this to see wha
   because the AI reader is not asked to tell new from existing. A real
   per-mark status (new / existing / remove / relocate) is queued for a
   database change.
+- **Reader-accuracy test: a smaller answer key, and a review of what the AI
+  found.** Each sheet is now scored only on the 8–10 symbol types counted on
+  it; other types are ignored. Data and telecom get their own score. Every
+  AI find that is not in the hand count is listed on a local review page with
+  a picture and a link that opens that exact spot in BidRidge, and can be
+  marked "my miss" or "AI wrong". Scoring again after fixing the count reuses
+  the saved AI answers, so it costs nothing.
+- **A link can open a plan at one spot.** An address ending
+  `/plans?pdf=…&page=…&x=…&y=…` opens that plan set and page, zoomed to that
+  point with the usual ring. Used by the review page.
 
 ## [2026-09-30]
 

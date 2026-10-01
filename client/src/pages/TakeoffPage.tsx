@@ -311,6 +311,7 @@ import {
 } from "@/lib/stampSelection";
 import { withSavedSheet, withSheetChecked } from "@/lib/sheetScaleCache";
 import { canRetryWithFreshUrl, isExpiredPlanUrl } from "@/lib/planUrlRefresh";
+import { readPlanSpot, withoutPlanSpot } from "@/lib/planSpotLink";
 import { groupStamps } from "@shared/takeoffCounts";
 import { LayersPanel } from "@/components/takeoff/LayersPanel";
 import { MaterialsListDialog } from "@/components/MaterialsListDialog";
@@ -2500,6 +2501,43 @@ export default function TakeoffPage({
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   const doc = docs.find(d => d.id === selectedDocId) ?? docs[0] ?? null;
+
+  /*
+    A LINK TO ONE SPOT (@/lib/planSpotLink), 2026-10-01 — the reader-accuracy
+    review page sends the estimator to each AI find to say whose mistake it
+    was. Read on arrival and on every hash change, since that page reuses one
+    app tab. Applied once the plan set it names is loaded, exactly as the
+    drops readout's jump does, then taken off the address so a reload does
+    not jump again. A plan set not on this bid is ignored, and said.
+  */
+  const [spotLink, setSpotLink] = useState(() =>
+    readPlanSpot(window.location.hash)
+  );
+  useEffect(() => {
+    const onHash = () => setSpotLink(readPlanSpot(window.location.hash));
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  useEffect(() => {
+    if (!spotLink || docs.length === 0) return;
+    const clear = () => {
+      setSpotLink(null);
+      window.history.replaceState(
+        null,
+        "",
+        withoutPlanSpot(window.location.hash)
+      );
+    };
+    if (!docs.some(d => d.id === spotLink.pdfId)) {
+      toast.error("That link points at a plan set that is not on this bid.");
+      clear();
+      return;
+    }
+    setSelectedDocId(spotLink.pdfId);
+    setPage(spotLink.page);
+    jumpTo({ x: spotLink.x, y: spotLink.y });
+    clear();
+  }, [spotLink, docs, jumpTo]);
 
   /** A different plan is a different set of pictures. */
   useEffect(() => {

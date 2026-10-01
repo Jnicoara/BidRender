@@ -161,6 +161,16 @@ one suggestion per mark:
 Found + Wrong symbol + Missed = By hand, always. That is the check the numbers
 add up.
 
+> **Narrowed 2026-10-01 — the smaller answer key.** "Count every symbol on
+> the sheet" (§ "You count by hand, once" and the hand-count steps) is
+> replaced by **8–10 picked types per sheet**; unpicked types are ignored both
+> ways, data / telecom is a separate table, "… - EXISTING TO REMAIN" counts
+> score as their symbol, and **Extra** is split by the owner's verdict on
+> each spot ("AI wrong" / "my miss") in `scripts/readerAccuracyReview.mts`.
+> Rules: `scripts/readerAccuracyAnswerKey.ts`. Why: the full count was hours
+> a sheet, and an "extra" nobody has looked at is half the AI's fault and
+> half the key's. The matching rules above are unchanged.
+
 **Each method is run twice.** It costs cents, and without it a difference of
 three between two methods cannot be told apart from the same method scoring
 three differently on a second try (§ 15.2). The table shows both runs, e.g.
