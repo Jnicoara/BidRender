@@ -44,7 +44,10 @@
 // The `helixbid-` prefix is the product's old name, kept on purpose: activate
 // deletes old caches by this prefix, so renaming it would strand every existing
 // cache in the browsers that hold one.
-const CACHE_VERSION = "v1";
+// v2 (2026-09-30): drops any v1 asset cache that stored the front page under
+// a script's URL — see isCacheableAsset. Takes effect when the new worker
+// activates, on the next full open of the app (no skipWaiting, see install).
+const CACHE_VERSION = "v2";
 const SHELL_CACHE = `helixbid-shell-${CACHE_VERSION}`;
 const ASSET_CACHE = `helixbid-assets-${CACHE_VERSION}`;
 const MISC_CACHE = `helixbid-misc-${CACHE_VERSION}`;
@@ -129,11 +132,24 @@ self.addEventListener("fetch", event => {
   event.respondWith(staleWhileRevalidate(request, MISC_CACHE));
 });
 
+/**
+ * Only a real asset is kept. An HTML answer under /assets/ is the server's
+ * front page standing in for a file it does not have — what it sent for a
+ * missing asset until 2026-09-30 — and keeping it would break that script in
+ * this browser forever. The server now sends a 404 (server/staticCaching.ts);
+ * this is the second line, for any server or proxy that still does not.
+ */
+function isCacheableAsset(response) {
+  if (!response.ok) return false;
+  const type = response.headers.get("content-type") || "";
+  return !type.includes("text/html");
+}
+
 async function cacheFirst(request, cacheName) {
   const cached = await caches.match(request);
   if (cached) return cached;
   const response = await fetch(request);
-  if (response.ok) {
+  if (isCacheableAsset(response)) {
     const cache = await caches.open(cacheName);
     cache.put(request, response.clone());
   }

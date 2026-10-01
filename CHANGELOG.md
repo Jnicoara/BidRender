@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-30]
 
+- **BidRidge now tells you when there is a newer version.** Someone who had
+  the app open before an update kept running the old version until they
+  refreshed, so a fix did not reach them. Now a bar says "A new version of
+  BidRidge is available" with a Refresh button. It never reloads by itself,
+  so nothing typed is lost. If an out-of-date page can't load part of the
+  app, it says "BidRidge has been updated — Refresh" instead of "This screen
+  stopped working". A browser can also no longer get stuck holding a broken
+  copy of the app's code after an update.
+
 - **A sheet's scale no longer sits on top of the next sheet in the sheet
   list.** Setting a scale grew that row by a line, and for a moment (or for
   as long as the tab was in the background) the list still had it at its old

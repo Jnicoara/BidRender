@@ -286,6 +286,95 @@ describe("does not serve stale content indefinitely", () => {
   });
 });
 
+// ── Run, not read: what the worker actually keeps (2026-09-30) ───────────────
+
+describe("never keeps the front page as a script", () => {
+  /**
+   * sw.js executed for real against an in-memory Cache Storage, so this
+   * asserts behaviour rather than spelling. The fault it guards: a missing
+   * /assets/ file was answered with index.html and a 200, the cache-first
+   * rule stored it, and that browser could not load the script again.
+   */
+  async function fetchThroughWorker(
+    pathname: string,
+    answer: () => Response
+  ): Promise<{ status: number; stored: string[] }> {
+    const store = new Map<string, Response>();
+    const cache = {
+      match: async (req: { url: string } | string) =>
+        store.get(typeof req === "string" ? req : req.url)?.clone(),
+      put: async (req: { url: string } | string, res: Response) => {
+        store.set(typeof req === "string" ? req : req.url, res);
+      },
+      add: async () => undefined,
+    };
+    const listeners: Record<string, (event: unknown) => void> = {};
+    const self = {
+      location: { origin: "https://bidridge.com" },
+      addEventListener: (type: string, fn: (event: unknown) => void) => {
+        listeners[type] = fn;
+      },
+      clients: { claim: async () => undefined },
+    };
+    const caches = {
+      open: async () => cache,
+      match: cache.match,
+      keys: async () => [],
+      delete: async () => true,
+    };
+    new Function("self", "caches", "fetch", sw)(self, caches, async () =>
+      answer()
+    );
+    let responded: Promise<Response> | undefined;
+    listeners.fetch({
+      request: {
+        method: "GET",
+        mode: "no-cors",
+        url: `https://bidridge.com${pathname}`,
+      },
+      respondWith: (p: Promise<Response>) => {
+        responded = p;
+      },
+    });
+    const response = await responded!;
+    // cache.put is not awaited by the worker; let it land.
+    await new Promise(resolve => setTimeout(resolve, 0));
+    return { status: response.status, stored: Array.from(store.keys()) };
+  }
+
+  it("does not store an HTML answer for an /assets/ URL", async () => {
+    const result = await fetchThroughWorker(
+      "/assets/BidRenderShell-gone.js",
+      () =>
+        new Response("<!doctype html>", {
+          status: 200,
+          headers: { "content-type": "text/html; charset=UTF-8" },
+        })
+    );
+    expect(result.stored).toEqual([]);
+  });
+
+  it("does not store a 404", async () => {
+    const result = await fetchThroughWorker(
+      "/assets/gone.js",
+      () => new Response("Not found", { status: 404 })
+    );
+    expect(result).toEqual({ status: 404, stored: [] });
+  });
+
+  it("still keeps a real script", async () => {
+    const result = await fetchThroughWorker(
+      "/assets/index-abc.js",
+      () =>
+        new Response("export {};", {
+          status: 200,
+          headers: { "content-type": "application/javascript" },
+        })
+    );
+    expect(result.stored).toEqual(["https://bidridge.com/assets/index-abc.js"]);
+  });
+});
+
 // ── It must not become a requirement ─────────────────────────────────────────
 
 describe("works for people who never install it", () => {
