@@ -98,14 +98,20 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
 ### Capture fixes must ship in the next live release
 
 - [ ] **Remove `C:\dev\BidPhase-C-site` after the reader accuracy test, and
-      never commit or merge from it.** It is a detached git worktree at
-      `9851c86` that serves the counter's test site on port 3004
+      never commit or merge from it.** It is a detached git worktree (at
+      `52a6b0b` since 2026-10-01; was `9851c86`) that serves the counter's
+      test site on port 3004
       (2026-09-30), so edits in `C:\dev\BidPhase-C` cannot hot-reload into
       the page he is counting on. Its `.env` points `LOCAL_STORAGE_DIR` at
       `C:\dev\BidPhase-C\.local-storage`. It exists only to run; nothing in it
       is work. Moving it to newer code reloads his page, so ask the owner
       first. To remove: stop its `pnpm dev`, then
       `git worktree remove --force ../BidPhase-C-site` from `C:\dev\BidPhase-C`.
+      **3004 does NOT have** "Move to…", the review page's jump-to-spot link,
+      or Find all matching (`895cd7c`…`74b040a`) — moving it to them reloads
+      his page, so ask first.
+- [ ] **Whoever merges track-c: two small conflicts in `LegendPanel.tsx`
+      with Track B's 8a.** Keep BOTH buttons, and B's `text-xs`.
 - [ ] **Capture fixes (258718d + blur fix) must ship in the next live
       release.** Both are on `track-c` only (2026-09-30). Checked that day:
       live (`3ca33dc`) and staging (`0af50a6`) both still draw the "Name
