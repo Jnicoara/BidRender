@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-01]
 
+- **Every change is now tested automatically on GitHub.** Each push to
+  `local-dev`, a track branch or a Track A branch runs the type check and the
+  full test suite against a brand-new database, built from every migration and
+  seeded the way the app seeds itself. A track branch that tries to change the
+  database migrations is refused, because migrations stay with Track A. This
+  deploys nothing.
 - **Several legend symbols linked to one assembly now keep separate counts.**
   Three lights linked to the same assembly all landed in one count (22 + 3
   stored as 25, under one name). Each symbol now counts into its own count,
