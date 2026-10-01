@@ -4612,6 +4612,14 @@ The library is too small to train on, the symbols are too similar for a generic
 image embedding to separate, and a user with 40 symbols will never generate
 enough labelled data to make any of it better than the funnel above.
 
+> **Narrowed 2026-10-01 (Track C): matching the PDF's own LINE WORK on ONE
+> sheet is realistic, and measured.** "Find all matching" boxes a symbol on a
+> CAD sheet and finds every copy of its segments and words on that sheet, no
+> AI — 44 of 46 hand marks on Weld 1 E-200, 0.1 s a search, look-alikes
+> flagged, scans refused. The rejection above still stands for what it named:
+> PIXEL matching of stored thumbnails across a SET. Plan and numbers:
+> `references/find-all-matching-plan.md`.
+
 ### 9.4 THE THING THAT NEEDS CARE: a remembered match must never apply itself
 
 **Engineering firms use different symbols.** There are common conventions and
@@ -5573,6 +5581,12 @@ build tiling on — and leaves run-to-run variance for later.
 measurement is only worth taking when its answer changes what gets built next,
 and the answer goes stale if the model, the detail level or the prompt moves in
 between. Running it early buys a number that has to be re-earned.
+
+> **Superseded 2026-09-29 by `references/reader-accuracy-test-plan.md`**, on the
+> owner's go-ahead: the bake-off now compares legend and zoom (today, legend
+> pictures, zoomed-in pieces, both) instead of detail levels, and runs before
+> Phase 10 because its answer decides whether Phase 10 is built. The hand counts
+> are reused for every later re-run; `scripts/readerAccuracy.mts` runs it.
 
 ### 15.5 The gate
 

@@ -340,6 +340,14 @@ export const RENAMED_FROM_SHEET: Record<string, string> = {
     ])
   ),
   "Weatherproof cover, 2-gang": "Weatherproof in-use cover, 2-gang",
+  // ── Starter assemblies gaps, 2026-09-29. Both were on the sheet's pending
+  // Service Entrance shelf and ship in existing categories until it exists
+  // (references/track-a-handoff-starter-assemblies.md). All three gained the
+  // 2" size the service assemblies use; every Conduit Fittings row carries a
+  // size. "Riser strap, 3 in" stays on the sheet as NEW.
+  "Riser strap, 2 in": '2" riser strap',
+  "Meter socket hub": '2" meter hub',
+  "Mast roof flashing": '2" mast roof flashing',
 };
 
 /** Every sheet name that moved under a different name, whichever kind. */

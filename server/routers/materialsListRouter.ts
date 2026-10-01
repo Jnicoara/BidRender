@@ -64,7 +64,7 @@ import {
 import * as db from "../db";
 import { footageByRunType } from "../runTypeFootage";
 import { resolveRunType } from "../../shared/runTypeLookup";
-import { FITTING_KIND_LABELS } from "../../shared/runFittings";
+import { unmatchedKindWords } from "../../shared/runFittings";
 import { isBendRole } from "../../shared/runBends";
 import { isTeeRole, rootOf } from "../../shared/runNetwork";
 import { runOnBid } from "../../shared/runOnBid";
@@ -315,11 +315,15 @@ export const materialsListRouter = router({
               the each, on top of the pipe already listed by the foot.
             */
             if (row.role === "fieldBend") continue;
-            const kind = FITTING_KIND_LABELS[row.role].many;
-            if (
-              row.count.status === "unknown" &&
-              footage.get(runTypeId)?.legs.length
-            ) {
+            // Used only on lines with no part matched — "90° bends", not
+            // "elbows", beside a type that may buy sweeps (runFittings.ts).
+            const kind = unmatchedKindWords(row.role).many;
+            // Cable legs too (§ R1): an MC type's straps on an unscaled
+            // sheet are uncountable, and the supplier is told so.
+            const traced =
+              (footage.get(runTypeId)?.legs.length ?? 0) +
+              (footage.get(runTypeId)?.cableLegs.length ?? 0);
+            if (row.count.status === "unknown" && traced > 0) {
               uncounted.push(`${label} ${kind} — ${row.count.why}`);
               continue;
             }

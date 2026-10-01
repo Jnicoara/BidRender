@@ -147,3 +147,6 @@ client/public/__manus__/version.json
 
 # Regenerable: `npx tsx pricing/buildPricingSheet.mts` rebuilds it from the catalog.
 pricing/rows.json
+
+# Reader accuracy test: plan copies, results and the pictures sent (scripts/readerAccuracy.mts)
+reader-accuracy/

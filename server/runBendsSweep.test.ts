@@ -31,6 +31,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  ELBOW_WORDS,
   MERGE_WITHIN_FEET,
   countBends,
   legBends,
@@ -131,7 +132,7 @@ function bidCount(points: P[], mergeWithinFeet: number) {
   const counts = countFittings(
     [leg(points)],
     PVC_SPEC,
-    { method: FACTORY, limit: 360, mergeWithinFeet },
+    { method: FACTORY, limit: 360, mergeWithinFeet, words: ELBOW_WORDS },
     []
   );
   return { n90: qty(counts.elbow90), n45: qty(counts.elbow45) };

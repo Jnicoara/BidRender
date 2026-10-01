@@ -42,6 +42,7 @@ import {
 } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { verifyStorageToken } from "./storageTokens";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 import {
   buildProposal,
   DEFAULT_ACCENT,
@@ -79,6 +80,7 @@ const hasDb = !!process.env.DATABASE_URL;
 const USER = 9713;
 /** A second contractor, to prove branding never crosses between accounts. */
 const OTHER_USER = 9714;
+dropFixtureUsersAfterAll([USER, OTHER_USER]);
 
 const ctxFor = (id: number): TrpcContext =>
   ({ user: { id, role: "user" } }) as unknown as TrpcContext;

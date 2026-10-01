@@ -75,6 +75,7 @@
 import { materialTypeName } from "./materialSizeOrder";
 import { compareMaterials } from "./materialOrder";
 import { renamedTo } from "./renamedMaterials";
+import { countNounAfter, wordsHoldCount } from "./searchCounts";
 
 /** Words meaning "this joins, terminates or closes a product". */
 const FITTING_NOUNS = [
@@ -439,11 +440,27 @@ export function matchTier(row: RankableRow, query: string): MatchTier {
   const words = norm(query).split(" ").filter(Boolean);
   if (words.length === 0) return TIER.ASSOCIATED;
   let worst: MatchTier = TIER.EXACT;
-  for (const word of words) {
-    const tier = queryTier(row, word);
+  words.forEach((word, i) => {
+    const noun = countNounAfter(word, words[i + 1]);
+    const tier =
+      noun === null ? queryTier(row, word) : countQueryTier(row, word, noun);
     if (tier > worst) worst = tier;
-  }
+  });
   return worst;
+}
+
+/**
+ * queryTier for a COUNT — the "1" of "1 gang box". A word prefix is the wrong
+ * test for a number: "1" starts `1/2"`, so every 1/2" weatherproof box held
+ * the word and "Single-gang box" did not, and the boxes ranked first
+ * (2026-09-29). A count is held when the name holds it as a count
+ * (shared/searchCounts.ts, the same rule the matcher uses); failing that, the
+ * row's own aliases ("2g" on Double-gang box).
+ */
+function countQueryTier(row: RankableRow, n: string, noun: string): MatchTier {
+  if (wordsHoldCount(norm(row.name).split(" "), n, noun)) return TIER.MODIFIER;
+  if (wordsHoldCount(aliasTerms(row.aliases), n, noun)) return TIER.OWN_ALIAS;
+  return TIER.ASSOCIATED;
 }
 
 /**

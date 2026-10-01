@@ -1,5 +1,5 @@
 Category: Panels
-Items: 78
+Items: 85
 
 Category | Name | Size
 Panels | 30A cartridge fuse | 30A
@@ -64,6 +64,7 @@ Panels | 60A main-lug sub-panel, 8-space | 60A
 Panels | 100A meter base | 100A
 Panels | 200A meter base | 200A
 Panels | 400A meter base | 400A
+Panels | 2" meter hub | 2"
 Panels | 30A non-fused disconnect, NEMA 1 | 30A
 Panels | 60A non-fused disconnect, NEMA 1 | 60A
 Panels | 100A non-fused disconnect, NEMA 1 | 100A
@@ -80,3 +81,9 @@ Panels | Panel cover, surface | -
 Panels | Panel neutral bar | -
 Panels | Panel trim ring | -
 Panels | Panelboard interior only | -
+Panels | 225A panelboard, 3-phase main, 42-space | 225A
+Panels | 400A panelboard, 3-phase main, 42-space | 400A
+Panels | 100A panelboard, 3-phase main-lug, 24-space | 100A
+Panels | 125A panelboard, 3-phase main-lug, 30-space | 125A
+Panels | 225A panelboard, 3-phase main-lug, 42-space | 225A
+Panels | 400A panelboard, 3-phase main-lug, 42-space | 400A

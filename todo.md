@@ -95,6 +95,35 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
 
 ## Pending / Future
 
+### Capture fixes must ship in the next live release
+
+- [ ] **Remove `C:\dev\BidPhase-C-site` after the reader accuracy test, and
+      never commit or merge from it.** It is a detached git worktree (at
+      `52a6b0b` since 2026-10-01; was `9851c86`) that serves the counter's
+      test site on port 3004
+      (2026-09-30), so edits in `C:\dev\BidPhase-C` cannot hot-reload into
+      the page he is counting on. Its `.env` points `LOCAL_STORAGE_DIR` at
+      `C:\dev\BidPhase-C\.local-storage`. It exists only to run; nothing in it
+      is work. Moving it to newer code reloads his page, so ask the owner
+      first. To remove: stop its `pnpm dev`, then
+      `git worktree remove --force ../BidPhase-C-site` from `C:\dev\BidPhase-C`.
+      **3004 does NOT have** "Move to…", the review page's jump-to-spot link,
+      or Find all matching (`895cd7c`…`74b040a`) — moving it to them reloads
+      his page, so ask first.
+- [ ] **Whoever merges track-c: two small conflicts in `LegendPanel.tsx`
+      with Track B's 8a.** Keep BOTH buttons, and B's `text-xs`.
+- [ ] **Capture fixes (258718d + blur fix) must ship in the next live
+      release.** Both are on `track-c` only (2026-09-30). Checked that day:
+      live (`3ca33dc`) and staging (`0af50a6`) both still draw the "Name
+      this symbol" box inside the zoom transform (`SymbolCapture.tsx`, the
+      inline `absolute top-3 left-1/2` card), so Capture looks like it does
+      nothing there, and both still save the soft 1.5x backdrop crop. The
+      blur fix also lowers the router's thumbnail limit from 200,000 to
+      60,000 characters, because `symbol_links.thumbnail` is MySQL TEXT
+      (65,535 bytes). No migration. Symbols captured before the fix keep
+      their soft picture, because a re-capture never replaces an existing
+      thumbnail; remove the symbol and capture it again to get a sharp one.
+
 ### WRONG-NUMBER RISK: a run snaps onto a misplaced AI mark — fix after the reader accuracy test
 
 - [ ] **Tracing snaps a run end onto a nearby mark's spot (`legSnap.ts`). An
@@ -232,13 +261,50 @@ Both are timing, not wrong answers, and both touch the shared test database.
 Fix them together: a green run that sometimes lies about being red trains
 everyone to re-run instead of read.
 
+- [ ] **HANDOFF to whoever owns `server/db.ts` — the root cause of every
+      seed-heavy timeout below, including `materialsLibrary.test.ts`'s four
+      failures on `a-fitting-labor` (73c349e).** Found and measured
+      2026-09-29 on track-c; NOT committed there because A and B are working
+      in `db.ts`. `dedupeBaselineRows` checks for duplicates with a self-join
+      on `name`, and `name` has no index, so MySQL runs a nested loop over
+      every baseline row against every other: **1,473 ms of a 2,000 ms seed**
+      at 1,554 rows, and quadratic, so each catalog sweep makes it worse.
+      Seven tests in `materialsLibrary.test.ts` call the seed inside the test
+      body at 1.5–2.1 s each against the 5 s default.
+      **Reproduced:** four connections of the same query on ANOTHER database on
+      the same server (standing in for another worktree's suite) put exactly
+      four of those tests over 5 s — "Test timed out in 5000ms" — which is the
+      shape of the 73c349e failure. (That branch also predates the one-run
+      lock, `d4f4821`, so a second run on `bidrender_test_clean` is a
+      possible second cause; the lock covers that one already.)
+      **The fix, one statement, same answer** — the check only asks whether
+      any baseline name appears twice:
+      ```sql
+      SELECT 1 FROM `${table}` WHERE userId IS NULL
+      GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
+      ```
+      4 ms instead of 1,473. Applied temporarily: a full seed 2,000 ms → 20
+      ms; `materialsLibrary` + `materialsCatalog` + `seedPreservesUserPrices`,
+      101 tests, 2.8 s instead of ~40 s, none over 300 ms; `materialsLibrary`
+      5 of 5 clean under the same load that failed it. It also takes ~1.5 s
+      off every server start. The DELETE below it keeps the join — it only
+      runs when a duplicate exists. **Once it lands, drop the 60 s
+      `vi.setConfig` in `seedPreservesUserPrices.test.ts`** — that limit was
+      covering this, not a slow test — and consider an index on
+      `materials.name` (a migration) for the ~20 other per-name lookups.
+
 - [x] **`materialsCatalog.test.ts` "renames the reshaped rows in place"
       timed out at 5,004 ms** in a full run, 2026-09-29, after the sweeps
       took the catalog to 1,511 rows; 4.1–4.4 s alone, all assertions
       passing. Given 60 s like `seedPreservesUserPrices`. A timeout, not a
       race — but the next catalog growth will push other seed-heavy tests
       toward 5 s the same way.
-- [ ] **`server/backup.test.ts` "restores into an empty database, table for
+      **REAL FIX 2026-09-29, 60 s removed:** the test ran two queries per
+      rename — ~200 full-table scans, since `materials.name` has no index.
+      It now reads the baseline rows once and counts names in memory; the
+      same two assertions per rename, under 300 ms. 20 of 20 repeat runs
+      passed.
+- [x] **`server/backup.test.ts` "restores into an empty database, table for
       table and row for row" (line ~248) came up 11 `assemblies` rows short.**
       2026-09-27. A timing race on the shared test database: something else
       seeds or touches `assemblies` between the dump and the count, so the
@@ -253,6 +319,27 @@ everyone to re-run instead of read.
       anyway to build its own scratch database (`bidrender_catalogscale_test`)
       and only READ the shared one, so it cannot be. New tests that write a
       lot should do the same until this is fixed.
+      **FIXED 2026-09-29 — two causes, both OTHER RUNS, never another file.**
+      (1) Two runs on one database: the lock in `scripts/testSuiteLock.ts`
+      (see the seedReactivatesRetired entry) now refuses the second. (2) Two
+      runs on two DIFFERENT databases still collided, because the restore
+      went into the fixed schema `bidrender_backup_restore_test` (and the
+      verify tests into fixed `bidrender_verify_*`) — a schema name is
+      server-wide. Track B was seen dumping `bidrender_test_b` mid-session.
+      Reproduced by running the restore test against `bidrender_test_c` and a
+      schema-only copy of it at once: the copy's restore held the other run's
+      tables; alone it passed. Every scratch schema in `backup.test.ts` and
+      `catalogScale.test.ts` is now `<database>__<purpose>`
+      (`scratchSchemaFor`); the new naming case in `backup.test.ts` is red on
+      the old fixed name. The same two-at-once repro then passed twice.
+      Leftover: the corrupt-dump verify case never drops its scratch schema
+      (the restore fails before the drop), so `<db>__verify_corrupt` lingers
+      between runs — harmless, dropped on the next run's start.
+      **Leftover FIXED 2026-09-29, in `verifyBackup` itself:** it was not a
+      test quirk — a failed restore left its half-loaded schema on the
+      scratch server in real use too. The restore now drops it on the way
+      out (kept or not: nothing can be rehearsed on a failed restore). The
+      corrupt-dump case asserts the schema is gone — red on the old code.
 - [x] **`server/seedPreservesUserPrices.test.ts` "keeps the fork's price…"
       flakes on the 5 s default timeout.** 2026-09-27: failed in a full run
       (5010 ms), then run alone it passed once and failed once — it seeds the
@@ -261,7 +348,7 @@ everyone to re-run instead of read.
       this one wants the same. **FIXED 2026-09-28** with that 60 s limit: at
       1,455 rows it failed on every run, alone too, at 5.4 s with every
       assertion passing once the limit was lifted.
-- [ ] **`server/seedReactivatesRetired.test.ts` "never switches on a company
+- [x] **`server/seedReactivatesRetired.test.ts` "never switches on a company
       row that shares a shipped name" lost its own row under a full run.**
       2026-09-28, once, on the local-dev + track-c merge: the company row it
       inserts was gone when read back (`Cannot read properties of undefined
@@ -270,6 +357,24 @@ everyone to re-run instead of read.
       own user ids, and no other file uses 7404/7405. A race, not yet
       explained. Run it alongside the full suite several times before calling
       anything fixed.
+      **FIXED 2026-09-29 — the other deleter was a second RUN, not another
+      file.** Every worktree was told to test against `bidrender_test_clean`,
+      and `fileParallelism: false` only orders one run's own files. Starting
+      this file twice, two seconds apart, on one database failed 5 of 6 cases,
+      one with the exact `reading 'userId'` error: each run's `beforeEach`
+      deleted the other's 7404 rows. `vitest.globalSetup.ts` now holds a MySQL
+      named lock on the test database for the whole run
+      (`scripts/testSuiteLock.ts`) and a second run on the same database is
+      refused by name; separate databases (`bidrender_test_b`, `_c`) still
+      run together. `server/testSuiteLock.test.ts` checks from inside the run
+      that the lock is held — red with the globalSetup call removed. Rerun of
+      the two-at-once repro: first passed 3/3, second refused.
+- [x] **FIXED 2026-09-29 (plan W2):** only MySQL's "no such table" (1146,
+      read off drizzle's `cause`) means never migrated (`isMissingTable`,
+      `server/schemaCheck.ts`); anything else throws, and the script prints
+      "Could not read this database (…)" and exits 2 before checking anything.
+      `scripts/schemaDrift.test.ts` runs the script against a refused port —
+      red on the old code, which printed "never been migrated". The entry:
 - [ ] **`server/materialsLibrary.test.ts` failed 4 tests in ONE full run,
       2026-09-29, and has not failed since.** On `a-fitting-labor` against
       `bidrender_test_clean`: "re-stamps a baseline row whose category was
@@ -283,7 +388,7 @@ everyone to re-run instead of read.
       back, the same shape as the `seedReactivatesRetired` race above:
       suspect a second writer to shared `materials` rows mid-seed. Capture
       the assertion text on the next failure before changing anything.
-- [ ] **`scripts/schemaDrift.mts` says "this database has never been migrated"
+- [x] **`scripts/schemaDrift.mts` says "this database has never been migrated"
       when it simply cannot connect.** Measured 2026-09-27 against production
       with the laptop off the database's trusted list: that line printed, then
       `ETIMEDOUT` on `connect` ~20 s later. Production had 89 migrations. The
@@ -291,6 +396,27 @@ everyone to re-run instead of read.
       as an empty database — a false "never migrated" is an invitation to
       re-run every migration against live data. `references/deploying.md`
       § 10 warns about it until fixed.
+- [x] **FIXED 2026-09-29 (plan W3):** `linkOrigins` (`server/schemaCheck.ts`)
+      finds the migration that names each missing key and whether this
+      database ran it, by the migrator's own rule (`pendingMigrations`); the
+      report says "0095\_… adds it — scripts/migrate.mts adds these, do NOT add
+      them by hand" for a pending one, keeps the ALTER for an applied one,
+      and says when no migration declares it. Reproduced on a scratch schema
+      rolled back to 89 of 96: old script printed the false sentence and two
+      ALTERs, new one names 0089 and 0095. The entry:
+- [x] **`scripts/schemaDrift.mts` says a missing foreign key's migration is
+      "already recorded as applied" when it is NOT.** Measured 2026-09-29 on
+      `bidrender_test_c` with 89 of 96 migrations recorded: it listed
+      `takeoff_extra_defaults(userId)` and `takeoff_groups(dropRunTypeId)` as
+      missing and said "db:push will not add these — the migration that
+      declared each one is already recorded as applied", then printed
+      hand-written `ALTER TABLE … ADD CONSTRAINT` lines. Both come from 0089
+      and 0095, which were pending; applying them added both keys. The text is
+      a fixed string (`server/schemaCheck.ts` ~712) that never checks the
+      journal. Harm: it steers someone to hand-add a key that `migrate.mts`
+      would add itself, after which the pending migration dies on a duplicate
+      constraint. It should say which migration declares each key and
+      whether that one is applied. Not fixed yet.
 - [ ] **A terms page BEFORE any sharing of the AI correction log is turned
       on.** Decided by the owner 2026-09-27 (Stage 4, question 7). The log
       (`references/stage-4-safety-plan.md` § 3) records corrections from day
@@ -1600,6 +1726,25 @@ path is ever revived, give it the same treatment first.
       Needs a nullable `takeoff_stamps.dropExcluded` (NULL = follows the
       count; additive). Spec and B's follow-up in
       `references/quote-app-panel-plan.md` § 10, H3.
+- [ ] **Track A (migration): a STATUS on each mark — new / existing to
+      remain / remove / relocate — so an existing device is never priced as
+      new.** Asked for 2026-10-01 from the reader-accuracy hand count: many
+      devices on the test sheets are drawn as existing to remain, and a count
+      today cannot say so, so they were counted (and would be bid) with the
+      new ones. Proposed: nullable `takeoff_stamps.status` enum
+      (`new`,`existing`,`remove`,`relocate`), NULL read as `new` — additive,
+      no backfill, step 1 of the three. The bid bridge
+      (`shared/takeoffBridge.ts`) then counts only `new` (and `relocate`,
+      which is labour) toward a line; `existing` is shown, never priced;
+      `remove` wants its own demo labour line, owner to decide. **Until it
+      lands, Track C's stand-in is a NAME**: a second count "<name> - EXISTING
+      TO REMAIN" (`shared/existingToRemain.ts`, `scripts/readerTestExisting.mts`)
+      — which still prices if sent to a bid, so it is a test-account tool and
+      not the product answer. The migration should convert those names into
+      the status and fold the twin count into its base. Where it fits with
+      Find all matching's "maybe existing" flag:
+      `references/find-all-matching-plan.md`. Batched with B's nine pin-style
+      columns (next entry).
 - [ ] **Track A (migration): nine nullable pin-style columns, BATCHED with
       the mark-status column.** Not built; queued 2026-10-01. Shape, letter
       and color on each of `assemblies`, `symbol_links` and `takeoff_groups`.
@@ -1953,9 +2098,20 @@ counts need no rule of their own. `shared/runNetwork.ts` is the module.
   - [ ] **Before that deploy:** count stored `fitting = 'body'` tees in
         production. Expected 0, because nothing offers it. If it is not 0,
         stop and find out why before going on: those bids would gain a line.
-- [ ] **A cable run's tee buys nothing.** Cable types have no fitting slot
+- [x] **A cable run's tee buys nothing.** Cable types have no fitting slot
       (the MC item below), so a branch on a cable run counts its footage and
       drops but no junction box at the split. Same fix as MC connectors.
+      **FIXED 2026-09-29 (plan W4, owner Q2):** a tee on a cable run buys a
+      4" square box and blank cover (`SMALL_TEE_BOX`, the pair a small-pipe
+      tee already buys; `cableTeeRows`). Tees are now collected for cable
+      rows; a cable-only tee goes to the lowest cable type touching it
+      (`cableTeeOwners`). Pipe and cable cannot meet at a tee today (a cable
+      branch on a conduit run is refused — pinned). **Found on the way, and
+      fixed with it:** `sendToBid` decided tee ownership from the one type
+      being sent, so a 1/2" and a 3/4" type sharing a tee, sent separately,
+      STORED two boxes; the bid screen was right because it counts every
+      type. `server/cableTeeBox.test.ts`: both red on `1f66d7d` (`[]`, and
+      2 boxes for one tee). MC connectors and straps are still open, below.
 - [ ] **The main past a tee and the branch both read "from a tee"** in the
       runs panel, because nothing stored says which is which. Worth storing if
       the wording confuses anybody.
@@ -1997,7 +2153,32 @@ sheet scale were removed afterwards — production back to 0 bid lines, 2 runs.
 - [ ] **`5/6" wafer LED downlight` (the old spelling) reads as a fraction
       and finds nothing.** Split out of the comma item above on 2026-09-26:
       a size-parsing problem, not punctuation. Found by
-      `scripts/catalogRehearsal.mts search`.
+      `scripts/catalogRehearsal.mts search`. Planned 2026-09-29:
+      `references/track-c-next-batch-plan.md` § S2.
+- [x] **A count number in a search matches inside and at the start of
+      SIZES: "2 gang box", "3 hole", "2 pole 20" lead with the wrong rows.**
+      **FIXED 2026-09-29:** one count rule (`shared/searchCounts.ts`) read by
+      the matcher AND the ranker; "2 gang box" leads with Double-gang box.
+      Standard sweep unchanged; the new count sweep's 40 moved queries are
+      listed in the plan, § S1-moved.
+      Found 2026-09-29. "2 gang box" is a REGRESSION from `8c5c478` (the
+      weatherproof rows): `Double-gang box` was 4th at `e70ec15` and is now
+      out of the top five, behind `1/2" weatherproof box, single-gang` — the
+      count "2" matches inside `1/2"`. "3 hole" leads with 3/4" and 3" one-hole
+      straps; "2 pole 20" with `20 ft light pole`. The standard spot-check
+      sweep has none of these queries, which is why it passed. Planned, with
+      the risk to other count searches: `references/track-c-next-batch-plan.md`
+      § S1.
+- [ ] **`aliases()` drops a repeated word, which silently breaks alias
+      PHRASES.** `server/seed/materials/types.ts`: it de-duplicates word by
+      word, so "one hole 1 hole two hole 2 hole" was stored as "one hole 1
+      two 2" and "2 hole strap" could not find `EMT strap`; my own "3 hole 5
+      hole" on the weatherproof boxes became "3 hole 5". Both fixed by
+      hyphenating (2026-09-29). NOT audited: other rows may have lost a
+      phrase the same way. The audit is to compare each seed row's alias
+      INPUT with what `aliases()` returned and list every word dropped that
+      was not in the name — a script, not a grep, because the input is only
+      visible in the seed source.
 
 Couplings (sticks minus one per leg, drops included), connectors (one per
 conduit end, by node degree) and straps (one near each box, then spacing)
@@ -2065,7 +2246,15 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       aliases (S5). The run-type editor's 90°/45° pickers shipped the same
       day (S6, plan § 8b), and a traced sweep now counts as one bend on a
       sweep type (plan § 8a).
-- [ ] **The sentence under a sweep row still says "90° elbows".** Found
+- [x] **FIXED 2026-09-29 (plan W1, owner Q1: name the part, or "bend").**
+      The word follows the part the type buys (`bendWordsFor`,
+      `shared/runFittingMaterials.ts`, from the same names as the sweep merge
+      distance): sweep → "90° sweep", elbow or nothing chosen → "90° elbow",
+      anything else → "90° bend"; where NO part matched, the panel and the
+      materials list say "bend" (`unmatchedKindWords`). `words` is required on
+      `countFittings`, like `mergeWithinFeet`. `runBendsBridge.test.ts` goes
+      red on the old code with the exact old sentence. The entry as found:
+- [x] **The sentence under a sweep row still says "90° elbows".** Found
       2026-09-29 looking at the run panel (plan § 8b): the fitting line is
       named `2" PVC Sch 40 90-degree sweep, 36" radius` and the caption
       under it reads "At least 2 90° elbows: 2 corners …". The kind is
@@ -2126,15 +2315,78 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       picker.
 - [ ] **Locknuts and bushings** at each connector (RMC/IMC, and EMT into a
       panel). The rows exist (`conduit bushing`, `conduit locknut`); nothing
-      counts them yet.
+      counts them yet. **Rule decided by the owner 2026-09-29, build HELD
+      until Track A appends `locknut` and `bushing` to `runMaterialRole`
+      (A1).** Three facts reported first, in
+      `references/track-c-next-batch-plan.md` § W5: no connector row says it
+      includes a locknut or insulated throat; wire size is known per run
+      TYPE (its conductor), not per run, and not at all when a type names no
+      conductor; the box at a run end is not known, so hubs are known only at
+      LBs. A2/A3 there are the schema options if the owner wants those gaps
+      closed. **No wire size (owner, 2026-09-29):** on small conduit, a type
+      with no conductor chosen counts no bushing and says "wire size not
+      set, bushings not counted" (plan § W5).
+- [ ] **Commercial retail catalog gaps** — plan only, owner to answer RQ1–RQ5:
+      `references/track-c-retail-catalog-plan.md`. First: MC runs count no
+      connectors or straps, and there is no 12-4 MC. Surface raceway needs
+      Track A's category enum first.
+- [x] **FIXED 2026-09-29:** `dropFixtureUsersAfterAll` (`server/testFixtureUsers.ts`)
+      deletes each file's fixture users in `afterAll`, and every `userId`
+      table cascades from `users`. 23 files (the 20 below plus
+      stampDeleteAndDropUndo, quoteAppPanel, planCopilot from the local-dev
+      merge). Full run on `bidrender_test_c`: before, 21 files left 209 rows;
+      after, 0, and a second run of the 23 is 0 with nothing to clear. A
+      forced failing test in materialsList left 0 with the call, 46 without.
+      Still open: switching the report to a failure (needs it to count
+      user-owned rows only, so a seeder adding shipped rows is not flagged).
+      The entry as it stood: **Tests leave user-owned rows behind: 20
+      files, 195 rows per run.**
+      Measured 2026-09-29 with `TEST_LEAK_REPORT` (vitest.setup.ts): materials
+      93, assemblies 41, takeoff_run_types 37, then bids, users,
+      company_members and others. Worst: materialsList (38), proposal (18),
+      linePricingProblems (18), assemblyOverhead (16), extrasLaborSplit (13);
+      the full list is in the plan, § 3. None crosses files today (distinct
+      fixture ids) and SHARED rows are now a failure (`testLeakGuard.ts`);
+      these are the owner's "fix as a separate change" (Q5). When they are
+      clean, switch the report to a failure like the shared-row guard.
 - [ ] **PVC expansion fittings** on long exposed PVC runs.
-- [ ] **MC cable connectors and straps.** MC needs the same counting — a
+- [x] **MC cable connectors and straps.** MC needs the same counting — a
       connector at each end, straps at 6 ft and within 12 in of a box — and
       `countFittings` can serve it; the catalog has no MC connector rows by
       size yet, and cable types have no fitting slot.
-- [ ] **FMC/LFMC straps.** Flex carries a strap spacing (4.5 ft / 1 ft) but
+      **BUILT 2026-09-29 (retail plan § R1):** `countCableFittings` over
+      `cableLegs`, parts by `mcFittingNames`, 4 MC connectors + 2 MC straps.
+      The type's existing connector/strap columns hold an override. NM still
+      counts none (plastic box: none needed; box kind not known).
+- [x] **FMC/LFMC straps.** Flex carries a strap spacing (4.5 ft / 1 ft) but
       `strapFamily` returns null for flex, so flex straps say "No catalog
       strap" until sized flex straps ship.
+      **BUILT 2026-09-29 (retail plan § R7):** `<size> flexible conduit
+  one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
+      `server/raceStrapCatalog.test.ts` checks every raceway's strap ships.
+- [ ] **MC above a lay-in ceiling defaults to the ceiling-wire clip** (owner,
+      2026-09-29). An MC run counted today buys `MC one-hole strap` every
+      6 ft (§ R1), but above a T-bar ceiling MC is hung on the support wire
+      with `Independent support wire clip`, not strapped. Wanted: when the run
+      is above a lay-in ceiling, the strap line defaults to the wire clip, and
+      a QUICK way to set that (one control on the run or run type, not a trip
+      to the run-type editor per run). The type's strap override column can
+      already hold the clip; what is missing is knowing "above lay-in" and the
+      fast toggle. Decide where "above lay-in" lives (run, run type, or sheet
+      area) before building — check `references/takeoff-spec.md` D3 first,
+      which rejected a form on every run.
+- [ ] **Purchase list rounds to whole PACKS, not only whole pieces** (owner,
+      2026-09-29, starter assemblies plan D5). Built: `orderQty` in
+      `shared/materialsList.ts` rounds a piece or box UP to whole after the
+      sum, so a quarter tube never reaches a supplier. Not built: rounding to
+      the pack a part is sold in (a box of 100 wire nuts), because the catalog
+      has no pack size yet — `references/material-markup.md` D3. When pack
+      sizes land, round there too, in the same function.
+- [ ] **Starter assemblies: build the 168 once Track A lands H1 and H2**
+      (`references/starter-assemblies-plan.md`,
+      `references/track-a-handoff-starter-assemblies.md`). Order matters for
+      H2: the null-hours code ships BEFORE the migration that clears the 8
+      starters' placeholder hours, or every one prices at zero hours.
 - [ ] **Double counting from a user's own box assembly.** No starter assembly
       carries a connector or strap, so nothing overlaps today. A company
       whose own box or device assembly includes an EMT connector will count

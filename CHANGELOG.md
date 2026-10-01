@@ -26,9 +26,79 @@ This is the human-readable companion to the git history — read this to see wha
   mid-trace used to carry the points along, and the autosave could then file
   them under the new sheet. Now the run is kept as a draft on its own sheet
   and the trace tool is put down.
+- **Reader-accuracy test: "same as" names.** The AI names what it finds by
+  the captured legend symbol, and many hand counts are named differently
+  ("GFCI receptacle" vs "DUPLEX RECEPTACLE, GFCI"), so right answers were
+  being scored as the wrong symbol. The test's answer-key file can now say
+  which names are the same item. Nothing is renamed.
+
+- **Move marks to another count without clicking them again.** Select marks
+  on a sheet (click, or Shift-drag a box) and pick a count from "Move to…" in
+  the bar that appears. The marks stay exactly where they are and only what
+  they count changes, in one step that Undo takes back. Not allowed on a bid
+  whose quantities are locked. Made for separating devices drawn as
+  existing to remain from new ones.
+- **Reader-accuracy test: existing devices can be counted apart.** The test
+  account now has an "… - EXISTING TO REMAIN" assembly beside each symbol
+  being counted. The accuracy score treats those marks as the same symbol,
+  because the AI reader is not asked to tell new from existing. A real
+  per-mark status (new / existing / remove / relocate) is queued for a
+  database change.
+- **Reader-accuracy test: a smaller answer key, and a review of what the AI
+  found.** Each sheet is now scored only on the 8–10 symbol types counted on
+  it; other types are ignored. Data and telecom get their own score. Every
+  AI find that is not in the hand count is listed on a local review page with
+  a picture and a link that opens that exact spot in BidRidge, and can be
+  marked "my miss" or "AI wrong". Scoring again after fixing the count reuses
+  the saved AI answers, so it costs nothing.
+- **Find all matching (no AI).** While counting something, press "Find
+  all matching" and drag a box round one of that symbol on the sheet. Every
+  copy on the sheet is ringed — turned or mirrored copies too — in about a
+  tenth of a second. Nothing is counted until you confirm it: "Confirm all
+  clear" counts the plain ones, and copies that might be something else
+  (a "GF" beside a duplex, extra lines through it, joined to a bigger
+  symbol) or might be existing ("(E)" beside it, drawn lighter) are flagged
+  for you to decide one at a time, with "Count as existing" when there is an
+  existing-to-remain count. Works on drawings made by CAD; on a scanned
+  sheet it says it cannot see the symbols rather than guessing.
+- **A link can open a plan at one spot.** The Plans address that names a
+  plan set and sheet (`?set=…&sheet=…`) can also carry a point (`&x=…&y=…`):
+  it opens that sheet zoomed to that point with the usual ring. Used by the
+  review page.
 
 ## [2026-09-30]
 
+- **A captured symbol links itself to the assembly with the same name.**
+  Capture a symbol named exactly like one of your assemblies (capitals and
+  spacing aside) and it is linked to that assembly straight away, so one
+  click on it in the Legend starts counting. Nothing is guessed: a name that
+  is only similar stays unlinked, an assembly you pick yourself always wins,
+  and a symbol you captured before is never relinked.
+- **Right-click works in the symbol name boxes again.** The plan viewer
+  blocks the right-click menu over the drawing (a right-drag moves the
+  sheet), and that also blocked it in the "Name this symbol" box and the
+  whole-legend name boxes, which sit on top of the drawing. So the browser's
+  spelling suggestions could not be reached. Text boxes now get the normal
+  menu; right-click on the drawing works as before.
+- **Capture a whole legend in one go.** In the Legend panel, "Whole legend"
+  lets you draw one box around a plan's symbol legend. The app reads each
+  symbol's name from the drawing's own text (no AI), cuts a sharp picture of
+  the symbol beside it, and lists them all. Names that match your assemblies
+  are ticked; untick what you do not need, fix a name, and save them all at
+  once. Symbols you have already captured are never saved over. A scanned
+  legend, whose names are only a picture, is not guessed at: it says it
+  cannot be read and to capture those symbols one at a time.
+- **Capture on the legend works again.** After boxing a symbol, the "Name
+  this symbol" box was opening but drawn on the zoomed drawing, so it was a
+  speck at low zoom and off the top of the screen when zoomed in on a legend.
+  Capture looked like it did nothing. The box now always appears at a normal
+  size at the top of the viewer.
+- **Captured legend symbols are now saved sharp.** The picture used to be
+  cut from a low-resolution copy of the sheet and shrunk, so a symbol that
+  was crisp on screen was saved blurry (a 0.4-inch symbol came out about 43
+  pixels wide). It is now drawn fresh from the PDF at 400 pixels per inch, or
+  sharper if you were zoomed in further. Very large pictures are kept small
+  enough for the database, which previously could have refused them.
 - **BidRidge now tells you when there is a newer version.** Someone who had
   the app open before an update kept running the old version until they
   refreshed, so a fix did not reach them. Now a bar says "A new version of
@@ -107,6 +177,97 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-29]
 
+- **The AI reading test now measures WHERE the AI puts its marks, not just
+  whether it found them.** It reports how many inches off each mark lands,
+  whether the error is a stretch or a shift, and whether it is worse toward
+  the bottom of the sheet. It can also ask the AI for positions in pixels
+  instead of fractions of the picture, to see which is more accurate. This
+  follows the marks found landing up to 2.4 inches off.
+
+- **The pricing spreadsheet puts every Home Depot row first.** All 1,867
+  store rows sit in one unbroken block ahead of the 330 supply-house rows,
+  so the store pricing can be done in one sitting. It already held every
+  catalog row (1,554), plus 124 new rows and 519 brand variants.
+
+- **A backup check that fails no longer leaves a half-restored copy
+  behind.** When a backup would not restore, the test copy it was loading
+  into stayed on the database server until the next check cleared it. It is
+  now removed straight away. One slow test was also rewritten to ask the
+  database once rather than two hundred times, instead of just being given
+  longer to finish.
+
+- **Eleven parts the new starter assemblies needed are in the catalog.** A
+  commercial smoke detector head, well-pump drop cable, mini-split cable, a
+  meter hub, mast flashing and riser strap, an SE cable connector, a roof
+  flashing boot for conduit, a Cat6 RJ45 end, and a temporary pole and light
+  string. All unpriced, like every shipped part.
+
+- **The supplier materials list no longer asks for a fraction of an item.**
+  A recipe may use a quarter tube of firestop per hole; the list now adds
+  those up and rounds pieces and boxes UP to whole, so one to four holes
+  order one tube. Footage is unchanged.
+
+- **Flex runs now buy their straps, and #12 and #14 stranded THHN are in
+  the catalog.** A traced flexible metal or liquidtight run used to say "No
+  catalog strap"; it now counts one-hole straps sized to the flex (four new
+  parts). Stranded #12 and #14, common in commercial pipe, sit beside the
+  solid rows.
+
+- **Three-phase panels now come in sizes.** Six 208Y/120V panelboards,
+  100A to 400A, main-lug and main-breaker. Before, one unsized
+  "208V 3-phase panelboard" row stood for every size, so a 100A and a 400A
+  panel got the same price. That row stays for old bids and now says to
+  prefer a sized one.
+
+- **Occupancy sensor power packs and 18/3 control wire are in the
+  catalog.** A low-voltage ceiling sensor needs a power pack per zone and
+  18/3 cable to it; the catalog had the sensor only, so the pack was easy to
+  leave off. The ceiling sensors now say which kind needs the extra parts.
+
+- **12-4 and 14-4 MC cable, and 12-2 isolated-ground MC, are in the
+  catalog.** Three-phase branch circuits are commonly run in 12-4 MC, and
+  without it an estimator picked 12-3 and priced one wire in four too few.
+  The isolated-ground cable is what feeds cash-register receptacles.
+
+- **An MC cable run now buys its connectors and straps.** Each traced MC
+  run adds a connector at each end and a strap near each box and every 6 ft,
+  sized to the cable (3/8" connector and small strap for 12-2, and so on).
+  Before, every MC run was short these parts with nothing saying so. Six new
+  catalog parts: four MC connectors and two MC straps (unpriced, like every
+  shipped item).
+- **A branch on an MC or NM cable run now buys its box.** A tee on a cable
+  run counted the cable but no box at the split; it now adds a 4" square
+  box and blank cover, the same pair a small-pipe tee buys.
+- **A tee shared by two pipe sizes no longer stores two boxes.** Sending
+  each size to the bid separately saved a box for both; the bid screen
+  showed one, but the saved lines said two. Now only the larger pipe's
+  line carries it.
+
+- **The database check no longer gives wrong advice before a deploy.** It
+  used to say a database that could not be reached had "never been
+  migrated", and to call a missing link's migration "already applied" when
+  it simply had not run yet — with hand-written fixes that would have
+  broken the real migration. It now says it could not connect, and names
+  which pending migration will add each missing link.
+
+- **A run type bought as sweeps now says "sweep" under its sweep row.** The
+  count sentence said "At least 2 90° elbows" beside a row that was a 36"
+  sweep. It now names what the type actually buys — sweep or elbow — and
+  says "bend" where no part has been matched yet.
+
+- **Searching a count now finds that count.** "2 gang box" leads with the
+  double-gang box again (a weatherproof-box change earlier today had pushed
+  it out of the top five), "1 gang box" with the single-gang box, "2 pole"
+  and "2 pole 20" with 2-pole breakers instead of a 20 ft light pole, "20
+  space" with 20-space panels, and "3 hole" with the weatherproof boxes
+  rather than 3/4" straps. A number typed before "gang", "pole", "hole" and
+  the like no longer matches a size that merely starts with it.
+
+- **Weatherproof boxes now say their hub size, 1/2" or 3/4"**, and the
+  3/4" single-gang, double-gang, round and PVC boxes are new. The old
+  unsized rows became the 1/2" ones, so anything already using them keeps
+  working. Threaded closure plugs (1/2" and 3/4") are in the catalog too,
+  for the unused hubs (unpriced, like every shipped item).
 - **A proposal can no longer show a client $0.00 or a short total.** If any
   line on the bid is not priced, the proposal shows "Price pending" where the
   total (and any subtotal, tax or per-unit price) would be, and Print / Save

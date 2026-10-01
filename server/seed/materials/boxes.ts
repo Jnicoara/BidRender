@@ -384,33 +384,75 @@ const ceilingBoxes: BaselineMaterial[] = [
 ];
 
 const WP = "wp outdoor exterior rain tight";
+/*
+  Weatherproof boxes are sized by their HUBS, like the FS/FD cast boxes below
+  (plan § 9b, owner 2026-09-29): 1/2" and 3/4". The unsized rows became the
+  1/2" ones through RENAMED_BASELINE_MATERIALS, keeping their ids — 1/2" is
+  what most of them were bought as. No 1": the 1" FS cast box covers it. No
+  3/4" triple-gang: rare. Not split by hole count; "3 hole" and "5 hole" are
+  search terms, and the unused hubs take a closure plug (Conduit Fittings).
+  The size leads the name because the size sort only reads a leading size.
+*/
+const WP_HUB_SIZES = [
+  { size: '1/2"', slang: "1/2 half 0.5" },
+  { size: '3/4"', slang: "3/4 three quarter 0.75" },
+];
+// Hyphenated, one word each: aliases() drops a repeated word, so
+// "3 hole 5 hole" was stored as "3 hole 5" and "5 hole" found nothing.
+const WP_HOLES = "3-hole 5-hole hole hub bell box";
 const enclosures: BaselineMaterial[] = [
+  ...WP_HUB_SIZES.flatMap(({ size, slang }) => [
+    {
+      ...each,
+      name: `${size} weatherproof box, single-gang`,
+      searchAliases: aliases(
+        WP,
+        slang,
+        WP_HOLES,
+        "cast 1g one gang",
+        WP_BRANDS
+      ),
+    },
+    {
+      ...each,
+      name: `${size} weatherproof box, double-gang`,
+      searchAliases: aliases(
+        WP,
+        slang,
+        WP_HOLES,
+        "cast 2g two gang",
+        WP_BRANDS
+      ),
+    },
+  ]),
   {
     ...each,
-    name: "Weatherproof box, single-gang",
-    searchAliases: aliases(WP, "cast 1g one gang", WP_BRANDS),
-  },
-  {
-    ...each,
-    name: "Weatherproof box, double-gang",
-    searchAliases: aliases(WP, "cast 2g two gang", WP_BRANDS),
-  },
-  {
-    ...each,
-    name: "Weatherproof box, triple-gang",
-    searchAliases: aliases(WP, "cast 3g three gang", WP_BRANDS),
-  },
-  // Boxes audit, 2026-09-27. The device covers (flip, in-use) are on Wall
-  // Plates & Misc; these close a box that has no device in it.
-  {
-    ...each,
-    name: "Weatherproof round box",
+    name: '1/2" weatherproof box, triple-gang',
     searchAliases: aliases(
       WP,
-      "cast 4in 4 inch light fixture camera flood",
+      "1/2 half 0.5",
+      WP_HOLES,
+      "cast 3g three gang",
       WP_BRANDS
     ),
   },
+  // Boxes audit, 2026-09-27. The device covers (flip, in-use) are on Wall
+  // Plates & Misc; these close a box that has no device in it.
+  // No "4 inch" alias any more: now that the name carries a hub size, a "4"
+  // search finding a 1/2" row breaks "a size matches itself, whole", and it
+  // pushed the 4" square box off the top of "4 inch box"
+  // (materialSearchSizes.test.ts, 2026-09-29). "round" still finds it.
+  ...WP_HUB_SIZES.map(({ size, slang }) => ({
+    ...each,
+    name: `${size} weatherproof round box`,
+    searchAliases: aliases(
+      WP,
+      slang,
+      WP_HOLES,
+      "cast light fixture camera flood",
+      WP_BRANDS
+    ),
+  })),
   {
     ...each,
     name: "Weatherproof blank cover, single-gang",
@@ -432,15 +474,16 @@ const enclosures: BaselineMaterial[] = [
   },
   // PVC LAST in the name, and that was measured: led by "PVC", this row took
   // the top of a bare "pvc" search from the conduit (materialSearchRank.test.ts).
-  {
+  ...WP_HUB_SIZES.map(({ size, slang }) => ({
     ...each,
-    name: "Weatherproof box, single-gang, PVC",
+    name: `${size} weatherproof box, single-gang, PVC`,
     searchAliases: aliases(
       WP,
+      slang,
       "fs plastic nonmetallic hub glue solvent 1g one gang",
       PLASTIC_BRANDS
     ),
-  },
+  })),
   // Plan § 6, Tier 2.5 (2026-09-27): every exterior light or receptacle on
   // vinyl siding sits on one, and nothing else in the catalog is one.
   {

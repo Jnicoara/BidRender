@@ -42,9 +42,11 @@ import {
   type MaterialsListDoc,
 } from "../shared/materialsList";
 import type { TrpcContext } from "./_core/context";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 9301;
 const OTHER_USER = 9302;
+dropFixtureUsersAfterAll([USER, OTHER_USER]);
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 const describeDb = hasDb ? describe : describe.skip;
@@ -267,6 +269,61 @@ describe("rolling assemblies into one list", () => {
       },
     ]);
     expect(entries[0].qty).toBe(37);
+  });
+
+  /*
+    Owner, 2026-09-29 (starter assemblies plan Q5): a fractional part is
+    allowed in an assembly, and the purchase list rounds a piece UP to whole,
+    after summing. Red if the list goes back to two decimals for pieces.
+  */
+  it("orders whole pieces, rounded up after the sum, never 0.25 of one", () => {
+    const firestop = {
+      name: "Firestop caulk",
+      unit: "each" as const,
+      category: null,
+      qty: 0.25,
+    };
+    const one = aggregateMaterials([
+      { name: "Firestop penetration", count: 1, materials: [firestop] },
+    ]);
+    expect(one[0].qty).toBe(1);
+    const four = aggregateMaterials([
+      { name: "Firestop penetration", count: 4, materials: [firestop] },
+    ]);
+    expect(four[0].qty).toBe(1);
+    const five = aggregateMaterials([
+      { name: "Firestop penetration", count: 5, materials: [firestop] },
+    ]);
+    expect(five[0].qty).toBe(2);
+  });
+
+  it("does not order an extra piece from float noise", () => {
+    const tenth = {
+      name: "Part",
+      unit: "each" as const,
+      category: null,
+      qty: 0.1,
+    };
+    // 0.1 summed thirty times is 3.0000000000000013 in floating point.
+    const sources = Array.from({ length: 30 }, (_, i) => ({
+      name: `A${i}`,
+      count: 1,
+      materials: [tenth],
+    }));
+    expect(aggregateMaterials(sources)[0].qty).toBe(3);
+  });
+
+  it("keeps footage at two decimals rather than rounding it up", () => {
+    const entries = aggregateMaterials([
+      {
+        name: "Run",
+        count: 1,
+        materials: [
+          { name: "#12 THHN", unit: "foot", category: null, qty: 10.25 },
+        ],
+      },
+    ]);
+    expect(entries[0].qty).toBe(10.25);
   });
 });
 

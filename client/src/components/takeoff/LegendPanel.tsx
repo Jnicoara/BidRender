@@ -33,6 +33,7 @@ import {
   Pencil,
   Plus,
   RotateCcw,
+  Rows3,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,9 @@ export function LegendPanel({
   capturing,
   onStartCapture,
   onCancelCapture,
+  capturingLegend,
+  onStartLegend,
+  onCancelLegend,
   onLink,
   onUnlink,
   renameRefusal,
@@ -81,6 +85,10 @@ export function LegendPanel({
   capturing: boolean;
   onStartCapture: () => void;
   onCancelCapture: () => void;
+  /** True while the user is dragging one box around the whole legend. */
+  capturingLegend: boolean;
+  onStartLegend: () => void;
+  onCancelLegend: () => void;
   onLink: (symbolId: number, assemblyId: number) => void;
   onUnlink: (symbolId: number) => void;
   /**
@@ -109,26 +117,54 @@ export function LegendPanel({
         <span className="ml-auto normal-case tracking-normal text-xs">
           {symbols.length}
         </span>
-        <Button
-          size="sm"
-          variant="ghost"
-          className={cn("h-5 px-1.5 text-xs", capturing && "text-[#F5C518]")}
-          onClick={capturing ? onCancelCapture : onStartCapture}
-        >
-          {capturing ? (
-            "Cancel"
-          ) : (
-            <>
-              <Plus className="w-3 h-3 mr-1" /> Capture
-            </>
-          )}
-        </Button>
+        {!capturingLegend && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className={cn("h-5 px-1.5 text-xs", capturing && "text-[#F5C518]")}
+            onClick={capturing ? onCancelCapture : onStartCapture}
+          >
+            {capturing ? (
+              "Cancel"
+            ) : (
+              <>
+                <Plus className="w-3 h-3 mr-1" /> Capture
+              </>
+            )}
+          </Button>
+        )}
+        {!capturing && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className={cn(
+              "h-5 px-1.5 text-xs normal-case tracking-normal",
+              capturingLegend && "text-[#F5C518]"
+            )}
+            onClick={capturingLegend ? onCancelLegend : onStartLegend}
+            title="Draw one box around the whole legend: every symbol and its name are read from the drawing"
+          >
+            {capturingLegend ? (
+              "Cancel"
+            ) : (
+              <>
+                <Rows3 className="w-3 h-3 mr-1" /> Whole legend
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       {capturing && (
         <p className="px-3 pb-2 text-xs text-[#F5C518]">
           Drag a box around a symbol on the drawing's legend — the crop becomes
           its picture here.
+        </p>
+      )}
+      {capturingLegend && (
+        <p className="px-3 pb-2 text-[0.7rem] text-[#F5C518]">
+          Drag one box around the whole legend — symbols and their names. Each
+          symbol is read with the name beside it.
         </p>
       )}
 

@@ -221,8 +221,10 @@ import {
 import { groupRunFootage, type RunTypeFootageRow } from "./runTypeFootageCore";
 import { resolveRunType } from "../shared/runTypeLookup";
 import {
+  countCableFittings,
   countFittings,
   FITTING_KINDS,
+  MC_STRAP_SPACING,
   isFittingRole,
   isStickJoint,
   laborInRunRate,
@@ -241,6 +243,11 @@ import {
   fittingRows,
   bendMergeFeetForOverrides,
   bendMethodFor,
+  bendWordsFor,
+  cableRunRows,
+  cableTeeRows,
+  mcFittingNames,
+  SMALL_TEE_BOX,
   lbHubsTakeConnectors,
   pickFittingMaterial,
   parseRacewayName,
@@ -255,6 +262,7 @@ import {
   rehomeAnswersAtCut,
   rootOf,
   teeBoxOwners,
+  cableTeeOwners,
   type TeeRef,
 } from "../shared/runNetwork";
 import { pathRealInches } from "../shared/takeoffGeometry";
@@ -8809,6 +8817,70 @@ export async function deleteStamps(
 }
 
 /**
+ * The count each of these marks belongs to now, for marks on ONE bid.
+ *
+ * Read before a move so the move can be undone to exactly where each mark
+ * was — a selection can span several counts. Marks of another company or
+ * another bid are simply not returned, so the caller compares lengths.
+ */
+export async function getStampGroupsOnBid(
+  ids: readonly number[],
+  userId: number,
+  bidId: number
+): Promise<{ id: number; groupId: number | null }[]> {
+  if (ids.length === 0) return [];
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db
+    .select({ id: takeoffStamps.id, groupId: takeoffStamps.groupId })
+    .from(takeoffStamps)
+    .where(
+      and(
+        inArray(takeoffStamps.id, [...ids]),
+        eq(takeoffStamps.userId, userId),
+        eq(takeoffStamps.bidId, bidId),
+        // A mark whose plan set is gone is not on the bid, so it is not
+        // returned — and the move refuses whole (quantitiesIgnoreDeletedPlans).
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+      )
+    );
+}
+
+/**
+ * Put marks under another count, in ONE statement, keeping their ids and
+ * places. The provenance columns are rewritten from the new count by the
+ * caller, the same way `drop` writes them, so a moved mark is
+ * indistinguishable from one placed under that count.
+ */
+export async function moveStampsToGroup(
+  ids: readonly number[],
+  userId: number,
+  bidId: number,
+  to: {
+    groupId: number;
+    assemblyId: number | null;
+    assemblyName: string | null;
+    assemblyCategory: string | null;
+  }
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db
+    .update(takeoffStamps)
+    .set({ ...to, updatedAt: new Date() })
+    .where(
+      and(
+        inArray(takeoffStamps.id, [...ids]),
+        eq(takeoffStamps.userId, userId),
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+      )
+    );
+  return result.affectedRows;
+}
+
+/**
  * How many of these marks sit on a bid whose quantities are locked.
  *
  * Asked BEFORE a delete so a selection goes whole or not at all: a selection
@@ -12036,7 +12108,9 @@ export async function fittingRowsByRunType(
       row,
       type: resolveRunType(palette, storedId),
     }))
-    .filter(e => e.type !== undefined && e.type.pathType === "conduit");
+    // Cable types too, since 2026-09-29: a tee on a cable run buys its box
+    // (cableTeeRows). Everything else below is for conduit and skips them.
+    .filter(e => e.type !== undefined);
   if (entries.length === 0) return out;
 
   const linked = await getMaterialsByIds(
@@ -12050,6 +12124,7 @@ export async function fittingRowsByRunType(
         type!.elbow45MaterialId,
         type!.lbMaterialId,
         type!.pullBoxMaterialId,
+        type!.conductorMaterialId,
       ].filter((id): id is number => id !== null)
     ),
     userId
@@ -12062,10 +12137,32 @@ export async function fittingRowsByRunType(
   const racewayBaselineName = await shippedNamesOf(
     entries.map(({ type }) => resolved(type!.racewayMaterialId))
   );
+  // The same for a cable type's cable: its MC connector and strap are read
+  // from the shipped name (`mcFittingNames`), so a renamed fork still finds
+  // them. A company's own cable with no baseline falls back to its own name.
+  const cableBaselineName = await shippedNamesOf(
+    entries
+      .filter(({ type }) => type!.pathType === "cable")
+      .map(({ type }) => resolved(type!.conductorMaterialId))
+  );
+  const mcPartsOf = (t: NonNullable<(typeof entries)[number]["type"]>) => {
+    const cable = resolved(t.conductorMaterialId);
+    return cable
+      ? mcFittingNames(cableBaselineName(cable) ?? cable.name)
+      : null;
+  };
 
   const wantedNames = Array.from(
     new Set(
       entries.flatMap(({ type }) => {
+        if (type!.pathType === "cable") {
+          const mc = mcPartsOf(type!);
+          return [
+            SMALL_TEE_BOX.box,
+            SMALL_TEE_BOX.cover,
+            ...(mc ? [mc.connector, mc.strap] : []),
+          ];
+        }
         const name = racewayBaselineName(resolved(type!.racewayMaterialId));
         if (name === null) return [];
         return FITTING_KINDS.map(kind =>
@@ -12116,10 +12213,52 @@ export async function fittingRowsByRunType(
     new Map(entries.map(({ storedId, row }) => [storedId, row.legs])),
     typeId => sizeByType.get(typeId) ?? null
   );
+  // A tee only cable meets has no pipe legs to be owned through: a cable type
+  // buys it (cableTeeOwners). A tee any pipe meets stays the pipe's.
+  const cableOwners = cableTeeOwners(
+    teeOwners,
+    new Map(
+      entries
+        .filter(({ type }) => type!.pathType === "cable")
+        .map(({ storedId, row }) => [storedId, row.tees])
+    )
+  );
 
   for (const { storedId, row, type } of entries) {
     const t = type!;
     const raceway = resolved(t.racewayMaterialId);
+    if (t.pathType === "cable") {
+      // The box at each tee it owns, and — on MC — a connector at each end
+      // and its straps (§ R1). No pipe to fit. NM gets no connector here: into
+      // a plastic box it takes none, and which box it is is not known.
+      const ownedByCable = row.tees.filter(
+        tee => cableOwners.get(tee.id) === storedId
+      );
+      const mc = mcPartsOf(t);
+      const cable = resolved(t.conductorMaterialId);
+      const runRows =
+        mc && cable
+          ? cableRunRows(
+              countCableFittings(row.cableLegs, {
+                name: cable.name,
+                ...MC_STRAP_SPACING,
+              }),
+              {
+                connector: {
+                  override: resolved(t.connectorMaterialId) ?? null,
+                  wanted: mc.connector,
+                },
+                strap: {
+                  override: resolved(t.strapMaterialId) ?? null,
+                  wanted: mc.strap,
+                },
+              },
+              found
+            )
+          : [];
+      out.set(storedId, [...runRows, ...cableTeeRows(ownedByCable, found)]);
+      continue;
+    }
     const ownedTees = row.tees.filter(
       tee => teeOwners.get(tee.id) === storedId
     );
@@ -12166,6 +12305,11 @@ export async function fittingRowsByRunType(
             // Wider when this type's 90 or 45 is a sweep, so a traced sweep
             // is one bend. The run panel reads the same (`runBendDetail.ts`).
             mergeWithinFeet: bendMergeFeetForOverrides(
+              resolved(t.elbow90MaterialId)?.name ?? null,
+              resolved(t.elbow45MaterialId)?.name ?? null
+            ),
+            // And a sweep type's sentence says "sweeps", from the same names.
+            words: bendWordsFor(
               resolved(t.elbow90MaterialId)?.name ?? null,
               resolved(t.elbow45MaterialId)?.name ?? null
             ),

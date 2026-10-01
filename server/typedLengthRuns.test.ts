@@ -30,8 +30,10 @@ import {
   NO_VERTICALS,
 } from "../shared/takeoffQuantities";
 import { buildTakeoffExport, takeoffExportCsv } from "../shared/takeoffExport";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 9361;
+dropFixtureUsersAfterAll([USER]);
 const hasDb = Boolean(process.env.DATABASE_URL);
 const withDb = hasDb ? describe : describe.skip;
 

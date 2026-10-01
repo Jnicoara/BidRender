@@ -1,5 +1,5 @@
 Category: Strut & Supports
-Items: 47
+Items: 50
 
 Category | Name | Size
 Strut & Supports | 3/8" all-thread rod, 10 ft | 3/8"
@@ -22,6 +22,8 @@ Strut & Supports | 3/8" lock washer | 3/8"
 Strut & Supports | 1/2" lock washer | 1/2"
 Strut & Supports | 1/4" lock washer | 1/4"
 Strut & Supports | 5/8" lock washer | 5/8"
+Strut & Supports | MC one-hole strap, large | -
+Strut & Supports | MC one-hole strap, small | -
 Strut & Supports | 3/8" rod coupler | 3/8"
 Strut & Supports | 1/2" rod coupler | 1/2"
 Strut & Supports | 1/4" rod coupler | 1/4"
@@ -42,6 +44,7 @@ Strut & Supports | Strut flat plate | -
 Strut & Supports | Strut post base | -
 Strut & Supports | Strut wing connector | -
 Strut & Supports | T-bar grid clip | -
+Strut & Supports | Temporary pole, 6x6 post | 6x6
 Strut & Supports | Threaded rod stiffener | -
 Strut & Supports | Trapeze hanger kit | -
 Strut & Supports | 1-1/4" x 1-1/4" strut channel, 10 ft | 1-1/4"

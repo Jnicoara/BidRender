@@ -7,6 +7,11 @@
  * data, and did, on 2026-09-14. The rule is `checkTestDatabase` in
  * `scripts/databaseGuard.ts`, where it is tested; this file only applies it.
  *
+ * It then takes the database for the whole run, and refuses if another run
+ * already has it — two suites on one database delete each other's fixtures.
+ * See `scripts/testSuiteLock.ts`; `server/testSuiteLock.test.ts` checks, from
+ * inside the run, that the lock is really held.
+ *
  * `dotenv/config` is loaded here as well as in `setupFiles`, because global
  * setup runs in the main process and would otherwise judge an empty url while
  * the workers connect to the one from `.env`. vitest.setup.ts checks again in
@@ -14,8 +19,16 @@
  */
 import "dotenv/config";
 import { checkTestDatabase } from "./scripts/databaseGuard";
+import { holdTestSuiteLock } from "./scripts/testSuiteLock";
 
-export default function assertScratchDatabase(): void {
-  const result = checkTestDatabase(process.env.DATABASE_URL);
+export default async function assertScratchDatabase(): Promise<
+  (() => Promise<void>) | undefined
+> {
+  const url = process.env.DATABASE_URL;
+  const result = checkTestDatabase(url);
   if (!result.ok) throw new Error(result.message);
+  // No database, no DB-backed suites, nothing to share.
+  if (!url || !result.database) return undefined;
+  // Returned, so vitest calls it as the run's teardown.
+  return holdTestSuiteLock(url);
 }

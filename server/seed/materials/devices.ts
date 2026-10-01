@@ -256,6 +256,14 @@ export const RECEPTACLES: BaselineMaterial[] = [
 
 const SWITCH_SLANG = "light toggle device rocker decora 15 amp";
 
+/**
+ * Both ceiling sensors come in two kinds, and only one needs more parts
+ * (retail catalog plan § R4). Said on the row, because the aliases name both
+ * kinds and a sensor bought without its pack is a quiet shortfall.
+ */
+const CEILING_SENSOR_NOTE =
+  "Low-voltage kind: add a power pack per zone and 18/3 control wire. A line-voltage one needs neither.";
+
 export const SWITCHES: BaselineMaterial[] = [
   {
     ...device("Switches"),
@@ -434,6 +442,7 @@ export const SWITCHES: BaselineMaterial[] = [
     searchAliases: aliases(
       "motion passive infrared detector line voltage low voltage"
     ),
+    description: CEILING_SENSOR_NOTE,
   },
   {
     ...device("Switches"),
@@ -441,6 +450,23 @@ export const SWITCHES: BaselineMaterial[] = [
     searchAliases: aliases(
       "motion pir ultrasonic dual technology detector line voltage low voltage"
     ),
+    description: CEILING_SENSOR_NOTE,
+  },
+  /*
+    What a LOW-VOLTAGE ceiling sensor switches through (retail catalog plan
+    § R4, 2026-09-29): a relay and a transformer, one per zone. Without it the
+    sensor was bought and the pack was not.
+  */
+  {
+    ...device("Switches"),
+    // "Occupancy" is an alias, not the name: named "Occupancy sensor power
+    // pack" it ranked above two sensors for "occupancy sensor".
+    name: "Sensor power pack, 120/277V",
+    searchAliases: aliases(
+      "occupancy pp20 switchpack switch pack relay transformer low voltage ceiling motion"
+    ),
+    description:
+      "One per lighting zone, for low-voltage ceiling sensors. Wired to the sensor in 18/3.",
   },
 ];
 
