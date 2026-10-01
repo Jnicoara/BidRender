@@ -16,7 +16,16 @@
  * ── What it touches ──────────────────────────────────────────────────────────
  * ONE account (reader-test@local.test), ONE database (bidrender_local_c on
  * this machine). Refuses anything else, including with ALLOW_REMOTE_DATABASE.
- * For each of that account's symbols with no assembly:
+ * It creates assemblies and sets symbol links. It never reads or writes a
+ * count or a mark, so counting already done is untouched.
+ *
+ * First, the LEGENDS (added 2026-09-30, after the counter hit symbols on the
+ * test sheets that had no assembly because nobody had captured them yet):
+ * every entry in scripts/readerTestLegends.ts gets an empty assembly of that
+ * name unless the library already has one (case ignored). So Count can find
+ * any legend symbol before it is captured.
+ *
+ * Then, for each of that account's captured symbols with no assembly:
  *   - an assembly with the same name (case ignored, as the app's own duplicate
  *     check does) already in the library -> link to it;
  *   - otherwise create an empty one (no materials, 0 hours, category Devices)
@@ -35,6 +44,7 @@ import { assertWritableDatabase, LOCAL_HOSTS } from "./databaseGuard";
 import * as db from "../server/db";
 import { companies, takeoffGroups } from "../drizzle/schema";
 import { symbolLookupKey } from "../shared/takeoffCounts";
+import { READER_TEST_LEGENDS, type LegendEntry } from "./readerTestLegends";
 
 const ACCOUNT_EMAIL = "reader-test@local.test";
 const DATABASE_NAME = "bidrender_local_c";
@@ -105,9 +115,34 @@ const byName = new Map(
 );
 const byId = new Map(before.library.map(a => [a.id, a] as const));
 
+// ── Pass 1 plan: one assembly per legend entry the library does not have ───
+// Keyed like the app compares names, so "Junction Box" already in the library
+// covers the legend's "JUNCTION BOX", and an entry two legends share
+// (WIRELESS ACCESS POINT) is made once.
+const legendToCreate: LegendEntry[] = [];
+const legendReport: { set: string; name: string; status: string }[] = [];
+const plannedKeys = new Set<string>();
+for (const [set, entries] of Object.entries(READER_TEST_LEGENDS)) {
+  for (const entry of entries) {
+    const key = symbolLookupKey(entry.name);
+    const have = byName.get(key);
+    let status: string;
+    if (have) {
+      status = `has assembly "${have.name}"`;
+    } else if (plannedKeys.has(key)) {
+      status = "same name as an entry above — one assembly for both";
+    } else {
+      plannedKeys.add(key);
+      legendToCreate.push(entry);
+      status = `MISSING — create (${entry.category})`;
+    }
+    legendReport.push({ set, name: entry.name, status });
+  }
+}
+
 type Step =
   | { kind: "create"; symbolId: number; label: string }
-  | { kind: "link"; symbolId: number; label: string; assemblyId: number }
+  | { kind: "link"; symbolId: number; label: string; key: string }
   | { kind: "ok"; label: string }
   | { kind: "mismatch"; label: string; assemblyName: string };
 
@@ -126,14 +161,10 @@ const steps: Step[] = before.symbols.map(symbol => {
     }
     return { kind: "ok", label: symbol.label };
   }
-  const same = byName.get(symbolLookupKey(symbol.label));
-  return same
-    ? {
-        kind: "link",
-        symbolId: symbol.id,
-        label: symbol.label,
-        assemblyId: same.id,
-      }
+  // Linked to an assembly the library has now, or one pass 1 is about to make.
+  const key = symbolLookupKey(symbol.label);
+  return byName.has(key) || plannedKeys.has(key)
+    ? { kind: "link", symbolId: symbol.id, label: symbol.label, key }
     : { kind: "create", symbolId: symbol.id, label: symbol.label };
 });
 
@@ -150,12 +181,31 @@ const plainKeys = new Set(plainNames.map(g => symbolLookupKey(g.label)));
 console.log(
   `${ACCOUNT_EMAIL} (user ${userId}) in ${DATABASE_NAME} — ${apply ? "APPLYING" : "dry run, nothing written"}\n`
 );
+
+console.log("LEGEND SYMBOLS");
+for (const set of Object.keys(READER_TEST_LEGENDS)) {
+  const rows = legendReport.filter(r => r.set === set);
+  console.log(
+    `\n  ${set} — ${rows.length} symbol(s), ` +
+      `${rows.filter(r => r.status.startsWith("MISSING")).length} missing`
+  );
+  for (const row of rows) {
+    console.log(`    ${row.name.padEnd(72)} ${row.status}`);
+  }
+}
+console.log(
+  `\n${legendToCreate.length} legend assembl${legendToCreate.length === 1 ? "y" : "ies"} to create.\n`
+);
+
+console.log("CAPTURED SYMBOLS");
 for (const step of steps) {
   const line =
     step.kind === "create"
       ? `create assembly "${step.label}" and link it`
       : step.kind === "link"
-        ? `link to existing assembly "${byId.get(step.assemblyId)?.name}"`
+        ? byName.has(step.key)
+          ? `link to assembly "${byName.get(step.key)?.name}"`
+          : `link to assembly "${step.label}" (made from the legend above)`
         : step.kind === "ok"
           ? "already linked, same name"
           : `already linked to "${step.assemblyName}" — NAME DIFFERS, will not pair; left alone`;
@@ -175,27 +225,48 @@ console.log(
 );
 
 if (!apply) {
-  if (toDo.length) console.log("Run again with --apply to do it.");
+  if (toDo.length || legendToCreate.length)
+    console.log("Run again with --apply to do it.");
   process.exit(0);
 }
 
+// The same row assembliesRouter.create writes, minus materials and modifiers,
+// which an empty assembly has none of.
+const createEmpty = (name: string, category: LegendEntry["category"]) =>
+  db.createAssembly({
+    userId,
+    name,
+    category,
+    trade: "electrical",
+    projectType: null,
+    baseLaborHours: "0.0000",
+    overheadLaborHours: "0.0000",
+    laborRateId: null,
+  });
+
+// Pass 1: legend assemblies. Their ids join the name map so pass 2 can link
+// a captured symbol to one made a moment ago.
+const idByKey = new Map(
+  [...byName.entries()].map(([key, a]) => [key, a.id] as const)
+);
+for (const entry of legendToCreate) {
+  idByKey.set(
+    symbolLookupKey(entry.name),
+    await createEmpty(entry.name, entry.category)
+  );
+}
+
+// Pass 2: captured symbols.
 for (const step of toDo) {
-  let assemblyId: number;
-  if (step.kind === "create") {
-    // The same row assembliesRouter.create writes, minus materials and
-    // modifiers, which an empty assembly has none of.
-    assemblyId = await db.createAssembly({
-      userId,
-      name: step.label,
-      category: "Devices",
-      trade: "electrical",
-      projectType: null,
-      baseLaborHours: "0.0000",
-      overheadLaborHours: "0.0000",
-      laborRateId: null,
-    });
-  } else {
-    assemblyId = step.assemblyId;
+  const assemblyId =
+    step.kind === "create"
+      ? await createEmpty(step.label, "Devices")
+      : idByKey.get(step.key);
+  if (assemblyId === undefined) {
+    // Cannot happen unless pass 1 skipped an entry it planned; say so rather
+    // than link to nothing.
+    console.error(`  no assembly for "${step.label}" — not linked`);
+    continue;
   }
   await db.updateSymbolLink(step.symbolId, userId, { assemblyId });
 }
