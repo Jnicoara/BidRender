@@ -81,20 +81,48 @@ describe("a field bend — labor on a part that is $0 by nature", () => {
 });
 
 describe("labor on a traced line — 'Not priced', never 0 h", () => {
-  it("is unset on ANY traced line whose part had no labor unit", () => {
-    // A coupling, a pipe — not only a field bend (owner, 2026-09-26).
-    expect(
-      lineHoursUnset({ takeoffRunTypeId: 7, snapshotLaborHours: null })
-    ).toBe(true);
+  it("is unset on a traced line whose part had no labor unit", () => {
+    // Pipe, wire, an elbow — not only a field bend (owner, 2026-09-26). This
+    // used to say "a coupling, a pipe"; a coupling left the list 2026-09-29.
+    for (const role of ["raceway", "conductor", "elbow90", "lb", "pullBox"]) {
+      expect(
+        lineHoursUnset({
+          takeoffRunTypeId: 7,
+          runMaterialRole: role,
+          snapshotLaborHours: null,
+        })
+      ).toBe(true);
+    }
+  });
+  it("is never unset on a coupling, connector or strap — the run rate pays them", () => {
+    // Owner, 2026-09-29. A line of theirs sent before the rule holds NULL;
+    // calling it "Not priced" would ask for hours that must never be used.
+    for (const role of ["coupling", "connector", "strap"]) {
+      expect(
+        lineHoursUnset({
+          takeoffRunTypeId: 7,
+          runMaterialRole: role,
+          snapshotLaborHours: null,
+        })
+      ).toBe(false);
+    }
   });
   it("is an answer at a SET 0 — wire nuts made up with the device", () => {
     expect(
-      lineHoursUnset({ takeoffRunTypeId: 7, snapshotLaborHours: "0.0000" })
+      lineHoursUnset({
+        takeoffRunTypeId: 7,
+        runMaterialRole: "raceway",
+        snapshotLaborHours: "0.0000",
+      })
     ).toBe(false);
   });
   it("leaves hand-priced lines to their own rule and their own strip", () => {
     expect(
-      lineHoursUnset({ takeoffRunTypeId: null, snapshotLaborHours: null })
+      lineHoursUnset({
+        takeoffRunTypeId: null,
+        runMaterialRole: null,
+        snapshotLaborHours: null,
+      })
     ).toBe(false);
     expect(
       missingEntryCounts([

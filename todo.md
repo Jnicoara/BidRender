@@ -254,6 +254,19 @@ everyone to re-run instead of read.
       own user ids, and no other file uses 7404/7405. A race, not yet
       explained. Run it alongside the full suite several times before calling
       anything fixed.
+- [ ] **`server/materialsLibrary.test.ts` failed 4 tests in ONE full run,
+      2026-09-29, and has not failed since.** On `a-fitting-labor` against
+      `bidrender_test_clean`: "re-stamps a baseline row whose category was
+      lost", "backfills a fork that predates the column", "does not overwrite a
+      category the user chose for their own copy" and "re-stamps aliases that
+      were lost". The file passed alone (32/32) and the next two full runs were
+      clean (4,157 passing, only the known `schemaDrift` enum mismatch).
+      Nothing on that branch touches materials categories, aliases or the
+      seeder. The error text was not captured (the failing run printed only the
+      names). All four re-run `seedBaselineMaterials` and read a baseline row
+      back, the same shape as the `seedReactivatesRetired` race above:
+      suspect a second writer to shared `materials` rows mid-seed. Capture
+      the assertion text on the next failure before changing anything.
 - [ ] **`scripts/schemaDrift.mts` says "this database has never been migrated"
       when it simply cannot connect.** Measured 2026-09-27 against production
       with the laptop off the database's trusted list: that line printed, then

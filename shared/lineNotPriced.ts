@@ -33,6 +33,7 @@
  */
 import { needsPricing } from "./materialPricing";
 import { canPriceByHand, lineNeedsPrice } from "./handPricedLines";
+import { laborInRunRate } from "./runFittings";
 
 export type NotPricedLineLike = {
   qty: string | number;
@@ -85,12 +86,23 @@ export function lineNotPriced(
  * apart now; they read 0 h until they are sent again after the part is given
  * hours. A hand-priced line has its own rule and its own strip
  * (`shared/handPricedLines.ts`), because the next move there is to type.
+ *
+ * NEVER a coupling, connector or strap (owner, 2026-09-29): the run's per-foot
+ * rate pays their labor (`laborInRunRate`), so no hours are missing. Lines of
+ * theirs sent before that rule may still hold NULL; reading them as "Not
+ * priced" would send somebody to set hours that must never be used. The role
+ * is REQUIRED so a caller cannot leave it off and bring that back.
  */
 export function lineHoursUnset(line: {
   takeoffRunTypeId: number | null;
+  runMaterialRole: string | null;
   snapshotLaborHours: string | number | null;
 }): boolean {
-  return line.takeoffRunTypeId !== null && line.snapshotLaborHours === null;
+  return (
+    line.takeoffRunTypeId !== null &&
+    line.snapshotLaborHours === null &&
+    !laborInRunRate(line.runMaterialRole)
+  );
 }
 
 // ─── Parts not priced, inside a line that is ─────────────────────────────────
