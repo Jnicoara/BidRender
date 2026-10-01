@@ -161,6 +161,13 @@ duplex, correctly, which is still a disagreement someone has to resolve).
 
 Nothing else. Unconfirmed matches are never stored, so they need no table.
 
+> **Superseded in part, 2026-10-01 (later):** the capture box above belongs
+> to a LOOK, not to the item, once an item can have several looks — a box on
+> `symbol_links` can hold only one. `references/multiple-looks-plan.md` § 6
+> proposes one additive table, `symbol_looks`, carrying the box per look;
+> if the owner picks it, the `symbol_links` columns above are not needed.
+> (A's R.11 states the item-level columns; it is A's to update.)
+
 ---
 
 ## 7. Decisions for the owner — recommendation first
