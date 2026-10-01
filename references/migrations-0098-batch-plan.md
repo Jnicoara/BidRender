@@ -1,5 +1,259 @@
 # Migrations 0098–0105 — one additive batch for Tracks B and C. PLAN ONLY, 2026-09-29
 
+> **RENUMBERED 2026-10-01: this batch is now 0100–0107.** § R below is the
+> one list for every migration after 0095. It overrides § 0 and every
+> number in §§ 1–11. The sections below keep their old numbers as written,
+> and § R.2 maps each one. Nothing is written or run yet.
+
+## R. ONE LIST — every planned migration after 0095, reconciled 2026-10-01
+
+**Where things stand (measured, not assumed).** Live and staging both record
+**96** migrations, ending at 0095 (`deploying.md` § 11, release of
+2026-09-29). The only `.sql` files after 0095 on any branch are **0096 and
+0097, on `a-email-reset`**. Nothing else in this list has a file. They exist
+as plans only, on five branches, and before today **three of those plans
+claimed numbers that clash with each other**:
+
+- the invite gate plan said 0098, and the correction log plan said 0099
+  (`origin/a-plans`, each "if reset lands first");
+- this file used 0098–0105 for the B/C batch, and § 0 moved the invite gate
+  and the correction log to "0106 and later";
+- the legend plan says `0106_bid_pdf_legend_entries` in its file list and
+  "probably 0107" in its own text (`origin/a-plans-reader`, § 5).
+
+### R.1 Why the number has to be the DEPLOY order
+
+**The migrator skips a file whose number is lower than one already
+applied, and it says nothing.** Read from `drizzle-orm`'s
+`mysql-core/dialect.js`, `migrate()`: it reads the newest `created_at` in
+`__drizzle_migrations` and applies only files whose journal `when` is
+greater than that. So if 0102 is applied on staging and 0099 is written
+afterwards, 0099 never runs there. The first symptom is a screen failing
+with `Unknown column`, because nearly every read is a bare `select()`.
+
+So:
+
+1. **Numbers follow the order files reach a database**, not the order they
+   were planned.
+2. **A number below is a reservation until its `.sql` is written.** It can
+   still move.
+3. **Once a file is applied ANYWHERE, including staging and a test database
+   somebody keeps, nothing may be written below it.** Renumber the unwritten
+   ones upward instead.
+4. Before writing any file, list `drizzle/` on `local-dev`, `track-b`,
+   `track-c` and every open `a-*` branch. If the next free number is not what
+   this list says, **stop and find out which branch moved.**
+
+### R.2 The list, in order
+
+| #                         | File                                | Adds                                                                                                                                                             | Kind                                               | Was         |
+| ------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------- |
+| 0096                      | `0096_tee_body_role`                | `'teeBody'` appended to `bid_line_items.runMaterialRole`                                                                                                         | additive                                           | written     |
+| 0097                      | `0097_password_reset`               | table `password_reset_tokens`; `users.sessionsValidAfter` (NULL)                                                                                                 | additive                                           | written     |
+| 0098                      | `0098_signup_invites`               | table `signup_invites` (invite gate plan § 7: `codeHash` unique, `email`, `seatLimit`, `expiresAt`, accepted/revoked stamps, FKs `users`/`early_access_signups`) | additive                                           | 0098 / 0106 |
+| 0099                      | `0099_ai_correction_log`            | table `ai_correction_log` (correction log plan § 4, § 9: FKs SET NULL, `shareId` unique, `(dataUserId, createdAt)` index)                                        | additive                                           | 0099 / 0107 |
+| 0100                      | `0100_new_material_categories`      | 3 values appended to `materials.category`                                                                                                                        | additive                                           | 0098        |
+| 0101                      | `0101_locknut_bushing_roles`        | `'locknut'`, `'bushing'` appended to `runMaterialRole` (list = 0096's + 2)                                                                                       | additive                                           | 0099        |
+| 0102                      | `0102_materials_parent_id`          | `materials.parentId int NULL`                                                                                                                                    | additive                                           | 0100        |
+| 0103                      | `0103_materials_parent_id_fk`       | self-FK, `ON DELETE RESTRICT`                                                                                                                                    | additive                                           | 0101        |
+| 0104                      | `0104_materials_brand`              | `materials.brand varchar(64) NULL`                                                                                                                               | additive                                           | 0102        |
+| 0105                      | `0105_takeoff_stamps_drop_excluded` | `takeoff_stamps.dropExcluded boolean NULL`                                                                                                                       | additive                                           | 0103        |
+| 0106                      | `0106_assembly_categories`          | 2 values appended to `assemblies.category`, `NOT NULL` kept                                                                                                      | additive                                           | 0104        |
+| 0107                      | `0107_assembly_hours_nullable`      | `assemblies.baseLaborHours` NULL allowed, default dropped                                                                                                        | additive (§ 11 a)                                  | 0105        |
+| 0108                      | `0108_takeoff_stamps_status`        | `takeoff_stamps.status enum('new','existing','remove','relocate') NULL`, NULL = new                                                                              | additive                                           | unnumbered  |
+| 0109                      | `0109_assemblies_pin_style`         | `assemblies` pin shape, letter, color (NULL = automatic)                                                                                                         | additive                                           | unnumbered  |
+| 0110                      | `0110_symbol_links_pin_style`       | `symbol_links` pin shape, letter, color                                                                                                                          | additive                                           | unnumbered  |
+| 0111                      | `0111_takeoff_groups_pin_style`     | `takeoff_groups` pin shape, letter, color                                                                                                                        | additive                                           | unnumbered  |
+| 0112                      | `0112_bid_pdf_legend_entries`       | table `bid_pdf_legend_entries` (legend plan § 5)                                                                                                                 | additive                                           | 0106 / 0107 |
+| next                      | count-by-tag v2                     | `takeoff_groups.fixtureTag varchar(16) NULL`, `symbolLookupKey varchar(255) NULL`, no FK, no unique key                                                          | additive                                           | unnumbered  |
+| next                      | rename a captured legend item       | **probably nothing**: see R.6                                                                                                                                    | —                                                  | —           |
+| next                      | second batch (§ 10d + B2)           | brand line ×2, `bid_panels` + FKs, `panelId` + FK, `snapshotBrandLine`, example-price ×3. About ten files.                                                       | additive                                           | unnumbered  |
+| NEVER in `drizzle/` early | step-3 files                        | (i) clear the 8 starters' hours (§ 11 c); (ii) fold "… - EXISTING TO REMAIN" twin counts into `status`                                                           | **MEANING**: committed only after the code is live | —           |
+
+Also later, numbered at write time and **after** everything above: legend
+§ 8b (`quotedSupplier`/`quotedRef`/`quotedAmount` on `bid_line_items`,
+`takeoff_groups.packageLineId`), legend § 8c (`costMicros`,
+`aiSpendCapMicros`), H1 `quoteBucket` (held, § 6), pack sizes (§ 12).
+
+**Why this order, and not the plans' original numbers:**
+
+- **0098 and 0099 keep the numbers their own plans gave them.** Both block
+  the first outside invite (R.4) and are not tied to B's or C's code, so they
+  ship first. Their plans already said "if reset lands first", and with them
+  first, it does.
+- **The B/C batch shifts up two places as a block (0100–0107).** It rides with
+  B's and C's code, which has not been scheduled for live. Nothing in it is
+  written, so renumbering costs nothing. § 7 step 1's "expect 8 applied" is
+  still 8, now meaning 0100–0107 on a database at 0099.
+- **Status and the nine pin columns are one group (0108–0111)**, as B's plan
+  asks (`track-b-count-pin-styles-plan.md` § 6, handoffs). One statement per
+  file, per table: each file is one `ALTER TABLE … ADD …, ADD …, ADD …`.
+  MySQL applies a single `ALTER` whole or not at all, so three columns in one
+  statement keep the "applied or not, never half" rule. **The exact column
+  names and types are not in B's plan.** Settle them before writing:
+  - letter `varchar(2)` (§ 3, "up to two characters");
+  - color `varchar(7)`, copying `takeoff_run_types.color`, where a stored value
+    that is no longer in the palette reads as automatic;
+  - shape as `varchar`, not an enum, **because whether the wide rectangle is a
+    sixth shape is still undecided** (§ 2, decision 2). A varchar means
+    deciding later needs no migration.
+- **The legend table goes last of the numbered ones (0112).** It waits on the
+  correction log and on the reader accuracy test (legend plan, "The order, in
+  one place", items 0 and 3). Those are the slowest dependencies in the list.
+  If the legend is ready before the mark group, swap the numbers **before
+  either is written**, never after.
+- **Count-by-tag v2 has no number yet.** B's v1 needs no migration (the tag
+  lives in the count name, `count-by-tag-plan.md` § 2, § 4), and the columns
+  are "when the grouping is known to be wanted". **If that is decided before
+  0111 is written, add both columns to 0111's `ALTER`** (same table, same
+  batch). Otherwise it is its own file at the next number.
+
+### R.3 What goes together, and what must go first
+
+| Group                      | Files     | Goes with                               | Must come after                                                                                                                             |
+| -------------------------- | --------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| A: before the first invite | 0096–0099 | `a-email-reset`, then gate and log code | nothing. **0096 must precede 0101** (0101 restates the enum with `teeBody`, § 0)                                                            |
+| B: B/C batch               | 0100–0107 | B's and C's code that reads them        | 0096 (above). 0103 after 0102 (FK on its column). 0107 before the "Hours not set" code, and the hours `UPDATE` only after that code is live |
+| C: marks                   | 0108–0111 | B's style editor, then status looks     | nothing in the schema. The status **fold** (step 3) waits for the code that reads `status`                                                  |
+| D: legend                  | 0112      | legend reading v1                       | 0099 (it writes correction rows), the accuracy test                                                                                         |
+| E: second batch            | next      | brand / example-price code              | 0102 and 0104 (brand lines match `materials.brand`). **Must be live before ANY non-zero price goes into the seed files**                    |
+
+Every numbered file is **step 1** (migrate, then push the code). The two
+step-3 files are written and committed only after their code is on the live
+site. A step-3 file committed early runs at step 1, because `migrate.mts`
+applies everything pending.
+
+### R.4 BEFORE THE FIRST OUTSIDE INVITE
+
+**Migrations: 0096, 0097, 0098, 0099, on live, with their code.** Nothing
+else in this list is needed for an invite.
+
+- **0097 + reset code.** An outside user must be able to reset a forgotten
+  password (stage-4 build order 2).
+- **0098 + gate code.** The gate must exist before anyone outside has the
+  address (stage-4 build order 3; before-beta checklist § 2).
+- **0099 + log code.** Corrections made before the table exists are lost for
+  good, and the plan reader is open to everyone (`shared/permissions.ts`). The
+  log's code must add `ai_correction_log.cropKey` to `FILE_SOURCES`
+  (`server/backup/collectFiles.ts`). Without it, the orphan sweep deletes
+  every crop after 7 days and the backup never copies them (correction log
+  plan § 5, § 8). Also, `a-ai-marks` `2ca2def` merges before the log is built
+  (owner answer 7).
+
+**Not migrations, but on the same list** (from the invite gate, correction
+log and stage-4 plans):
+
+- the owner's terms sentence;
+- the day-one invite list;
+- a real Reply-To on invite emails;
+- check live `users` for password-less OAuth-era accounts;
+- re-count duplicate emails before any UNIQUE index on `users.email`. It is
+  kept OUT of 0098 on purpose;
+- confirm the smoke account (1421) never signs up;
+- **if the priced sheet lands before invites, group E and its code must be
+  live first.**
+
+### R.5 Could put a WRONG NUMBER on a bid
+
+None of the step-1 files changes a number on its own: old code ignores a new
+column. The risk is in the code that reads them and in the step-3 files.
+In order of danger:
+
+1. **Mark status (0108), today and after.**
+   - **Today**, an existing device to remain is counted and priced as new,
+     with nothing on screen to say so. Track C's stand-in, a twin count named
+     "… - EXISTING TO REMAIN", **still prices if it is sent to a bid**.
+   - **After 0108**, the risks are the bridge treating NULL as anything but
+     `new`, `relocate` or `remove` pricing material when they are labor, or a
+     twin count that was never folded still pricing.
+   - **Track C's todo entry contradicts itself**: it says "no backfill, step 1"
+     and also "the migration should convert those names and fold the twin
+     count". Those are two files: 0108 (additive) now, and the fold (step 3)
+     after the code. **The fold must never ride in 0108.**
+2. **Example prices (group E).** Once a seed file carries a real price,
+   `costPerUnit === 0` stops meaning "nobody priced this". Then the Materials
+   screen reports a priced catalog that no contractor has checked a line of.
+   Order: E's columns, then the code that reads `examplePriceSource`, then
+   the priced seed. **Never the prices first** (§ 10b).
+3. **Assembly hours (0107 and step 3 i).** If the `UPDATE` runs before the
+   "Hours not set" code is live, all 8 starters price at **zero hours** on
+   every new bid, silently (§ 11 c).
+4. **Enum restatements (0100, 0101, 0106).** A `MODIFY` restates the whole
+   list. A retyped or reordered value silently changes what a stored value
+   means; `runMaterialRole` decides which bid line a fitting lands on. **Copy
+   the previous file's list verbatim and append.**
+5. **Out-of-order apply (R.1).** A skipped file is a missing column, so this
+   usually takes a screen down rather than changing a number. **0108 is the
+   exception:** if code that reads `status` meets a database without it, it
+   breaks. If it is written to fall back to "treat all as new", it prices
+   existing devices quietly.
+6. **Code, not migration, but flagged by B:** with count-by-tag, two tagged
+   counts on one assembly make `groupForAssembly` (`server/assemblyGroup.ts`)
+   pick the first, so marks are counted as the wrong type
+   (`count-by-tag-plan.md` § 5). v1 needs a tag chooser and a test.
+7. **Legend § 8b `quotedAmount`** (later). NULL must read as "Not priced" on
+   a bid line, never $0 (CLAUDE.md § Editing fields, 6).
+
+### R.6 Renaming a captured legend item — probably no column
+
+A captured legend item is a `symbol_links` row. It already has
+`label varchar(255) NOT NULL` and `lookupKey varchar(255) NOT NULL`, and
+`db.updateSymbolLink` takes a partial update. So a rename is
+`label` + `lookupKey` together, with a collision check **in code**:
+`lookupKey` has a plain index, not a unique one, so nothing in the database
+stops two items getting the same name. `count-by-tag-plan.md` lines 94–95
+warns that a rename can quietly detach a tag link. **B is building rename now
+and will say if it needs a column.** If it does, it takes the next free number
+at write time, under R.1's rule.
+
+### R.7 Backup and rehearsal on a RESTORED copy, before staging
+
+**Every apply to live is preceded by a fresh backup, verified by restoring it**
+(`deploying.md` § 5a, steps 1–2). That is standing practice for every row
+here.
+
+**These also get rehearsed on a restored copy of live BEFORE staging**,
+because their failure mode is data-dependent and a fixture database cannot
+show it:
+
+| File                     | Why a restored copy                                                                                                                                     |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0103 (parentId FK)       | Time it on real row counts. Rehearse the RESTRICT-vs-user-cascade account delete (§ 7 step 3)                                                           |
+| 0100, 0101, 0106 (enums) | A restated list is checked against REAL stored values: `SELECT DISTINCT` before and after must match                                                    |
+| 0107 (nullability)       | `MODIFY` on a populated column. Check every row keeps its hours: before-and-after count of `baseLaborHours` by value                                    |
+| step 3 (i) hours clear   | Meaning change. **Expect 0 → 8**, then a second run changes 0                                                                                           |
+| step 3 (ii) status fold  | Meaning change. Before and after: marks per base count, twin counts left, bid line quantities per bid. **Totals must move only by what was "existing"** |
+
+New tables (0097, 0098, 0099, 0112) and new nullable columns (0102, 0104,
+0105, 0108–0111) need only the test-database rehearsal of § 7 step 1: run
+twice, the second run applies 0, drift before and after. The standing
+backup-before-live still applies.
+
+**If any count above does not match, stop and find out why before going
+on.** A mismatch means either this plan is stale or the database is not in
+the state you think it is, and those want opposite responses.
+
+### R.8 Plans on other branches that still state the old numbers
+
+Per CLAUDE.md § "Where decisions live", each needs a line pointing here
+when its branch is next touched. They are not edited in this commit.
+
+- `origin/a-plans:references/invite-gate-plan.md` § 7 still says 0098. That
+  matches, but the line should cite R.
+- `origin/a-plans:references/ai-correction-log-plan.md` § 9 still says 0099.
+  Same.
+- `origin/a-plans-reader:references/legend-reading-plan.md` § 5 says 0106 /
+  "probably 0107". It is now **0112**. Separately, its rehearsal check expects
+  "three foreign keys" where its schema lists four. Fix that before it is
+  used as a pass check.
+- `origin/track-c:todo.md`, the mark status entry: split into 0108 + a
+  step-3 fold (R.5 1). It also links
+  `references/find-all-matching-plan.md`, **which does not exist on any
+  branch**.
+- `origin/track-b:references/track-b-count-pin-styles-plan.md`: now 0108
+  (status) and 0109–0111 (styles). Column names and types are to be settled
+  (R.2).
+
 **Status: nothing here is written or run.** No `.sql` file exists yet, and
 no database has been touched. Measured against `local-dev` at `90a286c`, which
 ends at **0095**, and `a-email-reset` at `af82b2f`, which holds **0096**
@@ -41,6 +295,11 @@ them, so nothing here is written before that release is out.
 ---
 
 ## 0. Numbering depends on `a-email-reset` landing first
+
+> **SUPERSEDED 2026-10-01 by § R.** The invite gate and correction log now
+> come BEFORE this batch (0098, 0099), and this batch is 0100–0107. The
+> reasoning below about 0096 preceding the locknut file still holds; that
+> file is now 0101.
 
 - The numbers below assume **0096 and 0097 merge before this batch**. The
   journal on that branch ends at `idx 97, when 1789958700000`, so this batch
