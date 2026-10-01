@@ -214,11 +214,188 @@ function qualifiers(words: readonly WordBox[]) {
   return { device, status };
 }
 
+/**
+ * The boxed symbol, ready to be searched for on any sheet: its line work and
+ * words relative to its centre, plus what the look-alike flags compare with
+ * (its shade, its device words, how much line work is joined onto it). Built
+ * on the sheet it was boxed on — a legend sheet, or the plan itself.
+ */
+export type SymbolTemplate = {
+  rel: RelSeg[];
+  relWords: RelWord[];
+  totalLength: number;
+  symbolLightness: number;
+  halfW: number;
+  halfH: number;
+  size: number;
+  tol: number;
+  /** Short line work joined onto the boxed one from outside (§ flags). */
+  boxedJoined: number;
+  /** Device words beside the boxed one (GF, WP…). */
+  boxedDevice: ReadonlySet<string>;
+  /** Where it was boxed, on its own sheet. */
+  cx: number;
+  cy: number;
+  segments: number;
+  words: string[];
+};
+
+export type SymbolFromBox =
+  | { kind: "ok"; symbol: SymbolTemplate }
+  | { kind: "scan" | "empty" | "tooBig"; message: string };
+
+/**
+ * A sheet indexed once for searching: segments by length, words by text, and
+ * grids by cell size built on first use. Checking a sheet against a whole
+ * legend searches it once per legend symbol; re-sorting ~100,000 segments for
+ * each would be most of the time.
+ */
+export type PreparedSheet = {
+  geo: VectorGeometry;
+  words: readonly WordBox[];
+  byLength: number[];
+  lengths: Float64Array;
+  wordIndex: Map<string, number[]>;
+  grid: (cell: number) => SegmentGrid;
+  lengthOf: (i: number) => number;
+};
+
+export function prepareSheet(
+  geo: VectorGeometry,
+  words: readonly WordBox[]
+): PreparedSheet {
+  const segs = geo.segs;
+  const n = segs.length / 4;
+  const lengthOf = (i: number) =>
+    Math.hypot(
+      segs[i * 4 + 2] - segs[i * 4],
+      segs[i * 4 + 3] - segs[i * 4 + 1]
+    );
+  const byLength = Array.from({ length: n }, (_, i) => i).sort(
+    (p, q) => lengthOf(p) - lengthOf(q)
+  );
+  const wordIndex = new Map<string, number[]>();
+  words.forEach((w, i) => {
+    const k = wordKey(w.text);
+    const list = wordIndex.get(k);
+    if (list) list.push(i);
+    else wordIndex.set(k, [i]);
+  });
+  const grids = new Map<number, SegmentGrid>();
+  return {
+    geo,
+    words,
+    byLength,
+    lengths: Float64Array.from(byLength.map(lengthOf)),
+    wordIndex,
+    lengthOf,
+    grid: cell => {
+      // Rounded so symbols of nearly one size share a grid.
+      const key = Math.max(4, Math.round(cell));
+      let g = grids.get(key);
+      if (!g) {
+        g = new SegmentGrid(segs, key);
+        grids.set(key, g);
+      }
+      return g;
+    },
+  };
+}
+
+/** True when the page is a scanned picture: nothing here can see symbols. */
+export function isScan(geo: VectorGeometry): boolean {
+  return geo.imageCoverage > 0.4 && geo.segs.length / 4 < SCAN_MAX_SEGMENTS;
+}
+
+/**
+ * Short line work JOINED onto a symbol from outside, of its shade. On Weld 1
+ * the telecom triangle is also half of a bow-tie symbol (two triangles tip to
+ * tip and a "+"): the other half touches this one and runs nowhere near its
+ * middle, so "lines through it" cannot see it. Wires join every device too,
+ * so a copy's count is compared with the boxed one's, not with zero.
+ */
+function joinedCount(
+  sheet: PreparedSheet,
+  t: Pick<SymbolTemplate, "size" | "tol" | "symbolLightness">,
+  matched: ReadonlySet<number>,
+  x: number,
+  y: number,
+  hw: number,
+  hh: number
+): number {
+  const segs = sheet.geo.segs;
+  const ends: number[] = [];
+  matched.forEach(i => ends.push(i * 4, i * 4 + 2));
+  let count = 0;
+  sheet.grid(t.size / 2).near(x, y, 2 * t.size, i => {
+    if (matched.has(i) || sheet.lengthOf(i) > 1.5 * t.size) return;
+    if (Math.abs(sheet.geo.lightness[i] - t.symbolLightness) > LIGHTNESS_STEP)
+      return;
+    // Joined from OUTSIDE: a piece of the symbol itself that happened not to
+    // match exactly lies inside, and is not "more" of anything.
+    const mx = (segs[i * 4] + segs[i * 4 + 2]) / 2;
+    const my = (segs[i * 4 + 1] + segs[i * 4 + 3]) / 2;
+    if (Math.abs(mx - x) <= hw && Math.abs(my - y) <= hh) return;
+    for (const p of [i * 4, i * 4 + 2])
+      for (const e of ends)
+        if (Math.hypot(segs[p] - segs[e], segs[p + 1] - segs[e + 1]) <= t.tol) {
+          count += 1;
+          return;
+        }
+  });
+  return count;
+}
+
+/** Words within a symbol's reach of (x, y), less the ones that ARE it. */
+function ringWords(
+  words: readonly WordBox[],
+  x: number,
+  y: number,
+  hw: number,
+  hh: number,
+  size: number,
+  exclude: ReadonlySet<number>
+): WordBox[] {
+  const ringPad = Math.max(8, 0.9 * size);
+  return words.filter(
+    (w, i) =>
+      !exclude.has(i) &&
+      Math.abs(w.cx - x) <= hw + ringPad &&
+      Math.abs(w.cy - y) <= hh + ringPad
+  );
+}
+
+/** Box one symbol on a sheet, and every copy of it on the SAME sheet. */
 export function findMatching(
   geo: VectorGeometry,
   words: readonly WordBox[],
   boxIn: MatchBox
 ): FindResult {
+  const sheet = prepareSheet(geo, words);
+  const made = symbolFromBox(sheet, boxIn);
+  if (made.kind !== "ok") return made;
+  const t = made.symbol;
+  const found = searchSymbol(t, sheet, { boxedHere: true });
+  if (found.kind !== "ok") return found;
+  return {
+    kind: "ok",
+    matches: found.matches,
+    symbol: {
+      segments: t.segments,
+      words: t.words,
+      width: t.halfW * 2,
+      height: t.halfH * 2,
+    },
+  };
+}
+
+/** The symbol inside `boxIn`, on the sheet it was drawn on. */
+export function symbolFromBox(
+  sheet: PreparedSheet,
+  boxIn: MatchBox
+): SymbolFromBox {
+  const geo = sheet.geo;
+  const words = sheet.words;
   const box = normaliseBox(boxIn);
   const segs = geo.segs;
   const n = segs.length / 4;
@@ -344,14 +521,81 @@ export function findMatching(
     height: w.height,
   }));
 
-  const grid = new SegmentGrid(segs, Math.max(4, size / 2));
-  const lengthOf = lengthAt;
+  // What the flags compare a copy with, measured where it was boxed.
+  const shape = { size, tol, symbolLightness };
+  const boxedJoined = joinedCount(
+    sheet,
+    shape,
+    new Set(symbolSegs),
+    cx,
+    cy,
+    halfW,
+    halfH
+  );
+  const symbolUsedWords = new Set(
+    symbolWords.map(w => words.indexOf(w)).filter(i => i >= 0)
+  );
+  const boxedDevice = qualifiers(
+    ringWords(words, cx, cy, halfW, halfH, size, symbolUsedWords)
+  ).device;
+
+  return {
+    kind: "ok",
+    symbol: {
+      rel,
+      relWords,
+      totalLength,
+      symbolLightness,
+      halfW,
+      halfH,
+      size,
+      tol,
+      boxedJoined,
+      boxedDevice,
+      cx,
+      cy,
+      segments: symbolSegs.length,
+      words: symbolWords.map(w => w.text),
+    },
+  };
+}
+
+export type SearchResult =
+  | { kind: "ok"; matches: Match[] }
+  | { kind: "scan" | "empty"; message: string };
+
+/**
+ * Every copy of `t` on `sheet` — the sheet it was boxed on, or another one
+ * (a legend symbol searched for on a plan). `boxedHere` marks the copy that
+ * IS the boxed one; only meaningful on the sheet it was boxed on.
+ */
+export function searchSymbol(
+  t: SymbolTemplate,
+  sheet: PreparedSheet,
+  opts: { boxedHere?: boolean } = {}
+): SearchResult {
+  const geo = sheet.geo;
+  const words = sheet.words;
+  const segs = geo.segs;
+  if (isScan(geo)) return { kind: "scan", message: SCAN_MESSAGE };
+  const {
+    rel,
+    relWords,
+    totalLength,
+    symbolLightness,
+    halfW,
+    halfH,
+    size,
+    tol,
+    boxedJoined,
+    cx,
+    cy,
+  } = t;
+  const grid = sheet.grid(size / 2);
+  const lengthOf = sheet.lengthOf;
 
   // ── The anchor: the symbol's rarest part on this sheet ──────────────────
-  const byLength = Array.from({ length: n }, (_, i) => i).sort(
-    (p, q) => lengthOf(p) - lengthOf(q)
-  );
-  const lengths = Float64Array.from(byLength.map(lengthOf));
+  const { byLength, lengths } = sheet;
   const lowerBound = (v: number) => {
     let lo = 0;
     let hi = lengths.length;
@@ -458,13 +702,7 @@ export function findMatching(
   };
   const found: Found[] = [];
   const seen = new Set<string>();
-  const wordIndex = new Map<string, number[]>();
-  words.forEach((w, i) => {
-    const k = wordKey(w.text);
-    const list = wordIndex.get(k);
-    if (list) list.push(i);
-    else wordIndex.set(k, [i]);
-  });
+  const wordIndex = sheet.wordIndex;
 
   for (const cand of candidates) {
     const sig = `${Math.round(cand.tx * 2)},${Math.round(cand.ty * 2)},${cand.o.rotation},${cand.o.mirrored}`;
@@ -554,59 +792,9 @@ export function findMatching(
   }
 
   // ── Flags ───────────────────────────────────────────────────────────────
-  /*
-    Short line work JOINED onto a copy, of its shade. On Weld 1 the telecom
-    triangle is also half of a bow-tie symbol (two triangles tip to tip and a
-    "+"): the other half touches this one and runs nowhere near its middle,
-    so "lines through it" cannot see it. Wires join every device too, so the
-    count is compared with the boxed one's, not with zero.
-  */
-  const joinedCount = (
-    matched: ReadonlySet<number>,
-    x: number,
-    y: number,
-    hw: number,
-    hh: number
-  ) => {
-    const ends: number[] = [];
-    matched.forEach(i => ends.push(i * 4, i * 4 + 2));
-    let count = 0;
-    grid.near(x, y, 2 * size, i => {
-      if (matched.has(i) || lengthOf(i) > 1.5 * size) return;
-      if (Math.abs(geo.lightness[i] - symbolLightness) > LIGHTNESS_STEP) return;
-      // Joined from OUTSIDE: a piece of the symbol itself that happened not
-      // to match exactly lies inside, and is not "more" of anything.
-      const mx = (segs[i * 4] + segs[i * 4 + 2]) / 2;
-      const my = (segs[i * 4 + 1] + segs[i * 4 + 3]) / 2;
-      if (Math.abs(mx - x) <= hw && Math.abs(my - y) <= hh) return;
-      for (const p of [i * 4, i * 4 + 2])
-        for (const e of ends)
-          if (Math.hypot(segs[p] - segs[e], segs[p + 1] - segs[e + 1]) <= tol) {
-            count += 1;
-            return;
-          }
-    });
-    return count;
-  };
-  const boxedJoined = joinedCount(new Set(symbolSegs), cx, cy, halfW, halfH);
-  const ringPad = Math.max(8, 0.9 * size);
-  const symbolUsedWords = new Set(
-    symbolWords.map(w => words.indexOf(w)).filter(i => i >= 0)
-  );
-  const ringWords = (
-    x: number,
-    y: number,
-    hw: number,
-    hh: number,
-    exclude: Set<number>
-  ) =>
-    words.filter(
-      (w, i) =>
-        !exclude.has(i) &&
-        Math.abs(w.cx - x) <= hw + ringPad &&
-        Math.abs(w.cy - y) <= hh + ringPad
-    );
-  const boxedQ = qualifiers(ringWords(cx, cy, halfW, halfH, symbolUsedWords));
+  // Joined line work and device words, compared with the boxed one's
+  // (measured where it was boxed — `symbolFromBox`).
+  const boxedQ = { device: t.boxedDevice };
 
   const matches: Match[] = kept.map(f => {
     const turned = f.o.rotation === 90 || f.o.rotation === 270;
@@ -616,7 +804,7 @@ export function findMatching(
     const maybeExisting: string[] = [];
 
     // Lighter or darker than the boxed one.
-    if (f.matched.size > 0 && symbolSegs.length > 0) {
+    if (f.matched.size > 0 && rel.length > 0) {
       let sum = 0;
       let len = 0;
       f.matched.forEach(i => {
@@ -659,14 +847,19 @@ export function findMatching(
         needsLook.push(
           "more lines run through it than the one you boxed — it may be a different symbol"
         );
-      else if (joinedCount(f.matched, f.tx, f.ty, hw, hh) - boxedJoined >= 2)
+      else if (
+        joinedCount(sheet, t, f.matched, f.tx, f.ty, hw, hh) - boxedJoined >=
+        2
+      )
         needsLook.push(
           "more lines are joined onto it than the one you boxed — it may be part of a bigger symbol"
         );
     }
 
     // Words beside it.
-    const q = qualifiers(ringWords(f.tx, f.ty, hw, hh, f.usedWords));
+    const q = qualifiers(
+      ringWords(words, f.tx, f.ty, hw, hh, size, f.usedWords)
+    );
     q.device.forEach(w => {
       if (!boxedQ.device.has(w))
         needsLook.push(
@@ -697,19 +890,20 @@ export function findMatching(
       coverage: f.coverage,
       needsLook,
       maybeExisting,
-      isBoxed: Math.hypot(f.tx - cx, f.ty - cy) <= 2 * tol,
+      isBoxed:
+        opts.boxedHere === true && Math.hypot(f.tx - cx, f.ty - cy) <= 2 * tol,
     };
   });
 
   matches.sort((p, q) => p.y - q.y || p.x - q.x);
-  return {
-    kind: "ok",
-    matches,
-    symbol: {
-      segments: symbolSegs.length,
-      words: symbolWords.map(w => w.text),
-      width: halfW * 2,
-      height: halfH * 2,
-    },
-  };
+  return { kind: "ok", matches };
+}
+
+/**
+ * The words beside a point, sorted into the kinds the flags use. Exported
+ * for the sheet check (@/lib/sheetCheck), so "a device word" means one thing
+ * in both.
+ */
+export function wordKinds(words: readonly WordBox[]) {
+  return qualifiers(words);
 }

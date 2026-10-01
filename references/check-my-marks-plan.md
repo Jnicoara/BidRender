@@ -211,6 +211,22 @@ NULL` (NULL = never accepted), cleared when the mark is moved. Additive.
 
 ## 8. Open questions for the owner
 
+> **DECIDED 2026-10-01 by Track C** (recommended answers; the owner asked to
+> be asked only about bid numbers, money, or what cannot be undone):
+>
+> 1. **A button for the sheet and one for a count; nothing automatic.**
+> 2. **"Nothing under it" shows a Delete button that asks first.** Deleting
+>    changes a bid number, but only when the estimator presses it and
+>    confirms, and it is undoable — so the CHOICE to offer the button is not
+>    one of the owner's three kinds.
+> 3. **"Keep as is" is remembered once a column exists; until then it is
+>    remembered for the session only** (§ 7's `checkAcceptedAt`, requested
+>    from A). Built that way, behind a switch that is off.
+> 4. **Status words are NOTED, not raised as a disagreement**, until marks
+>    have a status column.
+> 5. **The two Weld 1 marks are the owner's to fix** — they are his answer
+>    key, so nothing here moves them. The check raises them; he decides.
+
 1. **Should "check my marks" run on the whole sheet by default, or only the
    count you are working on?** Recommended: a button for each; nothing
    automatic.
@@ -397,6 +413,21 @@ three:
   `connect-point-plan.md` § 8 already says.
 
 ### 10.7 Open questions for the owner
+
+> **DECIDED 2026-10-01 by Track C, except Q1, which is the owner's:**
+>
+> 1. **ASKED, not decided:** splitting the E111 floor ("F") and boxed data
+>    outlets into their own counts changes the numbers on his bid, so the
+>    screen offers Split and he presses it — or not.
+> 2. **Heights are recorded on the mark, same item** — once the
+>    `mountHeightInches` column exists (requested from A). Until then the
+>    height is shown as a suggestion that cannot be saved, behind a switch
+>    that is off.
+> 3. **A word between two devices is shown on both.**
+> 4. **"Keep in this count" remembered for the session only** until the
+>    column exists (same as § 8 Q3).
+> 5. **Angled copies are shown as "can't tell"** until the matcher learns
+>    wall angles.
 
 1. **The 2 floor data outlets ("F") and 3 in a box on E111 — a separate count
    each, or keep them in the data count?** Recommended: split, so the floor

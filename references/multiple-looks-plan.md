@@ -256,6 +256,25 @@ Each goes red on today's code and green with the change:
 
 ## 9. Open questions for the owner
 
+> **DECIDED 2026-10-01 by Track C, on the owner's instruction to take the
+> recommended answer except where a choice changes a bid number, costs money
+> or cannot be undone.** None of the seven does — every one is about what is
+> shown or asked, and a look changes no count (§ 7) — so all are decided:
+>
+> 1. Separate item → **asks for its own name, old name pre-filled.**
+> 2. Looks from other plan sets → **searched too, this set's first; all only
+>    proposals.**
+> 3. Whole legend with a matching name → **left as it is by default.**
+> 4. Looks per search → **up to 5, this set's first.** (The AI cap in item 7
+>    follows the same number; any AI call is still a priced button.)
+> 5. A new look that matches another item's marks → **warn, default Cancel.**
+> 6. Removing the last look → **allowed; the item keeps no picture.**
+> 7. Reader pictures → **the set's own look first, others up to the cap.**
+>
+> **Not buildable yet:** every item here needs `symbol_looks` (§ 6), a new
+> table — requested from Track A, not numbered. Nothing of this plan is
+> built until it exists.
+
 1. **"No, make it a separate item" needs a different name.** Two items with
    one name would make every list ambiguous. OK to ask for a new name there?
    (Recommended: yes, with the old name pre-filled to edit.)

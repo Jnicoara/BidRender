@@ -270,6 +270,23 @@ vector sheets**: locating is the part it is worst at and code does for free.
 
 ## 8. Open questions for the owner
 
+> **DECIDED 2026-10-01 by Track C where no money, bid number or undoable
+> change is involved; the rest are ASKED.**
+>
+> 1. **Room-wide "existing to remain" from a note: not built now** (it needs
+>    rooms read — a separate job). Decided.
+> 2. **ASKED — money:** the default spending limit for a "read this set"
+>    run. Built as a cost shown before every AI call and a stop at **$1**
+>    a run until he says otherwise.
+> 3. **ASKED — money:** whether scans may use the whole-sheet reader as a
+>    priced button. Nothing changes for scans meanwhile (the reader button is
+>    as it was; Find, check and labelling refuse scans).
+> 4. **A correction offered on the next job from the same engineer: yes, as
+>    a suggestion only** — once A's correction log exists. Decided.
+> 5. **Heights written without `"` or `+`** — a question of fact, left open:
+>    bare numbers are not read as heights until he says his engineers write
+>    them that way.
+
 1. **Is "existing to remain" from a NOTE ("all devices in room 104 are
    existing to remain") something you want flagged on every mark in that
    room?** It needs rooms read too — a bigger job.
