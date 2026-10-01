@@ -62,12 +62,13 @@ So:
 | 0107                      | `0107_assembly_hours_nullable`            | `assemblies.baseLaborHours` NULL allowed, default dropped                                                                                                                                                 | additive (§ 11 a)                                   | 0105        |
 | 0108                      | `0108_takeoff_stamps_status`              | `takeoff_stamps.status enum('new','existing','remove','relocate') NULL`, NULL = new. **ONE column for A's list AND C's find-all plan § 6 — the same request** (R.9)                                       | additive — the column ONLY; the fold is step 3 (ii) | unnumbered  |
 | 0109                      | `0109_assemblies_pin_style`               | `assemblies.pinShape`, `pinLetter`, `pinColor` (NULL = automatic; types R.10)                                                                                                                             | additive                                            | unnumbered  |
-| 0110                      | `0110_symbol_links_pin_style`             | `symbol_links.pinShape`, `pinLetter`, `pinColor` + **`originalLabel varchar(255) NULL`** (B's rename) + **C's capture box** `captureX/Y/Width/Height` if decided (R.11)                                   | additive                                            | unnumbered  |
+| 0110                      | `0110_symbol_links_pin_style`             | `symbol_links.pinShape`, `pinLetter`, `pinColor` + **`originalLabel varchar(255) NULL`** (B's rename). **No capture box** — it moved to the looks table (R.11)                                            | additive                                            | unnumbered  |
 | 0111                      | `0111_takeoff_groups_pin_style`           | `takeoff_groups.pinShape`, `pinLetter`, `pinColor` + **`symbolLookupKey varchar(255) NULL`** (pin plan § 11.7 + count-by-tag § 2) + `fixtureTag` if wanted (R.12)                                         | additive                                            | unnumbered  |
 | 0112                      | `0112_bid_pdf_legend_entries`             | table `bid_pdf_legend_entries` (legend plan § 5)                                                                                                                                                          | additive                                            | 0106 / 0107 |
 | 0113 (placeholder)        | connect point per symbol                  | **Shape not known yet**: where conduit meets a wall device, stored as distance + direction from the symbol's centre. `references/connect-point-plan.md` (track-b, not pushed when this was written). R.13 | expected additive                                   | new         |
 | next                      | count-by-tag `fixtureTag`, if NOT in 0111 | `takeoff_groups.fixtureTag varchar(16) NULL`, no FK, no unique key                                                                                                                                        | additive                                            | unnumbered  |
-| next                      | C's capture box, if NOT in 0110           | `symbol_links.captureX/Y/Width/Height decimal(12,4) NULL`, page points                                                                                                                                    | additive                                            | unnumbered  |
+| next                      | C's looks table `symbol_looks`            | one row per LOOK of a legend item: picture, plan set + sheet, capture box (`decimal(12,4)` ×4), who added it. **Replaces R.11's capture box columns** (`multiple-looks-plan.md` § 6, track-c `f107f3c`)   | additive                                            | was R.11    |
+| next, after both          | `bid_pdf_legend_entries.lookId`           | `int NULL -> symbol_looks, set null`, only if the legend plan is built                                                                                                                                    | additive                                            | new         |
 | next                      | second batch (§ 10d + B2)                 | brand line ×2, `bid_panels` + FKs, `panelId` + FK, `snapshotBrandLine`, example-price ×3. About ten files.                                                                                                | additive                                            | unnumbered  |
 | NEVER in `drizzle/` early | step-3 files                              | (i) clear the 8 starters' hours (§ 11 c); (ii) fold "… - EXISTING TO REMAIN" twin counts into `status` — **R.9, after 0108's code is live**                                                               | **MEANING**: committed only after the code is live  | —           |
 
@@ -108,7 +109,7 @@ Also later, numbered at write time and **after** everything above: legend
   then, otherwise its own file.
 - **The connect point is a placeholder at 0113.** Its plan is not written
   yet. If its columns turn out to be on `symbol_links` and are settled before
-  0110 is written, they fold into 0110 like the capture box. Otherwise 0113
+  0110 is written, they fold into 0110. Otherwise 0113
   stands, or swaps with 0112 if it is ready first — **before either is
   written** (R.1).
 
@@ -263,7 +264,14 @@ when its branch is next touched. They are not edited in this commit.
   used as a pass check.
 - `origin/track-c:todo.md`, the mark status entry, and
   `references/find-all-matching-plan.md` § 5 and § 6: split into 0108 + a
-  step-3 fold (R.9). The capture box is 0110 or a later file (R.11).
+  step-3 fold (R.9). Its § 6 capture box columns are replaced by C's
+  `symbol_looks` table (R.11); `multiple-looks-plan.md` says the find-all
+  plan is told.
+- `origin/track-c:references/multiple-looks-plan.md` § 6: its rehearsal
+  check expects "four foreign keys", but its own schema lists **five**
+  (`userId`, `symbolLinkId`, `bidPdfId`, `sheetId`, `createdByUserId`). Fix
+  that before it is used as a pass check, the same fault as the legend plan
+  above.
   **Correction:** this line first said the find-all plan "does not exist on
   any branch". That was true when it was checked. It was pushed to track-c
   later the same day (`970fdd2`, now at `f47335e`).
@@ -340,7 +348,37 @@ automatic (§ 6). Proposed, the same three on `assemblies`, `symbol_links` and
 status look (§ 7) is what carries a number, and it reads 0108, not these.
 **B to confirm the names before 0109 is written.**
 
-### R.11 C's capture box — `symbol_links.captureX/Y/Width/Height`
+### R.11 C's capture box — now the `symbol_looks` table
+
+> **Replaced 2026-10-01 (later) by C's `multiple-looks-plan.md` § 6**
+> (track-c `f107f3c`). An item can now have several LOOKS: pictures of the
+> same symbol captured from different sets. A box on `symbol_links` can hold
+> only one look's box, so the box moves to the look. **Nothing goes on
+> `symbol_links` for the box, and nothing goes in 0110.**
+>
+> The table, as C proposes it (additive, new table, no `UPDATE`):
+> `symbol_looks` (`id`; `userId` → users cascade; `symbolLinkId` →
+> symbol_links cascade; `thumbnail text NULL`; `bidPdfId` → bid_pdfs set null;
+> `sheetId` → bid_pdf_sheets set null; `captureX/Y/Width/Height decimal(12,4)
+NULL`; `createdByUserId` → users set null; `createdAt`; indexes on
+> `symbolLinkId` and `userId`).
+>
+> - **No backfill.** An item with no look rows reads its old
+>   `symbol_links.thumbnail` as a box-less first look.
+> - **Number: "next", not reserved yet.** Neither find-all nor looks is
+>   approved as a product (looks plan § 9 has seven open questions). When it
+>   is, it takes the next free number under R.1.
+> - **`bid_pdf_legend_entries.lookId` depends on it.** That FK cannot exist
+>   before the looks table does. So either the looks table is numbered BEFORE
+>   0112 and `lookId` goes into 0112's `CREATE` (a swap, allowed only while
+>   neither is written), or `lookId` is its own later `ALTER`. Decide when
+>   the first of the two is written.
+> - **No number on a bid.** Looks only seed proposals. A look never has its
+>   own count; every look counts into the item's one count (looks plan § 2).
+> - Rehearse with `SHOW CREATE TABLE symbol_looks`: **five** foreign keys and
+>   two indexes, not the four C's plan says (R.8).
+>
+> What R.11 said before, kept for the record:
 
 From `find-all-matching-plan.md` § 4 step 3 and § 6 (`f47335e` on track-c):
 nullable, in page points, for "Find on this sheet" from a legend row.
