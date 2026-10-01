@@ -19,6 +19,12 @@ This is the human-readable companion to the git history — read this to see wha
   Save PDF / Ctrl+P is blocked with a plain message to add work to the bid
   first — the same way unpriced lines are blocked.
 
+- **"Show me on the drawing" now actually moves the drawing.** Pressing Link or
+  Fix on a plan-reader suggestion, ticking one, or picking a counted item or a
+  drop used to draw a ring where the thing was and leave the view alone, so at
+  full-sheet view (or with the spot off screen) it looked like nothing
+  happened. The drawing now zooms in and centres on the spot.
+
 ## [2026-09-29]
 
 - **A proposal can no longer show a client $0.00 or a short total.** If any
