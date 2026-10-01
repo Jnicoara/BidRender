@@ -18,29 +18,40 @@
  * content is the worst of both: it does not show anything useful and it has
  * not given the drawing back either.
  */
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+} from "lucide-react";
+import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 
 /**
- * THE PHONE LAYOUT (references/track-b-phone-and-readability-plan.md § 3).
- * Not docked beside the drawing — there is no room — but the SAME children,
- * so there is no phone-only copy of either panel to drift:
+ * THE PHONE AND TABLET LAYOUTS (references/device-audit.md; the phone half
+ * started in references/track-b-phone-and-readability-plan.md § 3). Not
+ * docked where there is no room, but the SAME children, so there is no
+ * phone-only copy of either panel to drift:
  *
  * - `portal`: rendered into another element, which is how the sheet list
- *   becomes the panel's Sheets tab.
- * - `fullScreen`: the whole screen while open, closed by "← Plan". It
- *   appears rather than sliding — a full-height panel that clips must not
- *   move by keyframe (CLAUDE.md § Responsiveness rule 4).
+ *   becomes the panel's Sheets tab (phone AND tablet).
+ * - `sheet`: a BOTTOM SHEET over the lower part of the drawing, with the
+ *   drawing still visible and still movable above it. Replaced the
+ *   full-screen panel on 2026-10-01 (device brief: "a bottom sheet on
+ *   phones"), which hid the drawing entirely while a count was being read.
+ *   Taller or shorter by its own button, closed by Done. It appears rather
+ *   than sliding — a panel that clips must not move by keyframe (CLAUDE.md §
+ *   Responsiveness rule 4).
  */
 export type SidePanelPhone =
   | { as: "portal"; target: HTMLElement | null }
   | {
-      as: "fullScreen";
+      as: "sheet";
       open: boolean;
       onClose: () => void;
-      /** What the header says beside "← Plan" — the sheet you are on. */
+      /** What the sheet's header names — the drawing sheet you are on. */
       title: React.ReactNode;
     };
 
@@ -76,6 +87,9 @@ export function SidePanel({
   children: React.ReactNode;
 }) {
   const dragging = useRef<{ startX: number; startWidth: number } | null>(null);
+  const coarse = useCoarsePointer();
+  /** The phone's bottom sheet: about half the screen, or nearly all of it. */
+  const [tall, setTall] = useState(false);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -132,25 +146,46 @@ export function SidePanel({
         )
       : null;
   }
-  if (phone?.as === "fullScreen") {
+  if (phone?.as === "sheet") {
     if (!phone.open) return null;
     return (
       <div
         role="dialog"
         aria-label={label}
-        className="phone-panel fixed inset-0 z-50 flex flex-col h-dvh bg-card"
+        className={cn(
+          "phone-panel fixed inset-x-0 bottom-0 z-50 flex flex-col bg-card",
+          "border-t border-border rounded-t-xl shadow-[0_-8px_24px_rgba(0,0,0,0.45)]",
+          // dvh, never vh: a phone's address bar would push the bottom of a
+          // vh-sized sheet — its Done button's row — off the screen.
+          tall ? "h-[92dvh]" : "h-[55dvh]"
+        )}
       >
-        <div className="flex items-center gap-2 border-b border-border px-1 shrink-0">
+        <div className="flex items-center gap-1 border-b border-border px-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => setTall(on => !on)}
+            aria-label={
+              tall ? "Make the panel shorter" : "Make the panel taller"
+            }
+            title={tall ? "Shorter — show more drawing" : "Taller"}
+            className="flex h-11 min-w-11 items-center justify-center text-muted-foreground"
+          >
+            {tall ? (
+              <ChevronDown className="w-5 h-5" />
+            ) : (
+              <ChevronUp className="w-5 h-5" />
+            )}
+          </button>
+          <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+            {phone.title}
+          </div>
           <button
             type="button"
             onClick={phone.onClose}
-            className="flex h-11 min-w-11 items-center gap-1.5 px-2 text-sm font-medium"
+            className="flex h-11 min-w-11 items-center px-3 text-sm font-medium text-[#F5C518]"
           >
-            <ArrowLeft className="w-4 h-4" /> Plan
+            Done
           </button>
-          <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground text-right pr-2">
-            {phone.title}
-          </div>
         </div>
         <div className="flex-1 min-h-0 flex flex-col">{children}</div>
       </div>
@@ -194,7 +229,8 @@ export function SidePanel({
               ? "border-r border-border items-end pr-1.5"
               : "border-l border-border items-start pl-1.5"
           )}
-          style={{ width: FOLDED_STRIP_WIDTH }}
+          // A finger's 44 px on a touch screen; the mouse keeps the slim strip.
+          style={{ width: coarse ? 44 : FOLDED_STRIP_WIDTH }}
         >
           <Chevron className="w-3.5 h-3.5" />
         </button>
@@ -206,11 +242,12 @@ export function SidePanel({
     <div
       onPointerDown={onPointerDown}
       className={cn(
-        "shrink-0 flex flex-col items-center bg-card select-none",
+        "relative shrink-0 flex flex-col items-center bg-card select-none",
         side === "left" ? "border-l border-border" : "border-r border-border",
         open ? "cursor-col-resize" : null
       )}
-      style={{ width: PANEL_RAIL_WIDTH }}
+      // The browser must not scroll the page while a finger drags the rail.
+      style={{ width: PANEL_RAIL_WIDTH, touchAction: "none" }}
     >
       <button
         type="button"
@@ -219,7 +256,20 @@ export function SidePanel({
         aria-expanded={open}
         title={open ? `Hide ${label}` : `Show ${label}`}
         aria-label={open ? `Hide ${label}` : `Show ${label}`}
-        className="w-full h-9 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+        className={cn(
+          "flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer",
+          /*
+            On a touch screen the fold button is a finger's 44 x 44 without
+            widening the rail by 26 px of drawing: it overhangs the drawing's
+            edge instead, on the side away from the panel.
+          */
+          coarse
+            ? cn(
+                "absolute top-1 z-20 w-11 h-11 rounded-md border border-border bg-card shadow",
+                side === "left" ? "left-0" : "right-0"
+              )
+            : "w-full h-9"
+        )}
       >
         <Chevron className="w-3.5 h-3.5" />
       </button>

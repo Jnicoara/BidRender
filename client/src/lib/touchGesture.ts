@@ -27,7 +27,12 @@
  * suite can reach, and a rule about which gesture places a mark on a bid is
  * one that needs a red to go to (CLAUDE.md § "A rule is not a mechanism").
  */
-import { clampView, zoomAbout, type PlanView, type ViewBounds } from "./planView";
+import {
+  clampView,
+  zoomAbout,
+  type PlanView,
+  type ViewBounds,
+} from "./planView";
 
 /**
  * How far a finger may wander and still be a tap, in CSS px.
@@ -167,7 +172,11 @@ export function stepGesture(
         const last = { x: e.x, y: e.y };
         return {
           state: { ...state, last },
-          out: { type: "pan", dx: e.x - state.start.x, dy: e.y - state.start.y },
+          out: {
+            type: "pan",
+            dx: e.x - state.start.x,
+            dy: e.y - state.start.y,
+          },
         };
       }
       return { state: IDLE, out: { type: "end" } };
@@ -175,8 +184,7 @@ export function stepGesture(
 
     case "pinch": {
       if (e.type === "down") return { state, out: NONE }; // a third finger: ignored
-      if (e.type === "cancel")
-        return { state: IDLE, out: { type: "end" } };
+      if (e.type === "cancel") return { state: IDLE, out: { type: "end" } };
       const isA = e.id === state.a;
       const isB = e.id === state.b;
       if (!isA && !isB) return { state, out: NONE };
@@ -208,10 +216,16 @@ export function stepGesture(
 
     case "draining": {
       if (e.type === "down")
-        return { state: { kind: "draining", down: [...state.down, e.id] }, out: NONE };
+        return {
+          state: { kind: "draining", down: [...state.down, e.id] },
+          out: NONE,
+        };
       if (e.type === "up" || e.type === "cancel") {
         const down = state.down.filter(id => id !== e.id);
-        return { state: down.length ? { kind: "draining", down } : IDLE, out: NONE };
+        return {
+          state: down.length ? { kind: "draining", down } : IDLE,
+          out: NONE,
+        };
       }
       return { state, out: NONE };
     }
@@ -235,7 +249,10 @@ export function pinchView(
     frame.startA.x - frame.startB.x,
     frame.startA.y - frame.startB.y
   );
-  const d1 = Math.hypot(frame.nowA.x - frame.nowB.x, frame.nowA.y - frame.nowB.y);
+  const d1 = Math.hypot(
+    frame.nowA.x - frame.nowB.x,
+    frame.nowA.y - frame.nowB.y
+  );
   const factor = d0 > 0 ? d1 / d0 : 1;
   const mid0 = {
     x: (frame.startA.x + frame.startB.x) / 2,

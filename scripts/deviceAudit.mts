@@ -320,8 +320,7 @@ async function main() {
   mkdirSync(outDir, { recursive: true });
 
   const browser = await launchChrome();
-  const report: Record<string, Record<string, Measure & { shot: string }>> =
-    {};
+  const report: Record<string, Record<string, Measure & { shot: string }>> = {};
   let hard = 0;
   try {
     for (const size of sizes) {
@@ -333,9 +332,15 @@ async function main() {
         await gotoRoute(lp, "/dashboard");
         const m = await lp.evaluate(measureInPage);
         const shot = `${size.name}-login.jpg`;
-        await lp.screenshot({ path: path.join(outDir, shot), type: "jpeg", quality: 60, scale: "css" });
+        await lp.screenshot({
+          path: path.join(outDir, shot),
+          type: "jpeg",
+          quality: 60,
+          scale: "css",
+        });
         (report.login ??= {})[size.name] = { ...m, shot };
-        if (m.sidewaysScroll || m.overflowRight.length || m.cutOffBelow.length) hard++;
+        if (m.sidewaysScroll || m.overflowRight.length || m.cutOffBelow.length)
+          hard++;
         await anon.close();
       }
       for (const screen of screensFor(bidId)) {
@@ -344,9 +349,15 @@ async function main() {
         if (screen.key === "plans") await page.waitForTimeout(2500);
         const m = await page.evaluate(measureInPage);
         const shot = `${size.name}-${screen.key}.jpg`;
-        await page.screenshot({ path: path.join(outDir, shot), type: "jpeg", quality: 60, scale: "css" });
+        await page.screenshot({
+          path: path.join(outDir, shot),
+          type: "jpeg",
+          quality: 60,
+          scale: "css",
+        });
         (report[screen.key] ??= {})[size.name] = { ...m, shot };
-        if (m.sidewaysScroll || m.overflowRight.length || m.cutOffBelow.length) hard++;
+        if (m.sidewaysScroll || m.overflowRight.length || m.cutOffBelow.length)
+          hard++;
         const small = size.touch ? ` small=${m.smallTargets.length}` : "";
         console.log(
           `${size.name.padEnd(17)} ${screen.key.padEnd(11)} sideways=${m.sidewaysScroll ? "YES" : "no"} offRight=${m.overflowRight.length} cut=${m.cutOffBelow.length}${small}/${m.controls}`

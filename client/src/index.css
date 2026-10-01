@@ -394,6 +394,57 @@
     min-height: 44px;
   }
 
+  /*
+    ── A FINGER, ANYWHERE IN THE APP (references/device-audit.md) ──────────
+    Widened 2026-10-01 from the phone panel above to every screen, on any
+    device whose main pointer is a finger — phones AND tablets, either way
+    round. A laptop's mouse does not match `pointer: coarse`, so the laptop
+    keeps its dense rows exactly as they were.
+
+    1. Every control is at least 44 x 44 px (takeoff-spec ground rule 2).
+       min-*, not height/width, so a component's own h-7 or w-6 is outgrown
+       rather than fought. Checkboxes and switches are left their own size:
+       they sit inside a label that is the real target.
+    2. Nothing is reachable only by hovering. A control written as
+       `opacity-0 group-hover:opacity-100` is simply shown — a finger cannot
+       hover, so on a tablet those were buttons that did not exist. Matched
+       on the class itself, so one added next month is covered too.
+    `[data-compact]` opts a control out, for the rare one that is genuinely
+    not a target (a decorative chip); it must say why where it is used.
+  */
+  @media (pointer: coarse) {
+    :where(
+        button,
+        [role="button"],
+        [role="tab"],
+        [role="menuitem"],
+        [role="option"],
+        [role="combobox"],
+        a[href],
+        input:not([type="checkbox"]):not([type="radio"]):not(
+            [type="range"]
+          ):not([type="hidden"]),
+        select,
+        summary
+      ):not([data-compact]):not([role="checkbox"]):not([role="switch"]):not(
+        [role="radio"]
+      ) {
+      min-height: 44px;
+    }
+    :where(button, [role="button"], [role="tab"]):not([data-compact]):not(
+        [role="checkbox"]
+      ):not([role="switch"]):not([role="radio"]) {
+      min-width: 44px;
+    }
+    [class*="group-hover:opacity-100"].opacity-0,
+    [class*="group-hover:opacity-100"][class*="opacity-0"] {
+      /* !important: this sits in @layer components, and the utilities layer
+         (where opacity-0 lives) wins over it otherwise, whatever the
+         specificity. */
+      opacity: 1 !important;
+    }
+  }
+
   /* Number change flash */
   @keyframes num-flash {
     0% {

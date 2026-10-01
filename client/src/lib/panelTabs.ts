@@ -57,11 +57,12 @@ export function visibleTabs(
   readerAvailable: boolean,
   layout: PlansLayout = "laptop"
 ): PanelTab[] {
-  const order = layout === "phone" ? PHONE_ORDER : PANEL_TABS;
+  // A tablet gets the phone's order too: its sheets are a tab as well.
+  const order = layout === "laptop" ? PANEL_TABS : PHONE_ORDER;
   return order.filter(
     tab =>
       (tab !== "reader" || readerAvailable) &&
-      (tab !== "sheets" || layout === "phone")
+      (tab !== "sheets" || layout !== "laptop")
   );
 }
 

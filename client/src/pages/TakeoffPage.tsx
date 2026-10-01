@@ -80,6 +80,7 @@ import {
   PanelRight,
   TriangleAlert,
   RotateCcw,
+  SquareDashedMousePointer,
 } from "lucide-react";
 import { pinStylesForBid } from "@shared/pinLetters";
 import {
@@ -141,8 +142,12 @@ import {
   type GestureOutput,
   type GestureState,
 } from "@/lib/touchGesture";
-import { wantsNativeMenu } from "@/lib/nativeMenu";
+import { EDITABLE_SELECTOR, wantsNativeMenu } from "@/lib/nativeMenu";
+
+/** What a finger on the drawing reaches directly: real controls and boxes. */
+const TOUCH_NATIVE_SELECTOR = `button, a[href], label, [role="button"], [role="menuitem"], [data-touch-native], ${EDITABLE_SELECTOR}`;
 import { usePlansLayout } from "@/hooks/usePlansLayout";
+import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import { sheetDisplay, sheetLabel } from "@shared/sheetIdentity";
 import {
   isPlansAddressFor,
@@ -760,6 +765,7 @@ function PlanPane({
   overlay,
   onUrlExpired,
   controlsTarget,
+  fitOnly = false,
   thumbnailWants,
   onThumbnail,
   focusRequest,
@@ -779,6 +785,11 @@ function PlanPane({
    * its own and a bar that has not mounted yet does not swallow the controls.
    */
   controlsTarget?: HTMLElement | null;
+  /**
+   * The phone: Fit alone. Two fingers zoom there, and the − % + trio cost the
+   * bar a whole row (device audit, 2026-10-01).
+   */
+  fitOnly?: boolean;
   /**
    * The pages worth a thumbnail right now, most wanted first — what the grid
    * and the pictures list have on screen (lib/thumbnailQueue.ts). Drawn one at
@@ -1513,6 +1524,12 @@ function PlanPane({
       if (e.pointerType !== "touch" || own.has(e)) return;
       if (!(e.target instanceof Node) || !vp.contains(e.target)) return;
       const target = e.target as Element;
+      // A real control on top of the drawing — a pill's Finish or ✕, a name
+      // box — is not the drawing. Left entirely to the browser, so a tap
+      // focuses a text box and a long-press there still opens the menu with
+      // the spelling fixes (@/lib/nativeMenu).
+      if (state.kind === "idle" && target.closest?.(TOUCH_NATIVE_SELECTOR))
+        return;
       if (
         state.kind === "idle" &&
         !forwarded &&
@@ -1568,9 +1585,7 @@ function PlanPane({
             : "cancel";
       if (type !== "move") held.delete(e.pointerId);
       feed(
-        type === "cancel"
-          ? { type, id: e.pointerId }
-          : { type, ...finger(e) },
+        type === "cancel" ? { type, id: e.pointerId } : { type, ...finger(e) },
         e.pointerId
       );
     };
@@ -2116,35 +2131,39 @@ function PlanPane({
           <Loader2 className="w-3 h-3 animate-spin" /> Drawing…
         </span>
       )}
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 w-7 p-0"
-        onClick={() => zoomByStep(1 / BUTTON_ZOOM_STEP)}
-        disabled={loading}
-        aria-label="Zoom out"
-        title="Zoom out (−)"
-      >
-        <Minus className="w-4 h-4" />
-      </Button>
-      <span
-        className="font-mono text-xs tabular-nums min-w-[3.5rem] text-center text-muted-foreground"
-        aria-live="polite"
-        aria-label={`Zoom ${formatZoom(view.zoom)}`}
-      >
-        {loading ? "—" : formatZoom(view.zoom)}
-      </span>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 w-7 p-0"
-        onClick={() => zoomByStep(BUTTON_ZOOM_STEP)}
-        disabled={loading}
-        aria-label="Zoom in"
-        title="Zoom in (+)"
-      >
-        <Plus className="w-4 h-4" />
-      </Button>
+      {!fitOnly && (
+        <>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={() => zoomByStep(1 / BUTTON_ZOOM_STEP)}
+            disabled={loading}
+            aria-label="Zoom out"
+            title="Zoom out (−)"
+          >
+            <Minus className="w-4 h-4" />
+          </Button>
+          <span
+            className="font-mono text-xs tabular-nums min-w-[3.5rem] text-center text-muted-foreground"
+            aria-live="polite"
+            aria-label={`Zoom ${formatZoom(view.zoom)}`}
+          >
+            {loading ? "—" : formatZoom(view.zoom)}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={() => zoomByStep(BUTTON_ZOOM_STEP)}
+            disabled={loading}
+            aria-label="Zoom in"
+            title="Zoom in (+)"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+        </>
+      )}
       <Button
         size="sm"
         variant="ghost"
@@ -2822,6 +2841,15 @@ export default function TakeoffPage({
   const [selectedStampIds, setSelectedStampIds] = useState<ReadonlySet<number>>(
     () => new Set()
   );
+  /**
+   * The finger's Shift and Alt (references/device-audit.md § Touch). Select:
+   * taps add or remove marks and a drag boxes them. Free: a new leg's first
+   * point does not snap. Both toolbar/pill switches, shown on a coarse
+   * pointer, because a tablet has no key to hold.
+   */
+  const coarse = useCoarsePointer();
+  const [touchSelect, setTouchSelect] = useState(false);
+  const [freeLegPoints, setFreeLegPoints] = useState(false);
   /** Waiting for "Delete N marks?" to be answered. */
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   /** The question as it was asked — see `deleteSelected`. */
@@ -4478,8 +4506,41 @@ export default function TakeoffPage({
     panel is one full-screen panel with the same tabs plus Sheets, opened from
     the bar under the drawing and closed by "← Plan".
   */
+  // Picking up a tool puts Select down: it only means anything with no tool
+  // armed, and left on it would quietly turn the next drag into a box.
+  useEffect(() => {
+    if (armedGroup || tracing) setTouchSelect(false);
+  }, [armedGroup, tracing]);
+
   const layout = usePlansLayout();
   const phone = layout === "phone";
+  /*
+    TABLET (references/device-audit.md, 2026-10-01): the panel stays BESIDE
+    the drawing, as on a laptop, but the sheet list becomes the panel's
+    Sheets tab as on a phone — two docked panels on an upright iPad left the
+    drawing a strip 116 px wide (measured). `compact` is "not a laptop".
+  */
+  const tablet = layout === "tablet";
+  const compact = layout !== "laptop";
+  const [windowWidth, setWindowWidth] = useState(() =>
+    typeof window === "undefined" ? 1536 : window.innerWidth
+  );
+  useEffect(() => {
+    const onResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  /**
+   * The panel on a tablet: the width the person chose, but never more than
+   * 38% of the screen, so an upright tablet keeps most of it for the drawing
+   * (820 px upright → 312 px panel; sideways the chosen 400 px still fits).
+   */
+  const workWidth = tablet
+    ? Math.max(
+        PANEL_LIMITS.work.min,
+        Math.min(panels.workWidth, Math.round(windowWidth * 0.38))
+      )
+    : panels.workWidth;
   const [phonePanelOpen, setPhonePanelOpen] = useState(false);
   /** Where the sheet list is portalled on the phone's Sheets tab. */
   const [sheetsSlot, setSheetsSlot] = useState<HTMLElement | null>(null);
@@ -7008,11 +7069,22 @@ export default function TakeoffPage({
         stays, because that is the bar you work from.
       */}
       {!focusMode && (
-        <div className="border-b border-border px-6 py-2 shrink-0">
+        <div
+          className={cn(
+            "border-b border-border shrink-0",
+            phone ? "px-2 py-1" : "px-6 py-2"
+          )}
+        >
           {/* Wraps (2026-09-29): on one line at phone width "Add PDF" sat
               76px past the edge, measured. The title keeps the first line
-              (basis-56) and the buttons drop below it whole. */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              (basis-56) and the buttons drop below it whole. On the phone
+              the buttons are one ⋯ instead, so the line never wraps. */}
+          <div
+            className={cn(
+              "flex items-center gap-x-3 gap-y-2",
+              phone ? "flex-nowrap gap-x-1" : "flex-wrap"
+            )}
+          >
             <Button
               size="sm"
               variant="ghost"
@@ -7021,8 +7093,13 @@ export default function TakeoffPage({
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Bid
             </Button>
-            <div className="flex-1 min-w-0 basis-56">
-              <h1 className="text-lg font-semibold truncate">
+            <div className={cn("flex-1 min-w-0", !phone && "basis-56")}>
+              <h1
+                className={cn(
+                  "font-semibold truncate",
+                  phone ? "text-base" : "text-lg"
+                )}
+              >
                 Plans{bid?.bid?.name ? ` — ${bid.bid.name}` : ""}
               </h1>
               {/*
@@ -7034,55 +7111,102 @@ export default function TakeoffPage({
                 not reach the price, while the price moves underneath them, is
                 worse than saying nothing.
               */}
-              <p className="text-xs text-muted-foreground">
-                Set each sheet&apos;s scale, then mark and trace what is on it.
-                Counts you send to the bid change its price; the rest stay here
-                until you do.
-              </p>
+              {/* Laptop only: on a tablet or phone it was two or three lines
+                  of height taken from the drawing on every visit, to say what
+                  the screen is for (device audit, 2026-10-01). */}
+              {!compact && (
+                <p className="text-xs text-muted-foreground">
+                  Set each sheet&apos;s scale, then mark and trace what is on
+                  it. Counts you send to the bid change its price; the rest stay
+                  here until you do.
+                </p>
+              )}
             </div>
+            {/*
+              THE PHONE: the three bid-level actions behind one ⋯, so the
+              header is one line and the drawing gets the rest. Same three
+              actions, same handlers — no phone-only copy of what they do.
+            */}
+            {phone && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 w-8 px-0 shrink-0"
+                    aria-label="More for this bid's plans"
+                    title="Materials list, export, add a PDF"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => setMaterialsListOpen(true)}>
+                    <ClipboardList className="w-3.5 h-3.5" /> Materials list
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setTakeoffExportOpen(true)}>
+                    <FileSpreadsheet className="w-3.5 h-3.5" /> Export takeoff
+                  </DropdownMenuItem>
+                  {docs.length > 0 && (
+                    <DropdownMenuItem
+                      disabled={uploading}
+                      onSelect={() => fileInput.current?.click()}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      {uploading ? "Uploading…" : "Add PDF"}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             {/* Left of "Add PDF" and available from the first mark, not at the
               end: a supplier quote is how a contractor finds out what things
               cost, so it must not sit behind a finished, priced bid. It stays
               outlined rather than filled because adding a plan is still the
               louder action on this screen. */}
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1.5 text-xs shrink-0"
-              onClick={() => setMaterialsListOpen(true)}
-              title="Materials list — quantities only, for a supplier quote"
-            >
-              <ClipboardList className="w-3.5 h-3.5" /> Materials list
-            </Button>
-            {/* The takeoff itself, by sheet and type — the door out to a
+            {!phone && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-xs shrink-0"
+                  onClick={() => setMaterialsListOpen(true)}
+                  title="Materials list — quantities only, for a supplier quote"
+                >
+                  <ClipboardList className="w-3.5 h-3.5" /> Materials list
+                </Button>
+                {/* The takeoff itself, by sheet and type — the door out to a
                 spreadsheet. Beside the materials list because both are files
                 that leave the app; outlined, like it. */}
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1.5 text-xs shrink-0"
-              onClick={() => setTakeoffExportOpen(true)}
-              title="Every count and run, by sheet and type — prices only if you ask"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" /> Export takeoff
-            </Button>
-            {docs.length > 0 && (
-              <Button
-                size="sm"
-                className="h-8 gap-1.5 text-xs shrink-0"
-                onClick={() => fileInput.current?.click()}
-                disabled={uploading}
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading…
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-3.5 h-3.5" /> Add PDF
-                  </>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-xs shrink-0"
+                  onClick={() => setTakeoffExportOpen(true)}
+                  title="Every count and run, by sheet and type — prices only if you ask"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> Export takeoff
+                </Button>
+                {docs.length > 0 && (
+                  <Button
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs shrink-0"
+                    onClick={() => fileInput.current?.click()}
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />{" "}
+                        Uploading…
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5" /> Add PDF
+                      </>
+                    )}
+                  </Button>
                 )}
-              </Button>
+              </>
             )}
           </div>
         </div>
@@ -7270,19 +7394,25 @@ export default function TakeoffPage({
             it would have nothing to offer them as. Not on a locked bid, which
             takes no new marks.
           */}
-          {armedGroup && activeSheet && !tracing && !quantitiesLocked && (
-            <Button
-              size="sm"
-              variant={findSession ? "secondary" : "outline"}
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => (findSession ? setFindSession(null) : startFind())}
-              title="Box one symbol and find every copy of it on this sheet. Nothing is counted until you confirm it."
-              aria-pressed={Boolean(findSession)}
-            >
-              <ScanSearch className="w-3.5 h-3.5" />
-              Find all matching
-            </Button>
-          )}
+          {!phone &&
+            armedGroup &&
+            activeSheet &&
+            !tracing &&
+            !quantitiesLocked && (
+              <Button
+                size="sm"
+                variant={findSession ? "secondary" : "outline"}
+                className="h-7 gap-1.5 text-xs"
+                onClick={() =>
+                  findSession ? setFindSession(null) : startFind()
+                }
+                title="Box one symbol and find every copy of it on this sheet. Nothing is counted until you confirm it."
+                aria-pressed={Boolean(findSession)}
+              >
+                <ScanSearch className="w-3.5 h-3.5" />
+                Find all matching
+              </Button>
+            )}
 
           {activeSheet && !tracing && <div className="w-px h-4 bg-border" />}
 
@@ -7294,7 +7424,7 @@ export default function TakeoffPage({
             sheet the screen offered NO tool at all, and a tool that is not on
             screen does not read as unavailable, it reads as non-existent.
           */}
-          {activeSheet && !tracing && (
+          {!phone && activeSheet && !tracing && (
             <>
               {/*
                 aria-disabled, not disabled. A truly disabled button gets
@@ -7434,7 +7564,7 @@ export default function TakeoffPage({
             "select"s doing different things was the confusion. It saves
             nothing and puts nothing on the sheet; it reads words to copy.
           */}
-          {activeSheet && !tracing && (
+          {!phone && activeSheet && !tracing && (
             <>
               <div className="w-px h-4 bg-border" />
               <Button
@@ -7475,17 +7605,19 @@ export default function TakeoffPage({
               >
                 <Undo2 className="w-3.5 h-3.5" />
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 w-7 px-0"
-                onClick={() => void stepBack("redo")}
-                disabled={undoBusy || nextRedo(undoState) === null}
-                title={redoTitle(undoState)}
-                aria-label={redoTitle(undoState)}
-              >
-                <Redo2 className="w-3.5 h-3.5" />
-              </Button>
+              {!phone && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 px-0"
+                  onClick={() => void stepBack("redo")}
+                  disabled={undoBusy || nextRedo(undoState) === null}
+                  title={redoTitle(undoState)}
+                  aria-label={redoTitle(undoState)}
+                >
+                  <Redo2 className="w-3.5 h-3.5" />
+                </Button>
+              )}
               {/*
                 DELETE, beside the arrows that take it back. It names what it
                 will delete ("Delete 3 marks") and is greyed out until
@@ -7518,6 +7650,86 @@ export default function TakeoffPage({
                   </Button>
                 );
               })()}
+              {/*
+                SELECT — the finger's Shift-click and Shift-drag (device audit,
+                touch #16/#17). Only on a coarse pointer: with a mouse the keys
+                already do it, and a switch nobody needs is a switch in the way.
+              */}
+              {coarse && !armedGroup && (!phone || touchSelect) && (
+                <Button
+                  size="sm"
+                  variant={touchSelect ? "default" : "outline"}
+                  className="h-7 gap-1.5 px-2 text-xs"
+                  onClick={() => setTouchSelect(on => !on)}
+                  aria-pressed={touchSelect}
+                  title={
+                    touchSelect
+                      ? "Selecting — tap marks to add or remove, drag to box them. Tap to stop."
+                      : "Select several marks: tap them, or drag a box"
+                  }
+                >
+                  <SquareDashedMousePointer className="w-3.5 h-3.5" />
+                  Select
+                </Button>
+              )}
+              {/*
+                THE PHONE'S TOOLS (device audit, 2026-10-01). A phone is for
+                checking a bid and quick counts, so the bar keeps Count, Undo
+                and Delete and everything else moves behind this one button —
+                still there, because manual mode must stay complete (CLAUDE.md
+                § AI features), just not taking half the screen. Each item
+                calls exactly what its toolbar button calls.
+              */}
+              {phone && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1.5 px-2 text-xs"
+                      aria-label="More tools"
+                    >
+                      <MoreHorizontal className="w-3.5 h-3.5" /> Tools
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      disabled={!measurability}
+                      onSelect={() => startTracing("conduit")}
+                    >
+                      <ConduitIcon className="w-3.5 h-3.5" /> Trace{" "}
+                      {armedRunType.conduit?.label ?? "conduit"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={!measurability}
+                      onSelect={() => startTracing("cable")}
+                    >
+                      <CableIcon className="w-3.5 h-3.5" /> Trace{" "}
+                      {armedRunType.cable?.label ?? "cable"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => startSelectingText()}>
+                      <TextSelect className="w-3.5 h-3.5" /> Copy text
+                    </DropdownMenuItem>
+                    {armedGroup && !quantitiesLocked && (
+                      <DropdownMenuItem onSelect={() => startFind()}>
+                        <ScanSearch className="w-3.5 h-3.5" /> Find all matching
+                      </DropdownMenuItem>
+                    )}
+                    {!armedGroup && (
+                      <DropdownMenuItem onSelect={() => setTouchSelect(true)}>
+                        <SquareDashedMousePointer className="w-3.5 h-3.5" />
+                        Select several marks
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      disabled={undoBusy || nextRedo(undoState) === null}
+                      onSelect={() => void stepBack("redo")}
+                    >
+                      <Redo2 className="w-3.5 h-3.5" /> {redoTitle(undoState)}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </>
           )}
 
@@ -7607,7 +7819,8 @@ export default function TakeoffPage({
               Counting needs no scale, and a specifications or legend sheet has
               nothing on it to measure at all.
             */}
-            {activeSheet && (
+            {/* On the phone only while tracing, where the length needs it. */}
+            {activeSheet && (!phone || tracing) && (
               <ScaleControl
                 sheet={activeSheet}
                 wanted={
@@ -7638,19 +7851,25 @@ export default function TakeoffPage({
               makes flat distance measurable, the other makes vertical distance
               measurable, and neither of them counts anything until it is set.
             */}
-            <JobHeightsChip
-              bidId={bidId}
-              onChanged={() => refreshFor("heights")}
-            />
+            {!phone && (
+              <>
+                <JobHeightsChip
+                  bidId={bidId}
+                  onChanged={() => refreshFor("heights")}
+                />
 
-            <div className="w-px h-4 bg-border" />
+                <div className="w-px h-4 bg-border" />
+              </>
+            )}
 
             {/* PlanPane portals its zoom cluster in here. */}
             <div ref={setZoomSlot} className="flex items-center" />
 
-            <div className="w-px h-4 bg-border" />
+            {!phone && <div className="w-px h-4 bg-border" />}
 
+            {/* No Focus on the phone: it has no side panels to put away. */}
             <Button
+              hidden={phone}
               size="sm"
               variant={focusMode ? "default" : "ghost"}
               className="h-7 gap-1.5 px-2 text-xs"
@@ -7743,7 +7962,7 @@ export default function TakeoffPage({
           <SidePanel
             side="left"
             label="the sheet list"
-            phone={phone ? { as: "portal", target: sheetsSlot } : undefined}
+            phone={compact ? { as: "portal", target: sheetsSlot } : undefined}
             open={panels.sheets}
             width={panels.sheetsWidth}
             minWidth={PANEL_LIMITS.sheets.min}
@@ -7879,6 +8098,7 @@ export default function TakeoffPage({
               focusRequest={focusRequest}
               onPage={setPage}
               controlsTarget={zoomSlot}
+              fitOnly={phone}
               thumbnailWants={wantedThumbnails}
               onThumbnail={rememberThumbnail}
               onPageCount={pageCount =>
@@ -8249,6 +8469,9 @@ export default function TakeoffPage({
                         })
                       }
                       onClearSelection={() => setSelectedStampIds(new Set())}
+                      selectMode={touchSelect}
+                      freePoints={freeLegPoints}
+                      onToggleFreePoints={() => setFreeLegPoints(on => !on)}
                       focusPoint={focusPoint}
                       chromeTarget={size.chromeTarget}
                       legs={{
@@ -8322,7 +8545,7 @@ export default function TakeoffPage({
             phone={
               phone
                 ? {
-                    as: "fullScreen",
+                    as: "sheet",
                     open: phonePanelOpen,
                     onClose: () => setPhonePanelOpen(false),
                     // Named as the toolbar's sheet chip names it, from the
@@ -8337,7 +8560,7 @@ export default function TakeoffPage({
                 : undefined
             }
             open={panels.work}
-            width={panels.workWidth}
+            width={workWidth}
             minWidth={PANEL_LIMITS.work.min}
             maxWidth={PANEL_LIMITS.work.max}
             onToggle={() =>
@@ -8622,7 +8845,7 @@ export default function TakeoffPage({
               tabs={panelTabs}
               onTab={choosePanelTab}
               warnedTabs={warnedTabs}
-              phone={phone}
+              phone={compact}
               onSheetsSlot={setSheetsSlot}
               focusGroupId={
                 selectedStampIds.size === 0
