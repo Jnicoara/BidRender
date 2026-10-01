@@ -4603,6 +4603,14 @@ The library is too small to train on, the symbols are too similar for a generic
 image embedding to separate, and a user with 40 symbols will never generate
 enough labelled data to make any of it better than the funnel above.
 
+> **Narrowed 2026-10-01 (Track C): matching the PDF's own LINE WORK on ONE
+> sheet is realistic, and measured.** "Find all matching" boxes a symbol on a
+> CAD sheet and finds every copy of its segments and words on that sheet, no
+> AI — 44 of 46 hand marks on Weld 1 E-200, 0.1 s a search, look-alikes
+> flagged, scans refused. The rejection above still stands for what it named:
+> PIXEL matching of stored thumbnails across a SET. Plan and numbers:
+> `references/find-all-matching-plan.md`.
+
 ### 9.4 THE THING THAT NEEDS CARE: a remembered match must never apply itself
 
 **Engineering firms use different symbols.** There are common conventions and
