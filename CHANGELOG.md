@@ -6,6 +6,19 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-30]
 
+- **A legend symbol counts the moment you click it, assembly or not.**
+  Clicking a symbol nobody has linked used to stop and ask which assembly it
+  was, so a light fixture a supplier will price as a package could not be
+  counted at all. Now the click starts counting it by name, and "Link" sits
+  beside the symbol for whenever you want it. Any count made by name has a
+  "Link assembly…" control on its card, which turns it into an assembly
+  count with every mark kept.
+- **The materials list has a "Supplier to price" section.** Counts with no
+  assembly behind them — "A1 luminaire: 38" — are listed there by name and
+  quantity, in the dialog, the CSV and the PDF, for the supplier to quote as
+  a package. They used to appear only in a note saying they could not be
+  itemised. They never show a price, and never $0.
+
 - **A sheet's scale no longer sits on top of the next sheet in the sheet
   list.** Setting a scale grew that row by a line, and for a moment (or for
   as long as the tab was in the background) the list still had it at its old

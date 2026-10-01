@@ -17,7 +17,13 @@
  * row — which is exactly the column this document does not print.
  */
 import { jsPDF } from "jspdf";
-import { unitLabel, type MaterialsListDoc } from "@shared/materialsList";
+import {
+  SUPPLIER_TO_PRICE_HEADING,
+  SUPPLIER_TO_PRICE_NOTE,
+  isEmptyList,
+  unitLabel,
+  type MaterialsListDoc,
+} from "@shared/materialsList";
 
 const INK = [24, 24, 24] as [number, number, number];
 const MUTED = [110, 110, 110] as [number, number, number];
@@ -194,7 +200,28 @@ export function buildMaterialsListPdf(doc: MaterialsListDoc): jsPDF {
     }
   }
 
-  if (doc.entries.length === 0 && doc.measured.length === 0) {
+  // ── Counts with no parts list: the supplier's to price ────────────────────
+  if (doc.forQuote.length > 0) {
+    room(50);
+    y += 10;
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(...INK);
+    pdf.text(SUPPLIER_TO_PRICE_HEADING, ML, y);
+    y += 6;
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(...MUTED);
+    y += 10;
+    pdf.text(SUPPLIER_TO_PRICE_NOTE, ML, y);
+    y += 16;
+    tableHead("Counted");
+    for (const entry of doc.forQuote) {
+      row(entry.name, String(entry.qty), unitLabel(entry.unit));
+    }
+  }
+
+  if (isEmptyList(doc)) {
     pdf.setFontSize(10);
     pdf.setTextColor(...MUTED);
     pdf.text("Nothing has been taken off this bid yet.", ML, y);

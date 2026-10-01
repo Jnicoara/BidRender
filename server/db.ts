@@ -8631,6 +8631,54 @@ export async function updateTakeoffGroup(
 }
 
 /**
+ * Change what a count IS — a plain count gets an assembly, or loses one —
+ * with every mark kept (legend plan § 8a; plan-viewer-overhaul.md § 16, "mark
+ * first, name it after").
+ *
+ * The group and its marks move in ONE transaction. A mark carries the assembly
+ * it was counted under (`takeoff_stamps.assemblyId`), and the materials list
+ * and the mark colours read it from there, so a group that changed while its
+ * marks did not would itemise nothing and draw the old colour — a count that
+ * says it is linked while the supply list says it is not.
+ *
+ * The label is left alone: it is what the estimator called the thing on this
+ * job. Any typed price goes, because an assembly prices it from here on and
+ * two prices on one count is two answers to one question.
+ */
+export async function setGroupSource(
+  id: number,
+  userId: number,
+  assembly: { id: number; name: string; category: string | null } | null
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.transaction(async tx => {
+    await tx
+      .update(takeoffGroups)
+      .set({
+        kind: assembly ? "assembly" : "plain",
+        assemblyId: assembly?.id ?? null,
+        materialId: null,
+        unitCost: null,
+        unitHours: null,
+        laborRateId: null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(takeoffGroups.id, id), eq(takeoffGroups.userId, userId)));
+    await tx
+      .update(takeoffStamps)
+      .set({
+        assemblyId: assembly?.id ?? null,
+        assemblyName: assembly?.name ?? null,
+        assemblyCategory: assembly?.category ?? null,
+      })
+      .where(
+        and(eq(takeoffStamps.groupId, id), eq(takeoffStamps.userId, userId))
+      );
+  });
+}
+
+/**
  * Remove a counted thing, and with it every mark on the drawing.
  *
  * The marks go by the foreign key's `cascade`, not by a second statement here —

@@ -253,7 +253,7 @@ export function CoPilotPanel({
               ? "No legend symbols yet. Capture one from the sheet's legend below and link it to an assembly — that is what tells the reader what a symbol means."
               : symbolQuery.trim()
                 ? "None of your linked legend symbols match that."
-                : "Your legend symbols are not linked to anything yet. Click one in the Legend below to link it to an assembly, then come back here."}
+                : "Your legend symbols are not linked to anything yet. Press Link beside one in the Legend below to choose its assembly, then come back here."}
           </p>
         )}
       </div>

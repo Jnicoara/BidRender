@@ -3292,10 +3292,41 @@ export default function TakeoffPage({
           !row.sendability.sendable &&
           row.sendability.reason === "already-on-bid",
         sendable: row.sendability.sendable,
+        // Made by name, with nothing from the library behind it (§ 8a).
+        byNameOnly: row.kind === "plain" || row.kind === "typed",
       });
     }
     return map;
   }, [bidCounts.data]);
+
+  /*
+    LINK AN ASSEMBLY TO A COUNT made without one (legend plan § 8a). Every
+    mark is kept and changes what it counts, on every sheet — so the other
+    sheets' cached marks go too, as for a count deleted.
+  */
+  const setGroupSource = trpc.takeoffGroups.setSource.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: (_result, vars) => {
+      const label =
+        bidCounts.data?.groups.find(g => g.id === vars.id)?.label ?? "count";
+      const assembly = allAssemblies.find(a => a.id === vars.assemblyId);
+      toast.success(
+        assembly
+          ? `"${label}" now counts ${assembly.name}. Every mark kept.`
+          : `"${label}" is a count by name again.`
+      );
+      // The armed tool follows, so the next click is the same thing.
+      setArmedGroup(armed =>
+        armed && armed.groupId === vars.id
+          ? { ...armed, assemblyId: vars.assemblyId }
+          : armed
+      );
+    },
+    onSettled: () => {
+      refreshFor("countSource");
+      void utils.takeoffStamps.listForSheet.invalidate();
+    },
+  });
 
   const sendToBid = trpc.takeoffGroups.sendToBid.useMutation({
     onError: e => toast.error(e.message),
@@ -6868,6 +6899,14 @@ export default function TakeoffPage({
               waitingToSend={bidCounts.data?.waitingToSend}
               countedWithNoPrice={bidCounts.data?.countedWithNoPrice}
               onSendToBid={id => sendToBid.mutate({ id })}
+              linkAssemblies={allAssemblies.map(a => ({
+                id: a.id,
+                name: a.name,
+                category: a.category ?? null,
+              }))}
+              onLinkAssembly={(id, assemblyId) =>
+                setGroupSource.mutate({ id, assemblyId })
+              }
               sendingGroupId={
                 sendToBid.isPending ? (sendToBid.variables?.id ?? null) : null
               }
@@ -7148,6 +7187,32 @@ export default function TakeoffPage({
                       groupForAssembly
                         .mutateAsync({ bidId, assemblyId: assembly.id })
                         .then(group => armGroup(group, assembly.id))
+                        .catch(() => {
+                          /* the mutation's onError has already said so */
+                        });
+                    }}
+                    onCountSymbol={symbol => {
+                      /*
+                        A plain count under the symbol's name (§ 8a). Reused,
+                        not refused, when the bid already has it: clicking
+                        the same symbol again means "keep counting that".
+                      */
+                      if (quantitiesLocked) {
+                        toast.error(
+                          lockedEditRefusal("new marks cannot be placed")
+                        );
+                        return;
+                      }
+                      createGroup
+                        .mutateAsync({
+                          bidId,
+                          label: symbol.label,
+                          reuseExisting: true,
+                        })
+                        .then(group => {
+                          armGroup(group, null);
+                          void utils.takeoffGroups.list.invalidate({ bidId });
+                        })
                         .catch(() => {
                           /* the mutation's onError has already said so */
                         });

@@ -12,11 +12,16 @@
  */
 import { markAppearance, markPath } from "@shared/takeoffMarks";
 import { Fragment, useState } from "react";
+import {
+  AssemblySearchList,
+  type SearchableAssembly,
+} from "./AssemblySearchList";
 import { layoutLegs } from "@/lib/runLegs";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/money";
 import {
   Check,
+  Link2,
   Plus,
   Sparkles,
   Trash2,
@@ -924,6 +929,12 @@ export type GroupBridgeState = {
   onBid: boolean;
   /** Can go over now. False covers "no price" and "not built yet" alike. */
   sendable: boolean;
+  /**
+   * Counted by name, with no assembly behind it (kinds `plain` and `typed`).
+   * The card then offers "Link assembly" — legend plan § 8a. Optional so a
+   * caller that never offers linking need not say.
+   */
+  byNameOnly?: boolean;
 };
 
 export type PanelStampGroup = {
@@ -1055,6 +1066,8 @@ export function RunsPanel({
   waitingToSend,
   countedWithNoPrice,
   onSendToBid,
+  linkAssemblies,
+  onLinkAssembly,
   sendingGroupId,
   onJumpTo,
   onRemoveStamp,
@@ -1164,6 +1177,12 @@ export function RunsPanel({
   countedWithNoPrice?: number;
   waitingToSend?: number;
   onSendToBid?: (groupId: number) => void;
+  /**
+   * The library, for "Link assembly" on a count made by name (§ 8a). Both
+   * this and `onLinkAssembly` must be given for the control to appear.
+   */
+  linkAssemblies?: SearchableAssembly[];
+  onLinkAssembly?: (groupId: number, assemblyId: number) => void;
   /** The count currently crossing, so its own control can say so. */
   sendingGroupId?: number | null;
   /** Move the viewer to a mark on the drawing and highlight it. */
@@ -1271,6 +1290,8 @@ export function RunsPanel({
 }) {
   const [addingTo, setAddingTo] = useState<number | null>(null);
   const [circuitName, setCircuitName] = useState("");
+  /** The count whose "which assembly?" search is open, if any. */
+  const [linkingGroupId, setLinkingGroupId] = useState<number | null>(null);
   const emptiedAt = emptiedCardIndex(stampGroups.length, emptiedCount);
 
   /**
@@ -1447,26 +1468,72 @@ export function RunsPanel({
                 }
                 // No Send on a locked bid: the server refuses it (lockGuard),
                 // and the locked notice below says why.
-                if (!state.sendable || !onSendToBid || quantitiesLocked)
-                  return null;
+                if (quantitiesLocked) return null;
                 const busy = sendingGroupId === group.groupId;
+                const canSend = state.sendable && onSendToBid;
+                /*
+                  LINK AN ASSEMBLY, any time (legend plan § 8a). Offered on a
+                  count made by name and not yet on the bid — the server
+                  refuses one on the bid, whose line was priced there. Not a
+                  nag: one quiet word beside Send, never a badge.
+                */
+                const canLink =
+                  state.byNameOnly && linkAssemblies && onLinkAssembly;
+                if (!canSend && !canLink) return null;
                 return (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => onSendToBid(group.groupId as number)}
-                    className="mt-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
-                  >
-                    {/*
-                    The BID's count, not this sheet's. A count marked across
-                    five sheets sends all of them, and a control reading "Send 5
-                    to bid" beside a panel showing five of fourteen would be
-                    telling the truth about the wrong number.
-                  */}
-                    {busy ? "Sending…" : `Send ${state.bidCount} to bid`}
-                  </button>
+                  <div className="mt-1 flex items-center gap-3">
+                    {canSend && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onSendToBid(group.groupId as number)}
+                        className="text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
+                      >
+                        {/*
+                        The BID's count, not this sheet's. A count marked across
+                        five sheets sends all of them, and a control reading "Send 5
+                        to bid" beside a panel showing five of fourteen would be
+                        telling the truth about the wrong number.
+                      */}
+                        {busy ? "Sending…" : `Send ${state.bidCount} to bid`}
+                      </button>
+                    )}
+                    {canLink && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setLinkingGroupId(id =>
+                            id === group.groupId ? null : group.groupId
+                          )
+                        }
+                        className="inline-flex items-center gap-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                        title="Choose the assembly this count is — every mark is kept"
+                      >
+                        <Link2 className="w-3 h-3" /> Link assembly…
+                      </button>
+                    )}
+                  </div>
                 );
               })()}
+              {linkingGroupId !== null &&
+                linkingGroupId === group.groupId &&
+                linkAssemblies &&
+                onLinkAssembly && (
+                  <div className="mt-1.5 rounded border border-border bg-muted/20 p-2 space-y-1.5">
+                    <p className="text-[0.7rem] text-muted-foreground">
+                      Which assembly is “{group.name}”? Every mark is kept and
+                      counts it from now on.
+                    </p>
+                    <AssemblySearchList
+                      assemblies={linkAssemblies}
+                      onPick={assembly => {
+                        onLinkAssembly(group.groupId as number, assembly.id);
+                        setLinkingGroupId(null);
+                      }}
+                      onCancel={() => setLinkingGroupId(null)}
+                    />
+                  </div>
+                )}
               {/* The drop to each of these devices (held-migrations plan § 3):
                 set once on the count, shown once set. */}
               {group.groupId !== null &&
