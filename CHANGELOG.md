@@ -14,6 +14,11 @@ This is the human-readable companion to the git history — read this to see wha
   stays on one line rather than breaking in two, and a long one like
   3/16" = 1'-0" now fits in full even with the list dragged to its narrowest.
 
+- **A proposal for a bid with nothing on it no longer shows the client
+  $0.00.** It says "No work added yet" where the total would be, and Print /
+  Save PDF / Ctrl+P is blocked with a plain message to add work to the bid
+  first — the same way unpriced lines are blocked.
+
 ## [2026-09-29]
 
 - **A proposal can no longer show a client $0.00 or a short total.** If any

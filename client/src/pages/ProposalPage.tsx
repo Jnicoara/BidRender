@@ -201,8 +201,12 @@ export default function ProposalPage({
   const unpricedList = mode === "full" && data ? data.notPricedLines : [];
   const headline = notPricedHeadline(notPriced);
   const [confirmPrint, setConfirmPrint] = useState(false);
+  // A bid with no lines is blocked the same way (owner, 2026-09-30): its
+  // total is $0.00 and there is nothing to price, so the list is empty and
+  // the dialog says to add work instead.
+  const noWork = mode === "full" && !!data?.document.investment.noWork;
   const requestPrint = () => {
-    if (anyNotPriced(notPriced)) setConfirmPrint(true);
+    if (noWork || anyNotPriced(notPriced)) setConfirmPrint(true);
     else print();
   };
   // Ctrl+P goes through the same question as the button. A ref, so the
@@ -610,15 +614,27 @@ export default function ProposalPage({
         <AlertDialogContent className="bp-no-print">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Price {headline.one ? "this" : "these"} before sending
+              {noWork
+                ? "Add work before sending"
+                : `Price ${headline.one ? "this" : "these"} before sending`}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {headline.text}, so the total would be short. The proposal can't
-              be printed or saved until {headline.one ? "it is" : "they are"}{" "}
-              priced on the bid.
+              {noWork ? (
+                <>
+                  This bid has no lines yet, so the total would be $0.00. The
+                  proposal can't be printed or saved until work is added to the
+                  bid.
+                </>
+              ) : (
+                <>
+                  {headline.text}, so the total would be short. The proposal
+                  can't be printed or saved until{" "}
+                  {headline.one ? "it is" : "they are"} priced on the bid.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {unpricedList.length > 0 && (
+          {!noWork && unpricedList.length > 0 && (
             <ul className="text-sm list-disc pl-5 space-y-0.5 max-h-48 overflow-y-auto">
               {unpricedList.map((item, i) => (
                 <li key={i}>
