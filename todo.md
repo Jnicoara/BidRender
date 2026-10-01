@@ -3,6 +3,63 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Open tabs keep running the OLD code after a deploy — plan, 2026-09-30 (not built)
+
+**Yes, they do.** A tab that was open before a deploy keeps the old JS in
+memory until the page is reloaded. Nothing tells it a new build exists:
+`/api/version` (`server/_core/index.ts`, `no-store`, returns `builtAt` and
+`commit`) is polled by nothing in `client/src`, and the service worker
+(`client/public/sw.js`) has no `updatefound` / `controllerchange` handling.
+So a fix like 6a3defa (proposal never shows $0) does not reach somebody with
+BidRidge already open. They keep printing $0 until they happen to refresh.
+That is a wrong-number risk, not just a cosmetic one.
+
+**Why staging needed a HARD refresh is NOT explained by the code. Find out
+before building on a guess.** Read from the source:
+
+- navigations are network-first (`sw.js` `networkFirstDocument`), and Express
+  serves `index.html` with `max-age=0` + ETag, so a plain reload should fetch
+  the new `index.html` and its new hashed assets;
+- `/assets/*` is cache-first FOREVER (`cacheFirst`), and a missing asset falls
+  through the `"*"` route in `server/_core/vite.ts` `serveStatic` as
+  `index.html` with a **200**, which `cacheFirst` then STORES under the asset's
+  URL. A request that reaches an old instance mid-rollout could therefore pin a
+  broken asset in that browser until the caches are cleared. A hard refresh
+  bypasses the service worker, which would fit what was seen;
+- or the plain reload simply came before the 3–6 minute rebuild was serving.
+
+Check on the next staging deploy: before refreshing, record the loaded
+`index-*.js` (DevTools → Sources) against what `/` serves now, and look in
+Application → Cache Storage → `helixbid-assets-v1` for an entry whose
+content-type is `text/html`.
+
+**The fix, small, in this order:**
+
+1. **"New version available — Refresh" banner.** A client hook reads its own
+   build stamp (`client/src/lib/buildStamp.ts`, already baked in at build)
+   and polls `/api/version` every ~5 min and on `visibilitychange` → visible
+   (when somebody returns to the tab, which is the common case). If `commit`
+   differs, show a non-modal bar with a Refresh button. **Do not auto-reload:**
+   a reload can drop a typed draft, an unsent stamp batch or an open dialog.
+   The bar says what to do and the user picks the moment. Skip in dev (no
+   stamp). The comparison goes in `client/src/lib` so vitest can reach it:
+   same commit / different commit / unreachable / no stamp. Unreachable must
+   never show the bar.
+2. **Never answer a missing `/assets/*` with `index.html`.** In `serveStatic`,
+   send a 404 for `/assets/` paths before the `"*"` fallthrough. In `sw.js`
+   `cacheFirst`, only cache a response whose content-type is not `text/html`.
+   Bump `CACHE_VERSION` so any poisoned entry is dropped (check
+   `server/pwa.test.ts`, which pins sw.js behaviour).
+3. **Recover from a failed chunk load.** Listen for `vite:preloadError` (the
+   lazy `BidRenderShell` import in `App.tsx`) and show the same Refresh bar
+   instead of a blank screen. Guard it so it cannot loop.
+4. **Optional: `Cache-Control: no-cache` on `index.html`** and
+   `public, max-age=31536000, immutable` on `/assets/*`, so no proxy or CDN
+   ever holds an old shell.
+
+Not in scope: forcing every open tab to reload, or `skipWaiting`. Both are
+deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
+
 ## SaaS Multi-User Upgrade (v4.0)
 
 - [x] Upgrade project to full-stack (database + auth + backend server)
