@@ -1043,6 +1043,39 @@ export type RunTypeBridgeEntry = {
   quantityFeet: number;
 };
 
+/**
+ * "This sheet: 3 marks · 6 items · 358 ft of runs" — the panel's pinned line,
+ * and on the phone the bar under the drawing too. ONE component for both, so
+ * the two can never count differently (CLAUDE.md § Copying a layout does not
+ * copy the behaviour).
+ */
+export function ThisSheetLine({
+  stampGroups,
+  runs,
+  className,
+}: {
+  stampGroups: readonly { count: number }[];
+  runs: readonly {
+    runTypeId: number | null;
+    isSuggestion: boolean;
+    quantities: { runFeet: number } | null;
+  }[];
+  className?: string;
+}) {
+  return (
+    <p className={className}>
+      {sheetLine({
+        counts: stampGroups,
+        runs: runs.map(r => ({
+          runTypeId: r.runTypeId,
+          isSuggestion: r.isSuggestion,
+          feet: r.quantities?.runFeet ?? null,
+        })),
+      })}
+    </p>
+  );
+}
+
 export function RunsPanel({
   runs,
   totals,
@@ -1079,6 +1112,8 @@ export function RunsPanel({
   tabs,
   onTab,
   warnedTabs,
+  phone = false,
+  onSheetsSlot,
   focusGroupId,
   renderRunEnds,
   renderRunType,
@@ -1209,6 +1244,10 @@ export function RunsPanel({
   onTab: (tab: PanelTab) => void;
   /** Tabs with something in them that needs a look (§ 1 rule 5). */
   warnedTabs: ReadonlySet<PanelTab>;
+  /** The phone layout: finger-sized tabs (plan § 3). */
+  phone?: boolean;
+  /** The element the phone's Sheets tab lends to the sheet list. */
+  onSheetsSlot?: (el: HTMLElement | null) => void;
   /** The count whose marks were just selected on the drawing, to show. */
   focusGroupId?: number | null;
   /**
@@ -1368,7 +1407,9 @@ export function RunsPanel({
       <div
         role="tablist"
         aria-label="Plan panel"
-        className="flex shrink-0 overflow-x-auto border-b border-border"
+        // No visible scrollbar: on a desktop browser at phone width it drew
+        // a 14px bar under the tabs (seen 2026-09-30); the strip still swipes.
+        className="flex shrink-0 overflow-x-auto border-b border-border [scrollbar-width:none]"
       >
         {tabs.map(t => {
           const active = t === tab;
@@ -1393,8 +1434,10 @@ export function RunsPanel({
               className={cn(
                 // px-1.5, not more: all five must fit the panel's 280px
                 // minimum, or Totals — the tab most likely to carry the
-                // warning mark — is the one scrolled out of sight.
-                "flex-1 min-w-fit flex items-center justify-center gap-1 px-1.5 h-9 text-xs border-b-2 whitespace-nowrap",
+                // warning mark — is the one scrolled out of sight. A
+                // finger's 44px on the phone (takeoff-spec ground rule 2).
+                "flex-1 min-w-fit flex items-center justify-center gap-1 px-1.5 text-xs border-b-2 whitespace-nowrap",
+                phone ? "h-11 text-sm px-2.5" : "h-9",
                 active
                   ? "border-[#F5C518] text-foreground font-medium"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -1418,16 +1461,11 @@ export function RunsPanel({
         runs and so counted nothing.
       */}
       <div className="px-3 py-1.5 border-b border-border shrink-0 text-xs">
-        <p className="text-foreground">
-          {sheetLine({
-            counts: stampGroups,
-            runs: runs.map(r => ({
-              runTypeId: r.runTypeId,
-              isSuggestion: r.isSuggestion,
-              feet: r.quantities?.runFeet ?? null,
-            })),
-          })}
-        </p>
+        <ThisSheetLine
+          stampGroups={stampGroups}
+          runs={runs}
+          className="text-foreground"
+        />
         {quantitiesLocked && (
           <p className="text-muted-foreground mt-0.5">
             This bid's quantities are locked, so its plans cannot be marked,
@@ -1454,6 +1492,14 @@ export function RunsPanel({
         can only reach by first scrolling something else to the bottom.
       */}
       <div ref={scrollerRef} className="flex-1 overflow-y-auto min-h-0">
+        {/*
+          THE PHONE'S SHEETS TAB: the left panel's own sheet list, portalled
+          here (SidePanel `phone.as === "portal"`). Full height, so the list's
+          own scroller is the one scroll area and this one has nothing to do.
+        */}
+        {tab === "sheets" && (
+          <div ref={onSheetsSlot} className="h-full flex flex-col min-h-0" />
+        )}
         {/* Stamped assemblies first: an estimator drops dozens per sheet and
             traces a handful of runs, so the thing they are actively adding to
             stays where they can watch it climb. */}

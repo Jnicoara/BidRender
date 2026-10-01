@@ -273,6 +273,35 @@ every row. Measure again on one before calling Part A done.
 > bar. With tabs, the phone gets the SAME tabs as one full-screen panel
 > instead: one way to see the panel, not a phone-only arrangement of it.
 
+> **THE PANEL'S PHONE LAYOUT IS BUILT, 2026-09-30 (track-b). Touch gestures
+> are NOT** — pan, pinch and guard 3 ship together or not at all (§ "Touch"
+> below), and this piece was the layout only. What landed:
+>
+> - `plansLayout()` in `client/src/lib/plansLayout.ts` (tested), read through
+>   `usePlansLayout()`.
+> - `SidePanel` takes a `phone` variant instead of a phone-only copy:
+>   the right panel is `fullScreen` ("← Plan", the sheet named as the
+>   toolbar names it), the sheet list is `portal`-ed into a **Sheets** tab.
+>   Phone tab order Sheets · Counts · Runs · Totals · Legend · Reader, so
+>   Totals' mark is never past the edge. Picking a sheet there closes the
+>   panel onto it.
+> - The bar under the drawing is `ThisSheetLine` — the SAME component as the
+>   panel's pinned line — plus an amber mark whenever any tab has one.
+> - The app's bottom nav hides on Plans (measured: it sat on the bar).
+> - `.phone-panel` gives every control inside the panel a 44 px minimum.
+>   Sheet rows measured 56 px after. The rename pencil shows on a coarse
+>   pointer.
+>
+> **Checked** in a same-origin frame at 390×844 and 360×740 (the driven
+> window cannot be resized): no sideways page scroll, nothing cut off below,
+> no control under 44 px inside the panel, opening and closing leaves the
+> drawing's transform identical, the address follows a sheet picked on the
+> phone, and back at 1536 the laptop layout returns unchanged. **Not
+> checked:** a real phone, `pointer: coarse` (no touch device here), and a
+> tablet turning mid-count. **Still the phone's biggest problem:** the TOOL
+> BAR, which wraps to about half of a 390×844 screen — not part of this
+> piece.
+
 ### What is wrong today (from `todo.md`, measured 2026-09-29)
 
 At a 390 px window the sheet list (240 px) and the counts panel (400 px, its

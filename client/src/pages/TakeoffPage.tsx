@@ -76,6 +76,8 @@ import {
   MoreHorizontal,
   Redo2,
   Undo2,
+  PanelRight,
+  TriangleAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -115,6 +117,8 @@ import {
   type PlanView,
   type ViewBounds,
 } from "@/lib/planView";
+import { usePlansLayout } from "@/hooks/usePlansLayout";
+import { sheetDisplay, sheetLabel } from "@shared/sheetIdentity";
 import {
   isPlansAddressFor,
   pageBeyondSet,
@@ -289,6 +293,7 @@ import { takePendingPlan } from "@/lib/pendingPlanUpload";
 import { TraceLayer, type DropMarker } from "@/components/takeoff/TraceLayer";
 import {
   RunsPanel,
+  ThisSheetLine,
   type GroupBridgeState,
 } from "@/components/takeoff/RunsPanel";
 import { TakeoffSummaryPanel } from "@/components/takeoff/TakeoffSummaryPanel";
@@ -3823,24 +3828,47 @@ export default function TakeoffPage({
     § 1, owner 2026-09-30). Remembered per person in this browser; rules in
     @/lib/panelTabs, which the suite can reach.
   */
+  /*
+    PHONE OR LAPTOP (plan § 3, @/lib/plansLayout). On the phone the right
+    panel is one full-screen panel with the same tabs plus Sheets, opened from
+    the bar under the drawing and closed by "← Plan".
+  */
+  const layout = usePlansLayout();
+  const phone = layout === "phone";
+  const [phonePanelOpen, setPhonePanelOpen] = useState(false);
+  /** Where the sheet list is portalled on the phone's Sheets tab. */
+  const [sheetsSlot, setSheetsSlot] = useState<HTMLElement | null>(null);
   const panelTabs = useMemo(
-    () => visibleTabs(readerAvailable),
-    [readerAvailable]
+    () => visibleTabs(readerAvailable, layout),
+    [readerAvailable, layout]
   );
   const [panelTab, setPanelTab] = useState<PanelTab>(() =>
-    readStoredTab(readerAvailable)
+    readStoredTab(readerAvailable, layout)
   );
   // The feature list can land after the first render; a remembered Reader
-  // tab then opens, and losing the reader closes it.
+  // tab then opens, and losing the reader closes it. The same for the
+  // layout: turning a tablet sideways takes Sheets away.
   useEffect(() => {
     setPanelTab(current =>
-      current === "reader" && !readerAvailable
+      !panelTabs.includes(current)
         ? "counts"
-        : current === "counts" && readerAvailable
-          ? readStoredTab(true)
+        : current === "counts"
+          ? readStoredTab(readerAvailable, layout)
           : current
     );
-  }, [readerAvailable]);
+  }, [readerAvailable, layout, panelTabs]);
+  /*
+    On the phone, picking a sheet on the Sheets tab means "show me it": the
+    panel closes onto the drawing. Only from that tab — a sheet that changes
+    while Counts or Totals is open (a jump from a row) leaves the panel be.
+  */
+  const sheetKey = `${selectedDocId}:${page}`;
+  const lastSheetKey = useRef(sheetKey);
+  useEffect(() => {
+    if (lastSheetKey.current === sheetKey) return;
+    lastSheetKey.current = sheetKey;
+    if (phone && panelTab === "sheets") setPhonePanelOpen(false);
+  }, [sheetKey, phone, panelTab]);
   const choosePanelTab = useCallback((tab: PanelTab) => {
     setPanelTab(tab);
     writeStoredTab(tab);
@@ -6647,6 +6675,7 @@ export default function TakeoffPage({
           <SidePanel
             side="left"
             label="the sheet list"
+            phone={phone ? { as: "portal", target: sheetsSlot } : undefined}
             open={panels.sheets}
             width={panels.sheetsWidth}
             minWidth={PANEL_LIMITS.sheets.min}
@@ -7027,6 +7056,23 @@ export default function TakeoffPage({
           <SidePanel
             side="right"
             label="counted items"
+            phone={
+              phone
+                ? {
+                    as: "fullScreen",
+                    open: phonePanelOpen,
+                    onClose: () => setPhonePanelOpen(false),
+                    // Named as the toolbar's sheet chip names it, from the
+                    // same function — "Sheet 1" here beside "E0.01" there
+                    // was seen on screen 2026-09-30.
+                    title: activeSheet
+                      ? sheetLabel(
+                          sheetDisplay(activeSheet, identities.get(page))
+                        )
+                      : `Sheet ${page}`,
+                  }
+                : undefined
+            }
             open={panels.work}
             width={panels.workWidth}
             minWidth={PANEL_LIMITS.work.min}
@@ -7326,6 +7372,8 @@ export default function TakeoffPage({
               tabs={panelTabs}
               onTab={choosePanelTab}
               warnedTabs={warnedTabs}
+              phone={phone}
+              onSheetsSlot={setSheetsSlot}
               focusGroupId={
                 selectedStampIds.size === 0
                   ? null
@@ -7454,6 +7502,34 @@ export default function TakeoffPage({
             />
           </SidePanel>
         </div>
+      )}
+
+      {/*
+        THE PHONE'S BAR UNDER THE DRAWING (plan § 3): this sheet's line, and
+        the way into the panel. A warning anywhere in the panel shows here
+        too — with the panel closed, its tabs' marks are out of sight, and a
+        line not on the bid is a bid that is short (plan § 4 item 2).
+      */}
+      {phone && doc && !phonePanelOpen && (
+        <button
+          type="button"
+          onClick={() => setPhonePanelOpen(true)}
+          className="flex h-12 shrink-0 items-center gap-2 border-t border-border bg-card px-3 text-left"
+          aria-label="Open the panel: counts, runs, sheets and totals"
+        >
+          <ThisSheetLine
+            stampGroups={stampGroups}
+            runs={visibleRuns}
+            className="min-w-0 flex-1 truncate text-sm"
+          />
+          {warnedTabs.size > 0 && (
+            <TriangleAlert
+              className="w-4 h-4 shrink-0 text-warning"
+              aria-label="something needs a look"
+            />
+          )}
+          <PanelRight className="w-5 h-5 shrink-0 text-muted-foreground" />
+        </button>
       )}
 
       {dragging && docs.length > 0 && (

@@ -9,7 +9,10 @@
  * no red to go to is an instruction").
  */
 
+import type { PlansLayout } from "@/lib/plansLayout";
+
 export const PANEL_TABS = [
+  "sheets",
   "counts",
   "runs",
   "legend",
@@ -18,7 +21,23 @@ export const PANEL_TABS = [
 ] as const;
 export type PanelTab = (typeof PANEL_TABS)[number];
 
+/**
+ * THE PHONE'S ORDER (plan § 3). The sheet list joins the tabs, because there
+ * is no room for a left panel, and Totals moves ahead of Legend and Reader:
+ * at 360px the strip scrolls sideways, and the tab that carries the warning
+ * mark must not be the one past the edge.
+ */
+const PHONE_ORDER: readonly PanelTab[] = [
+  "sheets",
+  "counts",
+  "runs",
+  "totals",
+  "legend",
+  "reader",
+];
+
 export const PANEL_TAB_LABELS: Record<PanelTab, string> = {
+  sheets: "Sheets",
   counts: "Counts",
   runs: "Runs",
   legend: "Legend",
@@ -31,33 +50,47 @@ export const PANEL_TAB_KEY = "bidrender.takeoff.panelTab";
 
 /**
  * The tabs this person can see. The Reader exists only when the reader does
- * (§ 1 rule 6) — a tab that opens on "this is off" is a dead end.
+ * (§ 1 rule 6) — a tab that opens on "this is off" is a dead end. Sheets
+ * exists only on the phone; on a laptop the sheets have their own panel.
  */
-export function visibleTabs(readerAvailable: boolean): PanelTab[] {
-  return PANEL_TABS.filter(tab => tab !== "reader" || readerAvailable);
+export function visibleTabs(
+  readerAvailable: boolean,
+  layout: PlansLayout = "laptop"
+): PanelTab[] {
+  const order = layout === "phone" ? PHONE_ORDER : PANEL_TABS;
+  return order.filter(
+    tab =>
+      (tab !== "reader" || readerAvailable) &&
+      (tab !== "sheets" || layout === "phone")
+  );
 }
 
 /**
  * The remembered tab, or Counts. Anything unrecognised — a value from a later
- * build, a hand-edited store, the Reader on an account without it — opens
- * Counts rather than an empty panel.
+ * build, a hand-edited store, the Reader on an account without it, Sheets on
+ * a laptop — opens Counts rather than an empty panel.
  */
 export function storedTab(
   raw: string | null | undefined,
-  readerAvailable: boolean
+  readerAvailable: boolean,
+  layout: PlansLayout = "laptop"
 ): PanelTab {
-  const tabs = visibleTabs(readerAvailable);
+  const tabs = visibleTabs(readerAvailable, layout);
   return (tabs as readonly string[]).includes(raw ?? "")
     ? (raw as PanelTab)
     : "counts";
 }
 
 /** Read inside try/catch: blocked storage just opens Counts (§ 1 rule 2). */
-export function readStoredTab(readerAvailable: boolean): PanelTab {
+export function readStoredTab(
+  readerAvailable: boolean,
+  layout: PlansLayout = "laptop"
+): PanelTab {
   try {
     return storedTab(
       window.localStorage.getItem(PANEL_TAB_KEY),
-      readerAvailable
+      readerAvailable,
+      layout
     );
   } catch {
     return "counts";

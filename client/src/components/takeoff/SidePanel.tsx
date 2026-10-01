@@ -19,8 +19,30 @@
  * not given the drawing back either.
  */
 import { useCallback, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+
+/**
+ * THE PHONE LAYOUT (references/track-b-phone-and-readability-plan.md § 3).
+ * Not docked beside the drawing — there is no room — but the SAME children,
+ * so there is no phone-only copy of either panel to drift:
+ *
+ * - `portal`: rendered into another element, which is how the sheet list
+ *   becomes the panel's Sheets tab.
+ * - `fullScreen`: the whole screen while open, closed by "← Plan". It
+ *   appears rather than sliding — a full-height panel that clips must not
+ *   move by keyframe (CLAUDE.md § Responsiveness rule 4).
+ */
+export type SidePanelPhone =
+  | { as: "portal"; target: HTMLElement | null }
+  | {
+      as: "fullScreen";
+      open: boolean;
+      onClose: () => void;
+      /** What the header says beside "← Plan" — the sheet you are on. */
+      title: React.ReactNode;
+    };
 
 /** The rail's width while the panel is OPEN, where it is also the resize grip. */
 export const PANEL_RAIL_WIDTH = 18;
@@ -37,8 +59,11 @@ export function SidePanel({
   onToggle,
   onWidth,
   label,
+  phone,
   children,
 }: {
+  /** Set on the phone layout only; see SidePanelPhone. */
+  phone?: SidePanelPhone;
   side: "left" | "right";
   open: boolean;
   width: number;
@@ -98,6 +123,39 @@ export function SidePanel({
    */
   const pointsLeft = side === "left" ? open : !open;
   const Chevron = pointsLeft ? ChevronLeft : ChevronRight;
+
+  if (phone?.as === "portal") {
+    return phone.target
+      ? createPortal(
+          <div className="h-full flex flex-col min-h-0">{children}</div>,
+          phone.target
+        )
+      : null;
+  }
+  if (phone?.as === "fullScreen") {
+    if (!phone.open) return null;
+    return (
+      <div
+        role="dialog"
+        aria-label={label}
+        className="phone-panel fixed inset-0 z-50 flex flex-col h-dvh bg-card"
+      >
+        <div className="flex items-center gap-2 border-b border-border px-1 shrink-0">
+          <button
+            type="button"
+            onClick={phone.onClose}
+            className="flex h-11 min-w-11 items-center gap-1.5 px-2 text-sm font-medium"
+          >
+            <ArrowLeft className="w-4 h-4" /> Plan
+          </button>
+          <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground text-right pr-2">
+            {phone.title}
+          </div>
+        </div>
+        <div className="flex-1 min-h-0 flex flex-col">{children}</div>
+      </div>
+    );
+  }
 
   /*
     ── FOLDED: the whole rail is the button ───────────────────────────────────

@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-30]
 
+- **The Plans screen's panel works on a phone.** At phone width it used to
+  run off the side of the screen, taking its buttons with it. Now the drawing
+  gets the whole width, a bar along the bottom says what is on this sheet,
+  and tapping it opens the panel full-screen — the same tabs as on a laptop,
+  plus a Sheets tab for picking a sheet. Every button in it is finger-sized,
+  and "← Plan" returns to the drawing exactly where you left it. Moving
+  around the drawing with fingers is not done yet.
+
 - **The Plans screen's right-hand panel is easier to read.** Nearly all of
   its text was 10–11 px; every number, price and warning is now at least
   12 px and each line item 14 px. Warnings have their own amber colour on a

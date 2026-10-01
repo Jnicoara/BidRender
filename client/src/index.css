@@ -380,6 +380,20 @@
     animation: tab-enter 150ms cubic-bezier(0.23, 1, 0.32, 1) both;
   }
 
+  /*
+    THE PHONE'S FULL-SCREEN PANEL (references/track-b-phone-and-readability-
+    plan.md § 3): every control a finger's 44px (takeoff-spec ground rule 2).
+    One rule over the panel rather than a size on each of its hundred
+    buttons, so a control added later cannot miss it. min-height, not
+    height: it outranks a component's own h-6 without fighting its width.
+  */
+  .phone-panel button,
+  .phone-panel [role="button"],
+  .phone-panel input,
+  .phone-panel select {
+    min-height: 44px;
+  }
+
   /* Number change flash */
   @keyframes num-flash {
     0% {
