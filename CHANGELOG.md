@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-30]
 
+- **The Plans screen's right-hand panel is now tabs: Counts, Runs, Legend,
+  Reader and Totals.** It used to be one long column — about nine screens of
+  scrolling on a small job, with scroll boxes inside it. Now one tab is open
+  at a time and scrolls on its own. A line along the top always says what is
+  on this sheet ("This sheet: 3 marks · 6 items · 358 ft of runs"), replacing
+  a number that added marks to runs and meant nothing. Clicking a run or a
+  mark on the drawing opens its tab, scrolled to it. A tab holding a warning
+  — such as Totals while something is not on the bid — shows an amber mark,
+  so nothing important hides in a closed tab. The panel remembers the tab
+  you last chose. Laptop only for now; the phone comes later.
+
 - **A legend symbol counts the moment you click it, assembly or not.**
   Clicking a symbol nobody has linked used to stop and ask which assembly it
   was, so a light fixture a supplier will price as a package could not be

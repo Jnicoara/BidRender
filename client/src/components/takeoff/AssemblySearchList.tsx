@@ -72,7 +72,9 @@ export function AssemblySearchList({
           autoFocus
         />
       </div>
-      <div className="max-h-40 overflow-y-auto">
+      {/* At most MAX_RESULTS rows, so no scroll box of its own — it sits
+          inside the panel's one scroll area. */}
+      <div>
         {results.map(assembly => (
           <button
             key={assembly.id}

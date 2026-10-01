@@ -160,6 +160,14 @@ import {
 import { RunSpecEditor } from "@/components/takeoff/RunSpecEditor";
 import { resolveRunType } from "@shared/runTypeLookup";
 import { lockedEditRefusal } from "@shared/quantityLock";
+import {
+  readStoredTab,
+  tabForSelection,
+  tabWarnings,
+  visibleTabs,
+  writeStoredTab,
+  type PanelTab,
+} from "@/lib/panelTabs";
 import { runTypeSpec } from "@shared/takeoffCounts";
 import { CalibrateLayer } from "@/components/takeoff/CalibrateLayer";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
@@ -3697,6 +3705,59 @@ export default function TakeoffPage({
   /** False while the server has AI switched off (server/aiFeatures.ts). */
   const readerAvailable = useCompany().hasFeature("takeoff.copilot");
 
+  /*
+    THE RIGHT PANEL'S TABS (references/track-b-phone-and-readability-plan.md
+    § 1, owner 2026-09-30). Remembered per person in this browser; rules in
+    @/lib/panelTabs, which the suite can reach.
+  */
+  const panelTabs = useMemo(
+    () => visibleTabs(readerAvailable),
+    [readerAvailable]
+  );
+  const [panelTab, setPanelTab] = useState<PanelTab>(() =>
+    readStoredTab(readerAvailable)
+  );
+  // The feature list can land after the first render; a remembered Reader
+  // tab then opens, and losing the reader closes it.
+  useEffect(() => {
+    setPanelTab(current =>
+      current === "reader" && !readerAvailable
+        ? "counts"
+        : current === "counts" && readerAvailable
+          ? readStoredTab(true)
+          : current
+    );
+  }, [readerAvailable]);
+  const choosePanelTab = useCallback((tab: PanelTab) => {
+    setPanelTab(tab);
+    writeStoredTab(tab);
+  }, []);
+  /*
+    SELECTING ON THE DRAWING OPENS ITS TAB (§ 1 rule 4, approved). Keyed on
+    the selection itself, so every way of selecting — a click on the line,
+    a jump from the drops readout, a drop picked on the sheet — lands on the
+    editor for it. Arming a tool is not a selection and switches nothing.
+    Not remembered: the remembered tab is the one the person chose.
+  */
+  useEffect(() => {
+    if (selectedRunId !== null) setPanelTab(tabForSelection("run"));
+  }, [selectedRunId]);
+  useEffect(() => {
+    if (selectedStampIds.size > 0) setPanelTab(tabForSelection("mark"));
+  }, [selectedStampIds]);
+  /** A tab with a warning in it shows a mark (§ 1 rule 5, approved). */
+  const warnedTabs = useMemo(
+    () =>
+      tabWarnings({
+        notOnBid: bidSummary.data?.notOnBid.length ?? 0,
+        totalsLeftOut:
+          (totals?.unmeasurableCount ?? 0) +
+          (totals?.leftOut?.noType.count ?? 0),
+        countsThatCannotSend: bidCounts.data?.countedWithNoPrice ?? 0,
+      }),
+    [bidSummary.data, totals, bidCounts.data]
+  );
+
   const { data: copilot } = trpc.planCopilot.state.useQuery(
     { sheetId: activeSheet?.id ?? 0 },
     { enabled: Boolean(activeSheet) && readerAvailable }
@@ -7091,61 +7152,75 @@ export default function TakeoffPage({
                   </>
                 )
               }
+              /*
+                THE READER has its own tab since 2026-09-30 (§ 1 of the
+                panel plan). It used to sit above the layers and legend in
+                one long column. Opening the tab starts nothing: a read is
+                a button, never an effect (CLAUDE.md § AI features).
+              */
+              reader={
+                readerAvailable ? (
+                  <CoPilotPanel
+                    state={copilot}
+                    reading={readSheet.isPending}
+                    canRead={canRead}
+                    onRead={runReader}
+                    onConfirm={findingIds => {
+                      if (!copilot?.runId) return;
+                      confirmFindings.mutate({
+                        runId: copilot.runId,
+                        findingIds,
+                        confirmed: true,
+                      });
+                    }}
+                    onDismiss={findingIds =>
+                      dismissFindings.mutate({ findingIds })
+                    }
+                    onCorrect={(findingId, symbolLinkId) =>
+                      correctFinding.mutate({
+                        findingId,
+                        symbolLinkId,
+                        confirmed: true,
+                      })
+                    }
+                    onJumpTo={at => {
+                      setFocusPoint(at);
+                      window.setTimeout(() => setFocusPoint(null), 2200);
+                    }}
+                    symbols={symbols}
+                    onAsk={question => {
+                      if (!activeSheet) return;
+                      const snapshot = snapshotPage(
+                        pageCanvas.current,
+                        pageCanvasScale.current,
+                        copilot?.readerModel ?? PLAN_READER_FALLBACK_MODEL
+                      );
+                      if (!snapshot) return;
+                      askCopilot.mutate({
+                        sheetId: activeSheet.id,
+                        question,
+                        pageImage: snapshot.image,
+                        pageText: pageTextByPage.current.get(page) ?? "",
+                      });
+                    }}
+                    asking={askCopilot.isPending}
+                    answer={copilotAnswer}
+                    onClearAnswer={() => setCopilotAnswer(null)}
+                  />
+                ) : undefined
+              }
+              tab={panelTab}
+              tabs={panelTabs}
+              onTab={choosePanelTab}
+              warnedTabs={warnedTabs}
+              focusGroupId={
+                selectedStampIds.size === 0
+                  ? null
+                  : (stamps.find(s => selectedStampIds.has(s.id))?.groupId ??
+                    null)
+              }
               legend={
                 <>
-                  {/* Above the layers and the legend: what the reader found
-                        is the thing a user comes to this pane to act on, and
-                        the legend it depends on sits below it where it is
-                        still one glance away. */}
-                  {readerAvailable && (
-                    <CoPilotPanel
-                      state={copilot}
-                      reading={readSheet.isPending}
-                      canRead={canRead}
-                      onRead={runReader}
-                      onConfirm={findingIds => {
-                        if (!copilot?.runId) return;
-                        confirmFindings.mutate({
-                          runId: copilot.runId,
-                          findingIds,
-                          confirmed: true,
-                        });
-                      }}
-                      onDismiss={findingIds =>
-                        dismissFindings.mutate({ findingIds })
-                      }
-                      onCorrect={(findingId, symbolLinkId) =>
-                        correctFinding.mutate({
-                          findingId,
-                          symbolLinkId,
-                          confirmed: true,
-                        })
-                      }
-                      onJumpTo={at => {
-                        setFocusPoint(at);
-                        window.setTimeout(() => setFocusPoint(null), 2200);
-                      }}
-                      symbols={symbols}
-                      onAsk={question => {
-                        if (!activeSheet) return;
-                        const snapshot = snapshotPage(
-                          pageCanvas.current,
-                          pageCanvasScale.current,
-                          copilot?.readerModel ?? PLAN_READER_FALLBACK_MODEL
-                        );
-                        if (!snapshot) return;
-                        askCopilot.mutate({
-                          sheetId: activeSheet.id,
-                          question,
-                          pageImage: snapshot.image,
-                          pageText: pageTextByPage.current.get(page) ?? "",
-                        });
-                      }}
-                      asking={askCopilot.isPending}
-                      answer={copilotAnswer}
-                      onClearAnswer={() => setCopilotAnswer(null)}
-                    />
-                  )}
                   <LayersPanel
                     present={present}
                     state={effectiveLayers}

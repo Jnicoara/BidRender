@@ -11,12 +11,13 @@
  * conductor counts are exactly the sort of number someone types down a column.
  */
 import { markAppearance, markPath } from "@shared/takeoffMarks";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   AssemblySearchList,
   type SearchableAssembly,
 } from "./AssemblySearchList";
 import { layoutLegs } from "@/lib/runLegs";
+import { PANEL_TAB_LABELS, sheetLine, type PanelTab } from "@/lib/panelTabs";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/money";
 import {
@@ -1072,7 +1073,13 @@ export function RunsPanel({
   onJumpTo,
   onRemoveStamp,
   legend,
+  reader,
   summary,
+  tab,
+  tabs,
+  onTab,
+  warnedTabs,
+  focusGroupId,
   renderRunEnds,
   renderRunType,
   onAnswerBranchWiring,
@@ -1188,8 +1195,22 @@ export function RunsPanel({
   /** Move the viewer to a mark on the drawing and highlight it. */
   onJumpTo: (at: { x: number; y: number }) => void;
   onRemoveStamp: (id: number) => void;
-  /** The legend panel, rendered beneath the list. */
+  /** The Legend tab: layers and captured symbols. */
   legend?: React.ReactNode;
+  /** The Reader tab's content, when the reader exists (§ 1 rule 6). */
+  reader?: React.ReactNode;
+  /**
+   * Which tab is open, and the ones offered. Held by the page, not here,
+   * because selecting on the DRAWING opens a tab (§ 1 rule 4) and the
+   * drawing is not in this component.
+   */
+  tab: PanelTab;
+  tabs: readonly PanelTab[];
+  onTab: (tab: PanelTab) => void;
+  /** Tabs with something in them that needs a look (§ 1 rule 5). */
+  warnedTabs: ReadonlySet<PanelTab>;
+  /** The count whose marks were just selected on the drawing, to show. */
+  focusGroupId?: number | null;
   /**
    * The whole-set summary (TakeoffSummaryPanel), where the one grey "N counts
    * are not on the bid yet" line used to be. A node, like `legend`: it owns
@@ -1292,6 +1313,33 @@ export function RunsPanel({
   const [circuitName, setCircuitName] = useState("");
   /** The count whose "which assembly?" search is open, if any. */
   const [linkingGroupId, setLinkingGroupId] = useState<number | null>(null);
+
+  /*
+    BRING THE SELECTION INTO VIEW (§ 1 rule 4). Opening the Runs tab for a
+    run picked on the drawing is not enough when its row is 1,700px down the
+    list under the traced footage — measured on the fixture, 2026-09-30. Only
+    when the row is out of view, so a row clicked in the panel itself does
+    not jump. `scrollTop` rather than scrollIntoView: it moves this scroller
+    only, never the page around it.
+  */
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const selector =
+      tab === "runs" && selectedRunId !== null
+        ? `[data-run-row="${selectedRunId}"]`
+        : tab === "counts" && focusGroupId != null
+          ? `[data-count-card="${focusGroupId}"]`
+          : null;
+    if (!selector) return;
+    const row = scroller.querySelector<HTMLElement>(selector);
+    if (!row) return;
+    const view = scroller.getBoundingClientRect();
+    const at = row.getBoundingClientRect();
+    if (at.top >= view.top && at.top < view.bottom - 40) return;
+    scroller.scrollTop += at.top - view.top;
+  }, [tab, selectedRunId, focusGroupId]);
   const emptiedAt = emptiedCardIndex(stampGroups.length, emptiedCount);
 
   /**
@@ -1311,13 +1359,81 @@ export function RunsPanel({
 
   return (
     <div className="h-full flex flex-col bg-card border-l border-border min-h-0">
-      <div className="px-3 py-2 border-b border-border shrink-0">
-        <div className="flex items-center gap-1.5 text-[0.7rem] uppercase tracking-wide text-muted-foreground">
-          <Zap className="w-3 h-3" /> Counted items
-          <span className="ml-auto normal-case tracking-normal">
-            {stampGroups.reduce((n, g) => n + g.count, 0) + runs.length}
-          </span>
-        </div>
+      {/*
+        TABS — one box at a time (references/track-b-phone-and-readability-plan.md
+        § 1). A strip that scrolls sideways if it ever runs out of width; it
+        never wraps to two rows. A tab with a warning inside it carries the
+        mark on the tab itself, because a warning in a closed tab is unseen.
+      */}
+      <div
+        role="tablist"
+        aria-label="Plan panel"
+        className="flex shrink-0 overflow-x-auto border-b border-border"
+      >
+        {tabs.map(t => {
+          const active = t === tab;
+          const warned = warnedTabs.has(t);
+          return (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onTab(t)}
+              title={
+                warned ? `${PANEL_TAB_LABELS[t]} — needs a look` : undefined
+              }
+              /*
+                NO `transition-colors`, on purpose. It was here first, and in
+                a background tab a transition never advances, so the strip
+                held the PREVIOUS tab's underline over the new tab's content
+                — seen on screen 2026-09-30. Which tab is open must never be
+                one frame behind.
+              */
+              className={cn(
+                // px-1.5, not more: all five must fit the panel's 280px
+                // minimum, or Totals — the tab most likely to carry the
+                // warning mark — is the one scrolled out of sight.
+                "flex-1 min-w-fit flex items-center justify-center gap-1 px-1.5 h-9 text-xs border-b-2 whitespace-nowrap",
+                active
+                  ? "border-[#F5C518] text-foreground font-medium"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {PANEL_TAB_LABELS[t]}
+              {warned && (
+                <TriangleAlert
+                  className="w-3 h-3 text-warning shrink-0"
+                  aria-label="needs a look"
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/*
+        PINNED, above every tab and never scrolling (§ 1 rule 3, answer 6).
+        It replaced "Counted items 9", which added this sheet's marks to its
+        runs and so counted nothing.
+      */}
+      <div className="px-3 py-1.5 border-b border-border shrink-0 text-xs">
+        <p className="text-foreground">
+          {sheetLine({
+            counts: stampGroups,
+            runs: runs.map(r => ({
+              runTypeId: r.runTypeId,
+              isSuggestion: r.isSuggestion,
+              feet: r.quantities?.runFeet ?? null,
+            })),
+          })}
+        </p>
+        {quantitiesLocked && (
+          <p className="text-muted-foreground mt-0.5">
+            This bid's quantities are locked, so its plans cannot be marked,
+            traced, changed or sent to it. Unlock it on the bid first.
+          </p>
+        )}
       </div>
 
       {/*
@@ -1337,22 +1453,40 @@ export function RunsPanel({
         a wheel that does different things two inches apart, and a legend you
         can only reach by first scrolling something else to the bottom.
       */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div ref={scrollerRef} className="flex-1 overflow-y-auto min-h-0">
         {/* Stamped assemblies first: an estimator drops dozens per sheet and
             traces a handful of runs, so the thing they are actively adding to
             stays where they can watch it climb. */}
-        {stampGroups.map((group, cardIndex) => (
-          <Fragment key={group.groupId ?? group.assemblyId ?? group.name}>
-            {emptiedAt === cardIndex && emptiedCount && (
-              <EmptiedCountRow
-                card={emptiedCount}
-                cardUndo={cardUndo}
-                onCardUndo={onCardUndo}
-              />
-            )}
-            <div className="border-b border-border px-3 py-2 hover:bg-muted/40 transition-colors">
-              <div className="flex items-center gap-2">
-                {/*
+        {tab === "counts" &&
+          stampGroups.length === 0 &&
+          !(emptiedAt === 0 && emptiedCount) && (
+            <div className="p-6 text-center">
+              <Zap className="w-7 h-7 mx-auto mb-3 text-muted-foreground/50" />
+              <p className="text-sm font-medium text-muted-foreground">
+                Nothing counted on this sheet yet
+              </p>
+              <p className="text-xs text-muted-foreground/70 mt-1.5">
+                Pick something to count from Count in the toolbar, or click a
+                symbol on the Legend tab, then click on the drawing.
+              </p>
+            </div>
+          )}
+        {tab === "counts" &&
+          stampGroups.map((group, cardIndex) => (
+            <Fragment key={group.groupId ?? group.assemblyId ?? group.name}>
+              {emptiedAt === cardIndex && emptiedCount && (
+                <EmptiedCountRow
+                  card={emptiedCount}
+                  cardUndo={cardUndo}
+                  onCardUndo={onCardUndo}
+                />
+              )}
+              <div
+                data-count-card={group.groupId ?? undefined}
+                className="border-b border-border px-3 py-2 hover:bg-muted/40 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  {/*
                 The swatch IS the legend. It draws the same shape in the same
                 colour as the marks on the drawing, from the same function —
                 a panel that showed a yellow circle for every count would be
@@ -1362,71 +1496,75 @@ export function RunsPanel({
                 Fixed at 20px here rather than clamped: this one is on the
                 screen, not on the paper, so it has no zoom to fight.
               */}
-                {(() => {
-                  const { shape, color } = markAppearance({
-                    groupId: group.groupId,
-                    assemblyId: group.assemblyId,
-                    assemblyCategory: group.stamps[0]?.assemblyCategory ?? null,
-                  });
-                  return (
-                    <svg
-                      width={20}
-                      height={20}
-                      viewBox="0 0 20 20"
-                      className="shrink-0"
-                      aria-hidden="true"
+                  {(() => {
+                    const { shape, color } = markAppearance({
+                      groupId: group.groupId,
+                      assemblyId: group.assemblyId,
+                      assemblyCategory:
+                        group.stamps[0]?.assemblyCategory ?? null,
+                    });
+                    return (
+                      <svg
+                        width={20}
+                        height={20}
+                        viewBox="0 0 20 20"
+                        className="shrink-0"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d={markPath(shape, 10, 10, 8)}
+                          fill={color}
+                          fillOpacity={0.22}
+                          stroke={color}
+                          strokeWidth={2}
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    );
+                  })()}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm truncate">{group.name}</p>
+                    <p className="text-[0.7rem] text-muted-foreground">
+                      {group.count} placed
+                    </p>
+                  </div>
+                  <span className="font-mono text-sm tabular-nums">
+                    {group.count}
+                  </span>
+                  {/* Undo and trash, as on a run card (owner, 2026-09-29). */}
+                  {group.groupId !== null && (
+                    <CardUndo
+                      subject={{ kind: "count", id: group.groupId }}
+                      cardUndo={cardUndo}
+                      onCardUndo={onCardUndo}
+                    />
+                  )}
+                  {onDeleteCountMarks && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                      disabled={quantitiesLocked || group.stamps.length === 0}
+                      onClick={() =>
+                        onDeleteCountMarks(
+                          group.stamps.map(s => ({
+                            id: s.id,
+                            name: group.name,
+                          }))
+                        )
+                      }
+                      title={
+                        quantitiesLocked
+                          ? "This bid's quantities are locked — unlock them on the bid to delete."
+                          : `Delete the ${group.count} ${group.name} ${group.count === 1 ? "mark" : "marks"} on this sheet — the count stays`
+                      }
+                      aria-label={`Delete ${group.name} marks on this sheet`}
                     >
-                      <path
-                        d={markPath(shape, 10, 10, 8)}
-                        fill={color}
-                        fillOpacity={0.22}
-                        stroke={color}
-                        strokeWidth={2}
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  );
-                })()}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm truncate">{group.name}</p>
-                  <p className="text-[0.7rem] text-muted-foreground">
-                    {group.count} placed
-                  </p>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  )}
                 </div>
-                <span className="font-mono text-sm tabular-nums">
-                  {group.count}
-                </span>
-                {/* Undo and trash, as on a run card (owner, 2026-09-29). */}
-                {group.groupId !== null && (
-                  <CardUndo
-                    subject={{ kind: "count", id: group.groupId }}
-                    cardUndo={cardUndo}
-                    onCardUndo={onCardUndo}
-                  />
-                )}
-                {onDeleteCountMarks && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive"
-                    disabled={quantitiesLocked || group.stamps.length === 0}
-                    onClick={() =>
-                      onDeleteCountMarks(
-                        group.stamps.map(s => ({ id: s.id, name: group.name }))
-                      )
-                    }
-                    title={
-                      quantitiesLocked
-                        ? "This bid's quantities are locked — unlock them on the bid to delete."
-                        : `Delete the ${group.count} ${group.name} ${group.count === 1 ? "mark" : "marks"} on this sheet — the count stays`
-                    }
-                    aria-label={`Delete ${group.name} marks on this sheet`}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                )}
-              </div>
-              {/*
+                {/*
               Where this count stands with the bid.
 
               Three states and three different things worth saying, all of them
@@ -1439,16 +1577,16 @@ export function RunsPanel({
               a badge on the drawing, which is what level 1's promise of a quiet
               count actually forbids.
             */}
-              {(() => {
-                const state =
-                  group.groupId === null
-                    ? undefined
-                    : bridge?.get(group.groupId);
-                if (!state) return null;
-                if (state.onBid) {
-                  return (
-                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
-                      {/*
+                {(() => {
+                  const state =
+                    group.groupId === null
+                      ? undefined
+                      : bridge?.get(group.groupId);
+                  if (!state) return null;
+                  if (state.onBid) {
+                    return (
+                      <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                        {/*
                       LOCKED IS SAID HERE, not left to the bid screen.
 
                       This is the screen somebody is standing on while they
@@ -1460,137 +1598,139 @@ export function RunsPanel({
                       did not move. CLAUDE.md § a label describing the OLD
                       meaning.
                     */}
-                      {quantitiesLocked
-                        ? "On the bid — locked"
-                        : "On the bid — the line follows these marks"}
-                    </p>
-                  );
-                }
-                // No Send on a locked bid: the server refuses it (lockGuard),
-                // and the locked notice below says why.
-                if (quantitiesLocked) return null;
-                const busy = sendingGroupId === group.groupId;
-                const canSend = state.sendable && onSendToBid;
-                /*
+                        {quantitiesLocked
+                          ? "On the bid — locked"
+                          : "On the bid — the line follows these marks"}
+                      </p>
+                    );
+                  }
+                  // No Send on a locked bid: the server refuses it (lockGuard),
+                  // and the locked notice below says why.
+                  if (quantitiesLocked) return null;
+                  const busy = sendingGroupId === group.groupId;
+                  const canSend = state.sendable && onSendToBid;
+                  /*
                   LINK AN ASSEMBLY, any time (legend plan § 8a). Offered on a
                   count made by name and not yet on the bid — the server
                   refuses one on the bid, whose line was priced there. Not a
                   nag: one quiet word beside Send, never a badge.
                 */
-                const canLink =
-                  state.byNameOnly && linkAssemblies && onLinkAssembly;
-                if (!canSend && !canLink) return null;
-                return (
-                  <div className="mt-1 flex items-center gap-3">
-                    {canSend && (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => onSendToBid(group.groupId as number)}
-                        className="text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
-                      >
-                        {/*
+                  const canLink =
+                    state.byNameOnly && linkAssemblies && onLinkAssembly;
+                  if (!canSend && !canLink) return null;
+                  return (
+                    <div className="mt-1 flex items-center gap-3">
+                      {canSend && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => onSendToBid(group.groupId as number)}
+                          className="text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
+                        >
+                          {/*
                         The BID's count, not this sheet's. A count marked across
                         five sheets sends all of them, and a control reading "Send 5
                         to bid" beside a panel showing five of fourteen would be
                         telling the truth about the wrong number.
                       */}
-                        {busy ? "Sending…" : `Send ${state.bidCount} to bid`}
-                      </button>
-                    )}
-                    {canLink && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setLinkingGroupId(id =>
-                            id === group.groupId ? null : group.groupId
-                          )
-                        }
-                        className="inline-flex items-center gap-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground"
-                        title="Choose the assembly this count is — every mark is kept"
-                      >
-                        <Link2 className="w-3 h-3" /> Link assembly…
-                      </button>
-                    )}
-                  </div>
-                );
-              })()}
-              {linkingGroupId !== null &&
-                linkingGroupId === group.groupId &&
-                linkAssemblies &&
-                onLinkAssembly && (
-                  <div className="mt-1.5 rounded border border-border bg-muted/20 p-2 space-y-1.5">
-                    <p className="text-[0.7rem] text-muted-foreground">
-                      Which assembly is “{group.name}”? Every mark is kept and
-                      counts it from now on.
-                    </p>
-                    <AssemblySearchList
-                      assemblies={linkAssemblies}
-                      onPick={assembly => {
-                        onLinkAssembly(group.groupId as number, assembly.id);
-                        setLinkingGroupId(null);
-                      }}
-                      onCancel={() => setLinkingGroupId(null)}
-                    />
-                  </div>
-                )}
-              {/* The drop to each of these devices (held-migrations plan § 3):
+                          {busy ? "Sending…" : `Send ${state.bidCount} to bid`}
+                        </button>
+                      )}
+                      {canLink && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setLinkingGroupId(id =>
+                              id === group.groupId ? null : group.groupId
+                            )
+                          }
+                          className="inline-flex items-center gap-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                          title="Choose the assembly this count is — every mark is kept"
+                        >
+                          <Link2 className="w-3 h-3" /> Link assembly…
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
+                {linkingGroupId !== null &&
+                  linkingGroupId === group.groupId &&
+                  linkAssemblies &&
+                  onLinkAssembly && (
+                    <div className="mt-1.5 rounded border border-border bg-muted/20 p-2 space-y-1.5">
+                      <p className="text-[0.7rem] text-muted-foreground">
+                        Which assembly is “{group.name}”? Every mark is kept and
+                        counts it from now on.
+                      </p>
+                      <AssemblySearchList
+                        assemblies={linkAssemblies}
+                        onPick={assembly => {
+                          onLinkAssembly(group.groupId as number, assembly.id);
+                          setLinkingGroupId(null);
+                        }}
+                        onCancel={() => setLinkingGroupId(null)}
+                      />
+                    </div>
+                  )}
+                {/* The drop to each of these devices (held-migrations plan § 3):
                 set once on the count, shown once set. */}
-              {group.groupId !== null &&
-                groupDrops?.get(group.groupId) &&
-                onSetGroupDrop && (
-                  <GroupDrop
-                    info={groupDrops.get(group.groupId)!}
-                    heightTypes={dropHeightTypes}
-                    runTypes={dropRunTypes}
-                    locked={quantitiesLocked}
-                    onSet={patch =>
-                      onSetGroupDrop(group.groupId as number, patch)
-                    }
-                  />
-                )}
-              {/* Walk the instances: each chip jumps the viewer to that mark. */}
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {group.stamps.map((placed, index) => (
-                  <button
-                    key={placed.id}
-                    onClick={() => onJumpTo({ x: placed.x, y: placed.y })}
-                    className="px-1.5 py-0.5 rounded text-[0.65rem] font-mono bg-muted hover:bg-[#F5C518]/20 hover:text-[#F5C518] transition-colors"
-                    title="Show this one on the drawing"
-                  >
-                    {index + 1}
-                  </button>
-                ))}
-                {/*
+                {group.groupId !== null &&
+                  groupDrops?.get(group.groupId) &&
+                  onSetGroupDrop && (
+                    <GroupDrop
+                      info={groupDrops.get(group.groupId)!}
+                      heightTypes={dropHeightTypes}
+                      runTypes={dropRunTypes}
+                      locked={quantitiesLocked}
+                      onSet={patch =>
+                        onSetGroupDrop(group.groupId as number, patch)
+                      }
+                    />
+                  )}
+                {/* Walk the instances: each chip jumps the viewer to that mark. */}
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {group.stamps.map((placed, index) => (
+                    <button
+                      key={placed.id}
+                      onClick={() => onJumpTo({ x: placed.x, y: placed.y })}
+                      className="px-1.5 py-0.5 rounded text-[0.65rem] font-mono bg-muted hover:bg-[#F5C518]/20 hover:text-[#F5C518] transition-colors"
+                      title="Show this one on the drawing"
+                    >
+                      {index + 1}
+                    </button>
+                  ))}
+                  {/*
                   The WHOLE count — every mark on every sheet (plan § 1.2
                   c′). Words, not a second bin beside the first: two bins on
                   one card, one for this sheet and one for all of them, is a
                   coin toss. It asks first and names what goes.
                 */}
-                {onDeleteCount &&
-                  group.groupId !== null &&
-                  !quantitiesLocked &&
-                  !bridge?.get(group.groupId)?.onBid && (
-                    <button
-                      type="button"
-                      onClick={() => onDeleteCount(group.groupId as number)}
-                      className="ml-auto text-[0.65rem] text-muted-foreground hover:text-destructive underline-offset-2 hover:underline"
-                      title="Delete this count and its marks on every sheet — asks first"
-                    >
-                      Delete count…
-                    </button>
-                  )}
+                  {onDeleteCount &&
+                    group.groupId !== null &&
+                    !quantitiesLocked &&
+                    !bridge?.get(group.groupId)?.onBid && (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteCount(group.groupId as number)}
+                        className="ml-auto text-[0.65rem] text-muted-foreground hover:text-destructive underline-offset-2 hover:underline"
+                        title="Delete this count and its marks on every sheet — asks first"
+                      >
+                        Delete count…
+                      </button>
+                    )}
+                </div>
               </div>
-            </div>
-          </Fragment>
-        ))}
-        {emptiedAt === stampGroups.length && emptiedCount && (
-          <EmptiedCountRow
-            card={emptiedCount}
-            cardUndo={cardUndo}
-            onCardUndo={onCardUndo}
-          />
-        )}
+            </Fragment>
+          ))}
+        {tab === "counts" &&
+          emptiedAt === stampGroups.length &&
+          emptiedCount && (
+            <EmptiedCountRow
+              card={emptiedCount}
+              cardUndo={cardUndo}
+              onCardUndo={onCardUndo}
+            />
+          )}
 
         {/*
           Where the takeoff stands with the bid — one line, in one place.
@@ -1632,14 +1772,7 @@ export function RunsPanel({
           does NOT go on the drawing — level 1's promise of a quiet count, and
           § 5f, which forbids a badge on the sheet.
         */}
-        {quantitiesLocked ? (
-          <p className="px-3 py-2 text-[0.7rem] text-muted-foreground border-b border-border">
-            This bid's quantities are locked, so its plans cannot be marked,
-            traced, changed or sent to it. Unlock it on the bid first.
-          </p>
-        ) : null}
-
-        {summary ? (
+        {tab !== "totals" ? null : summary ? (
           summary
         ) : stampGroups.length > 0 && waitingToSend !== undefined ? (
           <p className="px-3 py-2 text-[0.7rem] text-muted-foreground border-b border-border">
@@ -1671,7 +1804,7 @@ export function RunsPanel({
           A half-specified type still shows its feet. The measurement is real
           work somebody did; what is missing is only the name to order it under.
         */}
-        {runTypeBridge && runTypeBridge.length > 0 && (
+        {tab === "runs" && runTypeBridge && runTypeBridge.length > 0 && (
           <div className="border-b border-border">
             <div className="px-3 pt-2.5 pb-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground">
               Traced footage
@@ -1942,17 +2075,17 @@ export function RunsPanel({
           </div>
         )}
 
-        {dropsReadout}
+        {tab === "totals" && dropsReadout}
 
-        {runs.length === 0 && stampGroups.length === 0 ? (
+        {tab !== "runs" ? null : runs.length === 0 ? (
           <div className="p-6 text-center">
             <Zap className="w-7 h-7 mx-auto mb-3 text-muted-foreground/50" />
             <p className="text-sm font-medium text-muted-foreground">
-              Nothing counted yet
+              No runs on this sheet yet
             </p>
             <p className="text-xs text-muted-foreground/70 mt-1.5">
-              Mark an assembly onto the plan, or trace a conduit or cable run.
-              Everything you place appears here as you go.
+              Trace a conduit or cable run on the drawing. Each one appears here
+              as you go, with what it puts on the bid.
             </p>
           </div>
         ) : (
@@ -1995,6 +2128,7 @@ export function RunsPanel({
               <Fragment key={run.id}>
                 {header}
                 <div
+                  data-run-row={run.id}
                   className={cn(
                     "border-b border-border px-3 py-2.5 cursor-pointer transition-colors",
                     multi && "pl-6",
@@ -3024,113 +3158,117 @@ export function RunsPanel({
           })
         )}
 
-        {legend}
-      </div>
+        {tab === "legend" && legend}
+        {tab === "reader" && reader}
 
-      {/*
+        {/*
         Bid totals. Conduit, cable and wire never merge into one number.
 
-        Pinned below the scroller and NEVER inside it: this is the number the
-        panel exists to show, and a total you have to go looking for is a total
-        that gets read off stale. shrink-0 is what keeps its last row whole.
+        **This said "pinned below the scroller and NEVER inside it" until
+        2026-09-30**, because a total you have to go looking for gets read off
+        stale. The tabs (references/track-b-phone-and-readability-plan.md § 1)
+        move it into the Totals tab, and keep the reason with two guards
+        instead: the tab carries a warning mark whenever anything is not on
+        the bid, and the pinned "This sheet" line above every tab is the
+        figure that moves while you work.
       */}
-      {totals && (
-        <div className="border-t border-border px-3 py-2.5 shrink-0 space-y-1">
-          <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1">
-            This bid, all sheets
-          </div>
-          {/* Bought, with every term that went into it — the flat share is
+        {tab === "totals" && totals && (
+          <div className="border-t border-border px-3 py-2.5 space-y-1">
+            <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1">
+              This bid, all sheets
+            </div>
+            {/* Bought, with every term that went into it — the flat share is
               the remainder, so the four always add up on screen. */}
-          <Footage
-            label="Conduit"
-            flat={round2(
-              totals.conduitBoughtFeet -
-                totals.conduitVerticalFeet -
-                totals.conduitExtraFeet
-            )}
-            vertical={totals.conduitVerticalFeet}
-            extra={totals.conduitExtraFeet}
-            total={totals.conduitBoughtFeet}
-          />
-          <Footage
-            label="Cable"
-            flat={round2(
-              totals.cableBoughtFeet -
-                totals.cableVerticalFeet -
-                totals.cableExtraFeet -
-                totals.cableMakeupFeet
-            )}
-            vertical={totals.cableVerticalFeet}
-            extra={totals.cableExtraFeet}
-            makeup={totals.cableMakeupFeet}
-            total={totals.cableBoughtFeet}
-          />
-          <Footage
-            label="Wire"
-            flat={round2(
-              totals.wireBoughtFeet -
-                totals.wireVerticalFeet -
-                totals.wireExtraFeet -
-                totals.wireMakeupFeet
-            )}
-            vertical={totals.wireVerticalFeet}
-            extra={totals.wireExtraFeet}
-            makeup={totals.wireMakeupFeet}
-            total={totals.wireBoughtFeet}
-          />
-          {/* Drops from marks (§ 3): what they add, and what is not counted
+            <Footage
+              label="Conduit"
+              flat={round2(
+                totals.conduitBoughtFeet -
+                  totals.conduitVerticalFeet -
+                  totals.conduitExtraFeet
+              )}
+              vertical={totals.conduitVerticalFeet}
+              extra={totals.conduitExtraFeet}
+              total={totals.conduitBoughtFeet}
+            />
+            <Footage
+              label="Cable"
+              flat={round2(
+                totals.cableBoughtFeet -
+                  totals.cableVerticalFeet -
+                  totals.cableExtraFeet -
+                  totals.cableMakeupFeet
+              )}
+              vertical={totals.cableVerticalFeet}
+              extra={totals.cableExtraFeet}
+              makeup={totals.cableMakeupFeet}
+              total={totals.cableBoughtFeet}
+            />
+            <Footage
+              label="Wire"
+              flat={round2(
+                totals.wireBoughtFeet -
+                  totals.wireVerticalFeet -
+                  totals.wireExtraFeet -
+                  totals.wireMakeupFeet
+              )}
+              vertical={totals.wireVerticalFeet}
+              extra={totals.wireExtraFeet}
+              makeup={totals.wireMakeupFeet}
+              total={totals.wireBoughtFeet}
+            />
+            {/* Drops from marks (§ 3): what they add, and what is not counted
               for them — fittings (Q8), a count with no run type or height,
               and marks near an unlinked run end that may count twice. */}
-          {totals.markDropCount > 0 && (
-            <p className="text-[0.7rem] text-muted-foreground pt-1">
-              Includes {totals.markDropCount} drop
-              {totals.markDropCount === 1 ? "" : "s"} to counted devices (
-              {totals.markDropFeet.toFixed(2)} ft). Connectors and elbows for
-              them are not counted.
-            </p>
-          )}
-          {(totals.markDropNotes?.noTypeGroups ?? 0) +
-            (totals.markDropNotes?.noHeightGroups ?? 0) >
-            0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {(totals.markDropNotes?.noTypeGroups ?? 0) +
-                (totals.markDropNotes?.noHeightGroups ?? 0)}{" "}
-              counted item
-              {(totals.markDropNotes?.noTypeGroups ?? 0) +
-                (totals.markDropNotes?.noHeightGroups ?? 0) ===
-              1
-                ? " asks"
-                : "s ask"}{" "}
-              for a drop that is not counted — see the item for why.
-            </p>
-          )}
-          {(totals.markDropNotes?.mayDoubleCount ?? 0) > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {totals.markDropNotes?.mayDoubleCount} marked device
-              {totals.markDropNotes?.mayDoubleCount === 1 ? "" : "s"} near a
-              run's end may have its drop counted twice.
-            </p>
-          )}
-          {totals.conduitExtraFeet +
-            totals.cableExtraFeet +
-            totals.wireExtraFeet >
-            0 && (
-            <p className="text-[0.7rem] text-muted-foreground pt-1">
-              Extra is bought, not installed — labor is on the installed feet.
-            </p>
-          )}
-          {totals.noExtraCount > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {totals.noExtraCount} run
-              {totals.noExtraCount === 1 ? " carries" : "s carry"} no extra —
-              none is set. Set it in Settings › Heights & extra.
-            </p>
-          )}
+            {totals.markDropCount > 0 && (
+              <p className="text-[0.7rem] text-muted-foreground pt-1">
+                Includes {totals.markDropCount} drop
+                {totals.markDropCount === 1 ? "" : "s"} to counted devices (
+                {totals.markDropFeet.toFixed(2)} ft). Connectors and elbows for
+                them are not counted.
+              </p>
+            )}
+            {(totals.markDropNotes?.noTypeGroups ?? 0) +
+              (totals.markDropNotes?.noHeightGroups ?? 0) >
+              0 && (
+              <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {(totals.markDropNotes?.noTypeGroups ?? 0) +
+                  (totals.markDropNotes?.noHeightGroups ?? 0)}{" "}
+                counted item
+                {(totals.markDropNotes?.noTypeGroups ?? 0) +
+                  (totals.markDropNotes?.noHeightGroups ?? 0) ===
+                1
+                  ? " asks"
+                  : "s ask"}{" "}
+                for a drop that is not counted — see the item for why.
+              </p>
+            )}
+            {(totals.markDropNotes?.mayDoubleCount ?? 0) > 0 && (
+              <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {totals.markDropNotes?.mayDoubleCount} marked device
+                {totals.markDropNotes?.mayDoubleCount === 1 ? "" : "s"} near a
+                run's end may have its drop counted twice.
+              </p>
+            )}
+            {totals.conduitExtraFeet +
+              totals.cableExtraFeet +
+              totals.wireExtraFeet >
+              0 && (
+              <p className="text-[0.7rem] text-muted-foreground pt-1">
+                Extra is bought, not installed — labor is on the installed feet.
+              </p>
+            )}
+            {totals.noExtraCount > 0 && (
+              <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {totals.noExtraCount} run
+                {totals.noExtraCount === 1 ? " carries" : "s carry"} no extra —
+                none is set. Set it in Settings › Heights & extra.
+              </p>
+            )}
 
-          {/*
+            {/*
             THE ZERO HAS TO SHOUT.
 
             § 2.3 makes the argument about an unset allowance and it applies
@@ -3140,29 +3278,29 @@ export function RunsPanel({
             job the missing footage is a large share of the total, and a bid
             that is under is the mistake that gets won.
           */}
-          {totals.flatOnlyCount > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {totals.conduitVerticalFeet === 0 &&
-              totals.cableVerticalFeet === 0 &&
-              totals.wireVerticalFeet === 0
-                ? `No vertical footage is in these numbers. ${totals.flatOnlyCount} run${totals.flatOnlyCount === 1 ? " is" : "s are"} counted flat only.`
-                : `${totals.flatOnlyCount} run${totals.flatOnlyCount === 1 ? " is" : "s are"} counted flat only — no drop or rise on ${totals.flatOnlyCount === 1 ? "it" : "them"}.`}
-            </p>
-          )}
-          {/*
+            {totals.flatOnlyCount > 0 && (
+              <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {totals.conduitVerticalFeet === 0 &&
+                totals.cableVerticalFeet === 0 &&
+                totals.wireVerticalFeet === 0
+                  ? `No vertical footage is in these numbers. ${totals.flatOnlyCount} run${totals.flatOnlyCount === 1 ? " is" : "s are"} counted flat only.`
+                  : `${totals.flatOnlyCount} run${totals.flatOnlyCount === 1 ? " is" : "s are"} counted flat only — no drop or rise on ${totals.flatOnlyCount === 1 ? "it" : "them"}.`}
+              </p>
+            )}
+            {/*
             QUANTITY TRACES (D21) — flat by choice, so not in the line above,
             and said here in its own words: none of their drops are in these
             numbers until approved. Only while ends are waiting; once every
             end is answered there is nothing left out to say.
           */}
-          {(totals.quantity?.openEnds ?? 0) > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {`Quantity traces are flat footage only — no drops are in these numbers for ${totals.quantity!.openEnds} leg end${totals.quantity!.openEnds === 1 ? "" : "s"}. Open a quantity trace to add them.`}
-            </p>
-          )}
-          {/*
+            {(totals.quantity?.openEnds ?? 0) > 0 && (
+              <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {`Quantity traces are flat footage only — no drops are in these numbers for ${totals.quantity!.openEnds} leg end${totals.quantity!.openEnds === 1 ? "" : "s"}. Open a quantity trace to add them.`}
+              </p>
+            )}
+            {/*
             THE HALF-COUNTED RUN, WHICH IS THE WORSE OF THE TWO.
 
             The line above says a number is missing its drops entirely. This
@@ -3175,59 +3313,61 @@ export function RunsPanel({
             situations need opposite actions and a single number covering both
             could not say which one to take.
           */}
-          {/*
+            {/*
             A BUTTON since 2026-09-29 (owner): the sentence said what was
             wrong and left the estimator to go and find the run. It opens the
             first such run's Run ends section; the number stays, because it is
             what says how much is missing.
           */}
-          {totals.partialVerticalCount > 0 &&
-            (onOpenPartialEnds ? (
-              <button
-                type="button"
-                onClick={onOpenPartialEnds}
-                className="mt-1 w-full text-left text-[0.7rem] text-[#F5C518] flex items-start gap-1.5 rounded border border-[#F5C518]/40 px-2 py-1 hover:bg-[#F5C518]/10"
-              >
-                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-                <span>
-                  <span className="font-medium underline underline-offset-2">
-                    Set ends
+            {totals.partialVerticalCount > 0 &&
+              (onOpenPartialEnds ? (
+                <button
+                  type="button"
+                  onClick={onOpenPartialEnds}
+                  className="mt-1 w-full text-left text-[0.7rem] text-[#F5C518] flex items-start gap-1.5 rounded border border-[#F5C518]/40 px-2 py-1 hover:bg-[#F5C518]/10"
+                >
+                  <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                  <span>
+                    <span className="font-medium underline underline-offset-2">
+                      Set ends
+                    </span>
+                    {` — ${totals.partialVerticalCount} run${totals.partialVerticalCount === 1 ? " has" : "s have"} only one end counted, so ${totals.partialVerticalCount === 1 ? "its" : "their"} drops are short.`}
                   </span>
-                  {` — ${totals.partialVerticalCount} run${totals.partialVerticalCount === 1 ? " has" : "s have"} only one end counted, so ${totals.partialVerticalCount === 1 ? "its" : "their"} drops are short.`}
-                </span>
-              </button>
-            ) : (
+                </button>
+              ) : (
+                <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+                  <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                  {`${totals.partialVerticalCount} run${totals.partialVerticalCount === 1 ? " has" : "s have"} only one end counted — ${totals.partialVerticalCount === 1 ? "its" : "their"} drops are short by whatever is missing.`}
+                </p>
+              ))}
+            {totals.unmeasurableCount > 0 && (
               <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
                 <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-                {`${totals.partialVerticalCount} run${totals.partialVerticalCount === 1 ? " has" : "s have"} only one end counted — ${totals.partialVerticalCount === 1 ? "its" : "their"} drops are short by whatever is missing.`}
+                {totals.unmeasurableCount} run
+                {totals.unmeasurableCount === 1 ? " is" : "s are"} not in these
+                totals — no usable scale on the sheet. Type{" "}
+                {totals.unmeasurableCount === 1
+                  ? "its length"
+                  : "their lengths"}{" "}
+                in the run to count{" "}
+                {totals.unmeasurableCount === 1 ? "it" : "them"}.
               </p>
-            ))}
-          {totals.unmeasurableCount > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {totals.unmeasurableCount} run
-              {totals.unmeasurableCount === 1 ? " is" : "s are"} not in these
-              totals — no usable scale on the sheet. Type{" "}
-              {totals.unmeasurableCount === 1 ? "its length" : "their lengths"}{" "}
-              in the run to count{" "}
-              {totals.unmeasurableCount === 1 ? "it" : "them"}.
-            </p>
-          )}
-          {/*
+            )}
+            {/*
             Typed lengths ARE in the figures above (§ 4c), and this says so:
             a number an estimator supplied and one the app measured are
             different kinds of fact. Plain, not amber — typing is an answer.
           */}
-          {totals.typedCount > 0 && (
-            <p className="text-[0.7rem] text-muted-foreground pt-1">
-              {totals.typedCount} run
-              {totals.typedCount === 1
-                ? " has a length"
-                : "s have lengths"}{" "}
-              typed by hand rather than measured off the drawing.
-            </p>
-          )}
-          {/*
+            {totals.typedCount > 0 && (
+              <p className="text-[0.7rem] text-muted-foreground pt-1">
+                {totals.typedCount} run
+                {totals.typedCount === 1
+                  ? " has a length"
+                  : "s have lengths"}{" "}
+                typed by hand rather than measured off the drawing.
+              </p>
+            )}
+            {/*
             WHAT THE BID PRICES, AND WHAT IT DOES NOT (owner, 2026-09-27).
 
             These figures used to be finished runs only while the bid priced
@@ -3239,28 +3379,29 @@ export function RunsPanel({
             missing from a bid; plain for branch wiring, because that one is
             the estimator's own answer working as intended.
           */}
-          {(totals.leftOut?.noType.count ?? 0) > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {noTypeSentence(totals.leftOut!.noType)}
+            {(totals.leftOut?.noType.count ?? 0) > 0 && (
+              <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {noTypeSentence(totals.leftOut!.noType)}
+              </p>
+            )}
+            {(totals.leftOut?.branch.count ?? 0) > 0 && (
+              <p className="text-[0.7rem] text-muted-foreground pt-1">
+                {totals.leftOut!.branch.count} run
+                {totals.leftOut!.branch.count === 1 ? " is" : "s are"} branch
+                wiring — the devices already include that wire, so it is not
+                counted here. Conduit still is.
+              </p>
+            )}
+            <p className="text-[0.7rem] text-muted-foreground/70 pt-1">
+              What the bid prices, all sheets.
+              {(totals.leftOut?.draftCount ?? 0) > 0 &&
+                ` Includes ${totals.leftOut!.draftCount} run${totals.leftOut!.draftCount === 1 ? "" : "s"} not finished yet.`}{" "}
+              Suggestions are not counted.
             </p>
-          )}
-          {(totals.leftOut?.branch.count ?? 0) > 0 && (
-            <p className="text-[0.7rem] text-muted-foreground pt-1">
-              {totals.leftOut!.branch.count} run
-              {totals.leftOut!.branch.count === 1 ? " is" : "s are"} branch
-              wiring — the devices already include that wire, so it is not
-              counted here. Conduit still is.
-            </p>
-          )}
-          <p className="text-[0.7rem] text-muted-foreground/70 pt-1">
-            What the bid prices, all sheets.
-            {(totals.leftOut?.draftCount ?? 0) > 0 &&
-              ` Includes ${totals.leftOut!.draftCount} run${totals.leftOut!.draftCount === 1 ? "" : "s"} not finished yet.`}{" "}
-            Suggestions are not counted.
-          </p>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

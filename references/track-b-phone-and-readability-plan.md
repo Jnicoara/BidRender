@@ -49,6 +49,32 @@
 
 ## 1. MAIN DIRECTION — the right-hand panel becomes tabs
 
+> **BUILT on the laptop, 2026-09-30 (track-b).** The owner approved both
+> calls below: selecting on the drawing opens its tab (rule 4), and a tab
+> with a warning shows a mark (rule 5). What landed, and where it differs:
+>
+> - Rules live in `client/src/lib/panelTabs.ts` with tests beside them.
+> - **Undo / Delete stay in the toolbar**, not in the pinned strip: they
+>   already never scroll and never hide behind a tab, which is all rule 3
+>   asks. The pinned strip holds the "This sheet" line and the lock notice.
+> - **Traced footage (the per-type Send) sits on Runs**, above the runs.
+> - Rule 4 also SCROLLS to the selection — measured on the fixture, a run's
+>   editor was 2,073 px down the Runs tab, so "opens its tab" alone was not
+>   "opens its editor". A selection opens a tab but is not remembered.
+> - Rule 5 marks: Totals while anything is not on the bid or the totals
+>   leave footage out (no scale, no type); Counts for a count whose assembly
+>   is gone. The mark uses the new `--warning` amber; the rest of § 2.3's
+>   sweep is still Part A.
+> - Measured after: one scroll area per tab (rule 1 walk), four nested
+>   scrollers removed, five tabs fit the 280 px minimum with px-1.5, and
+>   opening Reader made no API call.
+> - **Found on screen:** `transition-colors` on the tabs left the PREVIOUS
+>   tab underlined in a background tab (transitions do not advance there).
+>   Removed.
+> - Part A items 2–6 (text sizes, the amber sweep, folding "Not on the bid
+>   yet" by reason, muted grey) are NOT done; the phone (Part B) is not
+>   started.
+
 ### Why
 
 Today the panel is one long column of everything: the counted list, the

@@ -104,7 +104,9 @@ export function LegendPanel({
         </p>
       )}
 
-      <div className="max-h-52 overflow-y-auto">
+      {/* No scroll box of its own: the panel's tab is the one scroll area
+          (track-b-phone-and-readability-plan.md § 1 rule 1). */}
+      <div>
         {symbols.length === 0 ? (
           <p className="px-3 pb-3 text-xs text-muted-foreground">
             Capture a symbol from the plan's legend, then click it to start

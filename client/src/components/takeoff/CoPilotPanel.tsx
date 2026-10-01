@@ -361,8 +361,9 @@ export function CoPilotPanel({
             </p>
           )}
 
-          {/* The findings, banded by tier. */}
-          <div className="max-h-72 overflow-y-auto">
+          {/* The findings, banded by tier. No scroll box of their own since
+              the Reader got its own tab: the tab is the one scroll area. */}
+          <div>
             {grouped.map(({ tier, rows }) =>
               rows.length === 0 ? null : (
                 <div key={tier}>
