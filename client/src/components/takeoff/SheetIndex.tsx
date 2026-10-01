@@ -42,7 +42,13 @@
  * The rows are one small query per plan, so the fetch stays whole and only
  * the DOM is windowed.
  */
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/utils";
 import { selectOnFocus } from "@/lib/selectOnFocus";
@@ -60,6 +66,15 @@ import type { SheetReadProgress } from "@/lib/sheetReadJob";
 import { sheetDisplay, type StoredSheetIdentity } from "@shared/sheetIdentity";
 
 const FLASH_MS = 1100;
+/**
+ * A name row's height without and with its one-line scale caption, in CSS px
+ * at UI scale 1.0 (the virtualiser works inside the shell's zoom, so these do
+ * not change with it). Measured 2026-09-30: 36.5 and 55.3 at every panel width
+ * from 180 to 420. Rounded UP, because an estimate that is too tall leaves a
+ * gap for a frame and one that is too short draws a row on top of the next.
+ */
+const NAME_ROW = 37;
+const NAME_ROW_WITH_SCALE = 56;
 
 type ListMode = "names" | "pictures";
 const LIST_MODE_KEY = "bidrender.takeoff.sheetListMode";
@@ -265,57 +280,76 @@ function SheetRow({
               />
             </div>
           ) : (
-            <p
-              className={cn(
-                "text-sm truncate transition-colors",
-                flash && "text-emerald-300"
-              )}
-              title={
-                display.number
-                  ? `${display.number} ${display.title}`
-                  : display.title
-              }
-            >
-              {display.number && (
-                <span className="font-mono font-medium mr-1.5">
-                  {display.number}
-                </span>
-              )}
-              <span
+            /*
+              The pencil sits on the TITLE line, not beside the whole row, so
+              the scale caption below runs the full width. Beside the row it
+              held 28px of the caption line empty, which at a 180px panel
+              was the difference between `3/16" = 1'-0"` and `3/16" = 1'-…`.
+            */
+            <div className="flex items-start gap-2">
+              <p
                 className={cn(
-                  // A default label is visibly provisional, so it reads as
-                  // something to fix rather than as the sheet's actual name.
-                  display.provisional &&
-                    !flash &&
-                    "text-muted-foreground italic"
+                  "flex-1 min-w-0 text-sm truncate transition-colors",
+                  flash && "text-emerald-300"
                 )}
+                title={
+                  display.number
+                    ? `${display.number} ${display.title}`
+                    : display.title
+                }
               >
-                {display.title}
-              </span>
-            </p>
+                {display.number && (
+                  <span className="font-mono font-medium mr-1.5">
+                    {display.number}
+                  </span>
+                )}
+                <span
+                  className={cn(
+                    // A default label is visibly provisional, so it reads as
+                    // something to fix rather than as the sheet's actual name.
+                    display.provisional &&
+                      !flash &&
+                      "text-muted-foreground italic"
+                  )}
+                >
+                  {display.title}
+                </span>
+              </p>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  startEditing();
+                }}
+                className="shrink-0 p-1 -my-0.5 rounded text-muted-foreground/60 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-foreground hover:bg-muted transition-all"
+                aria-label={`Edit the number and title of page ${sheet.pageNumber}`}
+                title="Edit number and title"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            </div>
           )}
 
+          {/*
+            ONE line, always (owner, 2026-09-30). At a narrow panel the scale
+            used to wrap — `3/16" =` over `1'-0"`, with the ruler floating
+            between them — which made the row taller than the list had
+            measured it, so for a moment it sat on top of the next sheet's
+            row. Measured at 180px: the caption went to 34px, the row to 72px.
+            Outside editing, a row is now one of two heights (with or without
+            a scale) at any panel width, and the estimate in SheetRows uses
+            both, so a row is laid out at its real height before it is
+            measured. The full scale stays on hover.
+          */}
           {sheet.scaleText && (
-            <span className="flex items-center gap-1 text-[0.7rem] text-muted-foreground/70 mt-0.5">
-              <Ruler className="w-2.5 h-2.5" />
-              <span className="font-mono">{sheet.scaleText}</span>
+            <span
+              className="flex items-center gap-1 min-w-0 text-[0.7rem] text-muted-foreground/70 mt-0.5"
+              title={sheet.scaleText}
+            >
+              <Ruler className="w-2.5 h-2.5 shrink-0" />
+              <span className="font-mono truncate">{sheet.scaleText}</span>
             </span>
           )}
         </div>
-
-        {!editing && (
-          <button
-            onClick={e => {
-              e.stopPropagation();
-              startEditing();
-            }}
-            className="shrink-0 p-1 rounded text-muted-foreground/60 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-foreground hover:bg-muted transition-all"
-            aria-label={`Edit the number and title of page ${sheet.pageNumber}`}
-            title="Edit number and title"
-          >
-            <Pencil className="w-3 h-3" />
-          </button>
-        )}
       </div>
 
       <span className="sr-only" role="status" aria-live="polite">
@@ -602,23 +636,58 @@ function SheetRows({
   // Only sizes the scrollbar and the opening offset before rows are measured.
   // A picture row is a 4:3 picture the width of the default 240px panel plus
   // its caption.
-  const estimate = pictures ? 228 : 40;
+  const pictureEstimate = 228;
+  /*
+    Per row, so a row is laid out at its real height BEFORE it is measured.
+    One flat 40 put every captioned row 15px over the row below it until the
+    resize observer caught up — a frame in a visible tab, indefinitely in a
+    background one. See NAME_ROW for the measured heights.
+  */
+  const estimateRow = useCallback(
+    (index: number) =>
+      pictures
+        ? pictureEstimate
+        : sheets[index]?.scaleText
+          ? NAME_ROW_WITH_SCALE
+          : NAME_ROW,
+    [pictures, sheets]
+  );
+  const itemKey = useCallback(
+    (index: number) => {
+      const sheet = sheets[index];
+      return sheet ? `${sheet.id}:${sheet.scaleText ? "s" : ""}` : index;
+    },
+    [sheets]
+  );
   /*
     Open at the row asked for. Nothing above it has been measured, so its
-    offset is exactly rows x estimate. The virtualiser is TOLD the offset as
-    well as the element being scrolled to it: scrolled alone, the scroll
+    offset is exactly the sum of the estimates above it. The virtualiser is
+    TOLD the offset as well as the element being scrolled to it: scrolled
+    alone, the scroll
     happened before the virtualiser was listening, and it drew rows 0-25 at
     offset 12,000 — an empty list (measured). scrollToIndex is not used
     because it settles over animation frames, which a background tab never
     runs.
   */
-  const [openingOffset] = useState(
-    () => Math.max(0, Math.min(startRow, sheets.length - 1)) * estimate
-  );
+  const [openingOffset] = useState(() => {
+    const rows = Math.max(0, Math.min(startRow, sheets.length - 1));
+    let offset = 0;
+    for (let i = 0; i < rows; i++) offset += estimateRow(i);
+    return offset;
+  });
   const virtualizer = useVirtualizer({
     count: sheets.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => estimate,
+    estimateSize: estimateRow,
+    /*
+      Measurements are cached by this key, so it names the SHEET and whether
+      it has a caption. By index (the default), a remembered height belonged
+      to a position rather than a sheet. And with the caption in the key,
+      setting a scale is a cache miss: the row is laid out at its captioned
+      height straight away, instead of keeping its old height — and covering
+      18px of the next row — until it is measured again (seen 2026-09-30).
+    */
+    getItemKey: itemKey,
     overscan: pictures ? 2 : 10,
     initialOffset: openingOffset,
   });

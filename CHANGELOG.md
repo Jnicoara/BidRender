@@ -4,6 +4,16 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-30]
+
+- **A sheet's scale no longer sits on top of the next sheet in the sheet
+  list.** Setting a scale grew that row by a line, and for a moment (or for
+  as long as the tab was in the background) the list still had it at its old
+  height, so the scale covered the sheet below. Rows now take their new
+  height the instant a scale is set. On a narrow sheet list the scale also
+  stays on one line rather than breaking in two, and a long one like
+  3/16" = 1'-0" now fits in full even with the list dragged to its narrowest.
+
 ## [2026-09-29]
 
 - **Deleting on the Plans screen now asks in proportion to what you lose.**
