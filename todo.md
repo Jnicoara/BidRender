@@ -47,7 +47,49 @@ left as written rather than rewritten to match the rename.
       least off the main thread. The scale test's budgets are the alarm; do
       not loosen them to get past it.
 
-### Before beta: the Plans screen at phone width — side panels become drawers
+### Before beta: price an unpriced line right where it blocks you
+
+- [ ] **Owner, 2026-09-30.** When a bid has unpriced lines, "For your quote
+      app" refuses to show figures ("This bid has lines without a price. Price
+      them on the bid…", `QuoteAppPanel.tsx` `Blocked`). The bid page's
+      amber strip ("N lines are not priced", `BidsPage.tsx` ~1324) explains
+      but offers no box. The owner also named a "Price this before sending"
+      panel; **no screen carries that text today** (searched `track-b` and
+      `origin/local-dev`, 2026-09-30), so it is either the `Blocked` panel
+      under another name or a step still to be built. Ask which before
+      building. Wanted:
+  - Next to **each** unpriced line, in both places, a price box. Typing a
+    price unblocks the bid as soon as no line is left unpriced.
+  - **Saved on this bid only by default**, with a tick box "Also save to my
+    catalog". Ticked, it writes the company's own material row (a FORK if the
+    row is a shipped one; never a price typed onto a baseline row, CLAUDE.md
+    § "Where a priced catalog lands").
+  - **Never $0 and never blank as an answer.** An empty or invalid box
+    leaves the line "Not priced"; it does not commit a zero (CLAUDE.md
+    § Editing fields rule 6, and `commitNullableEdit` in placeholder mode).
+    A typed 0 on a hand-priced line stays a real answer, as today
+    (`shared/lineNotPriced.ts`).
+  - The line then says **"priced on this bid"**, so nobody mistakes it for a
+    catalog price.
+  - **"Not priced" on the bid page links to the same box** — one component
+    (one `LineCost`-style seam), not a second copy of the field.
+  - **Needs a MIGRATION — Track A.** A hand-priced line already stores a
+    typed price, so for those it needs none. But a line from a run type or
+    an assembly carries only the snapshot, and **a snapshot must never be
+    mutated** (CLAUDE.md § Data model). "Priced on this bid" needs its own
+    nullable column on `bid_line_items` (e.g. `bidUnitCost`, no default, NULL =
+    not priced here), read by `lineNotPriced` AND its SQL copy
+    `lineNotPricedSql` in `server/db.ts` together. Additive, so it is step 1
+    of the three-step deploy (migrate first). Two edges to decide in the
+    spec: an unpriced PART inside an otherwise-priced assembly line
+    (`snapshotUnpricedParts`) has no line to put a box on, and a line whose
+    LABOR is unpriced wants hours, not a price.
+
+### Before beta: the Plans screen at phone width — side panels become tabs
+
+> **Replanned 2026-09-30:** not drawers any more. The owner chose tabs for the
+> right-hand panel, with the phone showing the same tabs as one full-screen
+> panel. See `references/track-b-phone-and-readability-plan.md`.
 
 - [ ] **Owner, 2026-09-29: its own piece, later, before beta.** At a 390 px
       window the sheet list (240 px) and the counts panel (a fixed 400 px, its
@@ -68,8 +110,8 @@ left as written rather than rewritten to match the rename.
       both reshape the same panel — and look at it at the size it ships, at
       UI scale 1.0 and on a laptop screen, before calling it done.
       **Planned 2026-09-30, with the phone layout above:**
-      `references/track-b-phone-and-readability-plan.md` (six questions for
-      the owner at the end; nothing built yet).
+      `references/track-b-phone-and-readability-plan.md` (owner answered all
+      six the same day; the panel becomes tabs; nothing built yet).
 
 ### Before beta: speed of the summary, and two missing Undos
 
