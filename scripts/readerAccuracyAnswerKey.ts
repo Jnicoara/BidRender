@@ -36,7 +36,10 @@
  */
 import { labelKey, scoreReading } from "./readerAccuracyScore";
 import type { HandMark, Score, Suggestion } from "./readerAccuracyScore";
-import { splitExistingToRemain } from "../shared/existingToRemain";
+import {
+  existingToRemainName,
+  splitExistingToRemain,
+} from "../shared/existingToRemain";
 
 export type Verdict = "ai-wrong" | "my-miss";
 
@@ -65,7 +68,48 @@ export type AnswerKeyFile = {
     }
   >;
   verdicts?: VerdictEntry[];
+  /**
+   * Names that are the SAME ITEM, one list per item, the hand count's name
+   * first: `[["GFCI receptacle", "DUPLEX RECEPTACLE, GFCI", "GFCI"]]`.
+   * Added 2026-10-01: the AI labels a find with the CAPTURED legend symbol's
+   * name, and 10 of the owner's 15 counts are named differently from their
+   * symbol — so a right answer scored as "wrong symbol". Nothing is renamed;
+   * scoring reads every name in a list as the first one.
+   */
+  sameAs?: string[][];
 };
+
+/**
+ * The name scoring uses for `label`: the first name of its "same as" list,
+ * or the label itself. An "- EXISTING TO REMAIN" twin keeps its suffix, so it
+ * still folds into its symbol the way `labelKey` already does.
+ */
+export function sameAsNamer(
+  file: AnswerKeyFile | null
+): (label: string | null) => string | null {
+  const canonical = new Map<string, string>();
+  for (const group of file?.sameAs ?? []) {
+    const first = group.find(n => n.trim());
+    if (!first) continue;
+    for (const name of group) {
+      const key = labelKey(name);
+      // A name in two lists would make the answer depend on file order.
+      const already = canonical.get(key);
+      if (already !== undefined && labelKey(already) !== labelKey(first))
+        throw new Error(
+          `"${name}" is in two "same as" lists in answer-key.json — keep it in one.`
+        );
+      canonical.set(key, first.trim());
+    }
+  }
+  return label => {
+    if (label === null) return null;
+    const { base, existing } = splitExistingToRemain(label);
+    const mapped = canonical.get(labelKey(base));
+    if (mapped === undefined) return label;
+    return existing ? existingToRemainName(mapped) : mapped;
+  };
+}
 
 export type SheetKey = {
   /** Normalised keys (labelKey) of every picked type, data included. */

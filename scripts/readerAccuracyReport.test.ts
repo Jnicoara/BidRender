@@ -78,6 +78,51 @@ describe("the report against the smaller key", () => {
     ]);
   });
 
+  it("scores the AI's legend-symbol name as the hand count's item through 'same as'", () => {
+    // The AI names a find by the captured symbol ("DUPLEX RECEPTACLE, GFCI");
+    // the hand count is "GFCI receptacle". Without the list: wrong symbol.
+    const readings = [
+      reading({
+        marks: [
+          { label: "GFCI receptacle", x: 0, y: 0 },
+          { label: "GFCI receptacle - EXISTING TO REMAIN", x: 300, y: 0 },
+        ],
+        suggestions: [
+          { label: "DUPLEX RECEPTACLE, GFCI", x: 2, y: 1, unreadable: false },
+          { label: "GFCI", x: 301, y: 0, unreadable: false },
+        ],
+      }),
+    ];
+    const without = buildReport(readings, null, R);
+    expect(without.main[0].perRun[0]).toMatchObject({ found: 0, wrong: 2 });
+    const withList = buildReport(
+      readings,
+      { sameAs: [["GFCI receptacle", "DUPLEX RECEPTACLE, GFCI", "GFCI"]] },
+      R
+    );
+    expect(withList.main[0].perRun[0]).toMatchObject({
+      byHand: 2,
+      found: 2,
+      wrong: 0,
+      extra: 0,
+    });
+  });
+
+  it("refuses a name in two 'same as' lists rather than pick one by order", () => {
+    expect(() =>
+      buildReport(
+        [reading({})],
+        {
+          sameAs: [
+            ["A", "B"],
+            ["C", "b"],
+          ],
+        },
+        R
+      )
+    ).toThrow(/two "same as" lists/);
+  });
+
   it("keeps data in its own table and prints both", () => {
     const r = buildReport(
       [

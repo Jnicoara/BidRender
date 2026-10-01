@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-01]
 
+- **Reader-accuracy test: "same as" names.** The AI names what it finds by
+  the captured legend symbol, and many hand counts are named differently
+  ("GFCI receptacle" vs "DUPLEX RECEPTACLE, GFCI"), so right answers were
+  being scored as the wrong symbol. The test's answer-key file can now say
+  which names are the same item. Nothing is renamed.
+
 - **Move marks to another count without clicking them again.** Select marks
   on a sheet (click, or Shift-drag a box) and pick a count from "Move to…" in
   the bar that appears. The marks stay exactly where they are and only what

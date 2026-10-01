@@ -161,7 +161,13 @@ const { askForPixels, pixelsToFractions } = await import(
   "./readerAccuracyPixels"
 );
 const { tileGrid, ownedBy } = await import("./readerAccuracyTiles");
-const { sheetKeyName } = await import("./readerAccuracyAnswerKey");
+const { sheetKeyName, sameAsNamer } = await import("./readerAccuracyAnswerKey");
+// Read once, up front: a broken file stops the run BEFORE any AI call.
+const sameAsName = sameAsNamer(
+  (await import("./readerAccuracyFiles")).readAnswerKeyFile()
+);
+const named = <T extends { label: string | null }>(rows: T[]): T[] =>
+  rows.map(r => ({ ...r, label: sameAsName(r.label) ?? r.label }));
 const { buildReport, formatReport, lineName, METHOD_NAMES } = await import(
   "./readerAccuracyReport"
 );
@@ -433,9 +439,13 @@ for (const pdf of pdfs) {
         ? `  hand count: ${marks.length} marks`
         : "  no hand count on this sheet yet — the AI's answer is shown, not scored"
     );
+    // Through the "same as" lists, so a count named differently from its
+    // legend symbol on purpose is not reported as a typo.
     const typos = unmatchedLabels(
-      marks,
-      (setLegend.length ? setLegend : accountLegend).map(l => l.label)
+      named(marks),
+      (setLegend.length ? setLegend : accountLegend).map(
+        l => sameAsName(l.label) ?? l.label
+      )
     );
     if (marks.length && typos.length) {
       console.log(
@@ -596,12 +606,18 @@ for (const pdf of pdfs) {
             y: f.y,
             unreadable: f.confidence === "unreadable",
           }));
+          // Scored through the "same as" lists; the record below keeps the
+          // AI's own names, so a re-score can apply a corrected list.
           const score = marks.length
-            ? scoreReading(marks, suggestions, MATCH_RADIUS_POINTS)
+            ? scoreReading(
+                named(marks),
+                named(suggestions),
+                MATCH_RADIUS_POINTS
+              )
             : null;
           const pairs = pairForPosition(
-            marks,
-            suggestions,
+            named(marks),
+            named(suggestions),
             PLACEMENT_RADIUS_POINTS
           );
           const placement = marks.length

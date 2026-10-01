@@ -8,6 +8,7 @@
  */
 import {
   keyForSheet,
+  sameAsNamer,
   scoreSheet,
   verdictFor,
   type AnswerKeyFile,
@@ -122,7 +123,18 @@ export function buildReport(
   const picked = new Map<string, { name: string; data: boolean }[]>();
   let ignored = 0;
 
-  for (const r of readings) {
+  // Every name through the "same as" lists first, so a hand count and the
+  // AI's legend-symbol name for one item are one item everywhere below.
+  const sameAs = sameAsNamer(file);
+  for (const raw of readings) {
+    const r: Reading = {
+      ...raw,
+      marks: raw.marks.map(m => ({ ...m, label: sameAs(m.label) ?? "" })),
+      suggestions: raw.suggestions.map(s => ({
+        ...s,
+        label: sameAs(s.label),
+      })),
+    };
     const key = keyForSheet(r.sheet, r.marks, file);
     if (!picked.has(r.sheet))
       picked.set(
