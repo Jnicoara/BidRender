@@ -1600,6 +1600,17 @@ path is ever revived, give it the same treatment first.
       Needs a nullable `takeoff_stamps.dropExcluded` (NULL = follows the
       count; additive). Spec and B's follow-up in
       `references/quote-app-panel-plan.md` § 10, H3.
+- [ ] **Track A (migration): nine nullable pin-style columns, BATCHED with
+      the mark-status column.** Not built; queued 2026-10-01. Shape, letter
+      and color on each of `assemblies`, `symbol_links` and `takeoff_groups`.
+      They are saved company-wide the way run colors are, and a shipped
+      assembly forks on edit. NULL means automatic, so they are additive with
+      no backfill (step 1 of the three). Spec: Track B's
+      `references/track-b-count-pin-styles-plan.md` § 6 (on `track-b`, not yet
+      on `local-dev`). The batch-mate is nullable `takeoff_stamps.status`
+      (`new`/`existing`/`remove`/`relocate`, NULL read as `new`), recorded in
+      Track C's `todo.md` on `track-c`. B's style editor waits for the nine
+      columns, and the status looks (§ 7) wait for the status column.
 
 - [x] **BUILT 2026-09-27 (Track B), owner's answers as recommended in
       `references/track-b-beta-plan.md` § 1.** `storageDelete` on both
