@@ -4,6 +4,14 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-09-30]
+
+- **Capture on the legend works again.** After boxing a symbol, the "Name
+  this symbol" box was opening but drawn on the zoomed drawing, so it was a
+  speck at low zoom and off the top of the screen when zoomed in on a legend.
+  Capture looked like it did nothing. The box now always appears at a normal
+  size at the top of the viewer.
+
 ## [2026-09-29]
 
 - **The AI reading test now measures WHERE the AI puts its marks, not just

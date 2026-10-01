@@ -17,6 +17,7 @@
  * phase 2c's and are untouched.
  */
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -76,13 +77,26 @@ export function cropToThumbnail(
  *
  * Follows the standing edit rules: the field selects on focus, Enter commits,
  * Escape abandons.
+ *
+ * ── It is portalled to the screen layer, and that is not optional ───────────
+ * This form is rendered from the sheet's overlay, which sits INSIDE the zoom
+ * transform. Until 2026-09-30 it was drawn there, so it scaled and moved with
+ * the drawing: measured on E0.01, 62x31 px at 19% (a speck at the top of the
+ * sheet) and 1,826 px ABOVE the window at 179%, where a legend symbol is
+ * actually boxed. The form opened, took the keyboard focus, and could not be
+ * seen — so Capture read as doing nothing at all. `chromeTarget` is the
+ * untransformed layer the calibrate and select-text cards already use; it is
+ * a required prop so a caller cannot forget it.
  */
 export function SymbolCaptureForm({
   thumbnail,
+  chromeTarget,
   onSave,
   onCancel,
 }: {
   thumbnail: string | null;
+  /** PlanPane's screen-space layer. Null only before it has mounted. */
+  chromeTarget: HTMLElement | null;
   onSave: (label: string) => void;
   onCancel: () => void;
 }) {
@@ -101,8 +115,9 @@ export function SymbolCaptureForm({
     onSave(trimmed);
   };
 
-  return (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 w-80 rounded-xl border border-border bg-card/98 p-3 shadow-xl">
+  // pointer-events-auto: the screen layer is click-through by default.
+  const card = (
+    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 w-80 max-w-[calc(100%-1rem)] pointer-events-auto rounded-xl border border-border bg-card/98 p-3 shadow-xl">
       <p className="text-sm font-medium">Name this symbol</p>
       <p className="text-xs text-muted-foreground mt-0.5">
         Used to recognise it again on the next set of plans.
@@ -164,6 +179,12 @@ export function SymbolCaptureForm({
       </div>
     </div>
   );
+
+  // The same fallback as CalibrateLayer and TextSelect. PlanPane sets the
+  // layer on its first commit (`ref={setChromeLayer}`), and this form only
+  // exists after a box has been dragged on a rendered page, so the inline
+  // branch is for a layer that has not mounted, not a normal path.
+  return chromeTarget ? createPortal(card, chromeTarget) : card;
 }
 
 /**

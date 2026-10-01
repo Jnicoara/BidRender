@@ -5642,6 +5642,7 @@ export default function TakeoffPage({
                     {pendingCapture && (
                       <SymbolCaptureForm
                         thumbnail={pendingCapture.thumbnail}
+                        chromeTarget={size.chromeTarget}
                         onCancel={() => setPendingCapture(null)}
                         onSave={label => {
                           captureSymbol.mutate(
