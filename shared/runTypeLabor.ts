@@ -237,10 +237,32 @@ export function laborPerFootSentence(type: RunTypeSpec): string {
   const total = runTypeComponentsPerFoot(type).length;
   const hours = trimHours(labor.hours);
 
-  if (labor.complete) return `${hours} h per ft`;
+  // A conduit rate says, briefly, that it covers fittings (owner, 2026-09-29,
+  // `LABOR_IN_RUN_RATE`). Briefly because the run type list is ~161px wide:
+  // the full wording wrapped to four lines. `laborPerFootCoverage` carries the
+  // full wording for a tooltip. A partial figure keeps its warning instead,
+  // unshortened — the list's own comment (RunTypePicker.tsx) explains why a
+  // clipped warning is worse than a second line — and says nothing about
+  // coverage, because a rate still being filled in covers nothing yet.
+  if (labor.complete) {
+    return type.pathType === "conduit"
+      ? `${hours} h per ft, covers fittings`
+      : `${hours} h per ft`;
+  }
   if (labor.hours <= 0) return "No labor units yet — priced at material only";
   const verb = labor.unsetCount === 1 ? "has" : "have";
   return `${hours} h per ft so far — ${labor.unsetCount} of ${total} ${verb} no labor unit`;
+}
+
+/**
+ * The full wording of what a conduit type's per-foot rate covers, for a
+ * tooltip beside `laborPerFootSentence`. "Covers fittings" alone is short, and
+ * wrong if read literally: elbows, bends, LBs and boxes are fittings that keep
+ * their own hours. Undefined for a cable type, which has none of them.
+ */
+export function laborPerFootCoverage(type: RunTypeSpec): string | undefined {
+  if (type.pathType !== "conduit") return undefined;
+  return "The hours per foot cover the couplings, connectors and straps counted on a run, so those carry no hours of their own. Elbows, field bends, LBs, pull boxes and tee boxes keep their own hours.";
 }
 
 /**

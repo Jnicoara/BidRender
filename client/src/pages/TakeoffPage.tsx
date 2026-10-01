@@ -103,7 +103,9 @@ import {
 } from "@/lib/uploadTiming";
 import {
   BUTTON_ZOOM_STEP,
+  FOCUS_ZOOM_OVER_FIT,
   REGION_SETTLE_MS,
+  centreOn,
   clampView,
   fitView,
   formatZoom,
@@ -672,9 +674,16 @@ function PlanPane({
   controlsTarget,
   thumbnailWants,
   onThumbnail,
+  focusRequest,
 }: {
   doc: Document;
   page: number;
+  /**
+   * A spot to bring to the middle of the view, in PAGE POINTS (the space
+   * marks and reader findings are stored in). `seq` changes on every request,
+   * so asking for the same spot twice still moves the view back to it.
+   */
+  focusRequest?: { x: number; y: number; seq: number } | null;
   /**
    * Where this pane's own zoom controls go — the one top bar.
    *
@@ -909,6 +918,34 @@ function PlanPane({
     fittedFor.current = key;
     fitToView();
   }, [doc.id, page, canvasSize.width, canvasSize.height, fitToView]);
+
+  /**
+   * "Show me on the drawing": centre the requested spot, zoomed in to at
+   * least FOCUS_ZOOM_OVER_FIT past fit (see `centreOn` for why it zooms).
+   *
+   * Until 2026-09-30 a jump only drew a ring (`focusPoint`, TraceLayer) and
+   * never moved the view — so pressing Link or ticking a reader suggestion
+   * at fit, or with the spot off screen, looked like it did nothing.
+   *
+   * Declared AFTER the fit-on-arrival effect, so on a commit where both run
+   * the fit happens first and this wins. A request that arrives before the
+   * page has a raster is not marked handled, and runs once bounds exist.
+   * Keyed on `seq` so a re-render (a new drawn scale, a resize) never
+   * re-centres a view the user has since moved.
+   */
+  const handledFocus = useRef<number | null>(null);
+  useEffect(() => {
+    if (!focusRequest || handledFocus.current === focusRequest.seq) return;
+    const bounds = readBounds();
+    if (!bounds) return;
+    handledFocus.current = focusRequest.seq;
+    const minZoom = fitView(bounds).zoom * FOCUS_ZOOM_OVER_FIT;
+    const point = {
+      x: focusRequest.x * drawnScale,
+      y: focusRequest.y * drawnScale,
+    };
+    aimView(current => centreOn(current, bounds, point, minZoom));
+  }, [focusRequest, readBounds, aimView, drawnScale]);
 
   /**
    * The pane changed size — re-fit if the view was a fit, otherwise re-clamp.
@@ -2348,6 +2385,41 @@ export default function TakeoffPage({
   /** Where a click in the counted-items list sent the viewer. */
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(
     null
+  );
+  /** The same spot, as a request for PlanPane to bring it into view. */
+  const [focusRequest, setFocusRequest] = useState<{
+    x: number;
+    y: number;
+    seq: number;
+  } | null>(null);
+  const focusRingTimer = useRef<number | null>(null);
+  /**
+   * Every "show me on the drawing" goes through here: the counted-items list,
+   * a drop, a reader suggestion's tick and its Link / Fix. It MOVES the view
+   * (PlanPane's `focusRequest`) and rings the spot.
+   *
+   * The ring used to be the whole of it, and each caller cleared it with its
+   * own timer — so a second jump within 2.2s had its ring removed early by
+   * the first one's timer. One timer, reset on every jump.
+   */
+  const jumpTo = useCallback((at: { x: number; y: number }) => {
+    setFocusPoint(at);
+    setFocusRequest(current => ({ ...at, seq: (current?.seq ?? 0) + 1 }));
+    if (focusRingTimer.current !== null)
+      window.clearTimeout(focusRingTimer.current);
+    // Clear the highlight after a moment — a marker that stays ringed forever
+    // stops meaning "this is the one".
+    focusRingTimer.current = window.setTimeout(() => {
+      focusRingTimer.current = null;
+      setFocusPoint(null);
+    }, 2200);
+  }, []);
+  useEffect(
+    () => () => {
+      if (focusRingTimer.current !== null)
+        window.clearTimeout(focusRingTimer.current);
+    },
+    []
   );
   const [capturingSymbol, setCapturingSymbol] = useState(false);
   /** "Whole legend" is picked up: the next drag is one box around a legend. */
@@ -6628,6 +6700,7 @@ export default function TakeoffPage({
               key={doc.id}
               doc={doc}
               page={page}
+              focusRequest={focusRequest}
               onPage={setPage}
               controlsTarget={zoomSlot}
               thumbnailWants={wantedThumbnails}
@@ -7038,12 +7111,7 @@ export default function TakeoffPage({
               sendingGroupId={
                 sendToBid.isPending ? (sendToBid.variables?.id ?? null) : null
               }
-              onJumpTo={at => {
-                setFocusPoint(at);
-                // Clear the highlight after a moment — a marker that stays
-                // ringed forever stops meaning "this is the one".
-                window.setTimeout(() => setFocusPoint(null), 2200);
-              }}
+              onJumpTo={jumpTo}
               onRemoveStamp={id => removeStamp.mutate({ id })}
               summary={
                 <TakeoffSummaryPanel
@@ -7178,10 +7246,7 @@ export default function TakeoffPage({
                     }
                     selected={selectedDrop}
                     onSelect={setSelectedDrop}
-                    onJumpTo={at => {
-                      setFocusPoint(at);
-                      window.setTimeout(() => setFocusPoint(null), 2200);
-                    }}
+                    onJumpTo={jumpTo}
                     onAnswer={answers =>
                       answerDrops.mutate({
                         rootRunId: run.parentRunId ?? run.id,
@@ -7197,10 +7262,7 @@ export default function TakeoffPage({
                       bidId={bidId}
                       legs={runEndsLegs(run.parentRunId ?? run.id)}
                       onSave={onSetEnds}
-                      onJumpTo={at => {
-                        setFocusPoint(at);
-                        window.setTimeout(() => setFocusPoint(null), 2200);
-                      }}
+                      onJumpTo={jumpTo}
                       highlight={endHighlight}
                       locked={quantitiesLocked}
                     />
@@ -7249,10 +7311,7 @@ export default function TakeoffPage({
                           confirmed: true,
                         })
                       }
-                      onJumpTo={at => {
-                        setFocusPoint(at);
-                        window.setTimeout(() => setFocusPoint(null), 2200);
-                      }}
+                      onJumpTo={jumpTo}
                       symbols={symbols}
                       onAsk={question => {
                         if (!activeSheet) return;
@@ -7369,8 +7428,9 @@ export default function TakeoffPage({
                       setSelectedDocId(to.bidPdfId);
                     if (to.pageNumber !== null) setPage(to.pageNumber);
                     setSelectedRunId(to.runId);
-                    setFocusPoint({ x: to.x, y: to.y });
-                    window.setTimeout(() => setFocusPoint(null), 2200);
+                    // Same commit as the page change, so PlanPane fits the
+                    // new sheet first and then centres this spot on it.
+                    jumpTo({ x: to.x, y: to.y });
                   }}
                 />
               }

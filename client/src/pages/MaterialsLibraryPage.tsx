@@ -624,6 +624,15 @@ function MaterialRow({
                 — defaults for counting fittings, yours to change
               </span>
             </p>
+            {/* What this pipe's labor hours per foot pay for on a traced run
+                (owner, 2026-09-29, `LABOR_IN_RUN_RATE`). Said where the rate
+                and the fitting counts are set, so nobody puts hours on a
+                coupling expecting a run to use them. */}
+            <p className="text-[0.7rem] text-muted-foreground mt-0.5">
+              Its labor hours per foot cover the couplings, connectors and
+              straps counted on a run. Elbows, bends, LBs and boxes keep their
+              own hours.
+            </p>
             <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
               <label className="flex items-center gap-1.5">
                 Stick
@@ -825,7 +834,7 @@ function MaterialRow({
       {unhoured ? (
         <span
           className="text-xs w-24 text-right shrink-0 font-medium text-[#F5C518]"
-          title="No labor unit yet — work using this material carries no hours until you set one."
+          title="No labor unit yet — work using this material carries no hours until you set one. On a traced run, couplings, connectors and straps need none: the pipe's hours per foot pay for them."
         >
           Needs hours
         </span>

@@ -9,6 +9,7 @@
 import { describe, it, expect } from "vitest";
 import {
   BUTTON_ZOOM_STEP,
+  FOCUS_ZOOM_OVER_FIT,
   MAX_ZOOM,
   MIN_ZOOM,
   REGION_MARGIN,
@@ -16,6 +17,7 @@ import {
   snapToDevicePixel,
   MIN_VISIBLE_FRACTION,
   FIT_SLACK_FRACTION,
+  centreOn,
   clampView,
   clampZoom,
   fitView,
@@ -640,5 +642,68 @@ describe("regionStillGood", () => {
     expect(
       regionStillGood({ rect: want, scale: 7 }, { rect: want, scale: 7 })
     ).toBe(true);
+  });
+});
+
+// ─── centreOn: "show me on the drawing" (2026-09-30) ──────────────────────────
+
+describe("centreOn", () => {
+  /*
+    A WIDE sheet in the same 800x600 viewport, so the two axes do not overflow
+    together — the fixture rule in CLAUDE.md § "A test fixture shaped like its
+    container". The 4:3 `bounds` above is used as well, because that is what a
+    real sheet in a real pane mostly looks like.
+  */
+  const wide: ViewBounds = {
+    viewportWidth: 800,
+    viewportHeight: 600,
+    contentWidth: 3600,
+    contentHeight: 1200,
+  };
+  const onScreen = (
+    view: { zoom: number; x: number; y: number },
+    p: { x: number; y: number }
+  ) => ({ x: view.x + p.x * view.zoom, y: view.y + p.y * view.zoom });
+
+  for (const [name, b] of [
+    ["4:3 sheet", bounds],
+    ["wide sheet", wide],
+  ] as const) {
+    it(`from FIT, moves the view and puts the spot in the middle (${name})`, () => {
+      // The reported fault: Link / tick at fit moved nothing.
+      const fit = fitView(b);
+      const spot = { x: b.contentWidth * 0.3, y: b.contentHeight * 0.7 };
+      const next = centreOn(fit, b, spot, fit.zoom * FOCUS_ZOOM_OVER_FIT);
+      expect(next).not.toEqual(fit);
+      expect(next.zoom).toBeCloseTo(fit.zoom * FOCUS_ZOOM_OVER_FIT, 6);
+      const at = onScreen(next, spot);
+      expect(at.x).toBeCloseTo(400, 3);
+      expect(at.y).toBeCloseTo(300, 3);
+    });
+
+    it(`a spot in the far corner still reaches the middle (${name})`, () => {
+      const fit = fitView(b);
+      const corner = { x: b.contentWidth, y: b.contentHeight };
+      const next = centreOn(fit, b, corner, fit.zoom * FOCUS_ZOOM_OVER_FIT);
+      const at = onScreen(next, corner);
+      expect(at.x).toBeCloseTo(400, 3);
+      expect(at.y).toBeCloseTo(300, 3);
+    });
+  }
+
+  it("never zooms OUT of a closer view somebody chose", () => {
+    const fit = fitView(wide);
+    const close = { zoom: fit.zoom * 10, x: 0, y: 0 };
+    const spot = { x: 1800, y: 600 };
+    const next = centreOn(close, wide, spot, fit.zoom * FOCUS_ZOOM_OVER_FIT);
+    expect(next.zoom).toBe(close.zoom);
+    const at = onScreen(next, spot);
+    expect(at.x).toBeCloseTo(400, 3);
+    expect(at.y).toBeCloseTo(300, 3);
+  });
+
+  it("respects MAX_ZOOM", () => {
+    const next = centreOn(fitView(wide), wide, { x: 10, y: 10 }, 999);
+    expect(next.zoom).toBe(MAX_ZOOM);
   });
 });
