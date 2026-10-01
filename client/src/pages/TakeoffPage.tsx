@@ -92,6 +92,7 @@ import {
   fitView,
   formatZoom,
   regionStillGood,
+  sharpRenderScale,
   snapToDevicePixel,
   wantedRegion,
   wheelZoomFactor,
@@ -249,6 +250,7 @@ import {
   SymbolCaptureForm,
   SymbolCaptureLayer,
   cropToThumbnail,
+  renderSharpCapture,
   type CaptureRegion,
 } from "@/components/takeoff/SymbolCapture";
 import {
@@ -669,6 +671,18 @@ function PlanPane({
      * it here instead: this layer sits over the viewport, untransformed.
      */
     chromeTarget: HTMLElement | null;
+    /**
+     * Device pixels per page point on screen right now — the sharpness the
+     * user is looking at (`sharpRenderScale`). Symbol capture renders at no
+     * less than this.
+     */
+    screenScale: number;
+    /**
+     * Draw a region of this page from the PDF at a chosen scale, region in
+     * page points. The same worker render the sharp patch uses. For symbol
+     * capture, which must not be cut from the soft backdrop.
+     */
+    renderRegion: (rect: PageRect, scale: number) => Promise<RenderedRegion>;
     /**
      * This page's text with positions, read from the open document when
      * asked — for "Select text". A function rather than data, so a sheet
@@ -1739,6 +1753,9 @@ function PlanPane({
                   renderScale: drawnScale,
                   canvas: canvasRef.current,
                   chromeTarget: chromeLayer,
+                  screenScale: sharpRenderScale(drawnScale, view.zoom, dpr),
+                  renderRegion: (rect, scale) =>
+                    render(page, scale, hash, rect),
                   loadTextLayer: () => pageTextLayer(page, hash),
                 })}
             </div>
@@ -2202,10 +2219,21 @@ export default function TakeoffPage({
     setCalibrating(false);
     setSelectingText(true);
   }, []);
-  /** The crop taken from the page, awaiting a name. */
+  /**
+   * The crop taken from the page, awaiting a name.
+   *
+   * `thumbnail` starts as the instant soft preview and is replaced by the
+   * sharp render when it arrives (`renderSharpCapture`). `id` ties that late
+   * reply to THIS capture: one that was cancelled, or replaced by a newer box,
+   * must not have its picture land on the next one.
+   */
   const [pendingCapture, setPendingCapture] = useState<{
+    id: number;
     thumbnail: string | null;
+    sharpening: boolean;
+    soft: boolean;
   } | null>(null);
+  const captureSeq = useRef(0);
   /**
    * Clicks not yet confirmed by the server — drawn here, mirrored to storage.
    *
@@ -5627,21 +5655,53 @@ export default function TakeoffPage({
                         renderScale={size.renderScale}
                         onCancel={() => setCapturingSymbol(false)}
                         onRegion={(region: CaptureRegion) => {
-                          const thumbnail = size.canvas
+                          // The soft preview, at once, so the form is never
+                          // empty while the sharp render runs.
+                          const preview = size.canvas
                             ? cropToThumbnail(
                                 size.canvas,
                                 region,
                                 size.renderScale
                               )
                             : null;
+                          const id = ++captureSeq.current;
                           setCapturingSymbol(false);
-                          setPendingCapture({ thumbnail });
+                          setPendingCapture({
+                            id,
+                            thumbnail: preview,
+                            sharpening: true,
+                            soft: false,
+                          });
+                          const settle = (sharp: string | null) =>
+                            setPendingCapture(current =>
+                              current?.id === id
+                                ? {
+                                    ...current,
+                                    thumbnail: sharp ?? current.thumbnail,
+                                    sharpening: false,
+                                    soft: sharp === null && preview !== null,
+                                  }
+                                : current
+                            );
+                          renderSharpCapture(
+                            region,
+                            size.screenScale,
+                            size.renderRegion
+                          ).then(settle, error => {
+                            console.warn(
+                              "[capture] sharp render failed; keeping the preview",
+                              error
+                            );
+                            settle(null);
+                          });
                         }}
                       />
                     )}
                     {pendingCapture && (
                       <SymbolCaptureForm
                         thumbnail={pendingCapture.thumbnail}
+                        sharpening={pendingCapture.sharpening}
+                        soft={pendingCapture.soft}
                         chromeTarget={size.chromeTarget}
                         onCancel={() => setPendingCapture(null)}
                         onSave={label => {

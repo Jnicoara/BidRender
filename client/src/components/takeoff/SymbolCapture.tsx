@@ -6,12 +6,16 @@
  * with Escape the way everything else in the app can — so it read as belonging
  * to a different application.
  *
- * ── The crop is taken from the rendered canvas ───────────────────────────────
- * Dragging a box gives a rectangle in page points; the pixels come from the
- * already-rasterised page rather than re-rendering the PDF, so capturing is
- * instant and costs nothing. It is downscaled hard: this is a thumbnail for
- * recognition, and a full-resolution crop would put a screenshot into a text
- * column.
+ * ── The picture is rendered again from the PDF, sharp ────────────────────────
+ * Dragging a box gives a rectangle in page points. Until 2026-09-30 the pixels
+ * were cut from the viewer's backdrop (1.5x, 108 px per paper inch) and shrunk
+ * to 96 px — so a symbol that was crisp on screen was saved soft, and that
+ * soft picture is what the reader-accuracy test hands the model as the legend.
+ * Now the box is drawn again by the PDF worker at `captureRenderScale`
+ * (shared/symbolCapture.ts): never softer than the screen it was boxed on,
+ * nor than 400 px per inch. The backdrop crop is still taken, instantly, so
+ * the naming form has a picture at once; the sharp one replaces it when the
+ * render arrives, and Save waits for it.
  *
  * Only the naming is new. Link creation, reuse and the one-time question are
  * phase 2c's and are untouched.
@@ -25,19 +29,72 @@ import { Input } from "@/components/ui/input";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { crosshairCursorStyle } from "@/lib/crosshairCursor";
 import { useCrosshairColor, useCrosshairSize } from "@/hooks/useCrosshairColor";
+import {
+  SYMBOL_THUMBNAIL_MAX_CHARS,
+  captureRenderScale,
+  capturePixelSize,
+  normaliseCaptureBox,
+  type CaptureBox,
+} from "@shared/symbolCapture";
 
-/** Longest edge of the stored thumbnail, in pixels. */
+/** Longest edge of the instant PREVIEW, in pixels. Not what is saved. */
 const THUMBNAIL_MAX_EDGE = 96;
 
-export type CaptureRegion = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
+export type CaptureRegion = CaptureBox;
+
+/** Draws a page region from the PDF — PlanPane's worker, region in points. */
+export type CaptureRenderer = (
+  rect: CaptureRegion,
+  scale: number
+) => Promise<{ bitmap: ImageBitmap }>;
+
+/**
+ * Render a boxed region from the PDF itself, as a PNG data URL.
+ *
+ * At `captureRenderScale`, so the picture is at least as sharp as the screen
+ * the box was drawn on. If the encoded picture is over the stored limit (rare:
+ * a box much bigger than a symbol), it is stepped down 20% at a time until it
+ * fits, rather than failing the save. Null for a box with no area, or when the
+ * picture cannot be read back — the caller keeps the preview and says so.
+ */
+export async function renderSharpCapture(
+  region: CaptureRegion,
+  screenScale: number,
+  renderRegion: CaptureRenderer
+): Promise<string | null> {
+  const box = normaliseCaptureBox(region);
+  const scale = captureRenderScale(box, screenScale);
+  if (!(scale > 0)) return null;
+  const size = capturePixelSize(box, scale);
+  if (size.width < 4 || size.height < 4) return null;
+
+  const { bitmap } = await renderRegion(box, scale);
+  try {
+    const out = document.createElement("canvas");
+    let width = bitmap.width;
+    let height = bitmap.height;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      out.width = width;
+      out.height = height;
+      const ctx = out.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(bitmap, 0, 0, width, height);
+      const url = out.toDataURL("image/png");
+      if (url.length <= SYMBOL_THUMBNAIL_MAX_CHARS) return url;
+      width = Math.max(1, Math.round(width * 0.8));
+      height = Math.max(1, Math.round(height * 0.8));
+    }
+    return null;
+  } finally {
+    bitmap.close();
+  }
+}
 
 /**
  * Crop a region of the rendered page canvas to a small PNG data URL.
+ *
+ * The instant PREVIEW only, from the 1.5x backdrop — soft by construction.
+ * `renderSharpCapture` makes the picture that is saved.
  *
  * Returns null rather than throwing on a degenerate box — a click without a
  * drag is a cancelled capture, not an error worth interrupting anyone over.
@@ -90,11 +147,20 @@ export function cropToThumbnail(
  */
 export function SymbolCaptureForm({
   thumbnail,
+  sharpening,
+  soft,
   chromeTarget,
   onSave,
   onCancel,
 }: {
   thumbnail: string | null;
+  /**
+   * The sharp picture is still being rendered. Save waits for it, because
+   * saving the preview would store exactly the soft picture this replaces.
+   */
+  sharpening: boolean;
+  /** The sharp render failed, so `thumbnail` is the soft preview. Said aloud. */
+  soft: boolean;
   /** PlanPane's screen-space layer. Null only before it has mounted. */
   chromeTarget: HTMLElement | null;
   onSave: (label: string) => void;
@@ -111,7 +177,7 @@ export function SymbolCaptureForm({
     const trimmed = label.trim();
     // Blank writes nothing — a symbol with no name cannot be found again, and
     // the label is what the link is keyed on.
-    if (!trimmed) return;
+    if (!trimmed || sharpening) return;
     onSave(trimmed);
   };
 
@@ -159,14 +225,22 @@ export function SymbolCaptureForm({
         />
       </div>
 
+      {soft && (
+        <p className="text-xs text-[#F5C518] mt-2" role="status">
+          The sharp picture could not be made, so this one is lower resolution.
+          Cancel and box it again to retry.
+        </p>
+      )}
+
       <div className="flex items-center gap-1.5 mt-2.5">
         <Button
           size="sm"
           className="h-7 gap-1.5 text-xs flex-1"
           onClick={commit}
-          disabled={!label.trim()}
+          disabled={!label.trim() || sharpening}
         >
-          <Check className="w-3 h-3" /> Save symbol
+          <Check className="w-3 h-3" />{" "}
+          {sharpening ? "Sharpening picture…" : "Save symbol"}
         </Button>
         <Button
           size="sm"

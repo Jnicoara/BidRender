@@ -29,6 +29,20 @@ left as written rather than rewritten to match the rename.
 
 ## Pending / Future
 
+### Capture fixes must ship in the next live release
+
+- [ ] **Capture fixes (258718d + blur fix) must ship in the next live
+      release.** Both are on `track-c` only (2026-09-30). Checked that day:
+      live (`3ca33dc`) and staging (`0af50a6`) both still draw the "Name
+      this symbol" box inside the zoom transform (`SymbolCapture.tsx`, the
+      inline `absolute top-3 left-1/2` card), so Capture looks like it does
+      nothing there, and both still save the soft 1.5x backdrop crop. The
+      blur fix also lowers the router's thumbnail limit from 200,000 to
+      60,000 characters, because `symbol_links.thumbnail` is MySQL TEXT
+      (65,535 bytes). No migration. Symbols captured before the fix keep
+      their soft picture, because a re-capture never replaces an existing
+      thumbnail; remove the symbol and capture it again to get a sharp one.
+
 ### The whole catalog goes to the browser, and grows with it
 
 - [ ] **`materials.list` is unpaged and search runs on the main thread.**

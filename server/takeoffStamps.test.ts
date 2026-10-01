@@ -29,6 +29,7 @@ import {
 import { bidPdfs, bids, symbolLinks, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
+import { SYMBOL_THUMBNAIL_MAX_CHARS } from "../shared/symbolCapture";
 
 const USER = 8585;
 const OTHER_USER = 8586;
@@ -935,6 +936,28 @@ describe.skipIf(!hasDb)("linking a legend symbol to an assembly", () => {
       caller().takeoffStamps.captureSymbol({
         label: "Bad",
         thumbnail: "https://example.com/huge.png",
+      })
+    ).rejects.toThrow();
+  });
+
+  // The column is MySQL TEXT (65,535 bytes). The schema used to allow 200,000
+  // characters, so a big picture passed validation and failed in the database.
+  // Sharp captures (2026-09-30) are the first pictures large enough to matter.
+  it("stores a picture at the size limit whole, and refuses one over it", async () => {
+    const prefix = "data:image/png;base64,";
+    const atLimit =
+      prefix + "A".repeat(SYMBOL_THUMBNAIL_MAX_CHARS - prefix.length);
+    await caller().takeoffStamps.captureSymbol({
+      label: "Big",
+      thumbnail: atLimit,
+    });
+    const symbols = await caller().takeoffStamps.symbols();
+    expect(symbols[0].thumbnail).toBe(atLimit);
+
+    await expect(
+      caller().takeoffStamps.captureSymbol({
+        label: "Too big",
+        thumbnail: atLimit + "A",
       })
     ).rejects.toThrow();
   });

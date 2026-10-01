@@ -46,6 +46,7 @@ import {
   tracedRunOf,
 } from "../../shared/takeoffQuantities";
 import { TAKEOFF_LOCATIONS } from "../../drizzle/schema";
+import { SYMBOL_THUMBNAIL_MAX_CHARS } from "../../shared/symbolCapture";
 import * as db from "../db";
 
 /**
@@ -67,9 +68,12 @@ const coordSchema = z.number().finite().min(-100000).max(100000);
  * generous ceiling here would let a full-page screenshot into a text column
  * and quietly bloat every list query that reads it.
  */
+// The column is MySQL TEXT (65,535 bytes). This was 200_000, so a picture
+// between the two passed here and failed in the database. See
+// shared/symbolCapture.ts.
 const thumbnailSchema = z
   .string()
-  .max(200_000)
+  .max(SYMBOL_THUMBNAIL_MAX_CHARS)
   .refine(
     v => v.startsWith("data:image/"),
     "Thumbnail must be an image data URL"

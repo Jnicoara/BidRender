@@ -11,6 +11,12 @@ This is the human-readable companion to the git history — read this to see wha
   speck at low zoom and off the top of the screen when zoomed in on a legend.
   Capture looked like it did nothing. The box now always appears at a normal
   size at the top of the viewer.
+- **Captured legend symbols are now saved sharp.** The picture used to be
+  cut from a low-resolution copy of the sheet and shrunk, so a symbol that
+  was crisp on screen was saved blurry (a 0.4-inch symbol came out about 43
+  pixels wide). It is now drawn fresh from the PDF at 400 pixels per inch, or
+  sharper if you were zoomed in further. Very large pictures are kept small
+  enough for the database, which previously could have refused them.
 
 ## [2026-09-29]
 

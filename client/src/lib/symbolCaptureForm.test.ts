@@ -54,6 +54,8 @@ describe("SymbolCaptureForm placement", () => {
     const inline = renderToStaticMarkup(
       createElement(SymbolCaptureForm, {
         thumbnail: null,
+        sharpening: false,
+        soft: false,
         chromeTarget: screenLayer,
         onSave: noop,
         onCancel: noop,
@@ -72,6 +74,8 @@ describe("SymbolCaptureForm placement", () => {
     const inline = renderToStaticMarkup(
       createElement(SymbolCaptureForm, {
         thumbnail: null,
+        sharpening: false,
+        soft: false,
         chromeTarget: null,
         onSave: noop,
         onCancel: noop,
@@ -80,5 +84,31 @@ describe("SymbolCaptureForm placement", () => {
 
     expect(inline).toContain("Name this symbol");
     expect(portals).toHaveLength(0);
+  });
+});
+
+describe("SymbolCaptureForm while the sharp picture is coming", () => {
+  const render = (sharpening: boolean, soft: boolean) =>
+    renderToStaticMarkup(
+      createElement(SymbolCaptureForm, {
+        thumbnail: "data:image/png;base64,AAAA",
+        sharpening,
+        soft,
+        chromeTarget: null,
+        onSave: noop,
+        onCancel: noop,
+      })
+    );
+
+  it("holds Save until the sharp picture has arrived", () => {
+    const markup = render(true, false);
+    expect(markup).toContain("Sharpening picture");
+    expect(markup).not.toContain("Save symbol");
+    expect(markup).toMatch(/<button[^>]*disabled/);
+  });
+
+  it("says so when it had to fall back to the soft preview", () => {
+    expect(render(false, true)).toContain("lower resolution");
+    expect(render(false, false)).not.toContain("lower resolution");
   });
 });
