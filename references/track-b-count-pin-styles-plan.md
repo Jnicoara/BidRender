@@ -2,7 +2,8 @@
 
 > **PLAN ONLY. Nothing here is built.** Written 2026-10-01 on `track-b` from
 > the owner's request the same day. Decisions for him are in § 10, each with
-> a recommendation first.
+> a recommendation first. **§ 11 (same day, later): several captured items
+> linked to one assembly** — decisions 13–18 are there.
 >
 > **What this builds on, so nobody re-decides it (CLAUDE.md § "Where
 > decisions live"):**
@@ -232,7 +233,9 @@ right.
 | This job only     | `takeoff_groups` — the same three              | This bid                                                     |
 
 - **Precedence:** this job → legend symbol → assembly → automatic (§§ 2–3,
-  5). NULL everywhere means automatic, so nothing has to be configured
+  5). **Refined 2026-10-01 in § 11.4:** an ASSEMBLY-level letter or color is
+  a default and bumps when two items share the assembly; item- and job-level
+  choices never bump. NULL everywhere means automatic, so nothing has to be configured
   (§ 5e: a feature nobody configures must work without being configured).
 - **Both directions** (CLAUDE.md § "As manual or as automated…"): a job
   override can be saved to the library ("Use this look on every job"), and
@@ -386,4 +389,245 @@ supported export.
 **Handoffs:** Track A — nine nullable style columns (`assemblies`,
 `symbol_links`, `takeoff_groups`: shape, letter, color) batched with the
 already-listed `takeoff_stamps.status`, all additive. Track C — § 8 against
-`find-all-matching-plan.md` once pushed.
+`find-all-matching-plan.md` once pushed. **§ 11 adds one more column for A
+(`takeoff_groups.symbolLookupKey`) — the same one `count-by-tag-plan.md` § 2
+already asks for, so it is one handoff, not two.**
+
+---
+
+## 11. Several captured items on ONE assembly (added 2026-10-01)
+
+> **PLAN ONLY.** From the owner's request the same day: three different
+> lights linked to the same assembly come out with identical pins. Builds on
+> §§ 3, 5, 6 above and on `references/count-by-tag-plan.md` (which hits the
+> same fault from the tag side — its § 5 now points here).
+
+### 11.1 What is actually wrong — it is not the look
+
+**The pins are identical because the marks are in ONE count.** A pin is
+drawn by its count (§ 5e, `markAppearance` in `shared/takeoffMarks.ts`), and
+clicking a linked legend symbol arms its assembly through
+`groupForAssembly` (`server/assemblyGroup.ts:30`):
+`existing.find(group => group.assemblyId === assembly.id)` — **the first
+count on the bid with that assembly wins.** Three lights linked to one
+assembly are therefore three doors into the SAME count:
+
+- the marks merge — "Linear 8ft: 22, Linear 4ft: 3" is stored as one count
+  of 25, and nothing kept which symbol each mark came from;
+- the count wears whichever name got there first (often the assembly's);
+- **giving the pins different looks cannot fix this** — there is only one
+  count to style. Restyling first would be a cosmetic fix over a lost
+  number.
+
+And it cannot be routed round today: `takeoffGroups.setSource` REFUSES a
+second count of an assembly the bid already counts
+(`takeoffGroupsRouter.ts`, "This bid already counts X as Y"), on the reasoning
+that two counts of one assembly split one number in half. That reasoning was
+right when a count was "an assembly"; it is wrong once a count is "a
+captured item", which is what this section changes.
+
+**Is it a wrong PRICE today? No** — every merged mark is the same assembly,
+priced the same, so the bid total is right. It is a wrong QUANTITY PER ITEM
+(C14 cross-checks, the fixture schedule, per-type ordering) and a lost
+distinction. That is why the fix is ordered as below rather than as an
+emergency.
+
+### 11.2 The fix: a count per captured item
+
+**Rule: a linked symbol arms ITS OWN count — the assembly's, under the
+symbol's name.** `groupForAssembly` gains the symbol as an optional key:
+
+1. A count on this bid with this assembly whose name matches the symbol's
+   names (current or captured — the two-name rule shipped today,
+   `symbolCountsOn` in `shared/takeoffCounts.ts`) → that one.
+2. Otherwise → a NEW count, label = the symbol's name, `assemblyId` = the
+   assembly. Never another symbol's count.
+3. **Without a symbol** (the toolbar's assembly picker, `forAssembly`;
+   recovered queues) and the bid has **more than one** count of that
+   assembly → **do not guess**: the picker opens a short chooser of those
+   counts. Exactly one → it, as today. None → create, as today.
+4. **The plan reader's Place** already knows the symbol (`finding.symbolLinkId`,
+   `planCopilotRouter.ts`), so it passes it and lands in the item's count —
+   no chooser needed. Today it calls `groupForAssembly` without it
+   (`planCopilotRouter.ts` ~936) and would merge.
+5. `setSource`'s refusal narrows: a second count of one assembly is allowed
+   when the two counts are different captured items; it still refuses two
+   PLAIN-named counts of one assembly (the split-in-half case it was written
+   for). Both files say so (CLAUDE.md § "Where decisions live").
+
+**Existing merged counts are left alone.** Marks already counted cannot be
+reattributed (no mark records its symbol). The old count keeps its name and
+marks and stays reachable through the chooser; new clicks on each symbol go
+to that symbol's own count. Track C's "move marks to another count"
+(`895cd7c`, on `track-c`) is the way to split an old one by hand — say so on
+the old count's card once both have landed.
+
+**Test that must fail before the fix:** two symbols linked to one assembly,
+click each, place marks — `forAssembly` with symbol A and with symbol B must
+return DIFFERENT counts, and without a symbol must refuse to pick (count-by-
+tag § 5's test, generalised).
+
+### 11.3 Should the fix come BEFORE people link several items to one assembly?
+
+**Yes — before, and before any pin-look work.** Three reasons:
+
+- every mark placed under the first-wins rule is a mark that later cannot be
+  split without re-marking (or Track C's move tool) — the cost grows with
+  use, so the cheapest day to fix it is the day before anyone relies on it;
+- the per-item looks (§ 11.4) have nothing to attach to until each item is its
+  own count;
+- the fix is small and needs no migration in v1 (§ 11.7).
+
+So the order is: **§ 11.2 → the step 1 pin rules (§ 9) → § 11.4 overrides
+after Track A's columns.** Until § 11.2 ships, linking a second symbol to an
+assembly another symbol already uses should say, at link time: "Clicks on
+both will count together as one count — they will be separated in an update."
+One sentence, honest, removed with the fix.
+
+### 11.4 Where a pin's look comes from — the item, with the assembly as default
+
+**Precedence, refined from § 6** (this job → legend symbol → assembly →
+automatic, unchanged in ORDER; what changes is how a SHARED default behaves):
+
+| Set on             | Meaning                                               | When two counts on a bid would collide                          |
+| ------------------ | ----------------------------------------------------- | --------------------------------------------------------------- |
+| This job (count)   | A choice for this count only                          | Never renumbered. A clash is flagged, not fixed silently        |
+| The captured item  | "This symbol always looks like this" (`symbol_links`) | Never renumbered. A clash is flagged, not fixed silently        |
+| The fixture TAG    | `(A-7)` in the name → letter A7 (count-by-tag § 3)    | Tags differ by definition                                       |
+| The assembly       | **A default** for every count of it                   | **Bumps**: the 2nd count of it steps aside (L → L2, next color) |
+| Automatic (§§ 2–5) | Family shape, table letter, first-use color           | Bumps, as § 3                                                   |
+
+- **The shape stays the FAMILY's, always.** Three lights are three
+  squares; shape says "lighting", and § 2's map is not overridden per item
+  (a light drawn as a hexagon would teach the wrong family). Letter and color
+  carry the difference.
+- **An assembly-level letter or color is a DEFAULT, so it bumps.** This is
+  the one new rule. § 3 says a CHOSEN letter is never renumbered; that stays
+  true for a letter chosen on the item or the count. But a letter chosen on
+  the assembly is chosen for "counts of this assembly", and when two items
+  share it, honouring it twice would make two counts wear one code — the
+  thing § 3 exists to stop. So the second count of that assembly on the bid
+  becomes L2 (and takes the next free first-use color), exactly as an
+  automatic letter would.
+- **"Each letter means one thing" still holds.** L2 means "the second lighting
+  count on this bid" — the same meaning the bump already has in § 3. A bump
+  never lands on a code the default table reserves (S3 stays the 3-way).
+- **Two item-level choices that collide** (the owner set both A-7 and A-9's
+  symbols to "L") are SHOWN, not silently renumbered: both pins read L, and
+  the Legend tab and both count cards say "Linear 8ft and Linear 4ft both
+  show L on this bid — change one". Silently renaming somebody's choice is
+  worse than showing it.
+- **Colors past six** (§ 5): three lights on one assembly take three of the
+  six; the letter is what guarantees the difference, as everywhere.
+
+### 11.5 What the BID shows — recommendation: one line per captured item
+
+**Recommended: one bid line per count, i.e. per captured item**, each named
+for the item, all priced from the same assembly:
+
+- it is what exists already — `bid_line_items` has ONE line per count
+  (`bid_line_items_bid_group_uq`, `takeoffBridge.ts`), and Send works per
+  count. A combined line would need a line pointing at several counts, which
+  is a schema change and breaks "a from-plans line follows ONE count";
+- **prices and hours: identical per unit, same total.** Each line snapshots
+  the assembly's cost, hours, modifiers and rate when IT is sent (R4). Sent
+  together → identical figures, and 22 + 3 lines total exactly what one line
+  of 25 would. **The one difference:** sent on different days after the
+  assembly or rate changed, the two lines carry different snapshots. That is
+  the existing snapshot rule doing its job, not a new risk — but the bid
+  should show it: lines of one assembly with different unit figures get the
+  existing stale-rate style mark;
+- **the R3 standing warning must NOT fire** for several from-plans lines of
+  one assembly that come from different counts — it is for plans + by-hand
+  duplicates. Check `takeoffBridge`'s R3 against this before shipping, or the
+  bid will warn on every correct multi-item job (a false alarm teaches people
+  to read past the real one);
+- **the customer proposal may combine** lines of one assembly into one row
+  — a display choice in the proposal, never a change to the lines. Offered as
+  a proposal setting later, not in this change;
+- **the materials list is unaffected**: it already totals by material.
+
+**Alternative, not recommended:** one combined line per assembly. Simpler bid
+for the customer, but it loses the per-item quantity the whole request is
+about, needs a migration, and gives a line two counts to follow.
+
+### 11.6 "Count again" — one click back to the last symbol
+
+Since 2026-10-01 a sheet change puts the count down (`client/src/lib/
+toolOnSheet.ts`). Right for safety, and it costs a re-pick on every sheet.
+
+- **Remember the last ARMED count per bid** — its count id and name, plus the
+  symbol it came from, if any. In memory on the page, and in `sessionStorage`
+  under a `bidridge:last-count:<bidId>` key so a reload keeps it (wrapped in
+  try/catch; nothing depends on it).
+- **A toolbar chip appears when nothing is armed and a last count exists**:
+  "↻ Count again: Linear 8ft". One click re-arms it through the ordinary
+  `armGroup` — so a locked bid refuses there, as it does for every pick-up.
+  On phone, the same chip in the bottom toolbar.
+- **A key** for it, chosen from the existing shortcut list when built (do not
+  assert a free letter here — read the list).
+- **It re-arms the COUNT, not the symbol**: if the count was deleted since,
+  the chip disappears (it reads the bid's count list, so it cannot offer a
+  count that no longer exists — refreshed by the same `takeoffGroups.list`
+  every count change already moves). With § 11.2 a symbol's count is stable,
+  so "the last symbol" and "the last count" are the same thing.
+- **Not automatic.** The tool does not come back by itself on the new sheet —
+  that is the fault the 2026-10-01 change fixed. One click, by the person,
+  on the sheet they now mean.
+- No migration, no server change.
+
+### 11.7 Database — flag for Track A, and what is safe without it
+
+**v1 needs no migration.** The count's link to its item is its NAME (the
+symbol's current or captured name — exactly how plain symbol counts are
+matched since the rename work today). That survives a symbol rename (both
+names are matched) but not a hand rename of the COUNT to something unrelated —
+then the next click on the symbol makes a new count. Visible (a second card),
+never a wrong price.
+
+**v2, FLAG FOR TRACK A: `takeoff_groups.symbolLookupKey varchar(255) NULL`** —
+the same column `count-by-tag-plan.md` § 2 already requests. NULL = not from
+a symbol (every existing row), so additive with no backfill. With it, a count
+belongs to its item by key, not by name. **Ship it in the same batch as the
+nine pin-style columns** and the optional `symbol_links.originalLabel`
+(todo.md, 2026-10-01). One handoff.
+
+### 11.8 What else this could break
+
+- **`setSource`'s refusal** (11.2.5) is a stated rule with a test; changing it
+  changes `server/` tests that assert it. Update the rule's comment, the test,
+  and the decision line together.
+- **R3 false alarms** on multi-item bids (11.5) — check before shipping.
+- **The toolbar picker gains a chooser** when an assembly has several counts —
+  a new step on a path that was one click. Only when there IS more than one;
+  never on a fresh bid.
+- **Recovered click queues** (`TakeoffPage` queue recovery, older shape keyed
+  by assembly) hit rule 3 with no person present: they take the FIRST count
+  as today and say so in the recovery toast, rather than opening a chooser
+  nobody is there to answer.
+- **Exports / CSV**: one row per count already, so per-item rows arrive for
+  free; the "Pin" column (§ 9) reads per count.
+- **Count-by-tag** is the same mechanism with a tag in the name; the two must
+  share `symbolCountsOn` and the v2 column, not grow two matchers.
+- **Existing merged counts** keep their marks; nothing is moved or renamed by
+  the fix (11.2).
+
+### 11.9 Decisions for the owner — recommendation first
+
+13. **Fix first-wins before any per-item look, and before people link several
+    items to one assembly — with a one-line warning at link time until
+    then (recommended)** / style first.
+14. **A linked symbol arms its own count, named for the symbol; the toolbar
+    picker asks when an assembly has several counts (recommended)** / keep
+    one count per assembly and only change the look (impossible — one
+    count has one look).
+15. **Shape from the family; letter and color from item → tag → assembly
+    default → automatic; an assembly-level choice bumps, an item-level choice
+    never does and a clash is flagged (recommended).**
+16. **Bid: one line per captured item, same unit prices; proposal may
+    combine for the customer later (recommended)** / one combined line per
+    assembly (migration, loses per-item quantity).
+17. **"Count again" chip + key, re-arming the last count per bid, never by
+    itself (recommended).**
+18. **v1 by name, no migration; `takeoff_groups.symbolLookupKey` for Track A
+    in the pin-style batch (recommended).**

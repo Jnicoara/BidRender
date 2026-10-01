@@ -235,6 +235,14 @@ library.
   when more than one count on the bid has the assembly, those doors open the
   tag chooser instead of guessing. Test: two groups, one assembly, `forAssembly`
   must not return either silently.
+  **Same fault, wider (2026-10-01):** it also merges several DIFFERENT legend
+  symbols linked to one assembly into one count — which is why their pins look
+  identical. `references/track-b-count-pin-styles-plan.md` § 11 plans the
+  general fix (a linked symbol arms its own count, by name in v1; the toolbar
+  picker asks when an assembly has several counts; the reader's Place passes
+  the symbol) and orders it BEFORE any pin-look work. Build it once, there;
+  tags reuse it rather than growing a second matcher. Its v2 column is the
+  same `takeoff_groups.symbolLookupKey` as § 2 here — one handoff to A.
 - **No way to move a mark between counts today.** A mark placed under A-7 that
   is really an A-9 has to be deleted and placed again. Acceptable for v1
   (delete is one key and undoable); the move is listed as later work. Worth
