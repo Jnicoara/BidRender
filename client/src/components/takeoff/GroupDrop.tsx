@@ -98,7 +98,7 @@ export function GroupDrop({
     return (
       <button
         type="button"
-        className="mt-1 block text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+        className="mt-1 block text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground"
         onClick={() => setOpen(true)}
       >
         Add a drop to each one
@@ -118,10 +118,10 @@ export function GroupDrop({
 
   return (
     <div className="mt-1.5 space-y-1 rounded border border-border/60 bg-muted/20 px-2 py-1.5">
-      <div className="flex flex-wrap items-center gap-1.5 text-[0.7rem]">
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
         <span className="text-muted-foreground">Each drops to</span>
         <select
-          className="h-6 rounded-md border border-input bg-transparent px-1.5 text-[0.7rem] text-foreground"
+          className="h-6 rounded-md border border-input bg-transparent px-1.5 text-xs text-foreground"
           value={info.dropKind ?? ""}
           disabled={locked}
           aria-label="What each mark drops to"
@@ -144,7 +144,7 @@ export function GroupDrop({
         </select>
         <span className="text-muted-foreground">in</span>
         <select
-          className="h-6 max-w-[12rem] rounded-md border border-input bg-transparent px-1.5 text-[0.7rem] text-foreground"
+          className="h-6 max-w-[12rem] rounded-md border border-input bg-transparent px-1.5 text-xs text-foreground"
           value={info.dropRunTypeId ?? ""}
           disabled={locked}
           aria-label="What each drop is made of"
@@ -167,7 +167,7 @@ export function GroupDrop({
       {undo && !locked && (
         <button
           type="button"
-          className="flex items-center gap-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-1 text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground"
           onClick={undoDrops}
           title="Put this count's drop back the way it was before your last change. Its marks and every other count stay as they are."
         >
@@ -177,7 +177,7 @@ export function GroupDrop({
       )}
 
       {info.dropKind !== null && info.dropKind !== DISTRIBUTION && (
-        <div className="flex items-center gap-2 text-[0.7rem]">
+        <div className="flex items-center gap-2 text-xs">
           <span className="text-muted-foreground shrink-0">
             Height for this count
           </span>
@@ -211,26 +211,26 @@ export function GroupDrop({
             </span>
             {total.toFixed(2)} ft
           </p>
-          <p className="text-[0.7rem] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             In {runType?.label ?? "the chosen run type"} — on that type's bid
             lines, with wire extra and makeup. Connectors and elbows for these{" "}
             {r.countedMarks.length} drops are NOT counted — add them by hand.
           </p>
           {info.whipFeet !== null && info.whipFeet > 0 && (
-            <p className="text-[0.7rem] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Whip {info.whipFeet} ft + drop {r.perDropFeet.toFixed(2)} ft each
               — this assembly's whip may already include the drop.
             </p>
           )}
           {r.claimedCount > 0 && (
-            <p className="text-[0.7rem] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {r.claimedCount} {r.claimedCount === 1 ? "mark is" : "marks are"}{" "}
               at a run's end, and the run counts{" "}
               {r.claimedCount === 1 ? "its" : "their"} drop.
             </p>
           )}
           {r.mayDoubleCount > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] flex items-start gap-1">
+            <p className="text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1">
               <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
               {r.mayDoubleCount} {r.mayDoubleCount === 1 ? "sits" : "sit"} near
               a run's end without being linked — the drop may be counted twice.
@@ -240,13 +240,13 @@ export function GroupDrop({
         </>
       )}
       {(r?.status === "no-height" || r?.status === "no-type") && (
-        <p className="text-[0.7rem] text-[#F5C518] flex items-start gap-1">
+        <p className="text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1">
           <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
           No drop counted — {r.reason}.
         </p>
       )}
       {locked && (
-        <p className="text-[0.7rem] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           This bid's quantities are locked, so its drops cannot change.
         </p>
       )}

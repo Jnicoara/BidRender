@@ -76,6 +76,8 @@ import {
   MoreHorizontal,
   Redo2,
   Undo2,
+  PanelRight,
+  TriangleAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -117,6 +119,19 @@ import {
   type PlanView,
   type ViewBounds,
 } from "@/lib/planView";
+import { usePlansLayout } from "@/hooks/usePlansLayout";
+import { sheetDisplay, sheetLabel } from "@shared/sheetIdentity";
+import {
+  isPlansAddressFor,
+  pageBeyondSet,
+  planAddressHash,
+  readPlanAddress,
+  readRememberedView,
+  rememberView,
+  resolvePlanAddress,
+  restoreView,
+  writeRememberedView,
+} from "@/lib/planAddress";
 import { SheetIndex } from "@/components/takeoff/SheetIndex";
 import {
   PDF_WHOLE_DOWNLOAD_LIMIT_BYTES,
@@ -162,6 +177,14 @@ import {
 import { RunSpecEditor } from "@/components/takeoff/RunSpecEditor";
 import { resolveRunType } from "@shared/runTypeLookup";
 import { lockedEditRefusal } from "@shared/quantityLock";
+import {
+  readStoredTab,
+  tabForSelection,
+  tabWarnings,
+  visibleTabs,
+  writeStoredTab,
+  type PanelTab,
+} from "@/lib/panelTabs";
 import { runTypeSpec } from "@shared/takeoffCounts";
 import { CalibrateLayer } from "@/components/takeoff/CalibrateLayer";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
@@ -272,6 +295,7 @@ import { takePendingPlan } from "@/lib/pendingPlanUpload";
 import { TraceLayer, type DropMarker } from "@/components/takeoff/TraceLayer";
 import {
   RunsPanel,
+  ThisSheetLine,
   type GroupBridgeState,
 } from "@/components/takeoff/RunsPanel";
 import { TakeoffSummaryPanel } from "@/components/takeoff/TakeoffSummaryPanel";
@@ -896,9 +920,49 @@ function PlanPane({
     if (canvasSize.width === 0) return;
     const key = `${doc.id}:${page}`;
     if (fittedFor.current === key) return;
+    const firstArrival = fittedFor.current === null;
     fittedFor.current = key;
+    /*
+      A REFRESH COMES BACK TO THE SAME ZOOM AND PLACE (owner, 2026-09-30) —
+      on the first sheet this pane shows, and only if this tab was last
+      looking at exactly it (@/lib/planAddress). A page flip inside the
+      session still fits, as it always has.
+    */
+    const bounds = readBounds();
+    if (firstArrival && bounds) {
+      const back = restoreView(readRememberedView(), doc.id, page, bounds);
+      if (back) {
+        viewIsFitted.current = false;
+        setView(back);
+        return;
+      }
+    }
     fitToView();
-  }, [doc.id, page, canvasSize.width, canvasSize.height, fitToView]);
+  }, [
+    doc.id,
+    page,
+    canvasSize.width,
+    canvasSize.height,
+    fitToView,
+    readBounds,
+  ]);
+
+  /*
+    Remember where this tab is looking, a moment after it stops moving. A
+    fitted view is forgotten rather than stored: a refresh fits anyway, and a
+    stored fit would outlive a pane that has since changed size.
+  */
+  useEffect(() => {
+    if (canvasSize.width === 0) return;
+    const timer = window.setTimeout(() => {
+      const bounds = readBounds();
+      if (!bounds) return;
+      writeRememberedView(
+        viewIsFitted.current ? null : rememberView(doc.id, page, view, bounds)
+      );
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [view, doc.id, page, canvasSize.width, readBounds]);
 
   /**
    * "Show me on the drawing": centre the requested spot, zoomed in to at
@@ -2011,8 +2075,16 @@ export default function TakeoffPage({
   const { data: bid } = trpc.bids.get.useQuery({ id: bidId });
   const { data: docs = [], isLoading } = trpc.bidPdfs.list.useQuery({ bidId });
 
-  const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
-  const [page, setPage] = useState(1);
+  /*
+    THE PLAN SET AND SHEET START FROM THE ADDRESS (owner, 2026-09-30): F5 on
+    page 5 of the third set used to land on the first set's first page. Read
+    once, on mount; checked against the bid's sets when they load, below.
+  */
+  const [askedAddress] = useState(() => readPlanAddress(window.location.hash));
+  const [selectedDocId, setSelectedDocId] = useState<number | null>(
+    askedAddress.setId
+  );
+  const [page, setPage] = useState(askedAddress.sheet ?? 1);
   const [dragging, setDragging] = useState(false);
   const [uploads, setUploads] = useState<UploadJob[]>([]);
   /**
@@ -2442,6 +2514,60 @@ export default function TakeoffPage({
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   const doc = docs.find(d => d.id === selectedDocId) ?? docs[0] ?? null;
+
+  /*
+    THE ADDRESS BAR SAYS WHICH SET AND SHEET IS OPEN (@/lib/planAddress).
+
+    1. Once the bid's sets have loaded, the address asked for is checked
+       against them: a deleted set, or a page past the end, opens the first
+       sheet with no error.
+    2. From then on every flip rewrites the address with `replaceState`, so a
+       refresh or a copied link opens the same sheet — and Back still leaves
+       the screen in one press rather than walking back through every sheet.
+       Only while the address is still this bid's Plans screen.
+    3. An address changed by hand (or Back/Forward between two Plans addresses
+       of this bid) moves the screen to it.
+  */
+  const addressSettled = useRef(false);
+  useEffect(() => {
+    if (addressSettled.current || isLoading) return;
+    addressSettled.current = true;
+    const resolved = resolvePlanAddress(askedAddress, docs);
+    setSelectedDocId(resolved.setId);
+    setPage(resolved.page);
+  }, [isLoading, docs, askedAddress]);
+  // A set opened for the first time reports its page count only once its
+  // file is read; a page asked for past that end drops to the first.
+  useEffect(() => {
+    if (doc && pageBeyondSet(page, doc.pageCount)) setPage(1);
+  }, [doc, page]);
+  useEffect(() => {
+    if (!addressSettled.current || !doc) return;
+    const hash = window.location.hash;
+    if (!isPlansAddressFor(hash, bidId)) return;
+    const next = planAddressHash(bidId, doc.id, page);
+    if (hash === next) return;
+    window.history.replaceState(window.history.state, "", next);
+  }, [bidId, doc, page]);
+  const docsRef = useRef(docs);
+  docsRef.current = docs;
+  useEffect(() => {
+    const follow = () => {
+      const hash = window.location.hash;
+      if (!addressSettled.current || !isPlansAddressFor(hash, bidId)) return;
+      const asked = readPlanAddress(hash);
+      if (asked.setId === null) return;
+      const resolved = resolvePlanAddress(asked, docsRef.current);
+      setSelectedDocId(resolved.setId);
+      setPage(resolved.page);
+    };
+    window.addEventListener("hashchange", follow);
+    window.addEventListener("popstate", follow);
+    return () => {
+      window.removeEventListener("hashchange", follow);
+      window.removeEventListener("popstate", follow);
+    };
+  }, [bidId]);
 
   /** A different plan is a different set of pictures. */
   useEffect(() => {
@@ -3364,10 +3490,41 @@ export default function TakeoffPage({
           !row.sendability.sendable &&
           row.sendability.reason === "already-on-bid",
         sendable: row.sendability.sendable,
+        // Made by name, with nothing from the library behind it (§ 8a).
+        byNameOnly: row.kind === "plain" || row.kind === "typed",
       });
     }
     return map;
   }, [bidCounts.data]);
+
+  /*
+    LINK AN ASSEMBLY TO A COUNT made without one (legend plan § 8a). Every
+    mark is kept and changes what it counts, on every sheet — so the other
+    sheets' cached marks go too, as for a count deleted.
+  */
+  const setGroupSource = trpc.takeoffGroups.setSource.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: (_result, vars) => {
+      const label =
+        bidCounts.data?.groups.find(g => g.id === vars.id)?.label ?? "count";
+      const assembly = allAssemblies.find(a => a.id === vars.assemblyId);
+      toast.success(
+        assembly
+          ? `"${label}" now counts ${assembly.name}. Every mark kept.`
+          : `"${label}" is a count by name again.`
+      );
+      // The armed tool follows, so the next click is the same thing.
+      setArmedGroup(armed =>
+        armed && armed.groupId === vars.id
+          ? { ...armed, assemblyId: vars.assemblyId }
+          : armed
+      );
+    },
+    onSettled: () => {
+      refreshFor("countSource");
+      void utils.takeoffStamps.listForSheet.invalidate();
+    },
+  });
 
   const sendToBid = trpc.takeoffGroups.sendToBid.useMutation({
     onError: e => toast.error(e.message),
@@ -3737,6 +3894,82 @@ export default function TakeoffPage({
 
   /** False while the server has AI switched off (server/aiFeatures.ts). */
   const readerAvailable = useCompany().hasFeature("takeoff.copilot");
+
+  /*
+    THE RIGHT PANEL'S TABS (references/track-b-phone-and-readability-plan.md
+    § 1, owner 2026-09-30). Remembered per person in this browser; rules in
+    @/lib/panelTabs, which the suite can reach.
+  */
+  /*
+    PHONE OR LAPTOP (plan § 3, @/lib/plansLayout). On the phone the right
+    panel is one full-screen panel with the same tabs plus Sheets, opened from
+    the bar under the drawing and closed by "← Plan".
+  */
+  const layout = usePlansLayout();
+  const phone = layout === "phone";
+  const [phonePanelOpen, setPhonePanelOpen] = useState(false);
+  /** Where the sheet list is portalled on the phone's Sheets tab. */
+  const [sheetsSlot, setSheetsSlot] = useState<HTMLElement | null>(null);
+  const panelTabs = useMemo(
+    () => visibleTabs(readerAvailable, layout),
+    [readerAvailable, layout]
+  );
+  const [panelTab, setPanelTab] = useState<PanelTab>(() =>
+    readStoredTab(readerAvailable, layout)
+  );
+  // The feature list can land after the first render; a remembered Reader
+  // tab then opens, and losing the reader closes it. The same for the
+  // layout: turning a tablet sideways takes Sheets away.
+  useEffect(() => {
+    setPanelTab(current =>
+      !panelTabs.includes(current)
+        ? "counts"
+        : current === "counts"
+          ? readStoredTab(readerAvailable, layout)
+          : current
+    );
+  }, [readerAvailable, layout, panelTabs]);
+  /*
+    On the phone, picking a sheet on the Sheets tab means "show me it": the
+    panel closes onto the drawing. Only from that tab — a sheet that changes
+    while Counts or Totals is open (a jump from a row) leaves the panel be.
+  */
+  const sheetKey = `${selectedDocId}:${page}`;
+  const lastSheetKey = useRef(sheetKey);
+  useEffect(() => {
+    if (lastSheetKey.current === sheetKey) return;
+    lastSheetKey.current = sheetKey;
+    if (phone && panelTab === "sheets") setPhonePanelOpen(false);
+  }, [sheetKey, phone, panelTab]);
+  const choosePanelTab = useCallback((tab: PanelTab) => {
+    setPanelTab(tab);
+    writeStoredTab(tab);
+  }, []);
+  /*
+    SELECTING ON THE DRAWING OPENS ITS TAB (§ 1 rule 4, approved). Keyed on
+    the selection itself, so every way of selecting — a click on the line,
+    a jump from the drops readout, a drop picked on the sheet — lands on the
+    editor for it. Arming a tool is not a selection and switches nothing.
+    Not remembered: the remembered tab is the one the person chose.
+  */
+  useEffect(() => {
+    if (selectedRunId !== null) setPanelTab(tabForSelection("run"));
+  }, [selectedRunId]);
+  useEffect(() => {
+    if (selectedStampIds.size > 0) setPanelTab(tabForSelection("mark"));
+  }, [selectedStampIds]);
+  /** A tab with a warning in it shows a mark (§ 1 rule 5, approved). */
+  const warnedTabs = useMemo(
+    () =>
+      tabWarnings({
+        notOnBid: bidSummary.data?.notOnBid.length ?? 0,
+        totalsLeftOut:
+          (totals?.unmeasurableCount ?? 0) +
+          (totals?.leftOut?.noType.count ?? 0),
+        countsThatCannotSend: bidCounts.data?.countedWithNoPrice ?? 0,
+      }),
+    [bidSummary.data, totals, bidCounts.data]
+  );
 
   const { data: copilot } = trpc.planCopilot.state.useQuery(
     { sheetId: activeSheet?.id ?? 0 },
@@ -6514,6 +6747,7 @@ export default function TakeoffPage({
           <SidePanel
             side="left"
             label="the sheet list"
+            phone={phone ? { as: "portal", target: sheetsSlot } : undefined}
             open={panels.sheets}
             width={panels.sheetsWidth}
             minWidth={PANEL_LIMITS.sheets.min}
@@ -6895,6 +7129,23 @@ export default function TakeoffPage({
           <SidePanel
             side="right"
             label="counted items"
+            phone={
+              phone
+                ? {
+                    as: "fullScreen",
+                    open: phonePanelOpen,
+                    onClose: () => setPhonePanelOpen(false),
+                    // Named as the toolbar's sheet chip names it, from the
+                    // same function — "Sheet 1" here beside "E0.01" there
+                    // was seen on screen 2026-09-30.
+                    title: activeSheet
+                      ? sheetLabel(
+                          sheetDisplay(activeSheet, identities.get(page))
+                        )
+                      : `Sheet ${page}`,
+                  }
+                : undefined
+            }
             open={panels.work}
             width={panels.workWidth}
             minWidth={PANEL_LIMITS.work.min}
@@ -6941,6 +7192,14 @@ export default function TakeoffPage({
               waitingToSend={bidCounts.data?.waitingToSend}
               countedWithNoPrice={bidCounts.data?.countedWithNoPrice}
               onSendToBid={id => sendToBid.mutate({ id })}
+              linkAssemblies={allAssemblies.map(a => ({
+                id: a.id,
+                name: a.name,
+                category: a.category ?? null,
+              }))}
+              onLinkAssembly={(id, assemblyId) =>
+                setGroupSource.mutate({ id, assemblyId })
+              }
               sendingGroupId={
                 sendToBid.isPending ? (sendToBid.variables?.id ?? null) : null
               }
@@ -7114,58 +7373,74 @@ export default function TakeoffPage({
                   </>
                 )
               }
+              /*
+                THE READER has its own tab since 2026-09-30 (§ 1 of the
+                panel plan). It used to sit above the layers and legend in
+                one long column. Opening the tab starts nothing: a read is
+                a button, never an effect (CLAUDE.md § AI features).
+              */
+              reader={
+                readerAvailable ? (
+                  <CoPilotPanel
+                    state={copilot}
+                    reading={readSheet.isPending}
+                    canRead={canRead}
+                    onRead={runReader}
+                    onConfirm={findingIds => {
+                      if (!copilot?.runId) return;
+                      confirmFindings.mutate({
+                        runId: copilot.runId,
+                        findingIds,
+                        confirmed: true,
+                      });
+                    }}
+                    onDismiss={findingIds =>
+                      dismissFindings.mutate({ findingIds })
+                    }
+                    onCorrect={(findingId, symbolLinkId) =>
+                      correctFinding.mutate({
+                        findingId,
+                        symbolLinkId,
+                        confirmed: true,
+                      })
+                    }
+                    onJumpTo={jumpTo}
+                    symbols={symbols}
+                    onAsk={question => {
+                      if (!activeSheet) return;
+                      const snapshot = snapshotPage(
+                        pageCanvas.current,
+                        pageCanvasScale.current,
+                        copilot?.readerModel ?? PLAN_READER_FALLBACK_MODEL
+                      );
+                      if (!snapshot) return;
+                      askCopilot.mutate({
+                        sheetId: activeSheet.id,
+                        question,
+                        pageImage: snapshot.image,
+                        pageText: pageTextByPage.current.get(page) ?? "",
+                      });
+                    }}
+                    asking={askCopilot.isPending}
+                    answer={copilotAnswer}
+                    onClearAnswer={() => setCopilotAnswer(null)}
+                  />
+                ) : undefined
+              }
+              tab={panelTab}
+              tabs={panelTabs}
+              onTab={choosePanelTab}
+              warnedTabs={warnedTabs}
+              phone={phone}
+              onSheetsSlot={setSheetsSlot}
+              focusGroupId={
+                selectedStampIds.size === 0
+                  ? null
+                  : (stamps.find(s => selectedStampIds.has(s.id))?.groupId ??
+                    null)
+              }
               legend={
                 <>
-                  {/* Above the layers and the legend: what the reader found
-                        is the thing a user comes to this pane to act on, and
-                        the legend it depends on sits below it where it is
-                        still one glance away. */}
-                  {readerAvailable && (
-                    <CoPilotPanel
-                      state={copilot}
-                      reading={readSheet.isPending}
-                      canRead={canRead}
-                      onRead={runReader}
-                      onConfirm={findingIds => {
-                        if (!copilot?.runId) return;
-                        confirmFindings.mutate({
-                          runId: copilot.runId,
-                          findingIds,
-                          confirmed: true,
-                        });
-                      }}
-                      onDismiss={findingIds =>
-                        dismissFindings.mutate({ findingIds })
-                      }
-                      onCorrect={(findingId, symbolLinkId) =>
-                        correctFinding.mutate({
-                          findingId,
-                          symbolLinkId,
-                          confirmed: true,
-                        })
-                      }
-                      onJumpTo={jumpTo}
-                      symbols={symbols}
-                      onAsk={question => {
-                        if (!activeSheet) return;
-                        const snapshot = snapshotPage(
-                          pageCanvas.current,
-                          pageCanvasScale.current,
-                          copilot?.readerModel ?? PLAN_READER_FALLBACK_MODEL
-                        );
-                        if (!snapshot) return;
-                        askCopilot.mutate({
-                          sheetId: activeSheet.id,
-                          question,
-                          pageImage: snapshot.image,
-                          pageText: pageTextByPage.current.get(page) ?? "",
-                        });
-                      }}
-                      asking={askCopilot.isPending}
-                      answer={copilotAnswer}
-                      onClearAnswer={() => setCopilotAnswer(null)}
-                    />
-                  )}
                   <LayersPanel
                     present={present}
                     state={effectiveLayers}
@@ -7207,6 +7482,32 @@ export default function TakeoffPage({
                       groupForAssembly
                         .mutateAsync({ bidId, assemblyId: assembly.id })
                         .then(group => armGroup(group, assembly.id))
+                        .catch(() => {
+                          /* the mutation's onError has already said so */
+                        });
+                    }}
+                    onCountSymbol={symbol => {
+                      /*
+                        A plain count under the symbol's name (§ 8a). Reused,
+                        not refused, when the bid already has it: clicking
+                        the same symbol again means "keep counting that".
+                      */
+                      if (quantitiesLocked) {
+                        toast.error(
+                          lockedEditRefusal("new marks cannot be placed")
+                        );
+                        return;
+                      }
+                      createGroup
+                        .mutateAsync({
+                          bidId,
+                          label: symbol.label,
+                          reuseExisting: true,
+                        })
+                        .then(group => {
+                          armGroup(group, null);
+                          void utils.takeoffGroups.list.invalidate({ bidId });
+                        })
                         .catch(() => {
                           /* the mutation's onError has already said so */
                         });
@@ -7261,6 +7562,34 @@ export default function TakeoffPage({
             />
           </SidePanel>
         </div>
+      )}
+
+      {/*
+        THE PHONE'S BAR UNDER THE DRAWING (plan § 3): this sheet's line, and
+        the way into the panel. A warning anywhere in the panel shows here
+        too — with the panel closed, its tabs' marks are out of sight, and a
+        line not on the bid is a bid that is short (plan § 4 item 2).
+      */}
+      {phone && doc && !phonePanelOpen && (
+        <button
+          type="button"
+          onClick={() => setPhonePanelOpen(true)}
+          className="flex h-12 shrink-0 items-center gap-2 border-t border-border bg-card px-3 text-left"
+          aria-label="Open the panel: counts, runs, sheets and totals"
+        >
+          <ThisSheetLine
+            stampGroups={stampGroups}
+            runs={visibleRuns}
+            className="min-w-0 flex-1 truncate text-sm"
+          />
+          {warnedTabs.size > 0 && (
+            <TriangleAlert
+              className="w-4 h-4 shrink-0 text-warning"
+              aria-label="something needs a look"
+            />
+          )}
+          <PanelRight className="w-5 h-5 shrink-0 text-muted-foreground" />
+        </button>
       )}
 
       {dragging && docs.length > 0 && (

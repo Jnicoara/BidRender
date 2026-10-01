@@ -152,3 +152,19 @@ describe("the whole-set summary and sending to the bid (2026-09-29)", () => {
       expect(set.has(q), q).toBe(true);
   });
 });
+
+describe("linking an assembly to a count (legend plan § 8a, 2026-09-30)", () => {
+  it("moves the marks, the count list, the materials list and the summary", () => {
+    // A linked count's marks change colour, and the materials list moves it
+    // out of "Supplier to price" into itemised parts — both have to show it.
+    const set = moves("countSource");
+    for (const q of [
+      "takeoffStamps.listForSheet",
+      "takeoffGroups.list",
+      "materialsList.get",
+      "takeoffSummary.forBid",
+      "bids.get",
+    ] as const)
+      expect(set.has(q), q).toBe(true);
+  });
+});

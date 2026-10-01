@@ -1,34 +1,33 @@
 /**
  * LegendPanel — symbols captured off a legend, and what each one means.
  *
- * ── The one-time question ────────────────────────────────────────────────────
- * Box a symbol on the legend, name it, and it lands here. The first click on an
- * unlinked symbol asks which assembly it matches; every click after that loads
- * that assembly straight into the stamp tool. That is the whole point — the
- * second job costs nothing to interpret.
+ * ── Click counts — linking is optional, and later ───────────────────────────
+ * Box a symbol on the legend, name it, and it lands here. Clicking it starts
+ * counting at once. A LINKED symbol counts its assembly; an UNLINKED one counts
+ * a plain count under the symbol's name — no price, no parts, and nothing
+ * asked first (legend plan § 8a).
+ *
+ * **Until 2026-09-30 the first click on an unlinked symbol asked which
+ * assembly it matched, and nothing could be counted until it was answered.**
+ * That is the toll gate CLAUDE.md § "As manual or as automated as the user
+ * wants" rules out: a lighting fixture a supplier will price as a package has
+ * no assembly to choose, and the question blocked the count. The link is now
+ * its own control on the row, and a count made either way can be linked
+ * later from its card in the counted list — every mark kept.
  *
  * Links are kept per USER rather than per bid, so a symbol linked on one set of
  * plans is already linked on the next. See the schema comment on symbol_links.
  *
  * ── Search is borrowed, not rebuilt ──────────────────────────────────────────
- * Choosing the assembly uses the same smartSearch ranking the Assembly Builder
- * uses, over the same assemblies list. A second search implementation would
- * rank differently and quietly disagree with the rest of the app.
+ * Choosing the assembly is AssemblySearchList, the same component a count's
+ * "Link assembly" uses, ranked by the same smartSearch as the Assembly
+ * Builder. A second search would rank differently and quietly disagree.
  */
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
-import {
-  BookOpen,
-  Check,
-  Link2,
-  Link2Off,
-  Plus,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { BookOpen, Link2, Link2Off, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { smartSearch } from "@/lib/smartSearch";
+import { AssemblySearchList } from "./AssemblySearchList";
 
 export type SymbolEntry = {
   id: number;
@@ -51,6 +50,7 @@ export function LegendPanel({
   onUnlink,
   onRemove,
   onUseSymbol,
+  onCountSymbol,
 }: {
   symbols: SymbolEntry[];
   assemblies: PickableAssembly[];
@@ -65,44 +65,23 @@ export function LegendPanel({
   onRemove: (symbolId: number) => void;
   /** Load a linked symbol's assembly into the stamp tool. */
   onUseSymbol: (symbol: SymbolEntry) => void;
+  /** Count an UNLINKED symbol as a plain count under its own name. */
+  onCountSymbol: (symbol: SymbolEntry) => void;
 }) {
-  /** The symbol awaiting its one-time "which assembly?" answer. */
+  /** The symbol whose "which assembly?" question is open. */
   const [linking, setLinking] = useState<SymbolEntry | null>(null);
-  const [query, setQuery] = useState("");
-
-  const searchable = useMemo(
-    () =>
-      assemblies.map(a => ({
-        id: String(a.id),
-        description: a.name,
-        category: a.category,
-      })),
-    [assemblies]
-  );
-
-  const results = useMemo(() => {
-    if (!query.trim()) return assemblies.slice(0, 8);
-    const hits = smartSearch(searchable, query, 8);
-    const byId = new Map(assemblies.map(a => [a.id, a]));
-    return hits
-      .map(hit => byId.get(Number(hit.id)))
-      .filter((a): a is PickableAssembly => Boolean(a));
-  }, [query, searchable, assemblies]);
 
   return (
     <div className="border-t border-border shrink-0">
       <div className="px-3 py-2 flex items-center gap-1.5 text-[0.7rem] uppercase tracking-wide text-muted-foreground">
         <BookOpen className="w-3 h-3" /> Legend
-        <span className="ml-auto normal-case tracking-normal">
+        <span className="ml-auto normal-case tracking-normal text-xs">
           {symbols.length}
         </span>
         <Button
           size="sm"
           variant="ghost"
-          className={cn(
-            "h-5 px-1.5 text-[0.7rem]",
-            capturing && "text-[#F5C518]"
-          )}
+          className={cn("h-5 px-1.5 text-xs", capturing && "text-[#F5C518]")}
           onClick={capturing ? onCancelCapture : onStartCapture}
         >
           {capturing ? (
@@ -116,40 +95,41 @@ export function LegendPanel({
       </div>
 
       {capturing && (
-        <p className="px-3 pb-2 text-[0.7rem] text-[#F5C518]">
+        <p className="px-3 pb-2 text-xs text-[#F5C518]">
           Drag a box around a symbol on the drawing's legend — the crop becomes
           its picture here.
         </p>
       )}
 
-      <div className="max-h-52 overflow-y-auto">
+      {/* No scroll box of its own: the panel's tab is the one scroll area
+          (track-b-phone-and-readability-plan.md § 1 rule 1). */}
+      <div>
         {symbols.length === 0 ? (
           <p className="px-3 pb-3 text-xs text-muted-foreground">
-            Capture a symbol from the plan's legend and link it to an assembly.
-            Once linked, one click loads it into the mark tool — on this job and
-            every job after it.
+            Capture a symbol from the plan's legend, then click it to start
+            counting. Link it to an assembly whenever you like — once linked,
+            one click counts that assembly, on this job and every job after it.
           </p>
         ) : (
           symbols.map(symbol => (
             <div
               key={symbol.id}
               className={cn(
-                "group flex items-center gap-2 px-3 py-1.5 border-t border-border/50 transition-colors",
-                symbol.isLinked
-                  ? "cursor-pointer hover:bg-muted/40"
-                  : "bg-[#F5C518]/5",
+                "group flex items-center gap-2 px-3 py-1.5 border-t border-border/50 transition-colors cursor-pointer hover:bg-muted/40",
                 symbol.assemblyId !== null &&
                   symbol.assemblyId === activeAssemblyId &&
                   "bg-[#F5C518]/10"
               )}
+              title={
+                symbol.isLinked
+                  ? "Count this assembly"
+                  : `Count “${symbol.label}” — no assembly needed`
+              }
               onClick={() => {
-                // Linked: straight into the stamp tool. Unlinked: the one-time
-                // question, asked once and never again for this symbol.
+                // Either way, straight into the mark tool (§ 8a). Linking is
+                // the row's own control, never a gate on counting.
                 if (symbol.isLinked) onUseSymbol(symbol);
-                else {
-                  setLinking(symbol);
-                  setQuery("");
-                }
+                else onCountSymbol(symbol);
               }}
             >
               {symbol.thumbnail ? (
@@ -164,7 +144,7 @@ export function LegendPanel({
 
               <div className="flex-1 min-w-0">
                 <p className="text-xs truncate">{symbol.label}</p>
-                <p className="text-[0.7rem] text-muted-foreground flex items-center gap-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
                   {symbol.isLinked ? (
                     <>
                       <Link2 className="w-2.5 h-2.5" />{" "}
@@ -172,13 +152,26 @@ export function LegendPanel({
                         "Linked"}
                     </>
                   ) : (
-                    <span className="text-[#F5C518]">
-                      Not linked — click to choose
-                    </span>
+                    "Counts by name · no assembly"
                   )}
                 </p>
               </div>
 
+              {!symbol.isLinked && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-5 px-1.5 shrink-0 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={e => {
+                    e.stopPropagation();
+                    setLinking(linking?.id === symbol.id ? null : symbol);
+                  }}
+                  title="Link this symbol to an assembly, for this job and every job after it"
+                  aria-label={`Link ${symbol.label} to an assembly`}
+                >
+                  <Link2 className="w-3 h-3 mr-0.5" /> Link
+                </Button>
+              )}
               {symbol.isLinked && (
                 <Button
                   size="sm"
@@ -211,52 +204,25 @@ export function LegendPanel({
         )}
       </div>
 
-      {/* The one-time question. Uses the Assembly Builder's own search. */}
+      {/* Which assembly — asked only when the Link control asks it. */}
       {linking && (
         <div className="border-t border-border p-3 space-y-2 bg-muted/20">
           <p className="text-xs font-medium">
             Which assembly does “{linking.label}” match?
           </p>
-          <p className="text-[0.7rem] text-muted-foreground">
-            Asked once. From then on, clicking this symbol loads that assembly
-            straight into the mark tool — on this job and every job after it.
+          <p className="text-xs text-muted-foreground">
+            From then on, clicking this symbol counts that assembly — on this
+            job and every job after it. A count you already made by name stays
+            as it is; link it from its card.
           </p>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
-            <Input
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === "Escape") setLinking(null);
-              }}
-              placeholder="Search assemblies…"
-              className="h-7 pl-7 text-xs"
-              autoFocus
-            />
-          </div>
-          <div className="max-h-40 overflow-y-auto">
-            {results.map(assembly => (
-              <button
-                key={assembly.id}
-                className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted flex items-center gap-2"
-                onClick={() => {
-                  onLink(linking.id, assembly.id);
-                  setLinking(null);
-                }}
-              >
-                <Check className="w-3 h-3 text-muted-foreground shrink-0" />
-                <span className="flex-1 min-w-0 truncate">{assembly.name}</span>
-                <span className="text-[0.7rem] text-muted-foreground">
-                  {assembly.category}
-                </span>
-              </button>
-            ))}
-            {results.length === 0 && (
-              <p className="text-[0.7rem] text-muted-foreground px-2 py-2">
-                Nothing matches “{query}”.
-              </p>
-            )}
-          </div>
+          <AssemblySearchList
+            assemblies={assemblies}
+            onPick={assembly => {
+              onLink(linking.id, assembly.id);
+              setLinking(null);
+            }}
+            onCancel={() => setLinking(null)}
+          />
           <Button
             size="sm"
             variant="ghost"

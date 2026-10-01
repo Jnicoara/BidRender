@@ -258,10 +258,7 @@ export function ScaleControl({
               flash &&
                 "border border-emerald-500 bg-emerald-500/10 text-emerald-300",
               !isSet && !flash && !wanted && "text-muted-foreground",
-              !isSet &&
-                !flash &&
-                wanted &&
-                "text-[#F5C518] hover:text-[#F5C518]"
+              !isSet && !flash && wanted && "text-warning hover:text-warning"
             )}
             title={
               isSet
@@ -279,7 +276,7 @@ export function ScaleControl({
             {isSet ? (
               <span className="flex items-center gap-1">
                 {offStandard && (
-                  <TriangleAlert className="w-3 h-3 text-orange-400" />
+                  <TriangleAlert className="w-3 h-3 text-warning" />
                 )}
                 <span className="font-mono">{label}</span>
                 {/*
@@ -289,7 +286,7 @@ export function ScaleControl({
                   one nobody reads by Thursday.
                 */}
                 {sizeWarning && pageSize ? (
-                  <span className="flex items-center gap-0.5 text-[0.65rem] text-[#F5C518]">
+                  <span className="flex items-center gap-0.5 text-xs text-warning">
                     · <TriangleAlert className="w-3 h-3" />
                     {pageSize.label} page
                   </span>
@@ -473,7 +470,7 @@ export function ScaleControl({
               produce it, and only one is a mistake.
             */}
             {offStandard && standard && (
-              <p className="text-[0.7rem] text-orange-300 flex items-start gap-1.5">
+              <p className="text-xs text-warning flex items-start gap-1.5">
                 <TriangleAlert className="w-3 h-3 shrink-0 mt-0.5" />
                 <span>
                   {Math.abs(standard.percentOff).toFixed(0)}%{" "}
@@ -490,7 +487,7 @@ export function ScaleControl({
               line saying so, and the check beside it.
             */}
             {sizeWarning && pageSize ? (
-              <p className="text-[0.7rem] text-[#F5C518] flex items-start gap-1.5">
+              <p className="text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
                 <TriangleAlert className="w-3 h-3 shrink-0 mt-0.5" />
                 <span>
                   This page is {pageSize.label}. If the set was drawn on a

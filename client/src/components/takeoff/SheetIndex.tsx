@@ -320,7 +320,9 @@ function SheetRow({
                   e.stopPropagation();
                   startEditing();
                 }}
-                className="shrink-0 p-1 -my-0.5 rounded text-muted-foreground/60 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-foreground hover:bg-muted transition-all"
+                // Always shown to a finger: a hover-only control does not
+                // exist on a touch screen (takeoff-spec ground rule 2).
+                className="shrink-0 p-1 -my-0.5 rounded text-muted-foreground/60 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100 hover:text-foreground hover:bg-muted transition-all"
                 aria-label={`Edit the number and title of page ${sheet.pageNumber}`}
                 title="Edit number and title"
               >

@@ -336,6 +336,7 @@ const docFixture = (
     },
   ],
   measured: [{ label: "Conduit", feet: 340, note: "Traced length." }],
+  forQuote: [],
   notes: ["A note."],
   ...over,
 });
@@ -383,6 +384,28 @@ describe("the CSV a supplier opens", () => {
     expect(isEmptyList(docFixture({ entries: [], measured: [] }))).toBe(true);
     expect(isEmptyList(docFixture())).toBe(false);
     expect(lineCount(docFixture())).toBe(3);
+  });
+
+  /*
+    LEGEND PLAN § 8a. A bid whose only takeoff is a count by name ("A1
+    luminaire: 38") is NOT an empty list — it is exactly the list a lighting
+    package is quoted from — and the CSV says what the rows are, never a price.
+  */
+  it("a count with no assembly is something to send, under its own heading", () => {
+    const doc = docFixture({
+      entries: [],
+      measured: [],
+      forQuote: [{ name: "A1 luminaire", qty: 38, unit: "each" }],
+    });
+    expect(isEmptyList(doc)).toBe(false);
+    expect(lineCount(doc)).toBe(1);
+    const rows = toCsv(doc).split("\r\n");
+    const heading = rows.indexOf('"Supplier to price"');
+    expect(heading).toBeGreaterThan(-1);
+    const row = rows.slice(heading).find(r => r.includes("A1 luminaire"))!;
+    expect(row).toContain('"38"');
+    expect(row).toContain('"ea"');
+    expect(row).not.toMatch(/\$|0\.00/);
   });
 });
 

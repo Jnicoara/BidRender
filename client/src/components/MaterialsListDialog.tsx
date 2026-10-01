@@ -35,6 +35,8 @@ import {
   Ruler,
 } from "lucide-react";
 import {
+  SUPPLIER_TO_PRICE_HEADING,
+  SUPPLIER_TO_PRICE_NOTE,
   exportFilename,
   isEmptyList,
   toCsv,
@@ -204,6 +206,34 @@ export function MaterialsListDialog({
                 </div>
               )}
 
+              {/* Counts with no parts list. Apart from both sections above,
+                  because the app itemised neither these nor their price: the
+                  supplier quotes them as they stand (legend plan § 8a). */}
+              {doc!.forQuote.length > 0 && (
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                    <Package className="w-3.5 h-3.5 text-muted-foreground" />
+                    {SUPPLIER_TO_PRICE_HEADING}
+                  </div>
+                  <p className="text-[0.7rem] text-muted-foreground mb-2">
+                    {SUPPLIER_TO_PRICE_NOTE}
+                  </p>
+                  {doc!.forQuote.map(entry => (
+                    <div
+                      key={entry.name}
+                      className="flex items-baseline justify-between gap-3 py-1"
+                    >
+                      <div className="text-sm min-w-0 truncate">
+                        {entry.name}
+                      </div>
+                      <div className="font-mono tabular-nums text-sm shrink-0">
+                        {entry.qty} {unitLabel(entry.unit)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {doc!.notes.length > 0 && (
                 <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-4">
                   {doc!.notes.map(note => (
@@ -224,6 +254,10 @@ export function MaterialsListDialog({
                     ? ` and ${doc!.measured.length} measured length${
                         doc!.measured.length === 1 ? "" : "s"
                       }`
+                    : ""
+                }${
+                  doc!.forQuote.length > 0
+                    ? `, plus ${doc!.forQuote.length} for the supplier to price`
                     : ""
                 }.`}
           </p>

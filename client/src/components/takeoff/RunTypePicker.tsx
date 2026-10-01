@@ -312,7 +312,7 @@ function ExtraDraftField({
         className="h-7 w-20 text-xs"
         aria-label={ariaLabel}
       />
-      <span className="text-[0.7rem] text-muted-foreground">{suffix}</span>
+      <span className="text-xs text-muted-foreground">{suffix}</span>
     </span>
   );
 }
@@ -413,7 +413,7 @@ export function MaterialSlot({
 
   return (
     <div className="mt-2.5">
-      <p className="text-[0.7rem] font-medium">{title}</p>
+      <p className="text-xs font-medium">{title}</p>
       {picking ? (
         <div className="mt-1">
           <MaterialPicker
@@ -434,7 +434,7 @@ export function MaterialSlot({
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 mt-1 px-1.5 text-[0.7rem] text-muted-foreground"
+            className="h-6 mt-1 px-1.5 text-xs text-muted-foreground"
             onClick={() => setPicking(false)}
           >
             <ArrowLeft className="w-3 h-3 mr-1" /> Back
@@ -683,13 +683,13 @@ export function RunTypePicker({
               sentence, not the guard.
             */}
             {editing.isShipped && (
-              <p className="text-[0.7rem] text-muted-foreground mb-1.5 leading-snug">
+              <p className="text-xs text-muted-foreground mb-1.5 leading-snug">
                 This is a type BidRidge ships. Saving makes your own copy of it
                 and leaves the original alone.
               </p>
             )}
 
-            <p className="text-[0.7rem] font-medium">Name</p>
+            <p className="text-xs font-medium">Name</p>
             <Input
               value={draft.label}
               onChange={e => setDraft({ ...draft, label: e.target.value })}
@@ -732,7 +732,7 @@ export function RunTypePicker({
               );
               return (
                 <div className="mt-2">
-                  <p className="text-[0.7rem] font-medium">Color</p>
+                  <p className="text-xs font-medium">Color</p>
                   <div
                     className="mt-1 flex flex-wrap items-center gap-1.5"
                     role="radiogroup"
@@ -744,7 +744,7 @@ export function RunTypePicker({
                       aria-checked={draft.color === null}
                       onClick={() => setDraft({ ...draft, color: null })}
                       className={cn(
-                        "h-6 px-2 rounded border text-[0.7rem] flex items-center gap-1.5",
+                        "h-6 px-2 rounded border text-xs flex items-center gap-1.5",
                         draft.color === null
                           ? "border-foreground text-foreground"
                           : "border-border text-muted-foreground hover:text-foreground"
@@ -794,18 +794,18 @@ export function RunTypePicker({
                   </div>
                   {draft.color !== null &&
                     (inUse.get(draft.color)?.length ?? 0) > 0 && (
-                      <p className="mt-1 text-[0.7rem] text-muted-foreground leading-snug">
+                      <p className="mt-1 text-xs text-muted-foreground leading-snug">
                         Also used by {inUse.get(draft.color)!.join(", ")} on
                         this bid.
                       </p>
                     )}
                   {draft.color !== null && (
-                    <p className="mt-1 text-[0.7rem] text-muted-foreground leading-snug">
+                    <p className="mt-1 text-xs text-muted-foreground leading-snug">
                       This color follows the type to every bid.
                     </p>
                   )}
                   {shifts.length > 0 && (
-                    <p className="mt-1 text-[0.7rem] text-muted-foreground leading-snug">
+                    <p className="mt-1 text-xs text-muted-foreground leading-snug">
                       On this bid,{" "}
                       {shifts
                         .map(
@@ -913,9 +913,7 @@ export function RunTypePicker({
 
             {pathType === "conduit" && (
               <div className="mt-2.5">
-                <p className="text-[0.7rem] font-medium">
-                  Conductors per circuit
-                </p>
+                <p className="text-xs font-medium">Conductors per circuit</p>
                 {/*
                   "ground included" is gone, and its going is the whole point.
 
@@ -939,12 +937,12 @@ export function RunTypePicker({
                     }
                     ariaLabel="Conductors per circuit"
                   />
-                  <span className="text-[0.7rem] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     insulated, not counting the ground
                   </span>
                 </div>
 
-                <p className="text-[0.7rem] font-medium mt-2.5">Grounds</p>
+                <p className="text-xs font-medium mt-2.5">Grounds</p>
                 <div className="flex items-center gap-2 mt-1">
                   <CountField
                     value={draft.groundCount}
@@ -955,7 +953,7 @@ export function RunTypePicker({
                     }
                     ariaLabel="Grounds per circuit"
                   />
-                  <span className="text-[0.7rem] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     usually one; two on an isolated ground
                   </span>
                 </div>
@@ -995,7 +993,7 @@ export function RunTypePicker({
             */}
             {pathType === "conduit" && (
               <div className="mt-2.5">
-                <p className="text-[0.7rem] font-medium">Fittings</p>
+                <p className="text-xs font-medium">Fittings</p>
                 {isEmt(draft.racewayMaterialName) ? (
                   <div
                     className="mt-1 flex gap-1"
@@ -1015,7 +1013,7 @@ export function RunTypePicker({
                             setDraft({ ...draft, fittingStyle: style })
                           }
                           className={cn(
-                            "flex-1 rounded border px-1.5 py-1 text-[0.7rem]",
+                            "flex-1 rounded border px-1.5 py-1 text-xs",
                             chosen
                               ? "border-[#F5C518] bg-[#F5C518]/10 text-foreground"
                               : "border-border text-muted-foreground hover:bg-muted"
@@ -1030,7 +1028,7 @@ export function RunTypePicker({
                     })}
                   </div>
                 ) : (
-                  <p className="text-[0.7rem] text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Couplings, connectors, straps and bends are counted from the
                     trace and matched to this raceway in the catalog.
                   </p>
@@ -1085,7 +1083,7 @@ export function RunTypePicker({
                   <button
                     type="button"
                     onClick={() => setChoosingFittings(true)}
-                    className="mt-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                    className="mt-1 text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground"
                   >
                     Choose fittings yourself
                   </button>
@@ -1107,10 +1105,10 @@ export function RunTypePicker({
             (draft.makeupByKindInches !== null &&
               Object.keys(draft.makeupByKindInches).length > 0) ? (
               <div className="mt-2.5 space-y-1">
-                <p className="text-[0.7rem] font-medium">Extra and makeup</p>
+                <p className="text-xs font-medium">Extra and makeup</p>
                 {pathType === "conduit" && (
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[0.7rem] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       Conduit extra, run length only
                     </span>
                     <ExtraDraftField
@@ -1125,7 +1123,7 @@ export function RunTypePicker({
                   </div>
                 )}
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[0.7rem] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     {pathType === "cable" ? "Cable extra" : "Wire extra"}, run
                     length and drops
                   </span>
@@ -1140,7 +1138,7 @@ export function RunTypePicker({
                   />
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[0.7rem] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     Makeup at a box, per wire
                   </span>
                   <ExtraDraftField
@@ -1157,7 +1155,7 @@ export function RunTypePicker({
                   />
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[0.7rem] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     Makeup at a panel, per wire
                   </span>
                   <ExtraDraftField
@@ -1178,7 +1176,7 @@ export function RunTypePicker({
                     key={t.typeKey}
                     className="flex items-center justify-between gap-2"
                   >
-                    <span className="text-[0.7rem] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       Makeup at {t.label}
                     </span>
                     <ExtraDraftField
@@ -1199,7 +1197,7 @@ export function RunTypePicker({
                     />
                   </div>
                 ))}
-                <p className="text-[0.7rem] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Blank follows the company. Extra is material only; makeup
                   carries labor.
                 </p>
@@ -1208,14 +1206,14 @@ export function RunTypePicker({
               <button
                 type="button"
                 onClick={() => setShowExtras(true)}
-                className="mt-2.5 block text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                className="mt-2.5 block text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground"
               >
                 Extra and makeup differ for this type
               </button>
             )}
 
             <p
-              className="text-[0.7rem] text-muted-foreground mt-2.5"
+              className="text-xs text-muted-foreground mt-2.5"
               title={laborPerFootCoverage({ ...draft, pathType })}
             >
               Labor {laborPerFootSentence({ ...draft, pathType })}
@@ -1296,7 +1294,7 @@ export function RunTypePicker({
             <p className="text-xs font-medium mb-1">
               What kind of {pathType} run?
             </p>
-            <p className="text-[0.7rem] text-muted-foreground mb-2">
+            <p className="text-xs text-muted-foreground mb-2">
               Every run you trace takes this until you change it.
             </p>
 
@@ -1362,13 +1360,13 @@ export function RunTypePicker({
                   surface — shared/takeoffCounts.ts.
                 */}
                       {type.needsSpecification ? (
-                        <span className="block text-[0.7rem] text-muted-foreground">
+                        <span className="block text-xs text-muted-foreground">
                           No materials yet — cannot be priced
                         </span>
                       ) : (
                         <>
                           {runTypeSpec(type) && (
-                            <span className="block text-[0.7rem] text-muted-foreground truncate">
+                            <span className="block text-xs text-muted-foreground truncate">
                               {runTypeSpec(type)}
                             </span>
                           )}
@@ -1404,7 +1402,7 @@ export function RunTypePicker({
                             only on the types that have something to warn about.
                           */}
                           <span
-                            className="block text-[0.7rem] text-muted-foreground"
+                            className="block text-xs text-muted-foreground"
                             title={laborPerFootCoverage(type)}
                           >
                             {laborPerFootSentence(type)}
@@ -1413,7 +1411,7 @@ export function RunTypePicker({
                       )}
                     </span>
                     {type.runCount > 0 && (
-                      <span className="text-[0.7rem] text-muted-foreground shrink-0 tabular-nums">
+                      <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
                         {type.runCount}
                       </span>
                     )}
@@ -1434,7 +1432,7 @@ export function RunTypePicker({
               ))}
 
               {results.length === 0 && !query.trim() && (
-                <p className="text-[0.7rem] text-muted-foreground px-2 py-2">
+                <p className="text-xs text-muted-foreground px-2 py-2">
                   No {pathType} types yet — type a name to make one.
                 </p>
               )}
@@ -1452,7 +1450,7 @@ export function RunTypePicker({
               {catalogHits.length > 0 && (
                 <>
                   <div className="h-px bg-border my-1.5" />
-                  <p className="px-2 pb-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+                  <p className="px-2 pb-1 text-[0.7rem] uppercase tracking-wide text-muted-foreground">
                     From the catalog
                   </p>
                   {catalogHits.map(material => (
@@ -1476,7 +1474,7 @@ export function RunTypePicker({
                       <Plus className="w-3 h-3 mt-0.5 shrink-0 text-muted-foreground" />
                       <span className="flex-1 min-w-0">
                         <span className="block truncate">{material.name}</span>
-                        <span className="block text-[0.7rem] text-muted-foreground">
+                        <span className="block text-xs text-muted-foreground">
                           Makes a {pathType} type from this material
                         </span>
                       </span>
@@ -1509,7 +1507,7 @@ export function RunTypePicker({
                       <span className="font-medium">{query.trim()}</span>”
                     </span>
                   </span>
-                  <span className="block text-[0.7rem] text-muted-foreground mt-0.5 pl-[1.125rem]">
+                  <span className="block text-xs text-muted-foreground mt-0.5 pl-[1.125rem]">
                     Add the materials to it whenever you like
                   </span>
                 </button>

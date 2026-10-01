@@ -49,6 +49,30 @@
 
 ## 1. MAIN DIRECTION — the right-hand panel becomes tabs
 
+> **BUILT on the laptop, 2026-09-30 (track-b).** The owner approved both
+> calls below: selecting on the drawing opens its tab (rule 4), and a tab
+> with a warning shows a mark (rule 5). What landed, and where it differs:
+>
+> - Rules live in `client/src/lib/panelTabs.ts` with tests beside them.
+> - **Undo / Delete stay in the toolbar**, not in the pinned strip: they
+>   already never scroll and never hide behind a tab, which is all rule 3
+>   asks. The pinned strip holds the "This sheet" line and the lock notice.
+> - **Traced footage (the per-type Send) sits on Runs**, above the runs.
+> - Rule 4 also SCROLLS to the selection — measured on the fixture, a run's
+>   editor was 2,073 px down the Runs tab, so "opens its tab" alone was not
+>   "opens its editor". A selection opens a tab but is not remembered.
+> - Rule 5 marks: Totals while anything is not on the bid or the totals
+>   leave footage out (no scale, no type); Counts for a count whose assembly
+>   is gone. The mark uses the new `--warning` amber; the rest of § 2.3's
+>   sweep is still Part A.
+> - Measured after: one scroll area per tab (rule 1 walk), four nested
+>   scrollers removed, five tabs fit the 280 px minimum with px-1.5, and
+>   opening Reader made no API call.
+> - **Found on screen:** `transition-colors` on the tabs left the PREVIOUS
+>   tab underlined in a background tab (transitions do not advance there).
+>   Removed.
+> - Part A items 2–6 were built the same day — see § 2.
+
 ### Why
 
 Today the panel is one long column of everything: the counted list, the
@@ -158,6 +182,40 @@ figures live on the Totals tab and say "this bid".
 These are one fixture's numbers. A real job with forty counts will be worse on
 every row. Measure again on one before calling Part A done.
 
+> **BUILT, 2026-09-30 (track-b): items 2–6.** Measured on "Bar layout
+> check", 1536 wide, panel 400 px, all five tabs (AI flag OFF, so Reader is
+> present):
+>
+> | Measure                       | Before         | After                                   |
+> | ----------------------------- | -------------- | --------------------------------------- |
+> | Text elements under 12 px     | 125 of 237     | **6 of 211**, all capitalised headings  |
+> | In the muted grey             | 108            | 76                                      |
+> | Warnings in the brand yellow  | 25             | **0**                                   |
+> | Totals tab: content / visible | 897 / 589 px   | 589 / 589 (folded; fits without scroll) |
+> | Runs tab: content / visible   | 2,266 / 589 px | 2,519 / 589 (the bigger text's cost)    |
+>
+> - Item 3: every yellow use in the panel, the scale control and the heights
+>   chip was decided one by one. **Stays yellow:** the active tab, a selected
+>   row, chip hover, the selected scale, the armed Capture hint, "Check it",
+>   and PROPOSALS (pull points, proposed drops, "Suggested") — those are drawn
+>   yellow-dashed on the drawing, and the row must match its marker.
+>   **Moved to `--warning`:** everything saying something is missing or
+>   wrong, plus the scale's off-standard triangle and note, which were a
+>   THIRD warning colour (`orange-300/400`). `CalibrateLayer`'s graded
+>   orange is a different surface and was not touched.
+> - Item 4: `foldNotOnBid` in `shared/takeoffSummary.ts`, tested in
+>   `server/takeoffSummary.test.ts`. A row keeps its own reason only when it
+>   differs from the line's; a sentence that only restates the line is left
+>   off. **No "Set scale" / "Pick a type" fix on the folded line** — the
+>   summary does not know which sheet or run, and there is no existing jump
+>   to send it to. The one fix that exists, Send, stays under the folds.
+> - Found on screen at 280 px: the run-type prefix made the ITEM the part
+>   that truncated (now its own 12 px line), and the branch-wiring question's
+>   two buttons ran 50 px past the panel (pre-existing; now wrap).
+> - Checked at 400 and 280 px, UI scale 1.0 and 1.25, dark and light. Not
+>   checked at a 1,366-wide window: the driven window is fixed at 1,536, and
+>   the panel's own width (280–620) is what these rules depend on.
+
 ### What changes
 
 1. **The tabs in § 1.** They are the biggest single cut to scrolling, so they
@@ -214,6 +272,35 @@ every row. Measure again on one before calling Part A done.
 > the two side panels as drawers covering ~70% of the drawing, opened from a
 > bar. With tabs, the phone gets the SAME tabs as one full-screen panel
 > instead: one way to see the panel, not a phone-only arrangement of it.
+
+> **THE PANEL'S PHONE LAYOUT IS BUILT, 2026-09-30 (track-b). Touch gestures
+> are NOT** — pan, pinch and guard 3 ship together or not at all (§ "Touch"
+> below), and this piece was the layout only. What landed:
+>
+> - `plansLayout()` in `client/src/lib/plansLayout.ts` (tested), read through
+>   `usePlansLayout()`.
+> - `SidePanel` takes a `phone` variant instead of a phone-only copy:
+>   the right panel is `fullScreen` ("← Plan", the sheet named as the
+>   toolbar names it), the sheet list is `portal`-ed into a **Sheets** tab.
+>   Phone tab order Sheets · Counts · Runs · Totals · Legend · Reader, so
+>   Totals' mark is never past the edge. Picking a sheet there closes the
+>   panel onto it.
+> - The bar under the drawing is `ThisSheetLine` — the SAME component as the
+>   panel's pinned line — plus an amber mark whenever any tab has one.
+> - The app's bottom nav hides on Plans (measured: it sat on the bar).
+> - `.phone-panel` gives every control inside the panel a 44 px minimum.
+>   Sheet rows measured 56 px after. The rename pencil shows on a coarse
+>   pointer.
+>
+> **Checked** in a same-origin frame at 390×844 and 360×740 (the driven
+> window cannot be resized): no sideways page scroll, nothing cut off below,
+> no control under 44 px inside the panel, opening and closing leaves the
+> drawing's transform identical, the address follows a sheet picked on the
+> phone, and back at 1536 the laptop layout returns unchanged. **Not
+> checked:** a real phone, `pointer: coarse` (no touch device here), and a
+> tablet turning mid-count. **Still the phone's biggest problem:** the TOOL
+> BAR, which wraps to about half of a 390×844 screen — not part of this
+> piece.
 
 ### What is wrong today (from `todo.md`, measured 2026-09-29)
 
