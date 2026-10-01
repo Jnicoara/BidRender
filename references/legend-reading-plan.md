@@ -438,6 +438,12 @@ before writing, so each part says what already exists.
 
 ### 8a. AI-made counts with no assembly, attachable later, on the CSV and materials list
 
+> **8a built and merged at 15c3f39** (2026-10-01). Built by Track B at
+> `5c33570` (count by name with no assembly, Link assembly any time, "Supplier
+> to price" on the materials list), merged into `local-dev` in `15c3f39`, on
+> staging the same day. The "What exists" list below is from before it was
+> built.
+
 **What the owner wants:** the reader can make a count that is just a name
 ("A1 luminaire: 38"), with no assembly behind it. An assembly can be attached
 later. The count shows on the takeoff CSV and the materials list, so a
