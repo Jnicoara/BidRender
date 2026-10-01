@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-30]
 
+- **Refreshing the Plans screen keeps your place.** F5, or reopening the
+  link, used to jump back to the first page of the first plan set. The
+  address now names the plan set and sheet, so a refresh — or a link you
+  send someone — opens that sheet, and a refresh in the same tab also comes
+  back to the same zoom and position. If that set or sheet has since been
+  deleted, it opens the first sheet instead, with no error. Flipping sheets
+  does not fill the Back button: Back still leaves the screen in one press.
+
 - **The Plans screen's right-hand panel is now tabs: Counts, Runs, Legend,
   Reader and Totals.** It used to be one long column — about nine screens of
   scrolling on a small job, with scroll boxes inside it. Now one tab is open

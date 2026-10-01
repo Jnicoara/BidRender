@@ -115,6 +115,17 @@ import {
   type PlanView,
   type ViewBounds,
 } from "@/lib/planView";
+import {
+  isPlansAddressFor,
+  pageBeyondSet,
+  planAddressHash,
+  readPlanAddress,
+  readRememberedView,
+  rememberView,
+  resolvePlanAddress,
+  restoreView,
+  writeRememberedView,
+} from "@/lib/planAddress";
 import { SheetIndex } from "@/components/takeoff/SheetIndex";
 import {
   PDF_WHOLE_DOWNLOAD_LIMIT_BYTES,
@@ -895,9 +906,49 @@ function PlanPane({
     if (canvasSize.width === 0) return;
     const key = `${doc.id}:${page}`;
     if (fittedFor.current === key) return;
+    const firstArrival = fittedFor.current === null;
     fittedFor.current = key;
+    /*
+      A REFRESH COMES BACK TO THE SAME ZOOM AND PLACE (owner, 2026-09-30) —
+      on the first sheet this pane shows, and only if this tab was last
+      looking at exactly it (@/lib/planAddress). A page flip inside the
+      session still fits, as it always has.
+    */
+    const bounds = readBounds();
+    if (firstArrival && bounds) {
+      const back = restoreView(readRememberedView(), doc.id, page, bounds);
+      if (back) {
+        viewIsFitted.current = false;
+        setView(back);
+        return;
+      }
+    }
     fitToView();
-  }, [doc.id, page, canvasSize.width, canvasSize.height, fitToView]);
+  }, [
+    doc.id,
+    page,
+    canvasSize.width,
+    canvasSize.height,
+    fitToView,
+    readBounds,
+  ]);
+
+  /*
+    Remember where this tab is looking, a moment after it stops moving. A
+    fitted view is forgotten rather than stored: a refresh fits anyway, and a
+    stored fit would outlive a pane that has since changed size.
+  */
+  useEffect(() => {
+    if (canvasSize.width === 0) return;
+    const timer = window.setTimeout(() => {
+      const bounds = readBounds();
+      if (!bounds) return;
+      writeRememberedView(
+        viewIsFitted.current ? null : rememberView(doc.id, page, view, bounds)
+      );
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [view, doc.id, page, canvasSize.width, readBounds]);
 
   /**
    * The pane changed size — re-fit if the view was a fit, otherwise re-clamp.
@@ -1982,8 +2033,16 @@ export default function TakeoffPage({
   const { data: bid } = trpc.bids.get.useQuery({ id: bidId });
   const { data: docs = [], isLoading } = trpc.bidPdfs.list.useQuery({ bidId });
 
-  const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
-  const [page, setPage] = useState(1);
+  /*
+    THE PLAN SET AND SHEET START FROM THE ADDRESS (owner, 2026-09-30): F5 on
+    page 5 of the third set used to land on the first set's first page. Read
+    once, on mount; checked against the bid's sets when they load, below.
+  */
+  const [askedAddress] = useState(() => readPlanAddress(window.location.hash));
+  const [selectedDocId, setSelectedDocId] = useState<number | null>(
+    askedAddress.setId
+  );
+  const [page, setPage] = useState(askedAddress.sheet ?? 1);
   const [dragging, setDragging] = useState(false);
   const [uploads, setUploads] = useState<UploadJob[]>([]);
   /**
@@ -2378,6 +2437,60 @@ export default function TakeoffPage({
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   const doc = docs.find(d => d.id === selectedDocId) ?? docs[0] ?? null;
+
+  /*
+    THE ADDRESS BAR SAYS WHICH SET AND SHEET IS OPEN (@/lib/planAddress).
+
+    1. Once the bid's sets have loaded, the address asked for is checked
+       against them: a deleted set, or a page past the end, opens the first
+       sheet with no error.
+    2. From then on every flip rewrites the address with `replaceState`, so a
+       refresh or a copied link opens the same sheet — and Back still leaves
+       the screen in one press rather than walking back through every sheet.
+       Only while the address is still this bid's Plans screen.
+    3. An address changed by hand (or Back/Forward between two Plans addresses
+       of this bid) moves the screen to it.
+  */
+  const addressSettled = useRef(false);
+  useEffect(() => {
+    if (addressSettled.current || isLoading) return;
+    addressSettled.current = true;
+    const resolved = resolvePlanAddress(askedAddress, docs);
+    setSelectedDocId(resolved.setId);
+    setPage(resolved.page);
+  }, [isLoading, docs, askedAddress]);
+  // A set opened for the first time reports its page count only once its
+  // file is read; a page asked for past that end drops to the first.
+  useEffect(() => {
+    if (doc && pageBeyondSet(page, doc.pageCount)) setPage(1);
+  }, [doc, page]);
+  useEffect(() => {
+    if (!addressSettled.current || !doc) return;
+    const hash = window.location.hash;
+    if (!isPlansAddressFor(hash, bidId)) return;
+    const next = planAddressHash(bidId, doc.id, page);
+    if (hash === next) return;
+    window.history.replaceState(window.history.state, "", next);
+  }, [bidId, doc, page]);
+  const docsRef = useRef(docs);
+  docsRef.current = docs;
+  useEffect(() => {
+    const follow = () => {
+      const hash = window.location.hash;
+      if (!addressSettled.current || !isPlansAddressFor(hash, bidId)) return;
+      const asked = readPlanAddress(hash);
+      if (asked.setId === null) return;
+      const resolved = resolvePlanAddress(asked, docsRef.current);
+      setSelectedDocId(resolved.setId);
+      setPage(resolved.page);
+    };
+    window.addEventListener("hashchange", follow);
+    window.addEventListener("popstate", follow);
+    return () => {
+      window.removeEventListener("hashchange", follow);
+      window.removeEventListener("popstate", follow);
+    };
+  }, [bidId]);
 
   /** A different plan is a different set of pictures. */
   useEffect(() => {
