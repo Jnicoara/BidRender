@@ -49,8 +49,9 @@ export type LegendDraftRow = {
 };
 
 export type WholeLegend =
-  | { kind: "rows"; rows: LegendDraftRow[]; mostlyUnread: boolean }
+  | { kind: "rows"; rows: LegendDraftRow[] }
   | { kind: "no-text" }
+  | { kind: "unreadable" }
   | { kind: "no-rows" };
 
 export async function readWholeLegend(opts: {
@@ -108,7 +109,7 @@ export async function readWholeLegend(opts: {
         row.symbol.height * drawn
       ),
     }));
-    return { kind: "rows", rows, mostlyUnread: reading.mostlyUnread };
+    return { kind: "rows", rows };
   } finally {
     bitmap.close();
   }
@@ -266,13 +267,16 @@ export function LegendCaptureForm({
         <Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading the legend…
       </p>
     );
-  } else if (state.kind === "no-text") {
+  } else if (state.kind === "no-text" || state.kind === "unreadable") {
+    // One message for both: a scanned legend with no text, and one whose
+    // scanned text is too garbled to trust. Nothing is listed — no partial
+    // or guessed names (owner, 2026-09-30).
     body = (
       <p className="px-3 py-3 text-xs" role="status">
-        There is no readable text in that box — this legend is a scanned
-        picture, so the names cannot be read from it. Use{" "}
-        <span className="font-medium">+ Capture</span> to box the symbols one at
-        a time.
+        This legend can't be read — it is a scanned picture, so the symbol names
+        are not in the drawing as text. Capture the symbols by hand: press{" "}
+        <span className="font-medium">+ Capture</span> and box them one at a
+        time.
       </p>
     );
   } else if (state.kind === "no-rows") {
@@ -286,16 +290,6 @@ export function LegendCaptureForm({
   } else {
     body = (
       <>
-        {state.mostlyUnread && (
-          <p
-            className="px-3 pb-2 text-xs text-[#F5C518] shrink-0"
-            role="status"
-          >
-            Most of this legend could not be read — it looks scanned. Save the
-            rows below that read correctly, and box the rest one at a time with
-            + Capture.
-          </p>
-        )}
         <div className="flex-1 min-h-0 overflow-y-auto border-b border-border/50">
           {shown.map(rowView)}
           {rest.length > 0 && (

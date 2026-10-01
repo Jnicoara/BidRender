@@ -62,19 +62,16 @@ export type LegendRow = {
 };
 
 export type LegendReading =
-  | {
-      kind: "rows";
-      rows: LegendRow[];
-      /**
-       * Fewer than half the rows read as a library name. On a legend whose
-       * text is a scan's OCR — words missing, letters wrong — this is what
-       * happens, and the screen says so and points to single Capture rather
-       * than presenting a list of garbled names as a reading.
-       */
-      mostlyUnread: boolean;
-    }
+  | { kind: "rows"; rows: LegendRow[] }
   /** The box holds no readable text — a scanned legend. */
   | { kind: "no-text" }
+  /**
+   * Text, but a scan's OCR rather than the drawing's own lettering
+   * (`looksLikeScanText`). Owner, 2026-09-30: say plainly it cannot be read
+   * and to capture by hand. NO rows are returned, so no partial or guessed
+   * name can reach the screen.
+   */
+  | { kind: "unreadable" }
   /** Text, but nothing that reads as a symbol and its name. */
   | { kind: "no-rows" };
 
@@ -147,6 +144,52 @@ export function legendLines(words: WordBox[]): Line[] {
 
 function overlapsBand(l: Line, top: number, bottom: number): boolean {
   return l.y1 > top && l.y0 < bottom;
+}
+
+/**
+ * Share of a legend's words that must sit at its one or two main text sizes
+ * for the text to be trusted as the drawing's own.
+ */
+export const MAIN_SIZE_SHARE = 0.85;
+
+/**
+ * Is this text a scan's OCR rather than the drawing's own lettering?
+ *
+ * ── Measured, 2026-09-30 ─────────────────────────────────────────────────────
+ * A legend is lettered in one or two sizes, and the PDF says so exactly. OCR
+ * measures every word's box separately, so its sizes scatter. Share of words
+ * at the two main sizes (within 4%): Weld 1 E-001 100% (305 words, one size),
+ * UNCC E001 100% (1,962 words, two sizes), Old Blueridge E0.01 57% (46 words,
+ * eight sizes — and rows reading "SHaDe", "MOUINTED", "RIEFERENCE RETERE").
+ *
+ * ── Why not judge by how many rows match the library ────────────────────────
+ * That was the first rule, and the screen check caught it the same hour: on an
+ * account whose assemblies are named differently, a perfectly readable Weld 1
+ * was called a scan. Whether a drawing can be read is a fact about the
+ * drawing, so it is measured from the drawing alone.
+ */
+export function looksLikeScanText(words: WordBox[]): boolean {
+  const heights = words
+    .filter(w => Math.abs(w.dy) < 0.2 && w.dx > 0 && w.height > 2)
+    .map(w => w.height);
+  if (heights.length === 0) return false;
+  const near = (a: number, b: number) => Math.abs(a - b) <= b * 0.04;
+  let left = heights;
+  let main = 0;
+  for (let size = 0; size < 2 && left.length > 0; size++) {
+    let best = left[0];
+    let bestCount = 0;
+    for (const h of left) {
+      const n = left.filter(o => near(o, h)).length;
+      if (n > bestCount) {
+        best = h;
+        bestCount = n;
+      }
+    }
+    main += bestCount;
+    left = left.filter(o => !near(o, best));
+  }
+  return main / heights.length < MAIN_SIZE_SHARE;
 }
 
 /** Lower-case alphanumeric words — punctuation and hyphens split. */
@@ -226,6 +269,7 @@ export function readLegend(opts: {
       w.cy <= box.y + box.height
   );
   if (inBox.length === 0) return { kind: "no-text" };
+  if (looksLikeScanText(inBox)) return { kind: "unreadable" };
 
   const lines = legendLines(inBox);
   const textRects = lines.map(rectOf);
@@ -402,10 +446,35 @@ export function readLegend(opts: {
   // Already in reading order: entries were built column by column, left to
   // right, each top to bottom.
   if (rows.length === 0) return { kind: "no-rows" };
-  const read = rows.filter(r => r.match !== "none").length;
-  return {
-    kind: "rows",
-    rows,
-    mostlyUnread: opts.library.length > 0 && read < rows.length / 2,
-  };
+
+  // One library name, one row. Found on screen, 2026-09-30: with a starter
+  // library, "Single-pole switch" matched by words on four Weld rows (SWITCH,
+  // SINGLE POLE and three that merely contain those words), all ticked, so
+  // Save would have filed four symbols under one name. A name matched by
+  // words goes to the row it covers most completely; the rest keep their own
+  // words, unticked. An exact match always keeps its name.
+  const coverage = (row: LegendRow) =>
+    nameTokens(row.name).length / Math.max(1, nameTokens(row.read).length);
+  const claimed = new Map<string, LegendRow>();
+  for (const row of rows) {
+    if (row.match === "none") continue;
+    const key = symbolLookupKey(row.name);
+    const holder = claimed.get(key);
+    if (
+      !holder ||
+      (row.match === "exact" && holder.match !== "exact") ||
+      (row.match === holder.match && coverage(row) > coverage(holder))
+    ) {
+      claimed.set(key, row);
+    }
+  }
+  for (const row of rows) {
+    if (row.match === "none") continue;
+    if (claimed.get(symbolLookupKey(row.name)) === row) continue;
+    row.name = row.read;
+    row.match = "none";
+    row.alreadyCaptured = captured.has(symbolLookupKey(row.read));
+    row.ticked = false;
+  }
+  return { kind: "rows", rows };
 }

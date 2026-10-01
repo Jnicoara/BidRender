@@ -8,7 +8,7 @@
  *
  * Measured on the same code by hand, 2026-09-30, and recorded here so a change
  * that makes it worse is visible: Weld 1 E-001 reads 48 of 48 symbols by their
- * exact legend names; UNCC E001 (a paragraph per entry) names 86 of its 103
+ * exact legend names; UNCC E001 (a paragraph per entry) names 85 of its 103
  * from the library automatically, none wrongly; Old Blueridge E0.01 is a scan
  * whose OCR text names 1 of 22, and is reported as mostly unread.
  */
@@ -128,9 +128,51 @@ describe("readLegend on Weld 1 E-001 (a two-column legend)", () => {
     expect(jb.ticked).toBe(false);
   });
 
-  it("is not reported as mostly unread", () => {
-    const r = read();
-    expect(r.kind === "rows" && r.mostlyUnread).toBe(false);
+  it("is read, not reported as unreadable", () => {
+    expect(read().kind).toBe("rows");
+  });
+
+  it("gives a library name to one row only, with the starter library", () => {
+    // Found on screen, 2026-09-30: user 1's starters made four Weld rows
+    // "Single-pole switch", all ticked.
+    const STARTERS = [
+      "Duplex receptacle standard",
+      "Single-pole switch",
+      "Dimmer switch",
+      "GFCI receptacle",
+    ];
+    const rows = rowsOf(
+      readLegend({ ...weld, box: WELD_BOX, library: STARTERS, captured: [] })
+    );
+    for (const name of STARTERS) {
+      expect(
+        rows.filter(r => r.name === name).length,
+        name
+      ).toBeLessThanOrEqual(1);
+    }
+    // And the one that keeps it is the row that is ONLY that: SWITCH, SINGLE POLE.
+    expect(rows.find(r => r.name === "Single-pole switch")?.read).toBe(
+      "SWITCH, SINGLE POLE"
+    );
+    // No two ticked rows would save under one name.
+    const ticked = rows.filter(r => r.ticked).map(r => r.name.toLowerCase());
+    expect(new Set(ticked).size).toBe(ticked.length);
+  });
+
+  it("is read on an account whose library has none of its names", () => {
+    // Found on screen, 2026-09-30: judging readability by library matches
+    // called Weld 1 "a scanned picture" for user 1, whose assemblies are named
+    // differently. Every row is offered, unmatched, for the user to name.
+    const r = readLegend({
+      ...weld,
+      box: WELD_BOX,
+      library: ["Duplex receptacle standard", "Single-pole switch"],
+      captured: [],
+    });
+    expect(r.kind).toBe("rows");
+    expect(
+      rowsOf(r).filter(row => row.match === "none").length
+    ).toBeGreaterThan(40);
   });
 });
 
@@ -147,15 +189,20 @@ describe("readLegend falls back on a scanned legend", () => {
     expect(r.kind).toBe("no-text");
   });
 
-  it("reports Old Blueridge E0.01, whose text is a scan's OCR, as mostly unread", () => {
+  it("calls Old Blueridge E0.01 unreadable and offers NO names from it", () => {
+    // Its text is a scan's OCR: 46 words for 22 symbols, some garbled. The
+    // owner's rule: no partial or guessed names — the kind carries no rows.
+    // Decided from the drawing alone, so the library makes no difference.
     const br = load("blueridge-legend.json");
-    const r = readLegend({
-      ...br,
-      box: { x: 1850, y: 60, width: 520, height: 1200 },
-      library: LIBRARY,
-      captured: [],
-    });
-    expect(r.kind === "rows" ? r.mostlyUnread : true).toBe(true);
+    for (const library of [LIBRARY, []]) {
+      const r = readLegend({
+        ...br,
+        box: { x: 1850, y: 60, width: 520, height: 1200 },
+        library,
+        captured: [],
+      });
+      expect(r).toEqual({ kind: "unreadable" });
+    }
   });
 });
 

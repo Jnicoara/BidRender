@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-30]
 
+- **Capture a whole legend in one go.** In the Legend panel, "Whole legend"
+  lets you draw one box around a plan's symbol legend. The app reads each
+  symbol's name from the drawing's own text (no AI), cuts a sharp picture of
+  the symbol beside it, and lists them all. Names that match your assemblies
+  are ticked; untick what you do not need, fix a name, and save them all at
+  once. Symbols you have already captured are never saved over. A scanned
+  legend, whose names are only a picture, is not guessed at: it says it
+  cannot be read and to capture those symbols one at a time.
 - **Capture on the legend works again.** After boxing a symbol, the "Name
   this symbol" box was opening but drawn on the zoomed drawing, so it was a
   speck at low zoom and off the top of the screen when zoomed in on a legend.
