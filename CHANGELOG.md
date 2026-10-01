@@ -4,6 +4,19 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-01]
+
+- **Changing sheets now puts the count tool down.** A count picked up on one
+  sheet stayed on after switching to another, so a click meant to move the
+  view on the legend sheet dropped a stray mark — a wrong count on the bid.
+  Every way of changing sheet (arrows, keys, the sheet list, a jump from a
+  list, Back) now returns to moving the view; pick the symbol again to count.
+  Starting the Capture box also puts a count down.
+- **A run left half-traced is saved where it was drawn.** Switching sheets
+  mid-trace used to carry the points along, and the autosave could then file
+  them under the new sheet. Now the run is kept as a draft on its own sheet
+  and the trace tool is put down.
+
 ## [2026-09-30]
 
 - **BidRidge now tells you when there is a newer version.** Someone who had

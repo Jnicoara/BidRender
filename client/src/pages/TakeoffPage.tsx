@@ -332,6 +332,13 @@ import {
   pruneSelection,
 } from "@/lib/stampSelection";
 import { withSavedSheet, withSheetChecked } from "@/lib/sheetScaleCache";
+import {
+  heldElsewhere,
+  heldOnSheet,
+  markForClick,
+  sheetKeyOf,
+  type SheetKey,
+} from "@/lib/toolOnSheet";
 import { canRetryWithFreshUrl, isExpiredPlanUrl } from "@/lib/planUrlRefresh";
 import { groupStamps } from "@shared/takeoffCounts";
 import { LayersPanel } from "@/components/takeoff/LayersPanel";
@@ -2359,7 +2366,30 @@ export default function TakeoffPage({
    */
   const [reachingForMeasure, setReachingForMeasure] = useState(false);
 
-  const [tracing, setTracing] = useState(false);
+  /**
+   * The sheet a trace was started on, or null when not tracing. Read through
+   * `tracing` below, which is false on any other sheet — @/lib/toolOnSheet.
+   */
+  const [traceHeld, setTraceHeld] = useState<{
+    sheetKey: SheetKey;
+    /** The sheet row, so work left behind is saved where it was drawn. */
+    sheetId: number | null;
+    sheetName: string;
+  } | null>(null);
+  /** Where the tool is being picked up: the sheet on screen at that moment. */
+  const sheetKeyNow = useRef<SheetKey>("");
+  const sheetNow = useRef<{ id: number; name: string } | null>(null);
+  const setTracing = useCallback((on: boolean) => {
+    setTraceHeld(
+      on
+        ? {
+            sheetKey: sheetKeyNow.current,
+            sheetId: sheetNow.current?.id ?? null,
+            sheetName: sheetNow.current?.name ?? "",
+          }
+        : null
+    );
+  }, []);
   const [tracePathType, setTracePathType] = useState<RunPathType>("conduit");
   const [tracePoints, setTracePoints] = useState<PagePoint[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
@@ -2414,12 +2444,20 @@ export default function TakeoffPage({
     cable: { id: number; label: string } | null;
   }>({ conduit: null, cable: null });
 
-  const [armedGroup, setArmedGroup] = useState<{
+  /**
+   * As stored. Read it as `armedGroup` (below), which is null on any sheet
+   * other than the one it was picked up on — @/lib/toolOnSheet.
+   */
+  const [armedGroupHeld, setArmedGroupHeld] = useState<{
     groupId: number;
     label: string;
     /** Null for a plain count. Kept for the legend panel's active-row mark. */
     assemblyId: number | null;
+    /** The sheet it was picked up on. */
+    sheetKey: SheetKey;
   } | null>(null);
+  /** Put the count down (null). Picking one up goes through `armGroup`. */
+  const setArmedGroup = setArmedGroupHeld;
   /**
    * The marks selected for deleting — one by click, more by Shift-click or
    * Shift-drag. The rules are in @/lib/stampSelection, where a test reaches
@@ -2516,6 +2554,17 @@ export default function TakeoffPage({
   const doc = docs.find(d => d.id === selectedDocId) ?? docs[0] ?? null;
 
   /*
+    THE TOOLS IN HAND, AS THIS SHEET SEES THEM. Every way of changing sheet
+    ends in `doc` and `page`, so keying on those two covers all of them —
+    including any added later — without a reset in each handler. On another
+    sheet a held tool reads as put down in this same render.
+  */
+  const sheetKey = sheetKeyOf(doc?.id ?? null, page);
+  sheetKeyNow.current = sheetKey;
+  const tracing = heldOnSheet(traceHeld, sheetKey) !== null;
+  const armedGroup = heldOnSheet(armedGroupHeld, sheetKey);
+
+  /*
     THE ADDRESS BAR SAYS WHICH SET AND SHEET IS OPEN (@/lib/planAddress).
 
     1. Once the bid's sets have loaded, the address asked for is checked
@@ -2610,6 +2659,9 @@ export default function TakeoffPage({
     [gridRange, listRange, thumbnailPageCount]
   );
   const activeSheet = sheets.find(s => s.pageNumber === page) ?? null;
+  sheetNow.current = activeSheet
+    ? { id: activeSheet.id, name: activeSheet.name }
+    : null;
 
   /**
    * A sheet changed — usually its scale.
@@ -3658,11 +3710,18 @@ export default function TakeoffPage({
         toast.error(lockedEditRefusal("new marks cannot be placed"));
         return;
       }
+      // One tool at a time: a box drag or a calibration click must not also
+      // land as a mark.
       setSelectingText(false);
-      setArmedGroup({
+      setCapturingSymbol(false);
+      setCalibrating(false);
+      setArmedGroupHeld({
         groupId: group.id,
         label: group.label,
         assemblyId,
+        // The sheet on screen now. Picked up on the way to another sheet
+        // (the request was slow), it is down on arrival — which is right.
+        sheetKey: sheetKeyNow.current,
       });
       toast.success(`Counting ${group.label} — click to place.`);
     },
@@ -3934,7 +3993,7 @@ export default function TakeoffPage({
     panel closes onto the drawing. Only from that tab — a sheet that changes
     while Counts or Totals is open (a jump from a row) leaves the panel be.
   */
-  const sheetKey = `${selectedDocId}:${page}`;
+  // `sheetKey` is the one the tools in hand are keyed on (@/lib/toolOnSheet).
   const lastSheetKey = useRef(sheetKey);
   useEffect(() => {
     if (lastSheetKey.current === sheetKey) return;
@@ -4220,20 +4279,29 @@ export default function TakeoffPage({
    */
   const queueStamp = useCallback(
     (at: { x: number; y: number }) => {
-      if (!activeSheet || !armedGroup) return;
-      const sheetId = activeSheet.id;
+      // Read from the STORED tool, not the derived one: the guard that a
+      // count picked up on another sheet places nothing is this call, here,
+      // where a test can reach it — not an effect that may not have run yet.
+      const mark = markForClick(
+        armedGroupHeld,
+        sheetKey,
+        activeSheet?.id ?? null,
+        at
+      );
+      if (!mark) return;
+      const { group, sheetId } = mark;
 
       setPending([
         ...pendingStamps.current,
         {
           key: nextPendingKey.current--,
           sheetId,
-          groupId: armedGroup.groupId,
-          name: armedGroup.label,
-          assemblyId: armedGroup.assemblyId,
+          groupId: group.groupId,
+          name: group.label,
+          assemblyId: group.assemblyId,
           assemblyCategory: armedCategory,
-          x: at.x,
-          y: at.y,
+          x: mark.x,
+          y: mark.y,
           sent: false,
         },
       ]);
@@ -4245,7 +4313,8 @@ export default function TakeoffPage({
     },
     [
       activeSheet?.id,
-      armedGroup,
+      armedGroupHeld,
+      sheetKey,
       armedCategory,
       flushStamps,
       mirrorQueue,
@@ -5614,6 +5683,69 @@ export default function TakeoffPage({
     setArmedGroup(null);
     if (tracing) cancelTrace();
   }, [quantitiesLocked, tracing, cancelTrace]);
+
+  /*
+    THE SHEET CHANGED: whatever was in hand is put down, and stays down.
+
+    The guard is already in place before this runs — `armedGroup` and
+    `tracing` read as down on any other sheet (@/lib/toolOnSheet). This clears
+    the stored tool so that coming BACK to the first sheet does not pick it up
+    again by itself, and keeps a trace's work rather than dropping it.
+
+    A trace left part way is saved where it was DRAWN, as a draft — the same
+    state the 4-second autosave already leaves it in, and drafts count on the
+    bid and show in the runs list. It is not finished for the estimator: a run
+    nobody said was done is not one. Saved legs of a branched run are
+    committed with their root, as Discard does; the leg in progress goes.
+  */
+  useEffect(() => {
+    if (heldElsewhere(armedGroupHeld, sheetKey)) setArmedGroupHeld(null);
+    if (!traceHeld || !heldElsewhere(traceHeld, sheetKey)) return;
+    const left = traceHeld;
+    const where = left.sheetName || "the last sheet";
+    if (legRootId !== null) {
+      commitRun.mutate({ id: legRootId });
+      toast.info(`Run on ${where} kept. Changing sheet puts the tool down.`);
+    } else if (
+      left.sheetId !== null &&
+      hasUnsavedWork(tracePoints, savedPointCount.current)
+    ) {
+      const sheetId = left.sheetId;
+      saveRun.mutate(
+        {
+          bidId,
+          sheetId,
+          id: draftRunId.current ?? undefined,
+          name: `Run on ${left.sheetName}`,
+          pathType: tracePathType,
+          points: tracePoints,
+          status: "draft",
+          runTypeId: armedRunType[tracePathType]?.id ?? null,
+          traceMode,
+        },
+        {
+          onSuccess: () => {
+            clearDraft(sheetId);
+            refreshRuns();
+          },
+        }
+      );
+      toast.info(
+        `Run on ${where} saved as a draft. Changing sheet puts the tool down.`
+      );
+    } else if (draftRunId.current !== null) {
+      toast.info(
+        `Run on ${where} saved as a draft. Changing sheet puts the tool down.`
+      );
+    }
+    setTraceHeld(null);
+    setTracePoints([]);
+    draftRunId.current = null;
+    savedPointCount.current = 0;
+    resetLegs();
+    // Only the sheet changing is a reason to run; the rest is read as it is.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetKey]);
 
   const handleSheetVisible = useCallback(
     (pageNumber: number, text: string) => {
@@ -7053,7 +7185,19 @@ export default function TakeoffPage({
                       onEditPoints={(id, points) =>
                         editPoints.mutate({ id, points })
                       }
-                      stamping={Boolean(armedGroup) && !tracing}
+                      /*
+                        The structural half of "one tool at a time", as for
+                        the text layer above: while another tool holds the
+                        sheet, a click cannot also be a mark.
+                      */
+                      stamping={
+                        Boolean(armedGroup) &&
+                        !tracing &&
+                        !capturingSymbol &&
+                        !pendingCapture &&
+                        !calibrating &&
+                        !selectingText
+                      }
                       armedGroupName={armedGroup?.label ?? null}
                       zoom={size.zoom}
                       stamps={[
@@ -7465,6 +7609,9 @@ export default function TakeoffPage({
                     activeAssemblyId={armedGroup?.assemblyId ?? null}
                     capturing={capturingSymbol}
                     onStartCapture={() => {
+                      // The box is a drag on the drawing; a count still in
+                      // hand would take the same press as a mark.
+                      setArmedGroup(null);
                       setSelectingText(false);
                       setCapturingSymbol(true);
                     }}
