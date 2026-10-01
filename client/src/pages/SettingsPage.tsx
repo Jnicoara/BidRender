@@ -41,7 +41,12 @@ import { BrandingSection } from "@/components/BrandingSection";
 import { SalesTaxSection } from "@/components/SalesTaxSection";
 import { ProposalDesignControls } from "@/components/proposal/ProposalDesignControls";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useCrosshairColor, useCrosshairSize } from "@/hooks/useCrosshairColor";
+import {
+  useCrosshairColor,
+  useCrosshairSize,
+  useShowNextSegment,
+} from "@/hooks/useCrosshairColor";
+import { Switch } from "@/components/ui/switch";
 import {
   CROSSHAIR_COLORS,
   CROSSHAIR_SIZES,
@@ -439,7 +444,31 @@ function DisplaySection() {
       </section>
 
       <CrosshairColorSetting />
+      <ShowNextSegmentSetting />
     </div>
+  );
+}
+
+/**
+ * The dim "Next" length beside the cursor while tracing. On by default; off
+ * hides only the label, never the preview line (@/lib/traceReadout).
+ */
+function ShowNextSegmentSetting() {
+  const [show, setShow] = useShowNextSegment();
+  return (
+    <section className="flex items-start justify-between gap-4">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-0.5">
+          <label htmlFor="show-next-segment">Show next-segment length</label>
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          While tracing a run, a small label at the cursor gives the length of
+          the segment you are about to click. The run total stays at the top
+          either way.
+        </p>
+      </div>
+      <Switch id="show-next-segment" checked={show} onCheckedChange={setShow} />
+    </section>
   );
 }
 

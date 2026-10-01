@@ -43,12 +43,16 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { CrosshairGuides, type CrosshairHandle } from "./CrosshairGuides";
 import { CROSSHAIR_COLORS, crosshairCursorStyle } from "@/lib/crosshairCursor";
-import { useCrosshairColor, useCrosshairSize } from "@/hooks/useCrosshairColor";
+import {
+  useCrosshairColor,
+  useCrosshairSize,
+  useShowNextSegment,
+} from "@/hooks/useCrosshairColor";
 import { Check, Ruler, TriangleAlert, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { traceReadout } from "@/lib/traceReadout";
 import {
   formatFeetInches,
-  pathRealInches,
   screenToPagePoints,
   type PagePoint,
 } from "@shared/takeoffGeometry";
@@ -57,6 +61,17 @@ import { legSnapLabel, type LegSnap } from "@/lib/legSnap";
 import { stampsInBox } from "@/lib/stampSelection";
 import { projectOntoPath } from "@shared/runNetwork";
 import { JOINED_WITHIN_POINTS } from "@shared/quantityDrops";
+import { addsTracePoint } from "@/lib/traceClick";
+import { pastDragThreshold } from "@/lib/dragThreshold";
+import {
+  insertPoint,
+  isPinned,
+  movePoint,
+  removePoint,
+  samePoints,
+  segmentMidpoints,
+  type PinnedEnds,
+} from "@/lib/runPointEdit";
 
 /**
  * How wide a run's invisible click target is, in SCREEN pixels.
@@ -239,7 +254,19 @@ export function TraceLayer({
   drops,
   onSelectDrop,
   runColors,
+  editableRunId = null,
+  onEditPoints,
+  onPickEnd,
 }: {
+  /**
+   * The run whose points can be dragged (T8, D7a) — the selected one, when
+   * nothing else is armed and the bid is not locked. Null shows no handles.
+   */
+  editableRunId?: number | null;
+  /** A drag, an added point or a removed one, finished: save these points. */
+  onEditPoints?: (runId: number, points: PagePoint[]) => void;
+  /** An end of the selected run clicked (not dragged): show it in Run ends. */
+  onPickEnd?: (runId: number, end: "start" | "end") => void;
   /** Which colour each run type gets on this bid — `takeoffRuns.typeColors`. */
   runColors: RunTypeColors;
   /** Branch legs while tracing (D20). Omitted, "New leg" does not exist. */
@@ -317,6 +344,8 @@ export function TraceLayer({
   chromeTarget?: HTMLElement | null;
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  /** When the last press while tracing landed — see @/lib/traceClick. */
+  const lastTracePress = useRef(Number.NEGATIVE_INFINITY);
   const [crosshairColor] = useCrosshairColor();
   const [crosshairSize] = useCrosshairSize();
   /** Moved directly, never through a render. See CrosshairGuides. */
@@ -353,13 +382,17 @@ export function TraceLayer({
    * zoom — the same idea as the run's hit target. Measured off the overlay's
    * laid-out size, which already includes the zoom transform.
    */
-  const snapReach = useCallback((): number => {
+  const pagePerScreenPx = useCallback((): number => {
     const svg = svgRef.current;
-    if (!svg) return LEG_SNAP_PX;
+    if (!svg) return 1;
     const rect = svg.getBoundingClientRect();
     const devicePerCss = rect.width === 0 ? 1 : width / rect.width;
-    return (LEG_SNAP_PX * devicePerCss) / renderScale;
+    return devicePerCss / renderScale;
   }, [width, renderScale]);
+  const snapReach = useCallback(
+    (): number => LEG_SNAP_PX * pagePerScreenPx(),
+    [pagePerScreenPx]
+  );
 
   const ratio = measurability.ok ? measurability.ratio : null;
 
@@ -484,17 +517,203 @@ export function TraceLayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [box !== null, clientToPage, snapReach, stamps, onBoxSelect]);
 
-  /** Live length of what is being traced, including the rubber-band segment. */
-  const liveInches = useMemo(() => {
-    if (!tracing || ratio === null) return null;
-    const withHover = hover && points.length > 0 ? [...points, hover] : points;
-    return pathRealInches(withHover, ratio);
-  }, [tracing, points, hover, ratio]);
+  /*
+    ── EDITING A RUN'S POINTS (T8, D7a) ────────────────────────────────────────
+    The selected run shows a round handle per point and a faint "+" on each
+    segment. Drag a handle to move it, drag a "+" to add a point there,
+    right-click a handle (or click it, then Delete) to remove it. The line
+    follows the pointer live and saves on release; Escape during a drag puts
+    it back and saves nothing. The rules are @/lib/runPointEdit.
 
-  const committedInches = useMemo(() => {
-    if (ratio === null) return null;
-    return pathRealInches(points, ratio);
-  }, [points, ratio]);
+    A handle's press calls stopPropagation: the viewport pans on a plain
+    left-drag, and a React event raised here bubbles to it (CLAUDE.md § "a
+    comment claiming that SOMETHING ELSE handles it").
+  */
+  type Drag = {
+    runId: number;
+    index: number;
+    /** The points before the drag, with an inserted point already in. */
+    origin: PagePoint[];
+    points: PagePoint[];
+    pinned: PinnedEnds;
+    moved: boolean;
+    /** Started on a "+": the point exists only if the drag goes somewhere. */
+    inserted: boolean;
+    /** Where the press began, on screen — for the drag threshold. */
+    start: { x: number; y: number };
+  };
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const dragRef = useRef(drag);
+  dragRef.current = drag;
+  const [pickedVertex, setPickedVertex] = useState<{
+    runId: number;
+    index: number;
+  } | null>(null);
+  useEffect(() => {
+    setPickedVertex(null);
+    setDrag(null);
+  }, [editableRunId]);
+
+  /*
+    The points just saved, held until the run list catches up. Without it the
+    line jumps back to where it was for the length of the save and then
+    forward again, on the one thing the person is watching. Cleared by ANY
+    change to the list: the page writes the new points into its cache at once,
+    and restores the old ones if the save fails, and both arrive here as a new
+    list.
+  */
+  const [settled, setSettled] = useState<{
+    runId: number;
+    points: PagePoint[];
+  } | null>(null);
+  useEffect(() => setSettled(null), [existingRuns]);
+  /** Where a run's points are drawn: mid-drag, just saved, or as stored. */
+  const pointsNow = (run: ExistingRun): PagePoint[] =>
+    drag && drag.runId === run.id
+      ? drag.points
+      : settled && settled.runId === run.id
+        ? settled.points
+        : run.points;
+  const commitEdit = useCallback(
+    (runId: number, points: PagePoint[]) => {
+      setSettled({ runId, points });
+      onEditPoints?.(runId, points);
+    },
+    [onEditPoints]
+  );
+
+  /** An END let go near a mark lands on it, as tracing does. */
+  const snapEnd = useCallback(
+    (d: Drag, points: PagePoint[]): PagePoint[] => {
+      if (d.index !== 0 && d.index !== points.length - 1) return points;
+      const p = points[d.index];
+      const reach = snapReach();
+      let best: PlacedStamp | null = null;
+      let bestD = reach;
+      for (const s of stamps) {
+        if (s.pending) continue;
+        const dist = Math.hypot(s.x - p.x, s.y - p.y);
+        if (dist <= bestD) {
+          best = s;
+          bestD = dist;
+        }
+      }
+      if (!best) return points;
+      return movePoint(points, d.index, best, d.pinned) ?? points;
+    },
+    [snapReach, stamps]
+  );
+
+  useEffect(() => {
+    if (!drag) return;
+    const move = (e: PointerEvent) => {
+      const page = clientToPage(e.clientX, e.clientY);
+      const d = dragRef.current;
+      if (!page || !d) return;
+      /*
+        A press is a CLICK until the pointer has moved DRAG_THRESHOLD_PX
+        (2026-09-29). It used to become a move on ANY movement, so a click
+        meant to pick a point committed a hair's shift to the run's length.
+      */
+      if (
+        !d.moved &&
+        !pastDragThreshold(d.start, { x: e.clientX, y: e.clientY })
+      )
+        return;
+      const next = movePoint(d.origin, d.index, page, d.pinned);
+      if (next) setDrag({ ...d, points: next, moved: true });
+    };
+    const end = () => {
+      const d = dragRef.current;
+      setDrag(null);
+      if (!d) return;
+      if (!d.moved) {
+        // A press with no movement picks the point, so Delete can remove it.
+        // A "+" pressed and not dragged adds nothing.
+        if (!d.inserted) {
+          setPickedVertex({ runId: d.runId, index: d.index });
+          // An END pressed and let go shows that end in the Run ends section.
+          const last = d.origin.length - 1;
+          if (d.index === 0 || d.index === last)
+            onPickEnd?.(d.runId, d.index === 0 ? "start" : "end");
+        }
+        return;
+      }
+      const final = snapEnd(d, d.points);
+      const run = existingRuns.find(r => r.id === d.runId);
+      if (run && !samePoints(run.points, final)) commitEdit(d.runId, final);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      dragRef.current = null;
+      setDrag(null);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    window.addEventListener("keydown", key, true);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      window.removeEventListener("keydown", key, true);
+    };
+    // Re-bound only when a drag starts or ends, not on every move.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    drag !== null,
+    clientToPage,
+    snapEnd,
+    existingRuns,
+    commitEdit,
+    onPickEnd,
+  ]);
+
+  /** Delete or Backspace removes the picked point; Escape lets go of it. */
+  useEffect(() => {
+    if (!pickedVertex) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable)
+      )
+        return;
+      if (e.key === "Escape") {
+        setPickedVertex(null);
+        return;
+      }
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const run = existingRuns.find(r => r.id === pickedVertex.runId);
+      if (!run) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const next = removePoint(run.points, pickedVertex.index, {
+        start: !!run.startTee,
+        end: !!run.endTee,
+      });
+      setPickedVertex(null);
+      if (next) commitEdit(run.id, next);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [pickedVertex, existingRuns, commitEdit]);
+
+  /**
+   * Run total (clicked points only — the pill) and Next (last point to the
+   * cursor — the label at the cursor). @/lib/traceReadout keeps the cursor
+   * out of the total; its test is what says so.
+   */
+  const readout = useMemo(
+    () => traceReadout(points, tracing ? hover : null, ratio),
+    [tracing, points, hover, ratio]
+  );
+  const [showNext] = useShowNextSegment();
 
   // Escape backs out one vertex at a time, then cancels — the same shape as
   // Escape everywhere else in the app: abandon the smallest thing first.
@@ -638,6 +857,15 @@ export function TraceLayer({
               legs.onNewLeg(at);
               return;
             }
+            // The second press of a double-click lands on or near the point
+            // the first one placed; adding it drew a stub the bend counter
+            // read as an elbow. Judged by distance AND by the time since the
+            // previous press, so a drifting double-click at low zoom is
+            // caught too. @/lib/traceClick.
+            const now = e.timeStamp;
+            const since = now - lastTracePress.current;
+            lastTracePress.current = now;
+            if (!addsTracePoint(points, page, pagePerScreenPx(), since)) return;
             onPointsChange([...points, page]);
             return;
           }
@@ -647,7 +875,8 @@ export function TraceLayer({
         }}
         onDoubleClick={e => {
           // Double-click finishes, which is what every drawing tool does. The
-          // extra point the first click added is already in the path.
+          // first press placed the end point; the second added nothing
+          // (addsTracePoint above).
           if (tracing && canFinish) {
             e.preventDefault();
             onFinish();
@@ -666,7 +895,9 @@ export function TraceLayer({
 
         {/* Runs already traced */}
         {existingRuns.map(run => {
-          const screen = run.points.map(toScreen);
+          // While a point is being dragged the line follows the pointer.
+          const livePoints = pointsNow(run);
+          const screen = livePoints.map(toScreen);
           if (screen.length < 2) return null;
           const isSelected = run.id === selectedRunId;
           /*
@@ -1224,8 +1455,10 @@ export function TraceLayer({
               strokeLinejoin="round"
               strokeLinecap="round"
             />
-            {/* Rubber band to the pointer, so the length updates before the
-                click rather than after it. */}
+            {/* Rubber band to the pointer: where the next click goes. A third
+                of the run's stroke and faint, so it cannot be mistaken for
+                traced run (it was two thirds at 0.75 until 2026-09-29). It
+                stays when the Next label is switched off. */}
             {hover && (
               <line
                 x1={toScreen(points[points.length - 1]).x}
@@ -1233,10 +1466,27 @@ export function TraceLayer({
                 x2={toScreen(hover).x}
                 y2={toScreen(hover).y}
                 stroke={RUN_COLOR[pathType]}
-                strokeWidth={runStroke * (2 / 3)}
+                strokeWidth={runStroke * (1 / 3)}
                 strokeDasharray="6 5"
-                strokeOpacity={0.75}
+                strokeOpacity={0.45}
               />
+            )}
+            {/* "Next": this segment's length alone, at the cursor. Dim and
+                small, because it is a preview; the run total is in the pill.
+                Settings → Display turns it off. */}
+            {hover && showNext && readout.next !== null && (
+              <text
+                x={toScreen(hover).x + runWidthInOverlay(zoom, 14)}
+                y={toScreen(hover).y - runWidthInOverlay(zoom, 10)}
+                fontSize={runWidthInOverlay(zoom, 11)}
+                fill="#94A3B8"
+                stroke="#0b0b0b"
+                strokeWidth={runWidthInOverlay(zoom, 11) * 0.18}
+                paintOrder="stroke"
+                pointerEvents="none"
+              >
+                Next {formatFeetInches(readout.next)}
+              </text>
             )}
             {points.map((point, index) => {
               const screen = toScreen(point);
@@ -1254,6 +1504,132 @@ export function TraceLayer({
             })}
           </>
         )}
+
+        {/* Point handles on the selected run — last, so they sit on top. */}
+        {!tracing &&
+          !stamping &&
+          editableRunId !== null &&
+          onEditPoints &&
+          (() => {
+            const run = existingRuns.find(r => r.id === editableRunId);
+            if (!run || run.points.length < 2) return null;
+            const pts = pointsNow(run);
+            const pinned = { start: !!run.startTee, end: !!run.endTee };
+            const color = runAppearance(runColors, run).color;
+            const r = runWidthInOverlay(zoom, 5);
+            const stroke = runWidthInOverlay(zoom, 1.5);
+            const begin = (
+              e: React.PointerEvent,
+              index: number,
+              origin: PagePoint[],
+              inserted: boolean
+            ) => {
+              if (e.button !== 0) return;
+              e.stopPropagation();
+              e.preventDefault();
+              setPickedVertex(null);
+              setDrag({
+                runId: run.id,
+                index,
+                origin,
+                points: origin,
+                pinned,
+                moved: false,
+                inserted,
+                start: { x: e.clientX, y: e.clientY },
+              });
+            };
+            return (
+              <g className="pointer-events-auto">
+                {!drag &&
+                  segmentMidpoints(run.points).map(({ segment, at }) => {
+                    const s = toScreen(at);
+                    const origin = insertPoint(run.points, segment, at);
+                    if (!origin) return null;
+                    return (
+                      <g
+                        key={`add-${segment}`}
+                        className="cursor-copy"
+                        onPointerDown={e => begin(e, segment + 1, origin, true)}
+                      >
+                        <circle
+                          cx={s.x}
+                          cy={s.y}
+                          r={r * 0.8}
+                          fill="#0b0b0b"
+                          fillOpacity={0.55}
+                          stroke={color}
+                          strokeOpacity={0.6}
+                          strokeWidth={stroke}
+                        />
+                        <path
+                          d={`M${s.x - r * 0.45},${s.y}H${s.x + r * 0.45}M${s.x},${s.y - r * 0.45}V${s.y + r * 0.45}`}
+                          stroke={color}
+                          strokeOpacity={0.8}
+                          strokeWidth={stroke}
+                        />
+                        <title>Drag to add a point here</title>
+                      </g>
+                    );
+                  })}
+                {pts.map((p, index) => {
+                  const s = toScreen(p);
+                  if (isPinned(index, pts.length, pinned))
+                    return (
+                      <rect
+                        key={`pt-${index}`}
+                        x={s.x - r * 0.8}
+                        y={s.y - r * 0.8}
+                        width={r * 1.6}
+                        height={r * 1.6}
+                        fill="#94A3B8"
+                        stroke="#0b0b0b"
+                        strokeWidth={stroke}
+                        className="cursor-pointer"
+                        // Cannot move, but can still be looked up in Run ends.
+                        onPointerDown={e => e.stopPropagation()}
+                        onClick={() =>
+                          onPickEnd?.(run.id, index === 0 ? "start" : "end")
+                        }
+                      >
+                        <title>
+                          This end is on a branch tee, so it stays where the
+                          branch leaves the run.
+                        </title>
+                      </rect>
+                    );
+                  const picked =
+                    pickedVertex?.runId === run.id &&
+                    pickedVertex.index === index;
+                  return (
+                    <circle
+                      key={`pt-${index}`}
+                      cx={s.x}
+                      cy={s.y}
+                      r={r}
+                      fill={picked ? "#F5C518" : "#ffffff"}
+                      stroke={color}
+                      strokeWidth={stroke * 1.4}
+                      className="cursor-move"
+                      onPointerDown={e => begin(e, index, run.points, false)}
+                      onContextMenu={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const next = removePoint(run.points, index, pinned);
+                        if (next) commitEdit(run.id, next);
+                      }}
+                    >
+                      <title>
+                        {run.points.length > 2
+                          ? "Drag to move · right-click (or click, then Delete) to remove"
+                          : "Drag to move · a run needs at least two points"}
+                      </title>
+                    </circle>
+                  );
+                })}
+              </g>
+            );
+          })()}
       </svg>
 
       {withChrome(
@@ -1377,7 +1753,7 @@ export function TraceLayer({
                 {pathType === "conduit" ? "Conduit run" : "Cable run"}
               </span>
               {/*
-                TWO NUMBERS, EACH SAYING WHICH IT IS.
+                ONE NUMBER: THE RUN TOTAL.
 
                 This pill showed the length INCLUDING the rubber-band segment
                 to the cursor, while the Finish button showed only the placed
@@ -1386,10 +1762,12 @@ export function TraceLayer({
                 move the mouse and it changes, and what gets saved is the
                 other one. Reported from bid 23 on 2026-09-21.
 
-                Placed comes first and stays put, because it is the number
-                that will exist after the next click. "To cursor" appears only
-                while there IS a rubber band, so a finished path shows one
-                figure rather than the same figure twice.
+                The 2026-09-21 fix labelled both ("placed" and "to cursor"),
+                but "to cursor" was still the whole path plus the preview, so a
+                stray mouse still made a big number appear. Since 2026-09-29
+                the pill holds only the clicked points, which never move with
+                the mouse, and the preview segment alone is a dim "Next" label
+                at the cursor (@/lib/traceReadout).
               */}
               {/*
                 ── EVERY SLOT IN THIS PILL HAS A FIXED WIDTH ─────────────────
@@ -1406,35 +1784,17 @@ export function TraceLayer({
                 The pill is the same width for the whole run, and nothing in
                 it can push or cover anything else.
               */}
-              <span className="font-mono text-sm tabular-nums inline-block min-w-[9ch] text-right">
-                {committedInches === null
-                  ? "—"
-                  : formatFeetInches(committedInches)}
-              </span>
               <span className="text-[0.7rem] text-muted-foreground">
                 {/* No scale: the path is still worth drawing, and its length
                     is typed in the run panel once it is finished (§ 4c). */}
                 {ratio === null
                   ? "no scale — type the length when finished"
-                  : "placed"}
+                  : "Run total"}
               </span>
-              <span
-                className={cn(
-                  "flex items-center gap-2",
-                  !(
-                    liveInches !== null &&
-                    committedInches !== null &&
-                    Math.abs(liveInches - committedInches) > 0.5
-                  ) && "invisible"
-                )}
-                aria-hidden={liveInches === null}
-              >
-                <span className="font-mono text-sm tabular-nums text-muted-foreground inline-block min-w-[9ch] text-right">
-                  {liveInches === null ? "" : formatFeetInches(liveInches)}
-                </span>
-                <span className="text-[0.7rem] text-muted-foreground">
-                  to cursor
-                </span>
+              <span className="font-mono text-sm tabular-nums inline-block min-w-[9ch] text-right">
+                {readout.runTotal === null
+                  ? "—"
+                  : formatFeetInches(readout.runTotal)}
               </span>
               <span className="text-[0.7rem] text-muted-foreground inline-block min-w-[4.5rem] tabular-nums">
                 {points.length} {points.length === 1 ? "point" : "points"}
@@ -1508,8 +1868,8 @@ export function TraceLayer({
               >
                 <Check className="w-3 h-3" /> Finish
                 <span className="font-mono inline-block min-w-[9ch] text-left">
-                  {committedInches !== null && points.length >= 2
-                    ? formatFeetInches(committedInches)
+                  {readout.runTotal !== null && points.length >= 2
+                    ? formatFeetInches(readout.runTotal)
                     : ""}
                 </span>
               </Button>

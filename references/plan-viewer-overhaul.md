@@ -2147,6 +2147,13 @@ and vertical drags are ignored. One gesture, two behaviours.
 — that behaviour is deliberate and stays. If EITHER axis overflows, apply the
 overlap rule to both.
 
+> **Overridden by the owner, 2026-09-29 — BUILT the same day** (`clampView`,
+> `FIT_SLACK_FRACTION` 0.15 in `client/src/lib/planView.ts`). "Centre
+> both" is what makes the sheet feel stuck from Fit downwards (measured: an
+> 80×60 px drag at Fit moves nothing). The owner wants panning at every zoom.
+> The per-VIEW decision stays; a sheet that fits gets a small, measured slack
+> instead of a forced centre. See `references/track-b-panning-plan.md`.
+
 **Why, and this is the part worth keeping:** the code's own comment justifies
 the centring with _"a sheet small enough to see whole is not one anybody is
 repositioning"_. That reasoning is true when the whole sheet fits and false in
@@ -2512,6 +2519,21 @@ marker nagging toward the bid breaks that promise on the screen where it was
 made.
 
 #### OVERRIDE 3 — a sent bid can be LOCKED, and then nothing follows the drawing
+
+> **Narrowed 2026-09-29 (owner: "a locked bid must not change").** As built
+> below, the lock froze the bid's numbers while the drawing behind them could
+> still gain marks, runs, legs, typed lengths, pull points and circuits
+> (`takeoffStampsRouter` said placing stayed allowed "on purpose"). Now the
+> drawing is frozen too: every one of those is refused with "This bid's
+> quantities are locked, so … Unlock them on the bid first."
+> (`shared/quantityLock.ts` `lockedEditRefusal`, `server/lockedEdits.test.ts`).
+> **Widened the same evening, by the owner's answers to that plan's
+> questions 1, 3 and 4:** a locked bid also refuses Send to bid (the count
+> send and the run-type send, through one check, `server/lockGuard.ts` —
+> reversing "a count sent to a locked bid arrives frozen"), setting, clearing
+> or auto-applying a sheet's scale, removing a plan set, and removing a bid
+> line that came from the plans. A hand-typed line stays removable.
+> `server/lockedPlans.test.ts`.
 
 **Decided and built 2026-09-24. This amends D2(a) a second time, and it amends
 OVERRIDE 2's own sentence — "after that the count is live for ever" — which was
@@ -4268,6 +4290,11 @@ the screen around it, and drop it first if Phase 5 runs long.
 
 **Dragging a vertex stays last and is cuttable.** Undo-and-re-click already
 works. If it competes with anything in Phases 5–8, it loses.
+
+> **Moved forward and BUILT 2026-09-29:** the owner asked for it with 5–8
+> built. Drag a point, drag a "+" to add one, right-click or Delete to
+> remove one; refused on a locked bid; undoable. `takeoffRuns.setPoints`,
+> `client/src/lib/runPointEdit.ts`, plan Part 1.
 
 **NEVER CALIBRATE OFF THE GRAPHIC SCALE BAR.** Decided 2026-09-18, and this one
 is filed here because it is the single most likely thing in this document to be

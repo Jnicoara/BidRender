@@ -57,12 +57,20 @@ export function StampPicker({
   onPick,
   onCountPlain,
   disabled,
+  onRefused,
 }: {
   assemblies: PickableAssembly[];
   onPick: (assembly: PickableAssembly) => void;
   /** Count something the library does not have — level 1. See the header. */
   onCountPlain: (label: string) => void;
   disabled?: boolean;
+  /**
+   * Set when counting is not allowed right now (a locked bid): opening the
+   * picker calls this instead, which says why. Refusing at the BUTTON rather
+   * than after a pick, because a pick makes the count before anything asks
+   * whether it may be marked — found on screen, 2026-09-29.
+   */
+  onRefused?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -90,6 +98,10 @@ export function StampPicker({
     <Popover
       open={open}
       onOpenChange={next => {
+        if (next && onRefused) {
+          onRefused();
+          return;
+        }
         setOpen(next);
         // Cleared on close so reopening does not present a stale query as if it
         // were the current filter.

@@ -125,6 +125,91 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
       least off the main thread. The scale test's budgets are the alarm; do
       not loosen them to get past it.
 
+### Before beta: price an unpriced line right where it blocks you
+
+- [ ] **Owner, 2026-09-30.** When a bid has unpriced lines, "For your quote
+      app" refuses to show figures ("This bid has lines without a price. Price
+      them on the bid…", `QuoteAppPanel.tsx` `Blocked`). The bid page's
+      amber strip ("N lines are not priced", `BidsPage.tsx` ~1324) explains
+      but offers no box. The owner also named a "Price this before sending"
+      panel; **no screen carries that text today** (searched `track-b` and
+      `origin/local-dev`, 2026-09-30), so it is either the `Blocked` panel
+      under another name or a step still to be built. Ask which before
+      building. Wanted:
+  - Next to **each** unpriced line, in both places, a price box. Typing a
+    price unblocks the bid as soon as no line is left unpriced.
+  - **Saved on this bid only by default**, with a tick box "Also save to my
+    catalog". Ticked, it writes the company's own material row (a FORK if the
+    row is a shipped one; never a price typed onto a baseline row, CLAUDE.md
+    § "Where a priced catalog lands").
+  - **Never $0 and never blank as an answer.** An empty or invalid box
+    leaves the line "Not priced"; it does not commit a zero (CLAUDE.md
+    § Editing fields rule 6, and `commitNullableEdit` in placeholder mode).
+    A typed 0 on a hand-priced line stays a real answer, as today
+    (`shared/lineNotPriced.ts`).
+  - The line then says **"priced on this bid"**, so nobody mistakes it for a
+    catalog price.
+  - **"Not priced" on the bid page links to the same box** — one component
+    (one `LineCost`-style seam), not a second copy of the field.
+  - **Needs a MIGRATION — Track A.** A hand-priced line already stores a
+    typed price, so for those it needs none. But a line from a run type or
+    an assembly carries only the snapshot, and **a snapshot must never be
+    mutated** (CLAUDE.md § Data model). "Priced on this bid" needs its own
+    nullable column on `bid_line_items` (e.g. `bidUnitCost`, no default, NULL =
+    not priced here), read by `lineNotPriced` AND its SQL copy
+    `lineNotPricedSql` in `server/db.ts` together. Additive, so it is step 1
+    of the three-step deploy (migrate first). Two edges to decide in the
+    spec: an unpriced PART inside an otherwise-priced assembly line
+    (`snapshotUnpricedParts`) has no line to put a box on, and a line whose
+    LABOR is unpriced wants hours, not a price.
+
+### Before beta: the Plans screen at phone width — side panels become tabs
+
+> **Replanned 2026-09-30:** not drawers any more. The owner chose tabs for the
+> right-hand panel, with the phone showing the same tabs as one full-screen
+> panel. See `references/track-b-phone-and-readability-plan.md`.
+
+- [ ] **Owner, 2026-09-29: its own piece, later, before beta.** At a 390 px
+      window the sheet list (240 px) and the counts panel (a fixed 400 px, its
+      own `shrink-0`) do not fit beside the drawing: measured, the counts panel
+      starts at x=276 and runs 286 px off screen, taking its card buttons
+      (undo, trash, "Add a drop") with it. Fix is structural, not a row that
+      wraps: at phone width both panels become drawers pulled over the
+      drawing, one at a time. Touch panning and pinch belong to the same piece
+      — and with them the guard that a finger landing to pan must not place a
+      mark or a point (place on TAP, on touch only). See
+      `references/track-b-panning-plan.md` § 3, guard 3.
+- [ ] **Owner, 2026-09-29: a readability pass on the Plans right-hand panel,
+      before beta, alongside the phone layout above.** Counted items, the Plan
+      reader, the Legend and the totals are too small and too muted to read at
+      a glance. Wanted: bigger text, stronger contrast, warnings that stand out
+      from ordinary rows (amber that reads as amber, not as another grey), and
+      less scrolling to reach the totals. Do it with the drawer work, since
+      both reshape the same panel — and look at it at the size it ships, at
+      UI scale 1.0 and on a laptop screen, before calling it done.
+      **Planned 2026-09-30, with the phone layout above:**
+      `references/track-b-phone-and-readability-plan.md` (owner answered all
+      six the same day; the panel becomes tabs; nothing built yet).
+
+### Before beta: speed of the summary, and two missing Undos
+
+- [ ] **Owner, 2026-09-30: measure the whole-plan-set summary on a 500-sheet
+      set.** `takeoffSummary.forBid` runs `takeoffGroups.list` and
+      `takeoffRunTypes.bridgeForBid` for the whole bid on every refresh, and
+      `sendAll` rebuilds it again before sending. It has only been looked at on
+      a scratch bid with 7 items. Time it (server ms and the panel's first
+      paint) on a real 500-sheet set with marks and runs spread across it, and
+      write the numbers next to the code. No number is claimed here yet.
+- [ ] **Owner, 2026-09-30: Undo for removing a circuit.** The delete rules
+      (bf88f5c) put Undo in every toast, but removing a circuit from a traced
+      run still has none: `removeCircuit` in `TakeoffPage.tsx` shows only an
+      error toast and refreshes.
+- [ ] **Owner, 2026-09-30: Undo for removing a bid line.** Same gap on the
+      bid: `bids.removeLine` in `BidsPage.tsx` and `QuickBidPage.tsx` drops the
+      line optimistically and offers no way back. A line carries frozen
+      snapshot prices, so Undo must restore the row, not re-add it at today's
+      prices.
+
 ### Flaky tests — fix in a batch before beta
 
 Both are timing, not wrong answers, and both touch the shared test database.
