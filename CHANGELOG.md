@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-30]
 
+- **A captured symbol links itself to the assembly with the same name.**
+  Capture a symbol named exactly like one of your assemblies (capitals and
+  spacing aside) and it is linked to that assembly straight away, so one
+  click on it in the Legend starts counting. Nothing is guessed: a name that
+  is only similar stays unlinked, an assembly you pick yourself always wins,
+  and a symbol you captured before is never relinked.
 - **Right-click works in the symbol name boxes again.** The plan viewer
   blocks the right-click menu over the drawing (a right-drag moves the
   sheet), and that also blocked it in the "Name this symbol" box and the

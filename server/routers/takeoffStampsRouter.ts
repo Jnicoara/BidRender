@@ -511,22 +511,40 @@ export const takeoffStampsRouter = router({
           alreadyKnown: true,
           assemblyId: updated?.assemblyId ?? null,
           isLinked: (updated?.assemblyId ?? null) !== null,
+          autoLinked: false,
         };
+      }
+
+      // A NEW symbol named exactly like an assembly in the library is linked
+      // to it (2026-09-30): the job scripts/readerTestAssemblies.mts did by
+      // hand after every capture. Exact name only, compared the way symbols
+      // are keyed, so nothing is guessed; an assembly the caller chose always
+      // wins; and an EXISTING symbol is never relinked (the branch above).
+      let assemblyId = input.assemblyId;
+      let autoLinked = false;
+      if (assemblyId === null) {
+        const library = await db.getLibraryAssemblies(ctx.scope.dataUserId);
+        const same = library.find(a => symbolLookupKey(a.name) === lookupKey);
+        if (same) {
+          assemblyId = same.id;
+          autoLinked = true;
+        }
       }
 
       const id = await db.createSymbolLink({
         userId: ctx.scope.dataUserId,
         label: input.label,
         lookupKey,
-        assemblyId: input.assemblyId,
+        assemblyId,
         thumbnail: input.thumbnail,
         capturedFromSheetId: input.capturedFromSheetId ?? null,
       });
       return {
         id,
         alreadyKnown: false,
-        assemblyId: input.assemblyId,
-        isLinked: input.assemblyId !== null,
+        assemblyId,
+        isLinked: assemblyId !== null,
+        autoLinked,
       };
     }),
 

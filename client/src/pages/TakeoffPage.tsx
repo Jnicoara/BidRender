@@ -6864,7 +6864,13 @@ export default function TakeoffPage({
                                 toast.success(
                                   r.alreadyKnown
                                     ? "Already in your legend."
-                                    : "Captured — click it to choose an assembly."
+                                    : r.autoLinked
+                                      ? `Captured and linked to “${
+                                          allAssemblies.find(
+                                            a => a.id === r.assemblyId
+                                          )?.name ?? label
+                                        }”, the assembly of the same name.`
+                                      : "Captured — click it to choose an assembly."
                                 ),
                             }
                           );
@@ -6917,6 +6923,7 @@ export default function TakeoffPage({
                         onCancel={() => setLegendDraft(null)}
                         onSave={async picked => {
                           let saved = 0;
+                          let linked = 0;
                           const failed: string[] = [];
                           for (let i = 0; i < picked.length; i++) {
                             const row = picked[i];
@@ -6924,12 +6931,13 @@ export default function TakeoffPage({
                               `Saving ${i + 1} of ${picked.length}…`
                             );
                             try {
-                              await captureLegendSymbol.mutateAsync({
+                              const r = await captureLegendSymbol.mutateAsync({
                                 label: row.name,
                                 thumbnail: row.picture,
                                 capturedFromSheetId: legendDraft.sheetId,
                               });
                               saved++;
+                              if (r.autoLinked) linked++;
                             } catch {
                               failed.push(row.name);
                             }
@@ -6939,7 +6947,10 @@ export default function TakeoffPage({
                           void utils.takeoffStamps.symbols.invalidate();
                           if (saved > 0) {
                             toast.success(
-                              `Saved ${saved} symbol${saved === 1 ? "" : "s"} to your legend.`
+                              `Saved ${saved} symbol${saved === 1 ? "" : "s"} to your legend` +
+                                (linked > 0
+                                  ? `; ${linked} linked to the assembly of the same name.`
+                                  : ".")
                             );
                           }
                           if (failed.length > 0) {

@@ -793,6 +793,67 @@ describe.skipIf(!hasDb)("linking a legend symbol to an assembly", () => {
     return list[0];
   }
 
+  describe("auto-link by exact name (2026-09-30)", () => {
+    // Assemblies outlive each test here, and the router refuses a second
+    // assembly of one name — so every test uses its own.
+    const makeAssembly = async (name: string) => {
+      const made = await caller().assemblies.create({
+        name,
+        category: "Devices",
+        baseLaborHours: 0,
+      });
+      if (!made) throw new Error(`assembly "${name}" was not created`);
+      return made;
+    };
+
+    it("links a new symbol to the assembly of the same name", async () => {
+      const { sheetId } = await scenario();
+      const assembly = await makeAssembly("Auto Link One");
+      const captured = await caller().takeoffStamps.captureSymbol({
+        label: "AUTO  link one", // case and spacing, as symbols are keyed
+        capturedFromSheetId: sheetId,
+      });
+      expect(captured.isLinked).toBe(true);
+      expect(captured.autoLinked).toBe(true);
+      expect(captured.assemblyId).toBe(assembly.id);
+      const rows = await caller().takeoffStamps.symbols();
+      expect(rows.find(r => r.label === "AUTO  link one")?.assemblyId).toBe(
+        assembly.id
+      );
+    });
+
+    it("guesses nothing: a near name stays unlinked", async () => {
+      await makeAssembly("Auto Link Two");
+      const captured = await caller().takeoffStamps.captureSymbol({
+        label: "Auto Link Twos",
+      });
+      expect(captured.isLinked).toBe(false);
+      expect(captured.autoLinked).toBe(false);
+    });
+
+    it("lets an assembly the caller chose win over the name", async () => {
+      await makeAssembly("Auto Link Three");
+      const chosen = await makeAssembly("Auto Link Three Chosen");
+      const captured = await caller().takeoffStamps.captureSymbol({
+        label: "Auto Link Three",
+        assemblyId: chosen.id,
+      });
+      expect(captured.assemblyId).toBe(chosen.id);
+      expect(captured.autoLinked).toBe(false);
+    });
+
+    it("never relinks a symbol that already exists", async () => {
+      // Captured before any assembly had its name: unlinked, and it stays so.
+      await caller().takeoffStamps.captureSymbol({ label: "Auto Link Four" });
+      await makeAssembly("Auto Link Four");
+      const again = await caller().takeoffStamps.captureSymbol({
+        label: "Auto Link Four",
+      });
+      expect(again.alreadyKnown).toBe(true);
+      expect(again.isLinked).toBe(false);
+    });
+  });
+
   it("captures an unlinked symbol on first sight", async () => {
     const { sheetId } = await scenario();
     const captured = await caller().takeoffStamps.captureSymbol({
