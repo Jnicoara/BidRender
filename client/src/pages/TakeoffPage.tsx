@@ -319,6 +319,11 @@ import {
   type CaptureRegion,
 } from "@/components/takeoff/SymbolCapture";
 import {
+  LegendCaptureForm,
+  readWholeLegend,
+  type WholeLegend,
+} from "@/components/takeoff/LegendCapture";
+import {
   allLayersOn,
   filterByLayers,
   layersPresent,
@@ -2345,6 +2350,19 @@ export default function TakeoffPage({
     null
   );
   const [capturingSymbol, setCapturingSymbol] = useState(false);
+  /** "Whole legend" is picked up: the next drag is one box around a legend. */
+  const [capturingLegend, setCapturingLegend] = useState(false);
+  /**
+   * The legend being read or reviewed. `state` is null while reading, then
+   * the reading. `sheetId` is the sheet it was boxed on, recorded with each
+   * symbol saved, as single Capture records it.
+   */
+  const [legendDraft, setLegendDraft] = useState<{
+    state: WholeLegend | null;
+    sheetId: number | undefined;
+  } | null>(null);
+  /** "Saving 3 of 47" while Save all runs. */
+  const [legendSaving, setLegendSaving] = useState<string | null>(null);
   /**
    * "Copy text" is picked up. ONE tool at a time, and it is kept that way in
    * two places rather than by a comment: picking this up puts the others down
@@ -2359,6 +2377,7 @@ export default function TakeoffPage({
     // so putting the count down here cannot strand a click.
     setArmedGroup(null);
     setCapturingSymbol(false);
+    setCapturingLegend(false);
     setCalibrating(false);
     setSelectingText(true);
   }, []);
@@ -3591,6 +3610,13 @@ export default function TakeoffPage({
     onError: e => toast.error(e.message),
     onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
   });
+  /**
+   * The same procedure for "Capture whole legend", without the per-call
+   * refresh and error toast: Save all refreshes the legend once at the end and
+   * names every row that failed in one message, rather than 47 refetches and
+   * a toast per row.
+   */
+  const captureLegendSymbol = trpc.takeoffStamps.captureSymbol.useMutation();
   const linkSymbol = trpc.takeoffStamps.linkSymbol.useMutation({
     onError: e => toast.error(e.message),
     onSuccess: r =>
@@ -6672,7 +6698,9 @@ export default function TakeoffPage({
                       !tracing &&
                       !calibrating &&
                       !capturingSymbol &&
-                      !pendingCapture && (
+                      !pendingCapture &&
+                      !capturingLegend &&
+                      !legendDraft && (
                         <TextSelectLayer
                           width={size.width}
                           height={size.height}
@@ -6757,6 +6785,84 @@ export default function TakeoffPage({
                             }
                           );
                           setPendingCapture(null);
+                        }}
+                      />
+                    )}
+                    {capturingLegend && (
+                      <SymbolCaptureLayer
+                        width={size.width}
+                        height={size.height}
+                        renderScale={size.renderScale}
+                        onCancel={() => setCapturingLegend(false)}
+                        onRegion={(region: CaptureRegion) => {
+                          setCapturingLegend(false);
+                          const sheetId = activeSheet?.id;
+                          setLegendDraft({ state: null, sheetId });
+                          readWholeLegend({
+                            box: region,
+                            renderRegion: size.renderRegion,
+                            loadTextLayer: size.loadTextLayer,
+                            library: allAssemblies.map(a => a.name),
+                            captured: symbols.map(s => s.label),
+                          }).then(
+                            state =>
+                              setLegendDraft(current =>
+                                current ? { ...current, state } : current
+                              ),
+                            error => {
+                              setLegendDraft(null);
+                              toast.error(
+                                `The legend could not be read: ${
+                                  error instanceof Error
+                                    ? error.message
+                                    : String(error)
+                                }`
+                              );
+                            }
+                          );
+                        }}
+                      />
+                    )}
+                    {legendDraft && (
+                      <LegendCaptureForm
+                        state={legendDraft.state}
+                        library={allAssemblies.map(a => a.name)}
+                        captured={symbols.map(s => s.label)}
+                        chromeTarget={size.chromeTarget}
+                        saving={legendSaving}
+                        onCancel={() => setLegendDraft(null)}
+                        onSave={async picked => {
+                          let saved = 0;
+                          const failed: string[] = [];
+                          for (let i = 0; i < picked.length; i++) {
+                            const row = picked[i];
+                            setLegendSaving(
+                              `Saving ${i + 1} of ${picked.length}…`
+                            );
+                            try {
+                              await captureLegendSymbol.mutateAsync({
+                                label: row.name,
+                                thumbnail: row.picture,
+                                capturedFromSheetId: legendDraft.sheetId,
+                              });
+                              saved++;
+                            } catch {
+                              failed.push(row.name);
+                            }
+                          }
+                          setLegendSaving(null);
+                          setLegendDraft(null);
+                          void utils.takeoffStamps.symbols.invalidate();
+                          if (saved > 0) {
+                            toast.success(
+                              `Saved ${saved} symbol${saved === 1 ? "" : "s"} to your legend.`
+                            );
+                          }
+                          if (failed.length > 0) {
+                            toast.error(
+                              `${failed.length} could not be saved: ${failed.join(", ")}`
+                            );
+                          }
                         }}
                       />
                     )}
@@ -7193,9 +7299,18 @@ export default function TakeoffPage({
                     capturing={capturingSymbol}
                     onStartCapture={() => {
                       setSelectingText(false);
+                      setCapturingLegend(false);
                       setCapturingSymbol(true);
                     }}
                     onCancelCapture={() => setCapturingSymbol(false)}
+                    capturingLegend={capturingLegend}
+                    onStartLegend={() => {
+                      setSelectingText(false);
+                      setCapturingSymbol(false);
+                      setPendingCapture(null);
+                      setCapturingLegend(true);
+                    }}
+                    onCancelLegend={() => setCapturingLegend(false)}
                     onLink={(symbolId, assemblyId) =>
                       linkSymbol.mutate({ id: symbolId, assemblyId })
                     }

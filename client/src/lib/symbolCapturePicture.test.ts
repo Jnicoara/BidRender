@@ -14,9 +14,11 @@ import { describe, it, expect } from "vitest";
 import {
   CAPTURE_MAX_EDGE,
   CAPTURE_MIN_PIXELS_PER_INCH,
+  LEGEND_MAX_PIXELS,
   SYMBOL_THUMBNAIL_MAX_CHARS,
   captureRenderScale,
   capturePixelSize,
+  legendRenderScale,
   normaliseCaptureBox,
 } from "@shared/symbolCapture";
 import { sharpRenderScale } from "@/lib/planView";
@@ -81,6 +83,28 @@ describe("captureRenderScale", () => {
     expect(captureRenderScale(junctionBox, Number.NaN) * 72).toBeCloseTo(
       CAPTURE_MIN_PIXELS_PER_INCH
     );
+  });
+});
+
+describe("legendRenderScale", () => {
+  it("renders Weld 1's whole legend at the full 400 px per inch", () => {
+    const weld = { x: 1215, y: 120, width: 510, height: 975 };
+    expect(legendRenderScale(weld) * 72).toBeCloseTo(
+      CAPTURE_MIN_PIXELS_PER_INCH
+    );
+  });
+
+  it("keeps a big box inside the pixel budget instead of failing", () => {
+    // UNCC E001's two-column schedule, 1,270 x 1,520 pt.
+    const uncc = { x: 130, y: 100, width: 1270, height: 1520 };
+    const s = legendRenderScale(uncc);
+    expect(1270 * s * 1520 * s).toBeLessThanOrEqual(LEGEND_MAX_PIXELS + 1);
+    // Still sharper than the viewer's backdrop (1.5x) by a wide margin.
+    expect(s).toBeGreaterThan(2.5);
+  });
+
+  it("is 0 for a box with no area", () => {
+    expect(legendRenderScale({ x: 0, y: 0, width: 0, height: 50 })).toBe(0);
   });
 });
 

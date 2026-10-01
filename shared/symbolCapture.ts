@@ -85,6 +85,26 @@ export function captureRenderScale(
   return Math.min(wanted, CAPTURE_MAX_EDGE / longest);
 }
 
+/**
+ * The most pixels "Capture whole legend" renders its box at, in one go.
+ *
+ * The whole box is drawn ONCE and every symbol is cut from it, because
+ * rendering each of 48 symbols separately redraws the page 48 times — tens of
+ * seconds on a dense sheet. 16 MP holds Weld 1's legend (510 x 975 pt) at the
+ * full 400 px per inch; a bigger box gets less, never below what fits.
+ */
+export const LEGEND_MAX_PIXELS = 16_000_000;
+
+/** The scale to render a whole-legend box at: the floor, or what fits. */
+export function legendRenderScale(box: CaptureBox): number {
+  const { width, height } = normaliseCaptureBox(box);
+  if (!(width > 0 && height > 0)) return 0;
+  return Math.min(
+    CAPTURE_MIN_PIXELS_PER_INCH / POINTS_PER_INCH,
+    Math.sqrt(LEGEND_MAX_PIXELS / (width * height))
+  );
+}
+
 /** The pixel size a box comes out at for a given render scale. */
 export function capturePixelSize(
   box: CaptureBox,

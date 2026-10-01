@@ -30,6 +30,7 @@ import { selectOnFocus } from "@/lib/selectOnFocus";
 import { crosshairCursorStyle } from "@/lib/crosshairCursor";
 import { useCrosshairColor, useCrosshairSize } from "@/hooks/useCrosshairColor";
 import {
+  CAPTURE_MAX_EDGE,
   SYMBOL_THUMBNAIL_MAX_CHARS,
   captureRenderScale,
   capturePixelSize,
@@ -70,24 +71,50 @@ export async function renderSharpCapture(
 
   const { bitmap } = await renderRegion(box, scale);
   try {
-    const out = document.createElement("canvas");
-    let width = bitmap.width;
-    let height = bitmap.height;
-    for (let attempt = 0; attempt < 8; attempt++) {
-      out.width = width;
-      out.height = height;
-      const ctx = out.getContext("2d");
-      if (!ctx) return null;
-      ctx.drawImage(bitmap, 0, 0, width, height);
-      const url = out.toDataURL("image/png");
-      if (url.length <= SYMBOL_THUMBNAIL_MAX_CHARS) return url;
-      width = Math.max(1, Math.round(width * 0.8));
-      height = Math.max(1, Math.round(height * 0.8));
-    }
-    return null;
+    return encodeCapture(bitmap, 0, 0, bitmap.width, bitmap.height);
   } finally {
     bitmap.close();
   }
+}
+
+/**
+ * A region of an already-rendered image as the PNG data URL a symbol is
+ * stored with: no longer than CAPTURE_MAX_EDGE on its long side, and stepped
+ * down 20% at a time until it fits SYMBOL_THUMBNAIL_MAX_CHARS rather than
+ * failing the save. Single capture and "Capture whole legend" both encode
+ * here, so the two cannot store pictures by different rules.
+ */
+export function encodeCapture(
+  source: CanvasImageSource,
+  sx: number,
+  sy: number,
+  sw: number,
+  sh: number
+): string | null {
+  if (!(sw >= 1 && sh >= 1)) return null;
+  const fit = Math.min(1, CAPTURE_MAX_EDGE / Math.max(sw, sh));
+  let width = Math.max(1, Math.round(sw * fit));
+  let height = Math.max(1, Math.round(sh * fit));
+  const out = document.createElement("canvas");
+  for (let attempt = 0; attempt < 8; attempt++) {
+    out.width = width;
+    out.height = height;
+    const ctx = out.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(source, sx, sy, sw, sh, 0, 0, width, height);
+    let url: string;
+    try {
+      url = out.toDataURL("image/png");
+    } catch {
+      return null;
+    }
+    if (url.length <= SYMBOL_THUMBNAIL_MAX_CHARS) return url;
+    width = Math.max(1, Math.round(width * 0.8));
+    height = Math.max(1, Math.round(height * 0.8));
+  }
+  return null;
 }
 
 /**
