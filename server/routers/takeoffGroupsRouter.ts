@@ -45,6 +45,7 @@ import { lockedEditRefusal } from "../../shared/quantityLock";
 import { DISTRIBUTION_KIND } from "../../shared/takeoffHeights";
 import { resolveRunType } from "../../shared/runTypeLookup";
 import { symbolCountsOn } from "../../shared/takeoffCounts";
+import { mayShareAssembly } from "../../shared/assemblyCounts";
 import { whipFeetOf } from "../../shared/branchWire";
 import {
   countsWaitingToSend,
@@ -358,17 +359,25 @@ export const takeoffGroupsRouter = router({
   /**
    * The group for one library assembly on one bid — found, or made.
    *
-   * Idempotent on purpose, and keyed on the ASSEMBLY rather than on its name:
-   * arming the stamp tool twice in one session must not produce two rows that
-   * split one count in half. A rename in the library afterwards leaves this
-   * group's label as it was, which is the same snapshot rule every other part
-   * of a takeoff follows.
+   * Idempotent on purpose: arming the stamp tool twice in one session must
+   * not produce two rows that split one count in half. A rename in the
+   * library afterwards leaves this group's label as it was, which is the same
+   * snapshot rule every other part of a takeoff follows.
+   *
+   * Keyed on the assembly AND, when a legend symbol was clicked, the symbol
+   * (track-b-count-pin-styles-plan.md § 11.2): several captured items linked
+   * to one assembly each get their own count. With no symbol and several
+   * counts of the assembly, this REFUSES (CONFLICT) rather than guess, and
+   * the picker asks which — unless `ifSeveral: "first"`, which only the
+   * recovered click queue passes, because nobody is there to answer.
    */
   forAssembly: procedure
     .input(
       z.object({
         bidId: z.number().int().positive(),
         assemblyId: z.number().int().positive(),
+        symbolId: z.number().int().positive().optional(),
+        ifSeveral: z.enum(["ask", "first"]).default("ask"),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -383,8 +392,16 @@ export const takeoffGroupsRouter = router({
           message: "Assembly not found.",
         });
 
+      // A symbol linked to some OTHER assembly says nothing about this one.
+      const symbol = input.symbolId
+        ? await db.getSymbolLinkById(input.symbolId, ctx.scope.dataUserId)
+        : undefined;
+
       // Shared with the plan reader's Place, so both reach the same count.
-      return groupForAssembly(input.bidId, ctx.scope.dataUserId, assembly);
+      return groupForAssembly(input.bidId, ctx.scope.dataUserId, assembly, {
+        symbol: symbol?.assemblyId === assembly.id ? symbol : null,
+        ifSeveral: input.ifSeveral,
+      });
     }),
 
   /** Change what a count is called. Every mark follows, because none holds it. */
@@ -419,8 +436,12 @@ export const takeoffGroupsRouter = router({
    *   snapshot is never rewritten, so linking now would leave the line and
    *   the count saying different things;
    * - an assembly this bid already counts under another name, because two
-   *   counts of one assembly split one number in half (`forAssembly` is
-   *   keyed on the assembly for the same reason).
+   *   counts of one assembly split one number in half. NARROWED 2026-10-01
+   *   (track-b-count-pin-styles-plan.md § 11.2.5): a count that is a captured
+   *   legend item may join an assembly another ITEM already counts — two
+   *   items sharing one assembly are two quantities, not one split in half.
+   *   Two plain-named counts of one assembly are still refused
+   *   (`mayShareAssembly`, shared/assemblyCounts.ts).
    */
   setSource: procedure
     .input(
@@ -458,9 +479,16 @@ export const takeoffGroupsRouter = router({
           code: "NOT_FOUND",
           message: "Assembly not found.",
         });
-      const clash = (await db.getGroupsForBid(group.bidId, userId)).find(
+      const others = (await db.getGroupsForBid(group.bidId, userId)).filter(
         other => other.id !== group.id && other.assemblyId === assembly.id
       );
+      const clash = mayShareAssembly(
+        group,
+        others,
+        await db.getSymbolLinks(userId)
+      )
+        ? undefined
+        : others[0];
       if (clash)
         throw new TRPCError({
           code: "CONFLICT",

@@ -28,10 +28,14 @@
  * OUT to an untransformed layer (`chromeTarget`), because chrome that scales
  * with the drawing is three pixels tall at 20% and off-screen at 400%.
  */
+import type { PinStyle } from "@shared/pinLetters";
 import {
+  LETTER_MIN_PX,
+  letterFit,
   markAppearance,
   markPath,
   markRadiusInOverlay,
+  markScreenDiameter,
   markStrokeInOverlay,
   runAppearance,
   runStrokeInOverlay,
@@ -256,10 +260,16 @@ export function TraceLayer({
   drops,
   onSelectDrop,
   runColors,
+  pins,
   editableRunId = null,
   onEditPoints,
   onPickEnd,
 }: {
+  /**
+   * Each count's letter and first-use colour on this bid (shared/pinLetters).
+   * The panel's swatches read the same map, so a card and its pins agree.
+   */
+  pins?: ReadonlyMap<number, PinStyle>;
   /**
    * The run whose points can be dragged (T8, D7a) — the selected one, when
    * nothing else is armed and the bid is not locked. Null shows no handles.
@@ -1086,7 +1096,10 @@ export function TraceLayer({
         {stamps.map(placed => {
           const at = toScreen({ x: placed.x, y: placed.y });
           const isSelected = !placed.pending && selectedStampIds.has(placed.id);
-          const { shape, color } = markAppearance(placed);
+          const { shape, color, letter } = markAppearance(placed, pins);
+          // Below the size a letter can be read at, shape + colour remain.
+          const showLetter =
+            letter !== null && markScreenDiameter(zoom) >= LETTER_MIN_PX;
           /*
             Sized in screen pixels and expressed in overlay units, because this
             overlay is inside the zoom transform. Selection adds a fifth on top
@@ -1129,9 +1142,36 @@ export function TraceLayer({
                 The centre dot is what makes a mark point at something. Kept at
                 a fixed fraction of the shape so it stays a dot rather than
                 becoming a filled shape at one zoom and vanishing at another.
+
+                Where the pin is big enough, the count's LETTER takes the dot's
+                place (shared/pinLetters.ts): it points just as well, and it
+                says which count this is on a print or to a colour-blind eye.
+                Dark text over a pale halo, so it reads on white paper and on
+                black linework alike.
               */}
-              <circle cx={at.x} cy={at.y} r={r * 0.28} fill={color} />
-              <title>{placed.name}</title>
+              {showLetter ? (
+                <text
+                  x={at.x}
+                  y={at.y + letterFit(shape, r, letter).dy}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={letterFit(shape, r, letter).size}
+                  fontWeight={700}
+                  fontFamily="ui-sans-serif, system-ui, sans-serif"
+                  fill="#0b0b0b"
+                  stroke="#ffffff"
+                  strokeWidth={stroke * 0.9}
+                  paintOrder="stroke"
+                  pointerEvents="none"
+                >
+                  {letter}
+                </text>
+              ) : (
+                <circle cx={at.x} cy={at.y} r={r * 0.28} fill={color} />
+              )}
+              <title>
+                {letter ? `${letter} — ${placed.name}` : placed.name}
+              </title>
             </g>
           );
         })}

@@ -135,7 +135,10 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
       end" hint). But the snap in `client/src/lib/legSnap.ts`, called from
       `TraceLayer.tsx`, COPIES a mark's position into the run's points, so
       a misplaced mark becomes a wrong length the moment someone traces to
-      it. - **Why it matters:** on staging's E-100 (2026-09-29) the reader's
+      it. **So does `snapEnd` in `TraceLayer.tsx`** (dragging a run END onto
+      a mark), and that one keeps no stamp id; found 2026-10-01. Both are
+      the subject of `references/connect-point-plan.md`, which proposes
+      "never snap to an unconfirmed AI mark" as part of the same change. - **Why it matters:** on staging's E-100 (2026-09-29) the reader's
       positions were up to about 2.4 in of paper off, about 10 ft at
       1/4" = 1'-0". A run traced to that mark carries the error into the
       wire and conduit footage, with nothing on screen to say so. - **Today an AI mark is an ordinary stamp row,** and nothing marks it as
@@ -1757,7 +1760,7 @@ path is ever revived, give it the same treatment first.
       Track C's `todo.md` on `track-c`. B's style editor waits for the nine
       columns, and the status looks (§ 7) wait for the status column.
 - [ ] **Track A (migration, optional): `symbol_links.originalLabel
-    varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
+  varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
       (Track B) WITHOUT a column: `label` is the new name and `lookupKey` keeps
       the captured name's key, which is what matching uses. The one loss is
       capitals — "Reset to original" gives "linear type", not "LINEAR TYPE",

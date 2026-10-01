@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planLoadState } from "./planLoadState";
+import { drawingNextSheet, marksMayShow, planLoadState } from "./planLoadState";
 
 describe("what the viewer shows while a plan opens", () => {
   it("says it is opening while the file loads", () => {
@@ -19,5 +19,26 @@ describe("what the viewer shows while a plan opens", () => {
     expect(
       planLoadState({ documentLoading: false, drawn: true, page: 3 }).show
     ).toBe("sheet");
+  });
+});
+
+describe("marks wait for their own sheet", () => {
+  it("are not drawn before any sheet is on the canvas", () => {
+    expect(marksMayShow({ drawnPage: null, page: 1 })).toBe(false);
+  });
+
+  it("are not drawn over the PREVIOUS sheet while the next one draws", () => {
+    // The fault: sheet 2's pins over sheet 1's raster for ~0.7 s.
+    expect(marksMayShow({ drawnPage: 1, page: 2 })).toBe(false);
+    expect(drawingNextSheet({ drawnPage: 1, page: 2 })).toBe(true);
+  });
+
+  it("are drawn once the canvas holds this sheet", () => {
+    expect(marksMayShow({ drawnPage: 2, page: 2 })).toBe(true);
+    expect(drawingNextSheet({ drawnPage: 2, page: 2 })).toBe(false);
+  });
+
+  it("the first sheet uses the full panel, not the bar", () => {
+    expect(drawingNextSheet({ drawnPage: null, page: 1 })).toBe(false);
   });
 });

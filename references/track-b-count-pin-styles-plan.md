@@ -397,7 +397,40 @@ already asks for, so it is one handoff, not two.**
 
 ## 11. Several captured items on ONE assembly (added 2026-10-01)
 
-> **PLAN ONLY.** From the owner's request the same day: three different
+> **BUILT 2026-10-01 (Track B), v1 with no migration** — was "plan only".
+> What shipped, and where it differs from the text below:
+>
+> - **§ 11.2** — `chooseAssemblyCount` (`shared/assemblyCounts.ts`), applied
+>   by `server/assemblyGroup.ts`; `forAssembly` takes `symbolId` and
+>   `ifSeveral`. **Two rules added beyond the plan:** (a) a symbol that is the
+>   ONLY one linked to its assembly keeps using the one count the bid already
+>   has of it, so a bid counted before the fix is not split into two cards for
+>   one item; (b) a plain count already named for the symbol (counted before it
+>   was linked) is linked to the assembly on the next click, every mark kept,
+>   rather than a second card under the same name — unless it is already on the
+>   bid, when the clicks go to it as it is. The plan reader's Place passes the
+>   symbol; a finding WITHOUT one takes the first count (`ifSeveral: "first"`),
+>   as recovered click queues do, rather than failing the Place.
+> - **§ 11.2.5** — `setSource` narrowed via `mayShareAssembly`; the router's
+>   doc comment says so too.
+> - **§ 11.4 / §§ 3, 5 (step 1 subset)** — `shared/pinLetters.ts`: letters per
+>   BID (tag → the item's name → the assembly's name → first letter), bumped
+>   in first-use order, never onto a table code; colours in first-use order.
+>   Shapes are unchanged (§ 2's family map is still decision 2). Chosen
+>   letters/colours wait for Track A's style columns. Letters draw at a pin
+>   size of 14 px and up (`LETTER_MIN_PX` — a judgement, step 0 still owes the
+>   measurement); in a triangle (lighting) the letter is small.
+> - **Tag letters amended as `count-by-tag-plan.md` § 3 proposed**: a trailing
+>   `(…)` tag first, then a leading one with a digit, up to 4 characters, the
+>   hyphen dropped (`A-7` → `A7`). A repeated tag bumps with a dot (`A7.2`).
+> - **§ 11.5** — no change needed: lines are already per count; tested that
+>   22 + 3 totals the same as 25 and that R3 does not fire.
+> - **§ 11.6** — `@/lib/countAgain`; the key is **R** (F, G, T and Ctrl+Z/Y
+>   were taken).
+> - **§ 11.3's link-time warning** was not built: the fix shipped first.
+> - **§ 11.7 v2** (`takeoff_groups.symbolLookupKey`) is still Track A's.
+>
+> From the owner's request the same day: three different
 > lights linked to the same assembly come out with identical pins. Builds on
 > §§ 3, 5, 6 above and on `references/count-by-tag-plan.md` (which hits the
 > same fault from the tag side — its § 5 now points here).

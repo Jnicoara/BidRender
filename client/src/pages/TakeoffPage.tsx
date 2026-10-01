@@ -79,7 +79,15 @@ import {
   Undo2,
   PanelRight,
   TriangleAlert,
+  RotateCcw,
 } from "lucide-react";
+import { pinStylesForBid } from "@shared/pinLetters";
+import {
+  countAgainOffer,
+  loadLastCount,
+  saveLastCount,
+  type LastCount,
+} from "@/lib/countAgain";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -98,7 +106,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { sheetClearQuestion } from "@/lib/sheetClearQuestion";
-import { planLoadState } from "@/lib/planLoadState";
+import {
+  drawingNextSheet,
+  marksMayShow,
+  planLoadState,
+} from "@/lib/planLoadState";
 import {
   endUploadTiming,
   markUpload,
@@ -1369,6 +1381,9 @@ function PlanPane({
   const [pageCount, setPageCount] = useState(doc.pageCount ?? 0);
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
+  /** The page whose raster is on the canvas, or null before the first. */
+  const [drawnPage, setDrawnPage] = useState<number | null>(null);
+  const marksShow = marksMayShow({ drawnPage, page });
   /** Opening → drawing sheet N → the sheet. @/lib/planLoadState. */
   const loadState = planLoadState({
     documentLoading: loading,
@@ -1524,6 +1539,9 @@ function PlanPane({
         canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
         endUploadTiming(`sheet ${page} drawn`);
         setCanvasSize({ width: bitmap.width, height: bitmap.height });
+        // Which sheet the canvas now holds — the marks wait for this
+        // (@/lib/planLoadState, `marksMayShow`).
+        setDrawnPage(page);
         // The scale this canvas was ACTUALLY drawn at, kept beside the canvas
         // it describes. Anything that converts between canvas pixels and page
         // points reads this, never RENDER_SCALE.
@@ -1954,6 +1972,20 @@ function PlanPane({
             </p>
           </div>
         )}
+        {/*
+          The "PDF loading bar" (track-b-plans-screen-edits-plan.md § 1): a
+          thin pulsing bar while the NEXT sheet draws over the last one, whose
+          marks are already hidden. No percentage — a page render reports no
+          progress, so a filling bar would be invented. A fade, never a slide
+          (CLAUDE.md § Responsiveness rule 4).
+        */}
+        {drawingNextSheet({ drawnPage, page }) && (
+          <div
+            role="status"
+            aria-label={`Drawing sheet ${page}`}
+            className="absolute top-0 inset-x-0 z-10 h-0.5 bg-[#F5C518] animate-pulse pointer-events-none"
+          />
+        )}
         {loading ? null : (
           /*
             ONE transform, wrapping the page and the overlay together.
@@ -2052,7 +2084,13 @@ function PlanPane({
                   }}
                 />
               )}
+              {/*
+                Only over THIS sheet's raster. A size alone was the old gate,
+                and after the first sheet there always is one — so on a sheet
+                change the new marks hung over the last sheet's drawing.
+              */}
               {canvasSize.width > 0 &&
+                marksShow &&
                 overlay?.({
                   ...canvasSize,
                   zoom: view.zoom,
@@ -2537,11 +2575,21 @@ export default function TakeoffPage({
     label: string;
     /** Null for a plain count. Kept for the legend panel's active-row mark. */
     assemblyId: number | null;
+    /**
+     * The legend symbol it was picked up from, if any — so the legend marks
+     * THAT row, not every symbol sharing the assembly (§ 11 of the pin plan).
+     */
+    symbolId?: number | null;
     /** The sheet it was picked up on. */
     sheetKey: SheetKey;
   } | null>(null);
   /** Put the count down (null). Picking one up goes through `armGroup`. */
   const setArmedGroup = setArmedGroupHeld;
+  /** The last count picked up on this bid — what "Count again" offers. */
+  const [lastCount, setLastCount] = useState<LastCount | null>(() =>
+    loadLastCount(bidId)
+  );
+  useEffect(() => setLastCount(loadLastCount(bidId)), [bidId]);
   /**
    * The marks selected for deleting — one by click, more by Shift-click or
    * Shift-drag. The rules are in @/lib/stampSelection, where a test reaches
@@ -3860,7 +3908,11 @@ export default function TakeoffPage({
 
   /** Pick the tool up. One function, so both doors leave the same state. */
   const armGroup = useCallback(
-    (group: { id: number; label: string }, assemblyId: number | null) => {
+    (
+      group: { id: number; label: string },
+      assemblyId: number | null,
+      symbolId: number | null = null
+    ) => {
       /*
         A locked bid takes no new marks (the server refuses them too). Said
         HERE, on picking the tool up, rather than on the first click: a click
@@ -3880,13 +3932,18 @@ export default function TakeoffPage({
         groupId: group.id,
         label: group.label,
         assemblyId,
+        symbolId,
         // The sheet on screen now. Picked up on the way to another sheet
         // (the request was slow), it is down on arrival — which is right.
         sheetKey: sheetKeyNow.current,
       });
+      // What "Count again" offers back once this is put down (@/lib/countAgain).
+      const last = { groupId: group.id, label: group.label };
+      setLastCount(last);
+      saveLastCount(bidId, last);
       toast.success(`Counting ${group.label} — click to place.`);
     },
-    [quantitiesLocked]
+    [quantitiesLocked, bidId]
   );
   /** A mark delete as an undo step: the packet puts them back, same ids. */
   const pushMarksDeleted = (
@@ -4840,13 +4897,21 @@ export default function TakeoffPage({
     // Older shape. The assembly is the honest reading of what was counted; a
     // queue with only a name becomes a plain count under that name, reusing
     // one if the bid already has it rather than making a second.
-    const groupFor = (first: Stored): Promise<{ id: number }> =>
+    //
+    // An assembly the bid now counts as several items (one per legend symbol,
+    // shared/assemblyCounts.ts) has nobody here to say which: these take the
+    // FIRST, and the toast says so rather than opening a chooser.
+    let tookFirstOfSeveral = false;
+    const groupFor = (
+      first: Stored
+    ): Promise<{ id: number; firstOfSeveral?: boolean }> =>
       typeof first.groupId === "number" && first.groupId > 0
         ? Promise.resolve({ id: first.groupId })
         : typeof first.assemblyId === "number" && first.assemblyId > 0
           ? groupForAssembly.mutateAsync({
               bidId: queued.bidId,
               assemblyId: first.assemblyId,
+              ifSeveral: "first",
             })
           : createGroup.mutateAsync({
               bidId: queued.bidId,
@@ -4860,6 +4925,7 @@ export default function TakeoffPage({
       try {
         for (const part of parts) {
           const group = await groupFor(part[0]);
+          if (group.firstOfSeveral) tookFirstOfSeveral = true;
           await dropStamps.mutateAsync({
             bidId: queued.bidId,
             sheetId,
@@ -4881,10 +4947,62 @@ export default function TakeoffPage({
       }
       if (recovered > 0)
         toast.success(
-          `Recovered ${recovered} mark${recovered === 1 ? "" : "s"} from your last session.`
+          `Recovered ${recovered} mark${recovered === 1 ? "" : "s"} from your last session.` +
+            (tookFirstOfSeveral
+              ? " Some were for an assembly this bid counts as several items, and went to the first of them — check its card."
+              : "")
         );
     })();
   }, [activeSheet?.id]);
+
+  /**
+   * Every count's pin letter and colour on this BID (shared/pinLetters.ts) —
+   * bid-wide, not this sheet's, so a count wears one letter on every sheet.
+   * Read by the drawing and the panel from this one map, so a card's swatch
+   * and its pins cannot disagree. It follows `takeoffGroups.list`, which every
+   * count change already refreshes.
+   */
+  const pinStyles = useMemo(() => {
+    const names = new Map(allAssemblies.map(a => [a.id, a.name] as const));
+    return pinStylesForBid(
+      (bidCounts.data?.groups ?? []).map(g => ({
+        id: g.id,
+        label: g.label,
+        assemblyName:
+          g.assemblyId === null ? null : (names.get(g.assemblyId) ?? null),
+      }))
+    );
+  }, [bidCounts.data?.groups, allAssemblies]);
+
+  /**
+   * R re-arms the last count ("Count again", @/lib/countAgain). Only while
+   * nothing is in hand — the chip is not on screen otherwise — and never
+   * while typing.
+   */
+  const countAgain = countAgainOffer(
+    lastCount,
+    bidCounts.data?.groups,
+    armedGroup !== null || tracing
+  );
+  useEffect(() => {
+    if (!activeSheet || !countAgain) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "r" && e.key !== "R") return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.isContentEditable)
+      )
+        return;
+      e.preventDefault();
+      armGroup(countAgain, countAgain.assemblyId);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeSheet, countAgain, armGroup]);
 
   /**
    * T picks "Copy text" up or puts it down. Not while tracing — the button
@@ -6854,38 +6972,71 @@ export default function TakeoffPage({
           ) : (
             activeSheet &&
             !tracing && (
-              <StampPicker
-                assemblies={allAssemblies.map(a => ({
-                  id: a.id,
-                  name: a.name,
-                  category: a.category ?? null,
-                }))}
-                disabled={allAssemblies.length === 0}
-                onRefused={
-                  quantitiesLocked
-                    ? () =>
-                        toast.error(
-                          lockedEditRefusal("new marks cannot be placed")
-                        )
-                    : undefined
-                }
-                onPick={assembly => {
-                  groupForAssembly
-                    .mutateAsync({ bidId, assemblyId: assembly.id })
-                    .then(group => armGroup(group, assembly.id))
-                    .catch(() => {
-                      /* the mutation's onError has already said so */
-                    });
-                }}
-                onCountPlain={label => {
-                  createGroup
-                    .mutateAsync({ bidId, label })
-                    .then(group => armGroup(group, null))
-                    .catch(() => {
-                      /* a duplicate name is refused by name, and said so */
-                    });
-                }}
-              />
+              <>
+                <StampPicker
+                  assemblies={allAssemblies.map(a => ({
+                    id: a.id,
+                    name: a.name,
+                    category: a.category ?? null,
+                  }))}
+                  disabled={allAssemblies.length === 0}
+                  onRefused={
+                    quantitiesLocked
+                      ? () =>
+                          toast.error(
+                            lockedEditRefusal("new marks cannot be placed")
+                          )
+                      : undefined
+                  }
+                  /*
+                  Several items sharing one assembly each have their own count
+                  (shared/assemblyCounts.ts), and the picker has no symbol to
+                  say which — so it asks, from the counts this bid already has.
+                */
+                  countsOf={assemblyId =>
+                    (bidCounts.data?.groups ?? []).filter(
+                      g => g.assemblyId === assemblyId
+                    )
+                  }
+                  onPickCount={(count, assemblyId) =>
+                    armGroup(count, assemblyId)
+                  }
+                  onPick={assembly => {
+                    groupForAssembly
+                      .mutateAsync({ bidId, assemblyId: assembly.id })
+                      .then(group => armGroup(group, assembly.id))
+                      .catch(() => {
+                        /* the mutation's onError has already said so */
+                      });
+                  }}
+                  onCountPlain={label => {
+                    createGroup
+                      .mutateAsync({ bidId, label })
+                      .then(group => armGroup(group, null))
+                      .catch(() => {
+                        /* a duplicate name is refused by name, and said so */
+                      });
+                  }}
+                />
+                {/*
+                COUNT AGAIN (pin plan § 11.6). A sheet change puts the count
+                down; this puts the last one back in one click, on the sheet
+                the person now means. Never by itself.
+              */}
+                {countAgain && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1.5 text-xs max-w-[12rem]"
+                    onClick={() => armGroup(countAgain, countAgain.assemblyId)}
+                    title={`Count ${countAgain.label} again (R)`}
+                    aria-label={`Count ${countAgain.label} again`}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Again: {countAgain.label}</span>
+                  </Button>
+                )}
+              </>
             )
           )}
 
@@ -7660,7 +7811,10 @@ export default function TakeoffPage({
                                             a => a.id === r.assemblyId
                                           )?.name ?? label
                                         }”, the assembly of the same name.`
-                                      : "Captured — click it to choose an assembly."
+                                      : // A click on it COUNTS (legend plan
+                                        // § 8a); linking is the row's own
+                                        // control, never the first step.
+                                        "Captured — click it in the legend to start counting. Link it to an assembly from its row whenever you like."
                                 ),
                             }
                           );
@@ -7769,6 +7923,7 @@ export default function TakeoffPage({
                       onPointsChange={setTracePoints}
                       existingRuns={drawnRuns}
                       runColors={runColors}
+                      pins={pinStyles}
                       drops={dropMarkers}
                       onSelectDrop={drop => {
                         // Open the trace's leg in the panel, with this drop
@@ -7970,6 +8125,7 @@ export default function TakeoffPage({
           >
             <RunsPanel
               runColors={runColors}
+              pins={pinStyles}
               hideOtherRuns={hideOtherRuns}
               onToggleHideOtherRuns={() => setHideOtherRuns(on => !on)}
               onAddLeg={run => {
@@ -8274,6 +8430,7 @@ export default function TakeoffPage({
                       category: a.category,
                     }))}
                     activeAssemblyId={armedGroup?.assemblyId ?? null}
+                    activeSymbolId={armedGroup?.symbolId ?? null}
                     capturing={capturingSymbol}
                     onStartCapture={() => {
                       // The box is a drag on the drawing; a count still in
@@ -8313,9 +8470,19 @@ export default function TakeoffPage({
                         a => a.id === symbol.assemblyId
                       );
                       if (!assembly) return;
+                      // The symbol goes too: several symbols sharing one
+                      // assembly each count into their own count (§ 11.2).
                       groupForAssembly
-                        .mutateAsync({ bidId, assemblyId: assembly.id })
-                        .then(group => armGroup(group, assembly.id))
+                        .mutateAsync({
+                          bidId,
+                          assemblyId: assembly.id,
+                          symbolId: symbol.id,
+                        })
+                        .then(group => {
+                          armGroup(group, assembly.id, symbol.id);
+                          // It may have made a count, or linked a plain one.
+                          void utils.takeoffGroups.list.invalidate({ bidId });
+                        })
                         .catch(() => {
                           /* the mutation's onError has already said so */
                         });
@@ -8342,7 +8509,7 @@ export default function TakeoffPage({
                           symbolId: symbol.id,
                         })
                         .then(group => {
-                          armGroup(group, null);
+                          armGroup(group, null, symbol.id);
                           void utils.takeoffGroups.list.invalidate({ bidId });
                         })
                         .catch(() => {

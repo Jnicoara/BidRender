@@ -62,6 +62,7 @@ export function LegendPanel({
   symbols,
   assemblies,
   activeAssemblyId,
+  activeSymbolId = null,
   capturing,
   onStartCapture,
   onCancelCapture,
@@ -81,6 +82,11 @@ export function LegendPanel({
   assemblies: PickableAssembly[];
   /** Which assembly the stamp tool currently holds, so the list can show it. */
   activeAssemblyId: number | null;
+  /**
+   * The symbol it was picked up from, when it was. Marks that row alone:
+   * several symbols can share one assembly, each with its own count.
+   */
+  activeSymbolId?: number | null;
   /** True while the user is dragging a box over the legend. */
   capturing: boolean;
   onStartCapture: () => void;
@@ -183,9 +189,10 @@ export function LegendPanel({
               key={symbol.id}
               className={cn(
                 "group flex items-center gap-2 px-3 py-1.5 border-t border-border/50 transition-colors cursor-pointer hover:bg-muted/40",
-                symbol.assemblyId !== null &&
-                  symbol.assemblyId === activeAssemblyId &&
-                  "bg-[#F5C518]/10"
+                (activeSymbolId !== null
+                  ? symbol.id === activeSymbolId
+                  : symbol.assemblyId !== null &&
+                    symbol.assemblyId === activeAssemblyId) && "bg-[#F5C518]/10"
               )}
               title={
                 symbol.isLinked
@@ -327,8 +334,9 @@ export function LegendPanel({
           </p>
           <p className="text-xs text-muted-foreground">
             From then on, clicking this symbol counts that assembly — on this
-            job and every job after it. A count you already made by name stays
-            as it is; link it from its card.
+            job and every job after it, under this symbol&rsquo;s own name. A
+            count you already made under its name joins that assembly on the
+            next click, every mark kept — unless it is already on the bid.
           </p>
           <AssemblySearchList
             assemblies={assemblies}

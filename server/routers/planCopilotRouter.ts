@@ -686,37 +686,63 @@ export const planCopilotRouter = router({
       // and counted on no bid line. A finding whose assembly cannot be found
       // is now refused rather than placed outside a count.
       type Target = { groupId: number; label: string; category: string | null };
-      const targets = new Map<number, Target | null>();
+      //
+      // Keyed by assembly AND legend symbol (2026-10-01, track-b-count-pin-
+      // styles-plan.md § 11.2.4): two symbols linked to one assembly are two
+      // items, each with its own count. Until then this passed no symbol and
+      // every finding of the assembly merged into the first count.
+      const targets = new Map<string, Target | string>();
       const placing: { row: (typeof placeable)[number]; target: Target }[] = [];
+      const missing =
+        "its assembly is no longer in your library, so there is nothing to count it as.";
       for (const row of placeable) {
         // `acceptable` already refused a finding with no assembly; this is the
         // same check restated so the type carries it rather than a `!`.
         if (row.assemblyId === null) continue;
-        if (!targets.has(row.assemblyId)) {
+        const key = `${row.assemblyId}:${row.symbolLinkId ?? "-"}`;
+        if (!targets.has(key)) {
           const assembly = await db.getAssemblyById(
             row.assemblyId,
             ctx.scope.dataUserId
           );
+          const symbol =
+            row.symbolLinkId !== null
+              ? await db.getSymbolLinkById(
+                  row.symbolLinkId,
+                  ctx.scope.dataUserId
+                )
+              : undefined;
           if (!assembly) {
-            targets.set(row.assemblyId, null);
+            targets.set(key, missing);
           } else {
-            const group = await groupForAssembly(
-              run.bidId,
-              ctx.scope.dataUserId,
-              assembly
-            );
-            targets.set(row.assemblyId, {
-              groupId: group.id,
-              label: group.label,
-              category: assembly.category ?? null,
-            });
+            try {
+              const group = await groupForAssembly(
+                run.bidId,
+                ctx.scope.dataUserId,
+                assembly,
+                {
+                  symbol: symbol?.assemblyId === assembly.id ? symbol : null,
+                  // No symbol means nobody can say which item; Place keeps
+                  // the old answer (the first count) rather than failing.
+                  ifSeveral: "first",
+                }
+              );
+              targets.set(key, {
+                groupId: group.id,
+                label: group.label,
+                category: assembly.category ?? null,
+              });
+            } catch (e) {
+              targets.set(
+                key,
+                e instanceof TRPCError ? e.message : "it could not be counted."
+              );
+            }
           }
         }
-        const target = targets.get(row.assemblyId) ?? null;
-        if (target === null) {
-          refusals.push(
-            `${row.rawLabel}: its assembly is no longer in your library, so there is nothing to count it as.`
-          );
+        const target = targets.get(key) ?? missing;
+        if (typeof target === "string") {
+          refusals.push(`${row.rawLabel}: ${target}`);
           continue;
         }
         placing.push({ row, target });

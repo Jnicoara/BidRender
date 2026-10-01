@@ -312,9 +312,18 @@ runIf("no writes without confirmation", () => {
     expect(result.placed).toBe(2);
     const stamps = await getStampsForSheet(s.sheetId, USER);
     expect(stamps).toHaveLength(2);
+    // Counted as the symbol's assembly, in the SYMBOL's own count — named for
+    // the symbol since 2026-10-01, when Place began passing the symbol so two
+    // symbols sharing one assembly stop merging (pin plan § 11.2.4). Before
+    // that the count wore the assembly's name; the assembly is what this
+    // assertion was always about.
+    expect(stamps.map(st => st.assemblyId)).toEqual([
+      s.recepAssemblyId,
+      s.recepAssemblyId,
+    ]);
     expect(stamps.map(st => st.assemblyName)).toEqual([
-      s.recepAssemblyName,
-      s.recepAssemblyName,
+      "Duplex receptacle",
+      "Duplex receptacle",
     ]);
     // The position survives the round trip, so the mark lands where the model
     // said it saw it — a stamp somewhere else is unverifiable against the plan.

@@ -10,7 +10,8 @@
  * Circuit rows follow CLAUDE.md § Editing fields via InlineNumberField —
  * conductor counts are exactly the sort of number someone types down a column.
  */
-import { markAppearance, markPath } from "@shared/takeoffMarks";
+import { letterFit, markAppearance, markPath } from "@shared/takeoffMarks";
+import type { PinStyle } from "@shared/pinLetters";
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
   AssemblySearchList,
@@ -74,6 +75,66 @@ function CardUndo({
   );
 }
 /**
+ * The swatch IS the legend. It draws the same shape, colour and letter as the
+ * marks on the drawing, from the same function and the same per-bid map — a
+ * panel that showed a yellow circle for every count would be worse than no
+ * swatch at all, because it would assert a sameness the drawing contradicts.
+ * One component for the live card and the emptied one, so they cannot drift.
+ *
+ * Fixed at 20px rather than clamped: this one is on the screen, not on the
+ * paper, so it has no zoom to fight.
+ */
+function CountSwatch({
+  groupId,
+  assemblyId,
+  assemblyCategory,
+  pins,
+  className,
+}: {
+  groupId: number | null;
+  assemblyId: number | null;
+  assemblyCategory: string | null;
+  pins?: ReadonlyMap<number, PinStyle>;
+  className?: string;
+}) {
+  const { shape, color, letter } = markAppearance(
+    { groupId, assemblyId, assemblyCategory },
+    pins
+  );
+  return (
+    <svg
+      width={20}
+      height={20}
+      viewBox="0 0 20 20"
+      className={cn("shrink-0", className)}
+      aria-hidden="true"
+    >
+      <path
+        d={markPath(shape, 10, 10, 8)}
+        fill={color}
+        fillOpacity={0.22}
+        stroke={color}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      {letter && (
+        <text
+          x={10}
+          y={10 + letterFit(shape, 8, letter).dy}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={letterFit(shape, 8, letter).size}
+          fontWeight={700}
+          className="fill-foreground"
+        >
+          {letter}
+        </text>
+      )}
+    </svg>
+  );
+}
+
+/**
  * A count card whose last mark on this sheet was just deleted. Same swatch,
  * same name and same undo arrow as the live card, in the same place, so the
  * way back is where the delete was (@/lib/emptiedCountCard). It goes as soon
@@ -81,37 +142,25 @@ function CardUndo({
  */
 function EmptiedCountRow({
   card,
+  pins,
   cardUndo,
   onCardUndo,
 }: {
   card: EmptiedCountCard;
+  pins?: ReadonlyMap<number, PinStyle>;
   cardUndo?: (subject: UndoSubject) => { label: string } | null;
   onCardUndo?: () => void;
 }) {
-  const { shape, color } = markAppearance({
-    groupId: card.groupId,
-    assemblyId: card.assemblyId,
-    assemblyCategory: card.assemblyCategory,
-  });
   return (
     <div className="border-b border-border px-3 py-2 bg-muted/30">
       <div className="flex items-center gap-2">
-        <svg
-          width={20}
-          height={20}
-          viewBox="0 0 20 20"
-          className="shrink-0 opacity-50"
-          aria-hidden="true"
-        >
-          <path
-            d={markPath(shape, 10, 10, 8)}
-            fill={color}
-            fillOpacity={0.22}
-            stroke={color}
-            strokeWidth={2}
-            strokeLinejoin="round"
-          />
-        </svg>
+        <CountSwatch
+          groupId={card.groupId}
+          assemblyId={card.assemblyId}
+          assemblyCategory={card.assemblyCategory}
+          pins={pins}
+          className="opacity-50"
+        />
         <div className="flex-1 min-w-0">
           <p className="text-sm truncate text-muted-foreground">{card.label}</p>
           <p className="text-xs text-muted-foreground">
@@ -1141,10 +1190,16 @@ export function RunsPanel({
   pullPointBusy = false,
   onAddLeg,
   runColors,
+  pins,
   hideOtherRuns,
   onToggleHideOtherRuns,
 }: {
   runs: PanelRun[];
+  /**
+   * Each count's letter and first-use colour on this bid — the SAME map the
+   * drawing reads (shared/pinLetters.ts), so a card's swatch is its pins.
+   */
+  pins?: ReadonlyMap<number, PinStyle>;
   /** Which colour each run type gets on this bid — `takeoffRuns.typeColors`. */
   runColors: RunTypeColors;
   /**
@@ -1530,6 +1585,7 @@ export function RunsPanel({
               {emptiedAt === cardIndex && emptiedCount && (
                 <EmptiedCountRow
                   card={emptiedCount}
+                  pins={pins}
                   cardUndo={cardUndo}
                   onCardUndo={onCardUndo}
                 />
@@ -1539,42 +1595,13 @@ export function RunsPanel({
                 className="border-b border-border px-3 py-2 hover:bg-muted/40 transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  {/*
-                The swatch IS the legend. It draws the same shape in the same
-                colour as the marks on the drawing, from the same function —
-                a panel that showed a yellow circle for every count would be
-                worse than no swatch at all, because it would assert a sameness
-                that the drawing contradicts.
-
-                Fixed at 20px here rather than clamped: this one is on the
-                screen, not on the paper, so it has no zoom to fight.
-              */}
-                  {(() => {
-                    const { shape, color } = markAppearance({
-                      groupId: group.groupId,
-                      assemblyId: group.assemblyId,
-                      assemblyCategory:
-                        group.stamps[0]?.assemblyCategory ?? null,
-                    });
-                    return (
-                      <svg
-                        width={20}
-                        height={20}
-                        viewBox="0 0 20 20"
-                        className="shrink-0"
-                        aria-hidden="true"
-                      >
-                        <path
-                          d={markPath(shape, 10, 10, 8)}
-                          fill={color}
-                          fillOpacity={0.22}
-                          stroke={color}
-                          strokeWidth={2}
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    );
-                  })()}
+                  {/* The swatch IS the legend — see CountSwatch. */}
+                  <CountSwatch
+                    groupId={group.groupId}
+                    assemblyId={group.assemblyId}
+                    assemblyCategory={group.stamps[0]?.assemblyCategory ?? null}
+                    pins={pins}
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate">{group.name}</p>
                     <p className="text-xs">{group.count} placed</p>
@@ -1778,6 +1805,7 @@ export function RunsPanel({
           emptiedCount && (
             <EmptiedCountRow
               card={emptiedCount}
+              pins={pins}
               cardUndo={cardUndo}
               onCardUndo={onCardUndo}
             />
