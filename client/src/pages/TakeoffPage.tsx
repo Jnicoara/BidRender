@@ -118,6 +118,7 @@ import {
   type PlanView,
   type ViewBounds,
 } from "@/lib/planView";
+import { wantsNativeMenu } from "@/lib/nativeMenu";
 import { SheetIndex } from "@/components/takeoff/SheetIndex";
 import {
   PDF_WHOLE_DOWNLOAD_LIMIT_BYTES,
@@ -1152,6 +1153,9 @@ function PlanPane({
     const vp = viewportRef.current;
     if (!vp) return;
     const onDown = (e: PointerEvent) => {
+      // A text box on the viewer's screen layer is not the drawing: pressing
+      // in it never pans (see wantsNativeMenu).
+      if (wantsNativeMenu(e.target)) return;
       const wants =
         e.button === 2 ||
         e.button === 1 ||
@@ -1166,8 +1170,15 @@ function PlanPane({
      * A right-click that opens a context menu over the drawing is never what
      * was wanted here, and suppressing it only after a drag has begun still
      * flashes the menu on a click that does not move.
+     *
+     * Except in a text box. Until 2026-09-30 this also swallowed the menu on
+     * the "Name this symbol" and whole-legend name boxes, which sit inside the
+     * viewport, so their spelling suggestions could not be reached.
      */
-    const onMenu = (e: MouseEvent) => e.preventDefault();
+    const onMenu = (e: MouseEvent) => {
+      if (wantsNativeMenu(e.target)) return;
+      e.preventDefault();
+    };
     vp.addEventListener("pointerdown", onDown, true);
     vp.addEventListener("contextmenu", onMenu);
     return () => {

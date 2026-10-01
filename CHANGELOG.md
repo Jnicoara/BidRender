@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-30]
 
+- **Right-click works in the symbol name boxes again.** The plan viewer
+  blocks the right-click menu over the drawing (a right-drag moves the
+  sheet), and that also blocked it in the "Name this symbol" box and the
+  whole-legend name boxes, which sit on top of the drawing. So the browser's
+  spelling suggestions could not be reached. Text boxes now get the normal
+  menu; right-click on the drawing works as before.
 - **Capture a whole legend in one go.** In the Legend panel, "Whole legend"
   lets you draw one box around a plan's symbol legend. The app reads each
   symbol's name from the drawing's own text (no AI), cuts a sharp picture of
