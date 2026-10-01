@@ -29,6 +29,31 @@ left as written rather than rewritten to match the rename.
 
 ## Pending / Future
 
+### WRONG-NUMBER RISK: a run snaps onto a misplaced AI mark — fix after the reader accuracy test
+
+- [ ] **Tracing snaps a run end onto a nearby mark's spot (`legSnap.ts`). An
+      AI mark placed in the wrong spot makes the run length wrong. Decide: no
+      snap to unconfirmed AI marks, or a visible warning.** Owner, 2026-09-30.
+      - **Found by asking whether any length or drop reads AI mark
+        positions.** The calculations do not: run length comes from the run's
+        own traced points, and drop length from heights
+        (`shared/groupDrops.ts` uses position only for the "sits near a run
+        end" hint). But the snap in `client/src/lib/legSnap.ts`, called from
+        `TraceLayer.tsx`, COPIES a mark's position into the run's points, so
+        a misplaced mark becomes a wrong length the moment someone traces to
+        it.
+      - **Why it matters:** on staging's E-100 (2026-09-29) the reader's
+        positions were up to about 2.4 in of paper off, about 10 ft at
+        1/4" = 1'-0". A run traced to that mark carries the error into the
+        wire and conduit footage, with nothing on screen to say so.
+      - **Today an AI mark is an ordinary stamp row,** and nothing marks it as
+        AI-placed. Either fix needs that signal first: `plan_copilot_findings`
+        holds `stampId` for every confirmed finding, so it can be derived
+        without a migration. Check that before adding a column.
+      - **Order:** after the accuracy test (`references/legend-reading-plan.md`
+        § 0 B, branch a-plans-reader), which measures position error. If
+        positions come back good, a warning may be enough; if not, no snap.
+
 ### The whole catalog goes to the browser, and grows with it
 
 - [ ] **`materials.list` is unpaged and search runs on the main thread.**
