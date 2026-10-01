@@ -46,29 +46,30 @@ So:
 
 ### R.2 The list, in order
 
-| #                         | File                                | Adds                                                                                                                                                             | Kind                                               | Was         |
-| ------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------- |
-| 0096                      | `0096_tee_body_role`                | `'teeBody'` appended to `bid_line_items.runMaterialRole`                                                                                                         | additive                                           | written     |
-| 0097                      | `0097_password_reset`               | table `password_reset_tokens`; `users.sessionsValidAfter` (NULL)                                                                                                 | additive                                           | written     |
-| 0098                      | `0098_signup_invites`               | table `signup_invites` (invite gate plan § 7: `codeHash` unique, `email`, `seatLimit`, `expiresAt`, accepted/revoked stamps, FKs `users`/`early_access_signups`) | additive                                           | 0098 / 0106 |
-| 0099                      | `0099_ai_correction_log`            | table `ai_correction_log` (correction log plan § 4, § 9: FKs SET NULL, `shareId` unique, `(dataUserId, createdAt)` index)                                        | additive                                           | 0099 / 0107 |
-| 0100                      | `0100_new_material_categories`      | 3 values appended to `materials.category`                                                                                                                        | additive                                           | 0098        |
-| 0101                      | `0101_locknut_bushing_roles`        | `'locknut'`, `'bushing'` appended to `runMaterialRole` (list = 0096's + 2)                                                                                       | additive                                           | 0099        |
-| 0102                      | `0102_materials_parent_id`          | `materials.parentId int NULL`                                                                                                                                    | additive                                           | 0100        |
-| 0103                      | `0103_materials_parent_id_fk`       | self-FK, `ON DELETE RESTRICT`                                                                                                                                    | additive                                           | 0101        |
-| 0104                      | `0104_materials_brand`              | `materials.brand varchar(64) NULL`                                                                                                                               | additive                                           | 0102        |
-| 0105                      | `0105_takeoff_stamps_drop_excluded` | `takeoff_stamps.dropExcluded boolean NULL`                                                                                                                       | additive                                           | 0103        |
-| 0106                      | `0106_assembly_categories`          | 2 values appended to `assemblies.category`, `NOT NULL` kept                                                                                                      | additive                                           | 0104        |
-| 0107                      | `0107_assembly_hours_nullable`      | `assemblies.baseLaborHours` NULL allowed, default dropped                                                                                                        | additive (§ 11 a)                                  | 0105        |
-| 0108                      | `0108_takeoff_stamps_status`        | `takeoff_stamps.status enum('new','existing','remove','relocate') NULL`, NULL = new                                                                              | additive                                           | unnumbered  |
-| 0109                      | `0109_assemblies_pin_style`         | `assemblies` pin shape, letter, color (NULL = automatic)                                                                                                         | additive                                           | unnumbered  |
-| 0110                      | `0110_symbol_links_pin_style`       | `symbol_links` pin shape, letter, color                                                                                                                          | additive                                           | unnumbered  |
-| 0111                      | `0111_takeoff_groups_pin_style`     | `takeoff_groups` pin shape, letter, color                                                                                                                        | additive                                           | unnumbered  |
-| 0112                      | `0112_bid_pdf_legend_entries`       | table `bid_pdf_legend_entries` (legend plan § 5)                                                                                                                 | additive                                           | 0106 / 0107 |
-| next                      | count-by-tag v2                     | `takeoff_groups.fixtureTag varchar(16) NULL`, `symbolLookupKey varchar(255) NULL`, no FK, no unique key                                                          | additive                                           | unnumbered  |
-| next                      | rename a captured legend item       | **probably nothing**: see R.6                                                                                                                                    | —                                                  | —           |
-| next                      | second batch (§ 10d + B2)           | brand line ×2, `bid_panels` + FKs, `panelId` + FK, `snapshotBrandLine`, example-price ×3. About ten files.                                                       | additive                                           | unnumbered  |
-| NEVER in `drizzle/` early | step-3 files                        | (i) clear the 8 starters' hours (§ 11 c); (ii) fold "… - EXISTING TO REMAIN" twin counts into `status`                                                           | **MEANING**: committed only after the code is live | —           |
+| #                         | File                                      | Adds                                                                                                                                                                                                      | Kind                                                | Was         |
+| ------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ----------- |
+| 0096                      | `0096_tee_body_role`                      | `'teeBody'` appended to `bid_line_items.runMaterialRole`                                                                                                                                                  | additive                                            | written     |
+| 0097                      | `0097_password_reset`                     | table `password_reset_tokens`; `users.sessionsValidAfter` (NULL)                                                                                                                                          | additive                                            | written     |
+| 0098                      | `0098_signup_invites`                     | table `signup_invites` (invite gate plan § 7: `codeHash` unique, `email`, `seatLimit`, `expiresAt`, accepted/revoked stamps, FKs `users`/`early_access_signups`)                                          | additive                                            | 0098 / 0106 |
+| 0099                      | `0099_ai_correction_log`                  | table `ai_correction_log` (correction log plan § 4, § 9: FKs SET NULL, `shareId` unique, `(dataUserId, createdAt)` index)                                                                                 | additive                                            | 0099 / 0107 |
+| 0100                      | `0100_new_material_categories`            | 3 values appended to `materials.category`                                                                                                                                                                 | additive                                            | 0098        |
+| 0101                      | `0101_locknut_bushing_roles`              | `'locknut'`, `'bushing'` appended to `runMaterialRole` (list = 0096's + 2)                                                                                                                                | additive                                            | 0099        |
+| 0102                      | `0102_materials_parent_id`                | `materials.parentId int NULL`                                                                                                                                                                             | additive                                            | 0100        |
+| 0103                      | `0103_materials_parent_id_fk`             | self-FK, `ON DELETE RESTRICT`                                                                                                                                                                             | additive                                            | 0101        |
+| 0104                      | `0104_materials_brand`                    | `materials.brand varchar(64) NULL`                                                                                                                                                                        | additive                                            | 0102        |
+| 0105                      | `0105_takeoff_stamps_drop_excluded`       | `takeoff_stamps.dropExcluded boolean NULL`                                                                                                                                                                | additive                                            | 0103        |
+| 0106                      | `0106_assembly_categories`                | 2 values appended to `assemblies.category`, `NOT NULL` kept                                                                                                                                               | additive                                            | 0104        |
+| 0107                      | `0107_assembly_hours_nullable`            | `assemblies.baseLaborHours` NULL allowed, default dropped                                                                                                                                                 | additive (§ 11 a)                                   | 0105        |
+| 0108                      | `0108_takeoff_stamps_status`              | `takeoff_stamps.status enum('new','existing','remove','relocate') NULL`, NULL = new. **ONE column for A's list AND C's find-all plan § 6 — the same request** (R.9)                                       | additive — the column ONLY; the fold is step 3 (ii) | unnumbered  |
+| 0109                      | `0109_assemblies_pin_style`               | `assemblies.pinShape`, `pinLetter`, `pinColor` (NULL = automatic; types R.10)                                                                                                                             | additive                                            | unnumbered  |
+| 0110                      | `0110_symbol_links_pin_style`             | `symbol_links.pinShape`, `pinLetter`, `pinColor` + **`originalLabel varchar(255) NULL`** (B's rename) + **C's capture box** `captureX/Y/Width/Height` if decided (R.11)                                   | additive                                            | unnumbered  |
+| 0111                      | `0111_takeoff_groups_pin_style`           | `takeoff_groups.pinShape`, `pinLetter`, `pinColor` + **`symbolLookupKey varchar(255) NULL`** (pin plan § 11.7 + count-by-tag § 2) + `fixtureTag` if wanted (R.12)                                         | additive                                            | unnumbered  |
+| 0112                      | `0112_bid_pdf_legend_entries`             | table `bid_pdf_legend_entries` (legend plan § 5)                                                                                                                                                          | additive                                            | 0106 / 0107 |
+| 0113 (placeholder)        | connect point per symbol                  | **Shape not known yet**: where conduit meets a wall device, stored as distance + direction from the symbol's centre. `references/connect-point-plan.md` (track-b, not pushed when this was written). R.13 | expected additive                                   | new         |
+| next                      | count-by-tag `fixtureTag`, if NOT in 0111 | `takeoff_groups.fixtureTag varchar(16) NULL`, no FK, no unique key                                                                                                                                        | additive                                            | unnumbered  |
+| next                      | C's capture box, if NOT in 0110           | `symbol_links.captureX/Y/Width/Height decimal(12,4) NULL`, page points                                                                                                                                    | additive                                            | unnumbered  |
+| next                      | second batch (§ 10d + B2)                 | brand line ×2, `bid_panels` + FKs, `panelId` + FK, `snapshotBrandLine`, example-price ×3. About ten files.                                                                                                | additive                                            | unnumbered  |
+| NEVER in `drizzle/` early | step-3 files                              | (i) clear the 8 starters' hours (§ 11 c); (ii) fold "… - EXISTING TO REMAIN" twin counts into `status` — **R.9, after 0108's code is live**                                                               | **MEANING**: committed only after the code is live  | —           |
 
 Also later, numbered at write time and **after** everything above: legend
 § 8b (`quotedSupplier`/`quotedRef`/`quotedAmount` on `bid_line_items`,
@@ -90,33 +91,37 @@ Also later, numbered at write time and **after** everything above: legend
   file, per table: each file is one `ALTER TABLE … ADD …, ADD …, ADD …`.
   MySQL applies a single `ALTER` whole or not at all, so three columns in one
   statement keep the "applied or not, never half" rule. **The exact column
-  names and types are not in B's plan.** Settle them before writing:
-  - letter `varchar(2)` (§ 3, "up to two characters");
-  - color `varchar(7)`, copying `takeoff_run_types.color`, where a stored value
-    that is no longer in the palette reads as automatic;
-  - shape as `varchar`, not an enum, **because whether the wide rectangle is a
-    sixth shape is still undecided** (§ 2, decision 2). A varchar means
-    deciding later needs no migration.
+  names and types are not in B's plan** (re-checked at `4a9f5f9` and
+  `4d5c4bb`). R.10 proposes them; that list supersedes the one first written
+  here, which said letter `varchar(2)`. Each table's file also carries that
+  table's other additive columns from the same handoff (R.10–R.12), so it is
+  one `ALTER` per table rather than one per request.
 - **The legend table goes last of the numbered ones (0112).** It waits on the
   correction log and on the reader accuracy test (legend plan, "The order, in
   one place", items 0 and 3). Those are the slowest dependencies in the list.
   If the legend is ready before the mark group, swap the numbers **before
   either is written**, never after.
-- **Count-by-tag v2 has no number yet.** B's v1 needs no migration (the tag
-  lives in the count name, `count-by-tag-plan.md` § 2, § 4), and the columns
-  are "when the grouping is known to be wanted". **If that is decided before
-  0111 is written, add both columns to 0111's `ALTER`** (same table, same
-  batch). Otherwise it is its own file at the next number.
+- **Count-by-tag splits in two (R.12).** `symbolLookupKey` now goes IN 0111,
+  because the pin plan § 11.7 asks for the same column for "several symbols
+  on one assembly" and says to ship it with the pin columns. `fixtureTag` is
+  still "when the grouping is known to be wanted": in 0111 if decided by
+  then, otherwise its own file.
+- **The connect point is a placeholder at 0113.** Its plan is not written
+  yet. If its columns turn out to be on `symbol_links` and are settled before
+  0110 is written, they fold into 0110 like the capture box. Otherwise 0113
+  stands, or swaps with 0112 if it is ready first — **before either is
+  written** (R.1).
 
 ### R.3 What goes together, and what must go first
 
-| Group                      | Files     | Goes with                               | Must come after                                                                                                                             |
-| -------------------------- | --------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| A: before the first invite | 0096–0099 | `a-email-reset`, then gate and log code | nothing. **0096 must precede 0101** (0101 restates the enum with `teeBody`, § 0)                                                            |
-| B: B/C batch               | 0100–0107 | B's and C's code that reads them        | 0096 (above). 0103 after 0102 (FK on its column). 0107 before the "Hours not set" code, and the hours `UPDATE` only after that code is live |
-| C: marks                   | 0108–0111 | B's style editor, then status looks     | nothing in the schema. The status **fold** (step 3) waits for the code that reads `status`                                                  |
-| D: legend                  | 0112      | legend reading v1                       | 0099 (it writes correction rows), the accuracy test                                                                                         |
-| E: second batch            | next      | brand / example-price code              | 0102 and 0104 (brand lines match `materials.brand`). **Must be live before ANY non-zero price goes into the seed files**                    |
+| Group                      | Files     | Goes with                                            | Must come after                                                                                                                             |
+| -------------------------- | --------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| A: before the first invite | 0096–0099 | `a-email-reset`, then gate and log code              | nothing. **0096 must precede 0101** (0101 restates the enum with `teeBody`, § 0)                                                            |
+| B: B/C batch               | 0100–0107 | B's and C's code that reads them                     | 0096 (above). 0103 after 0102 (FK on its column). 0107 before the "Hours not set" code, and the hours `UPDATE` only after that code is live |
+| C: marks                   | 0108–0111 | B's style editor, rename, status looks; C's find-all | nothing in the schema. The status **fold** (step 3 ii) waits until the code that reads `status` is LIVE (R.9)                               |
+| D: legend                  | 0112      | legend reading v1                                    | 0099 (it writes correction rows), the accuracy test                                                                                         |
+| (placeholder)              | 0113      | connect point                                        | its plan (R.13)                                                                                                                             |
+| E: second batch            | next      | brand / example-price code                           | 0102 and 0104 (brand lines match `materials.brand`). **Must be live before ANY non-zero price goes into the seed files**                    |
 
 Every numbered file is **step 1** (migrate, then push the code). The two
 step-3 files are written and committed only after their code is on the live
@@ -166,10 +171,9 @@ In order of danger:
    - **After 0108**, the risks are the bridge treating NULL as anything but
      `new`, `relocate` or `remove` pricing material when they are labor, or a
      twin count that was never folded still pricing.
-   - **Track C's todo entry contradicts itself**: it says "no backfill, step 1"
-     and also "the migration should convert those names and fold the twin
-     count". Those are two files: 0108 (additive) now, and the fold (step 3)
-     after the code. **The fold must never ride in 0108.**
+   - **Track C's todo entry and its find-all plan § 5 both say the twins are
+     converted "by the same migration".** They are not; R.9 splits it into two
+     steps. **The fold must never ride in 0108.**
 2. **Example prices (group E).** Once a seed file carries a real price,
    `costPerUnit === 0` stops meaning "nobody priced this". Then the Materials
    screen reports a priced catalog that no contractor has checked a line of.
@@ -196,6 +200,17 @@ In order of danger:
 
 ### R.6 Renaming a captured legend item — probably no column
 
+> **Superseded 2026-10-01 (later): it needs one optional column,
+> `symbol_links.originalLabel`, in 0110.** B shipped rename without a column
+> (`0e87f96` on track-b). `label` is the new name, and `lookupKey` keeps the
+> captured name's key for matching. The one loss is capitals: "Reset to
+> original" gives "linear type", not "LINEAR TYPE", and says so on the button.
+> `originalLabel varchar(255) NULL` holds the exact original. NULL means
+> never renamed, or renamed before the column existed; either way, fall back
+> to `lookupKey`. Nothing is broken without it. B asks for it in the pin
+> batch (track-b `todo.md`, "Track A (migration, optional)"). The text below
+> is what was written before B said so.
+
 A captured legend item is a `symbol_links` row. It already has
 `label varchar(255) NOT NULL` and `lookupKey varchar(255) NOT NULL`, and
 `db.updateSymbolLink` takes a partial update. So a rename is
@@ -216,13 +231,13 @@ here.
 because their failure mode is data-dependent and a fixture database cannot
 show it:
 
-| File                     | Why a restored copy                                                                                                                                     |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0103 (parentId FK)       | Time it on real row counts. Rehearse the RESTRICT-vs-user-cascade account delete (§ 7 step 3)                                                           |
-| 0100, 0101, 0106 (enums) | A restated list is checked against REAL stored values: `SELECT DISTINCT` before and after must match                                                    |
-| 0107 (nullability)       | `MODIFY` on a populated column. Check every row keeps its hours: before-and-after count of `baseLaborHours` by value                                    |
-| step 3 (i) hours clear   | Meaning change. **Expect 0 → 8**, then a second run changes 0                                                                                           |
-| step 3 (ii) status fold  | Meaning change. Before and after: marks per base count, twin counts left, bid line quantities per bid. **Totals must move only by what was "existing"** |
+| File                     | Why a restored copy                                                                                                                                                                                                                            |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0103 (parentId FK)       | Time it on real row counts. Rehearse the RESTRICT-vs-user-cascade account delete (§ 7 step 3)                                                                                                                                                  |
+| 0100, 0101, 0106 (enums) | A restated list is checked against REAL stored values: `SELECT DISTINCT` before and after must match                                                                                                                                           |
+| 0107 (nullability)       | `MODIFY` on a populated column. Check every row keeps its hours: before-and-after count of `baseLaborHours` by value                                                                                                                           |
+| step 3 (i) hours clear   | Meaning change. **Expect 0 → 8**, then a second run changes 0                                                                                                                                                                                  |
+| step 3 (ii) status fold  | Meaning change. Before and after: marks per base count, twin counts left, bid line quantities per bid. **Totals must move only by what was "existing"**. Rehearse on a restored copy of WHICHEVER database has twins (R.9: live may have none) |
 
 New tables (0097, 0098, 0099, 0112) and new nullable columns (0102, 0104,
 0105, 0108–0111) need only the test-database rehearsal of § 7 step 1: run
@@ -246,13 +261,141 @@ when its branch is next touched. They are not edited in this commit.
   "probably 0107". It is now **0112**. Separately, its rehearsal check expects
   "three foreign keys" where its schema lists four. Fix that before it is
   used as a pass check.
-- `origin/track-c:todo.md`, the mark status entry: split into 0108 + a
-  step-3 fold (R.5 1). It also links
-  `references/find-all-matching-plan.md`, **which does not exist on any
-  branch**.
-- `origin/track-b:references/track-b-count-pin-styles-plan.md`: now 0108
-  (status) and 0109–0111 (styles). Column names and types are to be settled
-  (R.2).
+- `origin/track-c:todo.md`, the mark status entry, and
+  `references/find-all-matching-plan.md` § 5 and § 6: split into 0108 + a
+  step-3 fold (R.9). The capture box is 0110 or a later file (R.11).
+  **Correction:** this line first said the find-all plan "does not exist on
+  any branch". That was true when it was checked. It was pushed to track-c
+  later the same day (`970fdd2`, now at `f47335e`).
+- `origin/track-b:references/track-b-count-pin-styles-plan.md` (§ 6, § 11.7)
+  and `count-by-tag-plan.md` § 2: status is 0108, styles 0109–0111,
+  `symbolLookupKey` in 0111, `originalLabel` in 0110. Column names and types
+  are proposed in R.10. B to confirm.
+
+### R.9 Mark status — ONE column, TWO steps
+
+**The duplicate, merged.** Track A's queue (`todo.md`), Track C's `todo.md`
+entry and C's `find-all-matching-plan.md` § 6 all ask for the same thing:
+`takeoff_stamps.status enum('new','existing','remove','relocate') NULL`,
+NULL = new. It is **0108, once**. B's pin plan § 7 draws it and asks for
+nothing more.
+
+**Step 1: `0108_takeoff_stamps_status`. The column only.**
+
+```sql
+ALTER TABLE `takeoff_stamps` ADD `status` enum('new','existing','remove','relocate');
+```
+
+- No default. NULL = `new` is the only meaning today, so nothing is
+  backfilled. `DEFAULT 'new'` would make "not yet decided" and
+  "deliberately new" the same value.
+- Migrate, then push the code that reads it. The bridge
+  (`shared/takeoffBridge.ts`) prices `new` (NULL included), and `relocate` as
+  labour only. It never prices `existing`. `remove` waits on the owner's
+  demo-labour answer. The card says "12 new · 4 existing" (pin plan § 7).
+
+**Step 2: the code is LIVE.** Only then is step 3 written.
+
+**Step 3: the twin fold, a meaning change.** A later file, **committed to
+`drizzle/` only after step 2 is live** (R.3, step-3 rule):
+
+- each mark in a "<name> - EXISTING TO REMAIN" count moves to its base count
+  with `status = 'existing'`;
+- the emptied twin count goes;
+- C's twin ASSEMBLIES (made by C's script, `shared/existingToRemain.ts`) are
+  retired, not deleted (CLAUDE.md § "Retire, never delete").
+
+**Before writing it, measure where twins exist.** `existingToRemain.ts` is on
+`track-c` only: absent from `main`, `staging` and `local-dev` at the time of
+writing. So twins exist only in databases where track-c's code or C's test
+script has run. **On live the fold may have nothing to do.** Count twin
+groups on each database first. If live has none, step 3 is still written
+(staging and test databases may hold them), but its live rehearsal is "0 → 0",
+and it should say so in advance.
+
+**What the fold must decide first (owner):** a twin that was **sent to a bid**
+has a bid line pricing existing devices. After the fold that line has no
+count behind it. It must be removed, or flagged for the estimator, and
+**never left silently pricing**. On a locked bid, the fold must not move
+anything; it leaves the twin and reports it. **A bid total WILL move here,
+and correctly**: it stops charging for devices that are already on the wall.
+That is the one intended number change in this list. Say so in the release
+entry, so it is not read as a fault (the bid 23 precedent, `deploying.md`
+§ 11).
+
+### R.10 Pin-style columns — proposed names and types (B's plan has none)
+
+Checked against `track-b-count-pin-styles-plan.md` at `4a9f5f9` and
+`4d5c4bb`. The plan says only "shape, letter, color", nullable, NULL =
+automatic (§ 6). Proposed, the same three on `assemblies`, `symbol_links` and
+`takeoff_groups`:
+
+| Column      | Type          | Why                                                                                                                                                                                                                                                                                                                      |
+| ----------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pinShape`  | `varchar(16)` | Six named shapes (§ 2), including the new wide rectangle, which is conditional on the § 9 step-0 measurement. A varchar means adding or dropping one is a code change, checked against one list in `shared/`, **not a migration**. An unknown stored value reads as automatic, like run colours.                         |
+| `pinLetter` | `varchar(4)`  | **Changed from the `varchar(2)` first written here.** § 3 says a chosen letter is "up to two characters", but lighting "takes the plan's own tag … a leading 1–3 character tag" (`C14`). `varchar(2)` would refuse a 3-character tag outright. The limit lives in one zod schema; the column only has to be wide enough. |
+| `pinColor`  | `varchar(7)`  | `#RRGGBB`, the same as `takeoff_run_types.color`, whose rule B copies (§ 5): a chosen colour wins, and a stored value no longer in the palette reads as automatic.                                                                                                                                                       |
+
+**None of the nine changes a number**: a pin's look is display only. The
+status look (§ 7) is what carries a number, and it reads 0108, not these.
+**B to confirm the names before 0109 is written.**
+
+### R.11 C's capture box — `symbol_links.captureX/Y/Width/Height`
+
+From `find-all-matching-plan.md` § 4 step 3 and § 6 (`f47335e` on track-c):
+nullable, in page points, for "Find on this sheet" from a legend row.
+Pre-existing captures have none and simply do not offer it.
+
+- **Type:** `decimal(12,4) NULL` ×4, matching `takeoff_stamps.x`/`y`.
+  The sheet is already `symbol_links.capturedFromSheetId`, so nothing else is
+  needed.
+- **Placement:** in 0110 (same table, same handoff), **if the owner says yes
+  to find-all step 3** (plan § 7, decision 6) before 0110 is written.
+  Otherwise its own file at the next number. The plan has not been approved
+  as a product yet, and a column nobody has decided to use is a column
+  nobody chose.
+- **No number on a bid.** It only proposes matches, and unconfirmed matches
+  are never counted (pin plan § 8).
+
+### R.12 Count-by-tag and several-symbols-on-one-assembly — the columns
+
+| Column                                             | Asked for by                                                                                                                   | Placement                                                                             |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `takeoff_groups.symbolLookupKey varchar(255) NULL` | `count-by-tag-plan.md` § 2 **and** pin plan § 11.7 (several captured items on one assembly) — the same column, asked for twice | **0111.** B: "ship it in the same batch as the nine pin-style columns … One handoff." |
+| `takeoff_groups.fixtureTag varchar(16) NULL`       | `count-by-tag-plan.md` § 2 (v2)                                                                                                | 0111 if the grouping is wanted by then, else its own file                             |
+
+- Both have NULL = not from a symbol / untagged, which is every existing row.
+  Additive, no backfill. The optional step-3 tag backfill from labels is not
+  planned.
+- **No FK on `symbolLookupKey`, on purpose**: a library symbol is per user, a
+  count is per bid, and deleting a symbol must not touch a bid. **No unique
+  key either**: names are unique per bid by the router (count-by-tag § 5), and
+  a unique key over a nullable column would not stop duplicate NULLs anyway.
+- **Wrong-number risk is in code, not the columns** (R.5 6):
+  `groupForAssembly` picks the FIRST count on an assembly. Once one assembly
+  has several counts (tags, or § 11's one count per captured item), a mark can
+  land on the wrong one. B's § 11.2 and count-by-tag § 5 both say "choose,
+  never guess". v1 needs that chooser and a test. **v1 matches by name, not by
+  key, so it does not need 0111 to be safe.**
+
+### R.13 Connect point — PLACEHOLDER (0113)
+
+The point on a wall-device symbol where the conduit really meets it, stored
+as a distance and direction from the symbol's centre. B is writing
+`references/connect-point-plan.md` on track-b. It was **not pushed** when
+this was written (checked on `origin/track-b`).
+
+- **Expected additive** (nullable, NULL = the centre, today's behaviour), but
+  not assumed: classify it per R.3 when the plan exists.
+- **Where it lives is the open question.** It could be per captured symbol
+  (`symbol_links`), per assembly as a default, or both, with the pin plan's
+  precedence.
+- **Could it move a number? Probably yes**, unlike the pin look. If traced
+  run ends snap to the connect point instead of the centre, every run's
+  footage changes by the offset. **Its plan must say whether existing runs are
+  re-measured.** If they are, that is a meaning change (step 3) with a
+  before-and-after footage count. If only new runs use it, it is additive and
+  old runs keep their length.
 
 **Status: nothing here is written or run.** No `.sql` file exists yet, and
 no database has been touched. Measured against `local-dev` at `90a286c`, which
