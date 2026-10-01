@@ -147,6 +147,32 @@ export type NotPricedTally = { lines: number; parts: number };
 
 export const NOTHING_NOT_PRICED: NotPricedTally = { lines: 0, parts: 0 };
 
+/**
+ * The lines a total leaves something out of, by name, for a warning that has
+ * to say WHICH ("Duplex receptacle, 2 parts not priced"). Same two predicates
+ * as `countNotPriced` below, so the list and the count cannot disagree.
+ */
+export function notPricedLines<L extends PartsLineLike & { name: string }>(
+  lines: readonly { line: L; directCost: number | null }[]
+): { name: string; wholeLine: boolean; parts: number }[] {
+  return lines.flatMap(
+    ({
+      line,
+      directCost,
+    }): {
+      name: string;
+      wholeLine: boolean;
+      parts: number;
+    }[] => {
+      if (lineNotPriced(line, directCost)) {
+        return [{ name: line.name, wholeLine: true, parts: 0 }];
+      }
+      const parts = linePartsNotPriced(line, directCost);
+      return parts > 0 ? [{ name: line.name, wholeLine: false, parts }] : [];
+    }
+  );
+}
+
 /** How much of a bid the total leaves unpriced. */
 export function countNotPriced(
   lines: readonly { line: PartsLineLike; directCost: number | null }[]

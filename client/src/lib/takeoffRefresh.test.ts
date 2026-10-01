@@ -3,6 +3,7 @@ import {
   BID_QUANTITY_QUERIES,
   QUERIES_MOVED_BY,
   type TakeoffChange,
+  sheetsToRefresh,
 } from "./takeoffRefresh";
 
 const moves = (change: TakeoffChange) => new Set(QUERIES_MOVED_BY[change]);
@@ -89,5 +90,65 @@ describe("what each change on the Plans screen must refresh", () => {
       expect(moves("groupDrop").has(q), q).toBe(true);
     }
     expect(moves("groupDrop").has("takeoffGroups.list")).toBe(true);
+  });
+});
+
+describe("undo and clearing a sheet (Track B, 2026-09-29)", () => {
+  it("move every bid figure, the marks and the runs", () => {
+    for (const change of ["undo", "sheetCleared"] as const) {
+      const set = moves(change);
+      for (const q of [
+        ...BID_QUANTITY_QUERIES,
+        "takeoffStamps.listForSheet",
+        "takeoffRuns.listForSheet",
+        "takeoffRuns.typeColors",
+      ] as const)
+        expect(set.has(q), `${change} → ${q}`).toBe(true);
+    }
+  });
+
+  it("refresh the STEP's sheet as well as the open one", () => {
+    // Undo pressed on sheet 4 for a step taken on sheet 2.
+    expect(sheetsToRefresh(4, 2)).toEqual([4, 2]);
+    expect(sheetsToRefresh(4, 4)).toEqual([4]);
+    expect(sheetsToRefresh(null, 2)).toEqual([2]);
+    expect(sheetsToRefresh(4, undefined)).toEqual([4]);
+  });
+});
+
+describe("a change to a run's ends (the drop)", () => {
+  it("moves the bid's lines, the materials list and the Send preview", () => {
+    // The gap found 2026-09-29: the ends editor refreshed takeoffRuns only.
+    const set = moves("runEnds");
+    for (const q of [
+      "bids.get",
+      "materialsList.get",
+      "takeoffRunTypes.bridgeForBid",
+      "takeoffRuns.totals",
+      "takeoffRuns.drops",
+      "takeoffRuns.listForSheet",
+    ] as const)
+      expect(set.has(q), q).toBe(true);
+  });
+});
+
+describe("the whole-set summary and sending to the bid (2026-09-29)", () => {
+  it("every change kind moves the summary, since it states every quantity", () => {
+    for (const change of Object.keys(QUERIES_MOVED_BY) as TakeoffChange[])
+      expect(moves(change).has("takeoffSummary.forBid"), change).toBe(true);
+  });
+
+  it("a send moves the bid's lines, the materials list, the counts and the summary", () => {
+    // The gap found 2026-09-29: a single count send refetched the count list
+    // only, so the bid and the materials list kept their old answer.
+    const set = moves("sentToBid");
+    for (const q of [
+      "bids.get",
+      "materialsList.get",
+      "takeoffGroups.list",
+      "takeoffRunTypes.bridgeForBid",
+      "takeoffSummary.forBid",
+    ] as const)
+      expect(set.has(q), q).toBe(true);
   });
 });

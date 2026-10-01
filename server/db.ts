@@ -6206,6 +6206,9 @@ export async function addCountToBid(
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
 
+  // Before either insert below — see releaseArchivedPlanSlot.
+  await releaseArchivedPlanSlot(bidId, { groupId: group.id });
+
   /*
     A FREE COUNT — a name and some marks, nothing from the library.
 
@@ -6363,6 +6366,44 @@ export async function saveLineAsAssembly(input: {
     snapshotUnpricedParts: 0,
   });
   return { assemblyId, materialId };
+}
+
+/**
+ * Delete an ARCHIVED from-plans line that still holds the slot a send is about
+ * to fill.
+ *
+ * The unique indexes on (bidId, takeoffGroupId) and (bidId, takeoffRunTypeId,
+ * runMaterialRole) include archived rows, while every send decides "is it on
+ * the bid?" from LIVE lines. So a count whose line had been archived passed
+ * the check and then died on the index with a raw database error — found
+ * 2026-09-29 by `server/sendAll.test.ts` before Send all was built on it.
+ *
+ * Deleting is right rather than restoring: an archived line is out of every
+ * total already, its snapshot is from whenever it was sent, and the send
+ * about to run writes a fresh one from the same count. Since 2026-09-29 a
+ * plan line cannot be archived at all (`archiveLinkedCopies` refuses), so
+ * this only ever meets rows archived before that.
+ */
+async function releaseArchivedPlanSlot(
+  bidId: number,
+  slot: { groupId: number } | { runTypeId: number; role: RunMaterialRole }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .delete(bidLineItems)
+    .where(
+      and(
+        eq(bidLineItems.bidId, bidId),
+        isNotNull(bidLineItems.archivedAt),
+        "groupId" in slot
+          ? eq(bidLineItems.takeoffGroupId, slot.groupId)
+          : and(
+              eq(bidLineItems.takeoffRunTypeId, slot.runTypeId),
+              eq(bidLineItems.runMaterialRole, slot.role)
+            )
+      )
+    );
 }
 
 /** The live bid line for a counted group, if it has one. */
@@ -8235,6 +8276,27 @@ export async function updateRunCircuit(
     );
 }
 
+/**
+ * The run a circuit hangs on, or null when the circuit is not this user's.
+ * Asked so a circuit edit can be refused on a locked bid: the circuit is
+ * addressed by its own id, and the lock lives on the run's bid.
+ */
+export async function getRunIdOfCircuit(
+  id: number,
+  userId: number
+): Promise<number | null> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select({ runId: takeoffRunCircuits.runId })
+    .from(takeoffRunCircuits)
+    .where(
+      and(eq(takeoffRunCircuits.id, id), eq(takeoffRunCircuits.userId, userId))
+    )
+    .limit(1);
+  return row?.runId ?? null;
+}
+
 export async function deleteRunCircuit(id: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -8703,6 +8765,34 @@ export async function deleteStamps(
       and(inArray(takeoffStamps.id, [...ids]), eq(takeoffStamps.userId, userId))
     );
   return result.affectedRows;
+}
+
+/**
+ * How many of these marks sit on a bid whose quantities are locked.
+ *
+ * Asked BEFORE a delete so a selection goes whole or not at all: a selection
+ * that reaches into a locked bid is refused entire, rather than deleting the
+ * unlocked half and leaving the screen to explain a partial result.
+ */
+export async function countStampsOnLockedBids(
+  ids: readonly number[],
+  userId: number
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(takeoffStamps)
+    .innerJoin(bids, eq(bids.id, takeoffStamps.bidId))
+    .where(
+      and(
+        inArray(takeoffStamps.id, [...ids]),
+        eq(takeoffStamps.userId, userId),
+        isNotNull(bids.quantitiesLockedAt)
+      )
+    );
+  return Number(row?.n ?? 0);
 }
 
 /** Every symbol the user has captured, linked or not. */
@@ -11555,6 +11645,26 @@ export async function answerPullPoint(
   });
 }
 
+/** The run a pull-point answer belongs to, or null when it is not this user's. */
+export async function getRunIdOfPullPoint(
+  answerId: number,
+  userId: number
+): Promise<number | null> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select({ runId: takeoffPullPoints.runId })
+    .from(takeoffPullPoints)
+    .where(
+      and(
+        eq(takeoffPullPoints.id, answerId),
+        eq(takeoffPullPoints.userId, userId)
+      )
+    )
+    .limit(1);
+  return row?.runId ?? null;
+}
+
 /** Withdraw one answer, so the spot is proposed afresh. */
 export async function clearPullPointAnswer(
   userId: number,
@@ -12218,6 +12328,10 @@ export async function addRunTypeRowToBid(
 
   const laborRate = hourlyCostFor(rates, defaults?.defaultLaborRateId ?? null);
 
+  await releaseArchivedPlanSlot(bidId, {
+    runTypeId: input.runTypeId,
+    role: input.role,
+  });
   const [result] = await db.insert(bidLineItems).values({
     bidId,
     takeoffRunTypeId: input.runTypeId,

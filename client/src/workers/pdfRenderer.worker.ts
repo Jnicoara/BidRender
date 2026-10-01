@@ -355,7 +355,7 @@ self.onmessage = async (e: MessageEvent) => {
   }
 
   /**
-   * The text on one page WITH where each item is drawn, for "Select text".
+   * The text on one page WITH where each item is drawn, for "Copy text".
    *
    * Raw items plus the scale-1 viewport's transform; the boxes are worked out
    * in client/src/lib/textSelection.ts, where the tests can reach them. Asked

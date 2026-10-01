@@ -49,13 +49,7 @@ import {
   rangeIsBackwards,
   toPage,
 } from "../../shared/bidSearch";
-import {
-  countsWaitingToSend,
-  countsWithNoPrice,
-  doubleCountedAssemblies,
-  type BridgeGroup,
-  type BridgeLine,
-} from "../../shared/takeoffBridge";
+import { planAttentionFor } from "../planAttention";
 import {
   staleRateLines,
   type RatedLineLike,
@@ -63,6 +57,7 @@ import {
 } from "../../shared/laborRatePricing";
 import {
   followsDrawing,
+  lockedEditRefusal,
   quantitySource,
   typedQuantityRefusal,
   unlockChanges,
@@ -84,21 +79,6 @@ import { footageByRunType } from "../runTypeFootage";
 import * as db from "../db";
 import { deleteBidWithFiles } from "../storedFiles";
 
-/**
- * The three things a takeoff can be telling a bid that its money does not say.
- *
- * ── Why all three live under the totals and none on the drawing ─────────────
- * The warning strip's rule is that it sits directly under the number it
- * contradicts, which is exactly the relationship each of these has with the
- * material total. A marker on the drawing would break level 1's promise of a
- * quiet count on the screen where that promise was made — see
- * references/plan-viewer-overhaul.md § 5f.
- *
- * ── `doubleCounted` is the half a warning at send time cannot cover ─────────
- * The hand-added line can arrive AFTER the count was sent, so this is read
- * every time the bid is shown rather than fired once at the crossing. That is
- * what makes R3 a rule in the code instead of a note in a document.
- */
 /** Lines priced at an older labor rate than their role has now. */
 async function staleRatesFor(
   lines: readonly RatedLineLike[],
@@ -109,56 +89,6 @@ async function staleRatesFor(
   );
   const current = await db.currentAssemblyRates(candidates, userId);
   return staleRateLines(lines, id => current.get(id) ?? null);
-}
-
-async function planAttentionFor(
-  bidId: number,
-  userId: number,
-  lines: readonly {
-    id: number;
-    name: string;
-    takeoffGroupId: number | null;
-    assemblyId: number | null;
-  }[]
-): Promise<{
-  waitingToSend: number;
-  countedWithNoPrice: number;
-  doubleCounted: string[];
-}> {
-  const bridgeLines: BridgeLine[] = lines.map(line => ({
-    id: line.id,
-    name: line.name,
-    takeoffGroupId: line.takeoffGroupId,
-    assemblyId: line.assemblyId,
-  }));
-
-  const families = await db.getAssemblyFamilies(
-    bridgeLines.flatMap(line =>
-      line.assemblyId === null ? [] : [line.assemblyId]
-    ),
-    userId
-  );
-  const doubleCounted = doubleCountedAssemblies(bridgeLines, families);
-
-  const [groups, counts] = await Promise.all([
-    db.getGroupsForBid(bidId, userId),
-    db.countStampsByGroup(bidId, userId),
-  ]);
-  const bridgeGroups: BridgeGroup[] = groups.map(group => ({
-    id: group.id,
-    label: group.label,
-    kind: group.kind,
-    assemblyId: group.assemblyId,
-    materialId: group.materialId,
-    unitCost: group.unitCost === null ? null : Number(group.unitCost),
-    count: counts.get(group.id) ?? 0,
-  }));
-
-  return {
-    waitingToSend: countsWaitingToSend(bridgeGroups, bridgeLines),
-    countedWithNoPrice: countsWithNoPrice(bridgeGroups, bridgeLines),
-    doubleCounted,
-  };
 }
 
 /**
@@ -1396,7 +1326,22 @@ export const bidsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      /*
+        A line FROM THE PLANS is part of what the lock holds, so a locked bid
+        keeps it (owner, 2026-09-29). A hand-typed line is not a quantity from
+        the plans and stays removable — the lock was never about it.
+      */
+      if (bid.quantitiesLockedAt !== null) {
+        const line = await db.getBidLineItem(input.id, input.bidId);
+        if (line && followsDrawing(line))
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: lockedEditRefusal(
+              "lines from the plans cannot be removed"
+            ),
+          });
+      }
       await db.deleteBidLineItem(input.id, input.bidId);
       return { success: true };
     }),
@@ -1506,7 +1451,36 @@ export const bidsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      /*
+        The bulk way to take lines off, so the same rule as `removeLine`: on a
+        locked bid, refused if any line it would archive came from the plans.
+        Whole or nothing, like a selection of marks.
+      */
+      if (bid.quantitiesLockedAt !== null) {
+        const links = await db.getBidUnitLinks(input.bidId);
+        const units = new Set(
+          links
+            .filter(l => l.templateLabel === input.templateLabel && !l.forkedAt)
+            .map(l => l.unitLabel)
+        );
+        const lines = await db.getBidLineItems(input.bidId);
+        if (
+          lines.some(
+            l =>
+              l.unitLabel !== null &&
+              units.has(l.unitLabel) &&
+              l.archivedAt === null &&
+              followsDrawing(l)
+          )
+        )
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: lockedEditRefusal(
+              "lines from the plans cannot be removed"
+            ),
+          });
+      }
       return db.archiveLinkedCopies(input.bidId, input.templateLabel);
     }),
 

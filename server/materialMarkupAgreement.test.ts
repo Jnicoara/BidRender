@@ -179,6 +179,7 @@ const proposal = buildProposal({
     validDays: 30,
   },
   now: new Date(0),
+  notPriced: rolled.notPriced,
 } as never);
 const unitPrice = (label: string) =>
   proposal.unitPricing.find(u => u.label === label)!.price;

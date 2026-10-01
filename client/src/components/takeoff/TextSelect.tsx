@@ -1,5 +1,5 @@
 /**
- * "Select text" — drag a box on the sheet, get the words inside it to copy, and
+ * "Copy text" — drag a box on the sheet, get the words inside it to copy, and
  * look them up in the catalog in one click.
  *
  * ── Its own tool, and it claims its own drag ─────────────────────────────────
@@ -204,7 +204,7 @@ export function TextSelectLayer({
         aria-live="polite"
       >
         <TextSelectIcon className="w-3.5 h-3.5 shrink-0 text-[#F5C518]" />
-        <span className="font-medium">Select text</span>
+        <span className="font-medium">Copy text</span>
         <span className="text-muted-foreground">·</span>
         <span
           className={cn(
@@ -220,7 +220,7 @@ export function TextSelectLayer({
           type="button"
           className="h-6 w-6 rounded-full grid place-items-center text-muted-foreground hover:text-foreground hover:bg-muted"
           onClick={onClose}
-          aria-label="Put down Select text"
+          aria-label="Put down Copy text"
         >
           <X className="w-3.5 h-3.5" />
         </button>

@@ -190,22 +190,22 @@ from now on.
 
 ## 3. Counting
 
-| ID  | What it does                                                                                                                                                                                                                          | Status         | Source                                           | Need         |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------ | ------------ |
-| C1  | **Stamp tool:** choose what you are counting once, then tap every place it occurs.                                                                                                                                                    | **Half-wired** | Plan item 7, Changelog, Current code             | Essential    |
-| C2  | **Start the stamp tool by picking an assembly directly** (search, recently used), so things not in the plan's legend can still be counted.                                                                                            | **Missing**    | Your request, Plan item 7, Changelog             | Essential    |
-| C3  | Plain high-contrast rings on the drawing, so you can see what has been counted.                                                                                                                                                       | **Works**      | Plan item 6, Changelog                           | Essential    |
-| C4  | A counted-items list: each assembly with its count, and numbered chips that jump to each mark.                                                                                                                                        | **Works**      | Plan item 5, Changelog                           | Essential    |
-| C5  | **Remove a stamp:** a visible remove control, the Delete key, and Undo.                                                                                                                                                               | **Half-wired** | Your request, Plan item 7, Changelog             | Essential    |
-| C6  | **Undo the last stamp** (and undo a removal).                                                                                                                                                                                         | **Missing**    | Old screen, Your request                         | Essential    |
-| C7  | Move a stamp by dragging it.                                                                                                                                                                                                          | **Missing**    | Plan item 7                                      | Nice-to-have |
-| C8  | Stamps survive a crash or a lost connection: saved in the browser as you tap, sent in batches, re-sent later.                                                                                                                         | **Works**      | Changelog                                        | Essential    |
-| C9  | **Legend:** drag a box around a symbol on the plan's legend, name it, link it to an assembly once; the link is remembered on every future job; unlink or remove it. **Reordered to FIRST 2026-09-21 — see § 5l of the overhaul doc.** | **Works**      | Plan items 4 and 9, Changelog                    | Essential    |
-| C10 | **Location tags** (Underground, Slab/Floor, Wall, Ceiling/Overhead, Exposed, Roof) on stamps and runs: a sticky location chosen on the tool before tapping, plus "all of this assembly on this sheet".                                | **Half-wired** | Changelog, Your request, Decided 2026-09-14 (D8) | Essential    |
-| C11 | **Layers:** show or hide marks by System (Devices, Lighting, Panels, conduit, cable) and by Location; warns when part of the sheet is hidden.                                                                                         | **Works**      | Changelog, Plan § Layers                         | Nice-to-have |
-| C12 | Count without tapping each one (type a quantity, or rows × per row).                                                                                                                                                                  | **Missing**    | Old screen                                       | Nice-to-have |
-| C13 | Remove every stamp of one assembly on a sheet at once.                                                                                                                                                                                | **Missing**    | Found in this review                             | Nice-to-have |
-| C14 | **Schedule cross-check:** enter the quantities from the plan's own fixture and panel schedules and compare them with what was counted, with a clear flag when they disagree.                                                          | **Missing**    | Decided 2026-09-14 (section 13)                  | Essential    |
+| ID  | What it does                                                                                                                                                                                                                                   | Status         | Source                                           | Need         |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------ | ------------ |
+| C1  | **Stamp tool:** choose what you are counting once, then tap every place it occurs.                                                                                                                                                             | **Half-wired** | Plan item 7, Changelog, Current code             | Essential    |
+| C2  | **Start the stamp tool by picking an assembly directly** (search, recently used), so things not in the plan's legend can still be counted.                                                                                                     | **Missing**    | Your request, Plan item 7, Changelog             | Essential    |
+| C3  | Plain high-contrast rings on the drawing, so you can see what has been counted.                                                                                                                                                                | **Works**      | Plan item 6, Changelog                           | Essential    |
+| C4  | A counted-items list: each assembly with its count, and numbered chips that jump to each mark.                                                                                                                                                 | **Works**      | Plan item 5, Changelog                           | Essential    |
+| C5  | **Remove a stamp:** a visible remove control, the Delete key, and Undo.                                                                                                                                                                        | **Half-wired** | Your request, Plan item 7, Changelog             | Essential    |
+| C6  | **Undo the last stamp** (and undo a removal). Built 2026-09-29: undo/redo of placing and deleting marks and of finishing and deleting runs, 50 steps per bid, button and Ctrl/⌘+Z (`client/src/lib/undoStack.ts`, `server/takeoffRestore.ts`). | **Built**      | Old screen, Your request                         | Essential    |
+| C7  | Move a stamp by dragging it.                                                                                                                                                                                                                   | **Missing**    | Plan item 7                                      | Nice-to-have |
+| C8  | Stamps survive a crash or a lost connection: saved in the browser as you tap, sent in batches, re-sent later.                                                                                                                                  | **Works**      | Changelog                                        | Essential    |
+| C9  | **Legend:** drag a box around a symbol on the plan's legend, name it, link it to an assembly once; the link is remembered on every future job; unlink or remove it. **Reordered to FIRST 2026-09-21 — see § 5l of the overhaul doc.**          | **Works**      | Plan items 4 and 9, Changelog                    | Essential    |
+| C10 | **Location tags** (Underground, Slab/Floor, Wall, Ceiling/Overhead, Exposed, Roof) on stamps and runs: a sticky location chosen on the tool before tapping, plus "all of this assembly on this sheet".                                         | **Half-wired** | Changelog, Your request, Decided 2026-09-14 (D8) | Essential    |
+| C11 | **Layers:** show or hide marks by System (Devices, Lighting, Panels, conduit, cable) and by Location; warns when part of the sheet is hidden.                                                                                                  | **Works**      | Changelog, Plan § Layers                         | Nice-to-have |
+| C12 | Count without tapping each one (type a quantity, or rows × per row).                                                                                                                                                                           | **Missing**    | Old screen                                       | Nice-to-have |
+| C13 | Remove every stamp of one assembly on a sheet at once.                                                                                                                                                                                         | **Missing**    | Found in this review                             | Nice-to-have |
+| C14 | **Schedule cross-check:** enter the quantities from the plan's own fixture and panel schedules and compare them with what was counted, with a clear flag when they disagree.                                                                   | **Missing**    | Decided 2026-09-14 (section 13)                  | Essential    |
 
 **Notes**
 
@@ -264,7 +264,7 @@ from now on.
 | T5  | Bid-wide totals of conduit, cable and wire. **Overridden 2026-09-27 (owner):** was "from finished runs, leaving out drafts", which disagreed with the bid, which priced drafts. Now the totals count what the BID prices — drafts in; runs with no type, branch wiring's wire and suggestions out, each said under the totals, no type with its feet (`shared/runOnBid.ts`, `references/track-b-beta-plan.md` § 2). Runs on unscaled sheets are still left out and said. | **Works**      | Changelog, Decided 2026-09-27   | Essential    |
 | T6  | Protect a trace in progress: saved to the server every few seconds, kept in the browser on every tap, and a warning before leaving the page.                                                                                                                                                                                                                                                                                                                             | **Works**      | Changelog                       | Essential    |
 | T7  | **Pick an interrupted trace back up** and keep going.                                                                                                                                                                                                                                                                                                                                                                                                                    | **Half-wired** | Changelog                       | Essential    |
-| T8  | **Edit a finished run: drag a point** to fix it.                                                                                                                                                                                                                                                                                                                                                                                                                         | **Missing**    | Old screen, Your request        | Essential    |
+| T8  | **Edit a finished run: drag a point** to fix it. Built 2026-09-29: drag, add ("+" on a segment), remove (right-click or Delete); tee ends stay pinned; refused on a locked bid; undoable (`takeoffRuns.setPoints`).                                                                                                                                                                                                                                                      | **Built**      | Old screen, Your request        | Essential    |
 | T9  | **Extend a finished run.**                                                                                                                                                                                                                                                                                                                                                                                                                                               | **Missing**    | Old screen, Your request        | Essential    |
 | T10 | **Split a run**, or leave a gap inside one run ("lift the pen").                                                                                                                                                                                                                                                                                                                                                                                                         | **Missing**    | Old screen, Your request        | Nice-to-have |
 | T11 | **Rename a run.**                                                                                                                                                                                                                                                                                                                                                                                                                                                        | **Missing**    | Old screen, Your request        | Nice-to-have |
@@ -433,7 +433,8 @@ never be merged into one "AI" box.
 
 - **A1** — Switched off on your local copy (the `DISABLE_AI_FEATURES` setting),
   and it needs a connection. It reads each sheet you open automatically unless
-  you turn that off, which costs money per sheet (D11). Its "correct this"
+  you turn that off, which costs money per sheet (D11). _(Stale since D11:
+  since 2026-09-29 it never reads on open, and the switch is gone.)_ Its "correct this"
   control only appears on mouse hover (`CoPilotPanel.tsx:391`).
 - **A2** — The screen can show and accept a suggested route; what creates those
   suggestions was not reviewed for this spec.
@@ -673,6 +674,14 @@ against this.**
 - **Leave out:** the old "Clear page". Undo covers mistakes, and a one-tap wipe
   is how a whole takeoff gets lost.
 
+> **OVERRIDDEN 2026-09-29, confirmed by the owner, and built.** "Clear all
+> marks and runs on this sheet" is in the sheet's "…" menu. It answers the
+> reason above rather than ignoring it: it is never one tap (the question
+> lists exactly what goes, counted from the rows, and the button names the
+> number), and the whole clear is one undo step with the same ids. Refused on a
+> locked bid. No plan-set-wide clear. `server/routers/takeoffSheetRouter.ts`,
+> `references/track-b-plans-screen-edits-plan.md` Part 3.
+
 **D7 — How much run editing (T8–T11).**
 
 - (a) Drag a point, add to the end, delete a point, rename.
@@ -729,6 +738,13 @@ against this.**
 - (c) Ask once per bid.
 - **Pick:** (a). Automatic reading costs money on every sheet opened, including
   schedules and details nobody takes off.
+
+> **Overridden 2026-09-29 by the owner: no automatic reading at all, not even
+> opt-in.** (a) kept a "Read each sheet as I open it" switch, off by default.
+> It is removed. A sheet is read only when Read sheet is pressed, per
+> CLAUDE.md § "AI features" ("a call is a button"). The guard is
+> `server/aiCallsAreButtons.test.ts`, which fails if any effect in `client/src`
+> starts a reading or anything reads the old preference back.
 
 **D12 — Should "Where do I…?" be reachable from every page? (A5)**
 
@@ -1221,8 +1237,12 @@ Checked against the deleted `PlanPanel.tsx`. These may have been forgotten.
   an installed app (section 7).
 - **Stamps that failed to send are not retried when the connection returns** —
   only with the next stamp placed, or when the sheet is reopened (C8).
-- **Stamp counts are never totalled across the whole bid** on this screen — only
-  per sheet (section 8 item 7).
+- ~~**Stamp counts are never totalled across the whole bid** on this screen — only
+  per sheet (section 8 item 7).~~ **Stale, and superseded 2026-09-29:** counts
+  were already whole-bid in `takeoffGroups.list`, and the counted-items panel
+  now carries a whole-set summary — on the bid / not on the bid yet, with a
+  reason for each — and "Send all to bid". See
+  `references/track-b-deletes-summary-pan-plan.md` §§ 2–3.
 - **The PDF drawing fix is on GitHub on `local-dev`, but not merged to `main` or
   deployed** (V6).
 - **Pages are drawn once at 1.5× size** — the sharpness limit once zoom exists

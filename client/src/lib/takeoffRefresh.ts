@@ -35,6 +35,7 @@ export type TakeoffQuery =
   | "takeoffRuns.typeColors"
   | "takeoffRunTypes.bridgeForBid"
   | "takeoffGroups.list"
+  | "takeoffSummary.forBid"
   | "takeoffHeights.forBid"
   | "bidPdfs.list"
   | "bidPdfs.sheetJumpList"
@@ -62,6 +63,13 @@ export const BID_QUANTITY_QUERIES = [
   */
   "bids.get",
   "materialsList.get",
+  /*
+    ADDED 2026-09-29 with the whole-set summary. It states every quantity on
+    the plan set as on the bid or not, so anything that moves a quantity or a
+    line moves it — which is why it lives in this list and not beside one
+    mutation (CLAUDE.md, the staleness class).
+  */
+  "takeoffSummary.forBid",
 ] as const satisfies readonly TakeoffQuery[];
 
 const RUN_QUERIES = [
@@ -125,7 +133,46 @@ export type TakeoffChange =
    * footage lands on run-type lines, so every bid quantity moves, and the
    * group row shows the result.
    */
-  | "groupDrop";
+  | "groupDrop"
+  /**
+   * An undo or redo (@/lib/undoStack). It can put back or take away marks
+   * AND runs at once, so it moves everything either can. Its per-sheet lists
+   * are the STEP's sheet, which may not be the open one — see
+   * `sheetsToRefresh`.
+   */
+  | "undo"
+  /** Every mark and run on one sheet removed (or put back) in one step. */
+  | "sheetCleared"
+  /**
+   * What sits at a run's end, or its height: the DROP. Until 2026-09-29 the
+   * ends editor refreshed `takeoffRuns` only, so the Send preview, the bid's
+   * lines and the materials list kept the old drop footage on screen.
+   */
+  | "runEnds"
+  /**
+   * A count or run type sent to the bid, singly or by Send all. Until
+   * 2026-09-29 the single count send refetched the count list only, so the
+   * bid's cached lines and the materials list kept the old answer.
+   */
+  | "sentToBid";
+
+/**
+ * Which sheets' own lists (marks, runs) a change must refresh.
+ *
+ * The screen invalidated per-sheet lists for the OPEN sheet only. An undo
+ * pressed after switching sheets changes the sheet the step was on, and that
+ * sheet's cached marks would have shown the old answer on return — the
+ * staleness class in CLAUDE.md. So both, when they differ.
+ */
+export function sheetsToRefresh(
+  openSheetId: number | null | undefined,
+  stepSheetId: number | null | undefined
+): number[] {
+  const ids = [openSheetId, stepSheetId].filter(
+    (id): id is number => typeof id === "number"
+  );
+  return Array.from(new Set(ids));
+}
 
 function unique(list: readonly TakeoffQuery[]): readonly TakeoffQuery[] {
   return Array.from(new Set(list));
@@ -153,4 +200,8 @@ export const QUERIES_MOVED_BY: Readonly<
   ]),
   heights: unique(["takeoffHeights.forBid", ...RUN_QUERIES]),
   groupDrop: unique([...MARK_QUERIES, ...RUN_QUERIES]),
+  undo: unique([...MARK_QUERIES, ...RUN_QUERIES]),
+  sheetCleared: unique([...MARK_QUERIES, ...RUN_QUERIES]),
+  runEnds: unique(RUN_QUERIES),
+  sentToBid: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
 };

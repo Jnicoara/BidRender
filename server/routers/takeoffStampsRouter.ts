@@ -45,9 +45,23 @@ import {
   runFeet,
   tracedRunOf,
 } from "../../shared/takeoffQuantities";
+import { lockedEditRefusal } from "../../shared/quantityLock";
 import { TAKEOFF_LOCATIONS } from "../../drizzle/schema";
 import { SYMBOL_THUMBNAIL_MAX_CHARS } from "../../shared/symbolCapture";
 import * as db from "../db";
+import {
+  STAMPS_PACKET,
+  openPacket,
+  packetSchema,
+  sealPacket,
+} from "../restorePacket";
+import {
+  bidsOfStamps,
+  confirmPlacedIds,
+  deleteStampsWithSnapshot,
+  restoreStamps,
+  type StampSnapshot,
+} from "../takeoffRestore";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -94,6 +108,29 @@ async function requireBid(bidId: number, userId: number) {
   return bid;
 }
 
+/**
+ * Refuse to delete marks from a bid whose quantities are locked.
+ *
+ * The locked line reads its stored `qty`, so the number would not move — but
+ * the drawing it was priced from would, and unlocking later re-reads that
+ * drawing. Whole selection or nothing.
+ *
+ * This comment used to say "placing a mark stays allowed on purpose (the send
+ * toast says further marks will not change a locked line)". That was reversed
+ * on 2026-09-29 by the owner — a locked bid must not change — because a mark
+ * placed after the lock is the same disagreement in the other direction: the
+ * sheet shows more than the quote, and unlocking silently adds it. `drop` now
+ * refuses too, and the toast no longer promises otherwise.
+ */
+async function refuseIfAnyLocked(ids: readonly number[], userId: number) {
+  if ((await db.countStampsOnLockedBids(ids, userId)) > 0)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "This bid's quantities are locked, so its marks cannot be removed. Unlock them on the bid first.",
+    });
+}
+
 export const takeoffStampsRouter = router({
   /**
    * Drop one or more stamps.
@@ -132,7 +169,12 @@ export const takeoffStampsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("new marks cannot be placed"),
+        });
       await requireSheet(input.sheetId, ctx.scope.dataUserId);
 
       const group = await db.getGroupById(input.groupId, ctx.scope.dataUserId);
@@ -162,7 +204,8 @@ export const takeoffStampsRouter = router({
         assemblyCategory = assembly?.category ?? null;
       }
 
-      await db.createStamps(
+      // The ids go back so the screen can offer "undo: N marks placed".
+      const ids = await db.createStampsReturningIds(
         input.at.map(point => ({
           bidId: input.bidId,
           sheetId: input.sheetId,
@@ -177,15 +220,39 @@ export const takeoffStampsRouter = router({
         }))
       );
 
-      return { dropped: input.at.length };
+      /*
+        `createStampsReturningIds` assumes one insert's ids are consecutive,
+        which MySQL promises only while no other insert interleaves with it
+        (this server runs innodb_autoinc_lock_mode=2). An undo that removes
+        the wrong mark is far worse than no undo, so the ids go back only if
+        every one of them is a row this insert wrote.
+      */
+      const confirmed = await confirmPlacedIds(ids, {
+        userId: ctx.scope.dataUserId,
+        sheetId: input.sheetId,
+        groupId: group.id,
+      });
+
+      return { dropped: input.at.length, ids: confirmed };
     }),
 
-  /** Remove one stamp — the misclick path. */
+  /**
+   * Remove one stamp — the misclick path. Refused on a locked bid.
+   *
+   * Returns `undo`, a sealed packet `restore` accepts (server/restorePacket.ts).
+   */
   remove: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
-      await db.deleteStamp(input.id, ctx.scope.dataUserId);
-      return { success: true };
+      await refuseIfAnyLocked([input.id], ctx.scope.dataUserId);
+      const { snapshot } = await deleteStampsWithSnapshot(
+        [input.id],
+        ctx.scope.dataUserId
+      );
+      return {
+        success: true,
+        undo: sealPacket(STAMPS_PACKET, ctx.scope.dataUserId, snapshot),
+      };
     }),
 
   /**
@@ -208,8 +275,50 @@ export const takeoffStampsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const ids = Array.from(new Set(input.ids));
-      const removed = await db.deleteStamps(ids, ctx.scope.dataUserId);
-      return { removed };
+      await refuseIfAnyLocked(ids, ctx.scope.dataUserId);
+      const { removed, snapshot } = await deleteStampsWithSnapshot(
+        ids,
+        ctx.scope.dataUserId
+      );
+      return {
+        removed,
+        undo: sealPacket(STAMPS_PACKET, ctx.scope.dataUserId, snapshot),
+      };
+    }),
+
+  /**
+   * Put deleted marks back — undo of a delete, redo of a placement.
+   *
+   * Same ids, and every run end, tee and AI finding that pointed at them is
+   * pointed at them again (server/takeoffRestore.ts). Refused, with a
+   * sentence, when that cannot be done exactly: the count is gone, the marks
+   * are already back, or the bid is locked.
+   */
+  restore: procedure
+    .input(z.object({ undo: packetSchema }))
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const snapshot = openPacket<StampSnapshot>(
+        STAMPS_PACKET,
+        userId,
+        input.undo
+      );
+      if (!snapshot)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "That undo step is not valid here.",
+        });
+      for (const bidId of bidsOfStamps(snapshot)) {
+        const bid = await requireBid(bidId, userId);
+        if (bid.quantitiesLockedAt !== null)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "This bid's quantities are locked, so its marks cannot be put back. Unlock them on the bid first.",
+          });
+      }
+      const restored = await restoreStamps(snapshot, userId);
+      return { restored };
     }),
 
   /** Every stamp on a sheet, for drawing the marks. */

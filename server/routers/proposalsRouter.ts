@@ -44,6 +44,7 @@ import {
 import { refuseIfIncomplete, reportPricingProblems } from "../pricingProblems";
 import { resolveBidClient } from "../../shared/bidClient";
 import { explainTaxStatus } from "../../shared/salesTax";
+import { notPricedLines } from "../../shared/lineNotPriced";
 import { storagePresignPut } from "../storage";
 import * as db from "../db";
 import { setLogoReleasingOld } from "../storedFiles";
@@ -415,6 +416,7 @@ export const proposalsRouter = router({
         // The clock is the server's, so two people looking at the same proposal
         // on either side of midnight see the same date on it.
         now: new Date(),
+        notPriced,
       });
 
       return {
@@ -474,12 +476,23 @@ export const proposalsRouter = router({
           totalDue: totals.totalDue,
         },
         /**
-         * Lines and parts nobody priced, which the total counts as $0. Unlike
-         * a line the engine cannot price, this does NOT refuse the proposal
-         * (owner, 2026-09-26): the composer warns before printing and shows
-         * the count in "Your figures", and the client's copy says nothing.
+         * Lines and parts nobody priced, which the total counts as $0.
+         *
+         * Until 2026-09-29 this did NOT stop printing (owner, 2026-09-26):
+         * the composer asked "Print anyway?" and the client's copy printed
+         * the short total, $0.00 on a bid with one line. Overridden by the
+         * owner on 2026-09-29: the document shows "Price pending" in place of
+         * every figure (`clientFigure`), and Print is blocked with this list
+         * until the lines are priced. The document itself still builds, so
+         * the estimator can see what they are fixing.
          */
         notPriced,
+        notPricedLines: notPricedLines(
+          priced.map(({ line, breakdown }) => ({
+            line,
+            directCost: breakdown?.directCost ?? null,
+          }))
+        ),
         lineCount: lines.length,
       };
     }),

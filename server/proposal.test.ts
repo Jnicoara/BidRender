@@ -52,8 +52,11 @@ import {
   missingBrandingFields,
   needsBranding,
   setSectionVisible,
+  clientFigure,
+  PRICE_PENDING,
   type BuildProposalInput,
 } from "../shared/proposal";
+import { NOTHING_NOT_PRICED, notPricedLines } from "../shared/lineNotPriced";
 
 /**
  * Split a minted storage URL back into its two halves.
@@ -134,6 +137,7 @@ function input(
       validDays: 30,
     },
     now: new Date("2026-08-13T12:00:00Z"),
+    notPriced: NOTHING_NOT_PRICED,
     ...overrides,
   };
 }
@@ -348,6 +352,47 @@ describe("layout and accent", () => {
 // ─── What the client may and may not see ──────────────────────────────────────
 
 describe("what leaves the building", () => {
+  it("prints 'Price pending', never a short figure, while anything is not priced", () => {
+    for (const notPriced of [
+      { lines: 1, parts: 0 },
+      { lines: 0, parts: 2 },
+    ]) {
+      const doc = buildProposal(input({ notPriced }));
+      expect(doc.investment.pricePending).toBe(true);
+      expect(
+        clientFigure(doc.investment, doc.investment.total, n => `$${n}`)
+      ).toBe(PRICE_PENDING);
+    }
+    const priced = buildProposal(input());
+    expect(priced.investment.pricePending).toBe(false);
+    expect(
+      clientFigure(priced.investment, priced.investment.total, n => `$${n}`)
+    ).toBe("$13200");
+  });
+
+  it("lists unpriced lines by name, agreeing with the count", () => {
+    const line = (name: string, cost: number, unpricedParts = 0) => ({
+      name,
+      qty: 1,
+      assemblyId: 1,
+      takeoffRunTypeId: null,
+      runMaterialRole: null,
+      snapshotMaterialCost: cost,
+      snapshotLaborHours: 0,
+      unpricedParts,
+    });
+    expect(
+      notPricedLines([
+        { line: line("Priced", 10), directCost: 10 },
+        { line: line("Nothing priced", 0), directCost: 0 },
+        { line: line("Short a lug", 10, 2), directCost: 10 },
+      ])
+    ).toEqual([
+      { name: "Nothing priced", wholeLine: true, parts: 0 },
+      { name: "Short a lug", wholeLine: false, parts: 2 },
+    ]);
+  });
+
   it("quotes one price, with overhead and profit inside it", () => {
     const doc = buildProposal(input());
     expect(doc.investment.total).toBe(13200);
@@ -532,6 +577,72 @@ describe.skipIf(!hasDb)("proposals end to end", () => {
     });
     return bid!;
   }
+
+  // ── A bid with a line nobody priced (owner, 2026-09-29) ───────────────────
+
+  it("never quotes a short total: an unpriced line makes the document 'Price pending' and names the line", async () => {
+    // Staging's bid 2 printed TOTAL INVESTMENT $0.00 with one unpriced line.
+    // A $0 material and no hours: the line's cost cell says "Not priced".
+    const free = await caller().materials.create({
+      name: `Unpriced probe ${Date.now()}${Math.random()}`,
+      unitOfSale: "each",
+      costPerUnit: 0,
+      category: "Receptacles",
+    });
+    const unpricedName = `Unpriced assembly ${Date.now()}${Math.random()}`;
+    const unpriced = await caller().assemblies.create({
+      name: unpricedName,
+      category: "Devices",
+      trade: "electrical",
+      projectType: null,
+      baseLaborHours: 0,
+      laborRateId: null,
+      materials: [{ materialId: free!.id, qty: 1 }],
+      modifierIds: [],
+    });
+    const bid = await bidWithOneLine();
+    await caller().bids.addAssembly({
+      bidId: bid.id,
+      assemblyId: unpriced!.id,
+      qty: 1,
+      unitLabel: null,
+    });
+
+    const full = await caller().proposals.document({ bidId: bid.id });
+    expect(full.notPriced.lines).toBe(1);
+    expect(full.document.investment.pricePending).toBe(true);
+    expect(
+      clientFigure(
+        full.document.investment,
+        full.document.investment.total,
+        n => n.toFixed(2)
+      )
+    ).toBe(PRICE_PENDING);
+    expect(full.notPricedLines).toEqual([
+      { name: unpricedName, wholeLine: true, parts: 0 },
+    ]);
+
+    // Scope-only prints no money, so it is never pending.
+    const scope = await caller().proposals.document({
+      bidId: bid.id,
+      mode: "scope-only",
+    });
+    expect(scope.document.investment.pricePending).toBe(false);
+  });
+
+  it("a fully priced bid prints its figure, not 'Price pending'", async () => {
+    const bid = await bidWithOneLine();
+    const full = await caller().proposals.document({ bidId: bid.id });
+    expect(full.document.investment.pricePending).toBe(false);
+    expect(full.notPricedLines).toEqual([]);
+    expect(
+      clientFigure(
+        full.document.investment,
+        full.document.investment.total,
+        n => n.toFixed(2)
+      )
+    ).toBe(full.document.investment.total.toFixed(2));
+  });
 
   // ── Branding ───────────────────────────────────────────────────────────────
 

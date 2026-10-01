@@ -62,6 +62,7 @@ import {
   refuseUnknownKinds,
 } from "../extrasInput";
 import * as db from "../db";
+import { refuseSendIfLocked } from "../lockGuard";
 
 /**
  * Gated on bids rather than on a library permission, deliberately: this palette
@@ -767,9 +768,8 @@ export const takeoffRunTypesRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const bid = await db.getBidById(input.bidId, ctx.scope.dataUserId);
-      if (!bid)
-        throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
+      // Refused whole on a locked bid (owner, 2026-09-29) — server/lockGuard.ts.
+      const bid = await refuseSendIfLocked(input.bidId, ctx.scope.dataUserId);
       /*
         RESOLVED, exactly like the read above, and for a sharper reason.
 
@@ -886,16 +886,13 @@ export const takeoffRunTypesRouter = router({
       const wanted = input.role
         ? candidates.filter(row => row.role === input.role)
         : candidates;
-      // Refill or swap, per role — the same plan the preview showed. Only
-      // asked on an unlocked bid; a locked one is refused below regardless.
-      const plans =
-        bid.quantitiesLockedAt === null
-          ? await resendPlans(
-              ctx.scope.dataUserId,
-              wanted,
-              existing.filter(line => line.archivedAt === null)
-            )
-          : new Map<string, ResendPlan>();
+      // Refill or swap, per role — the same plan the preview showed. A locked
+      // bid never reaches here (refused at the top).
+      const plans = await resendPlans(
+        ctx.scope.dataUserId,
+        wanted,
+        existing.filter(line => line.archivedAt === null)
+      );
 
       const sent = [];
       const updated = [];
@@ -914,20 +911,12 @@ export const takeoffRunTypesRouter = router({
         */
         const live = already.get(row.role);
         /*
-          A LOCKED bid keeps the footage it was sent at. This used to refresh
-          regardless, so pressing Send again after tracing more quietly
-          rewrote a quantity somebody had already quoted — the column IS the
-          frozen answer once `quantitiesLockedAt` is set, so this UPDATE was
-          the lock's one open door. A NEW row still arrives, frozen at today's
-          number, the same as a count sent to a locked bid.
+          A LOCKED bid used to be handled here: an existing line was skipped
+          (a re-send once rewrote a quoted quantity — the lock's open door)
+          while a NEW row still arrived frozen. Since 2026-09-29 the whole send
+          is refused at the top, so neither happens; the old skip is gone
+          rather than left as a branch nothing can reach.
         */
-        if (live && bid.quantitiesLockedAt !== null) {
-          skipped.push({
-            role: row.role,
-            why: "This bid's quantities are locked. Unlock the bid to update it from the drawing.",
-          });
-          continue;
-        }
         if (live) {
           const allowedAgain = row.sendable;
           if (!allowedAgain.ok) {

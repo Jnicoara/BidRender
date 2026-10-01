@@ -29,6 +29,7 @@ import {
   users,
 } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { behindTheLock } from "./behindTheLock.testHelper";
 import { lineHoursUnset, lineNotPriced } from "../shared/lineNotPriced";
 
 const USER = 8795;
@@ -377,8 +378,14 @@ withDb("factory elbows from the company size up", () => {
     await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
     await caller().bids.lockQuantities({ bidId });
 
-    await trace(bidId, sheetId, type.id, L);
-    await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+    // Behind the lock: a locked bid refuses tracing since 2026-09-29; this
+    // is a drawing that moved before that rule.
+    await behindTheLock(bidId, () => trace(bidId, sheetId, type.id, L));
+    // Since 2026-09-29 a locked bid refuses the send outright (server/lockGuard.ts),
+    // which is a stronger form of "Send-again does not move a frozen line".
+    await expect(
+      caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id })
+    ).rejects.toThrow(/locked/);
     const elbow = line((await detail(bidId)).lines, "elbow90")!;
     expect(Number(elbow.qty)).toBe(1);
     const database = await getDb();

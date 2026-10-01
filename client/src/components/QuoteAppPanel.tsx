@@ -146,10 +146,14 @@ export function QuoteAppPanel({
           ) : !settled ? (
             <p className="text-sm text-muted-foreground">Checking the bid…</p>
           ) : doc.state === "blocked" ? (
-            <Blocked doc={doc} />
+            <>
+              <PlanWarnings lines={doc.planWarnings} />
+              <Blocked doc={doc} />
+            </>
           ) : (
             <>
               {doc.isSample && <SampleWarning />}
+              <PlanWarnings lines={doc.planWarnings} />
               {doc.examplePricedLines > 0 && (
                 <p className="flex items-start gap-1.5 text-xs text-[#F5C518]">
                   <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
@@ -263,6 +267,26 @@ function SampleWarning() {
       <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[#F5C518]" />
       This is the example job. Its figures are not a real quote.
     </p>
+  );
+}
+
+/**
+ * Takeoff that is on the Plans screen and not on the bid (2026-09-29).
+ * Warnings, not gaps: the figures are right for what IS on the bid, so they
+ * are not held back — but a quote that looks finished while traced runs are
+ * missing from it is exactly the silence the owner ruled out.
+ */
+function PlanWarnings({ lines }: { lines: readonly string[] }) {
+  if (lines.length === 0) return null;
+  return (
+    <div className="flex items-start gap-1.5 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-3 py-2 text-xs">
+      <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[#F5C518]" />
+      <ul className="space-y-1">
+        {lines.map(line => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

@@ -17,6 +17,13 @@ This is the human-readable companion to the git history — read this to see wha
   pixels wide). It is now drawn fresh from the PDF at 400 pixels per inch, or
   sharper if you were zoomed in further. Very large pictures are kept small
   enough for the database, which previously could have refused them.
+- **A sheet's scale no longer sits on top of the next sheet in the sheet
+  list.** Setting a scale grew that row by a line, and for a moment (or for
+  as long as the tab was in the background) the list still had it at its old
+  height, so the scale covered the sheet below. Rows now take their new
+  height the instant a scale is set. On a narrow sheet list the scale also
+  stays on one line rather than breaking in two, and a long one like
+  3/16" = 1'-0" now fits in full even with the list dragged to its narrowest.
 
 ## [2026-09-29]
 
@@ -111,7 +118,195 @@ This is the human-readable companion to the git history — read this to see wha
   unsized rows became the 1/2" ones, so anything already using them keeps
   working. Threaded closure plugs (1/2" and 3/4") are in the catalog too,
   for the unused hubs (unpriced, like every shipped item).
+- **A proposal can no longer show a client $0.00 or a short total.** If any
+  line on the bid is not priced, the proposal shows "Price pending" where the
+  total (and any subtotal, tax or per-unit price) would be, and Print / Save
+  PDF is blocked with a list of the lines to price first. Before this it
+  asked "Print anyway?" and printed the short total; on a bid with one
+  unpriced line that was $0.00. A scope-only proposal, which shows no money,
+  is unchanged.
+- **The plan reader's Link button now always opens where you can see it.**
+  It used to be invisible until the mouse was over it, and pressing it opened
+  the "what is this really?" picker below the whole list of suggestions, often
+  cut off by the bottom of the pane, so it looked like nothing happened. The
+  picker now opens directly under the suggestion you pressed, and says plainly
+  when you have no legend symbols to pick from yet.
+- **Plan reader suggestions are no longer ticked for you, and ticking one
+  shows you where it is.** Checked on a real sheet, the reader's idea of WHERE
+  a symbol sits can be off by a couple of inches of paper (several feet at
+  1/4" scale), even when it is sure WHAT the symbol is. That is how a mark
+  ended up beside a keynote tag by a door instead of on the light fixture.
+  The app was placing marks exactly where the reader said; the reader was
+  wrong about where. Now nothing is placed until you tick it, and ticking it
+  (or pressing Link) moves the drawing to that spot so you can check it first.
 
+- **The plan reader no longer reads a sheet just because you opened it.** The
+  "Read each sheet as I open it" switch is gone. A sheet is read, and paid for,
+  only when you press Read sheet. With the switch on, clicking through a
+  forty-sheet set to find the electrical drawings could spend money on every
+  sheet you passed.
+- **Deleting on the Plans screen now asks in proportion to what you lose.**
+  One mark, or one count's marks on a sheet, goes at once with an "Undo"
+  button in the message. A whole run asks first and names it ("Delete run
+  Homerun — 88.89 ft?"); a new "Delete count…" removes a count from every
+  sheet after asking, and can be undone too. Clearing a sheet now says how
+  many feet of run go. In these questions Enter never deletes — it has to be
+  a click. A locked bid refuses all of it; deleting a whole count on a
+  locked bid used to be allowed, and is not any more.
+- **The Plans screen now says what is on the bid and what is not, for the
+  whole plan set.** An amber "Not on the bid yet" list names every count and
+  traced run that has not reached the bid, with the reason — not sent, no run
+  type, no scale, an assembly that was deleted, or conduit with no wire in
+  it. "Send N to bid…" shows a preview of what will go and what cannot, then
+  sends it in one press. Sending again never adds a second line, a locked bid
+  refuses, and if the drawing changed while the preview was open it asks you
+  to check again rather than sending something you did not see. Pressing
+  Enter in the preview never sends; it has to be a click.
+- **Sending a count or a run type again, after its bid line had been
+  archived, no longer fails with a database error.** The archived copy was
+  still holding the count's place on the bid; it is now cleared and a fresh
+  line goes on. This had to work before "Send all to bid" could be built.
+- **Two-finger scrolling on a trackpad now moves the sheet.** It used to zoom.
+  A mouse wheel still zooms (like Bluebeam), and pinching still zooms. The app
+  tells the two apart by how the scroll arrives; if your mouse ever pans
+  instead of zooming, say so — that is the one guess in this.
+- **You can move the sheet when zoomed out.** At "Fit" and below, dragging
+  the sheet did nothing — it snapped back to the middle. It now moves a
+  little (up to about a sixth of the view either way) so you can slide a
+  detail out from under a panel. "Fit" and the 0 key still put it back in the
+  middle.
+- **Dragging the sheet no longer picks or nudges things by accident.** A drag
+  that started on a mark used to move the sheet AND select that mark, so the
+  next Delete could remove something you never chose; it now just moves the
+  sheet. A small wobble while clicking no longer moves the sheet, and a click
+  on a run's point handle no longer shifts the point by a hair. Setting a
+  scale by measuring no longer nudges the sheet between the two clicks.
+- **The sheet list's header no longer cuts off its buttons.** When the sheet
+  panel was narrow (or the app's text size was larger), the list/picture
+  buttons were half hidden past the panel's edge. The header now moves them
+  to a second line instead. On a phone-width window, "Add PDF" at the top of
+  the Plans screen was also off the edge; that row now wraps too.
+- **Undo on the Plans screen now survives leaving it.** Going to the bid and
+  back used to wipe the undo history. It now lasts as long as the browser tab
+  (including a reload); a new tab starts with its own empty history, and the
+  button says "Nothing to undo in this tab yet".
+- **Slipped double-clicks no longer add stray elbows, and old ones are
+  flagged.** Finishing a run with a double-click could leave a tiny extra
+  segment when the mouse moved slightly, especially zoomed out, and that
+  turn was counted as an elbow. The trace tool now ignores the second click
+  of a double-click at any zoom. Runs traced before this that may have such
+  an end show "Check this elbow" with a Show button; nothing is changed on
+  them — you decide.
+- **Marks can no longer be counted as the wrong thing after a failed save.**
+  If saving marks failed (a dropped connection) and you then switched to
+  counting something else, the next save could file both sets under the first
+  item. Each count now saves separately, and marks recovered after a crash are
+  put back under the count they were placed with. Checked by making saves fail
+  on purpose: each count kept exactly its own marks.
+- **Traced runs that never reached the bid are now called out.** A run only
+  reaches the bid once its run type is sent, and nothing used to say when that
+  had not happened, so a bid and its quote could look finished with hundreds of
+  feet of pipe missing. The bid page and the quote panel now both say, for
+  example, "3 traced runs not on the bid — not sent yet", and name runs that
+  have no run type. The quote panel also mentions counts not yet sent and pipe
+  with no wire.
+- **A conduit run with no wire in it now says so, in amber.** A traced pipe
+  starts with no wire until wire is added, so it could reach the bid empty with
+  only a grey "none" to show for it. The run now reads "No wire on the bid for
+  this pipe" with a one-tap "Use the run type's wire", and the bid page warns
+  "N conduit runs have no wire". Nothing is added without you pressing it.
+- **A locked bid now refuses the last ways its numbers could still move.**
+  Sending counts or runs to it, changing or clearing a sheet's scale (and
+  applying one read automatically from the sheet), removing a plan set, and
+  removing a bid line that came from the plans are all refused with the same
+  plain "unlock it on the bid first" sentence. Lines you typed in by hand can
+  still be removed. The Send links, the scale chip and the plan's remove
+  button say so before anything happens.
+- **A locked bid's plans can no longer change at all.** Before, a locked
+  bid refused deletes but still let you place new marks, trace new runs, type
+  a run's length, add a leg, answer a pull point or change a run's wires. The
+  quoted numbers held, but the drawing behind them moved, and unlocking later
+  would have pulled those changes onto the bid unnoticed. All of these are now
+  refused with one plain sentence ("This bid's quantities are locked, so new
+  marks cannot be placed. Unlock them on the bid first."). The Count and trace
+  buttons say it before anything starts.
+- **Undo stays where you deleted, even when the count card empties.**
+  Deleting the last mark of a count on a sheet used to make its card (and its
+  undo arrow) disappear, leaving only the toolbar Undo. The card now stays in
+  place, greyed, reading "None left on this sheet", with its undo arrow, until
+  you do something else.
+- **Drops are set in the run card, end by end.** Selecting a run (on the plan
+  or its card) opens "Run ends", listing every end of every leg, branch ends
+  included. Each end has one-tap answers (Device box, Panel, J-box, Fixture,
+  Stub-up, Nothing) that take the drop from heights you already have, and a
+  height you can change for that end alone. Clicking an end on the plan
+  highlights it in the list. The "only one end counted" warning is now a
+  "Set ends" button that takes you to the run. Every end change can be
+  undone.
+- **Fixed: changing a run's end did not update the bid until something else
+  did.** The Send preview, the bid's lines and the materials list kept
+  showing the old drop footage after an end changed. They now update at once.
+- **Trash and undo on every count card, and undo on every run card.** A
+  count card's trash deletes that count's marks on the sheet you are looking
+  at, asking first when there is more than one. The count itself stays, and
+  its bid line follows. Each card's undo arrow takes back the latest change
+  when that change was to this card, and its tooltip names it. It is greyed
+  out when the latest change was somewhere else, so it can never undo out
+  of order.
+- **A Delete button on the Plans toolbar.** It sits beside Undo and Redo and
+  says what it will delete ("Delete 3 marks", "Delete run"). It is greyed
+  out until something is selected, and asks first when more than one mark
+  is selected. The Delete key does the same for a selected run.
+- **A locked bid no longer lets drops change.** What sits at a run's end
+  (and a quantity trace's drop answers) decides how much drop pipe and wire
+  the run needs, and those could still be changed on a locked bid. They are
+  now refused with "unlock them on the bid first", like the other locked
+  edits. A run traced after locking can still be drawn, but its ends wait
+  until the bid is unlocked.
+- **No more white square when a plan opens.** Opening a plan showed a small
+  blank white box in the corner until the first sheet was drawn. The loading
+  panel now stays up ("Opening plan set…", then "Drawing sheet 1…") until
+  the sheet can be shown whole and already fitted to the screen.
+- **You can clear one sheet, and put it back.** The new "…" menu beside the
+  sheet picker has "Clear all marks and runs on this sheet". It first asks
+  with the exact numbers, for example "Remove 12 runs and 40 marks in 5
+  counts from E1.01?", and warns when a count will have no marks left
+  anywhere. One Ctrl+Z puts the whole sheet back as it was. The sheet, its
+  scale and the counts stay. Not available on a locked bid.
+- **"Select text" is now called "Copy text".** It reads words off the drawing
+  for you to copy, and "select" was easily confused with selecting marks.
+- **A finished run's points can now be dragged.** Select a run and its
+  points show as handles. Drag one to move it, drag the faint "+" on a
+  segment to add a point, and right-click a point (or click it, then press
+  Delete) to remove it. The length, elbows and bid follow when you let go,
+  and Ctrl+Z puts the run back. A finished run stays finished and keeps its
+  location. A branch-tee end stays on its tee. If a moved corner loses an LB
+  or pull-box answer, the screen says so. Not available on a locked bid.
+- **Undo and redo on the Plans screen.** Placing marks, deleting marks,
+  finishing a run and deleting a run can each be undone with the new arrow in
+  the toolbar or Ctrl+Z, and redone with Ctrl+Shift+Z. The tooltip names the
+  step ("Undo: 3 marks placed"). Anything put back returns exactly as it was,
+  with the same links: a run that ended on a mark ends on it again, so no
+  vertical or count quietly changes. If something changed since (the count
+  was deleted, or the run was edited), the step is refused with the reason.
+  The history is per bid and lasts until the page is reloaded.
+- **While tracing, the top readout shows only the run total.** It used to
+  show a second, bigger "to cursor" figure that jumped whenever the mouse
+  moved, which read as the run's length. The pill now holds only the clicked
+  points, the same length that gets saved. A small dim "Next" label at the
+  cursor gives the segment you are about to click, and the preview line is
+  thinner and fainter. Settings → Display can turn the "Next" label off.
+- **Finishing a run with a double-click no longer adds a phantom elbow.** The
+  second click of the double-click added a tiny extra point. If the mouse had
+  moved even a pixel, the elbow count read the turn onto it as a corner and
+  put an elbow on the bid that nobody drew. The second click now adds
+  nothing. Runs already saved with a very short stub stop counting it too.
+- **A locked bid can no longer lose marks or runs.** Deleting a mark, a
+  selection of marks or a traced run went straight through on a bid whose
+  quantities were locked. The bid's number held, but the drawing behind it
+  changed, and unlocking later would have re-read the gaps. Those deletes are
+  now refused with "unlock them on the bid first". Placing new marks on a
+  locked bid still works, as before.
 - **Marks placed by the plan reader now count on the bid.** Pressing Place
   drew the marks and added their parts to the materials list, but the count
   and the bid line never moved, so the bid and the supply list disagreed with

@@ -6,6 +6,7 @@ import {
   deleteQuestion,
   pruneSelection,
   stampsInBox,
+  toolbarDelete,
 } from "./stampSelection";
 
 const set = (...ids: number[]) => new Set(ids);
@@ -57,9 +58,15 @@ describe("selecting marks", () => {
 });
 
 describe("deleting a selection", () => {
-  it("asks first for more than one mark, never for one", () => {
-    expect(deleteNeedsConfirm(1)).toBe(false);
-    expect(deleteNeedsConfirm(2)).toBe(true);
+  it("asks first when the marks span more than one count, never within one", () => {
+    const m = (groupName: string) => ({ groupName });
+    expect(deleteNeedsConfirm([m("Recep")])).toBe(false);
+    // One count's marks — a card's trash — go at once, with Undo (plan § 1.2 c).
+    expect(deleteNeedsConfirm([m("Recep"), m("Recep"), m("Recep")])).toBe(
+      false
+    );
+    // A box that caught another count's mark asks.
+    expect(deleteNeedsConfirm([m("Recep"), m("Switch")])).toBe(true);
   });
 
   it("names the counts a delete would touch", () => {
@@ -71,5 +78,27 @@ describe("deleting a selection", () => {
     expect(q.title).toBe("Delete 3 marks?");
     expect(q.confirm).toBe("Delete 3 marks");
     expect(q.detail).toMatch(/^2 × Receptacle, 1 × Switch\./);
+  });
+});
+
+describe("the toolbar Delete button", () => {
+  it("says how many marks it will delete", () => {
+    expect(toolbarDelete(3, null).label).toBe("Delete 3 marks");
+    expect(toolbarDelete(1, null).label).toBe("Delete 1 mark");
+  });
+
+  it("names a run or a leg when no marks are selected", () => {
+    expect(toolbarDelete(0, { isLeg: false }).label).toBe("Delete run");
+    expect(toolbarDelete(0, { isLeg: true }).label).toBe("Delete leg");
+  });
+
+  it("prefers marks, as the Delete key does", () => {
+    expect(toolbarDelete(2, { isLeg: false }).label).toBe("Delete 2 marks");
+  });
+
+  it("is disabled with nothing selected, and says how to select", () => {
+    const off = toolbarDelete(0, null);
+    expect(off.enabled).toBe(false);
+    expect(off.title).toMatch(/Select/);
   });
 });

@@ -92,6 +92,16 @@ const FIT_PADDING = 24;
 export const MIN_VISIBLE_FRACTION = 0.25;
 
 /**
+ * How far a sheet that FITS the pane may be moved from centre, per axis, as a
+ * fraction of the pane. Owner, 2026-09-29: "move the sheet around a little
+ * even when zoomed out". 0.15 on the measured 796×633 pane is ±119 px across
+ * and ±95 px up and down — enough to move a detail out from under the cursor
+ * or a panel, never enough to lose the sheet. A starting number, to be
+ * dragged on a laptop and a phone and changed here if it feels wrong.
+ */
+export const FIT_SLACK_FRACTION = 0.15;
+
+/**
  * Only NaN falls back to 1 — an infinity is clamped like any other overshoot.
  *
  * The distinction is deliberate. NaN carries no direction, so there is nothing
@@ -110,10 +120,12 @@ export function clampZoom(zoom: number): number {
  *
  * Two cases, and they want opposite behaviour:
  *
- *   The WHOLE SHEET fits — centre it, and ignore any pan. Letting someone shove
- *   a sheet they can already see all of into a corner looks like a bug, not a
- *   feature, and a sheet small enough to see whole is not one anybody is
- *   repositioning.
+ *   The WHOLE SHEET fits — it may move a LITTLE, FIT_SLACK_FRACTION of the
+ *   pane either side of centre. Until 2026-09-29 this centred and ignored
+ *   any pan, reasoning that "a sheet small enough to see whole is not one
+ *   anybody is repositioning". The owner is: the sheet felt stuck from Fit
+ *   down. Shoving it into a corner still looks like a bug, which is why the
+ *   stop is small rather than the overlap rule below.
  *
  *   ANY part of it is off screen — pan anywhere within it AND past its edges,
  *   with empty ground showing, until only `MIN_VISIBLE_FRACTION` of the
@@ -165,10 +177,31 @@ export function clampView(view: PlanView, bounds: ViewBounds): PlanView {
     scaledWidth <= bounds.viewportWidth &&
     scaledHeight <= bounds.viewportHeight
   ) {
+    /*
+      ── The whole sheet fits: it may move A LITTLE (owner, 2026-09-29) ──────
+      This used to return the centre and throw the pan away, and Fit is in
+      this state by definition — so from Fit downwards the sheet was stuck:
+      measured, an 80×60 px drag at Fit moved nothing. The owner wants to pan
+      at every zoom. The overlap rule below would let a fitted sheet slide
+      about 570 px sideways on the measured pane, which is not "a little", so
+      a fitted sheet gets its own stop: FIT_SLACK_FRACTION of the pane either
+      side of centre, per axis, decided for the view as before.
+
+      Crossing into the overlap rule never jumps further than the old rule
+      did: zooming OUT from a view panned far off clamps into the slack,
+      where it used to snap all the way to centre; zooming IN never moves it,
+      because every slack position is inside the overlap range.
+    */
+    const near = (offset: number, scaled: number, viewport: number) => {
+      const c = centred(scaled, viewport);
+      if (!Number.isFinite(offset)) return c;
+      const slack = viewport * FIT_SLACK_FRACTION;
+      return Math.min(c + slack, Math.max(c - slack, offset));
+    };
     return {
       zoom,
-      x: centred(scaledWidth, bounds.viewportWidth),
-      y: centred(scaledHeight, bounds.viewportHeight),
+      x: near(view.x, scaledWidth, bounds.viewportWidth),
+      y: near(view.y, scaledHeight, bounds.viewportHeight),
     };
   }
 
@@ -224,7 +257,19 @@ export function fitView(bounds: ViewBounds): PlanView {
       usableHeight / bounds.contentHeight
     )
   );
-  return clampView({ zoom, x: 0, y: 0 }, bounds);
+  /*
+    Centred HERE, not by clamping (0, 0): since 2026-09-29 a sheet that fits
+    may sit up to FIT_SLACK_FRACTION off centre, so the clamp would leave
+    (0, 0) wherever the slack allows. Fit is the way home, so it centres.
+  */
+  return clampView(
+    {
+      zoom,
+      x: (bounds.viewportWidth - bounds.contentWidth * zoom) / 2,
+      y: (bounds.viewportHeight - bounds.contentHeight * zoom) / 2,
+    },
+    bounds
+  );
 }
 
 /**

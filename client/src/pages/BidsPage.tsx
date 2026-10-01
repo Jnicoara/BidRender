@@ -88,6 +88,7 @@ import {
   handPricedGap,
 } from "@/components/HandPricedLineFields";
 import { quantitySource } from "@shared/quantityLock";
+import { runsNotOnBidText } from "@shared/runsNotOnBid";
 import { describeLineMarkup } from "@shared/materialMarkup";
 import { otherPercentCaption } from "@/lib/percentKind";
 import { money } from "@/lib/money";
@@ -1173,17 +1174,26 @@ export default function BidsPage({
                               />
                             </>
                           )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                            onClick={() =>
-                              removeLine.mutate({ bidId, id: line.id })
-                            }
-                            aria-label={`Remove ${line.name}`}
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </Button>
+                          {/*
+                            A locked line from the plans cannot be removed
+                            (server: bids.removeLine). The slot stays so the
+                            row keeps its shape; a hand-typed line keeps its X.
+                          */}
+                          {source === "locked" ? (
+                            <span className="w-7 shrink-0" aria-hidden />
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                              onClick={() =>
+                                removeLine.mutate({ bidId, id: line.id })
+                              }
+                              aria-label={`Remove ${line.name}`}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
                         </div>
                       );
                     })}
@@ -1507,6 +1517,49 @@ export default function BidsPage({
                     your library, so there is nothing to price them from. Count
                     them again on the <PlansLink bidId={bidId} />, from the
                     library or as a free count.
+                  </p>
+                </div>
+              )}
+
+              {/*
+                Runs traced and never sent (owner, 2026-09-29: "never
+                silent"). The sentence is shared/runsNotOnBid.ts, the same
+                one the quote panel shows, so the two cannot word it apart.
+              */}
+              {runsNotOnBidText(fromPlans.runsNotOnBid) && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {runsNotOnBidText(fromPlans.runsNotOnBid)}
+                    </span>{" "}
+                    None of that footage is in the total above. Send it from the{" "}
+                    <PlansLink bidId={bidId} />.
+                  </p>
+                </div>
+              )}
+
+              {/*
+                Pipe on the bid with no wire in it (owner, 2026-09-29). The
+                rule is shared/runNoWire.ts, the same one the run's own row
+                on the Plans screen reads, where the one-tap fix is.
+              */}
+              {fromPlans.runsWithNoWire > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {fromPlans.runsWithNoWire} conduit run
+                      {fromPlans.runsWithNoWire === 1 ? " has" : "s have"} no
+                      wire
+                    </span>{" "}
+                    {/* Not "the pipe is in the total": a run whose type
+                        was never sent has its pipe off the bid too, and
+                        that sentence was false for it (seen on screen,
+                        2026-09-29). This says only what is true of both. */}
+                    — nothing is pulled through its pipe, so no wire for it is
+                    priced. Add the wire on the <PlansLink bidId={bidId} />;
+                    each run offers its type&apos;s wire in one tap.
                   </p>
                 </div>
               )}

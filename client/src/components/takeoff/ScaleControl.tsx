@@ -74,7 +74,14 @@ export function ScaleControl({
   notToScale,
   wanted,
   pageSize = null,
+  onRefused,
 }: {
+  /**
+   * Set when the scale may not change (a locked bid): opening the popover
+   * calls this instead, which says why. At the chip, not after a scale has
+   * been typed or measured — same reason as the Count button (StampPicker).
+   */
+  onRefused?: () => void;
   sheet: ScaleSheet;
   onSet: (scaleText: string) => Promise<unknown>;
   onClear: () => void;
@@ -234,6 +241,10 @@ export function ScaleControl({
       <Popover
         open={open}
         onOpenChange={next => {
+          if (next && onRefused) {
+            onRefused();
+            return;
+          }
           setOpen(next);
           if (!next) setDraft("");
         }}

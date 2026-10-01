@@ -15,6 +15,7 @@ import {
   SHARP_SCALE_TOLERANCE,
   snapToDevicePixel,
   MIN_VISIBLE_FRACTION,
+  FIT_SLACK_FRACTION,
   clampView,
   clampZoom,
   fitView,
@@ -130,22 +131,28 @@ describe("clampView — the drawing can be pushed aside but never away", () => {
     expect(clampView(fitted, bounds)).toEqual(fitted);
   });
 
-  it("centres a drawing smaller than the viewport and ignores the pan", () => {
+  /*
+    CHANGED 2026-09-29 (owner: pan at every zoom). These two used to assert
+    the old rule — a sheet that fits is centred and the pan ignored — which is
+    exactly what made the sheet feel stuck at Fit. Now it moves, a little.
+  */
+  it("lets a drawing smaller than the viewport move a little, and stops it there", () => {
     const small: ViewBounds = {
       ...bounds,
       contentWidth: 400,
       contentHeight: 300,
     };
     const shoved = clampView({ zoom: 1, x: 9999, y: -9999 }, small);
-    expect(shoved.x).toBe((800 - 400) / 2);
-    expect(shoved.y).toBe((600 - 300) / 2);
+    expect(shoved.x).toBe((800 - 400) / 2 + 800 * FIT_SLACK_FRACTION);
+    expect(shoved.y).toBe((600 - 300) / 2 - 600 * FIT_SLACK_FRACTION);
   });
 
-  it("treats zoomed-out-below-viewport as small, not as pannable", () => {
-    // 2000 × 0.2 = 400 wide and 300 tall: the WHOLE sheet fits, so it centres.
-    const view = clampView({ zoom: 0.2, x: -300, y: 0 }, bounds);
-    expect(view.x).toBe((800 - 400) / 2);
-    expect(view.y).toBe((600 - 300) / 2);
+  it("pans a zoomed-out sheet within the slack, rather than ignoring the pan", () => {
+    // 2000 × 0.2 = 400 wide and 300 tall: the WHOLE sheet fits.
+    const centreX = (800 - 400) / 2;
+    const view = clampView({ zoom: 0.2, x: centreX - 40, y: 150 + 30 }, bounds);
+    expect(view.x).toBe(centreX - 40);
+    expect(view.y).toBe(180);
   });
 
   /*
@@ -204,13 +211,97 @@ describe("clampView — the drawing can be pushed aside but never away", () => {
       expect(fresh.y).toBe(wasPinnedTo);
     });
 
-    it("centres both axes again the moment the whole sheet fits", () => {
-      // Zooming back out past the fit point restores the old behaviour exactly.
-      // This is the half of the rule that is deliberately unchanged.
+    it("comes back to within the slack the moment the whole sheet fits", () => {
+      // CHANGED 2026-09-29: this used to snap all the way to centre. Now it
+      // stops at the slack — a smaller jump across the boundary than before.
       const out = clampView({ zoom: 0.3, x: -400, y: -400 }, wide);
-      expect(out.x).toBe((800 - 600) / 2);
-      expect(out.y).toBe((600 - 180) / 2);
+      expect(out.x).toBe((800 - 600) / 2 - 800 * FIT_SLACK_FRACTION);
+      expect(out.y).toBe((600 - 180) / 2 - 600 * FIT_SLACK_FRACTION);
     });
+  });
+});
+
+/*
+  PANNING AT FIT (owner, 2026-09-29), on fixtures deliberately NOT shaped like
+  the pane (CLAUDE.md § "A test fixture shaped like its container tests half
+  the rule"): a wide sheet, a tall one, and the pane and sheet actually
+  measured on screen at Fit (748×499 drawn in 796×633).
+*/
+describe("panning a sheet that fits", () => {
+  const shapes: [string, ViewBounds][] = [
+    [
+      "wide",
+      {
+        viewportWidth: 800,
+        viewportHeight: 600,
+        contentWidth: 2000,
+        contentHeight: 600,
+      },
+    ],
+    [
+      "tall",
+      {
+        viewportWidth: 800,
+        viewportHeight: 600,
+        contentWidth: 600,
+        contentHeight: 2000,
+      },
+    ],
+    [
+      "measured",
+      {
+        viewportWidth: 796,
+        viewportHeight: 633,
+        contentWidth: 3888,
+        contentHeight: 2594,
+      },
+    ],
+  ];
+
+  for (const [name, b] of shapes) {
+    it(`${name}: Fit is centred, and a small drag moves both axes by exactly that`, () => {
+      const fit = fitView(b);
+      const cx = (b.viewportWidth - b.contentWidth * fit.zoom) / 2;
+      const cy = (b.viewportHeight - b.contentHeight * fit.zoom) / 2;
+      expect(fit.x).toBeCloseTo(cx, 9);
+      expect(fit.y).toBeCloseTo(cy, 9);
+      const moved = clampView({ ...fit, x: fit.x + 40, y: fit.y + 40 }, b);
+      expect(moved.x).toBeCloseTo(fit.x + 40, 9);
+      expect(moved.y).toBeCloseTo(fit.y + 40, 9);
+    });
+
+    it(`${name}: a hard shove stops at the slack on both axes, and never loses the sheet`, () => {
+      const fit = fitView(b);
+      for (const s of [-1, 1]) {
+        const shoved = clampView(
+          { ...fit, x: fit.x + s * 99999, y: fit.y + s * 99999 },
+          b
+        );
+        expect(shoved.x).toBeCloseTo(
+          fit.x + s * b.viewportWidth * FIT_SLACK_FRACTION,
+          9
+        );
+        expect(shoved.y).toBeCloseTo(
+          fit.y + s * b.viewportHeight * FIT_SLACK_FRACTION,
+          9
+        );
+        const w = b.contentWidth * fit.zoom;
+        const h = b.contentHeight * fit.zoom;
+        expect(overlap(shoved.x, w, b.viewportWidth)).toBeGreaterThan(w * 0.5);
+        expect(overlap(shoved.y, h, b.viewportHeight)).toBeGreaterThan(h * 0.5);
+      }
+    });
+  }
+
+  it("zooming out across the boundary never lands further from centre than the old snap did, and within the slack", () => {
+    const b = shapes[0][1];
+    for (const x of [-99999, -500, 0, 300, 99999]) {
+      const out = clampView({ zoom: 0.25, x, y: x }, b);
+      const cx = (800 - 2000 * 0.25) / 2;
+      expect(Math.abs(out.x - cx)).toBeLessThanOrEqual(
+        800 * FIT_SLACK_FRACTION + 1e-9
+      );
+    }
   });
 });
 

@@ -933,6 +933,15 @@ export function CalibrateLayer({
           // dropped a calibration point would be maddening — you would move the
           // sheet and silently set one end of the measurement at the same time.
           if (e.button !== 0) return;
+          /*
+            Claim the press, as the trace overlay does. Without this the event
+            bubbled on to the viewer's plain-drag pan, so a calibration click
+            that wobbled also nudged the sheet — harmless only while the sheet
+            could not pan at Fit, and not harmless once it can (2026-09-29):
+            the second end would be aimed at a sheet sliding under the hand,
+            and the scale multiplies every run on the sheet.
+          */
+          e.stopPropagation();
           // The tips are read, then the drawing is clicked; they go on that click.
           setTipsOpen(false);
           if (points.length >= 2) return;

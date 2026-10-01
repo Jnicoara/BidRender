@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ProposalSheet } from "@/components/proposal/ProposalSheet";
+import { clientFigure } from "@shared/proposal";
 import { ProposalDesignControls } from "@/components/proposal/ProposalDesignControls";
 import { money } from "@/lib/money";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
@@ -186,13 +187,18 @@ export default function ProposalPage({
   };
 
   /**
-   * Unpriced lines do NOT block the proposal (owner, 2026-09-26) — unlike a
-   * line the engine cannot price, which the server refuses on. But the total
-   * leaves them out, so printing a priced proposal asks first. Scope-only
-   * prints no money and asks nothing.
+   * Unpriced lines BLOCK printing a priced proposal (owner, 2026-09-29).
+   *
+   * Until then they did not (owner, 2026-09-26): this asked "Print anyway?"
+   * and the client's copy printed a short total — $0.00 on staging's bid 2,
+   * which had one line and it unpriced. Now the document shows "Price
+   * pending" in place of each figure (`clientFigure`, shared/proposal.ts) and
+   * Print / Save PDF / Ctrl+P say which lines to price, with no way past.
+   * Scope-only prints no money and is never blocked.
    */
   const notPriced =
     mode === "full" && data ? data.notPriced : NOTHING_NOT_PRICED;
+  const unpricedList = mode === "full" && data ? data.notPricedLines : [];
   const headline = notPricedHeadline(notPriced);
   const [confirmPrint, setConfirmPrint] = useState(false);
   const requestPrint = () => {
@@ -564,7 +570,7 @@ export default function ProposalPage({
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-xs font-medium">On the proposal</span>
               <span className="font-mono text-sm">
-                {money(doc.investment.total)}
+                {clientFigure(doc.investment, doc.investment.total, money)}
               </span>
             </div>
           </section>
@@ -597,32 +603,39 @@ export default function ProposalPage({
         )}
       </div>
 
-      {/* Asked before printing a priced proposal with unpriced lines — never
-          a block (owner, 2026-09-26). The client's copy carries no "not
-          priced" text, so this is the last place the estimator hears it. */}
+      {/* A block, not a question (owner, 2026-09-29). It said "Print
+          anyway" until then, and the client got a short total. There is
+          deliberately no button here that prints. */}
       <AlertDialog open={confirmPrint} onOpenChange={setConfirmPrint}>
         <AlertDialogContent className="bp-no-print">
           <AlertDialogHeader>
-            <AlertDialogTitle>{headline.text}</AlertDialogTitle>
+            <AlertDialogTitle>
+              Price {headline.one ? "this" : "these"} before sending
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              The total on this proposal leaves {headline.one ? "it" : "them"}{" "}
-              out, so the client will see a price that is short by whatever{" "}
-              {headline.one ? "it costs" : "they cost"}. The proposal itself
-              does not mention it.
+              {headline.text}, so the total would be short. The proposal can't
+              be printed or saved until {headline.one ? "it is" : "they are"}{" "}
+              priced on the bid.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {unpricedList.length > 0 && (
+            <ul className="text-sm list-disc pl-5 space-y-0.5 max-h-48 overflow-y-auto">
+              {unpricedList.map((item, i) => (
+                <li key={i}>
+                  {item.name}
+                  <span className="text-muted-foreground">
+                    {item.wholeLine
+                      ? " — not priced"
+                      : ` — ${item.parts} part${item.parts === 1 ? "" : "s"} not priced`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={onBack}>
+            <AlertDialogCancel>Close</AlertDialogCancel>
+            <AlertDialogAction onClick={onBack}>
               Back to the bid
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setConfirmPrint(false);
-                // After the dialog has closed, so it is not in the print.
-                setTimeout(print, 0);
-              }}
-            >
-              Print anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

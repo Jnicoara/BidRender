@@ -3,6 +3,63 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Open tabs keep running the OLD code after a deploy — plan, 2026-09-30 (not built)
+
+**Yes, they do.** A tab that was open before a deploy keeps the old JS in
+memory until the page is reloaded. Nothing tells it a new build exists:
+`/api/version` (`server/_core/index.ts`, `no-store`, returns `builtAt` and
+`commit`) is polled by nothing in `client/src`, and the service worker
+(`client/public/sw.js`) has no `updatefound` / `controllerchange` handling.
+So a fix like 6a3defa (proposal never shows $0) does not reach somebody with
+BidRidge already open. They keep printing $0 until they happen to refresh.
+That is a wrong-number risk, not just a cosmetic one.
+
+**Why staging needed a HARD refresh is NOT explained by the code. Find out
+before building on a guess.** Read from the source:
+
+- navigations are network-first (`sw.js` `networkFirstDocument`), and Express
+  serves `index.html` with `max-age=0` + ETag, so a plain reload should fetch
+  the new `index.html` and its new hashed assets;
+- `/assets/*` is cache-first FOREVER (`cacheFirst`), and a missing asset falls
+  through the `"*"` route in `server/_core/vite.ts` `serveStatic` as
+  `index.html` with a **200**, which `cacheFirst` then STORES under the asset's
+  URL. A request that reaches an old instance mid-rollout could therefore pin a
+  broken asset in that browser until the caches are cleared. A hard refresh
+  bypasses the service worker, which would fit what was seen;
+- or the plain reload simply came before the 3–6 minute rebuild was serving.
+
+Check on the next staging deploy: before refreshing, record the loaded
+`index-*.js` (DevTools → Sources) against what `/` serves now, and look in
+Application → Cache Storage → `helixbid-assets-v1` for an entry whose
+content-type is `text/html`.
+
+**The fix, small, in this order:**
+
+1. **"New version available — Refresh" banner.** A client hook reads its own
+   build stamp (`client/src/lib/buildStamp.ts`, already baked in at build)
+   and polls `/api/version` every ~5 min and on `visibilitychange` → visible
+   (when somebody returns to the tab, which is the common case). If `commit`
+   differs, show a non-modal bar with a Refresh button. **Do not auto-reload:**
+   a reload can drop a typed draft, an unsent stamp batch or an open dialog.
+   The bar says what to do and the user picks the moment. Skip in dev (no
+   stamp). The comparison goes in `client/src/lib` so vitest can reach it:
+   same commit / different commit / unreachable / no stamp. Unreachable must
+   never show the bar.
+2. **Never answer a missing `/assets/*` with `index.html`.** In `serveStatic`,
+   send a 404 for `/assets/` paths before the `"*"` fallthrough. In `sw.js`
+   `cacheFirst`, only cache a response whose content-type is not `text/html`.
+   Bump `CACHE_VERSION` so any poisoned entry is dropped (check
+   `server/pwa.test.ts`, which pins sw.js behaviour).
+3. **Recover from a failed chunk load.** Listen for `vite:preloadError` (the
+   lazy `BidRenderShell` import in `App.tsx`) and show the same Refresh bar
+   instead of a blank screen. Guard it so it cannot loop.
+4. **Optional: `Cache-Control: no-cache` on `index.html`** and
+   `public, max-age=31536000, immutable` on `/assets/*`, so no proxy or CDN
+   ever holds an old shell.
+
+Not in scope: forcing every open tab to reload, or `skipWaiting`. Both are
+deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
+
 ## SaaS Multi-User Upgrade (v4.0)
 
 - [x] Upgrade project to full-stack (database + auth + backend server)
@@ -43,6 +100,27 @@ left as written rather than rewritten to match the rename.
       their soft picture, because a re-capture never replaces an existing
       thumbnail; remove the symbol and capture it again to get a sharp one.
 
+### WRONG-NUMBER RISK: a run snaps onto a misplaced AI mark — fix after the reader accuracy test
+
+- [ ] **Tracing snaps a run end onto a nearby mark's spot (`legSnap.ts`). An
+      AI mark placed in the wrong spot makes the run length wrong. Decide: no
+      snap to unconfirmed AI marks, or a visible warning.** Owner, 2026-09-30. - **Found by asking whether any length or drop reads AI mark
+      positions.** The calculations do not: run length comes from the run's
+      own traced points, and drop length from heights
+      (`shared/groupDrops.ts` uses position only for the "sits near a run
+      end" hint). But the snap in `client/src/lib/legSnap.ts`, called from
+      `TraceLayer.tsx`, COPIES a mark's position into the run's points, so
+      a misplaced mark becomes a wrong length the moment someone traces to
+      it. - **Why it matters:** on staging's E-100 (2026-09-29) the reader's
+      positions were up to about 2.4 in of paper off, about 10 ft at
+      1/4" = 1'-0". A run traced to that mark carries the error into the
+      wire and conduit footage, with nothing on screen to say so. - **Today an AI mark is an ordinary stamp row,** and nothing marks it as
+      AI-placed. Either fix needs that signal first: `plan_copilot_findings`
+      holds `stampId` for every confirmed finding, so it can be derived
+      without a migration. Check that before adding a column. - **Order:** after the accuracy test (`references/legend-reading-plan.md`
+      § 0 B, branch a-plans-reader), which measures position error. If
+      positions come back good, a warning may be enough; if not, no snap.
+
 ### The whole catalog goes to the browser, and grows with it
 
 - [ ] **`materials.list` is unpaged and search runs on the main thread.**
@@ -60,6 +138,91 @@ left as written rather than rewritten to match the rename.
       3,000:** page `materials.list` and move search to the server, or at
       least off the main thread. The scale test's budgets are the alarm; do
       not loosen them to get past it.
+
+### Before beta: price an unpriced line right where it blocks you
+
+- [ ] **Owner, 2026-09-30.** When a bid has unpriced lines, "For your quote
+      app" refuses to show figures ("This bid has lines without a price. Price
+      them on the bid…", `QuoteAppPanel.tsx` `Blocked`). The bid page's
+      amber strip ("N lines are not priced", `BidsPage.tsx` ~1324) explains
+      but offers no box. The owner also named a "Price this before sending"
+      panel; **no screen carries that text today** (searched `track-b` and
+      `origin/local-dev`, 2026-09-30), so it is either the `Blocked` panel
+      under another name or a step still to be built. Ask which before
+      building. Wanted:
+  - Next to **each** unpriced line, in both places, a price box. Typing a
+    price unblocks the bid as soon as no line is left unpriced.
+  - **Saved on this bid only by default**, with a tick box "Also save to my
+    catalog". Ticked, it writes the company's own material row (a FORK if the
+    row is a shipped one; never a price typed onto a baseline row, CLAUDE.md
+    § "Where a priced catalog lands").
+  - **Never $0 and never blank as an answer.** An empty or invalid box
+    leaves the line "Not priced"; it does not commit a zero (CLAUDE.md
+    § Editing fields rule 6, and `commitNullableEdit` in placeholder mode).
+    A typed 0 on a hand-priced line stays a real answer, as today
+    (`shared/lineNotPriced.ts`).
+  - The line then says **"priced on this bid"**, so nobody mistakes it for a
+    catalog price.
+  - **"Not priced" on the bid page links to the same box** — one component
+    (one `LineCost`-style seam), not a second copy of the field.
+  - **Needs a MIGRATION — Track A.** A hand-priced line already stores a
+    typed price, so for those it needs none. But a line from a run type or
+    an assembly carries only the snapshot, and **a snapshot must never be
+    mutated** (CLAUDE.md § Data model). "Priced on this bid" needs its own
+    nullable column on `bid_line_items` (e.g. `bidUnitCost`, no default, NULL =
+    not priced here), read by `lineNotPriced` AND its SQL copy
+    `lineNotPricedSql` in `server/db.ts` together. Additive, so it is step 1
+    of the three-step deploy (migrate first). Two edges to decide in the
+    spec: an unpriced PART inside an otherwise-priced assembly line
+    (`snapshotUnpricedParts`) has no line to put a box on, and a line whose
+    LABOR is unpriced wants hours, not a price.
+
+### Before beta: the Plans screen at phone width — side panels become tabs
+
+> **Replanned 2026-09-30:** not drawers any more. The owner chose tabs for the
+> right-hand panel, with the phone showing the same tabs as one full-screen
+> panel. See `references/track-b-phone-and-readability-plan.md`.
+
+- [ ] **Owner, 2026-09-29: its own piece, later, before beta.** At a 390 px
+      window the sheet list (240 px) and the counts panel (a fixed 400 px, its
+      own `shrink-0`) do not fit beside the drawing: measured, the counts panel
+      starts at x=276 and runs 286 px off screen, taking its card buttons
+      (undo, trash, "Add a drop") with it. Fix is structural, not a row that
+      wraps: at phone width both panels become drawers pulled over the
+      drawing, one at a time. Touch panning and pinch belong to the same piece
+      — and with them the guard that a finger landing to pan must not place a
+      mark or a point (place on TAP, on touch only). See
+      `references/track-b-panning-plan.md` § 3, guard 3.
+- [ ] **Owner, 2026-09-29: a readability pass on the Plans right-hand panel,
+      before beta, alongside the phone layout above.** Counted items, the Plan
+      reader, the Legend and the totals are too small and too muted to read at
+      a glance. Wanted: bigger text, stronger contrast, warnings that stand out
+      from ordinary rows (amber that reads as amber, not as another grey), and
+      less scrolling to reach the totals. Do it with the drawer work, since
+      both reshape the same panel — and look at it at the size it ships, at
+      UI scale 1.0 and on a laptop screen, before calling it done.
+      **Planned 2026-09-30, with the phone layout above:**
+      `references/track-b-phone-and-readability-plan.md` (owner answered all
+      six the same day; the panel becomes tabs; nothing built yet).
+
+### Before beta: speed of the summary, and two missing Undos
+
+- [ ] **Owner, 2026-09-30: measure the whole-plan-set summary on a 500-sheet
+      set.** `takeoffSummary.forBid` runs `takeoffGroups.list` and
+      `takeoffRunTypes.bridgeForBid` for the whole bid on every refresh, and
+      `sendAll` rebuilds it again before sending. It has only been looked at on
+      a scratch bid with 7 items. Time it (server ms and the panel's first
+      paint) on a real 500-sheet set with marks and runs spread across it, and
+      write the numbers next to the code. No number is claimed here yet.
+- [ ] **Owner, 2026-09-30: Undo for removing a circuit.** The delete rules
+      (bf88f5c) put Undo in every toast, but removing a circuit from a traced
+      run still has none: `removeCircuit` in `TakeoffPage.tsx` shows only an
+      error toast and refreshes.
+- [ ] **Owner, 2026-09-30: Undo for removing a bid line.** Same gap on the
+      bid: `bids.removeLine` in `BidsPage.tsx` and `QuickBidPage.tsx` drops the
+      line optimistically and offers no way back. A line carries frozen
+      snapshot prices, so Undo must restore the row, not re-add it at today's
+      prices.
 
 ### Flaky tests — fix in a batch before beta
 
@@ -2167,6 +2330,13 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       anyway / Back to the bid"), and "Your figures" shows the count beside
       Materials, Direct cost and Bid price. Scope-only prints no money and
       asks nothing.
+      **OVERRIDDEN 2026-09-29 by the owner (branch a-proposal-zero):** "a
+      client document must never show $0 or a short total". Staging's bid 2
+      printed TOTAL INVESTMENT $0.00 with one unpriced line. Now every figure
+      worked out from the bid's price reads "Price pending" on the document
+      (`clientFigure`, shared/proposal.ts), and Print / Save PDF / Ctrl+P is
+      a BLOCK listing the unpriced lines by name, with no "Print anyway".
+      Scope-only is unchanged.
 - [x] **BUILT 2026-09-26 (Track B): bid totals say how many lines they leave
       out** — "$4,210.00 + 4 lines not priced", "$0.00 + 4 …" when every line
       is unpriced. Materials, Direct cost and Bid price on the bid screen and
