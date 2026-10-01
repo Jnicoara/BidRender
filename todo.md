@@ -67,6 +67,9 @@ left as written rather than rewritten to match the rename.
       less scrolling to reach the totals. Do it with the drawer work, since
       both reshape the same panel — and look at it at the size it ships, at
       UI scale 1.0 and on a laptop screen, before calling it done.
+      **Planned 2026-09-30, with the phone layout above:**
+      `references/track-b-phone-and-readability-plan.md` (six questions for
+      the owner at the end; nothing built yet).
 
 ### Before beta: speed of the summary, and two missing Undos
 
