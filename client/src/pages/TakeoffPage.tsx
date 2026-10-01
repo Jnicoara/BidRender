@@ -131,6 +131,14 @@ import {
   type PlanView,
   type ViewBounds,
 } from "@/lib/planView";
+import {
+  IDLE as GESTURE_IDLE,
+  pinchView,
+  stepGesture,
+  type GestureEvent,
+  type GestureOutput,
+  type GestureState,
+} from "@/lib/touchGesture";
 import { usePlansLayout } from "@/hooks/usePlansLayout";
 import { sheetDisplay, sheetLabel } from "@shared/sheetIdentity";
 import {
@@ -1298,6 +1306,217 @@ function PlanPane({
       window.removeEventListener("pointercancel", end);
     };
   }, [panning, readBounds, aimView]);
+
+  /**
+   * FINGERS (references/device-audit.md § Touch; @/lib/touchGesture).
+   *
+   * A touch on the drawing is held, not forwarded, until it is known what it
+   * was: a tap is replayed to whatever is under it as a mouse click would
+   * have arrived (pointerdown, pointerup, click), so every tool keeps its one
+   * code path; a drag pans; two fingers pinch. Nothing a finger does on the
+   * way down can place a mark — the guard the panning plan made a condition
+   * of shipping touch at all.
+   *
+   * Two exceptions, both explicit:
+   * - A finger landing on something marked `data-touch-drag` (the capture
+   *   box, the copy-text box, a run's point handle) goes straight through,
+   *   because dragging IS that tool. A second finger arriving cancels it
+   *   (a real `pointercancel`) and pinches instead, so the sheet can always
+   *   be moved.
+   * - Mouse and pen are not touched at all: `pointerType` is checked first.
+   *
+   * Listeners are on the window in the CAPTURE phase so they run before
+   * anything in the page, including React's root listeners and the window
+   * listeners the mouse pan above relies on.
+   */
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    let state: GestureState = GESTURE_IDLE;
+    /** Ids of fingers this router is deciding for. */
+    const held = new Set<number>();
+    /** A finger handed to a drag tool, and the element it landed on. */
+    let forwarded: { id: number; target: Element } | null = null;
+    /** The view when the current pan or pinch began. */
+    let fromView: PlanView | null = null;
+    /** Events this router made itself, which it must let past. */
+    const own = new WeakSet<Event>();
+    /** Swallow the browser's own click after a held touch: we sent ours. */
+    let swallowClicksUntil = 0;
+
+    const local = (x: number, y: number) => {
+      const rect = vp.getBoundingClientRect();
+      return { x: x - rect.left, y: y - rect.top };
+    };
+
+    const replayTap = (x: number, y: number, id: number) => {
+      const target = document.elementFromPoint(x, y);
+      if (!target || !vp.contains(target)) return;
+      const init = {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        clientX: x,
+        clientY: y,
+        button: 0,
+        pointerId: id,
+        pointerType: "touch",
+        isPrimary: true,
+        view: window,
+      };
+      for (const [type, buttons] of [
+        ["pointerdown", 1],
+        ["pointerup", 0],
+      ] as const) {
+        const ev = new PointerEvent(type, { ...init, buttons });
+        own.add(ev);
+        target.dispatchEvent(ev);
+      }
+      const click = new MouseEvent("click", { ...init, buttons: 0 });
+      own.add(click);
+      target.dispatchEvent(click);
+    };
+
+    const act = (out: GestureOutput, pointerId: number) => {
+      const bounds = readBounds();
+      if (out.type === "tap") {
+        swallowClicksUntil = performance.now() + 700;
+        replayTap(out.x, out.y, pointerId);
+        return;
+      }
+      if (out.type === "end") {
+        fromView = null;
+        swallowClicksUntil = performance.now() + 700;
+        return;
+      }
+      if (!bounds) return;
+      if (out.type === "pan") {
+        fromView ??= viewRef.current;
+        const start = fromView;
+        aimView(
+          clampView(
+            { zoom: start.zoom, x: start.x + out.dx, y: start.y + out.dy },
+            bounds
+          )
+        );
+      } else if (out.type === "pinch") {
+        fromView ??= viewRef.current;
+        const start = fromView;
+        aimView(
+          pinchView(start, bounds, {
+            startA: local(out.startA.x, out.startA.y),
+            startB: local(out.startB.x, out.startB.y),
+            nowA: local(out.nowA.x, out.nowA.y),
+            nowB: local(out.nowB.x, out.nowB.y),
+          })
+        );
+      }
+    };
+
+    const feed = (e: GestureEvent, pointerId: number) => {
+      const before = state.kind;
+      const step = stepGesture(state, e);
+      state = step.state;
+      // A new pinch starts from the view as it is NOW, not from a pan's start.
+      if (state.kind === "pinch" && before !== "pinch") fromView = null;
+      act(step.out, pointerId);
+    };
+
+    const finger = (e: PointerEvent) => ({
+      id: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      t: e.timeStamp,
+    });
+
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType !== "touch" || own.has(e)) return;
+      if (!(e.target instanceof Node) || !vp.contains(e.target)) return;
+      const target = e.target as Element;
+      if (
+        state.kind === "idle" &&
+        !forwarded &&
+        target.closest?.("[data-touch-drag]")
+      ) {
+        forwarded = { id: e.pointerId, target };
+        // Tracked anyway, so a second finger can take over as a pinch.
+        held.add(e.pointerId);
+        state = stepGesture(state, { type: "down", ...finger(e) }).state;
+        return;
+      }
+      if (forwarded) {
+        // A second finger while a drag tool has the first: the tool lets go
+        // and the two fingers move the sheet.
+        const cancel = new PointerEvent("pointercancel", {
+          bubbles: true,
+          pointerId: forwarded.id,
+          pointerType: "touch",
+        });
+        own.add(cancel);
+        forwarded.target.dispatchEvent(cancel);
+        forwarded = null;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      held.add(e.pointerId);
+      feed({ type: "down", ...finger(e) }, e.pointerId);
+    };
+
+    const onMoveUp = (e: PointerEvent) => {
+      if (e.pointerType !== "touch" || own.has(e)) return;
+      if (!held.has(e.pointerId)) return;
+      if (forwarded?.id === e.pointerId) {
+        // The drag tool's own finger: let the tool have it, and only keep
+        // the machine's idea of where it is in step.
+        if (e.type !== "pointermove") {
+          held.delete(e.pointerId);
+          forwarded = null;
+          state = GESTURE_IDLE;
+        } else {
+          // Where it is now, so a pinch that takes over starts from here
+          // rather than jumping back to where the drag began.
+          state = { kind: "pending", id: e.pointerId, start: finger(e) };
+        }
+        return;
+      }
+      e.stopPropagation();
+      const type =
+        e.type === "pointermove"
+          ? "move"
+          : e.type === "pointerup"
+            ? "up"
+            : "cancel";
+      if (type !== "move") held.delete(e.pointerId);
+      feed(
+        type === "cancel"
+          ? { type, id: e.pointerId }
+          : { type, ...finger(e) },
+        e.pointerId
+      );
+    };
+
+    const onClick = (e: MouseEvent) => {
+      if (own.has(e)) return;
+      if (performance.now() > swallowClicksUntil) return;
+      if (!(e.target instanceof Node) || !vp.contains(e.target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("pointermove", onMoveUp, true);
+    window.addEventListener("pointerup", onMoveUp, true);
+    window.addEventListener("pointercancel", onMoveUp, true);
+    window.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("pointermove", onMoveUp, true);
+      window.removeEventListener("pointerup", onMoveUp, true);
+      window.removeEventListener("pointercancel", onMoveUp, true);
+      window.removeEventListener("click", onClick, true);
+    };
+  }, [readBounds, aimView]);
+
   const [pageCount, setPageCount] = useState(doc.pageCount ?? 0);
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
@@ -1871,10 +2090,15 @@ function PlanPane({
       )}
       <div
         ref={viewportRef}
+        data-plan-viewport
         className={cn(
           "flex-1 overflow-hidden bg-muted/20 min-h-0 relative",
           panning ? "cursor-grabbing" : spaceHeld ? "cursor-grab" : null
         )}
+        // Fingers are this screen's to interpret (the touch router above):
+        // without this the browser scrolls or zooms the PAGE instead, and
+        // sends a pointercancel half-way through every pan.
+        style={{ touchAction: "none" }}
         onPointerDown={beginPlainPan}
       >
         {/*

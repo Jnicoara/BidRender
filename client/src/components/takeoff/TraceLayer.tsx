@@ -1590,6 +1590,7 @@ export function TraceLayer({
                       <g
                         key={`add-${segment}`}
                         className="cursor-copy"
+                        data-touch-drag
                         onPointerDown={e => begin(e, segment + 1, origin, true)}
                       >
                         <circle
@@ -1651,6 +1652,9 @@ export function TraceLayer({
                       stroke={color}
                       strokeWidth={stroke * 1.4}
                       className="cursor-move"
+                      // Dragging a point is this handle's whole job, so a
+                      // finger on it moves the point, not the sheet.
+                      data-touch-drag
                       onPointerDown={e => begin(e, index, run.points, false)}
                       onContextMenu={e => {
                         e.preventDefault();
