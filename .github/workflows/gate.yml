@@ -1,0 +1,110 @@
+# The test gate — references/build-pipeline-plan.md § 1 and § 2 (piece 1).
+#
+# Every push to local-dev or a track-* branch, and every pull request, runs
+# `pnpm check` and the full vitest suite against a brand-new MySQL that is
+# migrated from drizzle/ and seeded the way the server seeds itself. Nothing
+# here deploys anything, and nothing here holds a credential for staging or
+# live: the only database it can reach is the throwaway one in its own
+# container.
+name: Gate
+
+on:
+  push:
+    # a-* is Track A's own work branches, so A's changes get the same gate
+    # before they reach local-dev.
+    branches: [local-dev, "track-*", "a-*"]
+  pull_request:
+
+# One run per branch at a time; a newer push cancels the older run.
+concurrency:
+  group: gate-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Migrations stay with Track A (plan § 2). A track branch whose OWN commits
+  # touch drizzle/ goes red here, before it can be merged.
+  #
+  # "Own" is the point: `git log --no-merges origin/local-dev..HEAD` lists the
+  # commits on this branch that local-dev does not have, leaving out merge
+  # commits. A's migrations that arrived by merging local-dev in are already on
+  # local-dev, so they never appear — a plain diff against local-dev would flag
+  # them, or flag a branch for merely being behind.
+  drizzle-guard:
+    if: startsWith(github.head_ref || github.ref_name, 'track-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Refuse migrations written on a track branch
+        run: |
+          git fetch --no-tags origin local-dev
+          commits=$(git log --no-merges --format='%h %s' origin/local-dev..HEAD -- drizzle/)
+          if [ -n "$commits" ]; then
+            echo "::error::This track branch changes drizzle/. Migrations are Track A's: hand the column to A in todo.md instead."
+            echo "Commits on this branch that touch drizzle/:"
+            echo "$commits"
+            git log --no-merges --name-only --format='--- %h' origin/local-dev..HEAD -- drizzle/
+            exit 1
+          fi
+          echo "No commit of this branch touches drizzle/."
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          # A throwaway container that lives for this job only; not a secret.
+          MYSQL_ROOT_PASSWORD: ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      # Loopback, and `test` as its own word: what checkTestDatabase
+      # (scripts/databaseGuard.ts) requires before the suite will run at all.
+      DATABASE_URL: mysql://root:ci@127.0.0.1:3306/bidrender_test_ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Cheapest check first, so a type error fails in a minute.
+      - name: Typecheck (app and tests)
+        run: pnpm check
+
+      # utf8mb4_unicode_ci is not optional: a database created with the server
+      # default dies at migration 0055 (ER_CANT_AGGREGATE_2COLLATIONS).
+      - name: Create the test database
+        run: >-
+          mysql -h 127.0.0.1 -P 3306 -uroot -pci -e
+          "CREATE DATABASE bidrender_test_ci CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+
+      # Every migration from zero — which also proves they still apply cleanly.
+      - name: Migrate
+        run: npx tsx scripts/migrate.mts
+
+      # The server seeds the shipped library on start and the tests never do;
+      # without this, 11 tests that need the shipped run types fail.
+      - name: Seed the shipped library
+        run: npx tsx scripts/seedBaseline.mts
+
+      - name: Test suite
+        run: pnpm test

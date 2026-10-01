@@ -16,14 +16,7 @@ import { BACKUP_PATH, backupToR2Handler } from "../scheduled/backupToR2";
 import { PLAN_UPLOAD_PATH, planUploadHandler } from "../planUpload";
 import { registerDiskStorageUploads } from "../diskStorage";
 import { registerStagingGate } from "../stagingGate";
-import {
-  seedBaselineAssemblies,
-  seedBaselineKits,
-  seedBaselineLaborRates,
-  seedBaselineMaterials,
-  seedBaselineModifiers,
-  seedBaselineRunTypes,
-} from "../db";
+import { seedShippedLibrary } from "../seedShippedLibrary";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -179,30 +172,12 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
-    // Library seeds. Assemblies MUST run last: their recipes are resolved by
-    // name against the material and modifier catalogs, and an assembly whose
-    // materials have not landed yet is skipped rather than half-built.
-    Promise.all([
-      seedBaselineMaterials().catch(err =>
-        console.warn("[BaselineMaterials] Seed failed:", err)
-      ),
-      seedBaselineLaborRates().catch(err =>
-        console.warn("[BaselineLaborRates] Seed failed:", err)
-      ),
-      seedBaselineModifiers().catch(err =>
-        console.warn("[BaselineModifiers] Seed failed:", err)
-      ),
-    ])
-      .then(() => seedBaselineAssemblies())
-      // Kits reference assemblies by name, so they come last of all.
-      .then(() => seedBaselineKits())
-      // Run types resolve their raceway and conductor by catalog name, so they
-      // wait for materials too. Independent of assemblies and kits; chained
-      // rather than parallel only to keep one failure from hiding another.
-      .then(() => seedBaselineRunTypes())
-      .catch(err =>
-        console.warn("[BaselineAssemblies/Kits] Seed failed:", err)
-      );
+    // Library seeds, in the order they depend on each other. The order lives
+    // in seedShippedLibrary, shared with scripts/seedBaseline.mts, so a test
+    // database is seeded exactly the way this server seeds itself.
+    void seedShippedLibrary((step, err) =>
+      console.warn(`[${step}] Seed failed:`, err)
+    );
   });
 }
 

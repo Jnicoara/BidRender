@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-01]
 
+- **Every change is now tested automatically on GitHub.** Each push to
+  `local-dev`, a track branch or a Track A branch runs the type check and the
+  full test suite against a brand-new database, built from every migration and
+  seeded the way the app seeds itself. A track branch that tries to change the
+  database migrations is refused, because migrations stay with Track A. This
+  deploys nothing.
+
 - **Legend symbols can be renamed.** A pencil beside each captured symbol in
   the Plans panel (laptop and phone) renames it; Enter saves, Escape cancels,
   and a blank name is refused. The count of that symbol on the open bid takes
