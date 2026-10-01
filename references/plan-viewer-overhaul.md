@@ -2168,6 +2168,15 @@ definition and still centres.
 
 ### Stamps have to look different from each other
 
+> **Proposed override, 2026-10-01 — awaiting the owner's decisions:**
+> `references/track-b-count-pin-styles-plan.md` replaces the CATEGORY shape
+> map below ("triangles are lighting") with a device-family map, adds a
+> letter inside every pin, moves count colors from the id hash to first-use
+> order per bid (as run types already are), and stores an optional chosen
+> look on the assembly, the legend symbol and the count. It **keeps** this
+> section's rejection of the captured legend image as the pin, and the
+> 10–26 px clamp.
+
 Every stamp is a 10px circle in `#F5C518` (`TraceLayer.tsx`). **That is the same
 yellow as a conduit run and the same yellow as every warning in the app** — so
 it is not only that stamps cannot be told apart from each other, a field of
