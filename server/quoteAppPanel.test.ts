@@ -24,6 +24,7 @@ import { bidRollup, type RollupLine } from "./bidPricing";
 import { getDb } from "./db";
 import { bids, users, type Bid } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 import { apportionWorkPrice, toCents } from "../shared/pricing";
 import { INTERNAL_FIELDS } from "../shared/accountingExport";
 import {
@@ -438,6 +439,7 @@ describe("what the panel says", () => {
 
 const USER = 9387;
 const OUTSIDER = 9388;
+dropFixtureUsersAfterAll([USER, OUTSIDER]);
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 const callerFor = (id: number, accessTier: "internal" | "standard") =>

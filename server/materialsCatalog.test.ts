@@ -497,6 +497,13 @@ describe("searching the enlarged catalog", () => {
     expect(search("ground rod", 1)[0]).toBe("Ground rod, 8 ft");
   });
 
+  it('answers "plug" with a receptacle first', () => {
+    // An estimator's "plug" is a receptacle. The expectHit above only asks
+    // for the top eight, and a Cat6 RJ45 end first built as "Cat6 plug" took
+    // the top spot while passing it (2026-09-29, starter assemblies plan).
+    expect(search("plug", 1)[0]).toBe("Duplex receptacle");
+  });
+
   it("ranks a product above its own accessories", () => {
     // The same failure wearing different clothes, and the one the enlarged
     // catalog actually introduced: "Cable staple" carried a "romex" alias, so
@@ -633,31 +640,21 @@ describe.skipIf(!hasDb)("seeding the catalog into a live database", () => {
     // The consolidation requirement: an item that is clearly the same thing
     // under a new name must keep its ROW, because assemblies, kits and takeoff
     // stamps all point at its id.
-    const db = await getDb();
-    for (const [from, to] of Object.entries(RENAMED_BASELINE_MATERIALS)) {
-      const old = await db!
-        .select()
-        .from(materials)
-        .where(eq(materials.name, from));
-      expect(
-        old.filter(r => r.userId === null),
-        `"${from}" survived the rename`
-      ).toEqual([]);
-
-      const now = await db!
-        .select()
-        .from(materials)
-        .where(eq(materials.name, to));
-      expect(now.filter(r => r.userId === null).length, `"${to}" missing`).toBe(
-        1
-      );
+    //
+    // Read the baseline rows ONCE and count names in memory. This used to run
+    // two queries per rename — ~200 full scans, since `name` has no index —
+    // and took 4.1–4.4 s alone, so it timed out under the full suite with no
+    // assertion wrong (todo.md, "Flaky tests"). A 60 s limit papered over it
+    // and would have been outgrown by the next catalog sweep.
+    const named = new Map<string, number>();
+    for (const row of await baselineRows()) {
+      named.set(row.name, (named.get(row.name) ?? 0) + 1);
     }
-    // Two queries per rename (~100 of them) against a full seed. 4.1–4.4 s
-    // alone and 5.0 s under the full suite on 2026-09-29, once the sweeps
-    // took the catalog to 1,511 — so the 5 s default timed it out with no
-    // assertion wrong. Same treatment as seedPreservesUserPrices (todo.md,
-    // "Flaky tests").
-  }, 60_000);
+    for (const [from, to] of Object.entries(RENAMED_BASELINE_MATERIALS)) {
+      expect(named.get(from) ?? 0, `"${from}" survived the rename`).toBe(0);
+      expect(named.get(to) ?? 0, `"${to}" missing`).toBe(1);
+    }
+  });
 
   it("withdraws retired rows from the catalog without destroying them", async () => {
     // Retiring must not delete: assemblies, kits and takeoff stamps point at

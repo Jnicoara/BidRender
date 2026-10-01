@@ -327,6 +327,39 @@ export function teeBoxOwners(
   return owners;
 }
 
+/**
+ * Which CABLE type buys the box at each tee no pipe owns (plan W4,
+ * 2026-09-29).
+ *
+ * `teeBoxOwners` reads conduit LEGS, and a cable run has none, so a tee on
+ * cable alone was owned by nobody and bought no box. The rule on top of it:
+ * a tee any pipe meets stays the pipe's — the box is sized to the pipe — and
+ * a tee only cable meets goes to the lowest cable type id that touches it, so
+ * two cable types at one split buy one box between them. Depends only on
+ * what meets at the tee, never on the order rows arrive.
+ *
+ * Returns tee id → owning cable type id, for tees `pipeOwners` does not have.
+ *
+ * Pipe and cable cannot meet at a tee TODAY — a branch keeps its run's kind,
+ * and a cable branch on a conduit run is refused (`cableTeeBox.test.ts` pins
+ * the refusal). The pipe rule is here for the day that changes, so the box
+ * is not bought twice.
+ */
+export function cableTeeOwners(
+  pipeOwners: ReadonlyMap<number, number>,
+  cableTees: ReadonlyMap<number, readonly TeeRef[]>
+): Map<number, number> {
+  const owners = new Map<number, number>();
+  cableTees.forEach((tees, typeId) => {
+    for (const tee of tees) {
+      if (pipeOwners.has(tee.id)) continue;
+      const current = owners.get(tee.id);
+      if (current === undefined || typeId < current) owners.set(tee.id, typeId);
+    }
+  });
+  return owners;
+}
+
 /** The two parts a tee box sends. Appended to `FITTING_KINDS`. */
 export const TEE_KINDS = ["teeBox", "teeCover"] as const;
 export type TeeKind = (typeof TEE_KINDS)[number];

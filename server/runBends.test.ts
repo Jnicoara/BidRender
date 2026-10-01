@@ -13,6 +13,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  ELBOW_WORDS,
   MERGE_WITHIN_FEET,
   countBends,
   describeRunBends,
@@ -120,7 +121,12 @@ function fittings(legs: readonly FittingLeg[], spec: RacewayFittingSpec) {
   return countFittings(
     legs,
     spec,
-    { method: FACTORY, limit: 360, mergeWithinFeet: MERGE_WITHIN_FEET },
+    {
+      method: FACTORY,
+      limit: 360,
+      mergeWithinFeet: MERGE_WITHIN_FEET,
+      words: ELBOW_WORDS,
+    },
     []
   );
 }

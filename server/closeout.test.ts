@@ -45,10 +45,12 @@ import {
   suggestHours,
 } from "../shared/closeout";
 import type { TrpcContext } from "./_core/context";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 9701;
 const OTHER = 9702;
 const ALL = [USER, OTHER];
+dropFixtureUsersAfterAll(ALL);
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 const describeDb = hasDb ? describe : describe.skip;

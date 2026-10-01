@@ -217,7 +217,7 @@ export type RunExtrasPatch = {
   makeupByKindInches?: Record<string, number> | null;
 };
 import { verticalsNotice } from "@shared/takeoffHeights";
-import { FITTING_KIND_LABELS, type FittingKind } from "@shared/runFittings";
+import { unmatchedKindWords, type FittingKind } from "@shared/runFittings";
 import { fittingRowSpeaks } from "@shared/runFittingMaterials";
 import type { TraceMode } from "@shared/traceMode";
 import type { RunTotalsLeftOut } from "@shared/runOnBid";
@@ -1062,9 +1062,12 @@ function resendSentence(resend: NonNullable<ResendPreview>): string {
   return `On Send: ${parts.join(", ")}`;
 }
 
-/** "Couplings", "90° elbows" — from the one table the server words with too. */
+/**
+ * "Couplings", "90° bends" — shown only where no part matched (a matched row
+ * shows the part's own name), so it reads as the server's unmatched lines do.
+ */
 function fittingLabel(role: FittingKind): string {
-  const many = FITTING_KIND_LABELS[role].many;
+  const many = unmatchedKindWords(role).many;
   return many.charAt(0).toUpperCase() + many.slice(1);
 }
 
@@ -1074,7 +1077,11 @@ export type RunTypeBridgeEntry = {
   /** For the swatch: the line style this type is drawn in. */
   pathType: "conduit" | "cable";
   rows: RunTypeBridgeRow[];
-  /** Conduit types only; empty on a cable type. */
+  /**
+   * Every conduit fitting on a conduit type; on a cable type, the box and
+   * cover at its tees (`cableTeeRows`) and, on MC, its connectors and straps
+   * (`cableRunRows`) — both since 2026-09-29.
+   */
   fittings: RunTypeBridgeFitting[];
   /** Runs of this type nobody has answered the branch-wiring question for. */
   unansweredCount: number;

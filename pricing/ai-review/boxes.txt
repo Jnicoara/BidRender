@@ -1,5 +1,5 @@
 Category: Boxes
-Items: 93
+Items: 97
 
 Category | Name | Size
 Boxes | 4-gang box | -
@@ -89,9 +89,13 @@ Boxes | Triple-gang metal box | -
 Boxes | Triple-gang old-work box | -
 Boxes | Weatherproof blank cover, double-gang | -
 Boxes | Weatherproof blank cover, single-gang | -
-Boxes | Weatherproof box, double-gang | -
-Boxes | Weatherproof box, single-gang | -
-Boxes | Weatherproof box, single-gang, PVC | -
-Boxes | Weatherproof box, triple-gang | -
+Boxes | 1/2" weatherproof box, double-gang | 1/2"
+Boxes | 3/4" weatherproof box, double-gang | 3/4"
+Boxes | 1/2" weatherproof box, single-gang | 1/2"
+Boxes | 3/4" weatherproof box, single-gang | 3/4"
+Boxes | 1/2" weatherproof box, single-gang, PVC | 1/2"
+Boxes | 3/4" weatherproof box, single-gang, PVC | 3/4"
+Boxes | 1/2" weatherproof box, triple-gang | 1/2"
 Boxes | Weatherproof lampholder cover | -
-Boxes | Weatherproof round box | -
+Boxes | 1/2" weatherproof round box | 1/2"
+Boxes | 3/4" weatherproof round box | 3/4"

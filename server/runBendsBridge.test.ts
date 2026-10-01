@@ -610,3 +610,43 @@ withDb("a pull point is proposed, and only an answer adds one", () => {
     );
   });
 });
+
+/*
+  A type bought as SWEEPS says "sweep" beside the sweep row (plan W1, owner
+  Q1, 2026-09-29). It said "At least 1 90° elbow" under
+  `2" PVC Sch 40 90-degree sweep, 36" radius` — a caption naming the old part
+  beside a row that is a different one reads as confirmation (CLAUDE.md
+  rule 7). Red before the fix: the sentence was the fixed word "90° elbow".
+*/
+withDb("a sweep type's sentence names the sweep", () => {
+  it("counts the L's turn as one 90° sweep, and never says elbow", async () => {
+    const sweep = await shipped('2" PVC Sch 40 90-degree sweep, 36" radius');
+    const type = await caller().takeoffRunTypes.create({
+      label: `PVC sweeps ${Date.now()}${Math.random()}`,
+      pathType: "conduit",
+      racewayMaterialId: (await shipped('2" PVC Sch 40')).id,
+      elbow90MaterialId: sweep.id,
+    });
+    const { bidId, sheetId } = await aBid("Sweep words");
+    await trace(bidId, sheetId, type.id, L);
+
+    const row = (await preview(bidId)).get("elbow90")!;
+    expect(row).toMatchObject({ status: "counted", qty: 1 });
+    expect(row.materialName).toBe(sweep.name);
+    expect(row.why).toMatch(/^At least 1 90° sweep: 1 corner/);
+    expect(row.why).not.toMatch(/elbow/);
+  });
+
+  it("a type that chose nothing still says elbow", async () => {
+    const type = await caller().takeoffRunTypes.create({
+      label: `PVC elbows ${Date.now()}${Math.random()}`,
+      pathType: "conduit",
+      racewayMaterialId: (await shipped('2" PVC Sch 40')).id,
+    });
+    const { bidId, sheetId } = await aBid("Elbow words");
+    await trace(bidId, sheetId, type.id, L);
+    expect((await preview(bidId)).get("elbow90")!.why).toMatch(
+      /^At least 1 90° elbow: 1 corner/
+    );
+  });
+});

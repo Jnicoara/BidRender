@@ -11,6 +11,8 @@
  *   Main → Worker:  { type: 'render', pageNum: number, scale: number, hash: string, reqId: string, rect?: PageRect }
  *   Main → Worker:  { type: 'outline', hash: string, reqId: string }
  *   Main → Worker:  { type: 'text', pageNum: number, hash: string, reqId: string }
+ *   Main → Worker:  { type: 'findMatching', pageNum, hash, reqId, box: {x,y,width,height} }
+ *   Worker → Main:  { type: 'matches', reqId, result: FindResult, readMs, findMs }
  *   Worker → Main:  { type: 'rendered', reqId: string, bitmap: ImageBitmap, pageNum: number, hash: string,
  *                     scale: number, rect: PageRect, pageWidth: number, pageHeight: number }
  *   Worker → Main:  { type: 'outline', reqId: string, entries: {pageNumber,title}[] }
@@ -38,6 +40,12 @@
 
 import * as pdfjs from "pdfjs-dist";
 import { pdfRangeLoadOptions } from "@shared/pdfRangeLoading";
+import { findMatching } from "@/lib/findMatching";
+import {
+  extractVectorGeometry,
+  type VectorGeometry,
+} from "@/lib/vectorGeometry";
+import { wordBoxes, type RawTextItem, type WordBox } from "@/lib/textSelection";
 import {
   clampRegion,
   fitScaleToBudget,
@@ -137,6 +145,12 @@ const WORKER_SAFE_OPTIONS = {
 
 let pdfDoc: import("pdfjs-dist").PDFDocumentProxy | null = null;
 let loadedHash: string | null = null;
+/** Find all matching's one cached page. Cleared when another is asked for. */
+let matchPage: {
+  key: string;
+  geo: VectorGeometry;
+  words: WordBox[];
+} | null = null;
 
 self.onmessage = async (e: MessageEvent) => {
   const msg = e.data;
@@ -164,6 +178,7 @@ self.onmessage = async (e: MessageEvent) => {
             });
       pdfDoc = await loadingTask.promise;
       loadedHash = msg.hash;
+      matchPage = null; // another document's line work is no use now
       const elapsed = (performance.now() - t0).toFixed(0);
       self.postMessage({
         type: "loaded",
@@ -390,6 +405,70 @@ self.onmessage = async (e: MessageEvent) => {
         reqId,
         pageNum,
         layer: { items, viewportTransform },
+      });
+    } catch (err) {
+      self.postMessage({ type: "error", reqId, message: String(err) });
+    }
+    return;
+  }
+
+  /**
+   * Find all matching (@/lib/findMatching): every copy on this page of the
+   * symbol in `box` (page points). The page's line work and words are read
+   * once and kept for ONE page — a sheet's are a few MB, and the next search
+   * is almost always on the same sheet — so only the first search on a sheet
+   * pays pdf.js's operator list (about a second on Weld 1 E-200).
+   */
+  if (msg.type === "findMatching") {
+    const { pageNum, hash, reqId, box } = msg;
+    if (!pdfDoc || loadedHash !== hash) {
+      self.postMessage({
+        type: "error",
+        reqId,
+        message: "PDF not loaded for this hash",
+      });
+      return;
+    }
+    try {
+      const t0 = performance.now();
+      const key = `${hash}#${pageNum}`;
+      if (!matchPage || matchPage.key !== key) {
+        matchPage = null;
+        const page = await pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 1 });
+        const [list, content] = await Promise.all([
+          page.getOperatorList(),
+          page.getTextContent(),
+        ]);
+        const items: RawTextItem[] = [];
+        for (const item of content.items)
+          if ("str" in item && item.str)
+            items.push({
+              str: item.str,
+              transform: item.transform,
+              width: item.width,
+            });
+        matchPage = {
+          key,
+          geo: extractVectorGeometry(
+            list.fnArray,
+            list.argsArray,
+            pdfjs.OPS as unknown as Record<string, number>,
+            viewport.transform,
+            viewport.width,
+            viewport.height
+          ),
+          words: wordBoxes({ items, viewportTransform: viewport.transform }),
+        };
+      }
+      const t1 = performance.now();
+      const result = findMatching(matchPage.geo, matchPage.words, box);
+      self.postMessage({
+        type: "matches",
+        reqId,
+        result,
+        readMs: Math.round(t1 - t0),
+        findMs: Math.round(performance.now() - t1),
       });
     } catch (err) {
       self.postMessage({ type: "error", reqId, message: String(err) });

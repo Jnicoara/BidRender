@@ -32,9 +32,11 @@ import {
 } from "../drizzle/schema";
 import { DEFAULT_ASSEMBLY_ROLE } from "./seed/baselineAssemblies";
 import type { TrpcContext } from "./_core/context";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 6161;
 const OTHER_USER = 6162;
+dropFixtureUsersAfterAll([USER, OTHER_USER]);
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 

@@ -19,11 +19,13 @@ import {
   nodeDegrees,
   sticksFor,
   strapsFor,
+  unmatchedKindWords,
   type FittingLeg,
   type RacewayFittingSpec,
 } from "../shared/runFittings";
+import { bendWordsFor } from "../shared/runFittingMaterials";
 import type { EndVertical } from "../shared/takeoffHeights";
-import { countBends } from "../shared/runBends";
+import { ELBOW_WORDS, countBends } from "../shared/runBends";
 
 const EMT: RacewayFittingSpec = {
   name: '1/2" EMT',
@@ -67,6 +69,7 @@ const BENDS = {
   limit: 360,
   // A type on standard elbows: the flat merge distance (runBendsSweep.test.ts).
   mergeWithinFeet: 3,
+  words: ELBOW_WORDS,
 };
 function count(legs: readonly FittingLeg[], spec: RacewayFittingSpec) {
   return countFittings(legs, spec, BENDS, []);
@@ -431,5 +434,30 @@ describe("a quantity trace's legs (D21, answer 1)", () => {
         answers: [ACCEPTED_LB],
       }).answers
     ).toHaveLength(1);
+  });
+});
+
+describe("what a type's 90s and 45s are called (bendWordsFor)", () => {
+  it("follows the part the type buys", () => {
+    expect(bendWordsFor(null, null)).toEqual(ELBOW_WORDS);
+    expect(
+      bendWordsFor('2" PVC Sch 40 90-degree sweep, 36" radius', null).elbow90
+    ).toEqual({ one: "90° sweep", many: "90° sweeps" });
+    expect(
+      bendWordsFor(null, '2" PVC Sch 40 45-degree sweep, 24" radius').elbow45
+    ).toEqual({ one: "45° sweep", many: "45° sweeps" });
+    expect(
+      bendWordsFor('2" PVC Sch 40 90-degree elbow', null).elbow90.one
+    ).toBe("90° elbow");
+  });
+
+  it('says "bend" for a part it cannot name — a renamed fork', () => {
+    expect(bendWordsFor("Our big PVC bend", null).elbow90.one).toBe("90° bend");
+  });
+
+  it("calls an unmatched 90 or 45 a bend, and every other kind by its name", () => {
+    expect(unmatchedKindWords("elbow90").many).toBe("90° bends");
+    expect(unmatchedKindWords("elbow45").one).toBe("45° bend");
+    expect(unmatchedKindWords("coupling").many).toBe("couplings");
   });
 });

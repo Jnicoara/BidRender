@@ -50,6 +50,7 @@ import {
   placeAnswer,
   type BendLeg,
   type BendMethod,
+  type BendWords,
   type EndDrop,
   type PullPointAnswer,
 } from "./runBends";
@@ -172,6 +173,22 @@ export const FITTING_KIND_LABELS: Record<
   teeCover: { one: "tee box cover", many: "tee box covers" },
 };
 
+/**
+ * How a kind reads where NO part was matched — the panel row with no material
+ * and the materials list's "not matched" lines. A 90 or 45 is called a BEND
+ * there: what it would be bought as (elbow or sweep) is exactly what is
+ * missing, and "elbows" beside a sweep type that failed to resolve would name
+ * a part nobody chose. Every other kind reads as FITTING_KIND_LABELS.
+ */
+export function unmatchedKindWords(kind: FittingKind): {
+  one: string;
+  many: string;
+} {
+  if (kind === "elbow90") return { one: "90° bend", many: "90° bends" };
+  if (kind === "elbow45") return { one: "45° bend", many: "45° bends" };
+  return FITTING_KIND_LABELS[kind];
+}
+
 /** Whether a bid line's run role is a fitting (a count) rather than footage. */
 export function isFittingRole(
   role: string | null | undefined
@@ -291,7 +308,17 @@ export function countFittings(
    * type bought as sweeps counts a traced sweep wrongly on the flat 3 ft
    * (`mergeWithinFeetFor`). `bendMergeFeetForOverrides` gives it.
    */
-  bends: { method: BendMethod; limit: number; mergeWithinFeet: number },
+  bends: {
+    method: BendMethod;
+    limit: number;
+    mergeWithinFeet: number;
+    /**
+     * What this type's 90s and 45s are called — required for the same reason
+     * as the merge distance: a sweep type's sentence said "90° elbows" beside
+     * a sweep row. `bendWordsFor` gives it.
+     */
+    words: BendWords;
+  },
   /**
    * The tees whose box THIS raceway buys (`teeBoxOwners`). Required, so a
    * caller has to decide: passing every tee its legs touch would buy the box
@@ -302,13 +329,68 @@ export function countFittings(
   const pieces = legs.flatMap(splitAtPullPoints);
   return {
     coupling: countCouplings(pieces, raceway),
-    connector: countConnectors(pieces, raceway),
+    connector: countConnectors(pieces, raceway, "conduit"),
     strap: countStraps(pieces, raceway),
     // Bends read the UNSPLIT legs: a pull point replaces the bend it sits on,
     // which only the whole leg can see.
-    ...countBends(legs, bends.method, bends.limit, bends.mergeWithinFeet)
-      .counts,
+    ...countBends(
+      legs,
+      bends.method,
+      bends.limit,
+      bends.mergeWithinFeet,
+      bends.words
+    ).counts,
     ...teeFittingCounts(ownedTees, raceway.teeCoverIncluded),
+  };
+}
+
+/**
+ * MC cable is strapped within 12 in of each box and every 6 ft after it
+ * (NEC 330.30). A constant rather than columns on the cable row, unlike a
+ * raceway's spacing: the materials screen edits spacing only on Conduit rows,
+ * so on a cable row it would be a number nobody could see or change. A
+ * company that holds MC another way (the wire clip above a lay-in ceiling)
+ * chooses that part on the run type; the count stays the code's.
+ */
+export const MC_STRAP_SPACING = {
+  strapSpacingFeet: 6,
+  strapFromBoxFeet: 1,
+} as const;
+
+/**
+ * The connectors and straps along a CABLE type's runs (retail catalog plan
+ * § R1, 2026-09-29) — the same arithmetic as a raceway's, over the same legs.
+ *
+ * Until then a cable type bought its footage and the box at its tees and
+ * nothing else, so every MC run was two connectors and a strap per 6 ft short,
+ * with nothing on screen saying so.
+ *
+ * No couplings (a coil), no bends (cable bends itself), no pull points. The
+ * caller decides which cables this applies to — MC only today, because an NM
+ * run into a plastic box takes no connector at all.
+ */
+export function countCableFittings(
+  legs: readonly FittingLeg[],
+  cable: {
+    name: string;
+    strapSpacingFeet: number;
+    strapFromBoxFeet: number;
+  }
+): { connector: FittingCount; strap: FittingCount } {
+  const spec: RacewayFittingSpec = {
+    name: cable.name,
+    stickLengthFeet: null,
+    stickJoint: "continuous",
+    strapSpacingFeet: cable.strapSpacingFeet,
+    strapFromBoxFeet: cable.strapFromBoxFeet,
+    // Neither applies: a cable run has no LBs, and its tee box is
+    // SMALL_TEE_BOX with its own cover line.
+    lbHubsTakeConnectors: true,
+    teeCoverIncluded: false,
+  };
+  return {
+    connector: countConnectors(legs, spec, "cable"),
+    strap: countStraps(legs, spec),
   };
 }
 
@@ -513,7 +595,9 @@ function countCouplings(
 
 function countConnectors(
   legs: readonly FittingLeg[],
-  raceway: RacewayFittingSpec
+  raceway: RacewayFittingSpec,
+  /** What enters the box, for the sentence: "one per cable end". */
+  entering: "conduit" | "cable"
 ): FittingCount {
   const kind = "connector" as const;
   if (legs.length === 0) {
@@ -580,7 +664,7 @@ function countConnectors(
       if (degree === 1) return plural(nodes, "line end");
       if (degree === 2)
         return `${plural(nodes, "in-and-out box", "in-and-out boxes")} (2 each)`;
-      return `${plural(nodes, "box", "boxes")} where ${degree} conduits meet`;
+      return `${plural(nodes, "box", "boxes")} where ${degree} ${entering}s meet`;
     });
   const teeParts = Array.from(teesByDegree.entries())
     .sort((a, b) => a[0] - b[0])
@@ -602,7 +686,7 @@ function countConnectors(
     why:
       qty === 0 && open > 0
         ? `No connectors: ${listed}`
-        : `${plural(qty, "connector")}: one per conduit end — ${listed}`,
+        : `${plural(qty, "connector")}: one per ${entering} end — ${listed}`,
   };
 }
 

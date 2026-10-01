@@ -1,5 +1,5 @@
 Category: Conduit Fittings
-Items: 579
+Items: 588
 
 Category | Name | Size
 Conduit Fittings | 1/2" EMT 45-degree elbow | 1/2"
@@ -521,6 +521,10 @@ Conduit Fittings | 1/2" liquidtight flexible conduit coupling | 1/2"
 Conduit Fittings | 3/4" liquidtight flexible conduit coupling | 3/4"
 Conduit Fittings | 1" liquidtight flexible conduit coupling | 1"
 Conduit Fittings | 1-1/4" liquidtight flexible conduit coupling | 1-1/4"
+Conduit Fittings | 1/2" flexible conduit one-hole strap | 1/2"
+Conduit Fittings | 3/4" flexible conduit one-hole strap | 3/4"
+Conduit Fittings | 1" flexible conduit one-hole strap | 1"
+Conduit Fittings | 1-1/4" flexible conduit one-hole strap | 1-1/4"
 Conduit Fittings | 1/2" flexible metal conduit connector | 1/2"
 Conduit Fittings | 3/4" flexible metal conduit connector | 3/4"
 Conduit Fittings | 1" flexible metal conduit connector | 1"
@@ -548,6 +552,7 @@ Conduit Fittings | 2" conduit locknut | 2"
 Conduit Fittings | 2-1/2" conduit locknut | 2-1/2"
 Conduit Fittings | 3" conduit locknut | 3"
 Conduit Fittings | 4" conduit locknut | 4"
+Conduit Fittings | 2" mast roof flashing | 2"
 Conduit Fittings | 1" metal weatherhead | 1"
 Conduit Fittings | 1-1/4" metal weatherhead | 1-1/4"
 Conduit Fittings | 1-1/2" metal weatherhead | 1-1/2"
@@ -581,3 +586,7 @@ Conduit Fittings | 2" rigid one-hole strap | 2"
 Conduit Fittings | 2-1/2" rigid one-hole strap | 2-1/2"
 Conduit Fittings | 3" rigid one-hole strap | 3"
 Conduit Fittings | 4" rigid one-hole strap | 4"
+Conduit Fittings | 2" riser strap | 2"
+Conduit Fittings | Roof flashing boot | -
+Conduit Fittings | 1/2" threaded closure | 1/2"
+Conduit Fittings | 3/4" threaded closure | 3/4"

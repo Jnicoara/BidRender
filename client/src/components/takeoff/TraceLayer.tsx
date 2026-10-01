@@ -251,6 +251,8 @@ export function TraceLayer({
   onStampClick,
   onBoxSelect,
   onDeleteSelected,
+  moveTargets,
+  onMoveSelected,
   onClearSelection,
   focusPoint,
   chromeTarget,
@@ -347,6 +349,12 @@ export function TraceLayer({
   /** The saved marks inside a Shift-drag box, in page points. */
   onBoxSelect: (ids: number[]) => void;
   onDeleteSelected: () => void;
+  /**
+   * The counts the selection can be moved to. Empty hides "Move to" — on a
+   * locked bid, where the server would refuse it anyway.
+   */
+  moveTargets?: { id: number; label: string }[];
+  onMoveSelected?: (groupId: number) => void;
   onClearSelection: () => void;
   /** Highlighted after a jump from the counted-items list. */
   focusPoint: { x: number; y: number } | null;
@@ -1721,6 +1729,31 @@ export function TraceLayer({
               >
                 Delete
               </Button>
+              {onMoveSelected && moveTargets && moveTargets.length > 1 && (
+                /*
+                  Counted as the wrong thing — most often a device drawn as
+                  existing to remain, counted with the new ones. A plain
+                  select: one choice, and the keyboard and screen readers
+                  already know it.
+                */
+                <select
+                  className="h-6 rounded-md border border-border bg-background px-1.5 text-xs pointer-events-auto max-w-56"
+                  value=""
+                  aria-label="Move the selected marks to another count"
+                  title="Move the selected marks to another count. They keep their places."
+                  onChange={e => {
+                    const id = Number(e.target.value);
+                    if (id > 0) onMoveSelected(id);
+                  }}
+                >
+                  <option value="">Move to…</option>
+                  {moveTargets.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              )}
               <Button
                 size="sm"
                 variant="ghost"

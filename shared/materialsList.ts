@@ -152,6 +152,30 @@ export function roundQty(value: number): number {
 }
 
 /**
+ * The quantity a supplier is asked for: a piece or a box is bought WHOLE,
+ * rounded UP; footage keeps its two decimals.
+ *
+ * Owner, 2026-09-29 (starter assemblies plan Q5): an assembly may carry a
+ * fractional part — a quarter tube of firestop per penetration — but the
+ * purchase list must never ask for 0.25 of an item. The fraction is kept
+ * through the SUM and rounded once at the end, so four penetrations order one
+ * tube, not four.
+ *
+ * Rounded to four places before the ceiling, because a float sum of 0.1 three
+ * times is 0.30000000000000004 and 2 pieces summed that way would otherwise
+ * order 3.
+ *
+ * This is whole PIECES, not whole PACKS: the catalog has no pack size yet
+ * (references/material-markup.md D3). When it does, rounding to a pack
+ * belongs here too — see todo.md.
+ */
+export function orderQty(unit: MaterialUnit, value: number): number {
+  if (unit === "foot") return roundQty(value);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.ceil(Math.round(value * 10_000) / 10_000);
+}
+
+/**
  * Roll assemblies into one list of materials.
  *
  * Keyed by name + unit, not by material id. Two rows that are the same material
@@ -223,7 +247,7 @@ export function aggregateMaterials(
 
   return Array.from(byKey.values()).map(entry => ({
     ...entry,
-    qty: roundQty(entry.qty),
+    qty: orderQty(entry.unit, entry.qty),
   }));
 }
 

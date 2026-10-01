@@ -181,8 +181,16 @@ async function restoreInto(
     await connection.query(`CREATE DATABASE \`${schema}\``);
     await connection.query(`USE \`${schema}\``);
 
-    // If this throws, the backup is not restorable — the whole point.
-    await connection.query(sql);
+    // If this throws, the backup is not restorable — the whole point. The
+    // half-loaded schema is dropped on the way out, kept or not: nothing can
+    // be rehearsed on a restore that failed, and leaving it behind put a
+    // stray schema on the scratch server after every failed verify.
+    try {
+      await connection.query(sql);
+    } catch (error) {
+      await connection.query(`DROP DATABASE IF EXISTS \`${schema}\``);
+      throw error;
+    }
 
     const [tables] = await connection.query<mysql.RowDataPacket[]>(
       `SELECT TABLE_NAME FROM information_schema.TABLES

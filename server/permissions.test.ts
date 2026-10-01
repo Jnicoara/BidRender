@@ -55,6 +55,7 @@ import {
   outranks,
 } from "../shared/permissions";
 import type { TrpcContext } from "./_core/context";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 // One company per role, plus a wholly separate contractor to steal from.
 const OWNER = 9501;
@@ -75,6 +76,7 @@ const ALL_USERS = [
   INTERNAL,
   NONMEMBER,
 ];
+dropFixtureUsersAfterAll(ALL_USERS);
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 const describeDb = hasDb ? describe : describe.skip;

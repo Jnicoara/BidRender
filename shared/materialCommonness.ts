@@ -205,7 +205,10 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   // ring and led on the name. Marking the ring is the same move as the LB.
   'Concrete ring, 4" deep': "common",
   "Handy box": "common",
-  "Weatherproof box, single-gang": "common",
+  // Both hub sizes of the single-gang (2026-09-29): with only the 1/2" marked,
+  // "wp box" put the 3/4" double-gang above the 3/4" single-gang.
+  '1/2" weatherproof box, single-gang': "common",
+  '3/4" weatherproof box, single-gang': "common",
 
   // ── Devices ──
   "Duplex receptacle": "core",

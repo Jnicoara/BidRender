@@ -6,17 +6,22 @@
  * with Escape the way everything else in the app can — so it read as belonging
  * to a different application.
  *
- * ── The crop is taken from the rendered canvas ───────────────────────────────
- * Dragging a box gives a rectangle in page points; the pixels come from the
- * already-rasterised page rather than re-rendering the PDF, so capturing is
- * instant and costs nothing. It is downscaled hard: this is a thumbnail for
- * recognition, and a full-resolution crop would put a screenshot into a text
- * column.
+ * ── The picture is rendered again from the PDF, sharp ────────────────────────
+ * Dragging a box gives a rectangle in page points. Until 2026-09-30 the pixels
+ * were cut from the viewer's backdrop (1.5x, 108 px per paper inch) and shrunk
+ * to 96 px — so a symbol that was crisp on screen was saved soft, and that
+ * soft picture is what the reader-accuracy test hands the model as the legend.
+ * Now the box is drawn again by the PDF worker at `captureRenderScale`
+ * (shared/symbolCapture.ts): never softer than the screen it was boxed on,
+ * nor than 400 px per inch. The backdrop crop is still taken, instantly, so
+ * the naming form has a picture at once; the sharp one replaces it when the
+ * render arrives, and Save waits for it.
  *
  * Only the naming is new. Link creation, reuse and the one-time question are
  * phase 2c's and are untouched.
  */
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,19 +29,99 @@ import { Input } from "@/components/ui/input";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { crosshairCursorStyle } from "@/lib/crosshairCursor";
 import { useCrosshairColor, useCrosshairSize } from "@/hooks/useCrosshairColor";
+import {
+  CAPTURE_MAX_EDGE,
+  SYMBOL_THUMBNAIL_MAX_CHARS,
+  captureRenderScale,
+  capturePixelSize,
+  normaliseCaptureBox,
+  type CaptureBox,
+} from "@shared/symbolCapture";
 
-/** Longest edge of the stored thumbnail, in pixels. */
+/** Longest edge of the instant PREVIEW, in pixels. Not what is saved. */
 const THUMBNAIL_MAX_EDGE = 96;
 
-export type CaptureRegion = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
+export type CaptureRegion = CaptureBox;
+
+/** Draws a page region from the PDF — PlanPane's worker, region in points. */
+export type CaptureRenderer = (
+  rect: CaptureRegion,
+  scale: number
+) => Promise<{ bitmap: ImageBitmap }>;
+
+/**
+ * Render a boxed region from the PDF itself, as a PNG data URL.
+ *
+ * At `captureRenderScale`, so the picture is at least as sharp as the screen
+ * the box was drawn on. If the encoded picture is over the stored limit (rare:
+ * a box much bigger than a symbol), it is stepped down 20% at a time until it
+ * fits, rather than failing the save. Null for a box with no area, or when the
+ * picture cannot be read back — the caller keeps the preview and says so.
+ */
+export async function renderSharpCapture(
+  region: CaptureRegion,
+  screenScale: number,
+  renderRegion: CaptureRenderer
+): Promise<string | null> {
+  const box = normaliseCaptureBox(region);
+  const scale = captureRenderScale(box, screenScale);
+  if (!(scale > 0)) return null;
+  const size = capturePixelSize(box, scale);
+  if (size.width < 4 || size.height < 4) return null;
+
+  const { bitmap } = await renderRegion(box, scale);
+  try {
+    return encodeCapture(bitmap, 0, 0, bitmap.width, bitmap.height);
+  } finally {
+    bitmap.close();
+  }
+}
+
+/**
+ * A region of an already-rendered image as the PNG data URL a symbol is
+ * stored with: no longer than CAPTURE_MAX_EDGE on its long side, and stepped
+ * down 20% at a time until it fits SYMBOL_THUMBNAIL_MAX_CHARS rather than
+ * failing the save. Single capture and "Capture whole legend" both encode
+ * here, so the two cannot store pictures by different rules.
+ */
+export function encodeCapture(
+  source: CanvasImageSource,
+  sx: number,
+  sy: number,
+  sw: number,
+  sh: number
+): string | null {
+  if (!(sw >= 1 && sh >= 1)) return null;
+  const fit = Math.min(1, CAPTURE_MAX_EDGE / Math.max(sw, sh));
+  let width = Math.max(1, Math.round(sw * fit));
+  let height = Math.max(1, Math.round(sh * fit));
+  const out = document.createElement("canvas");
+  for (let attempt = 0; attempt < 8; attempt++) {
+    out.width = width;
+    out.height = height;
+    const ctx = out.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(source, sx, sy, sw, sh, 0, 0, width, height);
+    let url: string;
+    try {
+      url = out.toDataURL("image/png");
+    } catch {
+      return null;
+    }
+    if (url.length <= SYMBOL_THUMBNAIL_MAX_CHARS) return url;
+    width = Math.max(1, Math.round(width * 0.8));
+    height = Math.max(1, Math.round(height * 0.8));
+  }
+  return null;
+}
 
 /**
  * Crop a region of the rendered page canvas to a small PNG data URL.
+ *
+ * The instant PREVIEW only, from the 1.5x backdrop — soft by construction.
+ * `renderSharpCapture` makes the picture that is saved.
  *
  * Returns null rather than throwing on a degenerate box — a click without a
  * drag is a cancelled capture, not an error worth interrupting anyone over.
@@ -76,13 +161,35 @@ export function cropToThumbnail(
  *
  * Follows the standing edit rules: the field selects on focus, Enter commits,
  * Escape abandons.
+ *
+ * ── It is portalled to the screen layer, and that is not optional ───────────
+ * This form is rendered from the sheet's overlay, which sits INSIDE the zoom
+ * transform. Until 2026-09-30 it was drawn there, so it scaled and moved with
+ * the drawing: measured on E0.01, 62x31 px at 19% (a speck at the top of the
+ * sheet) and 1,826 px ABOVE the window at 179%, where a legend symbol is
+ * actually boxed. The form opened, took the keyboard focus, and could not be
+ * seen — so Capture read as doing nothing at all. `chromeTarget` is the
+ * untransformed layer the calibrate and select-text cards already use; it is
+ * a required prop so a caller cannot forget it.
  */
 export function SymbolCaptureForm({
   thumbnail,
+  sharpening,
+  soft,
+  chromeTarget,
   onSave,
   onCancel,
 }: {
   thumbnail: string | null;
+  /**
+   * The sharp picture is still being rendered. Save waits for it, because
+   * saving the preview would store exactly the soft picture this replaces.
+   */
+  sharpening: boolean;
+  /** The sharp render failed, so `thumbnail` is the soft preview. Said aloud. */
+  soft: boolean;
+  /** PlanPane's screen-space layer. Null only before it has mounted. */
+  chromeTarget: HTMLElement | null;
   onSave: (label: string) => void;
   onCancel: () => void;
 }) {
@@ -97,12 +204,13 @@ export function SymbolCaptureForm({
     const trimmed = label.trim();
     // Blank writes nothing — a symbol with no name cannot be found again, and
     // the label is what the link is keyed on.
-    if (!trimmed) return;
+    if (!trimmed || sharpening) return;
     onSave(trimmed);
   };
 
-  return (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 w-80 rounded-xl border border-border bg-card/98 p-3 shadow-xl">
+  // pointer-events-auto: the screen layer is click-through by default.
+  const card = (
+    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 w-80 max-w-[calc(100%-1rem)] pointer-events-auto rounded-xl border border-border bg-card/98 p-3 shadow-xl">
       <p className="text-sm font-medium">Name this symbol</p>
       <p className="text-xs text-muted-foreground mt-0.5">
         Used to recognise it again on the next set of plans.
@@ -144,14 +252,22 @@ export function SymbolCaptureForm({
         />
       </div>
 
+      {soft && (
+        <p className="text-xs text-[#F5C518] mt-2" role="status">
+          The sharp picture could not be made, so this one is lower resolution.
+          Cancel and box it again to retry.
+        </p>
+      )}
+
       <div className="flex items-center gap-1.5 mt-2.5">
         <Button
           size="sm"
           className="h-7 gap-1.5 text-xs flex-1"
           onClick={commit}
-          disabled={!label.trim()}
+          disabled={!label.trim() || sharpening}
         >
-          <Check className="w-3 h-3" /> Save symbol
+          <Check className="w-3 h-3" />{" "}
+          {sharpening ? "Sharpening picture…" : "Save symbol"}
         </Button>
         <Button
           size="sm"
@@ -164,6 +280,12 @@ export function SymbolCaptureForm({
       </div>
     </div>
   );
+
+  // The same fallback as CalibrateLayer and TextSelect. PlanPane sets the
+  // layer on its first commit (`ref={setChromeLayer}`), and this form only
+  // exists after a box has been dragged on a rendered page, so the inline
+  // branch is for a layer that has not mounted, not a normal path.
+  return chromeTarget ? createPortal(card, chromeTarget) : card;
 }
 
 /**

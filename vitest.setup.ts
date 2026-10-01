@@ -1,4 +1,22 @@
+import { appendFileSync } from "node:fs";
+import path from "node:path";
+import { afterAll, beforeAll, expect } from "vitest";
 import { checkTestDatabase } from "./scripts/databaseGuard";
+import {
+  countRowsByTable,
+  describeLeaks,
+  leakedSharedRows,
+  readSharedRows,
+  rowCountDelta,
+  type SharedRow,
+  type SharedTable,
+} from "./scripts/testLeakGuard";
+import { BASELINE_MATERIALS } from "./server/seed/materials";
+import { BASELINE_ASSEMBLIES } from "./server/seed/baselineAssemblies";
+import { BASELINE_KITS } from "./server/seed/baselineKits";
+import { BASELINE_LABOR_RATES } from "./server/seed/baselineLaborRates";
+import { BASELINE_MODIFIERS } from "./server/seed/baselineModifiers";
+import { BASELINE_RUN_TYPES } from "./server/seed/baselineRunTypes";
 
 /**
  * Environment every test run needs, beyond what `.env` carries.
@@ -77,4 +95,65 @@ process.env.ANTHROPIC_API_KEY = "";
 {
   const result = checkTestDatabase(process.env.DATABASE_URL);
   if (!result.ok) throw new Error(result.message);
+}
+
+/**
+ * ── No test FILE may leave a shared row behind ───────────────────────────────
+ *
+ * Before each file, the shared (userId NULL) rows in the library tables are
+ * recorded; after it, a new one whose name is not shipped fails THAT file,
+ * named. A shared row a failing test left behind broke `assemblies.test.ts`
+ * on 2026-09-28 and 2026-09-29, one file away from the one that caused it.
+ * The rule and its reasons: scripts/testLeakGuard.ts.
+ *
+ * Registered here, in the setup file, so it runs around EVERY file and after
+ * each file's own afterAll (vitest runs after-hooks in reverse order) — a file
+ * that cleans up in afterAll is judged after it has.
+ *
+ * With TEST_LEAK_REPORT=<path>, it also appends each file's row-count change
+ * per table to that file, as JSON lines — the measurement of user-owned rows
+ * left behind (plan T3). Report only; nothing fails on it.
+ */
+if (process.env.DATABASE_URL) {
+  const url = process.env.DATABASE_URL;
+  let before: SharedRow[] = [];
+  let countsBefore: Record<string, number> | null = null;
+
+  beforeAll(async () => {
+    before = await readSharedRows(url);
+    if (process.env.TEST_LEAK_REPORT)
+      countsBefore = await countRowsByTable(url);
+  });
+
+  afterAll(async () => {
+    const file = path.relative(
+      process.cwd(),
+      expect.getState().testPath ?? "(unknown file)"
+    );
+    if (countsBefore && process.env.TEST_LEAK_REPORT) {
+      const delta = rowCountDelta(countsBefore, await countRowsByTable(url));
+      appendFileSync(
+        process.env.TEST_LEAK_REPORT,
+        JSON.stringify({ file, delta }) + "\n"
+      );
+    }
+    const leaked = leakedSharedRows(
+      before,
+      await readSharedRows(url),
+      shippedNames()
+    );
+    if (leaked.length > 0) throw new Error(describeLeaks(file, leaked));
+  });
+}
+
+/** Every name the seeders ship, per shared table — never a leak. */
+function shippedNames(): Map<SharedTable, Set<string>> {
+  return new Map<SharedTable, Set<string>>([
+    ["materials", new Set(BASELINE_MATERIALS.map(m => m.name))],
+    ["assemblies", new Set(BASELINE_ASSEMBLIES.map(a => a.name))],
+    ["kits", new Set(BASELINE_KITS.map(k => k.name))],
+    ["labor_rates", new Set(BASELINE_LABOR_RATES.map(r => r.name))],
+    ["modifiers", new Set(BASELINE_MODIFIERS.map(m => m.name))],
+    ["takeoff_run_types", new Set(BASELINE_RUN_TYPES.map(t => t.label))],
+  ]);
 }

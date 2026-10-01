@@ -37,10 +37,27 @@ import {
   summariseVerify,
   verifyBackup,
 } from "./backup/verifyBackup";
+import { scratchSchemaFor } from "../scripts/testSuiteLock";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
 const hasDb = Boolean(databaseUrl);
 const runIf = hasDb ? describe : describe.skip;
+
+/**
+ * Every schema this file creates and drops, named after the database under
+ * test. They were fixed names until 2026-09-29, and a schema name is
+ * server-wide — so two worktrees testing two databases at once restored into
+ * the SAME schema and read each other's rows ("11 `assemblies` short").
+ * See scratchSchemaFor in scripts/testSuiteLock.ts.
+ */
+const SCRATCH_SCHEMAS = hasDb
+  ? {
+      restore: scratchSchemaFor(databaseUrl, "restore"),
+      verifySelftest: scratchSchemaFor(databaseUrl, "verify_selftest"),
+      verifyCorrupt: scratchSchemaFor(databaseUrl, "verify_corrupt"),
+      verifyMismatch: scratchSchemaFor(databaseUrl, "verify_mismatch"),
+    }
+  : null;
 
 /** A destination that keeps everything in memory, so tests need no cloud. */
 function fakeTarget(
@@ -246,7 +263,18 @@ runIf("restoring the dump", () => {
    * Restores into a scratch schema and drops it again, so it never touches the
    * database it read from.
    */
-  const SCRATCH = "bidrender_backup_restore_test";
+  const SCRATCH = SCRATCH_SCHEMAS?.restore ?? "";
+
+  it("restores into a schema of its own database's, not one every test database shares", () => {
+    // Red while these were fixed names: two databases got the same schema.
+    const database = new URL(databaseUrl).pathname.slice(1);
+    for (const schema of Object.values(SCRATCH_SCHEMAS!)) {
+      expect(schema.startsWith(`${database}__`), schema).toBe(true);
+    }
+    const url = new URL(databaseUrl);
+    url.pathname = "/bidrender_test_someone_else";
+    expect(scratchSchemaFor(url.toString(), "restore")).not.toBe(SCRATCH);
+  });
 
   it("restores into an empty database, table for table and row for row", async () => {
     const dump = await dumpDatabase(databaseUrl);
@@ -603,7 +631,7 @@ runIf("verifying a backup end to end", () => {
     const result = await verifyBackup({
       target,
       scratchDatabaseUrl: databaseUrl,
-      scratchSchema: "bidrender_verify_selftest",
+      scratchSchema: SCRATCH_SCHEMAS!.verifySelftest,
     });
 
     expect(result.errors).toEqual([]);
@@ -642,12 +670,25 @@ runIf("verifying a backup end to end", () => {
     const result = await verifyBackup({
       target,
       scratchDatabaseUrl: databaseUrl,
-      scratchSchema: "bidrender_verify_corrupt",
+      scratchSchema: SCRATCH_SCHEMAS!.verifyCorrupt,
     });
 
     expect(result.ok, "a corrupted dump must not verify").toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
     expect(summariseVerify(result)).toContain("NOT VERIFIED");
+
+    // A failed restore cleans up after itself. It used to leave the
+    // half-loaded schema on the scratch server until the next run dropped it.
+    const connection = await mysql.createConnection({ uri: databaseUrl });
+    try {
+      const [left] = await connection.query<mysql.RowDataPacket[]>(
+        "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
+        [SCRATCH_SCHEMAS!.verifyCorrupt]
+      );
+      expect(left, "the failed restore's schema was left behind").toEqual([]);
+    } finally {
+      await connection.end();
+    }
   }, 120_000);
 
   it("notices when the restore does not match the manifest", async () => {
@@ -674,7 +715,7 @@ runIf("verifying a backup end to end", () => {
     const result = await verifyBackup({
       target,
       scratchDatabaseUrl: databaseUrl,
-      scratchSchema: "bidrender_verify_mismatch",
+      scratchSchema: SCRATCH_SCHEMAS!.verifyMismatch,
     });
 
     expect(result.ok).toBe(false);

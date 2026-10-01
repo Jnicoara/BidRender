@@ -1,5 +1,5 @@
 Category: Wire & Cable
-Items: 101
+Items: 108
 
 Category | Name | Size
 Wire & Cable | #14 bare CU, solid | #14
@@ -19,8 +19,10 @@ Wire & Cable | #18 fixture wire | #18
 Wire & Cable | #16 fixture wire | #16
 Wire & Cable | 14-2 MC cable | -
 Wire & Cable | 14-3 MC cable | -
+Wire & Cable | 14-4 MC cable | -
 Wire & Cable | 12-2 MC cable | -
 Wire & Cable | 12-3 MC cable | -
+Wire & Cable | 12-4 MC cable | -
 Wire & Cable | 10-2 MC cable | -
 Wire & Cable | 10-3 MC cable | -
 Wire & Cable | 10-4 MC cable | -
@@ -36,6 +38,8 @@ Wire & Cable | 3-3 MC cable | -
 Wire & Cable | 3-4 MC cable | -
 Wire & Cable | 2-2 MC cable | -
 Wire & Cable | 2-3 MC cable | -
+Wire & Cable | 12-2 MC cable, isolated ground | -
+Wire & Cable | 14-4 mini-split cable | -
 Wire & Cable | 14-2 NM-B | -
 Wire & Cable | 14-3 NM-B | -
 Wire & Cable | 12-2 NM-B | -
@@ -63,6 +67,7 @@ Wire & Cable | 2-2-4 SEU AL | -
 Wire & Cable | 14-3 SJOOW cord | -
 Wire & Cable | 12-3 SOOW cord | -
 Wire & Cable | 10-3 SOOW cord | -
+Wire & Cable | 12-2 submersible pump cable | -
 Wire & Cable | #14 THHN | #14
 Wire & Cable | #12 THHN | #12
 Wire & Cable | #10 THHN | #10
@@ -81,6 +86,8 @@ Wire & Cable | 300 kcmil THHN | 300 kcmil
 Wire & Cable | 350 kcmil THHN | 350 kcmil
 Wire & Cable | 400 kcmil THHN | 400 kcmil
 Wire & Cable | 500 kcmil THHN | 500 kcmil
+Wire & Cable | #14 THHN stranded | #14
+Wire & Cable | #12 THHN stranded | #12
 Wire & Cable | #10 THHN stranded | #10
 Wire & Cable | 12-3 tray cable | -
 Wire & Cable | 14-2 UF-B | -

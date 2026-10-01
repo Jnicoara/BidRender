@@ -28,10 +28,16 @@ import {
   isBendRole,
   mergeWithinFeetFor,
   type BendMethod,
+  type BendWords,
   type PullPointKind,
 } from "./runBends";
 import { tradeSizeAtLeast } from "./materialSizeOrder";
-import { isTeeRole } from "./runNetwork";
+import {
+  TEE_KINDS,
+  isTeeRole,
+  teeFittingCounts,
+  type TeeRef,
+} from "./runNetwork";
 
 /**
  * EMT's three fitting styles. NULL on a run type reads as set-screw — it is
@@ -241,6 +247,16 @@ export function pullBoxFor(
 }
 
 /**
+ * The box and cover at a tee on small pipe — and at EVERY tee on a cable run
+ * (owner, 2026-09-29, plan W4). One constant, so the two cannot come to name
+ * different parts.
+ */
+export const SMALL_TEE_BOX = {
+  box: '4" square box',
+  cover: '4" square blank cover',
+} as const;
+
+/**
  * The box at a branch tee (D20, answer 3): a 4" square box and blank cover up
  * to 3/4", 4-11/16" from 1" to 1-1/4", and the pull-box rule from 1-1/2" up —
  * a tee in large pipe is an angle pull, and a pull box comes with its screw
@@ -263,8 +279,8 @@ export function teeBoxFor(
   }
   if (inches <= 0.75) {
     return {
-      box: '4" square box',
-      cover: '4" square blank cover',
+      box: SMALL_TEE_BOX.box,
+      cover: SMALL_TEE_BOX.cover,
       why: `a 4" square box at each tee on ${parsed.size}`,
     };
   }
@@ -343,6 +359,37 @@ export function bendMergeFeetForOverrides(
   );
 }
 
+/**
+ * What this type's 90s and 45s are called, from the parts it buys — see
+ * `BendWords` (runBends.ts). Read with the same names, and the same sweep
+ * test, as `bendMergeFeetForOverrides`, so the merge distance and the word
+ * cannot disagree about whether a type buys sweeps.
+ *
+ *   nothing chosen        the catalog's factory elbow  → "90° elbow"
+ *   a sweep chosen        → "90° sweep"
+ *   an elbow chosen       → "90° elbow"
+ *   anything else chosen  → "90° bend" — the part is on the row beside it;
+ *                           the sentence does not guess what to call it.
+ */
+export function bendWordsFor(
+  elbow90Name: string | null,
+  elbow45Name: string | null
+): BendWords {
+  const wordFor = (degrees: 90 | 45, name: string | null) => {
+    const noun =
+      name === null || /\belbow\b/i.test(name)
+        ? "elbow"
+        : sweepRadiusInches(name) !== null
+          ? "sweep"
+          : "bend";
+    return { one: `${degrees}° ${noun}`, many: `${degrees}° ${noun}s` };
+  };
+  return {
+    elbow90: wordFor(90, elbow90Name),
+    elbow45: wordFor(45, elbow45Name),
+  };
+}
+
 export function lbName(size: string, family: string): string {
   return `${size} ${family} LB conduit body`;
 }
@@ -381,7 +428,9 @@ export function cBodyName(size: string, family: string): string {
 
 /**
  * The strap a family is held with. PVC 40 and 80 share an outside diameter,
- * as do rigid and IMC, so each pair shares a strap. Flex has none yet.
+ * as do rigid and IMC, so each pair shares a strap. So do flexible metal and
+ * liquidtight, since 2026-09-29 (retail plan § R7) — until then flex had no
+ * strap and its count said "No catalog strap".
  */
 export function strapFamily(family: RacewayFamilyLabel): string | null {
   switch (family) {
@@ -393,6 +442,11 @@ export function strapFamily(family: RacewayFamilyLabel): string | null {
     case "rigid conduit":
     case "IMC":
       return "rigid";
+    // "flexible conduit", not "flex": named `1/2" flex one-hole strap` it led
+    // a search for "1/2 flex", above the flex conduit itself.
+    case "flexible metal conduit":
+    case "liquidtight flexible conduit":
+      return "flexible conduit";
     default:
       return null;
   }
@@ -639,6 +693,119 @@ export function fittingRowSpeaks(row: {
   if (row.onBid || row.status === "unknown") return true;
   return row.status === "counted" && row.qty > 0;
 }
+
+/**
+ * A CABLE run's tee rows: the box and cover at each tee it owns. Its
+ * connectors and straps are `cableRunRows` (MC only, since 2026-09-29); a
+ * cable has no couplings or elbows to buy.
+ *
+ * Until 2026-09-29 a cable type got no fitting rows at all, so a branch on an
+ * MC or NM run counted its footage and drops and bought no box at the split:
+ * one box and cover short per tee, with nothing on screen saying so (plan
+ * W4). The box is SMALL_TEE_BOX, the owner's answer (Q2); a cable has no trade
+ * size to size it by. Ownership is `teeBoxOwners`, which ranks a type with no
+ * raceway below every pipe — so where conduit meets cable, the conduit buys
+ * the one box, sized to itself.
+ */
+export function cableTeeRows(
+  ownedTees: readonly TeeRef[],
+  found: (
+    name: string
+  ) => { id: number; name: string; costPerUnit: string | number } | undefined
+): FittingRow[] {
+  const counts = teeFittingCounts(ownedTees, false);
+  return TEE_KINDS.map(kind => {
+    const wanted = kind === "teeBox" ? SMALL_TEE_BOX.box : SMALL_TEE_BOX.cover;
+    const row = found(wanted);
+    const count = counts[kind];
+    return {
+      role: kind,
+      count,
+      pick: row
+        ? {
+            ok: true as const,
+            materialId: row.id,
+            name: row.name,
+            costPerUnit: row.costPerUnit,
+            override: false,
+          }
+        : { ok: false as const, why: `No catalog match for ${wanted}` },
+      qty: count.status === "counted" ? count.qty : 0,
+    };
+  });
+}
+
+/**
+ * The MC connector and strap for one MC cable, by its SHIPPED name — or null
+ * when the cable is not MC (retail catalog plan § R1, 2026-09-29).
+ *
+ * Sized by the cable's outside diameter, which follows conductor size and
+ * count: 14 and 12 AWG and 10-2/10-3 take a 3/8" connector and the small
+ * strap; 10-4 and 8 AWG a 1/2"; 6 and 4 AWG a 3/4"; 3 and 2 AWG a 1". The
+ * connector rows' descriptions say the same (seed/materials/connectors.ts).
+ *
+ * Read from the name, like `parseRacewayName`: the size is the leading
+ * `<gauge>-<count>`, and a suffix ("12-2 MC cable, isolated ground") does not
+ * change the part.
+ */
+export function mcFittingNames(
+  cableName: string | null
+): { connector: string; strap: string } | null {
+  if (cableName === null) return null;
+  const match = /^(\d+)-(\d) MC cable\b/.exec(cableName);
+  if (!match) return null;
+  const gauge = Number(match[1]);
+  const conductors = Number(match[2]);
+  const small = gauge >= 12 || (gauge === 10 && conductors <= 3);
+  const connector = small
+    ? '3/8"'
+    : gauge >= 8
+      ? '1/2"'
+      : gauge >= 4
+        ? '3/4"'
+        : '1"';
+  return {
+    connector: `${connector} MC connector`,
+    strap: small ? "MC one-hole strap, small" : "MC one-hole strap, large",
+  };
+}
+
+/**
+ * A CABLE run's connector and strap rows (§ R1): the type's own choice of
+ * part wins, as on a conduit type; otherwise the catalog part `mcFittingNames`
+ * names. The count is `countCableFittings`.
+ */
+export function cableRunRows(
+  counts: { connector: FittingCount; strap: FittingCount },
+  parts: {
+    connector: { override: FittingPart | null; wanted: string };
+    strap: { override: FittingPart | null; wanted: string };
+  },
+  found: (name: string) => FittingPart | undefined
+): FittingRow[] {
+  return (["connector", "strap"] as const).map(kind => {
+    const { override, wanted } = parts[kind];
+    const row = override ?? found(wanted);
+    const count = counts[kind];
+    return {
+      role: kind,
+      count,
+      pick: row
+        ? {
+            ok: true as const,
+            materialId: row.id,
+            name: row.name,
+            costPerUnit: row.costPerUnit,
+            override: override !== null,
+          }
+        : { ok: false as const, why: `No catalog match for ${wanted}` },
+      qty: count.status === "counted" ? count.qty : 0,
+    };
+  });
+}
+
+/** A part as a pick needs it. */
+type FittingPart = { id: number; name: string; costPerUnit: string | number };
 
 export function fittingRows(
   counts: Record<FittingKind, FittingCount>,

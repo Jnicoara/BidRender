@@ -110,6 +110,7 @@ import { sql } from "drizzle-orm";
 import { getTableConfig } from "drizzle-orm/mysql-core";
 import * as schema from "../drizzle/schema";
 import { getDb } from "./db";
+import { pendingMigrations, type Migration } from "./migrationRun";
 
 /**
  * A column that exists on both sides and disagrees about NULL.
@@ -482,7 +483,17 @@ export async function findSchemaDrift(): Promise<TableDrift[]> {
   return drift;
 }
 
-/** How many migrations this database believes it has run. */
+/**
+ * How many migrations this database believes it has run — null ONLY when it
+ * has no migrations table at all (never migrated).
+ *
+ * Any other failure THROWS. Until 2026-09-29 every error landed in a bare
+ * `catch` and came back as null, so a database that simply could not be
+ * reached — a timeout, a refused connection, a wrong password — was reported
+ * as "never migrated". Measured against production (89 applied) from off its
+ * trusted list, 2026-09-27. A false "never migrated" is an invitation to
+ * re-run every migration against live data; a connection error is not.
+ */
 export async function appliedMigrationCount(): Promise<number | null> {
   const db = await getDb();
   if (!db) return null;
@@ -491,11 +502,53 @@ export async function appliedMigrationCount(): Promise<number | null> {
       sql`SELECT COUNT(*) AS n FROM __drizzle_migrations`
     )) as unknown as [Array<{ n: number | string }>];
     return Number(rows[0]?.n ?? 0);
-  } catch {
-    // The table is absent on a database that has never been migrated at all,
-    // which is a legitimate answer rather than an error.
-    return null;
+  } catch (err) {
+    if (isMissingTable(err)) return null;
+    throw err;
   }
+}
+
+/**
+ * The date of the newest migration this database has recorded — what the
+ * migrator compares the journal against (`pendingMigrations`). Null when it
+ * has no migrations table; any other failure throws, as above.
+ */
+export async function lastMigrationAt(): Promise<number | null> {
+  const db = await getDb();
+  if (!db) return null;
+  try {
+    const [rows] = (await db.execute(
+      sql`SELECT MAX(created_at) AS at FROM __drizzle_migrations`
+    )) as unknown as [Array<{ at: number | string | null }>];
+    const at = rows[0]?.at;
+    return at === null || at === undefined ? null : Number(at);
+  } catch (err) {
+    if (isMissingTable(err)) return null;
+    throw err;
+  }
+}
+
+/**
+ * MySQL's "table doesn't exist" (ER_NO_SUCH_TABLE, 1146). drizzle wraps the
+ * driver's error and puts the real one on `cause`, so both are read; nothing
+ * else counts — measured, a refused connection arrives as ECONNREFUSED on
+ * the same `cause`.
+ */
+export function isMissingTable(err: unknown): boolean {
+  const codeOf = (e: unknown) =>
+    e && typeof e === "object"
+      ? {
+          code: (e as { code?: unknown }).code,
+          errno: (e as { errno?: unknown }).errno,
+        }
+      : { code: undefined, errno: undefined };
+  const direct = codeOf(err);
+  const cause = codeOf(
+    err && typeof err === "object" ? (err as { cause?: unknown }).cause : null
+  );
+  return [direct, cause].some(
+    c => c.code === "ER_NO_SUCH_TABLE" || c.errno === 1146
+  );
 }
 
 // ── Foreign keys — the links that make a delete take what hangs off it ──────
@@ -669,8 +722,56 @@ function addConstraintSql(link: ForeignKeySpec): string {
   );
 }
 
+/**
+ * Where a missing link comes from: the migration file that declares it, and
+ * whether this database has run that file yet.
+ *
+ * `pending` uses the migrator's own rule (`pendingMigrations`), so it is what
+ * `scripts/migrate.mts` will actually do. Null when no migration file names
+ * the constraint at all.
+ */
+export type LinkOrigin = { tag: string; pending: boolean } | null;
+
+/**
+ * For each missing link, the first migration whose statements name its
+ * constraint. Found by the constraint NAME, which every migration here writes
+ * out in full (`CONSTRAINT \`…_fk\` FOREIGN KEY …`), rather than by table and
+ * column, which a later migration could reuse.
+ */
+export function linkOrigins(
+  missing: readonly ForeignKeySpec[],
+  migrations: readonly Migration[],
+  lastAppliedAt: number | null
+): Map<string, LinkOrigin> {
+  const pending = new Set(
+    pendingMigrations(migrations, lastAppliedAt).map(m => m.tag)
+  );
+  const origins = new Map<string, LinkOrigin>();
+  for (const link of missing) {
+    const named = `\`${link.name}\``;
+    const from = migrations.find(m =>
+      m.statements.some(statement => statement.includes(named))
+    );
+    origins.set(
+      link.name,
+      from ? { tag: from.tag, pending: pending.has(from.tag) } : null
+    );
+  }
+  return origins;
+}
+
 /** The link drift as something a person reads and can act on. */
-export function describeForeignKeyDrift(drift: ForeignKeyDrift): string {
+export function describeForeignKeyDrift(
+  drift: ForeignKeyDrift,
+  /**
+   * Required: where each missing link comes from (`linkOrigins`). Without it
+   * this said every missing link's migration was "already recorded as
+   * applied" — a fixed sentence, false on 2026-09-29 for two links whose
+   * migrations (0089, 0095) were still pending, and it printed ALTERs that
+   * would have made those migrations fail on a duplicate constraint.
+   */
+  origins: ReadonlyMap<string, LinkOrigin>
+): string {
   if (drift.liveCount === 0 && drift.declaredCount > 0) {
     // Shouted, because it is not one gap but a different kind of database.
     return [
@@ -701,19 +802,53 @@ export function describeForeignKeyDrift(drift: ForeignKeyDrift): string {
     );
   }
   /*
-    `pnpm db:push` does not fix this. A link is added by a migration the
-    database has usually already recorded as applied, so re-running changes
-    nothing — the 0004 case. The statement is printed instead. MySQL checks
-    every existing row when a link is added, so an orphan left while it was
-    missing makes the statement fail; that is the database telling the truth.
+    Three answers, one per link, from WHERE it comes from — never one sentence
+    for all of them. That sentence used to be "the migration that declared
+    each one is already recorded as applied", true in the 0004 case it was
+    written for and false for any link whose migration is simply pending.
   */
-  lines.push(
-    "",
-    "db:push will not add these — the migration that declared each one is",
-    "already recorded as applied. To add one (MySQL checks every existing row,",
-    "so orphans left while it was missing make it fail until they are removed):",
-    ...drift.missing.map(link => `  ${addConstraintSql(link)}`)
+  const pending = drift.missing.filter(l => origins.get(l.name)?.pending);
+  const applied = drift.missing.filter(
+    l => origins.get(l.name)?.pending === false
   );
+  const nowhere = drift.missing.filter(
+    l => (origins.get(l.name) ?? null) === null
+  );
+  if (pending.length > 0) {
+    lines.push(
+      "",
+      "Not applied yet — scripts/migrate.mts adds these. Do NOT add them by",
+      "hand: the migration would then fail on a duplicate constraint.",
+      ...pending.map(
+        link => `  ${origins.get(link.name)!.tag} adds ${linkKey(link)}`
+      )
+    );
+  }
+  /*
+    `pnpm db:push` does not fix these. The migration that declared them is
+    recorded as applied, so re-running changes nothing — the 0004 case. The
+    statement is printed instead. MySQL checks every existing row when a link
+    is added, so an orphan left while it was missing makes the statement
+    fail; that is the database telling the truth.
+  */
+  if (applied.length > 0) {
+    lines.push(
+      "",
+      "db:push will not add these — the migration that declared each one",
+      `(${applied.map(l => origins.get(l.name)!.tag).join(", ")}) is already`,
+      "recorded as applied. To add one (MySQL checks every existing row, so",
+      "orphans left while it was missing make it fail until they are removed):",
+      ...applied.map(link => `  ${addConstraintSql(link)}`)
+    );
+  }
+  if (nowhere.length > 0) {
+    lines.push(
+      "",
+      "No migration in drizzle/ declares these, so nothing will add them.",
+      "The schema declares them; a migration that adds them is missing:",
+      ...nowhere.map(link => `  ${addConstraintSql(link)}`)
+    );
+  }
   if (drift.wrongRule.length > 0) {
     lines.push(
       "A wrong delete rule is fixed by dropping that constraint and adding it",

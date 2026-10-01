@@ -42,9 +42,11 @@ import {
 } from "../shared/linePricingProblems";
 import type { CompanyPricingDefaults } from "../shared/pricing";
 import type { TrpcContext } from "./_core/context";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 9471;
 const OTHER_USER = 9472;
+dropFixtureUsersAfterAll([USER, OTHER_USER]);
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 const describeDb = hasDb ? describe : describe.skip;

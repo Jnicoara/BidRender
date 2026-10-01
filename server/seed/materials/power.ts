@@ -401,6 +401,48 @@ const spacedPanels: BaselineMaterial[] = PANEL_SPACES.flatMap(
     ])
 );
 
+/**
+ * Three-phase panelboards, sized (retail catalog plan § R5, 2026-09-29).
+ *
+ * Every sized panel above is a single-phase load center, and the only
+ * three-phase row was the unsized "208V 3-phase panelboard" — one price for a
+ * 100A and a 400A panel. A 3-pole breaker also cannot go in a single-phase
+ * load center, so a sized row priced a panel that could not hold the job's
+ * breakers. These are the GENERIC parents (CLAUDE.md § Brands): an assembly
+ * points here, and the brand variants hang below once `parentId` exists
+ * (Track A). 208Y/120V only; 480V stays one row, rare on this kind of job.
+ */
+const THREE_PHASE_PANELS: { amps: string; main: boolean; spaces: string }[] = [
+  { amps: "100", main: false, spaces: "24" },
+  { amps: "125", main: false, spaces: "30" },
+  { amps: "225", main: false, spaces: "42" },
+  { amps: "225", main: true, spaces: "42" },
+  { amps: "400", main: false, spaces: "42" },
+  { amps: "400", main: true, spaces: "42" },
+];
+const threePhasePanels: BaselineMaterial[] = THREE_PHASE_PANELS.map(
+  ({ amps, main, spaces }) => ({
+    ...gear("Panels"),
+    /*
+      "main", as in "200A main panel": "main-breaker" in a name puts a panel
+      on the Breakers shelf (materialsCatalog.test.ts) and in "breaker"
+      search. And "panelboard" FIRST: search ties fall to display order, and
+      "225A 3-phase main panelboard" sorted ahead of every "main panel", so
+      "panel", "42 space" and "225a" led with three-phase rows.
+    */
+    name: `${amps}A panelboard, 3-phase ${main ? "main" : "main-lug"}, ${spaces}-space`,
+    searchAliases: aliases(
+      `${amps} amp ${spaces} space ${spaces} circuit`,
+      main
+        ? "three phase 3ph 208 208y/120 commercial main breaker mb"
+        : "three phase 3ph 208 208y/120 commercial mlo no main"
+    ),
+    description: main
+      ? "208Y/120V, 3-phase 4-wire, with its own main breaker."
+      : "208Y/120V, 3-phase 4-wire. Main-lug only: fed from an upstream breaker.",
+  })
+);
+
 const outdoorPanels: BaselineMaterial[] = ["100", "200"].map(amps => ({
   ...gear("Panels"),
   name: `${amps}A outdoor main panel`,
@@ -449,6 +491,19 @@ const meterBases: BaselineMaterial[] = ["100", "200", "400"].map(amps => ({
     "socket can meter main utility service ringless"
   ),
 }));
+
+/*
+  The hub an overhead mast threads into on top of a meter base (starter
+  assemblies plan § Gaps, 2026-09-29). The pricing sheet listed it unsized as
+  "Meter socket hub" under its pending Service Entrance shelf; it ships here,
+  beside the meter bases, until that shelf exists (see
+  references/track-a-handoff-starter-assemblies.md).
+*/
+const meterHub: BaselineMaterial = {
+  ...gear("Panels"),
+  name: '2" meter hub',
+  searchAliases: aliases("2in socket mast overhead service threaded top"),
+};
 
 /**
  * Disconnects come fused and non-fused at every size and the two are NOT
@@ -657,6 +712,10 @@ export const DISTRIBUTION: BaselineMaterial[] = [
     {
       name: "208V 3-phase panelboard",
       slang: "208y/120 three phase commercial lighting appliance mlo main",
+      // Kept, not retired (retail plan § R5, RQ4): a bid already priced from
+      // it keeps resolving, and pickers still offer it for "size unknown".
+      description:
+        "Unsized placeholder: one price for every size. Prefer a sized 3-phase panelboard.",
     },
     {
       name: "480V 3-phase panelboard",
@@ -728,10 +787,11 @@ export const DISTRIBUTION: BaselineMaterial[] = [
       name: "Modular furniture whip, 10 ft",
       slang: "cubicle systems furniture feed office",
     },
-  ].map(({ name, slang }) => ({
+  ].map((item: { name: string; slang: string; description?: string }) => ({
     ...gear("Distribution Equipment"),
-    name,
-    searchAliases: aliases(slang),
+    name: item.name,
+    searchAliases: aliases(item.slang),
+    ...(item.description ? { description: item.description } : {}),
   })),
   {
     ...gear("Distribution Equipment"),
@@ -756,9 +816,11 @@ export const PANELS_AND_BREAKERS: BaselineMaterial[] = [
   ...mainPanels,
   ...subPanels,
   ...spacedPanels,
+  ...threePhasePanels,
   ...outdoorPanels,
   ...panelParts,
   ...meterBases,
+  meterHub,
   ...disconnects,
   acDisconnect,
   ...fuses,

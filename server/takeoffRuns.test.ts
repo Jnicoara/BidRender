@@ -23,9 +23,11 @@ import { bidPdfSheets, bidPdfs, bids, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { footageByRunType } from "./runTypeFootage";
 import type { RunTypeFootageRow } from "./runTypeFootageCore";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 8383;
 const OTHER_USER = 8384;
+dropFixtureUsersAfterAll([USER, OTHER_USER]);
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 

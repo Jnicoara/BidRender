@@ -8,6 +8,12 @@
  * no stranded 14, so "#4/0 THHN" is unambiguous and a "(stranded)" suffix would
  * be noise on 30 rows to disambiguate one.
  *
+ * **Corrected 2026-09-29 (retail catalog plan § R6):** "no stranded 14" was
+ * wrong. #14 and #12 THHN are stocked stranded as well — commercial pulls in
+ * EMT commonly use it — so 14, 12 and 10 all exist both ways and all three
+ * name the stranded row. The plain "#14 THHN" and "#12 THHN" stay the solid
+ * rows, under the names the starter assemblies use.
+ *
  * ── Aluminum is flagged, deliberately ────────────────────────────────────────
  * Aluminum feeder is priced on a different commodity curve than copper and
  * moves independently of it, sometimes sharply. Every aluminum row says so in
@@ -79,9 +85,16 @@ const copperThhn: BaselineMaterial[] = [
     costPerUnit: UNPRICED,
     category: "Wire & Cable" as const,
     searchAliases: aliases(gaugeAliases(gauge), BUILDING_WIRE, "solid"),
-    ...(gauge === "#10"
-      ? { description: "Solid. The stranded version is a separate item." }
-      : {}),
+    description: "Solid. The stranded version is a separate item.",
+  })),
+  // The two stranded sizes added 2026-09-29 (§ R6); #10's is below.
+  ...["#14", "#12"].map(gauge => ({
+    name: `${gauge} THHN stranded`,
+    unitOfSale: "foot" as const,
+    costPerUnit: UNPRICED,
+    category: "Wire & Cable" as const,
+    searchAliases: aliases(gaugeAliases(gauge), BUILDING_WIRE),
+    description: "Stranded. The solid version is a separate item.",
   })),
   ...COPPER_STRANDED.map(gauge => ({
     // Only 10 AWG needs the suffix — it is the single size stocked both ways.
@@ -204,12 +217,20 @@ const nmb: BaselineMaterial[] = NM_SIZES.map(size => {
  * exists only as 3- and 4-conductor, and 2 AWG only as 2- and 3-conductor —
  * the gaps are real, not omissions, and inventing "3/2 MC" would put a part
  * number in the catalog that no supply house can fill.
+ *
+ * **This list claimed to be complete and was not, until 2026-09-29:** it had
+ * no 14-4 or 12-4, and 12-4 is one of the most common MC cables sold — a
+ * 208Y/120V building runs three-phase multiwire branch circuits (three hots,
+ * one shared neutral) in it. An estimator reached for 12-3 and bought one
+ * conductor in four too few (retail catalog plan § R2).
  */
 const MC_SIZES = [
   "14-2",
   "14-3",
+  "14-4",
   "12-2",
   "12-3",
+  "12-4",
   "10-2",
   "10-3",
   "10-4",
@@ -227,17 +248,47 @@ const MC_SIZES = [
   "2-3",
 ];
 
-const mcCable: BaselineMaterial[] = MC_SIZES.map(size => ({
-  name: `${size} MC cable`,
-  unitOfSale: "foot",
-  costPerUnit: UNPRICED,
-  category: "Wire & Cable",
-  // "BX" is the older armoured-cable name people still use for MC.
-  searchAliases: aliases(
-    size.replace("-", "/"),
-    "metal clad armored armoured bx flexible feeder"
+/** For the Notes column and the Materials screen — the two added in § R2. */
+const MC_DESCRIPTIONS: Record<string, string> = {
+  "14-4":
+    "Four conductors and a ground: three phases and a shared neutral, or two circuits.",
+  "12-4":
+    "Four conductors and a ground: three phases and a shared neutral, or two circuits.",
+};
+
+const mcCable: BaselineMaterial[] = [
+  ...MC_SIZES.map(
+    (size): BaselineMaterial => ({
+      name: `${size} MC cable`,
+      unitOfSale: "foot",
+      costPerUnit: UNPRICED,
+      category: "Wire & Cable",
+      // "BX" is the older armoured-cable name people still use for MC.
+      searchAliases: aliases(
+        size.replace("-", "/"),
+        "metal clad armored armoured bx flexible feeder"
+      ),
+      ...(MC_DESCRIPTIONS[size] ? { description: MC_DESCRIPTIONS[size] } : {}),
+    })
   ),
-}));
+  /*
+    What feeds a cash wrap's isolated-ground receptacles (§ R2): two
+    conductors, an insulated green ground for the IG terminal, and the
+    armour's bond. Priced by the foot like any cable; its grounds are inside
+    the jacket, so nothing counts them apart.
+  */
+  {
+    name: "12-2 MC cable, isolated ground",
+    unitOfSale: "foot",
+    costPerUnit: UNPRICED,
+    category: "Wire & Cable",
+    searchAliases: aliases(
+      "12/2 ig orange computer register cash wrap dedicated insulated green metal clad armored armoured bx"
+    ),
+    description:
+      "Two conductors, an insulated ground for the IG receptacle, and the bond.",
+  },
+];
 
 // ─── UF-B and fixture wire ────────────────────────────────────────────────────
 
@@ -294,6 +345,29 @@ const portableCord: BaselineMaterial[] = [
 
 const trayCable: BaselineMaterial[] = [
   cable("12-3 tray cable", "tc tc-er power control cable tray industrial"),
+];
+
+/*
+  Two cables the starter assemblies needed and the catalog lacked (plan
+  § Gaps, 2026-09-29). Neither is MC, so `mcFittingNames` must not read
+  either one as MC and buy MC connectors for it; its pattern needs
+  "MC cable" in the name, which these do not have.
+*/
+const equipmentCable: BaselineMaterial[] = [
+  {
+    ...cable(
+      "12-2 submersible pump cable",
+      "well drop flat jacketed direct burial 600v ground"
+    ),
+    description: "Well-pump drop cable: two conductors and a ground.",
+  },
+  {
+    ...cable(
+      "14-4 mini-split cable",
+      "minisplit ductless split system interconnect communication stranded heat pump"
+    ),
+    description: "Between a mini-split's outdoor and indoor units. Not MC.",
+  },
 ];
 
 // ─── Bare copper ground ───────────────────────────────────────────────────────
@@ -498,6 +572,7 @@ export const WIRE_AND_CABLE: BaselineMaterial[] = [
   ...fireAlarmCable,
   ...portableCord,
   ...trayCable,
+  ...equipmentCable,
   ...bareCopper,
   ...serCopper,
   ...serAluminum,
