@@ -140,7 +140,10 @@ architect") and is out of scope.
   (`A-7` → `A7`). Both files must say so (CLAUDE.md "when a new decision
   overrides an old one, say so in BOTH files") — to be written into the
   pin-styles plan when either is built, not before, so neither file claims
-  something unbuilt.
+  something unbuilt. **Built 2026-10-01** with the pin letters
+  (`fixtureTag`, `shared/pinLetters.ts`; pin plan § 11 "BUILT" note): the
+  hyphen is always dropped, and a leading tag needs a digit so "A light" is
+  not read as tag A.
 - **Letter-hiding below the measured size** (pin plan § 3) still applies, and
   hurts more here: two tags of one symbol differ ONLY by letter and color. At
   zoom levels where the letter is hidden, color alone separates them. Step 0

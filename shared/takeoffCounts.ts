@@ -495,17 +495,30 @@ export function symbolOriginalName(symbol: SymbolNames): string | null {
  * A count made under the current name comes first, because that is the one a
  * click on the symbol would make today.
  *
- * Assembly-backed counts are excluded on purpose: their name is the
- * assembly's, and renaming a legend symbol must never rename the assembly's
- * count, which other symbols may share (track-b-count-pin-styles-plan.md
+ * Counts of OTHER assemblies are excluded on purpose. And a count of the
+ * symbol's own assembly is included only when it carries the symbol's name:
+ * since 2026-10-01 a linked symbol arms its own count of the assembly, under
+ * its name (shared/assemblyCounts.ts), so that count IS the symbol's and a
+ * rename must follow it — or the next click would no longer find it. A count
+ * under the ASSEMBLY's name is never matched, so renaming a symbol never
+ * renames a count other symbols may share (track-b-count-pin-styles-plan.md
  * § 11).
  */
 export function symbolCountsOn<
   G extends { label: string; assemblyId: number | null },
->(groups: readonly G[], symbol: SymbolNames): G[] {
+>(
+  groups: readonly G[],
+  symbol: SymbolNames & { assemblyId?: number | null }
+): G[] {
   const current = symbolLookupKey(symbol.label);
+  const linked = symbol.assemblyId ?? null;
   return groups
-    .filter(g => g.assemblyId === null && nameMatchesSymbol(g.label, symbol))
+    .filter(
+      g =>
+        (g.assemblyId === null ||
+          (linked !== null && g.assemblyId === linked)) &&
+        nameMatchesSymbol(g.label, symbol)
+    )
     .sort(
       (a, b) =>
         Number(symbolLookupKey(b.label) === current) -
