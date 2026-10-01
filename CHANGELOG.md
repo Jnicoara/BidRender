@@ -80,6 +80,55 @@ This is the human-readable companion to the git history — read this to see wha
   app, it says "BidRidge has been updated — Refresh" instead of "This screen
   stopped working". A browser can also no longer get stuck holding a broken
   copy of the app's code after an update.
+
+- **The Plans screen's panel works on a phone.** At phone width it used to
+  run off the side of the screen, taking its buttons with it. Now the drawing
+  gets the whole width, a bar along the bottom says what is on this sheet,
+  and tapping it opens the panel full-screen — the same tabs as on a laptop,
+  plus a Sheets tab for picking a sheet. Every button in it is finger-sized,
+  and "← Plan" returns to the drawing exactly where you left it. Moving
+  around the drawing with fingers is not done yet.
+
+- **The Plans screen's right-hand panel is easier to read.** Nearly all of
+  its text was 10–11 px; every number, price and warning is now at least
+  12 px and each line item 14 px. Warnings have their own amber colour on a
+  tinted band, so they no longer look like the yellow that marks what is
+  selected. "Not on the bid yet" now shows one line per reason with a count
+  — "Traced, not sent yet — 10", "No wire in the pipe — 1" — and each line
+  opens to its items, instead of repeating the same reason under every row.
+
+- **Refreshing the Plans screen keeps your place.** F5, or reopening the
+  link, used to jump back to the first page of the first plan set. The
+  address now names the plan set and sheet, so a refresh — or a link you
+  send someone — opens that sheet, and a refresh in the same tab also comes
+  back to the same zoom and position. If that set or sheet has since been
+  deleted, it opens the first sheet instead, with no error. Flipping sheets
+  does not fill the Back button: Back still leaves the screen in one press.
+
+- **The Plans screen's right-hand panel is now tabs: Counts, Runs, Legend,
+  Reader and Totals.** It used to be one long column — about nine screens of
+  scrolling on a small job, with scroll boxes inside it. Now one tab is open
+  at a time and scrolls on its own. A line along the top always says what is
+  on this sheet ("This sheet: 3 marks · 6 items · 358 ft of runs"), replacing
+  a number that added marks to runs and meant nothing. Clicking a run or a
+  mark on the drawing opens its tab, scrolled to it. A tab holding a warning
+  — such as Totals while something is not on the bid — shows an amber mark,
+  so nothing important hides in a closed tab. The panel remembers the tab
+  you last chose. Laptop only for now; the phone comes later.
+
+- **A legend symbol counts the moment you click it, assembly or not.**
+  Clicking a symbol nobody has linked used to stop and ask which assembly it
+  was, so a light fixture a supplier will price as a package could not be
+  counted at all. Now the click starts counting it by name, and "Link" sits
+  beside the symbol for whenever you want it. Any count made by name has a
+  "Link assembly…" control on its card, which turns it into an assembly
+  count with every mark kept.
+- **The materials list has a "Supplier to price" section.** Counts with no
+  assembly behind them — "A1 luminaire: 38" — are listed there by name and
+  quantity, in the dialog, the CSV and the PDF, for the supplier to quote as
+  a package. They used to appear only in a note saying they could not be
+  itemised. They never show a price, and never $0.
+
 - **A sheet's scale no longer sits on top of the next sheet in the sheet
   list.** Setting a scale grew that row by a line, and for a moment (or for
   as long as the tab was in the background) the list still had it at its old

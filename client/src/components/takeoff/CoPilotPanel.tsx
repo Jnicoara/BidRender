@@ -80,8 +80,8 @@ const TIER_STYLE: Record<
     icon: Check,
   },
   low: {
-    row: "border-l-2 border-l-[#F5C518] bg-[#F5C518]/5",
-    badge: "text-[#F5C518] border-[#F5C518]/40",
+    row: "border-l-2 border-l-warning bg-warning/10",
+    badge: "text-warning border-warning/40",
     icon: TriangleAlert,
   },
   unreadable: {
@@ -210,7 +210,7 @@ export function CoPilotPanel({
       <p className="text-xs font-medium">
         What is “{finding.rawLabel}” really?
       </p>
-      <p className="text-[0.7rem] text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         Pick one of your legend symbols. It will be read this way on the rest of
         this drawing set — for your account only. The drawing has moved to where
         the reader put it; check that spot before placing.
@@ -248,12 +248,12 @@ export function CoPilotPanel({
           </button>
         ))}
         {linkable.length === 0 && (
-          <p className="text-[0.7rem] text-muted-foreground px-2 py-2">
+          <p className="text-xs text-muted-foreground px-2 py-2">
             {symbols.length === 0
               ? "No legend symbols yet. Capture one from the sheet's legend below and link it to an assembly — that is what tells the reader what a symbol means."
               : symbolQuery.trim()
                 ? "None of your linked legend symbols match that."
-                : "Your legend symbols are not linked to anything yet. Click one in the Legend below to link it to an assembly, then come back here."}
+                : "Your legend symbols are not linked to anything yet. Press Link beside one in the Legend below to choose its assembly, then come back here."}
           </p>
         )}
       </div>
@@ -293,7 +293,7 @@ export function CoPilotPanel({
         <Button
           size="sm"
           variant="ghost"
-          className={cn("h-5 px-1.5 text-[0.7rem]", !counts && "ml-auto")}
+          className={cn("h-5 px-1.5 text-xs", !counts && "ml-auto")}
           disabled={reading || !canRead}
           onClick={() => onRead(Boolean(state?.runId))}
           title={
@@ -336,10 +336,10 @@ export function CoPilotPanel({
           {state?.message && (
             <p
               className={cn(
-                "mx-3 mb-2 rounded px-2 py-1.5 text-[0.7rem] border",
+                "mx-3 mb-2 rounded px-2 py-1.5 text-xs border",
                 state.status === "failed"
                   ? "border-destructive/40 text-destructive bg-destructive/5"
-                  : "border-[#F5C518]/40 text-[#F5C518] bg-[#F5C518]/5"
+                  : "border-warning/40 text-warning bg-warning/10"
               )}
             >
               {state.message}
@@ -348,7 +348,7 @@ export function CoPilotPanel({
 
           {state?.summary && (
             <div className="mx-3 mb-2 rounded border border-border bg-muted/20 px-2 py-1.5">
-              <p className="text-[0.65rem] uppercase tracking-wide text-muted-foreground mb-1">
+              <p className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1">
                 Scope on this sheet
               </p>
               <p className="text-xs leading-relaxed">{state.summary}</p>
@@ -356,17 +356,18 @@ export function CoPilotPanel({
           )}
 
           {confirmedCount > 0 && (
-            <p className="px-3 pb-2 text-[0.7rem] text-emerald-400">
+            <p className="px-3 pb-2 text-xs text-emerald-400">
               {confirmedCount} placed on this sheet.
             </p>
           )}
 
-          {/* The findings, banded by tier. */}
-          <div className="max-h-72 overflow-y-auto">
+          {/* The findings, banded by tier. No scroll box of their own since
+              the Reader got its own tab: the tab is the one scroll area. */}
+          <div>
             {grouped.map(({ tier, rows }) =>
               rows.length === 0 ? null : (
                 <div key={tier}>
-                  <div className="px-3 py-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground bg-muted/20 border-y border-border/50">
+                  <div className="px-3 py-1 text-[0.7rem] uppercase tracking-wide text-muted-foreground bg-muted/20 border-y border-border/50">
                     {TIER_LABEL[tier]} · {rows.length}
                     {tier === "unreadable" && (
                       <span className="normal-case tracking-normal">
@@ -417,17 +418,17 @@ export function CoPilotPanel({
                             </p>
                             {finding.assemblyName &&
                               finding.assemblyName !== finding.rawLabel && (
-                                <p className="text-[0.7rem] text-muted-foreground truncate">
+                                <p className="text-xs text-muted-foreground truncate">
                                   read as “{finding.rawLabel}”
                                 </p>
                               )}
                             {finding.reason && (
-                              <p className="text-[0.7rem] text-muted-foreground leading-snug">
+                              <p className="text-xs text-muted-foreground leading-snug">
                                 {finding.reason}
                               </p>
                             )}
                             {finding.note && (
-                              <p className="text-[0.7rem] text-muted-foreground/80 italic leading-snug">
+                              <p className="text-xs text-muted-foreground/80 italic leading-snug">
                                 {finding.note}
                               </p>
                             )}
@@ -436,7 +437,7 @@ export function CoPilotPanel({
                           <div className="flex flex-col items-end gap-1 shrink-0">
                             <span
                               className={cn(
-                                "rounded-full border px-1.5 text-[0.6rem] leading-4",
+                                "rounded-full border px-1.5 text-xs leading-4",
                                 style.badge
                               )}
                             >
@@ -449,7 +450,7 @@ export function CoPilotPanel({
                               size="sm"
                               variant="ghost"
                               className={cn(
-                                "h-5 px-1 text-[0.65rem]",
+                                "h-5 px-1 text-xs",
                                 finding.needsLink
                                   ? "text-foreground"
                                   : "text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"

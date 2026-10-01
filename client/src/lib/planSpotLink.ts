@@ -1,54 +1,56 @@
 /**
- * A link to ONE SPOT on one sheet: `#/bids/<id>/plans?pdf=<id>&page=<n>&x=<pt>&y=<pt>`.
+ * A link to ONE SPOT on one sheet:
+ * `#/bids/<id>/plans?set=<planSetId>&sheet=<page>&x=<pt>&y=<pt>`.
  *
  * Added 2026-10-01 for the reader-accuracy review page, which lists every AI
  * find that is not in the hand count and needs to take the estimator to each
- * one to say whose mistake it was. The plans screen does the rest exactly as
- * the drops readout's jump does: open the plan set, open the page, centre the
- * spot zoomed in, ring it.
+ * one to say whose mistake it was.
  *
- * Plan set and page rather than a sheet id, because those are what the
- * screen selects by (`setSelectedDocId`, `setPage`), and the review script
- * has both to hand. Points are page points, as every mark is stored.
+ * It is Track B's Plans address (@/lib/planAddress — `set` and `sheet`) with
+ * a point added, so the screen's own address code opens the set and sheet,
+ * on arrival and on a hash change alike; the plans screen then only centres
+ * the point, zoomed in, and drops `x` and `y` from the address so a refresh
+ * does not jump again. This used its own `pdf` / `page` names until the
+ * address landed (merged 2026-10-01); two spellings for one place would have
+ * been two pieces of code choosing the open sheet.
  *
- * The screen strips these from the address once it has jumped, so a reload
- * does not jump again and a bookmark is the plain plans screen.
+ * Points are page points, as every mark is stored.
  */
+import { planAddressHash, readPlanAddress } from "./planAddress";
+
 export type PlanSpot = { pdfId: number; page: number; x: number; y: number };
 
 export function planSpotHash(bidId: number, spot: PlanSpot): string {
-  const q = new URLSearchParams({
-    pdf: String(spot.pdfId),
-    page: String(spot.page),
-    x: spot.x.toFixed(1),
-    y: spot.y.toFixed(1),
-  });
-  return `#/bids/${bidId}/plans?${q.toString()}`;
+  return (
+    planAddressHash(bidId, spot.pdfId, spot.page) +
+    `&x=${spot.x.toFixed(1)}&y=${spot.y.toFixed(1)}`
+  );
 }
 
 /** The spot a hash asks for, or null if it asks for none or for nonsense. */
 export function readPlanSpot(hash: string): PlanSpot | null {
   const at = hash.indexOf("?");
   if (at < 0) return null;
+  const { setId, sheet } = readPlanAddress(hash);
+  if (setId === null || sheet === null) return null;
   const q = new URLSearchParams(hash.slice(at + 1));
-  const pdfId = Number(q.get("pdf"));
-  const page = Number(q.get("page"));
-  const x = Number(q.get("x"));
-  const y = Number(q.get("y"));
-  if (!Number.isInteger(pdfId) || pdfId <= 0) return null;
-  if (!Number.isInteger(page) || page <= 0) return null;
   // A missing x reads as Number(null) = 0, which is a real point; refuse it.
-  if (q.get("x") === null || q.get("y") === null) return null;
+  const rawX = q.get("x");
+  const rawY = q.get("y");
+  if (rawX === null || rawY === null || rawX === "" || rawY === "") return null;
+  const x = Number(rawX);
+  const y = Number(rawY);
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  return { pdfId, page, x, y };
+  return { pdfId: setId, page: sheet, x, y };
 }
 
-/** The same hash without the spot, other query params kept. */
+/** The same hash without the point; the set and sheet stay. */
 export function withoutPlanSpot(hash: string): string {
   const at = hash.indexOf("?");
   if (at < 0) return hash;
   const q = new URLSearchParams(hash.slice(at + 1));
-  for (const k of ["pdf", "page", "x", "y"]) q.delete(k);
+  q.delete("x");
+  q.delete("y");
   const rest = q.toString();
   return hash.slice(0, at) + (rest ? `?${rest}` : "");
 }

@@ -58,7 +58,7 @@ function Axis({
           <Button
             size="sm"
             variant="ghost"
-            className="h-5 px-1.5 text-[0.7rem] text-muted-foreground"
+            className="h-5 px-1.5 text-xs text-muted-foreground"
             onClick={onAll}
           >
             All
@@ -66,7 +66,7 @@ function Axis({
           <Button
             size="sm"
             variant="ghost"
-            className="h-5 px-1.5 text-[0.7rem] text-muted-foreground"
+            className="h-5 px-1.5 text-xs text-muted-foreground"
             onClick={onNone}
           >
             None
@@ -120,7 +120,7 @@ function Axis({
               <span className="flex-1 min-w-0 truncate text-left">
                 {layerLabel(entry.key)}
               </span>
-              <span className="font-mono text-[0.7rem] text-muted-foreground">
+              <span className="font-mono text-xs text-muted-foreground">
                 {entry.count}
               </span>
               {on ? (
@@ -193,7 +193,7 @@ export function LayersPanel({
         )}
         <LayersIcon className="w-3 h-3" /> Layers
         {filtered && (
-          <span className="ml-auto normal-case tracking-normal text-[#F5C518]">
+          <span className="ml-auto normal-case tracking-normal text-xs text-warning">
             {hiddenCount} hidden
           </span>
         )}
@@ -262,7 +262,7 @@ export function LayersPanel({
           {/* Said plainly, because a filtered takeoff that looks complete is how a
           job gets quoted missing half its devices. */}
           {filtered && (
-            <p className="px-3 pb-2 text-[0.7rem] text-[#F5C518]">
+            <p className="mx-3 mb-2 rounded bg-warning/10 px-2 py-1 text-xs text-warning">
               Showing part of this sheet. Totals below cover the whole bid
               regardless.
             </p>

@@ -375,28 +375,28 @@ Each phase ships and gets used before the next starts.
 > **Re-ordered 2026-09-17 after testing Phase 1 on the live site.** The order
 > below is the current one; § 4.1 records what the testing changed and why.
 
-| Phase    | What                                                                              | DB change                |
-| -------- | --------------------------------------------------------------------------------- | ------------------------ |
-| **1**    | ~~Zoom, pan, and the three viewer bugs~~ **shipped**                              | No                       |
-| **1a**   | ~~Page-flip fit bug + tool discoverability~~ **shipped**                          | **No**                   |
-| **2**    | ~~Two-point scale calibration~~ **shipped**                                       | No (reuses `scaleRatio`) |
-| **3**    | ~~Sharp re-render of the visible area~~ **shipped**                               | **No**                   |
-| **4**    | ~~The layout: top bar, collapsing panels, focus mode~~ **shipped**                | **No**                   |
-| **4b**   | Measure-only tool                                                                 | **No**                   |
-| **5**    | **Verticals on runs — the money phase**                                           | **Yes**                  |
-| **6**    | Group row, plain counting, and marks you can tell apart — § 5e                    | **Yes** — count groups   |
-| **6b**   | **The bridge: counts onto the bid, then levels 3 and 2** — § 5f                   | **Yes** (small)          |
-| **6c**   | Takeoff-only jobs: stop nagging a finished count — § 5h                           | **Yes** (one column)     |
-| **7**    | Run settings: allowances, materials, sizes, ground                                | **Yes**                  |
-| **8**    | **Verticals on stamps**                                                           | **Yes** (small)          |
-| **9**    | Editing runs: drag a vertex, insert/remove points                                 | No                       |
-| **9a**   | **AI-assisted legend capture** — see § 9, and § 9.6 for why it precedes 10        | **Yes** (small)          |
-| **10**   | AI reader tiling, and the daily-limit question with it — **gated on § 15**        | No                       |
-| **10b**  | **AI-suggested known distances for calibration** — see § 13                       | No                       |
-| **11**   | Tablet and touch                                                                  | No                       |
-| **12**   | **Alternates and allowances** — add/deduct priced apart from the base — § 5g      | **Yes**                  |
-| **13**   | Per-bid proposal breakdown: where the choice is STORED, then the shapes — § 5g    | **Yes** (small)          |
-| **V1–4** | Viewer batch: big sets, sheet numbers, go-to, search — § 17 (independent of 5–13) | **V2 only** (additive)   |
+| Phase    | What                                                                                                                   | DB change                |
+| -------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| **1**    | ~~Zoom, pan, and the three viewer bugs~~ **shipped**                                                                   | No                       |
+| **1a**   | ~~Page-flip fit bug + tool discoverability~~ **shipped**                                                               | **No**                   |
+| **2**    | ~~Two-point scale calibration~~ **shipped**                                                                            | No (reuses `scaleRatio`) |
+| **3**    | ~~Sharp re-render of the visible area~~ **shipped**                                                                    | **No**                   |
+| **4**    | ~~The layout: top bar, collapsing panels, focus mode~~ **shipped**                                                     | **No**                   |
+| **4b**   | Measure-only tool                                                                                                      | **No**                   |
+| **5**    | **Verticals on runs — the money phase**                                                                                | **Yes**                  |
+| **6**    | Group row, plain counting, and marks you can tell apart — § 5e                                                         | **Yes** — count groups   |
+| **6b**   | **The bridge: counts onto the bid, then levels 3 and 2** — § 5f                                                        | **Yes** (small)          |
+| **6c**   | Takeoff-only jobs: stop nagging a finished count — § 5h                                                                | **Yes** (one column)     |
+| **7**    | Run settings: allowances, materials, sizes, ground                                                                     | **Yes**                  |
+| **8**    | **Verticals on stamps**                                                                                                | **Yes** (small)          |
+| **9**    | Editing runs: drag a vertex, insert/remove points                                                                      | No                       |
+| **9a**   | **AI-assisted legend capture** — see § 9, and § 9.6 for why it precedes 10                                             | **Yes** (small)          |
+| **10**   | AI reader tiling, and the daily-limit question with it — **gated on § 15**                                             | No                       |
+| **10b**  | **AI-suggested known distances for calibration** — see § 13                                                            | No                       |
+| **11**   | Tablet and touch — **phone LAYOUT built 2026-09-30, touch gestures not** (`track-b-phone-and-readability-plan.md` § 3) | No                       |
+| **12**   | **Alternates and allowances** — add/deduct priced apart from the base — § 5g                                           | **Yes**                  |
+| **13**   | Per-bid proposal breakdown: where the choice is STORED, then the shapes — § 5g                                         | **Yes** (small)          |
+| **V1–4** | Viewer batch: big sets, sheet numbers, go-to, search — § 17 (independent of 5–13)                                      | **V2 only** (additive)   |
 
 > **Phase 6 was split on 2026-09-18 and 6c inserted.** The bridge (6b) is the
 > largest piece in this document and is not a step inside an appearance phase —

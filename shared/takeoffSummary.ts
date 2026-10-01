@@ -331,6 +331,91 @@ export function takeoffSummary(input: {
   };
 }
 
+// ── "Not on the bid yet", folded by reason ──────────────────────────────────
+
+/**
+ * One line per reason, with a count, each opening to its rows
+ * (references/track-b-phone-and-readability-plan.md § 2.4, owner's answer 3,
+ * 2026-09-30). The reason is said ONCE, on the line, instead of under every
+ * row — measured before: the same "Traced, not sent yet." eleven times over.
+ *
+ * A row still says its own reason when it differs from the line's — a run
+ * row that "cannot go as it stands" carries a message of its own (no
+ * material named, a fitting unknown), and folding that away would turn a
+ * fixable row into an unexplained one.
+ */
+export type NotOnBidFold = {
+  /** The reason, with "notSent" split into traced and counted. */
+  id: string;
+  label: string;
+  /** Rows in this fold — the same unit as "Not on the bid yet — N". */
+  count: number;
+  /** Said once, under the line; null when every row says its own. */
+  why: string | null;
+  items: (SummaryItem & { ownWhy: string | null })[];
+  /** True when Send all sends every row in this fold. */
+  sendable: boolean;
+};
+
+const FOLD_LABEL: Record<string, string> = {
+  "notSent:run": "Traced, not sent yet",
+  "notSent:count": "Counted, not sent yet",
+  locked: "Bid is locked",
+  noType: "No run type",
+  noScale: "No scale",
+  noWire: "No wire in the pipe",
+  cannotSend: "Can't go on the bid as it stands",
+  assemblyGone: "Assembly no longer in your library",
+  unsupported: "Can't be priced on the bid yet",
+};
+
+/** Things one press fixes first; things that need work elsewhere after. */
+const FOLD_ORDER = Object.keys(FOLD_LABEL);
+
+export function foldNotOnBid(notOnBid: readonly SummaryItem[]): NotOnBidFold[] {
+  const byId = new Map<string, SummaryItem[]>();
+  for (const item of notOnBid) {
+    const reason = item.reason ?? "cannotSend";
+    const id = reason === "notSent" ? `notSent:${item.kind}` : reason;
+    const list = byId.get(id) ?? [];
+    list.push(item);
+    byId.set(id, list);
+  }
+  const rank = (id: string) => {
+    const at = FOLD_ORDER.indexOf(id);
+    return at < 0 ? FOLD_ORDER.length : at;
+  };
+  return Array.from(byId.entries())
+    .sort(([a], [b]) => rank(a) - rank(b))
+    .map(([id, items]) => {
+      // The line's sentence is the one most rows share, so a fold whose
+      // rows all say the same thing says it once and nothing under rows.
+      const tally = new Map<string, number>();
+      for (const i of items) {
+        if (i.why) tally.set(i.why, (tally.get(i.why) ?? 0) + 1);
+      }
+      const shared =
+        Array.from(tally.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      const why = shared !== null && tally.get(shared)! > 1 ? shared : null;
+      const label = FOLD_LABEL[id] ?? id;
+      const sentence = why ?? (items.length === 1 ? items[0].why : null);
+      return {
+        id,
+        label,
+        count: items.length,
+        // "Traced, not sent yet" over "Traced, not sent yet." says it twice
+        // (seen on screen 2026-09-30) — a sentence that only restates the
+        // line is left off.
+        why: sentence !== null && sentence === `${label}.` ? null : sentence,
+        items: items.map(i => ({
+          ...i,
+          ownWhy: items.length === 1 || i.why === why ? null : (i.why ?? null),
+        })),
+        sendable: items.every(i => i.send !== null),
+      };
+    });
+}
+
 /**
  * Whether the list Send all was shown is the list it would send now. Order
  * does not matter; membership does, both ways — an item added since the

@@ -1424,9 +1424,19 @@ can see and that cannot touch a single live row.
 | Database               | `bidrender`, login `bidrender_app` | `bidrender_staging`, login `bidrender_staging_app` — same cluster         |
 | Plans bucket           | `bidrender-plans`                  | `bidrender-plans-staging`                                                 |
 | Password page          | none                               | yes — `STAGING_PASSWORD`                                                  |
-| AI features            | on                                 | **off**, and no Anthropic key at all                                      |
+| AI features            | on                                 | **on since 2026-09-29** — `DISABLE_AI_FEATURES=false`, own key            |
 | Nightly backup / purge | yes                                | **no** — `DISABLE_SCHEDULED_JOBS=true`, no `CRON_SECRET`                  |
 | Cost                   | —                                  | $10/mo app (1 vCPU / 1 GiB fixed, same as live); database and bucket free |
+
+> **Corrected 2026-10-01.** The AI row said "**off**, and no Anthropic key at
+> all" until today, two days after it stopped being true. On 2026-09-29 staging
+> got `DISABLE_AI_FEATURES=false` and its own Anthropic key, named
+> `bidridge-staging` in the Anthropic console, set as an encrypted Run Time
+> variable in the app's settings. A staging check that day placed a real AI
+> mark. The stale row was then repeated as "staging has AI off" in a status
+> answer, which is how it was caught. **Staging AI calls spend real money**
+> on that key, under the same per-person daily limit as live. To answer "is
+> AI on?", read the app's settings, not this table.
 
 ### How to reach it
 

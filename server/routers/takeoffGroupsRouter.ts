@@ -296,11 +296,14 @@ export const takeoffGroupsRouter = router({
          * earlier, and silently pointing them at it would hide that. The
          * refusal names what is already there, which is the useful answer.
          *
-         * On for ONE caller: recovering clicks queued by a build older than
-         * phase 6 (client/src/pages/TakeoffPage.tsx). That path has no person
-         * to tell, and a refusal there would drop work that exists nowhere
-         * else — so it takes the existing group and adds the marks to it,
-         * which is what the estimator meant when they made both.
+         * On for TWO callers (client/src/pages/TakeoffPage.tsx):
+         * - recovering clicks queued by a build older than phase 6. That path
+         *   has no person to tell, and a refusal there would drop work that
+         *   exists nowhere else — so it takes the existing group and adds the
+         *   marks to it, which is what the estimator meant when they made both;
+         * - clicking an unlinked legend symbol (legend plan § 8a). The name is
+         *   the symbol's, not typed, so a second click on the same symbol
+         *   means "keep counting it" rather than a count somebody lost.
          */
         reuseExisting: z.boolean().default(false),
       })
@@ -387,6 +390,76 @@ export const takeoffGroupsRouter = router({
         label: input.label,
       });
       return { id: input.id, label: input.label };
+    }),
+
+  /**
+   * Link an assembly to a count made without one, or take it off again —
+   * every mark kept (legend plan § 8a; the one-way-door rule in CLAUDE.md).
+   *
+   * Three refusals, each naming the way through:
+   * - a locked bid, which must not change;
+   * - a count already ON the bid. Its line was priced on the bid, and a line's
+   *   snapshot is never rewritten, so linking now would leave the line and
+   *   the count saying different things;
+   * - an assembly this bid already counts under another name, because two
+   *   counts of one assembly split one number in half (`forAssembly` is
+   *   keyed on the assembly for the same reason).
+   */
+  setSource: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        /** NULL makes it a plain count again: a name and its marks. */
+        assemblyId: z.number().int().positive().nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const group = await requireGroup(input.id, userId);
+      const bid = await requireBid(group.bidId, userId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("its counts cannot be changed"),
+        });
+      if (await db.getBidLineForGroup(group.id))
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            `"${group.label}" is already on the bid as a line, priced there. ` +
+            `Remove that line from the bid first, then link the count and send it again.`,
+        });
+
+      if (input.assemblyId === null) {
+        await db.setGroupSource(group.id, userId, null);
+        return { id: group.id, kind: "plain" as const, assemblyId: null };
+      }
+
+      const assembly = await db.getAssemblyById(input.assemblyId, userId);
+      if (!assembly)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Assembly not found.",
+        });
+      const clash = (await db.getGroupsForBid(group.bidId, userId)).find(
+        other => other.id !== group.id && other.assemblyId === assembly.id
+      );
+      if (clash)
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `This bid already counts "${assembly.name}" as "${clash.label}". Mark these under that count instead, or link a different assembly.`,
+        });
+
+      await db.setGroupSource(group.id, userId, {
+        id: assembly.id,
+        name: assembly.name,
+        category: assembly.category ?? null,
+      });
+      return {
+        id: group.id,
+        kind: "assembly" as const,
+        assemblyId: assembly.id,
+      };
     }),
 
   /**

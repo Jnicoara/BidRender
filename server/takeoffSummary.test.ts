@@ -4,6 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
+  foldNotOnBid,
   sameSendList,
   takeoffSummary,
   type SummaryRunType,
@@ -225,6 +226,106 @@ describe("what the preview says about price", () => {
       ["run:7:raceway", false],
       ["run:7:strap", true],
     ]);
+  });
+});
+
+describe('"Not on the bid yet", folded by reason', () => {
+  const s = takeoffSummary({
+    locked: false,
+    counts: [count(1, 3), count(2, 1, "no-price")],
+    runTypes: [
+      runType({
+        unmeasurableCount: 2,
+        rows: [
+          {
+            role: "raceway",
+            materialName: '1/2" EMT',
+            feet: 100,
+            onBid: false,
+            sendable: { ok: true },
+          },
+          {
+            role: "conductor",
+            materialName: "#12 THHN",
+            feet: 200,
+            onBid: false,
+            sendable: { ok: true },
+          },
+          {
+            role: "ground",
+            materialName: null,
+            feet: 100,
+            onBid: false,
+            sendable: { ok: false, message: "This type names no ground." },
+          },
+        ],
+        fittings: [
+          {
+            role: "lb",
+            status: "unknown",
+            qty: 0,
+            why: "",
+            materialName: null,
+            onBid: false,
+            sendable: { ok: false, message: "Say whether this run has LBs." },
+            priced: null,
+          },
+        ],
+      }),
+    ],
+    untypedRuns: 4,
+  });
+  const folds = foldNotOnBid(s.notOnBid);
+
+  it("is one line per reason, with a count, traced and counted apart", () => {
+    expect(folds.map(f => [f.label, f.count])).toEqual([
+      ["Traced, not sent yet", 2],
+      ["Counted, not sent yet", 1],
+      ["No run type", 1],
+      ["No scale", 1],
+      ["Can't go on the bid as it stands", 2],
+      ["Assembly no longer in your library", 1],
+    ]);
+  });
+
+  it("covers every row exactly once — folding hides nothing", () => {
+    const keys = folds.flatMap(f => f.items.map(i => i.key));
+    expect(keys.sort()).toEqual(s.notOnBid.map(i => i.key).sort());
+    expect(folds.reduce((n, f) => n + f.count, 0)).toBe(s.notOnBid.length);
+  });
+
+  it("says a shared reason once on the line, not under each row", () => {
+    const noScale = folds.find(f => f.id === "noScale")!;
+    expect(noScale.why).toBe("On a sheet with no scale, so it has no length.");
+    const traced = folds.find(f => f.id === "notSent:run")!;
+    expect(traced.items.map(i => i.ownWhy)).toEqual([null, null]);
+  });
+
+  it("does not repeat a sentence that only restates the line", () => {
+    const traced = folds.find(f => f.id === "notSent:run")!;
+    expect(traced.label).toBe("Traced, not sent yet");
+    expect(traced.why).toBeNull();
+    expect(folds.find(f => f.id === "notSent:count")!.why).toBeNull();
+  });
+
+  it("keeps a row's own reason when the rows in a fold differ", () => {
+    const cannot = folds.find(f => f.id === "cannotSend")!;
+    expect(cannot.why).toBeNull();
+    expect(cannot.items.map(i => i.ownWhy)).toEqual([
+      "This type names no ground.",
+      "Say whether this run has LBs.",
+    ]);
+  });
+
+  it("marks only the folds Send all would send", () => {
+    expect(folds.filter(f => f.sendable).map(f => f.id)).toEqual([
+      "notSent:run",
+      "notSent:count",
+    ]);
+  });
+
+  it("folds nothing when everything is on the bid", () => {
+    expect(foldNotOnBid([])).toEqual([]);
   });
 });
 

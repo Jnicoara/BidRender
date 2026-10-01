@@ -160,7 +160,15 @@ export type TakeoffChange =
    * 2026-09-29 the single count send refetched the count list only, so the
    * bid's cached lines and the materials list kept the old answer.
    */
-  | "sentToBid";
+  | "sentToBid"
+  /**
+   * An assembly linked to a count, or taken off it (legend plan § 8a). Every
+   * mark of the count changes what it counts — its colour, what the
+   * materials list itemises and what Send would price — on every sheet.
+   * The other sheets' cached marks are the caller's to drop, as for a whole
+   * count deleted: this table knows the open sheet only.
+   */
+  | "countSource";
 
 /**
  * Which sheets' own lists (marks, runs) a change must refresh.
@@ -215,4 +223,5 @@ export const QUERIES_MOVED_BY: Readonly<
   sheetCleared: unique([...MARK_QUERIES, ...RUN_QUERIES]),
   runEnds: unique(RUN_QUERIES),
   sentToBid: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
+  countSource: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
 };

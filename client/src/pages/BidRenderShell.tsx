@@ -689,8 +689,17 @@ export default function BidRenderShell() {
         It previously spent two of the five on Bids and Quick bid, which on the
         smallest screen was the most expensive place to put a "which one?".
       */}
+      {/*
+        Not on the Plans screen (track-b-phone-and-readability-plan.md § 3):
+        it has its own bar along the bottom, and this one, fixed on top of
+        it, covered the bar's "This sheet" line and the way into the panel.
+        "← Bid" in the screen's own header goes back.
+      */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex bg-sidebar border-t border-border"
+        className={cn(
+          "md:hidden fixed bottom-0 left-0 right-0 z-30 flex bg-sidebar border-t border-border",
+          isInTakeoff && "hidden"
+        )}
         aria-label="Main"
       >
         {(

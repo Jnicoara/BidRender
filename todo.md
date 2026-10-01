@@ -169,13 +169,20 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
       app" refuses to show figures ("This bid has lines without a price. Price
       them on the bid…", `QuoteAppPanel.tsx` `Blocked`). The bid page's
       amber strip ("N lines are not priced", `BidsPage.tsx` ~1324) explains
-      but offers no box. The owner also named a "Price this before sending"
-      panel; **no screen carries that text today** (searched `track-b` and
-      `origin/local-dev`, 2026-09-30), so it is either the `Blocked` panel
-      under another name or a step still to be built. Ask which before
-      building. Wanted:
-  - Next to **each** unpriced line, in both places, a price box. Typing a
-    price unblocks the bid as soon as no line is left unpriced.
+      but offers no box. **The owner's "Price this before sending" is the
+      Proposal's print block** — the dialog Print/Save opens while any line
+      is unpriced (`ProposalPage.tsx` ~613, Track A's `a-proposal-zero`,
+      6a3defa, now on `local-dev` and live). It lists the unpriced lines and
+      offers only "Back to the bid".
+      _Corrected 2026-09-30: this note said no screen carried that text and
+      to ask which panel it meant. It was written from `track-b` before
+      a-proposal-zero was merged in, so the search could not find it._
+      Wanted:
+  - Next to **each** unpriced line, in all THREE places (the quote-app
+    `Blocked` panel, the bid page's strip, and the Proposal's "Price this
+    before sending" block), a price box. Typing a price unblocks as soon as
+    no line is left unpriced — on the Proposal, Print becomes available
+    without going back to the bid.
   - **Saved on this bid only by default**, with a tick box "Also save to my
     catalog". Ticked, it writes the company's own material row (a FORK if the
     row is a shipped one; never a price typed onto a baseline row, CLAUDE.md
@@ -1736,7 +1743,19 @@ path is ever revived, give it the same treatment first.
       not the product answer. The migration should convert those names into
       the status and fold the twin count into its base. Where it fits with
       Find all matching's "maybe existing" flag:
-      `references/find-all-matching-plan.md`.
+      `references/find-all-matching-plan.md`. Batched with B's nine pin-style
+      columns (next entry).
+- [ ] **Track A (migration): nine nullable pin-style columns, BATCHED with
+      the mark-status column.** Not built; queued 2026-10-01. Shape, letter
+      and color on each of `assemblies`, `symbol_links` and `takeoff_groups`.
+      They are saved company-wide the way run colors are, and a shipped
+      assembly forks on edit. NULL means automatic, so they are additive with
+      no backfill (step 1 of the three). Spec: Track B's
+      `references/track-b-count-pin-styles-plan.md` § 6 (on `track-b`, not yet
+      on `local-dev`). The batch-mate is nullable `takeoff_stamps.status`
+      (`new`/`existing`/`remove`/`relocate`, NULL read as `new`), recorded in
+      Track C's `todo.md` on `track-c`. B's style editor waits for the nine
+      columns, and the status looks (§ 7) wait for the status column.
 
 - [x] **BUILT 2026-09-27 (Track B), owner's answers as recommended in
       `references/track-b-beta-plan.md` § 1.** `storageDelete` on both
