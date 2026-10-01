@@ -58,6 +58,7 @@ const KNOWN_KINDS: Record<UndoOp["kind"], true> = {
   clearSheet: true,
   restoreGroup: true,
   removeGroup: true,
+  moveMarks: true,
 };
 const UNDO_KINDS = new Set<string>(Object.keys(KNOWN_KINDS));
 

@@ -1713,6 +1713,24 @@ path is ever revived, give it the same treatment first.
       Needs a nullable `takeoff_stamps.dropExcluded` (NULL = follows the
       count; additive). Spec and B's follow-up in
       `references/quote-app-panel-plan.md` § 10, H3.
+- [ ] **Track A (migration): a STATUS on each mark — new / existing to
+      remain / remove / relocate — so an existing device is never priced as
+      new.** Asked for 2026-10-01 from the reader-accuracy hand count: many
+      devices on the test sheets are drawn as existing to remain, and a count
+      today cannot say so, so they were counted (and would be bid) with the
+      new ones. Proposed: nullable `takeoff_stamps.status` enum
+      (`new`,`existing`,`remove`,`relocate`), NULL read as `new` — additive,
+      no backfill, step 1 of the three. The bid bridge
+      (`shared/takeoffBridge.ts`) then counts only `new` (and `relocate`,
+      which is labour) toward a line; `existing` is shown, never priced;
+      `remove` wants its own demo labour line, owner to decide. **Until it
+      lands, Track C's stand-in is a NAME**: a second count "<name> - EXISTING
+      TO REMAIN" (`shared/existingToRemain.ts`, `scripts/readerTestExisting.mts`)
+      — which still prices if sent to a bid, so it is a test-account tool and
+      not the product answer. The migration should convert those names into
+      the status and fold the twin count into its base. Where it fits with
+      Find all matching's "maybe existing" flag:
+      `references/find-all-matching-plan.md`.
 
 - [x] **BUILT 2026-09-27 (Track B), owner's answers as recommended in
       `references/track-b-beta-plan.md` § 1.** `storageDelete` on both

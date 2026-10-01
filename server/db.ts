@@ -8769,6 +8769,66 @@ export async function deleteStamps(
 }
 
 /**
+ * The count each of these marks belongs to now, for marks on ONE bid.
+ *
+ * Read before a move so the move can be undone to exactly where each mark
+ * was — a selection can span several counts. Marks of another company or
+ * another bid are simply not returned, so the caller compares lengths.
+ */
+export async function getStampGroupsOnBid(
+  ids: readonly number[],
+  userId: number,
+  bidId: number
+): Promise<{ id: number; groupId: number | null }[]> {
+  if (ids.length === 0) return [];
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db
+    .select({ id: takeoffStamps.id, groupId: takeoffStamps.groupId })
+    .from(takeoffStamps)
+    .where(
+      and(
+        inArray(takeoffStamps.id, [...ids]),
+        eq(takeoffStamps.userId, userId),
+        eq(takeoffStamps.bidId, bidId)
+      )
+    );
+}
+
+/**
+ * Put marks under another count, in ONE statement, keeping their ids and
+ * places. The provenance columns are rewritten from the new count by the
+ * caller, the same way `drop` writes them, so a moved mark is
+ * indistinguishable from one placed under that count.
+ */
+export async function moveStampsToGroup(
+  ids: readonly number[],
+  userId: number,
+  bidId: number,
+  to: {
+    groupId: number;
+    assemblyId: number | null;
+    assemblyName: string | null;
+    assemblyCategory: string | null;
+  }
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db
+    .update(takeoffStamps)
+    .set({ ...to, updatedAt: new Date() })
+    .where(
+      and(
+        inArray(takeoffStamps.id, [...ids]),
+        eq(takeoffStamps.userId, userId),
+        eq(takeoffStamps.bidId, bidId)
+      )
+    );
+  return result.affectedRows;
+}
+
+/**
  * How many of these marks sit on a bid whose quantities are locked.
  *
  * Asked BEFORE a delete so a selection goes whole or not at all: a selection

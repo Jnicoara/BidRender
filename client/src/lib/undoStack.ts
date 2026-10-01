@@ -75,7 +75,12 @@ export type UndoOp =
   /** Put a deleted count back — the row and its marks on every sheet. */
   | { kind: "restoreGroup"; packet: Packet; id: number }
   /** Delete the count again (redo of an undone count delete). */
-  | { kind: "removeGroup"; id: number };
+  | { kind: "removeGroup"; id: number }
+  /**
+   * Put marks under these counts (takeoffStamps.moveToGroup), one entry per
+   * count. Its own reverse: the server says where each mark was.
+   */
+  | { kind: "moveMarks"; moves: { groupId: number; ids: number[] }[] };
 
 export type UndoEntry = {
   /** What the step was, as the button's tooltip names it: "3 marks placed". */

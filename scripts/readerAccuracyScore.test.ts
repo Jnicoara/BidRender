@@ -26,6 +26,21 @@ function addsUp(s: ReturnType<typeof scoreReading>) {
 }
 
 describe("scoreReading", () => {
+  it("scores an EXISTING TO REMAIN mark as its symbol, since the AI is never asked which", () => {
+    const s = scoreReading(
+      [mark("DUPLEX RECEPTACLE - EXISTING TO REMAIN", 100, 200)],
+      [guess("Duplex receptacle", 104, 203)],
+      R
+    );
+    expect(s).toMatchObject({ found: 1, wrong: 0, missed: 0, extra: 0 });
+    expect(
+      unmatchedLabels(
+        [mark("DUPLEX RECEPTACLE - EXISTING TO REMAIN", 0, 0)],
+        ["Duplex receptacle"]
+      )
+    ).toEqual([]);
+  });
+
   it("counts a right symbol in the right place as found", () => {
     const s = scoreReading(
       [mark("Duplex", 100, 200)],

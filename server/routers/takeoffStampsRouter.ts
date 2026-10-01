@@ -287,6 +287,83 @@ export const takeoffStampsRouter = router({
     }),
 
   /**
+   * Put marks under another count — "these were counted as the wrong thing".
+   *
+   * Asked for on 2026-10-01 for the reader-accuracy hand count: devices drawn
+   * as EXISTING TO REMAIN had been counted together with new ones, and the
+   * only way to separate them was to delete and click every one again. A
+   * moved mark keeps its id and its place, so run ends, tees and AI findings
+   * that point at it still do; only what it counts changes.
+   *
+   * Whole selection or nothing, on ONE bid, and never on a locked bid — the
+   * same reason deleting is refused there: the drawing a locked quote was
+   * priced from must not move under it.
+   *
+   * `previous` is where each mark was, so the screen can undo to exactly that
+   * even when the selection spanned several counts.
+   */
+  moveToGroup: procedure
+    .input(
+      z.object({
+        ids: z.array(z.number().int().positive()).min(1).max(2000),
+        groupId: z.number().int().positive(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const ids = Array.from(new Set(input.ids));
+      const group = await db.getGroupById(input.groupId, userId);
+      if (!group)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "That count was not found.",
+        });
+      const bid = await requireBid(group.bidId, userId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("its marks cannot be moved"),
+        });
+
+      const current = await db.getStampGroupsOnBid(ids, userId, group.bidId);
+      if (current.length !== ids.length)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message:
+            "Some of those marks are not on this bid any more. Nothing was moved.",
+        });
+
+      let assemblyCategory: string | null = null;
+      if (group.assemblyId !== null) {
+        const assembly = await db.getAssemblyById(group.assemblyId, userId);
+        assemblyCategory = assembly?.category ?? null;
+      }
+      const moved = await db.moveStampsToGroup(ids, userId, group.bidId, {
+        groupId: group.id,
+        assemblyId: group.assemblyId,
+        assemblyName: group.kind === "assembly" ? group.label : null,
+        assemblyCategory,
+      });
+
+      const byGroup = new Map<number | null, number[]>();
+      for (const row of current) {
+        if (row.groupId === group.id) continue;
+        const list = byGroup.get(row.groupId) ?? [];
+        list.push(row.id);
+        byGroup.set(row.groupId, list);
+      }
+      return {
+        moved,
+        label: group.label,
+        // A mark with no count (pre-phase-6, never backfilled) cannot be put
+        // back under nothing by this procedure, so it is left out of undo.
+        previous: Array.from(byGroup.entries())
+          .filter((e): e is [number, number[]] => e[0] !== null)
+          .map(([groupId, ids]) => ({ groupId, ids })),
+      };
+    }),
+
+  /**
    * Put deleted marks back — undo of a delete, redo of a placement.
    *
    * Same ids, and every run end, tee and AI finding that pointed at them is

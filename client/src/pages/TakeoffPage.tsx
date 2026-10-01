@@ -2677,6 +2677,7 @@ export default function TakeoffPage({
   const undoSetEnds = trpc.takeoffRuns.setEnds.useMutation();
   const undoRestoreGroup = trpc.takeoffGroups.restore.useMutation();
   const undoRemoveGroup = trpc.takeoffGroups.remove.useMutation();
+  const undoMoveMarks = trpc.takeoffStamps.moveToGroup.useMutation();
   /** Ops whose mutations are declared further down the page. */
   const runUndoOpLater = useRef<(op: UndoOp) => Promise<UndoOp | null>>(
     async () => null
@@ -2747,6 +2748,17 @@ export default function TakeoffPage({
             ? { kind: "restoreGroup", packet: r.undo, id: op.id }
             : null;
         }
+        case "moveMarks": {
+          // Each count's marks go back where the server says they were.
+          const reverse: { groupId: number; ids: number[] }[] = [];
+          for (const move of op.moves) {
+            const r = await undoMoveMarks.mutateAsync(move);
+            reverse.push(...r.previous);
+          }
+          return reverse.length > 0
+            ? { kind: "moveMarks", moves: reverse }
+            : null;
+        }
         case "restoreSheet":
         case "clearSheet":
           // Wired with the tool that makes them (clear sheet), further down.
@@ -2766,6 +2778,7 @@ export default function TakeoffPage({
       undoSetEnds,
       undoRestoreGroup,
       undoRemoveGroup,
+      undoMoveMarks,
     ]
   );
 
@@ -3646,9 +3659,42 @@ export default function TakeoffPage({
       refreshFor("markRemoved");
     },
   });
+  /*
+    MOVING A SELECTION TO ANOTHER COUNT (2026-10-01). Same ids, same places;
+    only what they count changes. For separating devices drawn as existing to
+    remain from new ones without clicking every one again. One request, whole
+    or nothing, one undo step that puts each mark back under its own count.
+  */
+  const moveStamps = trpc.takeoffStamps.moveToGroup.useMutation({
+    onSuccess: r => {
+      if (r.moved > 0 && activeSheet && r.previous.length > 0)
+        pushUndo({
+          label: countLabel(r.moved, "mark", "marks", "moved"),
+          sheetId: activeSheet.id,
+          undo: { kind: "moveMarks", moves: r.previous },
+          redo: null,
+        });
+      toast.success(
+        `Moved ${r.moved} ${r.moved === 1 ? "mark" : "marks"} to ${r.label}.`
+      );
+    },
+    onError: e => toast.error(e.message),
+    onSettled: () => {
+      setSelectedStampIds(new Set());
+      refreshFor("marksMoved");
+    },
+  });
   const selectedStamps = useMemo(
     () => stamps.filter(s => selectedStampIds.has(s.id)),
     [stamps, selectedStampIds]
+  );
+  /** Every count on the bid, for "Move to" — by name, so a long list reads. */
+  const moveTargets = useMemo(
+    () =>
+      (bidCounts.data?.groups ?? [])
+        .map(g => ({ id: g.id, label: g.label }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [bidCounts.data?.groups]
   );
   // A mark deleted elsewhere, or a different sheet, leaves the selection.
   useEffect(() => {
@@ -7057,6 +7103,16 @@ export default function TakeoffPage({
                         )
                       }
                       onDeleteSelected={() => deleteSelected(false)}
+                      moveTargets={quantitiesLocked ? [] : moveTargets}
+                      onMoveSelected={groupId =>
+                        moveStamps.mutate({
+                          // A mark still being sent has no id yet.
+                          ids: Array.from(selectedStampIds).filter(
+                            id => id > 0
+                          ),
+                          groupId,
+                        })
+                      }
                       onClearSelection={() => setSelectedStampIds(new Set())}
                       focusPoint={focusPoint}
                       chromeTarget={size.chromeTarget}

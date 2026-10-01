@@ -10,7 +10,7 @@
  * wrong symbol or missed, so those three always add up to your count; and
  * every AI suggestion that is not matched to a mark is an extra.
  */
-import { symbolLookupKey } from "../shared/takeoffCounts";
+import { symbolKeyIgnoringExisting } from "../shared/existingToRemain";
 
 /** One symbol you marked by hand. Position in PDF page points. */
 export type HandMark = { label: string; x: number; y: number };
@@ -53,9 +53,15 @@ export type Score = {
   byType: Map<string, TypeTally>;
 };
 
-/** The label two names are compared on. The same key the legend uses. */
+/**
+ * The label two names are compared on. The same key the legend uses, with an
+ * " - EXISTING TO REMAIN" count folded into its symbol (2026-10-01): the
+ * reader is asked to report every device and is never asked new from
+ * existing, so an existing duplex it finds is a FOUND duplex, not a wrong
+ * symbol. The hand count keeps the two apart; only this comparison folds them.
+ */
 export function labelKey(label: string | null | undefined): string {
-  return label ? symbolLookupKey(label) : "";
+  return label ? symbolKeyIgnoringExisting(label) : "";
 }
 
 type Pair = { mark: number; guess: number; distance: number };

@@ -4,6 +4,21 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-01]
+
+- **Move marks to another count without clicking them again.** Select marks
+  on a sheet (click, or Shift-drag a box) and pick a count from "Move to…" in
+  the bar that appears. The marks stay exactly where they are and only what
+  they count changes, in one step that Undo takes back. Not allowed on a bid
+  whose quantities are locked. Made for separating devices drawn as
+  existing to remain from new ones.
+- **Reader-accuracy test: existing devices can be counted apart.** The test
+  account now has an "… - EXISTING TO REMAIN" assembly beside each symbol
+  being counted. The accuracy score treats those marks as the same symbol,
+  because the AI reader is not asked to tell new from existing. A real
+  per-mark status (new / existing / remove / relocate) is queued for a
+  database change.
+
 ## [2026-09-30]
 
 - **A captured symbol links itself to the assembly with the same name.**

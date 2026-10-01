@@ -119,6 +119,12 @@ export type TakeoffChange =
    * its drops, its connectors and what Send would put on the bid all move.
    */
   | "markRemoved"
+  /**
+   * Marks put under another count (takeoffStamps.moveToGroup). Two counts'
+   * quantities move at once, each with its drop, and a run ending on a moved
+   * mark now ends on a different thing.
+   */
+  | "marksMoved"
   /** A sheet's row: its scale, its number, its title. */
   | "sheet"
   /**
@@ -191,6 +197,11 @@ export const QUERIES_MOVED_BY: Readonly<
   */
   marksPlaced: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
   markRemoved: unique([...MARK_QUERIES, ...RUN_QUERIES]),
+  marksMoved: unique([
+    ...MARK_QUERIES,
+    ...RUN_QUERIES,
+    ...BID_QUANTITY_QUERIES,
+  ]),
   sheet: unique(SHEET_QUERIES),
   planRemoved: unique([
     "bidPdfs.list",
