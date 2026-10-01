@@ -49,7 +49,15 @@ export type RawDetection = {
 /** A legend link, as the resolver needs it. */
 export type LegendSymbol = {
   id: number;
+  /** The estimator's name for it, which may have been changed since capture. */
   label: string;
+  /**
+   * The key of the name it was CAPTURED under (`symbol_links.lookupKey`).
+   * Required, not optional: a renamed symbol must still be found by the name
+   * the drawing and the model use, and an optional field is one a caller
+   * forgets (shared/takeoffCounts.ts, `SymbolNames`).
+   */
+  lookupKey: string;
   assemblyId: number | null;
   assemblyName: string | null;
 };
@@ -199,6 +207,9 @@ export function buildFindings(
 
   const byKey = new Map<string, LegendSymbol>();
   const byId = new Map<number, LegendSymbol>();
+  // Original names first, current names over them: the current name is what
+  // the prompt hands the model, so on any overlap it is the one that wins.
+  for (const symbol of context.symbols) byKey.set(symbol.lookupKey, symbol);
   for (const symbol of context.symbols) {
     byKey.set(symbolLookupKey(symbol.label), symbol);
     byId.set(symbol.id, symbol);

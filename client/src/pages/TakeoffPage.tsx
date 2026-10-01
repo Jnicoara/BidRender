@@ -3861,6 +3861,38 @@ export default function TakeoffPage({
     onError: e => toast.error(e.message),
     onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
   });
+  /*
+    Rename and reset share one ending: the symbol's plain count on this bid
+    took the name too, so everything showing that count's name moves
+    (`countRenamed`), and a tool already armed on it says the new name.
+  */
+  const afterSymbolRename = (r: {
+    label: string;
+    renamedCountId: number | null;
+  }) => {
+    setArmedGroup(armed =>
+      armed && armed.groupId === r.renamedCountId
+        ? { ...armed, label: r.label }
+        : armed
+    );
+  };
+  const settleSymbolRename = () => {
+    void utils.takeoffStamps.symbols.invalidate();
+    refreshFor("countRenamed");
+  };
+  const renameSymbol = trpc.takeoffStamps.renameSymbol.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: afterSymbolRename,
+    onSettled: settleSymbolRename,
+  });
+  const resetSymbolName = trpc.takeoffStamps.resetSymbolName.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: r => {
+      afterSymbolRename(r);
+      toast.success(`Back to “${r.label}”.`);
+    },
+    onSettled: settleSymbolRename,
+  });
   const removeSymbol = trpc.takeoffStamps.removeSymbol.useMutation({
     onError: e => toast.error(e.message),
     onSuccess: () => toast.success("Legend symbol deleted."),
@@ -7620,6 +7652,17 @@ export default function TakeoffPage({
                       linkSymbol.mutate({ id: symbolId, assemblyId })
                     }
                     onUnlink={id => unlinkSymbol.mutate({ id })}
+                    renameRefusal={
+                      quantitiesLocked
+                        ? lockedEditRefusal(
+                            "its legend names cannot be changed"
+                          )
+                        : null
+                    }
+                    onRename={(id, label) =>
+                      renameSymbol.mutate({ id, bidId, label })
+                    }
+                    onResetName={id => resetSymbolName.mutate({ id, bidId })}
                     onRemove={id => setSymbolDeleteId(id)}
                     onUseSymbol={symbol => {
                       const assembly = allAssemblies.find(
@@ -7650,6 +7693,9 @@ export default function TakeoffPage({
                           bidId,
                           label: symbol.label,
                           reuseExisting: true,
+                          // A renamed symbol still owns the count made
+                          // under its original name on this bid.
+                          symbolId: symbol.id,
                         })
                         .then(group => {
                           armGroup(group, null);

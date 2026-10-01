@@ -162,7 +162,15 @@ export type TakeoffChange =
    * The other sheets' cached marks are the caller's to drop, as for a whole
    * count deleted: this table knows the open sheet only.
    */
-  | "countSource";
+  | "countSource"
+  /**
+   * A legend symbol renamed (2026-10-01). Its plain count on this bid takes
+   * the new name, and that name is read live by the count card, the marks'
+   * tooltips, the bid line, the materials list and the summary — so all of
+   * them move, though no number does. The legend's own `symbols` query is not
+   * per bid and is the caller's to drop.
+   */
+  | "countRenamed";
 
 /**
  * Which sheets' own lists (marks, runs) a change must refresh.
@@ -213,4 +221,5 @@ export const QUERIES_MOVED_BY: Readonly<
   runEnds: unique(RUN_QUERIES),
   sentToBid: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
   countSource: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
+  countRenamed: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
 };

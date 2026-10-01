@@ -153,6 +153,23 @@ describe("the whole-set summary and sending to the bid (2026-09-29)", () => {
   });
 });
 
+describe("renaming a legend symbol (2026-10-01)", () => {
+  it("moves everything that shows the count's name", () => {
+    // The count's name is read live by the card, the bid line, the
+    // materials list and the summary. A rename that refreshed only the
+    // legend would leave every one of them showing the old name.
+    const set = moves("countRenamed");
+    for (const q of [
+      "takeoffStamps.listForSheet",
+      "takeoffGroups.list",
+      "materialsList.get",
+      "takeoffSummary.forBid",
+      "bids.get",
+    ] as const)
+      expect(set.has(q), q).toBe(true);
+  });
+});
+
 describe("linking an assembly to a count (legend plan § 8a, 2026-09-30)", () => {
   it("moves the marks, the count list, the materials list and the summary", () => {
     // A linked count's marks change colour, and the materials list moves it

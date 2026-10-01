@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-01]
 
+- **Legend symbols can be renamed.** A pencil beside each captured symbol in
+  the Plans panel (laptop and phone) renames it; Enter saves, Escape cancels,
+  and a blank name is refused. The count of that symbol on the open bid takes
+  the new name too, so the count card, the bid line, the summary and the CSV
+  agree. The name it was captured under is still recognised — a count made
+  under it on another job, the plan reader, and capturing it again all find
+  the same symbol — and "Reset to original" puts it back (in lower case for
+  now). Renaming never touches a linked assembly or its count, and a locked
+  bid refuses it.
+
 - **Changing sheets now puts the count tool down.** A count picked up on one
   sheet stayed on after switching to another, so a click meant to move the
   view on the legend sheet dropped a stray mark — a wrong count on the bid.

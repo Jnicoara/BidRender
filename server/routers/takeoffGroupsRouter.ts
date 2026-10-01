@@ -44,6 +44,7 @@ import {
 import { lockedEditRefusal } from "../../shared/quantityLock";
 import { DISTRIBUTION_KIND } from "../../shared/takeoffHeights";
 import { resolveRunType } from "../../shared/runTypeLookup";
+import { symbolCountsOn } from "../../shared/takeoffCounts";
 import { whipFeetOf } from "../../shared/branchWire";
 import {
   countsWaitingToSend,
@@ -306,17 +307,33 @@ export const takeoffGroupsRouter = router({
          *   means "keep counting it" rather than a count somebody lost.
          */
         reuseExisting: z.boolean().default(false),
+        /**
+         * The legend symbol this count is for, when a symbol click made it.
+         * A renamed symbol still owns the count made under its ORIGINAL name
+         * (on a job counted before the rename), and without this the click
+         * would start a second count beside it and split the number in two.
+         */
+        symbolId: z.number().int().positive().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       await requireBid(input.bidId, ctx.scope.dataUserId);
 
       if (input.reuseExisting) {
-        const existing = await db.findGroupByLabel(
-          input.bidId,
-          ctx.scope.dataUserId,
-          input.label
-        );
+        const symbol = input.symbolId
+          ? await db.getSymbolLinkById(input.symbolId, ctx.scope.dataUserId)
+          : undefined;
+        const existing =
+          (symbol &&
+            symbolCountsOn(
+              await db.getGroupsForBid(input.bidId, ctx.scope.dataUserId),
+              symbol
+            )[0]) ??
+          (await db.findGroupByLabel(
+            input.bidId,
+            ctx.scope.dataUserId,
+            input.label
+          ));
         if (existing) {
           return {
             id: existing.id,

@@ -450,3 +450,65 @@ export function stampsInRegion(
 export function symbolLookupKey(label: string): string {
   return label.trim().toLowerCase().replace(/\s+/g, " ");
 }
+
+/**
+ * A captured legend symbol, as far as its NAMES go.
+ *
+ * ── Two names, and no new column for them (2026-10-01) ───────────────────────
+ * A symbol can be renamed. `label` is then the estimator's name, shown
+ * everywhere; `lookupKey` is NOT re-derived from it and keeps the key of the
+ * name the symbol was CAPTURED under. That is the original name, and it is
+ * what matching keeps finding: a plain count made under it on another bid,
+ * the plan reader naming it, a recapture typed the same way.
+ *
+ * The cost of using the column that exists: `lookupKey` is lower-cased, so the
+ * original's capitals are gone. "Reset to original" restores "linear type",
+ * not "LINEAR TYPE", and says so on the button. An exact original needs
+ * `symbol_links.originalLabel` — flagged for Track A in todo.md.
+ */
+export type SymbolNames = { label: string; lookupKey: string };
+
+/** Every key this symbol answers to — its current name and its original. */
+export function symbolNameKeys(symbol: SymbolNames): string[] {
+  const current = symbolLookupKey(symbol.label);
+  return current === symbol.lookupKey ? [current] : [current, symbol.lookupKey];
+}
+
+/** Does a name (a count's label, a reader's word) mean this symbol? */
+export function nameMatchesSymbol(name: string, symbol: SymbolNames): boolean {
+  return symbolNameKeys(symbol).includes(symbolLookupKey(name));
+}
+
+/**
+ * The original name, or null when the symbol still carries it. A rename that
+ * only changes capitals is not a rename — the key is the same.
+ */
+export function symbolOriginalName(symbol: SymbolNames): string | null {
+  return symbolLookupKey(symbol.label) === symbol.lookupKey
+    ? null
+    : symbol.lookupKey;
+}
+
+/**
+ * The plain counts on one bid that are this symbol's — counted by its name,
+ * under either the current one or the original, with no assembly behind them.
+ * A count made under the current name comes first, because that is the one a
+ * click on the symbol would make today.
+ *
+ * Assembly-backed counts are excluded on purpose: their name is the
+ * assembly's, and renaming a legend symbol must never rename the assembly's
+ * count, which other symbols may share (track-b-count-pin-styles-plan.md
+ * § 11).
+ */
+export function symbolCountsOn<
+  G extends { label: string; assemblyId: number | null },
+>(groups: readonly G[], symbol: SymbolNames): G[] {
+  const current = symbolLookupKey(symbol.label);
+  return groups
+    .filter(g => g.assemblyId === null && nameMatchesSymbol(g.label, symbol))
+    .sort(
+      (a, b) =>
+        Number(symbolLookupKey(b.label) === current) -
+        Number(symbolLookupKey(a.label) === current)
+    );
+}

@@ -37,8 +37,11 @@ import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import {
   buildCountedItems,
+  nameMatchesSymbol,
   stampName,
+  symbolCountsOn,
   symbolLookupKey,
+  symbolOriginalName,
 } from "../../shared/takeoffCounts";
 import {
   measurabilityOf,
@@ -125,6 +128,80 @@ async function refuseIfAnyLocked(ids: readonly number[], userId: number) {
       message:
         "This bid's quantities are locked, so its marks cannot be removed. Unlock them on the bid first.",
     });
+}
+
+/**
+ * Rename one captured symbol, and its plain count on this bid with it.
+ *
+ * Every refusal is checked before anything is written, so a refused rename
+ * leaves the legend and the bid exactly as they were.
+ */
+async function renameSymbolOnBid(
+  userId: number,
+  symbolId: number,
+  bidId: number,
+  nextLabel: (link: { label: string; lookupKey: string }) => string
+) {
+  const link = await db.getSymbolLinkById(symbolId, userId);
+  if (!link)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Symbol not found." });
+  const bid = await requireBid(bidId, userId);
+  if (bid.quantitiesLockedAt !== null)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: lockedEditRefusal("its legend names cannot be changed"),
+    });
+
+  const label = nextLabel(link).trim();
+  if (!label)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "A symbol needs a name.",
+    });
+
+  // Another symbol already answering to this name would make the two
+  // indistinguishable to every matcher, the plan reader included.
+  const clash = (await db.getSymbolLinks(userId)).find(
+    row => row.id !== link.id && nameMatchesSymbol(label, row)
+  );
+  if (clash)
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `Your legend already has a symbol called "${clash.label}".`,
+    });
+
+  const groups = await db.getGroupsForBid(bidId, userId);
+  const mine = symbolCountsOn(groups, link);
+  if (mine.length > 1)
+    throw new TRPCError({
+      code: "CONFLICT",
+      message:
+        `This bid counts "${mine[0].label}" and "${mine[1].label}" separately, ` +
+        `and both are this symbol. Delete or rename one of those counts first, ` +
+        `so the new name has one count to go to.`,
+    });
+  const count = mine[0] ?? null;
+  const taken = groups.find(
+    g =>
+      g.id !== count?.id && symbolLookupKey(g.label) === symbolLookupKey(label)
+  );
+  if (taken)
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `This bid already counts something called "${taken.label}".`,
+    });
+
+  // Only the label. `lookupKey` keeps the captured name — that is the point.
+  await db.updateSymbolLink(link.id, userId, { label });
+  if (count && count.label !== label)
+    await db.updateTakeoffGroup(count.id, userId, { label });
+
+  return {
+    id: link.id,
+    label,
+    originalName: symbolOriginalName({ label, lookupKey: link.lookupKey }),
+    renamedCountId: count?.id ?? null,
+  };
 }
 
 export const takeoffStampsRouter = router({
@@ -454,6 +531,8 @@ export const takeoffStampsRouter = router({
     return rows.map(row => ({
       id: row.id,
       label: row.label,
+      /** The captured name, when it has been renamed since; else null. */
+      originalName: symbolOriginalName(row),
       assemblyId: row.assemblyId,
       thumbnail: row.thumbnail,
       /** The whole point of the panel: is this one click away from stamping? */
@@ -481,10 +560,13 @@ export const takeoffStampsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const lookupKey = symbolLookupKey(input.label);
-      const existing = await db.getSymbolLinkByKey(
-        ctx.scope.dataUserId,
-        lookupKey
-      );
+      // A renamed symbol answers to its new name AND its captured one, so
+      // boxing it again under either finds the same row (no second "Linear").
+      const existing =
+        (await db.getSymbolLinkByKey(ctx.scope.dataUserId, lookupKey)) ??
+        (await db.getSymbolLinks(ctx.scope.dataUserId)).find(row =>
+          nameMatchesSymbol(input.label, row)
+        );
 
       if (existing) {
         // Fill in a thumbnail or a link if this capture supplies one the
@@ -577,6 +659,56 @@ export const takeoffStampsRouter = router({
       });
       return { success: true };
     }),
+
+  /**
+   * Rename a captured symbol — the estimator's name, shown everywhere.
+   *
+   * The name it was captured under is kept as `lookupKey` and stays a name it
+   * answers to (see `SymbolNames` in shared/takeoffCounts.ts), so a count made
+   * under it on another job, or the plan reader using it, still lands here.
+   *
+   * Asked FROM a bid, and the plain count of this symbol on that bid takes the
+   * new name too, so the count card, the bid line (which reads the count's
+   * name live), the summary and the CSV all agree with the legend. Other bids
+   * keep the names they were counted under — finished work does not change
+   * because the library did. Assembly-backed counts are never touched: their
+   * name is the assembly's, and the assembly's own name is never written here.
+   *
+   * A locked bid refuses, like every other change to its plans.
+   */
+  renameSymbol: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        bidId: z.number().int().positive(),
+        label: nameSchema,
+      })
+    )
+    .mutation(async ({ input, ctx }) =>
+      renameSymbolOnBid(
+        ctx.scope.dataUserId,
+        input.id,
+        input.bidId,
+        () => input.label
+      )
+    ),
+
+  /** Put a renamed symbol back to the name it was captured under. */
+  resetSymbolName: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        bidId: z.number().int().positive(),
+      })
+    )
+    .mutation(async ({ input, ctx }) =>
+      renameSymbolOnBid(
+        ctx.scope.dataUserId,
+        input.id,
+        input.bidId,
+        link => link.lookupKey
+      )
+    ),
 
   removeSymbol: procedure
     .input(z.object({ id: z.number().int().positive() }))

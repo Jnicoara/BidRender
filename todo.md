@@ -1611,6 +1611,19 @@ path is ever revived, give it the same treatment first.
       (`new`/`existing`/`remove`/`relocate`, NULL read as `new`), recorded in
       Track C's `todo.md` on `track-c`. B's style editor waits for the nine
       columns, and the status looks (§ 7) wait for the status column.
+- [ ] **Track A (migration, optional): `symbol_links.originalLabel
+    varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
+      (Track B) WITHOUT a column: `label` is the new name and `lookupKey` keeps
+      the captured name's key, which is what matching uses. The one loss is
+      capitals — "Reset to original" gives "linear type", not "LINEAR TYPE",
+      and says so on the button. This column would hold the exact original.
+      Additive, NULL = never renamed (or renamed before the column: fall back
+      to `lookupKey`). Nothing is broken without it; batch it with the pin
+      columns above rather than ship it alone.
+- [ ] **Track B, small: `takeoffGroups.rename` has no locked-bid check.**
+      Found 2026-10-01 while adding the legend rename, which does refuse. No
+      screen calls it today (grep `takeoffGroups.rename` in `client/src`), so
+      nothing can reach it from the app — close it before anything does.
 
 - [x] **BUILT 2026-09-27 (Track B), owner's answers as recommended in
       `references/track-b-beta-plan.md` § 1.** `storageDelete` on both

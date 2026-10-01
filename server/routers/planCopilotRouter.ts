@@ -261,6 +261,7 @@ async function legendFor(userId: number): Promise<LegendSymbol[]> {
   return links.map(link => ({
     id: link.id,
     label: link.label,
+    lookupKey: link.lookupKey,
     assemblyId: link.assemblyId,
     assemblyName:
       link.assemblyId === null ? null : (names.get(link.assemblyId) ?? null),
