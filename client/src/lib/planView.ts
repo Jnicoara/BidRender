@@ -228,6 +228,53 @@ export function fitView(bounds: ViewBounds): PlanView {
 }
 
 /**
+ * How far past fit `centreOn` zooms when asked to show a spot: a quarter of the
+ * sheet's width or height on screen at once.
+ *
+ * The plan reader's positions are off by up to about 2.4 in of paper
+ * (measured 2026-09-29, see readerPicks.ts), so the person checking a spot
+ * needs to see a few inches AROUND it, legibly. At fit the whole sheet is on
+ * screen and a symbol is a speck; at 4x a 36in sheet shows about 9in, which
+ * covers that error with room either side.
+ */
+export const FOCUS_ZOOM_OVER_FIT = 4;
+
+/**
+ * Bring one spot on the drawing to the middle of the viewport.
+ *
+ * `point` is in DRAWING pixels (page points times the render scale) — the same
+ * space `x + p * zoom` maps to the screen. Zooms IN to at least `minZoom` and
+ * never out: somebody already closer than that chose to be, and pulling them
+ * back would lose their place.
+ *
+ * ── Why it zooms at all (2026-09-30) ─────────────────────────────────────────
+ * "Show me on the drawing" used to draw a ring and leave the view alone. A
+ * reading is usually checked at fit, and at fit `clampView` centres the whole
+ * sheet and ignores any pan — so even a pan alone would have moved nothing.
+ * The ring was a speck somewhere on the sheet, or off screen when zoomed in,
+ * and pressing Link or ticking a suggestion looked like it did nothing.
+ *
+ * The result is still clamped, so a spot in a corner lands as near the middle
+ * as `MIN_VISIBLE_FRACTION` allows (a corner can reach the dead centre).
+ */
+export function centreOn(
+  view: PlanView,
+  bounds: ViewBounds,
+  point: { x: number; y: number },
+  minZoom: number
+): PlanView {
+  const zoom = clampZoom(Math.max(view.zoom, minZoom));
+  return clampView(
+    {
+      zoom,
+      x: bounds.viewportWidth / 2 - point.x * zoom,
+      y: bounds.viewportHeight / 2 - point.y * zoom,
+    },
+    bounds
+  );
+}
+
+/**
  * Zoom about a fixed point on screen — the pointer, or the viewport centre.
  *
  * **The point under the cursor must not move.** That one property is the
