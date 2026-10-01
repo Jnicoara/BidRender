@@ -110,6 +110,14 @@ can. See D17(b) and the open fork at D17(c).
 > per-end number was never built, so nothing moved; see the retirement note
 > on D17(b) in `references/takeoff-spec.md`.
 
+> **Overridden in part 2026-09-29, by the owner.** "Each reading its labour off
+> its own material row" no longer holds for **couplings, connectors and
+> straps**: the run's per-foot rate pays for them, so their lines carry cost
+> and zero hours and Send again never refills them. Elbows, bends, LBs, pull
+> boxes and tee boxes keep their own hours. The full note is on D17(b) in
+> `references/takeoff-spec.md`; the rule is `LABOR_IN_RUN_RATE` in
+> `shared/runFittings.ts`.
+
 **BUILT 2026-09-20 — the per-foot half.** `shared/runTypeLabor.ts` turns a run
 type into what ONE FOOT of it is made of, and `laborForRun` prices that from the
 material rows. The palette and the type editor both show the figure, through one

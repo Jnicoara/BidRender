@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-30]
 
+- **BidRidge now tells you when there is a newer version.** Someone who had
+  the app open before an update kept running the old version until they
+  refreshed, so a fix did not reach them. Now a bar says "A new version of
+  BidRidge is available" with a Refresh button. It never reloads by itself,
+  so nothing typed is lost. If an out-of-date page can't load part of the
+  app, it says "BidRidge has been updated — Refresh" instead of "This screen
+  stopped working". A browser can also no longer get stuck holding a broken
+  copy of the app's code after an update.
+
 - **The Plans screen's panel works on a phone.** At phone width it used to
   run off the side of the screen, taking its buttons with it. Now the drawing
   gets the whole width, a bar along the bottom says what is on this sheet,
@@ -62,6 +71,17 @@ This is the human-readable companion to the git history — read this to see wha
   stays on one line rather than breaking in two, and a long one like
   3/16" = 1'-0" now fits in full even with the list dragged to its narrowest.
 
+- **A proposal for a bid with nothing on it no longer shows the client
+  $0.00.** It says "No work added yet" where the total would be, and Print /
+  Save PDF / Ctrl+P is blocked with a plain message to add work to the bid
+  first — the same way unpriced lines are blocked.
+
+- **"Show me on the drawing" now actually moves the drawing.** Pressing Link or
+  Fix on a plan-reader suggestion, ticking one, or picking a counted item or a
+  drop used to draw a ring where the thing was and leave the view alone, so at
+  full-sheet view (or with the spot off screen) it looked like nothing
+  happened. The drawing now zooms in and centres on the spot.
+
 ## [2026-09-29]
 
 - **A proposal can no longer show a client $0.00 or a short total.** If any
@@ -85,6 +105,14 @@ This is the human-readable companion to the git history — read this to see wha
   The app was placing marks exactly where the reader said; the reader was
   wrong about where. Now nothing is placed until you tick it, and ticking it
   (or pressing Link) moves the drawing to that spot so you can check it first.
+
+- **Couplings, connectors and straps on a traced run are no longer paid for
+  twice.** A run's labor hours per foot already cover them, so their bid lines
+  now carry the part's cost and no hours of their own — they read "in run
+  rate" — and Send again never adds hours to them. Before, setting hours on
+  both the pipe and its couplings billed that labor once in every foot and
+  again per coupling. Elbows, field bends, LBs, pull boxes and tee boxes still
+  carry their own hours. The run type's labor line now says what it covers.
 
 - **The plan reader no longer reads a sheet just because you opened it.** The
   "Read each sheet as I open it" switch is gone. A sheet is read, and paid for,

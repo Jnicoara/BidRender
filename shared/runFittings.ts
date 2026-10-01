@@ -180,6 +180,36 @@ export function isFittingRole(
 }
 
 /**
+ * The fittings whose LABOR the run's per-foot rate already covers.
+ *
+ * Owner, 2026-09-29: a raceway's hours per foot pay for the couplings,
+ * connectors and straps that go with it, so those lines carry the part's COST
+ * and no hours of their own. Anything else would pay for the same work twice —
+ * once in every foot, once per fitting — the moment somebody set hours on both.
+ * Everything else counted on a run keeps its own hours: elbows, field bends,
+ * LBs, pull boxes, tee boxes and their covers are real extra work a per-foot
+ * figure does not include.
+ *
+ * This overrides takeoff-spec.md D17(b) and ASSEMBLIES_PLAN.md, which had every
+ * fitting carry its own labour and "the run is just pipe". Both say so.
+ *
+ * A LIST, not a flag per role scattered through the pricing code: it is read
+ * when a line is sent (`runLineLaborUnit`), when Send again considers a refill
+ * (`resendPlan`), and when the bid decides a line's hours are "not priced"
+ * (`lineHoursUnset`). Three readers of one rule is the case for one place.
+ */
+export const LABOR_IN_RUN_RATE: readonly FittingKind[] = [
+  "coupling",
+  "connector",
+  "strap",
+];
+
+/** Whether this run role's labor is paid by the run's per-foot rate. */
+export function laborInRunRate(role: string | null | undefined): boolean {
+  return (LABOR_IN_RUN_RATE as readonly unknown[]).includes(role);
+}
+
+/**
  * One kind of fitting, counted.
  *
  *   counted    a quantity, with how it was worked out

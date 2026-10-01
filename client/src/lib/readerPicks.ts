@@ -40,6 +40,13 @@ export function initialPicks(
  * the spot the reader gave, so the person deciding sees what they decide
  * about. Null when the suggestion has no position, and when a tick is being
  * REMOVED, since there is nothing to check then.
+ *
+ * **Until 2026-09-30 this comment was the only place that was true.** The
+ * spot went to `onJumpTo`, which only drew a ring and never moved the view —
+ * at fit a speck, zoomed in often off screen — so Link and ticking looked
+ * like they did nothing. The view now moves: TakeoffPage's `jumpTo` hands
+ * PlanPane a `focusRequest`, which centres the spot via `centreOn`
+ * (client/src/lib/planView.ts, tested there).
  */
 export function spotToShow(
   finding: PickableFinding,

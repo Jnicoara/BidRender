@@ -9,6 +9,8 @@ import { getLoginUrl } from "./const";
 import { registerServiceWorker } from "@/lib/registerServiceWorker";
 import { markStagingEnvironment } from "@/lib/appEnvironment";
 import StagingBand from "@/components/StagingBand";
+import { NewVersionBar } from "@/components/NewVersionBar";
+import { markPageOutOfDate } from "@/lib/versionCheck";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -80,12 +82,20 @@ const trpcClient = trpc.createClient({
 // see the module for why neither is incidental.
 registerServiceWorker();
 
+// A piece of the app failed to load: almost always a tab that outlived a
+// deploy, asking for a hashed file the new build no longer has. Not
+// preventDefault()ed, so the import still fails into the error screen, which
+// then says "updated, refresh" instead of "stopped working" (ErrorBoundary).
+// Never reloads by itself; see @/lib/versionCheck for why.
+window.addEventListener("vite:preloadError", () => markPageOutOfDate());
+
 // Before the first render, so no screen is ever drawn without room for the band.
 const isStaging = markStagingEnvironment(document);
 
 createRoot(document.getElementById("root")!).render(
   <>
     {isStaging && <StagingBand />}
+    <NewVersionBar />
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
         <App />

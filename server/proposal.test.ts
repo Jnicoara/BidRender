@@ -53,6 +53,7 @@ import {
   setSectionVisible,
   clientFigure,
   PRICE_PENDING,
+  NO_WORK_YET,
   type BuildProposalInput,
 } from "../shared/proposal";
 import { NOTHING_NOT_PRICED, notPricedLines } from "../shared/lineNotPriced";
@@ -368,6 +369,43 @@ describe("what leaves the building", () => {
     ).toBe("$13200");
   });
 
+  it("a bid with no lines never prints $0.00: every figure says 'No work added yet'", () => {
+    const zero = {
+      directCost: 0,
+      costWithMarkup: 0,
+      overheadAmount: 0,
+      profitAmount: 0,
+      finalPrice: 0,
+      totalLaborHours: 0,
+    };
+    const doc = buildProposal(input({ lines: [], totals: zero }));
+    expect(doc.investment.noWork).toBe(true);
+    expect(doc.investment.pricePending).toBe(true);
+    for (const amount of [
+      doc.investment.total,
+      doc.investment.subtotal,
+      doc.investment.workTotal,
+    ]) {
+      expect(clientFigure(doc.investment, amount, n => `$${n}`)).toBe(
+        NO_WORK_YET
+      );
+    }
+
+    // Scope-only prints no money, so an empty bid is never pending there.
+    const scope = buildProposal(
+      input({ lines: [], totals: zero, mode: "scope-only" })
+    );
+    expect(scope.investment.noWork).toBe(false);
+    expect(scope.investment.pricePending).toBe(false);
+
+    // A bid with lines is not "no work", priced or not.
+    expect(buildProposal(input()).investment.noWork).toBe(false);
+    expect(
+      buildProposal(input({ notPriced: { lines: 1, parts: 0 } })).investment
+        .noWork
+    ).toBe(false);
+  });
+
   it("lists unpriced lines by name, agreeing with the count", () => {
     const line = (name: string, cost: number, unpricedParts = 0) => ({
       name,
@@ -626,6 +664,25 @@ describe.skipIf(!hasDb)("proposals end to end", () => {
       mode: "scope-only",
     });
     expect(scope.document.investment.pricePending).toBe(false);
+  });
+
+  it("an empty bid's proposal says 'No work added yet', never $0.00", async () => {
+    const bid = await caller().bids.create({
+      name: `Empty proposal bid ${Date.now()}${Math.random()}`,
+      trades: ["electrical"],
+    });
+    const full = await caller().proposals.document({ bidId: bid!.id });
+    expect(full.lineCount).toBe(0);
+    expect(full.document.investment.total).toBe(0);
+    expect(full.document.investment.noWork).toBe(true);
+    expect(full.document.investment.pricePending).toBe(true);
+    expect(
+      clientFigure(
+        full.document.investment,
+        full.document.investment.total,
+        n => n.toFixed(2)
+      )
+    ).toBe(NO_WORK_YET);
   });
 
   it("a fully priced bid prints its figure, not 'Price pending'", async () => {

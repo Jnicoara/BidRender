@@ -3,7 +3,16 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
-## Open tabs keep running the OLD code after a deploy — plan, 2026-09-30 (not built)
+## Open tabs keep running the OLD code after a deploy — plan, 2026-09-30
+
+> **BUILT 2026-09-30 on `a-version-bar`: steps 1–4 below.** Bar:
+> `client/src/components/NewVersionBar.tsx` + `@/lib/versionCheck` (tested).
+> Server: `server/staticCaching.ts` (404 for a missing asset, no-cache on the
+> shell, immutable assets; tested over real HTTP). Worker: `sw.js`
+> `isCacheableAsset`, `CACHE_VERSION` v2 (tested by RUNNING sw.js). Chunk
+> failure: `vite:preloadError` + an "updated, refresh" error screen. Checked
+> on a local production build. **Still open: the hard-refresh question
+> below.** Do the staging check on the next deploy.
 
 **Yes, they do.** A tab that was open before a deploy keeps the old JS in
 memory until the page is reloaded. Nothing tells it a new build exists:
@@ -261,6 +270,19 @@ everyone to re-run instead of read.
       own user ids, and no other file uses 7404/7405. A race, not yet
       explained. Run it alongside the full suite several times before calling
       anything fixed.
+- [ ] **`server/materialsLibrary.test.ts` failed 4 tests in ONE full run,
+      2026-09-29, and has not failed since.** On `a-fitting-labor` against
+      `bidrender_test_clean`: "re-stamps a baseline row whose category was
+      lost", "backfills a fork that predates the column", "does not overwrite a
+      category the user chose for their own copy" and "re-stamps aliases that
+      were lost". The file passed alone (32/32) and the next two full runs were
+      clean (4,157 passing, only the known `schemaDrift` enum mismatch).
+      Nothing on that branch touches materials categories, aliases or the
+      seeder. The error text was not captured (the failing run printed only the
+      names). All four re-run `seedBaselineMaterials` and read a baseline row
+      back, the same shape as the `seedReactivatesRetired` race above:
+      suspect a second writer to shared `materials` rows mid-seed. Capture
+      the assertion text on the next failure before changing anything.
 - [ ] **`scripts/schemaDrift.mts` says "this database has never been migrated"
       when it simply cannot connect.** Measured 2026-09-27 against production
       with the laptop off the database's trusted list: that line printed, then
