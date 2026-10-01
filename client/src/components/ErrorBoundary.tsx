@@ -36,6 +36,7 @@ import {
   recordCrash,
   type CrashRecord,
 } from "@/lib/crashLog";
+import { isChunkLoadError, pageIsOutOfDate } from "@/lib/versionCheck";
 
 interface Props {
   children: ReactNode;
@@ -43,6 +44,12 @@ interface Props {
 
 interface State {
   hasError: boolean;
+  /**
+   * The crash is a piece of the app failing to load — a tab that outlived a
+   * deploy (2026-09-30). Said as "updated, refresh", not "stopped working",
+   * because that is what it is and Refresh is the whole fix.
+   */
+  outdated: boolean;
   crash: CrashRecord | null;
   copied: boolean;
 }
@@ -50,13 +57,21 @@ interface State {
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, crash: null, copied: false };
+    this.state = {
+      hasError: false,
+      outdated: false,
+      crash: null,
+      copied: false,
+    };
   }
 
-  static getDerivedStateFromError(): Partial<State> {
+  static getDerivedStateFromError(error: unknown): Partial<State> {
     // Only flips the switch. The record is built in componentDidCatch, which is
     // the one that gets the component stack.
-    return { hasError: true };
+    return {
+      hasError: true,
+      outdated: isChunkLoadError(error) || pageIsOutOfDate(),
+    };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -92,6 +107,29 @@ class ErrorBoundary extends Component<Props, State> {
     if (!this.state.hasError) return this.props.children;
 
     const { crash, copied } = this.state;
+
+    if (this.state.outdated) {
+      return (
+        <div className="flex items-center justify-center min-h-dvh p-6 bg-background">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6">
+            <RotateCcw className="w-8 h-8 text-[#F5C518] mb-4" />
+            <h1 className="text-lg font-semibold">BidRidge has been updated</h1>
+            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+              This page was opened before the update and can't load the part it
+              needs. Refresh to carry on with the new version. Nothing you had
+              already saved is affected.
+            </p>
+            <Button
+              className="gap-2 mt-5"
+              onClick={() => window.location.reload()}
+            >
+              <RotateCcw className="w-4 h-4" />
+              Refresh
+            </Button>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="flex items-center justify-center min-h-dvh p-6 bg-background">

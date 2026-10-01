@@ -3,7 +3,16 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
-## Open tabs keep running the OLD code after a deploy — plan, 2026-09-30 (not built)
+## Open tabs keep running the OLD code after a deploy — plan, 2026-09-30
+
+> **BUILT 2026-09-30 on `a-version-bar`: steps 1–4 below.** Bar:
+> `client/src/components/NewVersionBar.tsx` + `@/lib/versionCheck` (tested).
+> Server: `server/staticCaching.ts` (404 for a missing asset, no-cache on the
+> shell, immutable assets; tested over real HTTP). Worker: `sw.js`
+> `isCacheableAsset`, `CACHE_VERSION` v2 (tested by RUNNING sw.js). Chunk
+> failure: `vite:preloadError` + an "updated, refresh" error screen. Checked
+> on a local production build. **Still open: the hard-refresh question
+> below.** Do the staging check on the next deploy.
 
 **Yes, they do.** A tab that was open before a deploy keeps the old JS in
 memory until the page is reloaded. Nothing tells it a new build exists:
