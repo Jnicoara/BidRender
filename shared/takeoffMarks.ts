@@ -166,16 +166,70 @@ export function colorFor(group: { id: number }): MarkColor {
  * the same position. That is the honest answer: nothing about it says what it
  * is counting, so nothing here can say it is different.
  */
-export function markAppearance(mark: {
-  groupId: number | null;
-  assemblyId: number | null;
-  assemblyCategory?: string | null;
-}): { shape: MarkShape; color: MarkColor } {
+export function markAppearance(
+  mark: {
+    groupId: number | null;
+    assemblyId: number | null;
+    assemblyCategory?: string | null;
+  },
+  /**
+   * The bid's letters and first-use colours (`pinStylesForBid`,
+   * shared/pinLetters.ts). Since 2026-10-01 the colour comes from there for
+   * every count the bid lists, so two counts on one bid stop sharing a colour
+   * by hash; the id hash below is left for a mark whose count is not in it.
+   * Pass the SAME map to the drawing and the panel, or a swatch and its pins
+   * disagree.
+   */
+  pins?: ReadonlyMap<number, { letter: string; color: MarkColor }>
+): { shape: MarkShape; color: MarkColor; letter: string | null } {
   const id = mark.groupId ?? (mark.assemblyId !== null ? -mark.assemblyId : 0);
+  const pin = mark.groupId !== null ? pins?.get(mark.groupId) : undefined;
   return {
     shape: shapeFor({ id, assemblyCategory: mark.assemblyCategory }),
-    color: colorFor({ id }),
+    color: pin?.color ?? colorFor({ id }),
+    letter: pin?.letter ?? null,
   };
+}
+
+/**
+ * Whether a pin of this on-screen diameter can carry its letter. Below it the
+ * letter is noise on the symbol and shape + colour remain (pin plan § 3).
+ * Looked at 2026-10-01 on the Blueridge set at 1536 px wide: at 92% a pin is
+ * 16 px across and its "L" reads in a screenshot; at Fit (19%) the pin is at
+ * the 10 px floor and no letter is drawn. 14 sits between the two and is a
+ * judgement, not a measured edge — step 0 of the pin plan still owes that.
+ */
+export const LETTER_MIN_PX = 14;
+
+/** Font size for a letter inside a pin of radius `r`, by its length. */
+export function letterSize(r: number, letter: string): number {
+  const scale =
+    letter.length <= 1
+      ? 1.15
+      : letter.length === 2
+        ? 0.9
+        : letter.length === 3
+          ? 0.68
+          : 0.56;
+  return r * scale;
+}
+
+/**
+ * Where a letter sits in a shape, and how big — the shape's own centre is not
+ * always where there is room. A triangle (`markPath`: apex at r above the
+ * centre, base at r/2 below) is narrow at the middle, so a letter centred
+ * there spilled over the base of a 20 px swatch (seen 2026-10-01). It goes
+ * lower and smaller, into the wide part.
+ */
+export function letterFit(
+  shape: MarkShape,
+  r: number,
+  letter: string
+): { dy: number; size: number } {
+  const size = letterSize(r, letter);
+  return shape === "triangle"
+    ? { dy: r * 0.12, size: size * 0.72 }
+    : { dy: 0, size };
 }
 
 // ─── Traced runs ──────────────────────────────────────────────────────────────

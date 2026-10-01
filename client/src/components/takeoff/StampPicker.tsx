@@ -52,15 +52,28 @@ export type PickableAssembly = {
 /** How many to show before asking for a narrower query. */
 const MAX_RESULTS = 8;
 
+/** A count already on the bid, as the "which item?" step lists it. */
+export type PickableCount = { id: number; label: string };
+
 export function StampPicker({
   assemblies,
   onPick,
+  countsOf,
+  onPickCount,
   onCountPlain,
   disabled,
   onRefused,
 }: {
   assemblies: PickableAssembly[];
   onPick: (assembly: PickableAssembly) => void;
+  /**
+   * The counts this bid already has of an assembly. With MORE THAN ONE —
+   * several legend items sharing it, each its own count — a pick asks which
+   * item instead of guessing (references/track-b-count-pin-styles-plan.md
+   * § 11.2). Never on a fresh bid: one count or none goes straight through.
+   */
+  countsOf?: (assemblyId: number) => PickableCount[];
+  onPickCount?: (count: PickableCount, assemblyId: number) => void;
   /** Count something the library does not have — level 1. See the header. */
   onCountPlain: (label: string) => void;
   disabled?: boolean;
@@ -74,6 +87,22 @@ export function StampPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  /** The "which item?" step, when a picked assembly has several counts. */
+  const [choosing, setChoosing] = useState<{
+    assembly: PickableAssembly;
+    counts: PickableCount[];
+  } | null>(null);
+
+  /** Pick an assembly — or ask which of its counts, when it has several. */
+  const pick = (assembly: PickableAssembly) => {
+    const counts = countsOf?.(assembly.id) ?? [];
+    if (counts.length > 1 && onPickCount) {
+      setChoosing({ assembly, counts });
+      return;
+    }
+    onPick(assembly);
+    setOpen(false);
+  };
 
   const searchable = useMemo(
     () =>
@@ -105,7 +134,10 @@ export function StampPicker({
         setOpen(next);
         // Cleared on close so reopening does not present a stale query as if it
         // were the current filter.
-        if (!next) setQuery("");
+        if (!next) {
+          setQuery("");
+          setChoosing(null);
+        }
       }}
     >
       <PopoverTrigger asChild>
@@ -127,65 +159,98 @@ export function StampPicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-2">
-        <p className="text-xs font-medium mb-1">What are you counting?</p>
-        <p className="text-[0.7rem] text-muted-foreground mb-2">
-          Every click drops one. No scale needed — counting is not measuring.
-        </p>
-        <div className="relative mb-1.5">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
-          <Input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === "Escape") setOpen(false);
-              /*
+        {choosing ? (
+          <div>
+            <p className="text-xs font-medium mb-1">Which item?</p>
+            <p className="text-[0.7rem] text-muted-foreground mb-2">
+              This bid counts {choosing.assembly.name} as{" "}
+              {choosing.counts.length} separate items. Each keeps its own count
+              and its own bid line.
+            </p>
+            <div className="max-h-56 overflow-y-auto">
+              {choosing.counts.map((count, i) => (
+                <button
+                  key={count.id}
+                  autoFocus={i === 0}
+                  className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted focus:bg-muted outline-none truncate"
+                  onClick={() => {
+                    onPickCount?.(count, choosing.assembly.id);
+                    setOpen(false);
+                    setChoosing(null);
+                  }}
+                >
+                  {count.label}
+                </button>
+              ))}
+            </div>
+            <div className="h-px bg-border my-1.5" />
+            <button
+              className="w-full text-left px-2 py-1.5 rounded text-xs text-muted-foreground hover:bg-muted"
+              onClick={() => setChoosing(null)}
+            >
+              ← Back to the list
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="text-xs font-medium mb-1">What are you counting?</p>
+            <p className="text-[0.7rem] text-muted-foreground mb-2">
+              Every click drops one. No scale needed — counting is not
+              measuring.
+            </p>
+            <div className="relative mb-1.5">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+              <Input
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Escape") setOpen(false);
+                  /*
                 Enter takes the top hit, which is the whole point of ranking
                 them — and when there is no hit it counts what was typed, so a
                 name the library has never heard of is still one keystroke from
                 being counted.
               */
-              if (e.key === "Enter") {
-                if (results[0]) {
-                  onPick(results[0]);
-                  setOpen(false);
-                } else if (query.trim()) {
-                  onCountPlain(query.trim());
-                  setOpen(false);
-                }
-              }
-            }}
-            placeholder="Search, or type anything to count it…"
-            className="h-7 pl-7 text-xs"
-            autoFocus
-          />
-        </div>
-        <div className="max-h-56 overflow-y-auto">
-          {results.map(assembly => (
-            <button
-              key={assembly.id}
-              className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted flex items-center gap-2"
-              onClick={() => {
-                onPick(assembly);
-                setOpen(false);
-              }}
-            >
-              <span className="flex-1 min-w-0 truncate">{assembly.name}</span>
-              {assembly.category && (
-                <span className="text-[0.7rem] text-muted-foreground shrink-0">
-                  {assembly.category}
-                </span>
+                  if (e.key === "Enter") {
+                    if (results[0]) {
+                      pick(results[0]);
+                    } else if (query.trim()) {
+                      onCountPlain(query.trim());
+                      setOpen(false);
+                    }
+                  }
+                }}
+                placeholder="Search, or type anything to count it…"
+                className="h-7 pl-7 text-xs"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-56 overflow-y-auto">
+              {results.map(assembly => (
+                <button
+                  key={assembly.id}
+                  className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted flex items-center gap-2"
+                  onClick={() => pick(assembly)}
+                >
+                  <span className="flex-1 min-w-0 truncate">
+                    {assembly.name}
+                  </span>
+                  {assembly.category && (
+                    <span className="text-[0.7rem] text-muted-foreground shrink-0">
+                      {assembly.category}
+                    </span>
+                  )}
+                </button>
+              ))}
+              {results.length === 0 && !query.trim() && (
+                <p className="text-[0.7rem] text-muted-foreground px-2 py-2">
+                  Your library has no assemblies yet — type a name to count
+                  something anyway.
+                </p>
               )}
-            </button>
-          ))}
-          {results.length === 0 && !query.trim() && (
-            <p className="text-[0.7rem] text-muted-foreground px-2 py-2">
-              Your library has no assemblies yet — type a name to count
-              something anyway.
-            </p>
-          )}
-        </div>
+            </div>
 
-        {/*
+            {/*
           The escape hatch, below a divider and worded as what it does rather
           than as what it lacks. Where the price comes from is said while the
           count is being made, because it is different from every row above:
@@ -193,26 +258,29 @@ export function StampPicker({
           (Until 2026-09-25 this read "not on the bid", which stopped being
           true when free counts became sendable.)
         */}
-        {query.trim() && (
-          <>
-            <div className="h-px bg-border my-1.5" />
-            <button
-              className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted"
-              onClick={() => {
-                onCountPlain(query.trim());
-                setOpen(false);
-              }}
-            >
-              <span className="flex items-center gap-1.5">
-                <Hash className="w-3 h-3 text-muted-foreground shrink-0" />
-                <span className="truncate">
-                  Count “<span className="font-medium">{query.trim()}</span>”
-                </span>
-              </span>
-              <span className="block text-[0.7rem] text-muted-foreground mt-0.5 pl-[1.125rem]">
-                No library item needed — price it on the bid
-              </span>
-            </button>
+            {query.trim() && (
+              <>
+                <div className="h-px bg-border my-1.5" />
+                <button
+                  className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted"
+                  onClick={() => {
+                    onCountPlain(query.trim());
+                    setOpen(false);
+                  }}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Hash className="w-3 h-3 text-muted-foreground shrink-0" />
+                    <span className="truncate">
+                      Count “<span className="font-medium">{query.trim()}</span>
+                      ”
+                    </span>
+                  </span>
+                  <span className="block text-[0.7rem] text-muted-foreground mt-0.5 pl-[1.125rem]">
+                    No library item needed — price it on the bid
+                  </span>
+                </button>
+              </>
+            )}
           </>
         )}
       </PopoverContent>

@@ -12,6 +12,29 @@ This is the human-readable companion to the git history — read this to see wha
   seeded the way the app seeds itself. A track branch that tries to change the
   database migrations is refused, because migrations stay with Track A. This
   deploys nothing.
+- **Several legend symbols linked to one assembly now keep separate counts.**
+  Three lights linked to the same assembly all landed in one count (22 + 3
+  stored as 25, under one name). Each symbol now counts into its own count,
+  named for the symbol, and goes to the bid as its own line at the same unit
+  price — the bid total is exactly what it was. Counts already merged are left
+  as they are. The toolbar's Count picker asks "Which item?" when an assembly
+  is counted as more than one, instead of guessing.
+- **Count pins carry a letter, and colours no longer repeat on a bid.** Each
+  count gets a letter from its fixture tag ("(A-7)" → A7), else from what its
+  name says (GFCI → G, light → L), else from its assembly; a second count that
+  would share a letter becomes L2, R2, and never takes a code like S3 that
+  means something on plans. Letters show once the pin is big enough to read,
+  and on the count card. Colours go in order of first use, so the first six
+  counts on a bid are all different — existing counts may change colour once.
+- **"Again: <count>" in the toolbar** re-arms the last count with one click (or
+  R) after a sheet change put it down. It never comes back by itself.
+- **Pins no longer float over the wrong sheet.** Changing sheets drew the new
+  sheet's pins over the previous sheet's drawing for most of a second before
+  the new page appeared. Pins now wait for their own page, and a thin bar
+  across the top of the plan shows while the next sheet draws.
+- **The message after capturing a symbol** now says a click starts counting,
+  and that linking an assembly is optional, instead of "click it to choose an
+  assembly".
 
 - **Legend symbols can be renamed.** A pencil beside each captured symbol in
   the Plans panel (laptop and phone) renames it; Enter saves, Escape cancels,
