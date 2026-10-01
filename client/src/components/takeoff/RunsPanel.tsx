@@ -114,7 +114,7 @@ function EmptiedCountRow({
         </svg>
         <div className="flex-1 min-w-0">
           <p className="text-sm truncate text-muted-foreground">{card.label}</p>
-          <p className="text-[0.7rem] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             None left on this sheet — undo puts them back
           </p>
         </div>
@@ -236,16 +236,16 @@ function RunPullPoints({
 }) {
   const where = (place: "corner" | "end-drop") =>
     place === "end-drop" ? "at the top of the drop" : "at this corner";
-  const button = "h-6 px-2 text-[0.7rem]";
+  const button = "h-6 px-2 text-xs";
   return (
     <div className="mt-2 pt-2 border-t border-border/60 space-y-1.5">
       {bends.summary && (
-        <p className="text-[0.7rem] text-muted-foreground leading-snug">
+        <p className="text-xs text-muted-foreground leading-snug">
           {bends.summary}
         </p>
       )}
       {bends.overLimit.map(line => (
-        <p key={line} className="text-[0.7rem] text-[#F5C518] leading-snug">
+        <p key={line} className="text-xs text-warning leading-snug">
           {line}
         </p>
       ))}
@@ -265,7 +265,7 @@ function RunPullPoints({
               key={`${p.place}:${p.x}:${p.y}`}
               className="rounded border border-dashed border-[#F5C518]/60 px-2 py-1.5 space-y-1"
             >
-              <p className="text-[0.7rem] leading-snug">
+              <p className="text-xs leading-snug">
                 <span className="text-[#F5C518] font-medium">
                   Pull point proposed
                 </span>{" "}
@@ -323,7 +323,7 @@ function RunPullPoints({
           key={`accepted-${a.answerId}`}
           className="flex items-center justify-between gap-2"
         >
-          <p className="text-[0.7rem] leading-snug">
+          <p className="text-xs leading-snug">
             {a.kind === "lb" ? "LB" : "Pull box"} added {where(a.place)}.
           </p>
           <Button
@@ -347,7 +347,7 @@ function RunPullPoints({
             key={`dismissed-${p.answer!.id}`}
             className="flex items-center justify-between gap-2"
           >
-            <p className="text-[0.7rem] text-muted-foreground leading-snug">
+            <p className="text-xs text-muted-foreground leading-snug">
               Pull point dismissed {where(p.place)}.
             </p>
             <Button
@@ -613,7 +613,7 @@ function Footage({
           (seen on screen, 2026-09-29). */}
       {extra > 0 && (
         <div
-          className="text-right text-[0.7rem] text-muted-foreground/80"
+          className="text-right text-xs text-muted-foreground/80"
           title="Extra is bought but not installed, so it carries no install hours. Makeup is installed and does."
         >
           labor on {exact(installed)} ft
@@ -657,7 +657,7 @@ function TypedLength({
   if (!shown) {
     return (
       <button
-        className="mt-1 text-[0.7rem] text-muted-foreground underline hover:text-foreground"
+        className="mt-1 text-xs text-muted-foreground underline hover:text-foreground"
         onClick={e => {
           e.stopPropagation();
           setOpen(true);
@@ -685,7 +685,7 @@ function TypedLength({
           className="w-24"
         />
       </div>
-      <p className="text-[0.7rem] text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         Flat length only — drops and extra are added on top.
         {typedInches !== null && drawn !== null && (
           <> The drawn line measures {exact(drawn)} ft.</>
@@ -754,7 +754,7 @@ function RunExtrasEditor({
   if (!open && !differs) {
     return (
       <button
-        className="mt-1 block text-[0.7rem] text-muted-foreground underline hover:text-foreground"
+        className="mt-1 block text-xs text-muted-foreground underline hover:text-foreground"
         onClick={e => {
           e.stopPropagation();
           setOpen(true);
@@ -792,7 +792,7 @@ function RunExtrasEditor({
 
   return (
     <div className="mt-1.5 space-y-0.5" onClick={e => e.stopPropagation()}>
-      <div className="flex items-center justify-between text-[0.7rem]">
+      <div className="flex items-center justify-between text-xs">
         <span className="font-medium">
           Extra and makeup{differs ? " — differs from its type" : ""}
         </span>
@@ -1524,9 +1524,7 @@ export function RunsPanel({
                   })()}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate">{group.name}</p>
-                    <p className="text-[0.7rem] text-muted-foreground">
-                      {group.count} placed
-                    </p>
+                    <p className="text-xs">{group.count} placed</p>
                   </div>
                   <span className="font-mono text-sm tabular-nums">
                     {group.count}
@@ -1585,7 +1583,7 @@ export function RunsPanel({
                   if (!state) return null;
                   if (state.onBid) {
                     return (
-                      <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {/*
                       LOCKED IS SAID HERE, not left to the bid screen.
 
@@ -1625,7 +1623,7 @@ export function RunsPanel({
                           type="button"
                           disabled={busy}
                           onClick={() => onSendToBid(group.groupId as number)}
-                          className="text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
+                          className="text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
                         >
                           {/*
                         The BID's count, not this sheet's. A count marked across
@@ -1644,7 +1642,7 @@ export function RunsPanel({
                               id === group.groupId ? null : group.groupId
                             )
                           }
-                          className="inline-flex items-center gap-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                          className="inline-flex items-center gap-1 text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground"
                           title="Choose the assembly this count is — every mark is kept"
                         >
                           <Link2 className="w-3 h-3" /> Link assembly…
@@ -1658,7 +1656,7 @@ export function RunsPanel({
                   linkAssemblies &&
                   onLinkAssembly && (
                     <div className="mt-1.5 rounded border border-border bg-muted/20 p-2 space-y-1.5">
-                      <p className="text-[0.7rem] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         Which assembly is “{group.name}”? Every mark is kept and
                         counts it from now on.
                       </p>
@@ -1693,7 +1691,7 @@ export function RunsPanel({
                     <button
                       key={placed.id}
                       onClick={() => onJumpTo({ x: placed.x, y: placed.y })}
-                      className="px-1.5 py-0.5 rounded text-[0.65rem] font-mono bg-muted hover:bg-[#F5C518]/20 hover:text-[#F5C518] transition-colors"
+                      className="px-1.5 py-0.5 rounded text-xs font-mono bg-muted hover:bg-[#F5C518]/20 hover:text-[#F5C518] transition-colors"
                       title="Show this one on the drawing"
                     >
                       {index + 1}
@@ -1712,7 +1710,7 @@ export function RunsPanel({
                       <button
                         type="button"
                         onClick={() => onDeleteCount(group.groupId as number)}
-                        className="ml-auto text-[0.65rem] text-muted-foreground hover:text-destructive underline-offset-2 hover:underline"
+                        className="ml-auto text-xs text-muted-foreground hover:text-destructive underline-offset-2 hover:underline"
                         title="Delete this count and its marks on every sheet — asks first"
                       >
                         Delete count…
@@ -1775,7 +1773,7 @@ export function RunsPanel({
         {tab !== "totals" ? null : summary ? (
           summary
         ) : stampGroups.length > 0 && waitingToSend !== undefined ? (
-          <p className="px-3 py-2 text-[0.7rem] text-muted-foreground border-b border-border">
+          <p className="px-3 py-2 text-xs text-muted-foreground border-b border-border">
             {waitingToSend > 0
               ? `${waitingToSend} count${waitingToSend === 1 ? " is" : "s are"} not on the bid yet.`
               : countedWithNoPrice
@@ -1806,7 +1804,7 @@ export function RunsPanel({
         */}
         {tab === "runs" && runTypeBridge && runTypeBridge.length > 0 && (
           <div className="border-b border-border">
-            <div className="px-3 pt-2.5 pb-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+            <div className="px-3 pt-2.5 pb-1 text-[0.7rem] uppercase tracking-wide text-muted-foreground">
               Traced footage
             </div>
             {runTypeBridge.map(entry => {
@@ -1829,7 +1827,7 @@ export function RunsPanel({
                 <div key={entry.runTypeId} className="px-3 pb-2.5">
                   {/* The type's swatch, so this block — and the route /
                       quantity split under it — names its lines on sight. */}
-                  <p className="flex items-center gap-1.5 text-xs font-medium min-w-0">
+                  <p className="flex items-center gap-1.5 text-sm font-medium min-w-0">
                     <RunTypeSwatch
                       runTypeId={entry.runTypeId}
                       pathType={entry.pathType}
@@ -1841,15 +1839,20 @@ export function RunsPanel({
                     {entry.rows.map(row => (
                       <div key={row.role}>
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-[0.7rem] text-muted-foreground truncate">
+                          <span
+                            className={cn(
+                              "text-sm truncate",
+                              row.materialName === null && "text-warning"
+                            )}
+                          >
                             {row.materialName ?? "Not said what this is"}
                           </span>
-                          <span className="text-[0.7rem] font-mono tabular-nums shrink-0">
+                          <span className="text-sm font-mono tabular-nums shrink-0">
                             {row.feet} ft
                           </span>
                         </div>
                         {row.resend && (
-                          <p className="text-[0.65rem] text-[#F5C518] leading-snug">
+                          <p className="text-xs text-warning leading-snug">
                             {resendSentence(row.resend)}
                           </p>
                         )}
@@ -1892,7 +1895,7 @@ export function RunsPanel({
                       // as that row's (seen on screen 2026-09-26).
                       const what = pipe?.materialName ?? "Footage";
                       return (
-                        <p className="mt-0.5 text-[0.65rem] text-muted-foreground leading-snug">
+                        <p className="mt-0.5 text-xs text-muted-foreground leading-snug">
                           {route > 0
                             ? `${what}: ${feet(route)} from routes + ${feet(entry.quantityFeet)} from quantity traces`
                             : `${what}: all ${feet(entry.quantityFeet)} from quantity traces`}
@@ -1910,12 +1913,11 @@ export function RunsPanel({
                           <div className="flex items-baseline justify-between gap-2">
                             <span
                               className={cn(
-                                "text-[0.7rem] truncate",
+                                "text-sm truncate",
                                 fitting.materialName === null &&
                                   fitting.status === "counted" &&
-                                  fitting.qty > 0
-                                  ? "text-[#F5C518]"
-                                  : "text-muted-foreground"
+                                  fitting.qty > 0 &&
+                                  "text-warning"
                               )}
                             >
                               {fitting.materialName ??
@@ -1923,18 +1925,18 @@ export function RunsPanel({
                             </span>
                             <span className="flex items-baseline gap-1.5 shrink-0">
                               {fitting.priced === false && (
-                                <span className="text-[0.65rem] text-[#F5C518]">
+                                <span className="text-xs text-warning">
                                   Not priced
                                 </span>
                               )}
-                              <span className="text-[0.7rem] font-mono tabular-nums">
+                              <span className="text-sm font-mono tabular-nums">
                                 {fitting.status === "counted"
                                   ? (fitting.atLeast ? "≥ " : "") + fitting.qty
                                   : "—"}
                               </span>
                             </span>
                           </div>
-                          <p className="text-[0.65rem] text-muted-foreground/80 leading-snug">
+                          <p className="text-xs text-muted-foreground/80 leading-snug">
                             {fitting.why}
                           </p>
                           {/*
@@ -1944,14 +1946,14 @@ export function RunsPanel({
                             changes money on the bid.
                           */}
                           {fitting.resend && (
-                            <p className="text-[0.65rem] text-[#F5C518] leading-snug">
+                            <p className="text-xs text-warning leading-snug">
                               {resendSentence(fitting.resend)}
                             </p>
                           )}
                           {fitting.materialProblem &&
                             fitting.status === "counted" &&
                             fitting.qty > 0 && (
-                              <p className="text-[0.65rem] text-[#F5C518] leading-snug">
+                              <p className="text-xs text-warning leading-snug">
                                 {fitting.materialProblem}
                               </p>
                             )}
@@ -1972,7 +1974,7 @@ export function RunsPanel({
                   ).map(message => (
                     <p
                       key={message}
-                      className="mt-1 text-[0.7rem] text-muted-foreground"
+                      className="mt-1 text-xs text-muted-foreground"
                     >
                       {message}
                     </p>
@@ -1991,7 +1993,7 @@ export function RunsPanel({
                     old meaning, which dropped the pipe too.
                   */}
                   {entry.branchCount > 0 && (
-                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {entry.branchCount} run
                       {entry.branchCount === 1 ? " is" : "s are"} branch wiring
                       your devices already include, so{" "}
@@ -2003,7 +2005,7 @@ export function RunsPanel({
                     </p>
                   )}
                   {entry.unansweredCount > 0 && (
-                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {entry.unansweredCount} run
                       {entry.unansweredCount === 1 ? " has" : "s have"} devices
                       at both ends and{" "}
@@ -2012,7 +2014,7 @@ export function RunsPanel({
                     </p>
                   )}
                   {entry.unmeasurableCount > 0 && (
-                    <p className="mt-1 text-[0.7rem] text-[#F5C518]">
+                    <p className="mt-1 text-xs text-warning">
                       {entry.unmeasurableCount} run
                       {entry.unmeasurableCount === 1 ? " is" : "s are"} on a
                       sheet with no scale, so not counted at all.
@@ -2030,7 +2032,7 @@ export function RunsPanel({
                     row, not from the diff.
                   */}
                   {onBidCount > 0 && (
-                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {onBidCount} on the bid
                       {quantitiesLocked ? (
                         <> — locked</>
@@ -2053,7 +2055,7 @@ export function RunsPanel({
                       type="button"
                       disabled={busy}
                       onClick={() => onSendRunType(entry.runTypeId)}
-                      className="mt-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
+                      className="mt-1 text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
                     >
                       {busy
                         ? "Sending…"
@@ -2104,7 +2106,7 @@ export function RunsPanel({
                 key={`legs-${place.rootId}`}
                 className="flex items-center justify-between gap-2 border-b border-border/60 bg-muted/20 px-3 py-1.5"
               >
-                <span className="text-[0.7rem] text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   {place.count} legs · run total{" "}
                   <span className="font-mono text-foreground">
                     {place.runTotalFeet === null
@@ -2116,7 +2118,7 @@ export function RunsPanel({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 px-2 text-[0.7rem]"
+                    className="h-6 px-2 text-xs"
                     onClick={() => onAddLeg(run)}
                   >
                     Add leg
@@ -2194,12 +2196,12 @@ export function RunsPanel({
                         are not there. Just the leg.
                       */}
                       {multi && run.traceMode === "quantity" && (
-                        <p className="text-[0.7rem] text-muted-foreground truncate">
+                        <p className="text-xs text-muted-foreground truncate">
                           Leg {place.index}
                         </p>
                       )}
                       {multi && run.traceMode !== "quantity" && (
-                        <p className="text-[0.7rem] text-muted-foreground truncate">
+                        <p className="text-xs text-muted-foreground truncate">
                           Leg {place.index}
                           {place.startsAs === "branch"
                             ? // Not "branch": the main's continuation past a
@@ -2213,7 +2215,7 @@ export function RunsPanel({
                             (place.sameCircuitsAsFirst ? (
                               " · same circuits as leg 1"
                             ) : (
-                              <span className="text-[#F5C518]/90">
+                              <span className="text-warning">
                                 {" "}
                                 · circuits differ from leg 1
                               </span>
@@ -2249,10 +2251,10 @@ export function RunsPanel({
                         return (
                           <p
                             className={cn(
-                              "text-[0.7rem] truncate",
+                              "text-xs truncate",
                               run.spec
                                 ? "text-muted-foreground"
-                                : "text-[#F5C518]/80"
+                                : "text-warning"
                             )}
                           >
                             {run.spec ??
@@ -2269,7 +2271,7 @@ export function RunsPanel({
                         {run.traceMode === "quantity" && place.index === 1 && (
                           <Badge
                             variant="outline"
-                            className="text-[0.65rem] px-1.5 py-0 text-muted-foreground"
+                            className="text-xs px-1.5 py-0 text-muted-foreground"
                             title="Flat footage of this type — no ends, no circuits. Drops are proposed, never assumed."
                           >
                             Quantity
@@ -2278,7 +2280,7 @@ export function RunsPanel({
                         {run.isSuggestion && (
                           <Badge
                             variant="outline"
-                            className="text-[0.65rem] px-1.5 py-0 border-[#F5C518]/40 text-[#F5C518]"
+                            className="text-xs px-1.5 py-0 border-[#F5C518]/40 text-[#F5C518]"
                           >
                             <Sparkles className="w-2.5 h-2.5 mr-1" /> Suggested
                           </Badge>
@@ -2286,7 +2288,7 @@ export function RunsPanel({
                         {run.status === "draft" && !run.isSuggestion && (
                           <Badge
                             variant="outline"
-                            className="text-[0.65rem] px-1.5 py-0 text-muted-foreground"
+                            className="text-xs px-1.5 py-0 text-muted-foreground"
                           >
                             Draft
                           </Badge>
@@ -2304,7 +2306,7 @@ export function RunsPanel({
                           return waiting > 0 ? (
                             <Badge
                               variant="outline"
-                              className="text-[0.65rem] px-1.5 py-0 border-dashed border-[#F5C518]/60 text-[#F5C518]"
+                              className="text-xs px-1.5 py-0 border-dashed border-[#F5C518]/60 text-[#F5C518]"
                             >
                               {waiting === 1
                                 ? "Pull point to review"
@@ -2321,7 +2323,7 @@ export function RunsPanel({
                           onAddLeg &&
                           !run.isSuggestion && (
                             <button
-                              className="text-[0.7rem] underline text-muted-foreground hover:text-foreground"
+                              className="text-xs underline text-muted-foreground hover:text-foreground"
                               onClick={e => {
                                 e.stopPropagation();
                                 onAddLeg(run);
@@ -2404,15 +2406,17 @@ export function RunsPanel({
                   {run.wireOwnership === "unanswered" &&
                     onAnswerBranchWiring && (
                       <div className="mt-1.5 rounded border border-border/60 bg-muted/20 px-2 py-1.5">
-                        <p className="text-[0.7rem] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           Devices at both ends — is this the branch wiring your
                           devices already include?
                         </p>
-                        <div className="flex items-center gap-1.5 mt-1">
+                        {/* Wraps: side by side they ran 50px past a 280px
+                            panel, hiding "No" (measured 2026-09-30). */}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-6 px-2 text-[0.7rem]"
+                            className="h-6 px-2 text-xs"
                             onClick={e => {
                               e.stopPropagation();
                               onAnswerBranchWiring(run.id, true);
@@ -2423,7 +2427,7 @@ export function RunsPanel({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-6 px-2 text-[0.7rem]"
+                            className="h-6 px-2 text-xs"
                             onClick={e => {
                               e.stopPropagation();
                               onAnswerBranchWiring(run.id, false);
@@ -2442,7 +2446,7 @@ export function RunsPanel({
                 */}
                   {run.branchWiring === true &&
                     run.traceMode !== "quantity" && (
-                      <p className="text-[0.7rem] text-muted-foreground mt-1.5">
+                      <p className="text-xs text-muted-foreground mt-1.5">
                         {run.pathType === "conduit"
                           ? "Branch wiring — your devices already include this wire, so it is not counted again. The conduit still is."
                           : "Branch wiring — your devices already include this cable, so it is not counted again."}{" "}
@@ -2463,7 +2467,7 @@ export function RunsPanel({
                   {/* A run that cannot be measured says so instead of showing 0 */}
                   {run.quantities === null ? (
                     <>
-                      <p className="text-xs text-[#F5C518] mt-1.5 flex items-start gap-1.5">
+                      <p className="text-xs text-warning bg-warning/10 rounded px-2 py-1 mt-1.5 flex items-start gap-1.5">
                         <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
                         {onSetTypedLength
                           ? "No scale on this sheet, so this run is not in the totals. Type its length to count it."
@@ -2501,7 +2505,7 @@ export function RunsPanel({
                       {/* An extra nobody set whispers (§ 2.3), so the row
                           says it — the totals count these as well. */}
                       {carriesNoExtra(run.quantities) && (
-                        <p className="text-[0.7rem] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           No extra set — Settings › Heights & extra, or this
                           run's own below.
                         </p>
@@ -2562,7 +2566,7 @@ export function RunsPanel({
                               className={cn(
                                 "shrink-0",
                                 run.noWire
-                                  ? "text-amber-400 flex items-center gap-1"
+                                  ? "text-warning flex items-center gap-1"
                                   : "text-muted-foreground"
                               )}
                             >
@@ -2577,7 +2581,7 @@ export function RunsPanel({
                               className={cn(
                                 "font-mono",
                                 run.noWire
-                                  ? "text-amber-400/80"
+                                  ? "text-warning"
                                   : "text-muted-foreground/70"
                               )}
                             >
@@ -2610,7 +2614,7 @@ export function RunsPanel({
                               className={cn(
                                 "shrink-0",
                                 run.noWire
-                                  ? "text-amber-400 flex items-center gap-1 basis-full"
+                                  ? "text-warning flex items-center gap-1 basis-full"
                                   : "text-muted-foreground"
                               )}
                             >
@@ -2638,7 +2642,7 @@ export function RunsPanel({
                               {run.noWire &&
                                 typeCarriesWire(run.typeDefaults ?? null) && (
                                   <button
-                                    className="underline text-amber-300 hover:text-amber-200"
+                                    className="underline text-warning hover:text-foreground"
                                     onClick={e => {
                                       e.stopPropagation();
                                       addOneCircuit(
@@ -2745,7 +2749,7 @@ export function RunsPanel({
                       {(run.stubsToReview ?? []).map(stub => (
                         <div
                           key={`${stub.end}-${stub.vertex}`}
-                          className="flex items-start gap-1.5 text-xs text-amber-400"
+                          className="flex items-start gap-1.5 text-xs text-warning"
                         >
                           <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
                           <span className="flex-1">
@@ -2755,7 +2759,7 @@ export function RunsPanel({
                             double-click rather than a corner.
                           </span>
                           <button
-                            className="underline shrink-0 hover:text-amber-200"
+                            className="underline shrink-0 hover:text-foreground"
                             onClick={e => {
                               e.stopPropagation();
                               onJumpTo(stub.point);
@@ -2802,7 +2806,7 @@ export function RunsPanel({
                           the "copying a layout does not copy the behaviour"
                           trap in CLAUDE.md arriving as typography.
                         */}
-                          <span className="text-[0.7rem] text-[#F5C518] text-left">
+                          <span className="text-xs text-warning text-left">
                             {verticalsNotice(run.quantities?.verticals)}
                           </span>
                         </div>
@@ -2811,7 +2815,7 @@ export function RunsPanel({
                   )}
 
                   {run.scaleChangedSinceTraced && (
-                    <p className="text-[0.7rem] text-[#F5C518] mt-1">
+                    <p className="text-xs text-warning mt-1">
                       The sheet's scale changed since this was traced — check
                       the length.
                     </p>
@@ -2836,7 +2840,7 @@ export function RunsPanel({
                     ) && (
                       <button
                         type="button"
-                        className="mt-1.5 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                        className="mt-1.5 text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground"
                         aria-pressed={hideOtherRuns}
                         onClick={e => {
                           e.stopPropagation();
@@ -2866,7 +2870,7 @@ export function RunsPanel({
                   */}
                   {isSelected && onSetTraceMode && !run.isSuggestion && (
                     <p
-                      className="mt-2 text-[0.7rem] text-muted-foreground"
+                      className="mt-2 text-xs text-muted-foreground"
                       onClick={e => e.stopPropagation()}
                     >
                       {run.traceMode === "quantity"
@@ -2946,7 +2950,7 @@ export function RunsPanel({
                               className="h-6 w-12 text-xs"
                               ariaLabel={`Conductors for ${circuit.name}`}
                             />
-                            <span className="text-[0.7rem] text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               cond.
                             </span>
                             {/*
@@ -2990,10 +2994,10 @@ export function RunsPanel({
                                 })
                               }
                               className={cn(
-                                "text-[0.7rem] rounded px-1 py-0.5 border transition-colors",
+                                "text-xs rounded px-1 py-0.5 border transition-colors",
                                 circuit.separateGround
                                   ? "border-[#F5C518]/60 text-[#F5C518]"
-                                  : // Dotted underline at rest, because at 11px a
+                                  : // Dotted underline at rest, because at this size a
                                     // bare word beside "cond." reads as a label
                                     // and nobody would find the isolated-ground
                                     // option. It changes a wire quantity, so it
@@ -3012,7 +3016,7 @@ export function RunsPanel({
                             >
                               {circuit.separateGround ? "own gnd." : "gnd."}
                             </button>
-                            <span className="text-[0.7rem] font-mono text-muted-foreground w-16 text-right">
+                            <span className="text-xs font-mono text-muted-foreground w-16 text-right">
                               {run.quantities
                                 ? feet(
                                     run.quantities.wireByCircuit.find(
@@ -3095,7 +3099,7 @@ export function RunsPanel({
                       bid cannot disagree.
                     */}
                         {run.circuits.length > 0 && run.quantities && (
-                          <div className="flex items-baseline justify-between text-[0.7rem] gap-2 pt-0.5">
+                          <div className="flex items-baseline justify-between text-xs gap-2 pt-0.5">
                             <span className="text-muted-foreground/70">
                               {groundSentence(
                                 run.quantities.grounds,
@@ -3109,7 +3113,7 @@ export function RunsPanel({
                           </div>
                         )}
 
-                        <p className="text-[0.7rem] text-muted-foreground/70">
+                        <p className="text-xs text-muted-foreground/70">
                           {/*
                         BOTH RULES, because they are now different and the
                         line above states the one that surprises people.
@@ -3220,7 +3224,7 @@ export function RunsPanel({
               for them — fittings (Q8), a count with no run type or height,
               and marks near an unlinked run end that may count twice. */}
             {totals.markDropCount > 0 && (
-              <p className="text-[0.7rem] text-muted-foreground pt-1">
+              <p className="text-xs text-muted-foreground pt-1">
                 Includes {totals.markDropCount} drop
                 {totals.markDropCount === 1 ? "" : "s"} to counted devices (
                 {totals.markDropFeet.toFixed(2)} ft). Connectors and elbows for
@@ -3230,7 +3234,7 @@ export function RunsPanel({
             {(totals.markDropNotes?.noTypeGroups ?? 0) +
               (totals.markDropNotes?.noHeightGroups ?? 0) >
               0 && (
-              <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
                 <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
                 {(totals.markDropNotes?.noTypeGroups ?? 0) +
                   (totals.markDropNotes?.noHeightGroups ?? 0)}{" "}
@@ -3244,7 +3248,7 @@ export function RunsPanel({
               </p>
             )}
             {(totals.markDropNotes?.mayDoubleCount ?? 0) > 0 && (
-              <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
                 <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
                 {totals.markDropNotes?.mayDoubleCount} marked device
                 {totals.markDropNotes?.mayDoubleCount === 1 ? "" : "s"} near a
@@ -3255,12 +3259,12 @@ export function RunsPanel({
               totals.cableExtraFeet +
               totals.wireExtraFeet >
               0 && (
-              <p className="text-[0.7rem] text-muted-foreground pt-1">
+              <p className="text-xs text-muted-foreground pt-1">
                 Extra is bought, not installed — labor is on the installed feet.
               </p>
             )}
             {totals.noExtraCount > 0 && (
-              <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
                 <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
                 {totals.noExtraCount} run
                 {totals.noExtraCount === 1 ? " carries" : "s carry"} no extra —
@@ -3279,7 +3283,7 @@ export function RunsPanel({
             that is under is the mistake that gets won.
           */}
             {totals.flatOnlyCount > 0 && (
-              <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
                 <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
                 {totals.conduitVerticalFeet === 0 &&
                 totals.cableVerticalFeet === 0 &&
@@ -3295,7 +3299,7 @@ export function RunsPanel({
             end is answered there is nothing left out to say.
           */}
             {(totals.quantity?.openEnds ?? 0) > 0 && (
-              <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
                 <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
                 {`Quantity traces are flat footage only — no drops are in these numbers for ${totals.quantity!.openEnds} leg end${totals.quantity!.openEnds === 1 ? "" : "s"}. Open a quantity trace to add them.`}
               </p>
@@ -3324,7 +3328,7 @@ export function RunsPanel({
                 <button
                   type="button"
                   onClick={onOpenPartialEnds}
-                  className="mt-1 w-full text-left text-[0.7rem] text-[#F5C518] flex items-start gap-1.5 rounded border border-[#F5C518]/40 px-2 py-1 hover:bg-[#F5C518]/10"
+                  className="mt-1 w-full text-left text-xs text-warning flex items-start gap-1.5 rounded border border-warning/40 bg-warning/10 px-2 py-1 hover:bg-warning/20"
                 >
                   <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
                   <span>
@@ -3335,13 +3339,13 @@ export function RunsPanel({
                   </span>
                 </button>
               ) : (
-                <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+                <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
                   <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
                   {`${totals.partialVerticalCount} run${totals.partialVerticalCount === 1 ? " has" : "s have"} only one end counted — ${totals.partialVerticalCount === 1 ? "its" : "their"} drops are short by whatever is missing.`}
                 </p>
               ))}
             {totals.unmeasurableCount > 0 && (
-              <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
                 <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
                 {totals.unmeasurableCount} run
                 {totals.unmeasurableCount === 1 ? " is" : "s are"} not in these
@@ -3359,7 +3363,7 @@ export function RunsPanel({
             different kinds of fact. Plain, not amber — typing is an answer.
           */}
             {totals.typedCount > 0 && (
-              <p className="text-[0.7rem] text-muted-foreground pt-1">
+              <p className="text-xs text-muted-foreground pt-1">
                 {totals.typedCount} run
                 {totals.typedCount === 1
                   ? " has a length"
@@ -3380,20 +3384,20 @@ export function RunsPanel({
             the estimator's own answer working as intended.
           */}
             {(totals.leftOut?.noType.count ?? 0) > 0 && (
-              <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
                 <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
                 {noTypeSentence(totals.leftOut!.noType)}
               </p>
             )}
             {(totals.leftOut?.branch.count ?? 0) > 0 && (
-              <p className="text-[0.7rem] text-muted-foreground pt-1">
+              <p className="text-xs text-muted-foreground pt-1">
                 {totals.leftOut!.branch.count} run
                 {totals.leftOut!.branch.count === 1 ? " is" : "s are"} branch
                 wiring — the devices already include that wire, so it is not
                 counted here. Conduit still is.
               </p>
             )}
-            <p className="text-[0.7rem] text-muted-foreground/70 pt-1">
+            <p className="text-xs text-muted-foreground/70 pt-1">
               What the bid prices, all sheets.
               {(totals.leftOut?.draftCount ?? 0) > 0 &&
                 ` Includes ${totals.leftOut!.draftCount} run${totals.leftOut!.draftCount === 1 ? "" : "s"} not finished yet.`}{" "}

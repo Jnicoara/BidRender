@@ -84,13 +84,13 @@ export function AssemblySearchList({
           >
             <Check className="w-3 h-3 text-muted-foreground shrink-0" />
             <span className="flex-1 min-w-0 truncate">{assembly.name}</span>
-            <span className="text-[0.7rem] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               {assembly.category}
             </span>
           </button>
         ))}
         {results.length === 0 && (
-          <p className="text-[0.7rem] text-muted-foreground px-2 py-2">
+          <p className="text-xs text-muted-foreground px-2 py-2">
             {assemblies.length === 0
               ? "Your library has no assemblies yet."
               : `Nothing matches “${query}”.`}

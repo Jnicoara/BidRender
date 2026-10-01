@@ -108,10 +108,8 @@ export function RunSpecEditor({
   if (!draft) {
     return (
       <div className="flex items-center gap-2 mt-1.5">
-        <span className="text-[0.7rem] text-muted-foreground shrink-0">
-          Made of
-        </span>
-        <span className="text-[0.7rem] flex-1 min-w-0 truncate">
+        <span className="text-xs text-muted-foreground shrink-0">Made of</span>
+        <span className="text-xs flex-1 min-w-0 truncate">
           {summary ?? (
             <span className="text-muted-foreground">nothing said yet</span>
           )}
@@ -119,7 +117,7 @@ export function RunSpecEditor({
         <Button
           size="sm"
           variant="outline"
-          className="h-6 gap-1 px-2 text-[0.7rem] shrink-0"
+          className="h-6 gap-1 px-2 text-xs shrink-0"
           onClick={open}
           disabled={locked}
           title={
@@ -196,9 +194,9 @@ export function RunSpecEditor({
 
       {pathType === "conduit" && (
         <div className="mt-2.5">
-          <p className="text-[0.7rem] font-medium">Number of wires</p>
+          <p className="text-xs font-medium">Number of wires</p>
           {several ? (
-            <p className="text-[0.7rem] text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               This run has {circuits.length} circuits — set the wires on each
               one below.
             </p>
@@ -212,7 +210,7 @@ export function RunSpecEditor({
                 }
                 ariaLabel="Number of wires"
               />
-              <span className="text-[0.7rem] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 insulated, not counting the ground
               </span>
             </div>

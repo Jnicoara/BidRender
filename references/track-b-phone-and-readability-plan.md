@@ -71,9 +71,7 @@
 > - **Found on screen:** `transition-colors` on the tabs left the PREVIOUS
 >   tab underlined in a background tab (transitions do not advance there).
 >   Removed.
-> - Part A items 2–6 (text sizes, the amber sweep, folding "Not on the bid
->   yet" by reason, muted grey) are NOT done; the phone (Part B) is not
->   started.
+> - Part A items 2–6 were built the same day — see § 2.
 
 ### Why
 
@@ -183,6 +181,40 @@ figures live on the Totals tab and say "this bid".
 
 These are one fixture's numbers. A real job with forty counts will be worse on
 every row. Measure again on one before calling Part A done.
+
+> **BUILT, 2026-09-30 (track-b): items 2–6.** Measured on "Bar layout
+> check", 1536 wide, panel 400 px, all five tabs (AI flag OFF, so Reader is
+> present):
+>
+> | Measure                       | Before         | After                                   |
+> | ----------------------------- | -------------- | --------------------------------------- |
+> | Text elements under 12 px     | 125 of 237     | **6 of 211**, all capitalised headings  |
+> | In the muted grey             | 108            | 76                                      |
+> | Warnings in the brand yellow  | 25             | **0**                                   |
+> | Totals tab: content / visible | 897 / 589 px   | 589 / 589 (folded; fits without scroll) |
+> | Runs tab: content / visible   | 2,266 / 589 px | 2,519 / 589 (the bigger text's cost)    |
+>
+> - Item 3: every yellow use in the panel, the scale control and the heights
+>   chip was decided one by one. **Stays yellow:** the active tab, a selected
+>   row, chip hover, the selected scale, the armed Capture hint, "Check it",
+>   and PROPOSALS (pull points, proposed drops, "Suggested") — those are drawn
+>   yellow-dashed on the drawing, and the row must match its marker.
+>   **Moved to `--warning`:** everything saying something is missing or
+>   wrong, plus the scale's off-standard triangle and note, which were a
+>   THIRD warning colour (`orange-300/400`). `CalibrateLayer`'s graded
+>   orange is a different surface and was not touched.
+> - Item 4: `foldNotOnBid` in `shared/takeoffSummary.ts`, tested in
+>   `server/takeoffSummary.test.ts`. A row keeps its own reason only when it
+>   differs from the line's; a sentence that only restates the line is left
+>   off. **No "Set scale" / "Pick a type" fix on the folded line** — the
+>   summary does not know which sheet or run, and there is no existing jump
+>   to send it to. The one fix that exists, Send, stays under the folds.
+> - Found on screen at 280 px: the run-type prefix made the ITEM the part
+>   that truncated (now its own 12 px line), and the branch-wiring question's
+>   two buttons ran 50 px past the panel (pre-existing; now wrap).
+> - Checked at 400 and 280 px, UI scale 1.0 and 1.25, dark and light. Not
+>   checked at a 1,366-wide window: the driven window is fixed at 1,536, and
+>   the panel's own width (280–620) is what these rules depend on.
 
 ### What changes
 

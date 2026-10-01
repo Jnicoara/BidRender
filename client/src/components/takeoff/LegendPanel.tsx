@@ -75,16 +75,13 @@ export function LegendPanel({
     <div className="border-t border-border shrink-0">
       <div className="px-3 py-2 flex items-center gap-1.5 text-[0.7rem] uppercase tracking-wide text-muted-foreground">
         <BookOpen className="w-3 h-3" /> Legend
-        <span className="ml-auto normal-case tracking-normal">
+        <span className="ml-auto normal-case tracking-normal text-xs">
           {symbols.length}
         </span>
         <Button
           size="sm"
           variant="ghost"
-          className={cn(
-            "h-5 px-1.5 text-[0.7rem]",
-            capturing && "text-[#F5C518]"
-          )}
+          className={cn("h-5 px-1.5 text-xs", capturing && "text-[#F5C518]")}
           onClick={capturing ? onCancelCapture : onStartCapture}
         >
           {capturing ? (
@@ -98,7 +95,7 @@ export function LegendPanel({
       </div>
 
       {capturing && (
-        <p className="px-3 pb-2 text-[0.7rem] text-[#F5C518]">
+        <p className="px-3 pb-2 text-xs text-[#F5C518]">
           Drag a box around a symbol on the drawing's legend — the crop becomes
           its picture here.
         </p>
@@ -147,7 +144,7 @@ export function LegendPanel({
 
               <div className="flex-1 min-w-0">
                 <p className="text-xs truncate">{symbol.label}</p>
-                <p className="text-[0.7rem] text-muted-foreground flex items-center gap-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
                   {symbol.isLinked ? (
                     <>
                       <Link2 className="w-2.5 h-2.5" />{" "}
@@ -164,7 +161,7 @@ export function LegendPanel({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-5 px-1.5 shrink-0 text-[0.7rem] text-muted-foreground hover:text-foreground"
+                  className="h-5 px-1.5 shrink-0 text-xs text-muted-foreground hover:text-foreground"
                   onClick={e => {
                     e.stopPropagation();
                     setLinking(linking?.id === symbol.id ? null : symbol);
@@ -213,7 +210,7 @@ export function LegendPanel({
           <p className="text-xs font-medium">
             Which assembly does “{linking.label}” match?
           </p>
-          <p className="text-[0.7rem] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             From then on, clicking this symbol counts that assembly — on this
             job and every job after it. A count you already made by name stays
             as it is; link it from its card.

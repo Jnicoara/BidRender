@@ -70,10 +70,10 @@ export function BidDropsReadout({
         ) : (
           <ChevronRight className="w-3 h-3 text-muted-foreground" />
         )}
-        <span className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+        <span className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">
           Drops on this bid
         </span>
-        <span className="ml-auto text-[0.7rem] font-mono tabular-nums">
+        <span className="ml-auto text-xs font-mono tabular-nums">
           {count === 0 ? "none counted" : `${count} · ${feet.toFixed(2)} ft`}
         </span>
       </button>
@@ -95,12 +95,12 @@ export function BidDropsReadout({
                 >
                   <span className="text-xs truncate">
                     {group.label}
-                    <span className="text-[0.7rem] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       {" "}
                       · {group.count} ({sourceSplit(group)})
                     </span>
                   </span>
-                  <span className="text-[0.7rem] font-mono tabular-nums shrink-0">
+                  <span className="text-xs font-mono tabular-nums shrink-0">
                     {group.feet.toFixed(2)} ft
                   </span>
                 </button>
@@ -124,7 +124,7 @@ export function BidDropsReadout({
                       >
                         {/* The swatch of the run it drops from, in the
                             colour that run is drawn — the jump lands on it. */}
-                        <span className="flex items-center gap-1.5 min-w-0 text-[0.7rem] text-muted-foreground">
+                        <span className="flex items-center gap-1.5 min-w-0 text-xs text-muted-foreground">
                           <RunTypeSwatch
                             runTypeId={item.runTypeId}
                             pathType={item.pathType}
@@ -137,7 +137,7 @@ export function BidDropsReadout({
                             {item.source}
                           </span>
                         </span>
-                        <span className="text-[0.7rem] font-mono tabular-nums shrink-0">
+                        <span className="text-xs font-mono tabular-nums shrink-0">
                           {item.feet.toFixed(2)} ft
                         </span>
                       </button>
@@ -151,7 +151,7 @@ export function BidDropsReadout({
               once on the count, not per mark. */}
           {data.fromMarks.length > 0 && (
             <div className="pt-1">
-              <div className="text-[0.65rem] uppercase tracking-wide text-muted-foreground px-1">
+              <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground px-1">
                 From marks
               </div>
               {data.fromMarks.map(d => (
@@ -161,18 +161,18 @@ export function BidDropsReadout({
                 >
                   <span className="text-xs truncate">
                     {d.groupLabel}
-                    <span className="text-[0.7rem] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       {" "}
                       · {d.count} to {d.label || "device"},{" "}
                       {d.perDropFeet.toFixed(2)} ft each
                     </span>
                   </span>
-                  <span className="text-[0.7rem] font-mono tabular-nums shrink-0">
+                  <span className="text-xs font-mono tabular-nums shrink-0">
                     {d.feet.toFixed(2)} ft
                   </span>
                 </div>
               ))}
-              <p className="text-[0.7rem] text-muted-foreground px-1">
+              <p className="text-xs text-muted-foreground px-1">
                 Connectors and elbows for drops from marks are not counted — add
                 them by hand.
               </p>
@@ -180,14 +180,14 @@ export function BidDropsReadout({
           )}
           {/* What is NOT in the number above, counted rather than dropped. */}
           {data.noRunHeight > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518]">
+            <p className="rounded bg-warning/10 px-2 py-1 text-xs text-warning">
               {data.noRunHeight} end{data.noRunHeight === 1 ? " is" : "s are"}{" "}
               waiting on the job's run height — no drop can be counted until it
               is set.
             </p>
           )}
           {data.notMeasurable > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518]">
+            <p className="rounded bg-warning/10 px-2 py-1 text-xs text-warning">
               {data.notMeasurable} drop
               {data.notMeasurable === 1 ? " is" : "s are"} on a sheet with no
               scale, so not counted — the same rule the totals follow.

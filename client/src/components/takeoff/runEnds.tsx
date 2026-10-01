@@ -205,7 +205,7 @@ function VerticalLine({
           <Minus className="w-3 h-3" />
           At the {where}
         </span>
-        <span className="text-[0.7rem] text-muted-foreground text-right">
+        <span className="text-xs text-muted-foreground text-right">
           {words[vertical.reason]}
         </span>
       </div>
@@ -297,9 +297,7 @@ export function RunEndsEditor({
       {!endsElsewhere && (
         <>
           <div className="flex items-center gap-1.5">
-            <span className="text-[0.7rem] text-muted-foreground w-8">
-              From
-            </span>
+            <span className="text-xs text-muted-foreground w-8">From</span>
             {teeEnds.start ? (
               <TeeEnd />
             ) : (
@@ -313,7 +311,7 @@ export function RunEndsEditor({
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-[0.7rem] text-muted-foreground w-8">To</span>
+            <span className="text-xs text-muted-foreground w-8">To</span>
             {teeEnds.end ? (
               <TeeEnd />
             ) : (
@@ -341,14 +339,14 @@ export function RunEndsEditor({
       */}
       {suggestion && !teeEnds.end && (
         <div className="flex items-start gap-2 rounded border border-[#38BDF8]/40 bg-[#38BDF8]/5 px-2 py-1.5">
-          <span className="text-[0.7rem] flex-1 min-w-0">
+          <span className="text-xs flex-1 min-w-0">
             <span className="font-medium">{suggestion.label}</span> is marked at
             this end. Link it and this run keeps the drop, so it cannot be
             counted twice.
           </span>
           <Button
             size="sm"
-            className="h-6 px-2 text-[0.7rem]"
+            className="h-6 px-2 text-xs"
             onClick={() =>
               save({
                 endStampId: suggestion.stampId,
@@ -368,9 +366,7 @@ export function RunEndsEditor({
         routine — the sliders are for the run that differs (§ 2.5).
       */}
       <div className="flex items-center justify-between gap-2 pt-1">
-        <span className="text-[0.7rem] text-muted-foreground">
-          This run sits at
-        </span>
+        <span className="text-xs text-muted-foreground">This run sits at</span>
         <HeightFields
           compact
           value={ends.distributionHeightInches}
@@ -447,7 +443,7 @@ export function RunEndsSection({
         Run ends
       </div>
       {locked && (
-        <p className="text-[0.7rem] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           This bid's quantities are locked, so its ends cannot be changed.
         </p>
       )}
@@ -489,7 +485,7 @@ export function RunEndsSection({
                 >
                   {leg.label} · {which}
                 </button>
-                <span className="text-[0.7rem] text-muted-foreground text-right">
+                <span className="text-xs text-muted-foreground text-right">
                   {onTee
                     ? "branch tee — no drop"
                     : vertical?.counted
@@ -518,7 +514,7 @@ export function RunEndsSection({
                           })
                         }
                         className={cn(
-                          "h-6 rounded-full border px-2 text-[0.7rem] transition-colors disabled:opacity-50",
+                          "h-6 rounded-full border px-2 text-xs transition-colors disabled:opacity-50",
                           kind === pick.kind
                             ? "border-[#F5C518] bg-[var(--bp-yellow-dim)] text-foreground"
                             : "border-border text-muted-foreground hover:text-foreground"
@@ -537,12 +533,12 @@ export function RunEndsSection({
                         })
                       }
                       ariaLabel={`Something else at the ${which} of ${leg.label}`}
-                      className="h-6 w-28 text-[0.7rem]"
+                      className="h-6 w-28 text-xs"
                     />
                   </div>
                   {kind !== null && kind !== DISTRIBUTION_KIND && !locked && (
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[0.7rem] text-muted-foreground">
+                      <span className="text-xs text-muted-foreground">
                         Height here
                       </span>
                       <HeightFields

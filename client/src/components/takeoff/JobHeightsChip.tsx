@@ -82,7 +82,7 @@ export function JobHeightsChip({
           title="The heights this job's drops and rises are measured from"
         >
           {unset ? (
-            <TriangleAlert className="w-3.5 h-3.5 text-[#F5C518]" />
+            <TriangleAlert className="w-3.5 h-3.5 text-warning" />
           ) : (
             <ArrowUpDown className="w-3.5 h-3.5 text-[#38BDF8]" />
           )}
@@ -104,7 +104,7 @@ export function JobHeightsChip({
             This job's heights
           </div>
           {unset && (
-            <p className="text-xs text-[#F5C518]">
+            <p className="rounded bg-warning/10 px-2 py-1 text-xs text-warning">
               No distribution height is set, so no drop or rise is counted on
               any run. Set it here for this job, or in Settings for every job.
             </p>

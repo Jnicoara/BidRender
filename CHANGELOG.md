@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-09-30]
 
+- **The Plans screen's right-hand panel is easier to read.** Nearly all of
+  its text was 10–11 px; every number, price and warning is now at least
+  12 px and each line item 14 px. Warnings have their own amber colour on a
+  tinted band, so they no longer look like the yellow that marks what is
+  selected. "Not on the bid yet" now shows one line per reason with a count
+  — "Traced, not sent yet — 10", "No wire in the pipe — 1" — and each line
+  opens to its items, instead of repeating the same reason under every row.
+
 - **Refreshing the Plans screen keeps your place.** F5, or reopening the
   link, used to jump back to the first page of the first plan set. The
   address now names the plan set and sheet, so a refresh — or a link you
