@@ -75,6 +75,7 @@ import {
   X,
   MoreHorizontal,
   Redo2,
+  ScanSearch,
   Undo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -252,6 +253,24 @@ import { loadUndo, saveUndo, tabStorage } from "@/lib/undoPersist";
 import { pastDragThreshold, swallowNextClick } from "@/lib/dragThreshold";
 import { wheelIntent, type WheelGesture } from "@/lib/wheelIntent";
 import type { PageTextLayer } from "@/lib/textSelection";
+import type { FindResult, MatchBox } from "@/lib/findMatching";
+import {
+  clearOpen,
+  decide,
+  matchItems,
+  nextToLookAt,
+  type MatchItem,
+} from "@/lib/findMatchingSession";
+import {
+  MatchLayer,
+  MatchPanel,
+  type MatchPanelState,
+} from "@/components/takeoff/FindMatching";
+import {
+  existingToRemainName,
+  splitExistingToRemain,
+} from "@shared/existingToRemain";
+import { symbolLookupKey } from "@shared/takeoffCounts";
 import { TextSelectLayer } from "@/components/takeoff/TextSelect";
 import { useUploadSpeeds } from "@/lib/useUploadSpeeds";
 import {
@@ -434,6 +453,15 @@ function usePdfWorker() {
         pending.current.delete(msg.reqId);
         return;
       }
+      if (msg.type === "matches") {
+        pending.current.get(msg.reqId)?.resolve({
+          result: msg.result,
+          readMs: msg.readMs,
+          findMs: msg.findMs,
+        });
+        pending.current.delete(msg.reqId);
+        return;
+      }
       if (msg.type === "error") {
         const waiter = pending.current.get(msg.reqId);
         if (waiter) {
@@ -574,6 +602,13 @@ function usePdfWorker() {
         ask<string>({ type: "text", pageNum, hash }),
       pageTextLayer: (pageNum: number, hash: string) =>
         ask<PageTextLayer>({ type: "textItems", pageNum, hash }),
+      findMatching: (pageNum: number, hash: string, box: MatchBox) =>
+        ask<{ result: FindResult; readMs: number; findMs: number }>({
+          type: "findMatching",
+          pageNum,
+          hash,
+          box,
+        }),
     }),
     [load, loadUrl, ask]
   );
@@ -770,6 +805,13 @@ function PlanPane({
      * nobody selects text on is never read for it.
      */
     loadTextLayer: () => Promise<PageTextLayer>;
+    /**
+     * Find all matching (@/lib/findMatching) on this page, in the worker:
+     * every copy of the symbol in `box` (page points).
+     */
+    findMatching: (
+      box: MatchBox
+    ) => Promise<{ result: FindResult; readMs: number; findMs: number }>;
   }) => React.ReactNode;
   /**
    * Ask the server for a fresh URL for this document, and return it.
@@ -832,8 +874,15 @@ function PlanPane({
   const pendingSharp = useRef<ImageBitmap | null>(null);
 
   const dpr = useDevicePixelRatio();
-  const { load, loadUrl, render, outline, pageText, pageTextLayer } =
-    usePdfWorker();
+  const {
+    load,
+    loadUrl,
+    render,
+    outline,
+    pageText,
+    pageTextLayer,
+    findMatching: findMatchingOnPage,
+  } = usePdfWorker();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   /** State, not a ref: the overlay has to re-render once this layer exists. */
@@ -1954,6 +2003,7 @@ function PlanPane({
                   renderRegion: (rect, scale) =>
                     render(page, scale, hash, rect),
                   loadTextLayer: () => pageTextLayer(page, hash),
+                  findMatching: box => findMatchingOnPage(page, hash, box),
                 })}
             </div>
           </div>
@@ -4183,6 +4233,242 @@ export default function TakeoffPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [armedGroup?.groupId, activeSheet?.id]);
 
+  /*
+    FIND ALL MATCHING (2026-10-01). Box one symbol; every copy on the sheet
+    is offered as an UNCONFIRMED ring (@/lib/findMatchingSession). Nothing
+    is stored until a copy is confirmed, and confirming queues an ordinary
+    mark exactly as a click does — same batch, same undo, same crash mirror.
+    The count a confirmed copy goes to is fixed when the search starts, so
+    switching counts mid-review cannot send copies to the wrong one.
+  */
+  type FindSession = {
+    sheetId: number;
+    group: { groupId: number; label: string; assemblyId: number | null };
+    panel: MatchPanelState;
+  };
+  const [findSession, setFindSession] = useState<FindSession | null>(null);
+  const findItems =
+    findSession?.panel.phase === "results" ? findSession.panel.items : null;
+
+  // Another sheet is another search; a locked bid takes no marks at all.
+  useEffect(() => {
+    setFindSession(current =>
+      current && current.sheetId !== activeSheet?.id ? null : current
+    );
+  }, [activeSheet?.id]);
+  useEffect(() => {
+    if (quantitiesLocked) setFindSession(null);
+  }, [quantitiesLocked]);
+
+  /** Queue marks under a count that need not be the armed one. */
+  const queueMarksFor = useCallback(
+    (
+      group: { groupId: number; label: string; assemblyId: number | null },
+      at: readonly { x: number; y: number }[]
+    ) => {
+      if (!activeSheet || at.length === 0) return;
+      const sheetId = activeSheet.id;
+      const category =
+        group.assemblyId === null
+          ? null
+          : (allAssemblies.find(a => a.id === group.assemblyId)?.category ??
+            null);
+      setPending([
+        ...pendingStamps.current,
+        ...at.map(point => ({
+          key: nextPendingKey.current--,
+          sheetId,
+          groupId: group.groupId,
+          name: group.label,
+          assemblyId: group.assemblyId,
+          assemblyCategory: category,
+          x: point.x,
+          y: point.y,
+          sent: false,
+        })),
+      ]);
+      mirrorQueue(sheetId);
+      // Sent now rather than on the timer: a confirmation is a decision,
+      // not a run of clicks still in progress.
+      flushStamps();
+    },
+    [activeSheet?.id, allAssemblies, flushStamps, mirrorQueue, setPending]
+  );
+
+  /**
+   * The "- EXISTING TO REMAIN" twin of the count being searched for, if the
+   * library or the bid has one (shared/existingToRemain.ts). Null when the
+   * search is already FOR an existing count, or there is no twin to use.
+   */
+  const existingTwin = useMemo(() => {
+    if (!findSession) return null;
+    const { base, existing } = splitExistingToRemain(findSession.group.label);
+    if (existing) return null;
+    const key = symbolLookupKey(existingToRemainName(base));
+    const assembly = allAssemblies.find(a => symbolLookupKey(a.name) === key);
+    if (assembly)
+      return {
+        kind: "assembly" as const,
+        id: assembly.id,
+        label: assembly.name,
+      };
+    const count = (bidCounts.data?.groups ?? []).find(
+      g => symbolLookupKey(g.label) === key
+    );
+    return count
+      ? { kind: "count" as const, id: count.id, label: count.label }
+      : null;
+  }, [findSession, allAssemblies, bidCounts.data?.groups]);
+
+  const startFind = useCallback(() => {
+    if (!activeSheet || !armedGroup || quantitiesLocked) return;
+    setSelectingText(false);
+    setFindSession({
+      sheetId: activeSheet.id,
+      group: armedGroup,
+      panel: { phase: "boxing" },
+    });
+  }, [activeSheet?.id, armedGroup, quantitiesLocked]);
+
+  const runFind = useCallback(
+    async (
+      region: CaptureRegion,
+      find: (
+        box: MatchBox
+      ) => Promise<{ result: FindResult; readMs: number; findMs: number }>
+    ) => {
+      setFindSession(s => (s ? { ...s, panel: { phase: "finding" } } : s));
+      try {
+        const { result, readMs, findMs } = await find(region);
+        if (result.kind !== "ok") {
+          setFindSession(s =>
+            s ? { ...s, panel: { phase: "message", text: result.message } } : s
+          );
+          return;
+        }
+        const onSheet = [
+          ...stamps.map(s => ({ x: s.x, y: s.y, name: s.name })),
+          ...pendingStamps.current
+            .filter(m => m.sheetId === activeSheet?.id)
+            .map(m => ({ x: m.x, y: m.y, name: m.name })),
+        ];
+        setFindSession(s =>
+          s
+            ? {
+                ...s,
+                panel: {
+                  phase: "results",
+                  items: matchItems(result.matches, onSheet),
+                  selectedId: null,
+                  readMs,
+                  findMs,
+                },
+              }
+            : s
+        );
+      } catch (error) {
+        setFindSession(s =>
+          s
+            ? {
+                ...s,
+                panel: {
+                  phase: "message",
+                  text: `The search could not run: ${error instanceof Error ? error.message : String(error)}`,
+                },
+              }
+            : s
+        );
+      }
+    },
+    [stamps, activeSheet?.id]
+  );
+
+  /** Record decisions and move the selection on to what is still open. */
+  const decideFound = useCallback(
+    (ids: number[], state: MatchItem["state"]) => {
+      if (!findSession || findSession.panel.phase !== "results") return;
+      const panel = findSession.panel;
+      const items = decide(panel.items, ids, state);
+      // After one decision, on to the next; after Confirm all, stay put.
+      const next =
+        ids.length === 1 ? nextToLookAt(items, panel.selectedId) : null;
+      setFindSession({
+        ...findSession,
+        panel: { ...panel, items, selectedId: next?.id ?? null },
+      });
+      if (next) jumpTo({ x: next.x, y: next.y });
+    },
+    [findSession, jumpTo]
+  );
+
+  const confirmFound = useCallback(
+    (ids: number[]) => {
+      if (!findSession || !findItems) return;
+      const chosen = findItems.filter(i => ids.includes(i.id));
+      queueMarksFor(
+        findSession.group,
+        chosen.map(i => ({ x: i.x, y: i.y }))
+      );
+      decideFound(ids, "confirmed");
+    },
+    [findSession, findItems, queueMarksFor, decideFound]
+  );
+
+  const confirmFoundExisting = useCallback(
+    async (ids: number[]) => {
+      if (!findItems || !existingTwin) return;
+      const chosen = findItems.filter(i => ids.includes(i.id));
+      let group: { groupId: number; label: string; assemblyId: number | null };
+      if (existingTwin.kind === "assembly") {
+        const g = await groupForAssembly
+          .mutateAsync({ bidId, assemblyId: existingTwin.id })
+          .catch(() => null);
+        if (!g) return;
+        group = { groupId: g.id, label: g.label, assemblyId: existingTwin.id };
+        void bidCounts.refetch();
+      } else {
+        group = {
+          groupId: existingTwin.id,
+          label: existingTwin.label,
+          assemblyId: null,
+        };
+      }
+      queueMarksFor(
+        group,
+        chosen.map(i => ({ x: i.x, y: i.y }))
+      );
+      decideFound(ids, "confirmedExisting");
+    },
+    [
+      findItems,
+      existingTwin,
+      groupForAssembly,
+      bidId,
+      bidCounts,
+      queueMarksFor,
+      decideFound,
+    ]
+  );
+
+  const selectFound = useCallback((id: number | null) => {
+    setFindSession(s =>
+      s && s.panel.phase === "results"
+        ? { ...s, panel: { ...s.panel, selectedId: id } }
+        : s
+    );
+  }, []);
+  const nextFound = useCallback(() => {
+    if (!findSession || findSession.panel.phase !== "results") return;
+    const next = nextToLookAt(
+      findSession.panel.items,
+      findSession.panel.selectedId
+    );
+    if (next) {
+      selectFound(next.id);
+      jumpTo({ x: next.x, y: next.y });
+    }
+  }, [findSession, selectFound, jumpTo]);
+
   /**
    * Recover stamps clicked but never sent, after a crash or reload.
    *
@@ -6204,6 +6490,26 @@ export default function TakeoffPage({
             )
           )}
 
+          {/*
+            FIND ALL MATCHING sits beside the count it fills, and only there:
+            what it finds is offered AS the armed count, so with nothing armed
+            it would have nothing to offer them as. Not on a locked bid, which
+            takes no new marks.
+          */}
+          {armedGroup && activeSheet && !tracing && !quantitiesLocked && (
+            <Button
+              size="sm"
+              variant={findSession ? "secondary" : "outline"}
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => (findSession ? setFindSession(null) : startFind())}
+              title="Box one symbol and find every copy of it on this sheet. Nothing is counted until you confirm it."
+              aria-pressed={Boolean(findSession)}
+            >
+              <ScanSearch className="w-3.5 h-3.5" />
+              Find all matching
+            </Button>
+          )}
+
           {activeSheet && !tracing && <div className="w-px h-4 bg-border" />}
 
           {/*
@@ -7165,6 +7471,50 @@ export default function TakeoffPage({
                         preview: at => snapLegStart(at),
                       }}
                     />
+                    {/*
+                      Find all matching, last so its rings sit over the marks
+                      and take their own clicks (FindMatching.tsx).
+                    */}
+                    {findSession &&
+                      activeSheet &&
+                      findSession.sheetId === activeSheet.id && (
+                        <>
+                          {findSession.panel.phase === "boxing" && (
+                            <SymbolCaptureLayer
+                              width={size.width}
+                              height={size.height}
+                              renderScale={size.renderScale}
+                              onCancel={() => setFindSession(null)}
+                              onRegion={region =>
+                                void runFind(region, size.findMatching)
+                              }
+                            />
+                          )}
+                          {findSession.panel.phase === "results" && (
+                            <MatchLayer
+                              width={size.width}
+                              height={size.height}
+                              renderScale={size.renderScale}
+                              items={findSession.panel.items}
+                              selectedId={findSession.panel.selectedId}
+                              onSelect={selectFound}
+                            />
+                          )}
+                          <MatchPanel
+                            label={findSession.group.label}
+                            existingLabel={existingTwin?.label ?? null}
+                            state={findSession.panel}
+                            chromeTarget={size.chromeTarget}
+                            onConfirm={confirmFound}
+                            onConfirmExisting={ids =>
+                              void confirmFoundExisting(ids)
+                            }
+                            onReject={ids => decideFound(ids, "rejected")}
+                            onNext={nextFound}
+                            onClose={() => setFindSession(null)}
+                          />
+                        </>
+                      )}
                   </>
                 ) : null
               }

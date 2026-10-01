@@ -25,6 +25,16 @@ This is the human-readable companion to the git history — read this to see wha
   a picture and a link that opens that exact spot in BidRidge, and can be
   marked "my miss" or "AI wrong". Scoring again after fixing the count reuses
   the saved AI answers, so it costs nothing.
+- **Find all matching (no AI).** While counting something, press "Find
+  all matching" and drag a box round one of that symbol on the sheet. Every
+  copy on the sheet is ringed — turned or mirrored copies too — in about a
+  tenth of a second. Nothing is counted until you confirm it: "Confirm all
+  clear" counts the plain ones, and copies that might be something else
+  (a "GF" beside a duplex, extra lines through it, joined to a bigger
+  symbol) or might be existing ("(E)" beside it, drawn lighter) are flagged
+  for you to decide one at a time, with "Count as existing" when there is an
+  existing-to-remain count. Works on drawings made by CAD; on a scanned
+  sheet it says it cannot see the symbols rather than guessing.
 - **A link can open a plan at one spot.** An address ending
   `/plans?pdf=…&page=…&x=…&y=…` opens that plan set and page, zoomed to that
   point with the usual ring. Used by the review page.
