@@ -266,6 +266,16 @@ describe("what it refuses", () => {
     expect(r.kind !== "ok" && r.message).toMatch(/scanned picture/);
   });
 
+  it("refuses a scan even where its OCR text layer has a word in the box", () => {
+    // Old Blueridge: one picture, 0 segments, an OCR layer of ~190 words.
+    const r = findMatching(
+      geometry([], 1),
+      [word("S", 100, 100), word("S", 300, 100)],
+      boxAround(100, 100, 3)
+    );
+    expect(r.kind).toBe("scan");
+  });
+
   it("says an empty box is empty on a drawing", () => {
     const r = findMatching(
       geometry([{ segs: duplex(500, 500) }]),

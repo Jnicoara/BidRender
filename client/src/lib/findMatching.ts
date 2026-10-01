@@ -74,6 +74,13 @@ export type FindResult =
 export const MIN_COVERAGE = 0.8;
 /** More segments than this in the box is a region, not a symbol. */
 const MAX_SYMBOL_SEGMENTS = 600;
+/**
+ * A page mostly covered by a picture with fewer segments than this is a
+ * scan. Weld 1 E-200 has 96,540 and UNCC E111 87,186; the Blueridge scans 0.
+ */
+const SCAN_MAX_SEGMENTS = 500;
+const SCAN_MESSAGE =
+  "This sheet is a scanned picture, so Find all matching can't see the symbols on it. Count these by hand.";
 /** Lightness 0–255 apart that counts as "drawn lighter / darker". */
 const LIGHTNESS_STEP = 40;
 
@@ -222,6 +229,16 @@ export function findMatching(
     y >= box.y - pad &&
     y <= box.y + box.height + pad;
 
+  /*
+    A SCAN is refused whatever is in the box. Measured on Old Blueridge
+    (2026-10-01): its sheets are one picture and 0 segments, but carry an
+    OCR text layer (184 words on E1.01) — and a box that landed on an OCR'd
+    word was "matched" as a words-only symbol, 2 boxes in 64. A guess on a
+    scan is exactly what this must never give, so the page decides first.
+  */
+  if (geo.imageCoverage > 0.4 && n < SCAN_MAX_SEGMENTS)
+    return { kind: "scan", message: SCAN_MESSAGE };
+
   // ── The symbol ──────────────────────────────────────────────────────────
   const boxed: number[] = [];
   for (let i = 0; i < n; i++) {
@@ -268,12 +285,7 @@ export function findMatching(
   const symbolWords = words.filter(w => inBox(w.cx, w.cy));
 
   if (symbolSegs.length === 0 && symbolWords.length === 0) {
-    if (geo.imageCoverage > 0.4)
-      return {
-        kind: "scan",
-        message:
-          "This sheet is a scanned picture, so Find all matching can't see the symbols on it. Count these by hand.",
-      };
+    if (geo.imageCoverage > 0.4) return { kind: "scan", message: SCAN_MESSAGE };
     return {
       kind: "empty",
       message:
