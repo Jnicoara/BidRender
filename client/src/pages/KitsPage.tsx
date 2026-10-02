@@ -246,7 +246,7 @@ function KitBuilder({
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <div className="border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Button
             size="sm"
@@ -353,12 +353,18 @@ function KitBuilder({
                   Nothing in this kit yet. Search above to add assemblies.
                 </div>
               ) : (
+                /*
+                  PHONES GET A TWO-LINE CARD (device audit, 2026-10-01): the
+                  name takes the first line and may wrap; category, quantity
+                  and remove sit on the second, remove pushed right. `md:`
+                  restores the one-line row.
+                */
                 draftItems.map((item, index) => (
                   <div
                     key={item.assemblyId}
-                    className="flex items-center gap-3 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
+                    className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1 md:gap-3 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
                   >
-                    <span className="flex-1 min-w-0 text-sm truncate">
+                    <span className="basis-full md:flex-1 min-w-0 text-sm break-words md:truncate">
                       {item.name}
                     </span>
                     <span className="text-xs text-muted-foreground shrink-0">
@@ -384,7 +390,7 @@ function KitBuilder({
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                      className="h-7 w-7 p-0 shrink-0 ml-auto md:ml-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
                       onClick={() =>
                         setItems(current =>
                           (current ?? []).filter((_, i) => i !== index)
@@ -529,7 +535,7 @@ export default function KitsPage() {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <div className="border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Package className="w-5 h-5 text-primary" />
           <div className="flex-1 min-w-0">
@@ -564,8 +570,17 @@ export default function KitsPage() {
           />
         </div>
 
-        <div className="rounded-xl border border-border bg-card overflow-hidden max-w-4xl">
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
+        {/*
+          PHONES GET CARDS, NOT A TABLE (device audit, 2026-10-01). The
+          three action buttons grow to 44px for a finger, more than the
+          6rem column holds, so the pencil sat on top of the Starter badge
+          and the name was cut short. Below `md` the name, badge and
+          description take the full width and may wrap, and the actions
+          drop to their own line, pushed right. The column head is hidden
+          there; every `md:` class restores the table as it was.
+        */}
+        <div className="rounded-xl border border-border bg-card overflow-hidden max-w-4xl min-w-0">
+          <div className="hidden md:flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
             <span className="flex-1">Kit</span>
             <span className="w-24 shrink-0" />
           </div>
@@ -586,26 +601,26 @@ export default function KitsPage() {
             visibleKits.map(kit => (
               <div
                 key={kit.id}
-                className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
+                className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1 md:gap-3 px-4 py-3 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
               >
                 <button
                   onClick={() => setOpenId(kit.id)}
-                  className="flex-1 min-w-0 text-left"
+                  className="basis-full md:flex-1 min-w-0 text-left"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium truncate">
+                  <div className="flex flex-wrap md:flex-nowrap items-center gap-x-2 gap-y-1 md:gap-2">
+                    <span className="text-sm font-medium min-w-0 break-words md:truncate">
                       {kit.name}
                     </span>
                     <OriginBadge kit={kit} />
                   </div>
                   {kit.description && (
-                    <div className="text-xs text-muted-foreground truncate">
+                    <div className="text-xs text-muted-foreground break-words md:truncate">
                       {kit.description}
                     </div>
                   )}
                 </button>
 
-                <div className="flex items-center gap-0.5 w-24 justify-end shrink-0">
+                <div className="flex items-center gap-0.5 ml-auto md:ml-0 md:w-24 justify-end shrink-0">
                   <Button
                     size="sm"
                     variant="ghost"

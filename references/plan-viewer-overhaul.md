@@ -1150,6 +1150,11 @@ sheet at a time while that is true, and each picture appears as it arrives.
 **Tablet and touch stay at Phase 11.** The rails are 18px, which is a mouse
 target, not a thumb target.
 
+> **Phase 11 BUILT 2026-10-01 (Track B)** — `references/device-audit.md`:
+> touch pan and pinch that never place a mark, 44 px targets on any coarse
+> pointer, a 44 px fold button on the rail, a tablet layout, a phone bottom
+> sheet, and finger versions of every Shift / Alt / right-click / Esc action.
+
 **The bid header is hidden in focus mode rather than folded into the top bar.**
 Folding it in was considered: at 1536px the bar already carries eleven controls
 and adding a bid name, Materials list and Add PDF would make it wrap on any

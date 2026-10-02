@@ -184,7 +184,7 @@ export default function AnalyticsPage({
 
 function PageHeader({ companyName }: { companyName?: string }) {
   return (
-    <div className="border-b border-border px-6 py-4">
+    <div className="page-header border-b border-border px-6 py-4">
       <div className="flex items-center gap-3">
         <BarChart3 className="h-5 w-5 text-primary" />
         <div className="min-w-0 flex-1">

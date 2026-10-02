@@ -81,6 +81,7 @@ import {
   type MaterialCategoryName,
 } from "@shared/materialOrder";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { useIsMobile } from "@/hooks/useMobile";
 import { unitCost } from "@/lib/money";
 import { materialItemKey } from "@shared/materialMarkup";
 import { PercentKindInput } from "@/components/PercentKindInput";
@@ -764,11 +765,23 @@ function MaterialRow({
     );
   }
 
+  /*
+    PHONES GET A CARD, NOT A SQUEEZED ROW (device audit, 2026-10-01).
+
+    The four fixed columns — unit, cost, hours, actions — add up to wider than
+    a 390px phone on their own, so the name, the one flexible column, was
+    squeezed to nothing and the badge sat on top of the unit. Below md the row
+    wraps instead: the name takes a whole first line and may wrap, and the
+    figures and buttons share the line under it. From md up every class below
+    resolves to exactly the old row.
+  */
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate">{material.name}</span>
+    <div className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1.5 md:gap-3 px-4 py-3 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group">
+      <div className="basis-full md:flex-1 min-w-0">
+        <div className="flex flex-wrap md:flex-nowrap items-center gap-x-2 gap-y-1 md:gap-2">
+          <span className="text-sm font-medium break-words min-w-0 md:truncate">
+            {material.name}
+          </span>
           <OriginBadge material={material} />
           {/* Only when this material has its own markup. Every other row
               follows the rules, and saying so on 700 rows says nothing. */}
@@ -795,7 +808,7 @@ function MaterialRow({
         )}
       </div>
 
-      <span className="text-xs text-muted-foreground w-16 shrink-0">
+      <span className="text-xs text-muted-foreground md:w-16 shrink-0">
         {UNIT_LABEL[material.unitOfSale]}
       </span>
       {/* The price column doubles as the prompt. A shipped row is $0 until the
@@ -804,13 +817,13 @@ function MaterialRow({
           quietly. So an unpriced row says so instead of showing the zero. */}
       {unpriced ? (
         <span
-          className="text-xs w-24 text-right shrink-0 font-medium text-[#F5C518]"
+          className="text-xs md:w-24 text-right shrink-0 font-medium text-[#F5C518]"
           title="No price yet — this material prices the job at nothing until you set one."
         >
           Needs price
         </span>
       ) : (
-        <span className="text-sm font-mono w-24 text-right shrink-0">
+        <span className="text-sm font-mono md:w-24 text-right shrink-0">
           {unitCost(material.costPerUnit)}
         </span>
       )}
@@ -833,14 +846,14 @@ function MaterialRow({
       */}
       {unhoured ? (
         <span
-          className="text-xs w-24 text-right shrink-0 font-medium text-[#F5C518]"
+          className="text-xs md:w-24 text-right shrink-0 font-medium text-[#F5C518]"
           title="No labor unit yet — work using this material carries no hours until you set one. On a traced run, couplings, connectors and straps need none: the pipe's hours per foot pay for them."
         >
           Needs hours
         </span>
       ) : (
         <span
-          className="text-sm font-mono w-24 text-right shrink-0"
+          className="text-sm font-mono md:w-24 text-right shrink-0"
           /*
             No "per" here: UNIT_LABEL already carries it, and inconsistently —
             "each" but "per ft" and "per box". Written as "h per {label}" this
@@ -854,7 +867,7 @@ function MaterialRow({
         </span>
       )}
 
-      <div className="flex items-center gap-0.5 w-28 justify-end shrink-0">
+      <div className="flex items-center gap-0.5 ml-auto md:ml-0 md:w-28 justify-end shrink-0">
         <Button
           size="sm"
           variant="ghost"
@@ -1186,6 +1199,13 @@ export default function MaterialsLibraryPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  /*
+    Below md a material row is a two-line card (see MaterialRow), so the first
+    guess at its height is taller there. Still only a guess — rows are
+    measured — but a guess that is short by a whole line makes the first
+    screen of cards land on top of each other until they are measured.
+  */
+  const isPhone = useIsMobile();
   const rowVirtualizer = useVirtualizer({
     count: listItems.length,
     getScrollElement: () => scrollRef.current,
@@ -1195,7 +1215,7 @@ export default function MaterialsLibraryPage() {
       const kind = listItems[index]?.kind;
       if (kind === "header") return 30;
       if (kind === "typeHeader") return 26;
-      return 57;
+      return isPhone ? 96 : 57;
     },
     overscan: 10,
     scrollMargin: listRef.current?.offsetTop ?? 0,
@@ -1367,7 +1387,7 @@ export default function MaterialsLibraryPage() {
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Boxes className="w-5 h-5 text-primary" />
           <div className="flex-1 min-w-0">
@@ -1597,8 +1617,9 @@ export default function MaterialsLibraryPage() {
 
         {/* Table */}
         <div className="rounded-xl border border-border bg-card overflow-hidden">
-          {/* Column headers */}
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
+          {/* Column headers — not on a phone, where each row is a card and
+              there are no columns for them to head (see MaterialRow). */}
+          <div className="hidden md:flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
             <span className="flex-1">Material</span>
             <span className="w-16 shrink-0">Unit</span>
             <span className="w-24 text-right shrink-0">Cost</span>

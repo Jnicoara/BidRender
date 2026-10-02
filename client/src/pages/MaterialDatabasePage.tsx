@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { useIsMobile } from "@/hooks/useMobile";
 import { Upload, Search, X, Store, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -133,17 +134,23 @@ export default function MaterialDatabasePage() {
     return sortMaterialsForDisplay(list);
   }, [materials, searched, ageFilter, now]);
 
+  /*
+    Below md each row is a two-line card (see the row below), so the first
+    guess at its height is taller there. Rows are still measured; this only
+    stops the first screen of cards landing on top of each other.
+  */
+  const isPhone = useIsMobile();
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 48,
+    estimateSize: () => (isPhone ? 104 : 48),
     overscan: 12,
   });
 
   return (
     <div className="flex flex-col h-full bg-background">
       {/* ── Header ── */}
-      <div className="border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-6 py-4">
         {/* No Back button: this is a tab within Materials now, not a screen
             you arrived at from somewhere else. The tab strip below is the way
             across, and "Back" would have meant "wherever you were before",
@@ -242,7 +249,9 @@ export default function MaterialDatabasePage() {
         {/* ── Table ── */}
         <div className="flex-1 min-h-0 px-6 pb-6">
           <div className="h-full rounded-xl border border-border bg-card overflow-hidden flex flex-col">
-            <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground shrink-0">
+            {/* Column heads — not on a phone, where each row is a card and
+                there are no columns for them to head. */}
+            <div className="hidden md:flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground shrink-0">
               <span className="flex-1">Material</span>
               <span className="w-40 shrink-0">Supplier</span>
               <span className="w-28 text-right shrink-0">Price</span>
@@ -281,10 +290,19 @@ export default function MaterialDatabasePage() {
                           width: "100%",
                           transform: `translateY(${virtual.start}px)`,
                         }}
-                        className="flex items-center gap-3 px-4 py-2 border-b border-border hover:bg-muted/20 transition-colors"
+                        /*
+                          PHONES GET A CARD, NOT A SQUEEZED ROW (device audit,
+                          2026-10-01). Supplier, price and age are wider than a
+                          390px phone together, so the name was squeezed to
+                          nothing and the row scrolled sideways inside the
+                          list. Below md the name takes a whole first line and
+                          may wrap; supplier, price and age share the line
+                          under it. From md up these resolve to the old row.
+                        */
+                        className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1.5 md:gap-3 px-4 py-2 border-b border-border hover:bg-muted/20 transition-colors"
                       >
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm truncate">
+                        <div className="basis-full md:flex-1 min-w-0">
+                          <div className="text-sm break-words md:truncate">
                             {material.name}
                           </div>
                           {material.category && (
@@ -294,7 +312,7 @@ export default function MaterialDatabasePage() {
                           )}
                         </div>
 
-                        <div className="w-40 shrink-0">
+                        <div className="flex-1 min-w-0 md:flex-none md:w-40 md:shrink-0">
                           <Input
                             defaultValue={material.supplierName ?? ""}
                             placeholder="—"
@@ -312,7 +330,7 @@ export default function MaterialDatabasePage() {
                           />
                         </div>
 
-                        <div className="w-28 shrink-0 flex justify-end">
+                        <div className="md:w-28 shrink-0 flex justify-end">
                           <InlineNumberField
                             value={Number(material.costPerUnit)}
                             ariaLabel={`Price for ${material.name}`}
@@ -329,7 +347,7 @@ export default function MaterialDatabasePage() {
 
                         <div
                           className={cn(
-                            "w-20 text-right shrink-0 text-xs font-mono",
+                            "md:w-20 text-right shrink-0 text-xs font-mono",
                             PRICE_AGE_CLASSES[age.age]
                           )}
                           title={age.title}

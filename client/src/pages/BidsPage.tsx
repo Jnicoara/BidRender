@@ -571,7 +571,13 @@ export default function BidsPage({
   groups.sort((a, b) => (a.label === null ? 1 : b.label === null ? -1 : 0));
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    /*
+      On a phone the WHOLE page scrolls, header included. Wrapped to fit 390
+      px, the bid's header is four lines — about a third of the screen — and
+      pinned it would sit over every line card. From md up the header stays
+      put and only the body scrolls, as before (device audit, 2026-10-01).
+    */
+    <div className="flex flex-col h-full bg-background overflow-y-auto md:overflow-hidden">
       <MaterialsListDialog
         bidId={bidId}
         open={materialsListOpen}
@@ -592,7 +598,7 @@ export default function BidsPage({
         open={takeoffExportOpen}
         onOpenChange={setTakeoffExportOpen}
       />
-      <div className="border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Button
             size="sm"
@@ -793,12 +799,15 @@ export default function BidsPage({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+      <div className="shrink-0 md:shrink md:flex-1 md:overflow-y-auto px-4 md:px-6 py-5">
         {bid.isSample && <SampleBidNotice bidId={bid.id} />}
         {/* Above everything, full width: it changes what every quantity below
             it MEANS, so it cannot sit in a column somebody scrolls past. */}
         <QuantityLockPanel bidId={bidId} />
-        <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+        {/* minmax(0,1fr) on a phone, not the implicit `auto` column: an auto
+            track is as wide as its widest child's longest unbreakable line,
+            which made the whole bid 445 px wide on a 390 px phone. */}
+        <div className="grid gap-4 grid-cols-[minmax(0,1fr)] lg:grid-cols-[1fr_22rem]">
           <div className="space-y-4 min-w-0">
             {/* Add an assembly — deliberately minimal */}
             <div className="rounded-xl border border-border bg-card p-4 space-y-2">
@@ -870,7 +879,10 @@ export default function BidsPage({
 
             {/* Line items */}
             <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
+              {/* Column heads on a laptop or tablet only: on a phone each line
+                  is a card (name, then its numbers), so there are no columns
+                  for them to head (device audit, 2026-10-01). */}
+              <div className="hidden md:flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
                 <span className="flex-1">Line item</span>
                 <span className="w-16 text-right shrink-0">Qty</span>
                 <span className="w-24 text-right shrink-0">Hours</span>
@@ -939,10 +951,16 @@ export default function BidsPage({
                       return (
                         <div
                           key={line.id}
-                          className="flex items-center gap-3 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
+                          // A CARD on a phone: the name takes the first line
+                          // and the numbers wrap beneath it. A row from md up.
+                          className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
                         >
-                          <div className="flex-1 min-w-0">
-                            <span className="text-sm truncate">
+                          <div className="flex-1 min-w-0 basis-full md:basis-0">
+                            {/* `block`: truncate on an inline span only stops
+                                the wrap and never clips, so on a sideways
+                                tablet a long name ran under the quantity. On
+                                a phone's card it wraps whole instead. */}
+                            <span className="block text-sm break-words md:truncate">
                               {line.name}
                             </span>
                             {/*
@@ -1082,6 +1100,11 @@ export default function BidsPage({
                           `bidsRouter.updateLine` refuses with the same
                           sentence, from the same module.
                         */}
+                          {/* On a phone's card the quantity is not under a
+                              "Qty" column head, so it carries its own. */}
+                          <span className="md:hidden text-xs text-muted-foreground">
+                            Qty
+                          </span>
                           {source !== "typed" ? (
                             <span
                               className="font-mono text-sm w-16 text-center shrink-0 tabular-nums"
@@ -1133,7 +1156,7 @@ export default function BidsPage({
                                   priced", never "0 h" (owner, 2026-09-26) —
                                   the same words and colour as the cost cell. */}
                               {lineHoursUnset(line) ? (
-                                <span className="text-xs w-24 text-right shrink-0 text-[#F5C518]">
+                                <span className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]">
                                   Not priced
                                 </span>
                               ) : line.takeoffRunTypeId !== null &&
@@ -1145,14 +1168,14 @@ export default function BidsPage({
                                    somebody chose — the unset-is-not-zero rule
                                    from the other side. */
                                 <span
-                                  className="text-xs w-24 text-right shrink-0 text-muted-foreground"
+                                  className="text-xs md:w-24 text-right shrink-0 text-muted-foreground"
                                   title="The run's hours per foot pay for couplings, connectors and straps, so they carry no hours of their own."
                                 >
                                   in run rate
                                 </span>
                               ) : (
                                 <span
-                                  className="font-mono text-xs w-24 text-right shrink-0 text-muted-foreground"
+                                  className="font-mono text-xs md:w-24 text-right shrink-0 text-muted-foreground"
                                   title={
                                     /* Traced footage bought with extra: the
                                        hours are on what is INSTALLED, and the
@@ -1185,7 +1208,7 @@ export default function BidsPage({
                               */}
                               <LineCost
                                 line={line}
-                                className="w-24 text-right shrink-0"
+                                className="md:w-24 text-right shrink-0"
                               />
                             </>
                           )}
@@ -1200,7 +1223,7 @@ export default function BidsPage({
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                              className="h-7 w-7 p-0 shrink-0 ml-auto md:ml-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
                               onClick={() =>
                                 removeLine.mutate({ bidId, id: line.id })
                               }
@@ -1219,7 +1242,7 @@ export default function BidsPage({
           </div>
 
           {/* Rollup */}
-          <div className="lg:sticky lg:top-0 h-fit space-y-4">
+          <div className="lg:sticky lg:top-0 h-fit space-y-4 min-w-0">
             {/* Who the work is for. Above the total because it is part of what
                 the bid IS rather than part of what it costs, and because the
                 proposal reads it. Entirely optional — see ClientLinkField. */}

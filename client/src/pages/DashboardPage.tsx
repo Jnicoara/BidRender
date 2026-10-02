@@ -333,7 +333,7 @@ export default function DashboardPage({
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <div className="border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <LayoutDashboard className="w-5 h-5 text-primary" />
           <div className="flex-1 min-w-0">

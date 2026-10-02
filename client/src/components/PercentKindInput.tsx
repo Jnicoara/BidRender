@@ -53,7 +53,10 @@ export function PercentKindInput({
       ? whenBlank
       : otherPercentCaption(kind, value);
   return (
-    <span className="inline-flex items-center">
+    // Wraps on a phone: the blank-state caption is a whole sentence, and kept
+    // on one line it pushed Settings 212 px past a 390 px screen (device
+    // audit, 2026-10-01). From md up it stays on the line, as before.
+    <span className="inline-flex flex-wrap md:flex-nowrap items-center gap-y-1 max-w-full">
       <span className="relative inline-flex">
         <Input
           value={value}
@@ -75,7 +78,7 @@ export function PercentKindInput({
         </span>
       </span>
       {caption && (
-        <span className="ml-2 text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+        <span className="ml-2 text-xs text-muted-foreground tabular-nums md:whitespace-nowrap">
           {caption}
         </span>
       )}

@@ -1469,6 +1469,9 @@ export function RunsPanel({
       <div
         role="tablist"
         aria-label="Plan panel"
+        // A swipeable strip on purpose, never a page that scrolls sideways
+        // (the device audit exempts exactly this attribute).
+        data-sideways-ok
         // No visible scrollbar: on a desktop browser at phone width it drew
         // a 14px bar under the tabs (seen 2026-09-30); the strip still swipes.
         className="flex shrink-0 overflow-x-auto border-b border-border [scrollbar-width:none]"

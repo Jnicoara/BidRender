@@ -256,6 +256,8 @@ export function TextSelectLayer({
         height={height}
         viewBox={`0 0 ${width} ${height}`}
         className="absolute inset-0 w-full h-full z-10"
+        // A finger drags the box (TakeoffPage touch router).
+        data-touch-drag
         style={crosshairCursorStyle(crosshairColor, crosshairSize)}
         onPointerDown={e => {
           if (e.button !== 0) return;

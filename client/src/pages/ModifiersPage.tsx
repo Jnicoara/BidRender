@@ -207,18 +207,28 @@ function ModifierRow({
     );
   }
 
+  /*
+    PHONES GET CARDS, NOT A TABLE (device audit, 2026-10-01). The action
+    buttons grow to 44px for a finger, more than their 6rem column holds,
+    which squeezed every name to three letters ("Nig…"). Below `md` the name
+    and badge take a full-width first line and may wrap; the percentage and
+    the actions share the second, actions pushed right. Every `md:` class
+    restores the one-line row, so tablet and laptop are unchanged.
+  */
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate">{modifier.name}</span>
+    <div className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1 md:gap-3 px-4 py-3 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group">
+      <div className="basis-full md:flex-1 min-w-0">
+        <div className="flex flex-wrap md:flex-nowrap items-center gap-x-2 gap-y-1 md:gap-2">
+          <span className="text-sm font-medium min-w-0 break-words md:truncate">
+            {modifier.name}
+          </span>
           <OriginBadge modifier={modifier} />
         </div>
       </div>
 
       <span
         className={cn(
-          "text-sm font-mono w-20 text-right shrink-0",
+          "text-sm font-mono md:w-20 md:text-right shrink-0",
           modifier.laborAdjustmentPctValue < 0
             ? "text-emerald-400"
             : "text-foreground"
@@ -227,7 +237,7 @@ function ModifierRow({
         {formatPct(modifier.laborAdjustmentPctValue)}
       </span>
 
-      <div className="flex items-center gap-0.5 w-24 justify-end shrink-0">
+      <div className="flex items-center gap-0.5 ml-auto md:ml-0 md:w-24 justify-end shrink-0">
         <Button
           size="sm"
           variant="ghost"
@@ -289,9 +299,10 @@ function ArchivedRow({
   const archivedOn = formatArchivedAt(modifier.archivedAt);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group">
-      <div className="flex-1 min-w-0">
-        <span className="text-sm font-medium truncate text-muted-foreground">
+    // Same phone card as the active row above (device audit, 2026-10-01).
+    <div className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1 md:gap-3 px-4 py-3 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group">
+      <div className="basis-full md:flex-1 min-w-0">
+        <span className="text-sm font-medium break-words md:truncate text-muted-foreground">
           {modifier.name}
         </span>
         {archivedOn && (
@@ -301,11 +312,11 @@ function ArchivedRow({
         )}
       </div>
 
-      <span className="text-sm font-mono w-20 text-right shrink-0 text-muted-foreground">
+      <span className="text-sm font-mono md:w-20 md:text-right shrink-0 text-muted-foreground">
         {formatPct(modifier.laborAdjustmentPctValue)}
       </span>
 
-      <div className="flex items-center gap-1 w-52 justify-end shrink-0">
+      <div className="flex items-center gap-1 ml-auto md:ml-0 md:w-52 justify-end shrink-0">
         <Button
           size="sm"
           variant="ghost"
@@ -485,7 +496,7 @@ export default function ModifiersPage() {
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <SlidersHorizontal className="w-5 h-5 text-primary" />
           <div className="flex-1 min-w-0">
@@ -611,8 +622,9 @@ export default function ModifiersPage() {
           </>
         )}
 
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
+        {/* Column heads only from `md` up — phones get cards (see ModifierRow). */}
+        <div className="rounded-xl border border-border bg-card overflow-hidden min-w-0">
+          <div className="hidden md:flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
             <span className="flex-1">Condition</span>
             <span className="w-20 text-right shrink-0">Labor</span>
             <span
