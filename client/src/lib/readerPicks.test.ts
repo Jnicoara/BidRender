@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { initialPicks, spotToShow, type PickableFinding } from "./readerPicks";
+import {
+  findingSpot,
+  initialPicks,
+  spotToShow,
+  type PickableFinding,
+} from "./readerPicks";
 
 const finding = (over: Partial<PickableFinding> = {}): PickableFinding => ({
   id: 1,
@@ -31,5 +36,25 @@ describe("plan reader suggestions are placed only after somebody looked", () => 
   it("unticking, or a suggestion with no spot, moves nothing", () => {
     expect(spotToShow(finding(), false)).toBeNull();
     expect(spotToShow(finding({ x: null, y: null }), true)).toBeNull();
+  });
+});
+
+describe("Link jumps to the reader's spot", () => {
+  it("goes where the reader put the find", () => {
+    expect(findingSpot(finding())).toEqual({ x: 575.424, y: 1339.2 });
+  });
+
+  it("goes to the same spot a tick does", () => {
+    const f = finding({ x: 12, y: 34 });
+    expect(findingSpot(f)).toEqual(spotToShow(f, true));
+  });
+
+  it("treats a 0 as a real point on the page edge, not as no spot", () => {
+    expect(findingSpot(finding({ x: 0, y: 0 }))).toEqual({ x: 0, y: 0 });
+  });
+
+  it("stays put when either half of the spot is missing", () => {
+    expect(findingSpot(finding({ x: null }))).toBeNull();
+    expect(findingSpot(finding({ y: null }))).toBeNull();
   });
 });

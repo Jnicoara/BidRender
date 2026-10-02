@@ -150,15 +150,19 @@ export default function MaterialDatabasePage() {
   return (
     <div className="flex flex-col h-full bg-background">
       {/* ── Header ── */}
-      <div className="page-header border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-4 py-2.5 md:px-6 md:py-4">
         {/* No Back button: this is a tab within Materials now, not a screen
             you arrived at from somewhere else. The tab strip below is the way
             across, and "Back" would have meant "wherever you were before",
             which is not a place this header can name. */}
         <div className="flex items-center gap-3">
-          <div className="flex-1 min-w-0">
+          {/* `grow basis-0`, not `flex-1`: the phone rule in index.css pushes a
+              `.flex-1` title to its own line so long button rows wrap below
+              it. Here the one button says just "Import" on a phone and fits
+              beside the title, which is a line the first card gets back. */}
+          <div className="grow basis-0 min-w-0">
             <h1 className="text-lg font-semibold">Supplier pricing</h1>
-            <p className="text-xs text-muted-foreground">
+            <p className="hidden md:block text-xs text-muted-foreground">
               Your supply house's prices, on the same catalog everything else
               uses. Set a price here and every assembly that uses it follows.
             </p>
@@ -169,14 +173,16 @@ export default function MaterialDatabasePage() {
             className="h-8 gap-1.5 text-xs shrink-0"
             onClick={() => setImportOpen(true)}
           >
-            <Upload className="w-3.5 h-3.5" /> Import price list
+            <Upload className="w-3.5 h-3.5" />
+            <span className="md:hidden">Import</span>
+            <span className="hidden md:inline">Import price list</span>
           </Button>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {/* ── Search + age filters ── */}
-        <div className="px-6 pt-4 pb-3 space-y-3">
+        <div className="px-4 pt-2 pb-2 space-y-2 md:px-6 md:pt-4 md:pb-3 md:space-y-3">
           <LibraryTabs group="materials" current="pricing" />
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -201,7 +207,7 @@ export default function MaterialDatabasePage() {
             correctedQuery={searched?.correctedQuery ?? null}
           />
 
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap md:overflow-visible">
             {AGE_FILTERS.map(filter => {
               const count =
                 filter.key === "all" ? materials.length : tally[filter.key];
@@ -211,7 +217,7 @@ export default function MaterialDatabasePage() {
                   key={filter.key}
                   onClick={() => setAgeFilter(filter.key)}
                   className={cn(
-                    "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors",
+                    "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 py-1 text-xs transition-colors",
                     active
                       ? "border-[#F5C518]/50 bg-[#F5C518]/10 text-foreground"
                       : "border-border text-muted-foreground hover:text-foreground"
@@ -241,13 +247,15 @@ export default function MaterialDatabasePage() {
             >
               <AlertTriangle className="w-3.5 h-3.5" />
               {tally.stale} price{tally.stale === 1 ? "" : "s"} over 90 days old
-              — bidding from these is bidding on old numbers.
+              <span className="hidden md:inline">
+                — bidding from these is bidding on old numbers.
+              </span>
             </button>
           )}
         </div>
 
         {/* ── Table ── */}
-        <div className="flex-1 min-h-0 px-6 pb-6">
+        <div className="flex-1 min-h-0 px-4 pb-4 md:px-6 md:pb-6">
           <div className="h-full rounded-xl border border-border bg-card overflow-hidden flex flex-col">
             {/* Column heads — not on a phone, where each row is a card and
                 there are no columns for them to head. */}

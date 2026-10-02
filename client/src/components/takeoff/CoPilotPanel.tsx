@@ -20,7 +20,7 @@
  * the enforcing half.
  */
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { initialPicks, spotToShow } from "@/lib/readerPicks";
+import { findingSpot, initialPicks, spotToShow } from "@/lib/readerPicks";
 import { cn } from "@/lib/utils";
 import {
   Check,
@@ -379,10 +379,7 @@ export function CoPilotPanel({
                   {rows.map(finding => {
                     const style = TIER_STYLE[finding.confidence];
                     const Icon = style.icon;
-                    const at =
-                      finding.x !== null && finding.y !== null
-                        ? { x: finding.x, y: finding.y }
-                        : null;
+                    const at = findingSpot(finding);
                     return (
                       <Fragment key={finding.id}>
                         <div

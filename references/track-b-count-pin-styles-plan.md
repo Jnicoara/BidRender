@@ -1,9 +1,15 @@
 # Track B — count pins you can tell apart: shape, letter, color, status
 
-> **PLAN ONLY. Nothing here is built.** Written 2026-10-01 on `track-b` from
-> the owner's request the same day. Decisions for him are in § 10, each with
-> a recommendation first. **§ 11 (same day, later): several captured items
-> linked to one assembly** — decisions 13–18 are there.
+> **FINAL PLAN, 2026-10-01. §§ 1–10 are not built; § 11 is (see its box).**
+> Written on `track-b` from the owner's request the same day. **All twelve
+> decisions in § 10 are DECIDED** — the owner delegated them to Claude's
+> judgment, asking to be consulted only on anything that changes a bid number
+> or cannot be undone. None of the twelve does: every one is how a pin LOOKS,
+> and a look is computed or stored in nullable columns that can be cleared.
+> **§ 12 is the exact column list for Track A** (pins, mark status and the
+> connect point), checked against `drizzle/schema.ts` on `local-dev` the same
+> day. **§ 11: several captured items linked to one assembly** — decisions
+> 13–18 are there.
 >
 > **What this builds on, so nobody re-decides it (CLAUDE.md § "Where
 > decisions live"):**
@@ -347,7 +353,46 @@ supported export.
 
 ---
 
-## 10. Decisions for the owner — recommendation first
+## 10. Decisions — DECIDED 2026-10-01
+
+> **The owner delegated these twelve on 2026-10-01** ("decide the 12 open
+> pin decisions yourself… only ask me about anything that changes a bid
+> number or can't be undone"). Checked against that bar: **none of the
+> twelve changes a bid number** — pins are drawn from counts, and what a
+> count contributes to a bid is decided by the bridge (`takeoffBridge.ts`),
+> which reads no pin column. **None is irreversible** — step 1 is computed and
+> stores nothing, and step 2's columns are nullable, so clearing one restores
+> the automatic look. **So no question went to the owner.**
+>
+> **The one adjacent question that DOES change a number is not here and
+> stays the owner's:** what `existing`, `remove` and `relocate` do to a price
+> (todo.md, the mark-status entry — "`remove` wants its own demo labour line,
+> owner to decide"). Decision 8 below decides only how each status LOOKS; the
+> status looks ship with the column and not before, so a look can never
+> claim a status the bid is not applying.
+>
+> **Decided — each is the recommendation, with the reason it holds:**
+>
+> | #   | Decided                                                                                                                                                                                                                                                                                                                                | Why it holds                                                                                                                                                                                                                        |
+> | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | 1   | **Ring around the symbol zoomed in, compact pin zoomed out.** Switch point = the symbol's on-screen size passing the pin's, **measured in step 0**, not chosen.                                                                                                                                                                        | The only option that keeps BOTH asks (letter in the shape, symbol readable). The leader line is rejected for a wrong-count reason (§ 4).                                                                                            |
+> | 2   | **Six shapes, the wide 2:1 rectangle for panels/equipment — IF step 0 shows it reads apart from a square at the 10 px floor.** If it does not: five shapes, panels/equipment are squares and the letter (PN, DS, M, ME) separates them. Either way § 5e's "triangles are lighting" is replaced by § 2's family map (§ 5e now says so). | A measurement decides the one uncertain part; the fallback costs nothing because letters already guarantee uniqueness.                                                                                                              |
+> | 3   | **One meaning per code in the defaults; digit bump per BID (R, R2), never onto a table code.**                                                                                                                                                                                                                                         | Already built and tested (`shared/pinLetters.ts`, § 11 box). Per-sheet letters would let one count wear two letters across a job.                                                                                                   |
+> | 4   | **Adopt the § 3 table as BUILT in `shared/pinLetters.ts`:** P = 240 V, PN = panel, V = phone (T is only thermostat), two-letter codes rather than letter+digit. Owner can change any letter per item once step 2 lands.                                                                                                                | A letter is the most reversible thing in this plan — a chosen letter overrides it. **Fix at build time:** "safety switch" hits `/\bswitch/` before the `DS` rule and reads S; move the disconnect rule above switches, with a test. |
+> | 5   | **Lighting takes the fixture tag from the name ("A1", "(A-7)" → A7), else L.**                                                                                                                                                                                                                                                         | Already built. It is what is printed beside the symbol on the sheet.                                                                                                                                                                |
+> | 6   | **Looks saved on the assembly and the legend symbol (company-wide) and on the count (this job); a typed-name count keeps its look on this job only.** No company table keyed by name.                                                                                                                                                  | Names are a weak key; capturing the symbol (8a) is the existing way to make anything company-wide.                                                                                                                                  |
+> | 7   | **Six colors, first use per bid, a chosen color wins — the run-type rule.** No extra colors.                                                                                                                                                                                                                                           | First-use order is built (§ 11 box); more colors are harder to tell apart on a drawing and the letter already decides.                                                                                                              |
+> | 8   | **Status looks as tabled in § 7** — filled / hollow with a SOLID outline / X / arrow badge — **plus the split in words on the count card.** Shipped with the status column, never before.                                                                                                                                              | Hollow is solid because dashed already means provisional (§ 8). The words cover printouts and color blindness.                                                                                                                      |
+> | 9   | **Unconfirmed matches: dashed, hollow, "?", not counted, not snapped to.**                                                                                                                                                                                                                                                             | The drawing's existing "provisional" language. "Not snapped to" is also the connect-point plan's § 5.3 answer — one rule, one function.                                                                                             |
+> | 10  | **No legend image as the pin.** § 5e's ruling stands.                                                                                                                                                                                                                                                                                  | Mush at 10–26 px; the ring leaves the REAL symbol visible at reading zoom.                                                                                                                                                          |
+> | 11  | **Add a "Pin" column to the takeoff CSV** (code + shape name, e.g. "S3 diamond"), as the LAST column.                                                                                                                                                                                                                                  | Last, so a spreadsheet somebody built on the current column order keeps working. No ◇ glyph in the file — plain words survive every CSV reader.                                                                                     |
+> | 12  | **Faint marks: a held key plus a toolbar toggle (touch).** The key is chosen from the shortcut list when built (§ 11.6 found F, G, T and R taken — do not assert one here).                                                                                                                                                            | Reversible by letting go. Layers hides whole counts, which answers a different question.                                                                                                                                            |
+>
+> **Order of work (unchanged from § 9):** step 0 measurements → step 1
+> (computed, no migration) → step 2 after § 12's style columns → step 3 after
+> the status column → step 4 with Track C's Find all matching.
+
+The original options, kept for the record:
 
 1. **Pin vs. symbol:** **ring around the symbol when zoomed in, compact pin
    when zoomed out (recommended)** / see-through pin always on top /
@@ -386,12 +431,8 @@ supported export.
 12. **Faint marks:** **a held key plus a toolbar toggle (recommended)** /
     rely on hiding counts in Layers.
 
-**Handoffs:** Track A — nine nullable style columns (`assemblies`,
-`symbol_links`, `takeoff_groups`: shape, letter, color) batched with the
-already-listed `takeoff_stamps.status`, all additive. Track C — § 8 against
-`find-all-matching-plan.md` once pushed. **§ 11 adds one more column for A
-(`takeoff_groups.symbolLookupKey`) — the same one `count-by-tag-plan.md` § 2
-already asks for, so it is one handoff, not two.**
+**Handoffs:** Track A — the exact list is § 12. Track C — § 8 against
+`find-all-matching-plan.md` once pushed.
 
 ---
 
@@ -664,3 +705,78 @@ nine pin-style columns** and the optional `symbol_links.originalLabel`
     itself (recommended).**
 18. **v1 by name, no migration; `takeoff_groups.symbolLookupKey` for Track A
     in the pin-style batch (recommended).**
+
+---
+
+## 12. Exactly what Track A adds — pins, mark status, connect point
+
+**Checked 2026-10-01 against `origin/local-dev:drizzle/schema.ts`: none of
+these exist yet.** Every one is **ADDITIVE and nullable with no default** —
+step 1 of the three (CLAUDE.md § Deploying a migration), no `UPDATE`, no
+backfill, so all of it can go BEFORE the code. NULL always means "not set /
+automatic / old behaviour", and nothing may read NULL as 0. A numbers them;
+this plan does not.
+
+If what A finds in the schema does not match this list (a column already
+there, a table renamed), **stop and find out why before writing the .sql** —
+either this list is stale or a branch landed something nobody said.
+
+**Pins (§ 6) — nine columns, the same three on three tables:**
+
+| Table            | Column                                 | Type        | NULL means                                                                      |
+| ---------------- | -------------------------------------- | ----------- | ------------------------------------------------------------------------------- |
+| `assemblies`     | `markShape`                            | varchar(16) | the family's shape (§ 2); value is a `MARK_SHAPES` name                         |
+| `assemblies`     | `markLetter`                           | varchar(4)  | automatic letter (§ 3); 4 = the longest tag drawn                               |
+| `assemblies`     | `markColor`                            | varchar(7)  | first-use color; stored as the `#rrggbb` VALUE, as `takeoff_run_types.color` is |
+| `symbol_links`   | `markShape`, `markLetter`, `markColor` | as above    | as above                                                                        |
+| `takeoff_groups` | `markShape`, `markLetter`, `markColor` | as above    | as above                                                                        |
+
+A stored shape or color the code no longer knows reads as automatic, as run
+colors already do — so no enum, and a palette change never needs a migration.
+
+**Mark status (§ 7) — one column:**
+
+| Table            | Column   | Type                                            | NULL means |
+| ---------------- | -------- | ----------------------------------------------- | ---------- |
+| `takeoff_stamps` | `status` | enum(`new`,`existing`,`remove`,`relocate`) NULL | `new`      |
+
+What each status does to a PRICE is the owner's decision (todo.md, the
+mark-status entry), not this plan's. The column can land first; the pricing
+change is a meaning change and ships as code.
+
+**Several items on one assembly (§ 11.7 v2) — one column:**
+
+| Table            | Column            | Type         | NULL means        |
+| ---------------- | ----------------- | ------------ | ----------------- |
+| `takeoff_groups` | `symbolLookupKey` | varchar(255) | not from a symbol |
+
+The same column `count-by-tag-plan.md` § 2 asks for — one column, not two.
+
+**Connect point (`references/connect-point-plan.md` § 5) — four columns:**
+
+| Table                      | Column                   | Type                    | NULL means                                                 |
+| -------------------------- | ------------------------ | ----------------------- | ---------------------------------------------------------- |
+| `symbol_looks` (see below) | `connectDx`, `connectDy` | decimal(10,4)           | **never answered** — `0, 0` is "the middle", a real answer |
+| `takeoff_stamps`           | `rotation`               | smallint (0/90/180/270) | turning not known                                          |
+| `takeoff_stamps`           | `mirrored`               | boolean NULL            | turning not known                                          |
+
+**Where `connectDx/Dy` go — decided here, because connect-point § 5.3 left
+it to "whichever lands first":** on **`symbol_looks`**, the table Track C
+already queued (todo.md, "Requests to Track A from Check sheet";
+`multiple-looks-plan.md` § 6). The offset is measured from a capture box's
+centre, and the box lives on the look row; two architects' GFCIs stand off
+the wall differently. **Not also on `symbol_links`** — connect-point § 5.3
+says do not add both. **If A does not build `symbol_looks` in this batch,**
+the two columns go on `symbol_links` beside R.11's `captureX/Y/Width/Height`
+instead, and the look table reads them as the first look's, as
+`multiple-looks-plan.md` § 6 already does for the box.
+
+**Total: 15 columns** (9 pin, 1 status, 1 symbol key, 4 connect point), on
+five tables, plus `symbol_looks` itself if it is not already in A's batch.
+Batch them with C's `takeoff_stamps.mountHeightInches` /
+`checkAcceptedAt` (same table, same shape) and the optional
+`symbol_links.originalLabel`.
+
+**Rehearse with `SHOW CREATE TABLE`** on each of the five after applying,
+and run `scripts/schemaDrift.mts` before and after — a before/after of the
+same check, not a count of statements sent.

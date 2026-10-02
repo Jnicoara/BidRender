@@ -258,6 +258,21 @@ All additive and nullable. Specs are in the plans named.
       `references/track-b-phone-and-readability-plan.md` (owner answered all
       six the same day; the panel becomes tabs; nothing built yet).
 
+### Trace on touch: no rubber-band line between taps (Track B, 2026-10-01)
+
+- [ ] With a mouse the next leg of a run is previewed from the last point to
+      the pointer (`TraceLayer`'s `hover`). A finger has no hover, so on a
+      tablet each tap places a point blind and the leg appears only after it
+      lands. **Not simple, so not done in the device leftovers pass:** the
+      only way to show a finger's position before placing is a new gesture —
+      press, hold past `TOUCH_TAP_MAX_MS`, drag to aim with a magnifier above
+      the finger (which also fixes finger-cover), place on lift. Today a held
+      finger stops being a tap and a moving one is a PAN
+      (`client/src/lib/touchGesture.ts`), so this is a new state in that
+      machine, with tests there that a pan still places nothing (panning plan
+      § 3, guard 3). The tap-to-place path stays as it is.
+      `references/device-audit.md` § "Left to do".
+
 ### Before beta: speed of the summary, and two missing Undos
 
 - [ ] **Owner, 2026-09-30: measure the whole-plan-set summary on a 500-sheet
@@ -302,9 +317,9 @@ everyone to re-run instead of read.
       **The fix, one statement, same answer** — the check only asks whether
       any baseline name appears twice:
       ``sql
-    SELECT 1 FROM `${table}` WHERE userId IS NULL
-    GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
-    ``
+  SELECT 1 FROM `${table}` WHERE userId IS NULL
+  GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
+  ``
       4 ms instead of 1,473. Applied temporarily: a full seed 2,000 ms → 20
       ms; `materialsLibrary` + `materialsCatalog` + `seedPreservesUserPrices`,
       101 tests, 2.8 s instead of ~40 s, none over 300 ms; `materialsLibrary`
@@ -1773,8 +1788,12 @@ path is ever revived, give it the same treatment first.
       They are saved company-wide the way run colors are, and a shipped
       assembly forks on edit. NULL means automatic, so they are additive with
       no backfill (step 1 of the three). Spec: Track B's
-      `references/track-b-count-pin-styles-plan.md` § 6 (on `track-b`, not yet
-      on `local-dev`). The batch-mate is nullable `takeoff_stamps.status`
+      `references/track-b-count-pin-styles-plan.md` § 6. **§ 12 of that plan
+      (2026-10-01) is the EXACT list for A — 15 columns on five tables: these
+      nine, the status, `takeoff_groups.symbolLookupKey`, and the connect
+      point's `connectDx/Dy` (on `symbol_looks`) plus
+      `takeoff_stamps.rotation/mirrored`.** Its 12 decisions are made. The
+      batch-mate is nullable `takeoff_stamps.status`
       (`new`/`existing`/`remove`/`relocate`, NULL read as `new`), recorded in
       Track C's `todo.md` on `track-c`. B's style editor waits for the nine
       columns, and the status looks (§ 7) wait for the status column.
