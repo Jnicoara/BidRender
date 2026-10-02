@@ -69,9 +69,32 @@ git log --oneline -1 origin/main
 
 ## 4. Deploy sequence
 
-0. **Try it on staging first** — § 11: `git push origin local-dev:staging`,
-   migrations against `.env.staging.local` first, check the screens there.
-1. **Pre-flight** — § 3 above.
+> **`main` only ever fast-forwards to a commit that already passed the gate.**
+> Added 2026-10-01. GitHub's ruleset on `main` requires the **test** check
+> (`.github/workflows/gate.yml`) to be green ON THE COMMIT being pushed, so a
+> commit made on `main` itself — a hand edit, a merge commit, a revert — is
+> refused, because it has never been through the gate. So:
+>
+> - **Release what staging tested.** `main` moves to **the commit staging is
+>   serving** (`curl -s https://staging.bidridge.com/api/version`), by
+>   `git merge --ff-only <that commit>` — not to the tip of `local-dev`, which
+>   may have moved since. That commit passed the gate on `local-dev`, was
+>   deployed to staging, and passed the browser smoke test there (§ 12).
+> - **`--ff-only` refusing is a stop sign**, not something to work around:
+>   `main` has something you have not seen.
+> - **A revert goes through `local-dev` too** — § 4a.
+
+0. **Staging first.** Code-only changes reach staging BY THEMSELVES now: a
+   green push to `local-dev` is pushed to `staging` by the gate workflow, which
+   waits for staging to serve it and then runs the browser smoke test (§ 12).
+   A push that changes anything under `drizzle/` is REFUSED there — apply its
+   migrations to staging by hand (`.env.staging.local`, § 5), then
+   `git push origin local-dev:staging` yourself. To stop the automatic push,
+   set the repository variable `STAGING_AUTODEPLOY` to `off` (GitHub →
+   Settings → Secrets and variables → Actions → Variables).
+1. **Pre-flight** — § 3 above. Then confirm the release commit is green: the
+   Actions tab shows **Gate** passed for it on `local-dev`, including the
+   **smoke** job.
 2. **Sort the migrations, if there are any** — § 5, "Which goes first". Each
    **file** is either additive or a meaning change; a release normally has
    both.
@@ -101,17 +124,24 @@ code never arrived.
 GitHub nor your local checkout. **This is the fastest way out of a bad deploy**
 and the first thing to reach for.
 
-Rolling back the code as well, when you want `main` to match what is running:
+Rolling back the code as well, when you want `main` to match what is running —
+**through `local-dev`, because `main` refuses a commit the gate has not seen**
+(the ruleset, § 4):
 
 ```bash
+git checkout local-dev && git pull --ff-only
 git revert --no-commit <bad-commit>...<bad-commit>
 git commit -m "Revert <what>"
-git push origin main
+git push origin local-dev            # the gate runs; staging follows if green
+# when the Gate run for that commit is green:
+git checkout main && git merge --ff-only local-dev && git push origin main
+git checkout local-dev
 ```
 
 That undoes the change as a _new_ commit and triggers a fresh deploy. Slower
-than the Activity-tab rollback, but it keeps the history honest — prefer it
-over force-pushing `main`, which rewrites what everyone else has.
+than the Activity-tab rollback — which needs no gate and stays the fastest way
+out — but it keeps the history honest. Never force-push `main`; the ruleset
+blocks it anyway.
 
 **A rollback does not undo a migration.** Migrations are forward-only here, so
 rolling the code back to before a schema change leaves the database ahead of it.
@@ -1680,3 +1710,96 @@ the same question, allowed `GET, PUT, POST, HEAD`. Both § 9 and
 five `R2_PLANS_*` settings had been set to **Build Time**, so the running app
 saw them as empty — "PLAN_STORAGE=r2 but the plan bucket is not configured".
 They must be **Run Time** (the build never reads them).
+
+## 12. The browser smoke test on staging — `e2e/`
+
+**Added 2026-10-01** (references/build-pipeline-plan.md, piece 3). After every
+automatic staging deploy (§ 4, step 0), GitHub Actions runs a Playwright test
+in **its own headless browser** against `https://staging.bidridge.com` — the
+staging recheck list, done by a machine. It reports **failures only**: a green
+run says nothing; a red one emails the repo owner with the failing step named,
+and keeps a screenshot of the failing page as a run artifact for 7 days.
+
+**What it covers** (`e2e/smoke/`): an empty bid's proposal and blocked Print;
+uploading a two-sheet plan; the right-panel tabs; capturing symbols; rename and
+reset; 8a (count with no assembly, link later); two symbols on one assembly
+keeping separate counts and lines at one price; "Not on the bid yet" and Send
+all sending once; a sheet switch putting the count down; pins waiting for their
+own page, with the loading bar; R and "Again"; a refresh keeping sheet and zoom;
+undo, redo, delete and Undo; a traced run measuring **77.78 ft** (checked by
+arithmetic); deleting a run asking first, Enter not deleting; Clear this sheet
+and one Ctrl+Z; a locked bid refusing Send, a scale change, a mark delete and a
+plan removal; the new-version bar not reloading the page; every main screen at
+desktop, phone 390x844 and tablet 820x1180 / 1180x820 with nothing cut off; and
+the count-link-send flow **by touch** on both tablet sizes.
+
+**What it does NOT cover:** anything that spends AI money (it never presses an
+AI button), a real phone in a hand, and how a screen feels. Those stay manual.
+
+**It can never touch live.** The address must be staging or this machine
+(`scripts/smokeTarget.ts`, tested), and `bidridge.com` is refused by name. It
+uses its own staging account, names every bid it makes `CI smoke …`, archives
+them at the end, and sweeps any a crashed run left behind before it starts.
+
+**Known faults are carried as expected failures, never skipped**
+(`KNOWN_FAULTS` in `e2e/smoke/screens.spec.ts`, `test.fail`): visible on every
+run, and red ("expected to fail, but passed") the day they are fixed, so the
+entry comes out. **The list is empty today.** On its first day it found four —
+the Dashboard, bid and Proposal headers running off a 390px phone, and the
+sidebar covering the full-screen panel's "← Plan" on an upright tablet — and
+all four were fixed by Track B's device work the same day, each one reported
+by this mechanism.
+
+### Setting it up — the owner's steps, once
+
+The password never goes into the repo, a file, or a log. It lives in your
+password manager and in GitHub's encrypted secrets, which print as `***`.
+
+**A. Make the staging test account**
+
+1. Open a **private** browser window and go to `https://staging.bidridge.com`.
+2. Type the **staging password** (the yellow page) and press Enter.
+3. On the sign-in page, click **Create account**.
+4. Name: `CI smoke`. Email: an address you control that is used for nothing
+   else — a Gmail plus-address works (`yourname+bidridge-smoke@gmail.com`).
+5. Password: let your password manager **generate** one (long, with a symbol).
+   Save it there as **"BidRidge staging — smoke test"**, with the email.
+6. Click **Create account**. You can close the window at the welcome screen —
+   the test finishes first-run itself. **Never create this account on live.**
+
+**B. Give GitHub the three secrets**
+
+1. Go to `https://github.com/Jnicoara/BidRender`.
+2. Click **Settings** (top bar) → in the left column **Secrets and variables**
+   → **Actions**.
+3. On the **Secrets** tab, click **New repository secret**.
+4. Name `SMOKE_EMAIL`; Secret: the account's email. Click **Add secret**.
+5. **New repository secret** again: name `SMOKE_PASSWORD`; Secret: the
+   account's password. **Add secret**.
+6. **New repository secret** again: name `SMOKE_STAGING_PASSWORD`; Secret: the
+   staging password from step A2. **Add secret**.
+
+Until all three exist, the smoke job prints a warning ("NOT RUN: the … secrets
+are not all set") and passes, so a missing setup is visible but never blocks a
+merge. After step B, the next green push to `local-dev` runs it.
+
+**C. Check the first run** — **Actions** tab → **Gate** → the newest run on
+`local-dev` → the **smoke** job. Green means done. If the very first step
+(`sign in the smoke account`) fails, its message says which of the three was
+refused; re-enter that secret (a secret cannot be read back, only replaced).
+
+**Pausing staging deploys** while you recheck by hand: **Settings → Secrets and
+variables → Actions → Variables → New repository variable**, name
+`STAGING_AUTODEPLOY`, value `off`. Delete it (or set `on`) to resume.
+
+**Running it locally:** put a LOCAL account in `.env.test.local` (git-ignored:
+`SMOKE_BASE_URL=http://127.0.0.1:<port>`, `SMOKE_EMAIL`, `SMOKE_PASSWORD`),
+start a server on that port, then `pnpm smoke`. A production build
+(`pnpm build && pnpm start`) is the closer match to staging — the new-version
+bar only exists in a build.
+
+**Artifacts stay credential-free on purpose.** The repo is public, so anyone
+can download a run's artifacts. Playwright TRACES record every request with
+headers and bodies — the passwords and the session — so traces and video are
+off (`e2e/playwright.config.ts`), and only failure screenshots are uploaded.
+Do not turn traces on in CI.

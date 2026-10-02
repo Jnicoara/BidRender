@@ -3,7 +3,8 @@
     "client/src/**/*",
     "shared/**/*",
     "server/**/*",
-    "scripts/**/*.test.ts"
+    "scripts/**/*.test.ts",
+    "e2e/**/*.ts"
   ],
   "exclude": ["node_modules", "build", "dist"],
   "compilerOptions": {

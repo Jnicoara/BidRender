@@ -2173,7 +2173,8 @@ definition and still centres.
 
 ### Stamps have to look different from each other
 
-> **Proposed override, 2026-10-01 — awaiting the owner's decisions:**
+> **Override DECIDED 2026-10-01** (pin plan § 10, decided by Claude on the
+> owner's delegation; shape six still depends on a measurement there):
 > `references/track-b-count-pin-styles-plan.md` replaces the CATEGORY shape
 > map below ("triangles are lighting") with a device-family map, adds a
 > letter inside every pin, moves count colors from the id hash to first-use

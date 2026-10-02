@@ -6,6 +6,23 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-01]
 
+- **Staging now updates itself, and a robot rechecks it.** When a change passes
+  the tests on `local-dev`, it goes to staging automatically — unless it
+  changes the database, which still waits for Track A to apply by hand with a
+  backup. After each staging update, a browser test walks the recheck list on
+  its own throwaway bids: counting, linking, sending, locking, the proposal,
+  every main screen on phone and tablet sizes, and the core flow by touch. It
+  never touches the live site and never spends AI money. Live releases still
+  happen only when Track A does them, and only from a version that passed.
+- **Tablets and phones: two "why" notes on a bid now open with a tap.** "in
+  run rate" beside a coupling, connector or strap, and the note on traced
+  footage bought with extra, used to explain themselves only when a mouse
+  hovered over them. A finger could not read them. Tap the dotted-underlined
+  words and the same explanation opens.
+- **Phones: Supplier pricing shows prices sooner.** The header, tabs and
+  filters used to take up more than half the screen before the first price.
+  The filters now sit in one row that scrolls sideways, and the first price
+  starts about 170 px higher. Tablets and laptops are unchanged.
 - **New: "Check sheet" on the Plans screen.** After reading a legend with
   Whole legend, one button compares every mark on a sheet with the drawing.
   It lists the marks that look like something else or have nothing under

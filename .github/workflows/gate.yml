@@ -1,11 +1,21 @@
-# The test gate — references/build-pipeline-plan.md § 1 and § 2 (piece 1).
+# The test gate, the staging auto-deploy and the browser smoke test —
+# references/build-pipeline-plan.md, pieces 1, 2 and 3.
 #
-# Every push to local-dev or a track-* branch, and every pull request, runs
-# `pnpm check` and the full vitest suite against a brand-new MySQL that is
-# migrated from drizzle/ and seeded the way the server seeds itself. Nothing
-# here deploys anything, and nothing here holds a credential for staging or
-# live: the only database it can reach is the throwaway one in its own
-# container.
+# 1. Every push to local-dev, a track-* or an a-* branch, and every pull
+#    request, runs `pnpm check` and the full vitest suite against a brand-new
+#    MySQL migrated from drizzle/ and seeded the way the server seeds itself.
+# 2. A green push to local-dev then pushes the same commit to `staging` —
+#    CODE ONLY: anything under drizzle/ that differs from what staging runs is
+#    refused, because migrations are applied by hand, with a backup, by
+#    Track A (CLAUDE.md § Deploying a migration). Paused by setting the
+#    repository variable STAGING_AUTODEPLOY to "off".
+# 3. Once staging serves that commit, the Playwright smoke test runs against
+#    it (e2e/), on its own staging account, with throwaway bids.
+#
+# NOTHING HERE CAN REACH LIVE. No job pushes `main`, no secret names a live
+# credential, and the smoke test refuses bidridge.com by name
+# (scripts/smokeTarget.ts). Releasing live is one deliberate step by Track A
+# (references/deploying.md § 4).
 name: Gate
 
 on:
@@ -108,3 +118,127 @@ jobs:
 
       - name: Test suite
         run: pnpm test
+
+  # ── Piece 2: code-only auto-deploy to staging ────────────────────────────
+  deploy-staging:
+    needs: test
+    if: github.event_name == 'push' && github.ref_name == 'local-dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    outputs:
+      deployed: ${{ steps.push.outputs.deployed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Paused?
+        if: vars.STAGING_AUTODEPLOY == 'off'
+        run: echo "::warning::Auto-deploy to staging is PAUSED (repository variable STAGING_AUTODEPLOY=off). Nothing was pushed."
+
+      # The comparison is against what staging RUNS (origin/staging), not the
+      # previous commit: a migration merged three pushes ago still blocks
+      # until Track A has applied it to staging and pushed staging by hand.
+      - name: Refuse migrations, and anything that is not a fast-forward
+        if: vars.STAGING_AUTODEPLOY != 'off'
+        run: |
+          git fetch --no-tags origin staging
+          if ! git merge-base --is-ancestor origin/staging HEAD; then
+            echo "::error::staging has commits local-dev does not. Somebody pushed staging by hand; Track A decides what happens next. Nothing was pushed."
+            exit 1
+          fi
+          changed=$(git diff --name-only origin/staging HEAD -- drizzle/)
+          if [ -n "$changed" ]; then
+            echo "::error::Not deployed: this push changes drizzle/ against what staging runs. Migrations are applied by hand, with a backup, by Track A — then Track A pushes staging. Files:"
+            echo "$changed"
+            exit 1
+          fi
+          echo "Code only: no file under drizzle/ differs from staging."
+
+      - name: Push this commit to staging
+        id: push
+        if: vars.STAGING_AUTODEPLOY != 'off'
+        run: |
+          git push origin "HEAD:refs/heads/staging"
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
+
+      # DigitalOcean builds `staging` on every push, in 3–6 minutes, and a
+      # failed build leaves the OLD version running with nothing said. So
+      # wait until staging serves this exact commit, or fail loudly.
+      - name: Wait for staging to serve this commit
+        if: steps.push.outputs.deployed == 'true'
+        run: |
+          short="${GITHUB_SHA::7}"
+          for i in $(seq 1 60); do
+            served=$(curl -fsS https://staging.bidridge.com/api/version | sed -n 's/.*"commit":"\([0-9a-f]*\)".*/\1/p' || true)
+            if [ -n "$served" ] && [ "${GITHUB_SHA#"$served"}" != "$GITHUB_SHA" ]; then
+              echo "staging serves $served"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::staging did not start serving $short within 15 minutes. The build probably failed and DigitalOcean kept the previous version — check DigitalOcean → Activity."
+          exit 1
+
+  # ── Piece 3: the browser smoke test on staging ───────────────────────────
+  smoke:
+    needs: deploy-staging
+    if: needs.deploy-staging.outputs.deployed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SMOKE_BASE_URL: https://staging.bidridge.com
+      SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+      SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+      SMOKE_STAGING_PASSWORD: ${{ secrets.SMOKE_STAGING_PASSWORD }}
+    steps:
+      - name: Smoke account configured?
+        id: configured
+        run: |
+          if [ -z "$SMOKE_EMAIL" ] || [ -z "$SMOKE_PASSWORD" ] || [ -z "$SMOKE_STAGING_PASSWORD" ]; then
+            echo "::warning::Browser smoke test NOT RUN: the SMOKE_EMAIL / SMOKE_PASSWORD / SMOKE_STAGING_PASSWORD repository secrets are not all set. See references/deploying.md § 12."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.configured.outputs.ready == 'true'
+
+      - uses: pnpm/action-setup@v4
+        if: steps.configured.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.configured.outputs.ready == 'true'
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        if: steps.configured.outputs.ready == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Install the browser
+        if: steps.configured.outputs.ready == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke test staging
+        if: steps.configured.outputs.ready == 'true'
+        run: pnpm smoke
+
+      # Failure SCREENSHOTS only. The repo is public, so an artifact is
+      # readable by anyone: traces and videos are off in the config because
+      # they would carry the passwords and the session, and the session file
+      # (e2e/.auth/) is excluded here by name.
+      - name: Keep the failure screenshots
+        if: failure() && steps.configured.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-failures
+          path: |
+            e2e/.results/**/*.png
+            !e2e/.auth/**
+          retention-days: 7
+          if-no-files-found: ignore
