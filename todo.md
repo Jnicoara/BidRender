@@ -317,9 +317,9 @@ everyone to re-run instead of read.
       **The fix, one statement, same answer** — the check only asks whether
       any baseline name appears twice:
       ``sql
-  SELECT 1 FROM `${table}` WHERE userId IS NULL
-  GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
-  ``
+SELECT 1 FROM `${table}` WHERE userId IS NULL
+GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
+``
       4 ms instead of 1,473. Applied temporarily: a full seed 2,000 ms → 20
       ms; `materialsLibrary` + `materialsCatalog` + `seedPreservesUserPrices`,
       101 tests, 2.8 s instead of ~40 s, none over 300 ms; `materialsLibrary`
@@ -1797,6 +1797,22 @@ path is ever revived, give it the same treatment first.
       (`new`/`existing`/`remove`/`relocate`, NULL read as `new`), recorded in
       Track C's `todo.md` on `track-c`. B's style editor waits for the nine
       columns, and the status looks (§ 7) wait for the status column.
+- [ ] **Track B, after A's columns above: pin styles steps 2 and 3.** Step 1
+      shipped 2026-10-01 (computed default shape by device family, the wide
+      rectangle, letters and first-use colours, safety switch = DS). Still to
+      build. The seam is the "NOT BUILT" block in `shared/pinLetters.ts`,
+      which says where each one plugs in:
+      (a) **chosen looks.** Add `chosen` to `PinCount` from the nine
+      columns. Precedence is count → symbol → assembly → automatic. An
+      assembly letter bumps; count and symbol letters never do, and a clash
+      is flagged instead. Then the one style editor (plan § 6).
+      (b) **mark status.** It is per mark, so `markAppearance` takes the
+      stamp's status, and the overlay draws filled, hollow-solid, X or the
+      arrow badge (§ 7), plus the "12 new · 4 existing" split on the card.
+      Ship it only once the bid applies the status.
+      Also still open from step 1: the ring-around-the-symbol at reading
+      zoom, faint marks, the CSV "Pin" column, and the step 0 measurements
+      (`LETTER_MIN_PX` 14 is still a judgement).
 - [ ] **Track A (migration, optional): `symbol_links.originalLabel
 varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
       (Track B) WITHOUT a column: `label` is the new name and `lookupKey` keeps

@@ -5683,14 +5683,18 @@ export default function TakeoffPage({
    * count change already refreshes.
    */
   const pinStyles = useMemo(() => {
-    const names = new Map(allAssemblies.map(a => [a.id, a.name] as const));
+    const byId = new Map(allAssemblies.map(a => [a.id, a] as const));
     return pinStylesForBid(
-      (bidCounts.data?.groups ?? []).map(g => ({
-        id: g.id,
-        label: g.label,
-        assemblyName:
-          g.assemblyId === null ? null : (names.get(g.assemblyId) ?? null),
-      }))
+      (bidCounts.data?.groups ?? []).map(g => {
+        const assembly =
+          g.assemblyId === null ? undefined : byId.get(g.assemblyId);
+        return {
+          id: g.id,
+          label: g.label,
+          assemblyName: assembly?.name ?? null,
+          assemblyCategory: assembly?.category ?? null,
+        };
+      })
     );
   }, [bidCounts.data?.groups, allAssemblies]);
 
