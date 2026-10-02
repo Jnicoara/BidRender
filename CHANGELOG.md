@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-01]
 
+- **Staging now updates itself, and a robot rechecks it.** When a change passes
+  the tests on `local-dev`, it goes to staging automatically — unless it
+  changes the database, which still waits for Track A to apply by hand with a
+  backup. After each staging update, a browser test walks the recheck list on
+  its own throwaway bids: counting, linking, sending, locking, the proposal,
+  every main screen on phone and tablet sizes, and the core flow by touch. It
+  never touches the live site and never spends AI money. Live releases still
+  happen only when Track A does them, and only from a version that passed.
 - **Every change is now tested automatically on GitHub.** Each push to
   `local-dev`, a track branch or a Track A branch runs the type check and the
   full test suite against a brand-new database, built from every migration and
