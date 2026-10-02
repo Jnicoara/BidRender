@@ -298,6 +298,13 @@ import {
 } from "@/lib/undoStack";
 import { emptiedCountCard } from "@/lib/emptiedCountCard";
 import { nextMarkBatch, splitRecoveredMarks } from "@/lib/markBatches";
+import {
+  adoptRealGroup,
+  dropProvisional,
+  isProvisionalGroup,
+  lostMarksMessage,
+} from "@/lib/provisionalCount";
+import { earlyTextKey, sheetsToCatchUp } from "@/lib/scaleCatchUp";
 import { loadUndo, saveUndo, tabStorage } from "@/lib/undoPersist";
 import { pastDragThreshold, swallowNextClick } from "@/lib/dragThreshold";
 import { wheelIntent, type WheelGesture } from "@/lib/wheelIntent";
@@ -4248,6 +4255,10 @@ export default function TakeoffPage({
         // (the request was slow), it is down on arrival — which is right.
         sheetKey: sheetKeyNow.current,
       });
+      // A provisional count (@/lib/provisionalCount) is remembered for
+      // "Count again" only once the server has made it — `armWhileCreating`
+      // comes back here with the real one.
+      if (isProvisionalGroup(group.id)) return;
       // What "Count again" offers back once this is put down (@/lib/countAgain).
       const last = { groupId: group.id, label: group.label };
       setLastCount(last);
@@ -4256,6 +4267,7 @@ export default function TakeoffPage({
     },
     [quantitiesLocked, bidId]
   );
+
   /** A mark delete as an undo step: the packet puts them back, same ids. */
   const pushMarksDeleted = (
     undo: Packet | null,
@@ -4804,7 +4816,9 @@ export default function TakeoffPage({
         sheetId,
         bidId,
         pendingStamps.current
-          .filter(m => m.sheetId === sheetId)
+          // A provisional count's id means nothing after a reload; its marks
+          // are mirrored once the count exists (`armWhileCreating`).
+          .filter(m => m.sheetId === sheetId && !isProvisionalGroup(m.groupId))
           .map(m => ({ groupId: m.groupId, x: m.x, y: m.y }))
       );
     },
@@ -4954,6 +4968,78 @@ export default function TakeoffPage({
       mirrorQueue,
       setPending,
     ]
+  );
+
+  /**
+   * Pick up a count the server has not made yet, and keep every click.
+   *
+   * Arms AT ONCE under a provisional id, so a click in the round trip is a
+   * mark rather than a plain click (that gap lost 0 of 3 and 2 of 3 marks,
+   * silently — @/lib/provisionalCount). When the count exists its queued
+   * marks take the real id and go; when it is refused they come off the
+   * drawing and the person is told how many were not counted.
+   */
+  const nextProvisionalId = useRef(-1);
+  const armWhileCreating = useCallback(
+    (
+      label: string,
+      assemblyId: number | null,
+      symbolId: number | null,
+      create: () => Promise<{ id: number; label: string }>,
+      afterCreate?: () => void
+    ) => {
+      if (quantitiesLocked) {
+        toast.error(lockedEditRefusal("new marks cannot be placed"));
+        return;
+      }
+      const provisionalId = nextProvisionalId.current--;
+      armGroup({ id: provisionalId, label }, assemblyId, symbolId);
+      create()
+        .then(real => {
+          setPending(
+            adoptRealGroup(pendingStamps.current, provisionalId, real)
+          );
+          // Still the tool in hand: it becomes the real count, which also
+          // re-runs the flush (the effect on the armed id). Put down or
+          // swapped meanwhile: only the queued marks needed moving.
+          setArmedGroupHeld(held =>
+            held?.groupId === provisionalId
+              ? { ...held, groupId: real.id, label: real.label }
+              : held
+          );
+          // What armGroup would have remembered for "Count again".
+          const last = { groupId: real.id, label: real.label };
+          setLastCount(last);
+          saveLastCount(bidId, last);
+          for (const sheetId of Array.from(
+            new Set(pendingStamps.current.map(m => m.sheetId))
+          ))
+            mirrorQueue(sheetId);
+          flushStamps();
+          toast.success(`Counting ${real.label} — click to place.`);
+          afterCreate?.();
+        })
+        .catch((error: unknown) => {
+          const { kept, lost } = dropProvisional(
+            pendingStamps.current,
+            provisionalId
+          );
+          setPending(kept);
+          setArmedGroupHeld(held =>
+            held?.groupId === provisionalId ? null : held
+          );
+          // The mutation's onError has said why; this says what it cost.
+          if (lost > 0)
+            toast.error(
+              lostMarksMessage(
+                lost,
+                label,
+                error instanceof Error ? error.message : null
+              )
+            );
+        });
+    },
+    [bidId, quantitiesLocked, armGroup, flushStamps, mirrorQueue, setPending]
   );
 
   /**
@@ -6975,14 +7061,43 @@ export default function TakeoffPage({
       // block, general notes, keynotes — for free alongside the picture.
       pageTextByPage.current.set(pageNumber, text);
       const sheet = sheets.find(s => s.pageNumber === pageNumber);
-      // Nothing to attach a reading to yet; ensureSheets is still in flight and
-      // this page's text will be re-read the next time it is shown.
-      if (!sheet) return;
+      /*
+        Nothing to attach a reading to yet: ensureSheets is still in flight.
+        The text is KEPT and read the moment the rows arrive (the effect
+        below, @/lib/scaleCatchUp).
+
+        This comment used to say the page "will be re-read the next time it
+        is shown", and nothing did that: a drawn page is cached and its text
+        is not extracted again, so sheet 1 of a fresh upload sat on "Set
+        scale" until a reload (found by the smoke test, 2026-10-01).
+      */
+      if (!sheet) {
+        if (doc)
+          earlyPageText.current.set(earlyTextKey(doc.id, pageNumber), text);
+        return;
+      }
       if (sheet.scaleSource !== "none") return;
       detectScale.mutate({ id: sheet.id, sheetText: text });
     },
-    [sheets]
+    [sheets, doc]
   );
+
+  // Pages read before their sheet rows existed: detect them now (above).
+  const earlyPageText = useRef<Map<string, string>>(new Map());
+  const scaleCatchUpAsked = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    if (!doc) return;
+    for (const { sheetId, text } of sheetsToCatchUp(
+      doc.id,
+      sheets,
+      earlyPageText.current,
+      scaleCatchUpAsked.current
+    )) {
+      scaleCatchUpAsked.current.add(sheetId);
+      detectScale.mutate({ id: sheetId, sheetText: text });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheets, doc?.id]);
 
   /**
    * Send ONE queued file: check it, transfer it, record the sheet.
@@ -7699,20 +7814,21 @@ export default function TakeoffPage({
                     armGroup(count, assemblyId)
                   }
                   onPick={assembly => {
-                    groupForAssembly
-                      .mutateAsync({ bidId, assemblyId: assembly.id })
-                      .then(group => armGroup(group, assembly.id))
-                      .catch(() => {
-                        /* the mutation's onError has already said so */
-                      });
+                    // Armed at once; clicks before the count exists are kept
+                    // (armWhileCreating). The mutation's onError says why a
+                    // refusal happened, armWhileCreating what it cost.
+                    armWhileCreating(assembly.name, assembly.id, null, () =>
+                      groupForAssembly.mutateAsync({
+                        bidId,
+                        assemblyId: assembly.id,
+                      })
+                    );
                   }}
                   onCountPlain={label => {
-                    createGroup
-                      .mutateAsync({ bidId, label })
-                      .then(group => armGroup(group, null))
-                      .catch(() => {
-                        /* a duplicate name is refused by name, and said so */
-                      });
+                    // A duplicate name is refused by name, and said so.
+                    armWhileCreating(label, null, null, () =>
+                      createGroup.mutateAsync({ bidId, label })
+                    );
                   }}
                 />
                 {/*
@@ -9454,20 +9570,22 @@ export default function TakeoffPage({
                       if (!assembly) return;
                       // The symbol goes too: several symbols sharing one
                       // assembly each count into their own count (§ 11.2).
-                      groupForAssembly
-                        .mutateAsync({
-                          bidId,
-                          assemblyId: assembly.id,
-                          symbolId: symbol.id,
-                        })
-                        .then(group => {
-                          armGroup(group, assembly.id, symbol.id);
-                          // It may have made a count, or linked a plain one.
-                          void utils.takeoffGroups.list.invalidate({ bidId });
-                        })
-                        .catch(() => {
-                          /* the mutation's onError has already said so */
-                        });
+                      // Armed at once; clicks before the count exists are
+                      // kept (armWhileCreating).
+                      armWhileCreating(
+                        symbol.label,
+                        assembly.id,
+                        symbol.id,
+                        () =>
+                          groupForAssembly.mutateAsync({
+                            bidId,
+                            assemblyId: assembly.id,
+                            symbolId: symbol.id,
+                          }),
+                        // It may have made a count, or linked a plain one.
+                        () =>
+                          void utils.takeoffGroups.list.invalidate({ bidId })
+                      );
                     }}
                     onCountSymbol={symbol => {
                       /*
@@ -9475,28 +9593,25 @@ export default function TakeoffPage({
                         not refused, when the bid already has it: clicking
                         the same symbol again means "keep counting that".
                       */
-                      if (quantitiesLocked) {
-                        toast.error(
-                          lockedEditRefusal("new marks cannot be placed")
-                        );
-                        return;
-                      }
-                      createGroup
-                        .mutateAsync({
-                          bidId,
-                          label: symbol.label,
-                          reuseExisting: true,
-                          // A renamed symbol still owns the count made
-                          // under its original name on this bid.
-                          symbolId: symbol.id,
-                        })
-                        .then(group => {
-                          armGroup(group, null, symbol.id);
-                          void utils.takeoffGroups.list.invalidate({ bidId });
-                        })
-                        .catch(() => {
-                          /* the mutation's onError has already said so */
-                        });
+                      // Armed at once; clicks before the count exists are
+                      // kept (armWhileCreating, which also refuses on a
+                      // locked bid).
+                      armWhileCreating(
+                        symbol.label,
+                        null,
+                        symbol.id,
+                        () =>
+                          createGroup.mutateAsync({
+                            bidId,
+                            label: symbol.label,
+                            reuseExisting: true,
+                            // A renamed symbol still owns the count made
+                            // under its original name on this bid.
+                            symbolId: symbol.id,
+                          }),
+                        () =>
+                          void utils.takeoffGroups.list.invalidate({ bidId })
+                      );
                     }}
                   />
                 </>

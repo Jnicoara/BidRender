@@ -18,6 +18,8 @@
  * to is an instruction).
  */
 
+import { isProvisionalGroup } from "./provisionalCount";
+
 export type QueuedMark = {
   sheetId: number;
   groupId: number;
@@ -28,9 +30,14 @@ export type QueuedMark = {
 /**
  * The next batch: the unsent marks sharing the sheet and count of the OLDEST
  * unsent mark, in queue order. Empty when nothing is waiting.
+ *
+ * Marks under a PROVISIONAL count (a negative id: picked, not yet made by the
+ * server — @/lib/provisionalCount) are never batched. They wait until the
+ * count exists and adopts them, and they do not hold up real marks behind
+ * them.
  */
 export function nextMarkBatch<T extends QueuedMark>(queue: readonly T[]): T[] {
-  const first = queue.find(m => !m.sent);
+  const first = queue.find(m => !m.sent && !isProvisionalGroup(m.groupId));
   if (!first) return [];
   return queue.filter(
     m => !m.sent && m.sheetId === first.sheetId && m.groupId === first.groupId

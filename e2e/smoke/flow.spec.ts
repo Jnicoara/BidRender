@@ -57,13 +57,11 @@ async function armFromLegend(name: string) {
     .getByText(new RegExp(`^${name}$`, "i"))
     .first()
     .click();
-  // KNOWN GAP (found by this test, 2026-10-01): a by-name count is created on
-  // the server first, and clicks on the drawing before that reply are taken
-  // as plain clicks — measured, 0 of 3 and 2 of 3 marks kept, nothing said.
-  // Wait for the "Counting …" bar a person would see before clicking.
-  await expect(
-    page.getByText(new RegExp(`^Counting ${name}`, "i")).first()
-  ).toBeVisible();
+  // NO wait for the "Counting …" bar, on purpose. Until 2026-10-01 a by-name
+  // count was made on the server first and clicks before that reply were
+  // taken as plain clicks — measured 0 of 3 and 2 of 3 marks kept, silently.
+  // The tool now arms at once and keeps every click (@/lib/provisionalCount),
+  // so clicking straight away is the test of that fix.
 }
 
 /** A bid line by name, ignoring case for the same reason. */
@@ -114,16 +112,12 @@ test("2. a plan uploads; the right panel is tabs; the scale is read off the shee
     await expect(page.getByRole("tab", { name: tab })).toBeVisible();
   }
   await expect(page.getByText(/^1\/2$/).first()).toBeVisible(); // sheet 1 of 2
-  // KNOWN GAP (found by this test, 2026-10-01): a fresh upload shows sheet 1
-  // before its sheet rows exist, so `handleSheetVisible` (TakeoffPage.tsx)
-  // skips scale detection and waits for "the next time it is shown". A person
-  // sees "Set scale" on a sheet with a printed scale until they flip away and
-  // back. This walks the same way round; when the gap is fixed, delete the
-  // two flips and the scale must still appear.
-  await page.getByRole("button", { name: "Next sheet" }).click();
-  await expect(page.getByText(/^2\/2$/).first()).toBeVisible();
-  await page.getByRole("button", { name: "Previous sheet" }).click();
-  await expect(page.getByText(`1/4" = 1'-0"`).first()).toBeVisible({
+  // Sheet 1's printed scale is read straight after the upload, with no flip
+  // away and back. Until 2026-10-01 a fresh upload sat on "Set scale" here
+  // ("0/2 scaled"): the page was read before its sheet row existed and the
+  // reading was dropped (@/lib/scaleCatchUp). "1/2" because sheet 2 has not
+  // been shown yet, and only a shown page is read.
+  await expect(page.getByText(/^1\/2 scaled$/).first()).toBeVisible({
     timeout: 30_000,
   });
 });
