@@ -26,17 +26,22 @@
  * on a count — becomes two nullable columns on `takeoff_groups` when somebody
  * asks for it, and this file becomes the DEFAULT rather than the answer.
  */
+import { CATEGORY_FAMILY, FAMILY_SHAPE } from "./deviceFamily";
 
 // ─── Shapes ───────────────────────────────────────────────────────────────────
 
 /**
- * Five shapes, and five is not an accident.
+ * Six shapes, and the count is not an accident.
  *
  * They have to be told apart at a glance, at a size measured in millimetres, on
- * top of a black-on-white drawing that is already full of lines. Past five the
- * differences stop being differences: a heptagon and an octagon are both "a
+ * top of a black-on-white drawing that is already full of lines. Past a handful
+ * the differences stop being differences: a heptagon and an octagon are both "a
  * blob with corners" at 14 pixels, and a shape nobody can name is a shape
  * nobody can match to a legend.
+ *
+ * The sixth, `rect` — a 2:1 rectangle — joined 2026-10-01 for panels and
+ * equipment, which plans draw as long rectangles (pin plan § 2, decision 2).
+ * Looked at on screen at the 10 px floor beside a square before adopting it.
  */
 export const MARK_SHAPES = [
   "circle",
@@ -44,26 +49,28 @@ export const MARK_SHAPES = [
   "triangle",
   "diamond",
   "hexagon",
+  "rect",
 ] as const;
 export type MarkShape = (typeof MARK_SHAPES)[number];
 
 /**
- * The five library categories, each with a shape that stays the same across
- * every job — so an estimator who learns "triangles are lighting" keeps that.
+ * Each library category's shape, through its device family
+ * (shared/deviceFamily.ts) — so the category default and a count's own family
+ * cannot disagree about what "lighting" looks like.
  *
- * A count with no category gets one from its id instead (see `shapeFor`), which
- * means a plain count can collide with a category's shape. That is accepted:
- * the shape narrows the field and the COLOUR separates within it, and the two
- * together give thirty combinations, which is more distinct marks than a sheet
- * can usefully carry anyway.
+ * **Overrides § 5e's map (2026-10-01, pin plan § 2):** lighting was a triangle,
+ * panels a square, equipment a diamond, low voltage a hexagon. Now lighting is
+ * a square, panels and equipment a wide rectangle, data a triangle (the plan
+ * symbol for a data outlet), and the diamond belongs to switches.
+ *
+ * Used for a mark whose count is NOT in the bid's pin map; every listed count
+ * takes its shape from `pinStylesForBid`, which reads the count's own name
+ * first.
  */
-const SHAPE_BY_CATEGORY: Record<string, MarkShape> = {
-  Devices: "circle",
-  Lighting: "triangle",
-  Panels: "square",
-  "Equipment Connections": "diamond",
-  "Low Voltage/EMS": "hexagon",
-};
+function shapeForCategory(category: string): MarkShape | undefined {
+  const family = CATEGORY_FAMILY[category];
+  return family ? FAMILY_SHAPE[family] : undefined;
+}
 
 // ─── Colours ──────────────────────────────────────────────────────────────────
 
@@ -141,7 +148,7 @@ export function shapeFor(group: {
   assemblyCategory?: string | null;
 }): MarkShape {
   const fromCategory = group.assemblyCategory
-    ? SHAPE_BY_CATEGORY[group.assemblyCategory]
+    ? shapeForCategory(group.assemblyCategory)
     : undefined;
   return fromCategory ?? MARK_SHAPES[spread(group.id, MARK_SHAPES.length)];
 }
@@ -180,12 +187,18 @@ export function markAppearance(
    * Pass the SAME map to the drawing and the panel, or a swatch and its pins
    * disagree.
    */
-  pins?: ReadonlyMap<number, { letter: string; color: MarkColor }>
+  pins?: ReadonlyMap<
+    number,
+    { letter: string; color: MarkColor; shape: MarkShape }
+  >
 ): { shape: MarkShape; color: MarkColor; letter: string | null } {
   const id = mark.groupId ?? (mark.assemblyId !== null ? -mark.assemblyId : 0);
   const pin = mark.groupId !== null ? pins?.get(mark.groupId) : undefined;
   return {
-    shape: shapeFor({ id, assemblyCategory: mark.assemblyCategory }),
+    // The COUNT's shape (its own name first), not its assembly's category:
+    // two items on one assembly can be a duplex and a switch.
+    shape:
+      pin?.shape ?? shapeFor({ id, assemblyCategory: mark.assemblyCategory }),
     color: pin?.color ?? colorFor({ id }),
     letter: pin?.letter ?? null,
   };
@@ -227,9 +240,11 @@ export function letterFit(
   letter: string
 ): { dy: number; size: number } {
   const size = letterSize(r, letter);
-  return shape === "triangle"
-    ? { dy: r * 0.12, size: size * 0.72 }
-    : { dy: 0, size };
+  if (shape === "triangle") return { dy: r * 0.12, size: size * 0.72 };
+  // A 2:1 rectangle is only 0.89r tall (`markPath`), so a letter sized for
+  // the circle would stand out of it top and bottom.
+  if (shape === "rect") return { dy: 0, size: Math.min(size, r * 0.8) };
+  return { dy: 0, size };
 }
 
 // ─── Traced runs ──────────────────────────────────────────────────────────────
@@ -665,6 +680,20 @@ export function markPath(
   if (shape === "circle") {
     // Two arcs, because a circle has no vertices to list.
     return `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${r * 2} 0 a ${r} ${r} 0 1 0 ${-r * 2} 0`;
+  }
+
+  if (shape === "rect") {
+    // 2:1, corners on the same circle as every other shape: half-width w and
+    // half-height w/2 with w² + (w/2)² = r², so w = 2r/√5.
+    const w = (2 * r) / Math.sqrt(5);
+    const h = w / 2;
+    const corners = [
+      [cx - w, cy - h],
+      [cx + w, cy - h],
+      [cx + w, cy + h],
+      [cx - w, cy + h],
+    ].map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`);
+    return `M ${corners.join(" L ")} Z`;
   }
 
   const sides =

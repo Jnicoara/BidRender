@@ -2181,7 +2181,11 @@ definition and still centres.
 > order per bid (as run types already are), and stores an optional chosen
 > look on the assembly, the legend symbol and the count. It **keeps** this
 > section's rejection of the captured legend image as the pin, and the
-> 10–26 px clamp.
+> 10–26 px clamp. **The shape map was BUILT 2026-10-01** (`shared/deviceFamily.ts`):
+> receptacles and boxes are circles, lighting is squares, data is triangles,
+> switches are diamonds, panels and equipment are a 2:1 rectangle, and
+> everything else is hexagons. A count's own name decides first, and its
+> assembly is only the default.
 
 Every stamp is a 10px circle in `#F5C518` (`TraceLayer.tsx`). **That is the same
 yellow as a conduit run and the same yellow as every warning in the app** — so

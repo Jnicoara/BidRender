@@ -4,6 +4,18 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-02]
+
+- **No more lost clicks when you start counting.** Clicking marks straight
+  after choosing a legend symbol (or picking an assembly or typing a new count
+  name) could silently drop some of them while the app was still setting the
+  count up — in one test, none of three clicks were kept. Now the count is
+  ready the instant you pick it and every click is kept. If the count cannot
+  be made, the app says how many marks were not counted and why.
+- **A new plan's printed scale is read straight away.** A sheet with a scale
+  printed on it showed "Set scale" after uploading until you reloaded the
+  page. It is now read as soon as the sheet appears.
+
 ## [2026-10-01]
 
 - **Find all matching now works on scanned plans (test build, track-c).** Box
@@ -15,6 +27,15 @@ This is the human-readable companion to the git history — read this to see wha
   its size in pixels. Nothing on a scan counts until someone has checked the
   tag or the "E" beside it. An optional "Ask AI" button reads those from
   small pictures, about a cent for twelve.
+
+- **Count pins now take their shape from what the item is.** Receptacles and
+  junction boxes are circles, lights are squares, data outlets are triangles,
+  switches are diamonds, panels and disconnects are wide rectangles, and
+  anything else is a hexagon. Each item's own name decides. So a receptacle
+  and a switch sharing one assembly no longer look alike, and three lights on
+  one assembly differ by letter and colour. **Existing counts may change shape
+  once.** A safety switch now reads DS rather than S, and a data outlet reads
+  D rather than R. Bid numbers are unaffected.
 
 - **Staging now updates itself, and a robot rechecks it.** When a change passes
   the tests on `local-dev`, it goes to staging automatically — unless it
