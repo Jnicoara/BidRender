@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-01]
 
+- **Find all matching now works on scanned plans (test build, track-c).** Box
+  one symbol on a scanned sheet and every copy on that plan is found by its
+  picture, with no AI. On Old Blueridge it found 85 of the owner's 86 hand
+  marks. It searches only the plan you boxed on, so a demolition plan drawn
+  on the same sheet is never mixed in. Boxed on the demolition plan itself,
+  every find says "not counted". A scan too coarse to match is refused with
+  its size in pixels. Nothing on a scan counts until someone has checked the
+  tag or the "E" beside it. An optional "Ask AI" button reads those from
+  small pictures, about a cent for twelve.
+
 - **Staging now updates itself, and a robot rechecks it.** When a change passes
   the tests on `local-dev`, it goes to staging automatically — unless it
   changes the database, which still waits for Track A to apply by hand with a

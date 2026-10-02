@@ -4,7 +4,13 @@
  * answer (`server/tieBreak.ts`).
  */
 import { describe, it, expect } from "vitest";
-import { parseTieBreak, tieBreakRequest, type TieCrop } from "./tieBreak";
+import {
+  parseScanFinds,
+  parseTieBreak,
+  scanFindsRequest,
+  tieBreakRequest,
+  type TieCrop,
+} from "./tieBreak";
 
 const PIC = "data:image/png;base64,AAAA";
 
@@ -75,5 +81,50 @@ describe("tie-break request", () => {
     expect(text).toContain("Picture 2 — one of items 10, 11");
     // Two legend pictures plus two crops, nothing else.
     expect(text.match(/"type":"image_url"/g)?.length).toBe(4);
+  });
+});
+
+describe("scan finds: what is beside each copy", () => {
+  const scanCrops = [
+    { id: 1, picture: PIC },
+    { id: 2, picture: PIC },
+    { id: 3, picture: PIC },
+    { id: 4, picture: PIC },
+    { id: 5, picture: PIC },
+  ];
+
+  it("reads only the closed set of answers", () => {
+    const a = parseScanFinds(
+      said(
+        "Picture 1: 1\nPicture 2: 2\nPicture 3: 3\nPicture 4: 0\nPicture 5: 7"
+      ),
+      scanCrops
+    );
+    expect(Array.from(a.values())).toEqual([
+      "same",
+      "otherLabel",
+      "existing",
+      "notThis",
+      null, // 7 is not an answer
+    ]);
+  });
+
+  it("a missing line is no answer, not 'same'", () => {
+    const a = parseScanFinds(said("Picture 2: 1"), scanCrops);
+    expect(a.get(1)).toBeNull();
+    expect(a.get(2)).toBe("same");
+  });
+
+  it("sends the picked symbol and the crops, bounded, thinking off", () => {
+    const req = scanFindsRequest({
+      model: "claude-sonnet-5",
+      picked: PIC,
+      crops: scanCrops.slice(0, 2),
+    });
+    expect(req.maxTokens).toBeLessThanOrEqual(400);
+    expect(req.thinking).toEqual({ type: "disabled" });
+    expect(
+      JSON.stringify(req.messages).match(/"type":"image_url"/g)?.length
+    ).toBe(3);
   });
 });

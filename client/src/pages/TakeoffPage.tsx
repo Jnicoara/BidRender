@@ -319,11 +319,14 @@ import {
   type SheetCheckState,
 } from "@/components/takeoff/SheetCheck";
 import {
+  aiBatch,
+  applyAiAnswers,
   clearOpen,
   decide,
   matchItems,
   nextToLookAt,
   type MatchItem,
+  type ScanFindAnswer,
 } from "@/lib/findMatchingSession";
 import {
   MatchLayer,
@@ -5128,6 +5131,9 @@ export default function TakeoffPage({
                   selectedId: null,
                   readMs,
                   findMs,
+                  box: region,
+                  scan: result.scan ?? null,
+                  ai: { busy: false, message: null },
                 },
               }
             : s
@@ -5475,6 +5481,119 @@ export default function TakeoffPage({
       }
     },
     [activeSheet?.id, breakTies]
+  );
+
+  const checkScanFinds = trpc.planCopilot.checkScanFinds.useMutation();
+  /**
+   * Find all matching on a SCAN: ask the AI what is written beside the next
+   * few copies (server/tieBreak.ts `scanFindsRequest`). A button press,
+   * never an effect; small crops of the spots, never the sheet; the answers
+   * become reasons on copies that stay unconfirmed (applyAiAnswers).
+   */
+  const askAboutScanFinds = useCallback(
+    async (
+      renderRegion: (
+        rect: PageRect,
+        scale: number
+      ) => Promise<{ bitmap: ImageBitmap }>
+    ) => {
+      if (!activeSheet || !findSession || findSession.panel.phase !== "results")
+        return;
+      const panel = findSession.panel;
+      const batch = aiBatch(panel.items);
+      if (batch.length === 0) return;
+      const setAi = (ai: { busy: boolean; message: string | null }) =>
+        setFindSession(s =>
+          s && s.panel.phase === "results"
+            ? { ...s, panel: { ...s.panel, ai } }
+            : s
+        );
+      setAi({ busy: true, message: null });
+      // 180 dpi (2.5 px a point), a crop of 52–68 pt round the spot and a
+      // red box on the symbol: the sizes measured in scanned-plans-plan.md
+      // § 4.
+      const scale = 2.5;
+      const crop = async (
+        x: number,
+        y: number,
+        halfWidth: number,
+        halfHeight: number
+      ) => {
+        const half = Math.max(26, 1.6 * Math.max(halfWidth, halfHeight));
+        const { bitmap } = await renderRegion(
+          { x: x - half, y: y - half, width: 2 * half, height: 2 * half },
+          scale
+        );
+        const canvas = document.createElement("canvas");
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        const k = canvas.width / (2 * half);
+        ctx.strokeStyle = "#e11d48";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+          (half - halfWidth - 2) * k,
+          (half - halfHeight - 2) * k,
+          (2 * halfWidth + 4) * k,
+          (2 * halfHeight + 4) * k
+        );
+        return canvas.toDataURL("image/jpeg", 0.85);
+      };
+      try {
+        const b = panel.box;
+        const picked = await crop(
+          b.x + b.width / 2,
+          b.y + b.height / 2,
+          Math.abs(b.width) / 2,
+          Math.abs(b.height) / 2
+        );
+        const crops = await Promise.all(
+          batch.map(async (item, k) => ({
+            id: k + 1,
+            itemId: item.id,
+            picture: await crop(
+              item.x,
+              item.y,
+              item.halfWidth,
+              item.halfHeight
+            ),
+          }))
+        );
+        const r = await checkScanFinds.mutateAsync({
+          sheetId: activeSheet.id,
+          picked,
+          crops: crops.map(c => ({ id: c.id, picture: c.picture })),
+        });
+        const itemOf = new Map(crops.map(c => [c.id, c.itemId] as const));
+        const answers = new Map<number, ScanFindAnswer | null>();
+        r.answers.forEach(a => {
+          const id = itemOf.get(a.cropId);
+          if (id !== undefined) answers.set(id, a.answer);
+        });
+        setFindSession(s =>
+          s && s.panel.phase === "results"
+            ? {
+                ...s,
+                panel: {
+                  ...s.panel,
+                  items: applyAiAnswers(s.panel.items, answers),
+                  ai: { busy: false, message: r.message },
+                },
+              }
+            : s
+        );
+      } catch (error) {
+        setAi({
+          busy: false,
+          message: `The AI could not be asked: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    },
+    [activeSheet?.id, findSession, checkScanFinds]
   );
 
   const selectFound = useCallback((id: number | null) => {
@@ -8946,6 +9065,10 @@ export default function TakeoffPage({
                             existingLabel={existingTwin?.label ?? null}
                             state={findSession.panel}
                             chromeTarget={size.chromeTarget}
+                            canAskAi={readerAvailable}
+                            onAskAi={() =>
+                              void askAboutScanFinds(size.renderRegion)
+                            }
                             onConfirm={confirmFound}
                             onConfirmExisting={ids =>
                               void confirmFoundExisting(ids)

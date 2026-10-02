@@ -1,6 +1,12 @@
 # Scanned plans — plan and measurements (Track C, 2026-10-01)
 
-**PLAN ONLY. No code shipped.** Every number below was measured with
+> **BUILT, 2026-10-01 (later), on `track-c`.** Steps 1, 2, 3 and 5 of § 6
+> exist as the scan branch of Find all matching; step 4 (Tesseract) does
+> not, by the owner's choice. What was built, what it measured through the
+> shipped code, and where it departs from the plan below: **§ 9**. §§ 1–8
+> are the plan as written, kept as the record.
+
+**PLAN ONLY when written.** Every number in §§ 1–8 was measured with
 throwaway scripts (kept in the Track C scratchpad, not the repo) on the two
 scanned sheets of **Old Blueridge school**: **E1.01** (page 3, lighting) and
 **E1.02** (page 4, power). The answer key is the owner's hand count on the
@@ -285,3 +291,103 @@ useful alone, and every find stays unconfirmed:**
    turns out to matter. This choice costs money either way — yours to make.
 5. **Demolition plan finds: hidden or shown?** **Recommended: shown as "on the
    demolition plan, not counted"**, so nothing disappears silently.
+
+   > **Decided 2026-10-01 by the owner:** Q3 yes (opencv.js ships, loaded
+   > only when a scan is searched); Q4 AI tie-break only, no Tesseract for
+   > now; Q5 shown, not counted. See § 9.
+
+## 9. Built — the scan branch of Find all matching (2026-10-01)
+
+**Code:** `client/src/lib/scanMatching.ts` (everything but the opencv calls
+is pure and tested in `scanMatching.test.ts`), the worker's scan branch in
+`client/src/workers/pdfRenderer.worker.ts`, `openCvModule.ts` beside it, the
+panel in `components/takeoff/FindMatching.tsx`, and
+`planCopilot.checkScanFinds` with `scanFindsRequest` in `server/tieBreak.ts`.
+**Measured through the shipped code** with `scripts/scanMatchingCheck.mts`
+(re-runnable; `--ai` for the AI half).
+
+### What it does
+
+1. **Too poor to match** (`scanQuality`): the box's short side in the scan's
+   own pixels (`VectorGeometry.imagePixelsPerPoint`, read off the image
+   painted on the page). Under 16 px: refused, with the number — "This
+   symbol is 10 pixels across on this scan — too coarse to match. Count it
+   by hand." — before anything is rendered or opencv.js is fetched. 16–24 px:
+   matched, every find flagged.
+2. **Which plan**: titles from the OCR text layer (a short line, drawn 1.15x
+   the page's median text, holding PLAN). Each owns the drawing above it, cut
+   sideways at the first inch of white. **Only the plan the box is on is
+   searched.** Boxed on a demolition plan, every find says "on the demolition
+   plan — not counted unless you count it", is never clear, and Count it
+   still works. Boxed on no titled plan, the whole sheet is searched and a
+   find off every plan is flagged.
+3. **The matcher**: the plan at 150 dpi, Otsu black-and-white, straightened,
+   specks under 5 px removed; the boxed picture at 0.9 / 1 / 1.1 x four
+   quarter turns, normalised correlation at 0.7, one find per spot.
+4. **The AI, a button only** ("Ask AI about N (under 1¢)"): the picked crop
+   and up to 12 find crops, 52–68 pt round each, one call per press, never
+   pressed by anything else. Closed answers — same tag / a different tag /
+   an E (existing) / not this symbol — each of which becomes a REASON on a
+   find that stays unconfirmed.
+
+### Measured on E1.01 and E1.02 (his 86 marks)
+
+| Shape (his marks)  | Found       | On nothing in the plan         | Plan searched              |
+| ------------------ | ----------- | ------------------------------ | -------------------------- |
+| 2x4 rectangle (46) | **46 / 46** | 0                              | MAIN FLOOR - LIGHTING PLAN |
+| 2x2 square (13)    | **13 / 13** | 0 (81 on 2x4s, all flagged)    | MAIN FLOOR - LIGHTING PLAN |
+| Circle (8)         | **7 / 8**   | 0                              | MAIN FLOOR - LIGHTING PLAN |
+| Switch (6)         | **6 / 6**   | 0                              | MAIN FLOOR - LIGHTING PLAN |
+| Receptacle (11)    | **11 / 11** | 18 — the "E" ones, all flagged | MAIN FLOOR - POWER PLAN    |
+| Timer switch (2)   | **2 / 2**   | 0                              | MAIN FLOOR - POWER PLAN    |
+|                    | **85 / 86** |                                |                            |
+
+The miss is the "(A-8)" C fixture (§ 2). **Demolition:** a switch boxed on
+E1.01's demolition plan found 8, a receptacle on E1.02's found 37; every one
+labelled, none on his new-plan marks. **Too poor:** the switch box refuses at
+50 and 72 dpi (10, 14 px), is flagged at 100 (19 px), plain at 150 and 300.
+**Speed:** 5–7 s a search in node; **4.9–5.8 s on screen** (Chrome, a real
+worker, opencv.js fetched on the first search). Every number here is from
+2026-10-01; if a re-run differs, stop and find out why first.
+
+**The AI button, every find sent ($0.025 in all, Sonnet, thinking off):**
+
+- E1.01, picked an A2EM: of 46 rectangles, 39 of his A2s said "a different
+  tag", 4 A2EMs "same"; 3 wrong (2 "not this", 1 "different tag" on an
+  A2EM). Each wrong one is a flag, not a count.
+- E1.02, picked a duplex: 17 of the 18 "E" receptacles said "E" (one run;
+  an earlier run had 5 unparsed answers, which read as "could not tell").
+  **10 of his 11 said "not this symbol" — and they are not:** his are drawn
+  FILLED, the one picked is drawn hollow (crops looked at). The matcher had
+  already rated them a weaker likeness (0.81–0.83). Flagged twice, dropped
+  never.
+
+### Where the build departs from §§ 2–6, and why
+
+- **Every scan find starts "needs a look"**, not clear: "On a scan the tag or
+  an E beside it is not read — check it by eye." Without it, Confirm all on
+  E1.02 would have counted the 18 existing receptacles as new. Only the AI's
+  answer takes it off. **Cost:** with AI off, a scan is confirmed one find at
+  a time (Next walks them). Owner question 6 below.
+- **"Bigger shape wins" became a score flag.** It needs two shapes searched
+  together; the product searches one. Measured instead: the 2x2's own 13
+  scored 0.87–1.00, the 81 halves of 2x4s 0.71–0.80, so under 0.85 is "a
+  weaker likeness". (A ring-of-ink test was tried first and did not
+  separate them: 6 of his flagged, 2 of the 81.)
+- **A new procedure, not `breakTies`**: `breakTies` picks between LEGEND
+  items; this has no legend, only the picked symbol, so its question and
+  closed set differ (`checkScanFinds`, same rules: button, small crops,
+  closed answers, writes nothing).
+- **Two traps found building it, both silent:**
+  - opencv.js's module is a THENABLE. `import()` of it never settles, and an
+    async function returning it never returns. It is loaded through
+    `openCvModule.ts`, and its `then` is deleted once it is ready.
+  - Normalised correlation is 0/0 on blank paper, and opencv answers 1:
+    every white pixel was a "find". A window must hold 0.5–2x the picked
+    symbol's ink.
+
+6. **New, for the owner: Confirm all on a scan.** Today nothing on a scan is
+   "clear" until the AI has read the words beside it. **Recommended: keep
+   it** — the alternative counted 18 existing receptacles as new on E1.02 —
+   / or add "Confirm all N — I've checked the words by eye" as a second,
+   explicit button.

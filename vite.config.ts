@@ -24,6 +24,11 @@ export default defineConfig({
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
   },
+  // ES-module workers, so the PDF worker can split opencv.js (10 MB) into a
+  // chunk of its own, fetched only when a scanned sheet is searched
+  // (pdfRenderer.worker.ts). The worker is already created as
+  // `{ type: "module" }`; the default "iife" cannot code-split at all.
+  worker: { format: "es" },
   envDir: path.resolve(import.meta.dirname),
   root: path.resolve(import.meta.dirname, "client"),
   publicDir: path.resolve(import.meta.dirname, "client", "public"),

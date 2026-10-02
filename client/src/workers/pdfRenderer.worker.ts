@@ -42,7 +42,14 @@
 
 import * as pdfjs from "pdfjs-dist";
 import { pdfRangeLoadOptions } from "@shared/pdfRangeLoading";
-import { findMatching, isScan, prepareSheet } from "@/lib/findMatching";
+import {
+  findMatching,
+  isScan,
+  prepareSheet,
+  type FindResult,
+  type MatchBox,
+} from "@/lib/findMatching";
+import { findOnScan, type OpenCv } from "@/lib/scanMatching";
 import { runSheetCheck } from "@/lib/sheetCheck";
 import {
   extractVectorGeometry,
@@ -195,6 +202,114 @@ async function readMatchPage(
   };
   matchPages = [...matchPages.slice(-1), read];
   return read;
+}
+
+/**
+ * opencv.js (10 MB), fetched the first time a SCAN is searched and never
+ * before: its own chunk, behind a dynamic import, so opening a plan, a
+ * vector sheet's search and a refused scan symbol never download it.
+ */
+let openCv: Promise<OpenCv> | null = null;
+function loadOpenCv(): Promise<OpenCv> {
+  // Through ./openCvModule, never `import("@techstark/opencv-js")` directly:
+  // that import never settles (the reason is in that file).
+  openCv ??= import("./openCvModule").then(async mod => {
+    let cv = mod.openCvModule();
+    // The build hands over either a promise of the module or the module
+    // with its runtime still starting.
+    if (cv instanceof Promise) cv = (await cv) as Record<string, unknown>;
+    else if (!cv.Mat) {
+      // Started, or starting: any of its three signals will do, since the
+      // runtime may already be up before a callback can be set, and then
+      // `onRuntimeInitialized` never fires. A limit, so a runtime that never
+      // comes up says so instead of leaving "Looking across the sheet…" up.
+      const ready = cv;
+      await new Promise<void>((resolve, reject) => {
+        const done = () => {
+          clearInterval(poll);
+          clearTimeout(limit);
+          resolve();
+        };
+        const poll = setInterval(() => ready.Mat && done(), 50);
+        const limit = setTimeout(() => {
+          clearInterval(poll);
+          reject(new Error("opencv.js did not start"));
+        }, 60_000);
+        ready.onRuntimeInitialized = done;
+        // Called with no argument: resolving WITH the module would chase its
+        // own `then` forever (see below).
+        if (typeof ready.then === "function")
+          (ready.then as (f: () => void) => void)(() => done());
+      });
+    }
+    // The emscripten module is a THENABLE: returned from a promise as it
+    // is, every await resolves it again, forever, and the search never
+    // starts (seen in the check script, 2026-10-01). Ready now, so drop it.
+    delete cv.then;
+    return cv as unknown as OpenCv;
+  });
+  openCv.catch(() => {
+    openCv = null; // a failed download may be retried by the next search
+  });
+  return openCv;
+}
+
+/** Find all matching on a scanned page (@/lib/scanMatching), as a FindResult. */
+async function findOnScanPage(
+  doc: import("pdfjs-dist").PDFDocumentProxy,
+  pageNum: number,
+  matchPage: MatchPage,
+  box: MatchBox
+): Promise<FindResult> {
+  const page = await doc.getPage(pageNum);
+  const base = page.getViewport({ scale: 1 });
+  const result = await findOnScan({
+    box,
+    pixelsPerPoint: matchPage.geo.imagePixelsPerPoint,
+    words: matchPage.words,
+    pageWidth: base.width,
+    pageHeight: base.height,
+    loadCv: loadOpenCv,
+    render: async (rect, scale) => {
+      const viewport = page.getViewport({
+        scale,
+        offsetX: -rect.x * scale,
+        offsetY: -rect.y * scale,
+      });
+      const width = Math.max(1, Math.ceil(rect.width * scale));
+      const height = Math.max(1, Math.ceil(rect.height * scale));
+      const canvas = new OffscreenCanvas(width, height);
+      const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, width, height);
+      await page.render({
+        canvasContext: ctx as unknown as CanvasRenderingContext2D,
+        canvas: null as unknown as HTMLCanvasElement,
+        viewport,
+      }).promise;
+      const rgba = ctx.getImageData(0, 0, width, height).data;
+      const gray = new Uint8Array(width * height);
+      for (let k = 0; k < gray.length; k++)
+        gray[k] =
+          (rgba[4 * k] * 0.299 +
+            rgba[4 * k + 1] * 0.587 +
+            rgba[4 * k + 2] * 0.114) |
+          0;
+      return { gray, width, height, x0: rect.x, y0: rect.y, scale };
+    },
+  });
+  if (result.kind !== "ok") return result;
+  return {
+    kind: "ok",
+    matches: result.matches,
+    symbol: {
+      segments: 0,
+      words: [],
+      width: Math.abs(box.width),
+      height: Math.abs(box.height),
+    },
+    scan: { plan: result.plan?.title ?? null, pixels: result.pixels },
+  };
 }
 
 self.onmessage = async (e: MessageEvent) => {
@@ -478,7 +593,9 @@ self.onmessage = async (e: MessageEvent) => {
       const t0 = performance.now();
       const matchPage = await readMatchPage(pdfDoc, hash, pageNum);
       const t1 = performance.now();
-      const result = findMatching(matchPage.geo, matchPage.words, box);
+      const result = isScan(matchPage.geo)
+        ? await findOnScanPage(pdfDoc, pageNum, matchPage, box)
+        : findMatching(matchPage.geo, matchPage.words, box);
       self.postMessage({
         type: "matches",
         reqId,
