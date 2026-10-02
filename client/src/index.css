@@ -502,6 +502,23 @@
       flex-basis: calc(100% - 2rem) !important;
     }
   }
+  /*
+    A TABLET, or any window under 1280: the row may wrap, and the title never
+    shrinks below 14rem to avoid it. On an upright tablet the bid's header had
+    squeezed its NAME to zero width and its status to "D" (seen in the device
+    audit) — six buttons and a date left the title nothing, and `min-w-0` let
+    it go. Here the buttons drop to a second line instead, only when they do
+    not fit; a 1536 px laptop never reaches this rule.
+  */
+  @media (min-width: 768px) and (max-width: 1279px) {
+    .page-header > .flex {
+      flex-wrap: wrap;
+      row-gap: 0.5rem;
+    }
+    .page-header > .flex > .flex-1 {
+      min-width: 14rem !important;
+    }
+  }
 
   /* Number change flash */
   @keyframes num-flash {

@@ -10,14 +10,8 @@
       "overlaps": [],
       "overflowRight": [],
       "cutOffBelow": [],
-      "smallTargets": [
-        {
-          "label": "a.sr-only.focus:not-sr-only.focus:absolute «Skip to signup»",
-          "w": 1,
-          "h": 44
-        }
-      ],
-      "controls": 4,
+      "smallTargets": [],
+      "controls": 3,
       "shot": "phone-login.jpg"
     },
     "tablet-portrait": {
@@ -30,14 +24,8 @@
       "overlaps": [],
       "overflowRight": [],
       "cutOffBelow": [],
-      "smallTargets": [
-        {
-          "label": "a.sr-only.focus:not-sr-only.focus:absolute «Skip to signup»",
-          "w": 1,
-          "h": 44
-        }
-      ],
-      "controls": 4,
+      "smallTargets": [],
+      "controls": 3,
       "shot": "tablet-portrait-login.jpg"
     },
     "tablet-landscape": {
@@ -50,14 +38,8 @@
       "overlaps": [],
       "overflowRight": [],
       "cutOffBelow": [],
-      "smallTargets": [
-        {
-          "label": "a.sr-only.focus:not-sr-only.focus:absolute «Skip to signup»",
-          "w": 1,
-          "h": 44
-        }
-      ],
-      "controls": 4,
+      "smallTargets": [],
+      "controls": 3,
       "shot": "tablet-landscape-login.jpg"
     },
     "laptop": {
@@ -71,11 +53,6 @@
       "overflowRight": [],
       "cutOffBelow": [],
       "smallTargets": [
-        {
-          "label": "a.sr-only.focus:not-sr-only.focus:absolute «Skip to signup»",
-          "w": 1,
-          "h": 1
-        },
         {
           "label": "button.inline-flex.items-center.justify-center «Sign in»",
           "w": 69,
@@ -92,7 +69,7 @@
           "h": 40
         }
       ],
-      "controls": 4,
+      "controls": 3,
       "shot": "laptop-login.jpg"
     }
   },
