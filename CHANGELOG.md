@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-02]
 
+- **The database is ready for pin looks, mark status, mark heights and
+  several pictures per legend symbol** (migrations 0098–0102, plus 0096 and
+  0097 from the password-reset work). Every addition is empty and optional, so
+  nothing on a bid changes until the screens that use them ship. Rehearsed on a
+  restored copy of the staging database before staging itself.
+- **"Forgot password?" is merged** and can be tried on staging (only to the
+  addresses staging is allowed to email). Live still needs its database change
+  and email key before it works there.
 - **The plan reader can no longer be given another plan set's words.** The
   text read off each sheet (title block, notes, printed scale) was kept by page
   number only, so page 1 of one plan set could be sent to the reader with page

@@ -424,6 +424,9 @@ describe("stored files", () => {
           // pricing_problem_reports.dedupeKey — "<bid>:<line>:<code>", the
           // key one problem is upserted under. Not a file.
           "dedupeKey",
+          // takeoff_groups.symbolLookupKey (0099) — which legend symbol a
+          // count belongs to, as symbol_links.lookupKey. A name, not a file.
+          "symbolLookupKey",
         ].includes(column)
       ) {
         continue;

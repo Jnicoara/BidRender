@@ -687,6 +687,41 @@
       "when": 1789958700000,
       "tag": "0097_password_reset",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "5",
+      "when": 1789958800000,
+      "tag": "0098_takeoff_stamps_marks",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "5",
+      "when": 1789958900000,
+      "tag": "0099_takeoff_groups_marks",
+      "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "5",
+      "when": 1789959000000,
+      "tag": "0100_assemblies_marks",
+      "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "5",
+      "when": 1789959100000,
+      "tag": "0101_symbol_links_marks",
+      "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "5",
+      "when": 1789959200000,
+      "tag": "0102_symbol_looks",
+      "breakpoints": true
     }
   ]
 }

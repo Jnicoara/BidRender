@@ -4,6 +4,7 @@ import {
   boolean,
   int,
   json,
+  smallint,
   mysqlEnum,
   mysqlTable,
   type AnyMySqlColumn,
@@ -1056,6 +1057,16 @@ export const assemblies = mysqlTable(
     archivedAt: timestamp("archivedAt"),
 
     isActive: boolean("isActive").default(true).notNull(),
+
+    /**
+     * This assembly's chosen pin look on every job (0100;
+     * track-b-count-pin-styles-plan.md § 6). NULL = automatic. A shipped
+     * assembly forks on edit, so this is only ever set on a company's copy.
+     */
+    markShape: varchar("markShape", { length: 16 }),
+    markLetter: varchar("markLetter", { length: 4 }),
+    markColor: varchar("markColor", { length: 7 }),
+
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -3498,6 +3509,21 @@ export const takeoffGroups = mysqlTable(
       onDelete: "set null",
     }),
 
+    /**
+     * This count's chosen pin look (0099; track-b-count-pin-styles-plan.md
+     * § 6). NULL = automatic. Names and `#rrggbb` values, not enums: a value
+     * the code no longer knows reads as automatic, as run-type colours do.
+     */
+    markShape: varchar("markShape", { length: 16 }),
+    markLetter: varchar("markLetter", { length: 4 }),
+    markColor: varchar("markColor", { length: 7 }),
+    /**
+     * Which legend symbol this count belongs to, as `symbol_links.lookupKey`
+     * (§ 11.7, count-by-tag § 2). NULL = not from a symbol. Not a foreign key
+     * on purpose: deleting a library symbol must not touch a bid.
+     */
+    symbolLookupKey: varchar("symbolLookupKey", { length: 255 }),
+
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -3512,6 +3538,14 @@ export type TakeoffGroup = typeof takeoffGroups.$inferSelect;
 export type InsertTakeoffGroup = typeof takeoffGroups.$inferInsert;
 
 // ─── Stamps (takeoff phase 2c) ────────────────────────────────────────────────
+/**
+ * What a mark IS on the job (0098; track-b-count-pin-styles-plan.md § 7). NULL
+ * on `takeoff_stamps.status` reads as "new" — every mark placed before the
+ * column. Appending a value later keeps every stored index, like the other
+ * enums here; never reorder.
+ */
+export const MARK_STATUSES = ["new", "existing", "remove", "relocate"] as const;
+
 /**
  * One placed instance of an assembly on a sheet — a single click of the stamp
  * tool.
@@ -3594,6 +3628,27 @@ export const takeoffStamps = mysqlTable(
     x: decimal("x", { precision: 12, scale: 4 }).notNull(),
     y: decimal("y", { precision: 12, scale: 4 }).notNull(),
 
+    /*
+      The marks batch, 0098 (migrations-0098-batch-plan.md § S). All nullable
+      with no default, and NULL is always today's meaning — see the .sql.
+    */
+    /** NULL = new. How the others are PRICED is code, not this column. */
+    status: mysqlEnum("status", MARK_STATUSES),
+    /** 0/90/180/270; NULL = turning not known (connect-point-plan § 5.2). */
+    rotation: smallint("rotation"),
+    mirrored: boolean("mirrored"),
+    /** A height for THIS mark. NULL follows the count; 0 is a real height. */
+    mountHeightInches: decimal("mountHeightInches", {
+      precision: 7,
+      scale: 2,
+    }),
+    /** "read" = taken off the drawing and confirmed; never overwrites "typed". */
+    mountHeightSource: mysqlEnum("mountHeightSource", ["typed", "read"]),
+    /** "Keep" in a sheet check, remembered past that check. */
+    checkAcceptedAt: timestamp("checkAcceptedAt"),
+    /** This one mark takes no drop; NULL follows the count's (H3). */
+    dropExcluded: boolean("dropExcluded"),
+
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -3665,6 +3720,16 @@ export const symbolLinks = mysqlTable(
       { onDelete: "set null" }
     ),
 
+    /** This symbol's chosen pin look (0101); NULL = automatic. */
+    markShape: varchar("markShape", { length: 16 }),
+    markLetter: varchar("markLetter", { length: 4 }),
+    markColor: varchar("markColor", { length: 7 }),
+    /**
+     * The name exactly as captured, kept by a rename (0101). NULL = never
+     * renamed, or renamed before the column: fall back to `lookupKey`.
+     */
+    originalLabel: varchar("originalLabel", { length: 255 }),
+
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -3676,6 +3741,54 @@ export const symbolLinks = mysqlTable(
 
 export type SymbolLink = typeof symbolLinks.$inferSelect;
 export type InsertSymbolLink = typeof symbolLinks.$inferInsert;
+
+/**
+ * One LOOK of a legend item — the same symbol as drawn on one plan set — with
+ * the box it was captured with and where conduit meets it (0102;
+ * multiple-looks-plan.md § 6, connect-point-plan.md § 5). An item with no look
+ * rows reads its old `symbol_links.thumbnail` as a box-less first look, so
+ * nothing was backfilled.
+ */
+export const symbolLooks = mysqlTable(
+  "symbol_looks",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    /** The company OWNER (ctx.scope.dataUserId), as on every table. */
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    symbolLinkId: int("symbolLinkId")
+      .notNull()
+      .references(() => symbolLinks.id, { onDelete: "cascade" }),
+    thumbnail: text("thumbnail"),
+    bidPdfId: int("bidPdfId").references(() => bidPdfs.id, {
+      onDelete: "set null",
+    }),
+    sheetId: int("sheetId").references(() => bidPdfSheets.id, {
+      onDelete: "set null",
+    }),
+    /** The capture box, in PDF page points. */
+    captureX: decimal("captureX", { precision: 12, scale: 4 }),
+    captureY: decimal("captureY", { precision: 12, scale: 4 }),
+    captureWidth: decimal("captureWidth", { precision: 12, scale: 4 }),
+    captureHeight: decimal("captureHeight", { precision: 12, scale: 4 }),
+    /** From the box's centre. NULL = never answered; 0,0 = the middle. */
+    connectDx: decimal("connectDx", { precision: 10, scale: 4 }),
+    connectDy: decimal("connectDy", { precision: 10, scale: 4 }),
+    /** The PERSON who added it — authorship only, never a scoping key. */
+    createdByUserId: int("createdByUserId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => [
+    index("symbol_looks_symbolLinkId_idx").on(t.symbolLinkId),
+    index("symbol_looks_userId_idx").on(t.userId),
+  ]
+);
+
+export type SymbolLook = typeof symbolLooks.$inferSelect;
+export type InsertSymbolLook = typeof symbolLooks.$inferInsert;
 
 // ─── Plan co-pilot (AI plan reading) ──────────────────────────────────────────
 /**
