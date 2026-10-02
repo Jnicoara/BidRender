@@ -53,6 +53,18 @@ export function spotToShow(
   nowTicked: boolean
 ): { x: number; y: number } | null {
   if (!nowTicked) return null;
+  return findingSpot(finding);
+}
+
+/**
+ * Where a row's Link, Fix and "show me" take the drawing: the reader's spot,
+ * or null when it gave none. One function for all three so a row cannot jump
+ * one place on Link and another on a tick. A 0 is a real point on the page
+ * (its top or left edge), so only null means "no spot".
+ */
+export function findingSpot(
+  finding: Pick<PickableFinding, "x" | "y">
+): { x: number; y: number } | null {
   if (finding.x === null || finding.y === null) return null;
   return { x: finding.x, y: finding.y };
 }
