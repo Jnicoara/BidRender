@@ -1,9 +1,145 @@
 # Migrations 0098–0105 — one additive batch for Tracks B and C. PLAN ONLY, 2026-09-29
 
-> **RENUMBERED AGAIN 2026-10-02 — see § S, which overrides § R. The catalog batch is now 0106–0112.** (Was: "RENUMBERED 2026-10-01: this batch is now 0100–0107".) § R below is the
-> one list for every migration after 0095. It overrides § 0 and every
-> number in §§ 1–11. The sections below keep their old numbers as written,
-> and § R.2 maps each one. Nothing is written or run yet.
+> **RENUMBERED AGAIN 2026-10-02: § S below is the current list and overrides
+> § R's numbers.** This catalog batch is now 0106–0112. (Before that, on
+> 2026-10-01, § R made it 0100–0107, and § R overrides § 0 and the numbers in
+> §§ 1–11, which keep their original numbers as written.) Nothing after 0097
+> is written or run yet.
+
+## S. CONSOLIDATED BATCHES — 2026-10-02. This section overrides § R's numbers
+
+> **Why the numbers moved again, and why that is allowed.** § R put the
+> pre-invite files (gate, correction log) at 0098–0099 because they were the
+> most urgent. Since then Track B started BUILDING pin styles and Track C
+> shipped Check sheet behind OFF switches — both need their columns now,
+> while nothing for the invite gate or the correction log is built. Numbers
+> must follow DEPLOY order (R.1: the migrator silently skips a file numbered
+> below one already applied), so the marks batch now comes first. **Nothing
+> after 0097 is written**, so renumbering costs nothing. The rule from R.1
+> still holds: once any file is applied anywhere, nothing is ever written
+> below it. § R stays below as the reasoning record; where a number differs,
+> § S wins.
+
+**Every file below is ADDITIVE and NULLABLE with no default** — step 1 of the
+three (migrate BEFORE the code), no `UPDATE`, nothing changes what an existing
+column means. NULL always means "not set / automatic / old behaviour", and
+nothing may read it as 0. **One statement per file, one `ALTER` per table**,
+so a file is applied whole or not at all (several columns in one `ALTER` is
+still one statement).
+
+### S.1 The batches, in the order they deploy
+
+**Batch 1 — "marks", now (B builds pin styles; C's Check sheet waits behind
+OFF switches).** Goes with the already-written 0096/0097, which must be
+applied first anyway (they are below it, and 0096 is restated by later role
+enums). Both are additive and harmless without their code.
+
+| #    | File                            | Adds                                                                                                                                                                                                                                                         | For                |
+| ---- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ |
+| 0096 | `0096_tee_body_role` (written)  | `'teeBody'` appended to `runMaterialRole`                                                                                                                                                                                                                    | C                  |
+| 0097 | `0097_password_reset` (written) | `password_reset_tokens`; `users.sessionsValidAfter`                                                                                                                                                                                                          | A (reset)          |
+| 0098 | `0098_takeoff_stamps_marks`     | `takeoff_stamps`: `status enum('new','existing','remove','relocate')` (NULL = new), `rotation smallint`, `mirrored boolean`, `mountHeightInches decimal(7,2)`, `mountHeightSource enum('typed','read')`, `checkAcceptedAt timestamp`, `dropExcluded boolean` | B §7, §12; C; B H3 |
+| 0099 | `0099_takeoff_groups_marks`     | `takeoff_groups`: `markShape varchar(16)`, `markLetter varchar(4)`, `markColor varchar(7)`, `symbolLookupKey varchar(255)` (+ `fixtureTag varchar(16)` only if decided by then)                                                                              | B §6, §11.7        |
+| 0100 | `0100_assemblies_marks`         | `assemblies`: `markShape`, `markLetter`, `markColor` (as above)                                                                                                                                                                                              | B §6               |
+| 0101 | `0101_symbol_links_marks`       | `symbol_links`: `markShape`, `markLetter`, `markColor`, `originalLabel varchar(255)`                                                                                                                                                                         | B §6; B rename     |
+| 0102 | `0102_symbol_looks`             | table `symbol_looks` (C's `multiple-looks-plan.md` § 6) **with** `connectDx decimal(10,4)`, `connectDy decimal(10,4)` (B § 12: on the look, not the link)                                                                                                    | C; B connect point |
+
+That is **B's 15 columns** (9 pin, `status`, `symbolLookupKey`, `connectDx`,
+`connectDy`, `rotation`, `mirrored`) and **C's three** (`symbol_looks`,
+`mountHeight*`, `checkAcceptedAt`), plus `dropExcluded` (moved here from the
+old catalog batch: it is a `takeoff_stamps` column, and splitting one table
+across two batches would mean two `ALTER`s where one does). **Column names are
+B's** (`mark*`, settled in its § 12), not the `pin*` names R.10 proposed.
+
+**Batch 2 — "before the first outside invite".**
+
+| #    | File                      | Adds                                                                                                                                                                                |
+| ---- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0103 | `0103_signup_invites`     | the invite gate's table (invite-gate plan § 7)                                                                                                                                      |
+| 0104 | `0104_ai_correction_log`  | the correction log (its plan § 4) **plus C's** `askKind enum('crop','note')`, `askFingerprint varchar(64)` and index `(dataUserId, askFingerprint)` — in the CREATE, no second file |
+| 0105 | `0105_sheet_content_hash` | `bid_pdf_sheets.contentHash varchar(64)` (NULL = never read) — C's "never pay twice for the same drawing"                                                                           |
+
+**Batch 3 — "catalog", with C's catalog code.** The old 0100–0107, minus
+`dropExcluded` (now in 0098):
+
+| #    | File                           | Adds                                                        |
+| ---- | ------------------------------ | ----------------------------------------------------------- |
+| 0106 | `0106_new_material_categories` | 3 values appended to `materials.category`                   |
+| 0107 | `0107_locknut_bushing_roles`   | `'locknut'`, `'bushing'` appended (list = 0096's + 2)       |
+| 0108 | `0108_materials_parent_id`     | `materials.parentId int`                                    |
+| 0109 | `0109_materials_parent_id_fk`  | self-FK, `ON DELETE RESTRICT`                               |
+| 0110 | `0110_materials_brand`         | `materials.brand varchar(64)`                               |
+| 0111 | `0111_assembly_categories`     | 2 values appended to `assemblies.category`, `NOT NULL` kept |
+| 0112 | `0112_assembly_hours_nullable` | `assemblies.baseLaborHours` may be NULL                     |
+
+**Batch 4 — "legend reading"**: `0113_bid_pdf_legend_entries`, **with**
+`lookId int NULL -> symbol_looks, set null` in its `CREATE` — possible now
+because `symbol_looks` (0102) lands first, which settles the ordering question
+R.11 left open.
+
+**Batch 5 — "before the priced sheet"**: § 10d + B2 (brand line ×2,
+`bid_panels` + FKs, `panelId` + FK, `snapshotBrandLine`, example-price ×3),
+about ten files, numbered when written.
+
+**Not numbered, and why:**
+
+- **C's scan-decision log** (`scanned-plans-plan.md` § 5: sheet, box, item,
+  confirmed/rejected, code or AI). A new table; C says it is not needed until
+  the scan branch of Find all matching is built. Numbered then.
+- `fixtureTag` if not decided before 0099; legend § 8b/8c; H1 `quoteBucket`
+  (held); pack sizes (§ 12).
+- **The two step-3 files**, never in `drizzle/` before their code is live:
+  (i) clear the 8 starters' hours (§ 11 c), (ii) fold the "… - EXISTING TO
+  REMAIN" twins into `status` (R.9).
+
+### S.2 Rehearsal and checks for Batch 1
+
+- **Before writing:** list `drizzle/` on `local-dev`, `track-b`, `track-c`,
+  `a-email-reset`. The next free number must be 0098. B's § 12 says to stop if
+  anything on its list already exists in the schema — re-check that too.
+- **Test database, twice:** `schemaDrift` before; `migrate.mts` (expect
+  **7 applied**: 0096–0102 on a database at 0095); drift after ("matches");
+  `migrate.mts` again (expect 0). **If the count does not match, stop and find
+  out why before going on** — this line is stale, or the database is not where
+  you think.
+- `SHOW CREATE TABLE` on the five touched tables: `symbol_looks` must show
+  **five** foreign keys (C's plan says four; R.8) and its two indexes.
+- **A restored copy of live is not needed for Batch 1** (R.7): new nullable
+  columns and a new table only. The standing fresh-backup-before-live still
+  applies. Batch 3's FK and enums keep their restored-copy rehearsal.
+
+### S.3 Wrong-number watch for Batch 1 (R.5, restated for these columns)
+
+- `status`: the code must read NULL as `new`. A NULL read as anything else
+  stops counting real new work. How `existing`/`remove`/`relocate` are priced
+  is the owner's decision (todo.md), shipped as code.
+- `mountHeightInches`: NULL means "follow the count's height", and 0 is a real
+  height (a floor box). Reading NULL as 0 drops every vertical on that mark.
+- `connectDx/Dy`: NULL means "never answered"; `0, 0` means "the middle". If
+  runs snap to the connect point, footage changes, and the connect-point plan
+  must say whether existing runs are re-measured (R.13).
+- The `mark*` columns are display only; none moves a number.
+
+### S.4 Before the materials rename — in this order
+
+From `references/materials-naming-and-pricing-plan.md` § 7 (on
+`a-materials-plan`):
+
+1. **The owner answers that plan's open questions** (its § 8), starting with
+   "1-Pole" against the recorded "Single-Pole" decision.
+2. **The size-reading fix ships FIRST, in its own commit**: `readSize`,
+   `SIZE_PREFIXES` and `mcFittingNames` read BOTH the old dash form and the
+   new form, with tests. Measured: without it, MC cable runs lose their
+   connectors and straps on the bid, and 10/2–14/2 sort as amps. **No row is
+   renamed before this is live.**
+3. **The rename itself, in one commit** (C owns the catalog), through
+   `RENAMED_BASELINE_MATERIALS`, with the starter assemblies, run types and
+   search tables updated in the same commit. **No migration**: rows keep
+   their ids, so bid lines, assemblies and contractors' own copies are
+   untouched.
+4. **Then pricing:** Batch 3's `parentId`/`brand` (0108–0110) before brand
+   variants are seeded, and **Batch 5's example-price columns and their code
+   before ANY non-zero price goes into a seed file** (R.5 item 2).
 
 ## R. ONE LIST — every planned migration after 0095, reconciled 2026-10-01
 
