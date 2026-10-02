@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import LoginPage from "@/pages/LoginPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import { isResetAddress } from "@/lib/resetLink";
 import LandingPageContainer from "@/pages/landing/LandingPageContainer";
 import { addressAfterSignOut, landingAfterSignIn } from "@/lib/signInLanding";
 import { Loader2 } from "lucide-react";
@@ -32,6 +34,25 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const [signingIn, setSigningIn] = useState(false);
   /** Was this browser signed in at some point during this visit? */
   const wasSignedIn = useRef(false);
+  /**
+   * On the emailed reset link. Checked BEFORE the signed-in question: the
+   * link works whether or not this browser is signed in (someone locked out
+   * on their phone may still be signed in on this laptop), and a successful
+   * reset signs this browser out along with every other.
+   */
+  const [resetting, setResetting] = useState(() =>
+    isResetAddress(window.location.hash)
+  );
+  /** Said once on the sign-in form after a reset, then gone. */
+  const [signInNotice, setSignInNotice] = useState<string>();
+
+  useEffect(() => {
+    const onHash = () => {
+      if (isResetAddress(window.location.hash)) setResetting(true);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   /**
    * Clear the address when somebody signs out.
@@ -56,6 +77,28 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     window.location.hash = `#${addressAfterSignOut()}`;
   }, [user]);
 
+  if (resetting)
+    return (
+      <ResetPasswordPage
+        onDone={outcome => {
+          // Off the reset address, so the next screen is not the reset page
+          // again and the sign-in lands where it normally would.
+          window.history.replaceState(
+            null,
+            "",
+            window.location.pathname + window.location.search
+          );
+          setResetting(false);
+          setSignInNotice(
+            outcome === "changed"
+              ? "Password changed, and every other session signed out. Sign in with your new password."
+              : undefined
+          );
+          setSigningIn(true);
+        }}
+      />
+    );
+
   if (loading) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-background">
@@ -71,6 +114,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     if (signingIn)
       return (
         <LoginPage
+          notice={signInNotice}
           onSuccess={() => {
             // Whatever is in the address now is either a link this person
             // followed while signed out, or nothing in particular — the

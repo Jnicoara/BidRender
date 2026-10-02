@@ -621,6 +621,15 @@ This is the human-readable companion to the git history — read this to see wha
   measured, and the export gives it its own "Typed ft" column. It is the
   flat run only; drops and extra are added on top.
 
+- **"Forgot password?" on the sign-in page.** It emails a link to choose a
+  new password; the link works once, for one hour, and using it signs the
+  account out on every device. Changing your password in Settings now signs
+  out every other device too, while keeping the one you are on. Not live yet —
+  it needs a database change and the email service set up first.
+- **The database can now record a T conduit body at a branch tee as its own
+  bid line** (migration 0096). Nothing uses it yet — the plan viewer still
+  offers only a box at a tee — but the change that does needs the database
+  ready first. Rehearsed on a restored copy of the live database.
 - **Concrete ring boxes for deck pours are in the catalog**: 4" and 6"
   deep, and the backplate that goes with them (unpriced, like every
   shipped item).

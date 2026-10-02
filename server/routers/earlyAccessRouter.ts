@@ -26,54 +26,15 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import * as db from "../db";
+import { clientKey, createRateLimiter } from "../rateLimit";
 
 /**
- * Rate limit: submissions per address-family per window.
- *
- * ── Honest about what this is ───────────────────────────────────────────────
- * In-memory, so it is per instance. The app runs on Cloud Run, which means
- * several instances and a counter that resets whenever one is recycled — a
- * determined script gets through. That is accepted: the realistic threat to a
- * waitlist form is a bored bot hammering it, which this stops completely, not a
- * targeted attacker, whom nothing at this layer would stop anyway. The unique
- * index on email is the real backstop, and it caps the damage at one row per
- * address however many times it is posted.
- *
- * If this ever needs to be real, it belongs in front of the app rather than
- * here — see references/deploying.md for what the platform provides.
+ * Rate limit: 8 submissions per address per hour. What the limiter is and is
+ * not is in server/rateLimit.ts; here, the unique index on email is the real
+ * backstop, and it caps the damage at one row per address however many times
+ * it is posted.
  */
-const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
-const RATE_LIMIT_MAX = 8;
-const attempts = new Map<string, { count: number; resetAt: number }>();
-
-function overRateLimit(key: string, now: number): boolean {
-  const entry = attempts.get(key);
-  if (!entry || now > entry.resetAt) {
-    attempts.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    // Opportunistic sweep, so the map cannot grow without bound on a
-    // long-running instance. Cheap: it only walks on a fresh key.
-    if (attempts.size > 5000) {
-      attempts.forEach((value, existing) => {
-        if (now > value.resetAt) attempts.delete(existing);
-      });
-    }
-    return false;
-  }
-  entry.count += 1;
-  return entry.count > RATE_LIMIT_MAX;
-}
-
-/** Best-effort client identity for the limiter. Never stored. */
-function clientKey(req: { ip?: string; headers: Record<string, unknown> }) {
-  const forwarded = req.headers["x-forwarded-for"];
-  const first =
-    typeof forwarded === "string"
-      ? forwarded.split(",")[0]?.trim()
-      : Array.isArray(forwarded)
-        ? String(forwarded[0])
-        : undefined;
-  return first || req.ip || "unknown";
-}
+const overRateLimit = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 8 });
 
 /**
  * Normalise an address to the form it is stored and compared in.

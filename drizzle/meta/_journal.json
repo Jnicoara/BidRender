@@ -673,6 +673,20 @@
       "when": 1789958500000,
       "tag": "0095_group_drop_run_type_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "5",
+      "when": 1789958600000,
+      "tag": "0096_tee_body_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "5",
+      "when": 1789958700000,
+      "tag": "0097_password_reset",
+      "breakpoints": true
     }
   ]
 }

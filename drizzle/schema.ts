@@ -1,5 +1,6 @@
 import {
   bigint,
+  char,
   boolean,
   int,
   json,
@@ -94,10 +95,48 @@ export const users = mysqlTable("users", {
    * at any time — which is why this clears rather than latching.
    */
   checklistDismissedAt: timestamp("checklistDismissedAt"),
+
+  /**
+   * A session token issued before this moment is refused (0097). Set by a
+   * password reset and by a password change, which is what makes either one
+   * sign out every other device — a session otherwise lasts a year and
+   * carries nothing to check against. `shared/sessionValidity.ts` decides.
+   *
+   * NULL means neither has happened, and every session is judged as it was
+   * before the column existed. Deliberately no default: `now()` would have
+   * signed every user out on the day the migration ran.
+   */
+  sessionsValidAfter: timestamp("sessionsValidAfter"),
 });
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+/**
+ * One emailed password-reset link (0097). The token itself is never stored:
+ * `tokenHash` is its SHA-256, like a company invite code, so a copy of this
+ * table cannot be used to reset anybody's password.
+ *
+ * Single-use by `usedAt`, claimed with one conditional UPDATE so two requests
+ * racing on the same link cannot both succeed (`claimPasswordResetToken`).
+ */
+export const passwordResetTokens = mysqlTable(
+  "password_reset_tokens",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: char("tokenHash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+    usedAt: timestamp("usedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => [
+    unique("password_reset_tokens_tokenHash_uq").on(t.tokenHash),
+    index("password_reset_tokens_userId_idx").on(t.userId),
+  ]
+);
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 export const projects = mysqlTable(
@@ -2646,6 +2685,14 @@ export const RUN_MATERIAL_ROLES = [
   */
   "teeBox",
   "teeCover",
+  /*
+    A T conduit body at a branch tee (0096), appended. Its own role because a
+    run type can have box tees and body tees on one bid, and a line is keyed
+    by run type + role. No cover role: the body is priced with its cover and
+    gasket. Nothing writes it until the Track C wiring ships
+    (references/materials-track-c-plan.md § 4).
+  */
+  "teeBody",
 ] as const;
 export type RunMaterialRole = (typeof RUN_MATERIAL_ROLES)[number];
 

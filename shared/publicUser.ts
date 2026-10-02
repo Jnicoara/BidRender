@@ -43,7 +43,13 @@ export const PUBLIC_USER_FIELDS = [
  * Fields deliberately kept server-side, named so the drift test can tell
  * "considered and withheld" apart from "nobody has looked at this yet".
  */
-export const NEVER_SENT_USER_FIELDS = ["passwordHash", "openId"] as const;
+export const NEVER_SENT_USER_FIELDS = [
+  "passwordHash",
+  "openId",
+  // When this account's password last changed (0097) — a security event no
+  // screen shows, and a browser has no use for.
+  "sessionsValidAfter",
+] as const;
 
 export type PublicUserField = (typeof PUBLIC_USER_FIELDS)[number];
 
