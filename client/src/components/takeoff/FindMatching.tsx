@@ -16,22 +16,27 @@
  */
 import { createPortal } from "react-dom";
 import { useEffect } from "react";
-import { Check, ChevronRight, X } from "lucide-react";
+import { Check, ChevronRight, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { MatchBox } from "@/lib/findMatching";
 import {
+  aiBatch,
   clearOpen,
   itemKind,
   summary,
   type ItemKind,
   type MatchItem,
 } from "@/lib/findMatchingSession";
+import { DEMOLITION_REASON } from "@/lib/scanMatching";
 
 const RING: Record<ItemKind, { stroke: string; dash: string; tag: string }> = {
   clear: { stroke: "#22D3EE", dash: "5 3", tag: "" },
   needsLook: { stroke: "#F59E0B", dash: "3 2", tag: "?" },
   maybeExisting: { stroke: "#94A3B8", dash: "2 2", tag: "E?" },
   already: { stroke: "#64748B", dash: "1 3", tag: "" },
+  // On a demolition plan: offered, never counted unless chosen.
+  demolition: { stroke: "#FB7185", dash: "1 2", tag: "D" },
 };
 
 export function MatchLayer({
@@ -54,7 +59,7 @@ export function MatchLayer({
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
-      className="absolute inset-0 w-full h-full z-10 pointer-events-none"
+      className="absolute inset-0 w-full h-full z-10 pointer-events-none select-none"
       aria-label="Matches found on this sheet"
     >
       {items
@@ -110,8 +115,13 @@ export function MatchLayer({
               <title>
                 {kind === "already"
                   ? `Already counted as ${item.alreadyCounted}`
-                  : [...item.needsLook, ...item.maybeExisting].join("; ") ||
-                    "Found — not counted yet"}
+                  : [
+                      ...(item.onDemolitionPlan
+                        ? [DEMOLITION_REASON(item.onDemolitionPlan)]
+                        : []),
+                      ...item.needsLook,
+                      ...item.maybeExisting,
+                    ].join("; ") || "Found — not counted yet"}
               </title>
             </g>
           );
@@ -130,6 +140,12 @@ export type MatchPanelState =
       selectedId: number | null;
       readMs: number;
       findMs: number;
+      /** The box that was searched for, page points. */
+      box: MatchBox;
+      /** Present on a scan (@/lib/scanMatching): the plan searched. */
+      scan: { plan: string | null; pixels: number } | null;
+      /** The AI button's state (scans only): asking, and its last word. */
+      ai: { busy: boolean; message: string | null };
     };
 
 export function MatchPanel({
@@ -137,12 +153,18 @@ export function MatchPanel({
   existingLabel,
   state,
   chromeTarget,
+  canAskAi,
+  onAskAi,
   onConfirm,
   onConfirmExisting,
   onReject,
   onNext,
   onClose,
 }: {
+  /** The AI reader is on for this company: the scan button may be shown. */
+  canAskAi: boolean;
+  /** One press, one small call, about the next AI_BATCH copies. */
+  onAskAi: () => void;
   /** The count a confirmed copy goes to. */
   label: string;
   /** Its existing-to-remain twin, when there is one to put a copy in. */
@@ -179,7 +201,7 @@ export function MatchPanel({
   } else if (state.phase === "finding") {
     body = (
       <p className="text-xs text-muted-foreground" role="status">
-        Looking across the sheet…
+        Looking across the sheet… On a scanned sheet this takes several seconds.
       </p>
     );
   } else if (state.phase === "message") {
@@ -193,10 +215,18 @@ export function MatchPanel({
     const sel = state.items.find(i => i.id === state.selectedId) ?? null;
     const selKind = sel ? itemKind(sel) : null;
     const clear = clearOpen(state.items);
+    const askable = state.scan ? aiBatch(state.items) : [];
     body = (
       <>
         <p className="text-xs" role="status" aria-live="polite">
-          Found {s.found} on this sheet
+          Found {s.found}{" "}
+          {state.scan?.plan ? (
+            <>
+              on <span className="font-medium">{state.scan.plan}</span>
+            </>
+          ) : (
+            "on this sheet"
+          )}
           <span className="text-muted-foreground">
             {" "}
             (
@@ -207,6 +237,13 @@ export function MatchPanel({
           </span>
           . None is counted until you confirm it.
         </p>
+        {state.scan && (
+          <p className="text-xs text-muted-foreground mt-1">
+            A scan: matched by picture, so the tag or an E beside each one is
+            not read.{" "}
+            {canAskAi ? "Check them, or ask the AI." : "Check each one."}
+          </p>
+        )}
         <ul className="mt-1.5 space-y-0.5 text-xs">
           <li>
             <span className="inline-block w-2 h-2 rounded-full bg-[#22D3EE] mr-1.5" />
@@ -222,6 +259,13 @@ export function MatchPanel({
             <li>
               <span className="inline-block w-2 h-2 rounded-full bg-[#94A3B8] mr-1.5" />
               {s.maybeExisting} maybe existing
+            </li>
+          )}
+          {s.demolition > 0 && (
+            <li>
+              <span className="inline-block w-2 h-2 rounded-full bg-[#FB7185] mr-1.5" />
+              {s.demolition} on the demolition plan — not counted unless you
+              count them
             </li>
           )}
           {s.already > 0 && (
@@ -250,22 +294,55 @@ export function MatchPanel({
             variant="outline"
             className="h-7 gap-1 text-xs"
             onClick={onNext}
-            disabled={s.clear + s.needsLook + s.maybeExisting === 0}
+            disabled={
+              s.clear + s.needsLook + s.maybeExisting + s.demolition === 0
+            }
           >
             Next <ChevronRight className="w-3 h-3" />
           </Button>
+          {canAskAi && state.scan && askable.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 text-xs"
+              disabled={state.ai.busy}
+              onClick={onAskAi}
+              title="Sends small pictures of these spots, never the sheet. Answers are suggestions; nothing is counted."
+            >
+              <Sparkles className="w-3 h-3" />
+              {state.ai.busy
+                ? "Asking…"
+                : `Ask AI about ${askable.length} (under 1¢)`}
+            </Button>
+          )}
         </div>
+        {state.ai.message && (
+          <p className="text-xs text-muted-foreground mt-1.5" role="status">
+            {state.ai.message}
+          </p>
+        )}
 
         {sel && sel.state === "open" && selKind !== "already" && (
           <div className="mt-2.5 rounded-lg border border-border p-2">
             <p className="text-xs font-medium">
-              {selKind === "needsLook"
-                ? "Needs a look"
-                : selKind === "maybeExisting"
-                  ? "Maybe existing"
-                  : "Looks the same as the one you boxed"}
+              {selKind === "demolition"
+                ? "On the demolition plan — not counted"
+                : selKind === "needsLook"
+                  ? "Needs a look"
+                  : selKind === "maybeExisting"
+                    ? "Maybe existing"
+                    : "Looks the same as the one you boxed"}
             </p>
-            {[...sel.needsLook, ...sel.maybeExisting].map(reason => (
+            {/* The heading already says "demolition plan — not counted". */}
+            {[
+              ...sel.needsLook,
+              ...sel.maybeExisting,
+              ...(sel.ai === "same"
+                ? ["The AI reads the same tag or label beside it."]
+                : sel.ai === "noAnswer"
+                  ? ["The AI could not tell."]
+                  : []),
+            ].map(reason => (
               <p key={reason} className="text-xs text-muted-foreground mt-0.5">
                 {reason}
               </p>

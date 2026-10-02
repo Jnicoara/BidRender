@@ -17,16 +17,20 @@
  * so a refetch of the sheet list cannot send the same reading twice.
  */
 
+import { pageTextKey } from "./pageText";
+
 export type SheetForScale = {
   id: number;
   pageNumber: number;
   scaleSource: string;
 };
 
-/** The key a page's early-read text is kept under. */
-export function earlyTextKey(bidPdfId: number, pageNumber: number): string {
-  return `${bidPdfId}:${pageNumber}`;
-}
+/**
+ * The key a page's early-read text is kept under — the SAME (plan set, page)
+ * key the reader's page text uses (@/lib/pageText), so the two can never
+ * disagree about which page a text belongs to.
+ */
+export const earlyTextKey = pageTextKey;
 
 /**
  * The sheets whose scale should be detected now: read before their row

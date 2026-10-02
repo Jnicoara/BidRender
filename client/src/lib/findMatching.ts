@@ -54,6 +54,13 @@ export type Match = {
   maybeExisting: string[];
   /** The very one that was boxed. Still a device to count. */
   isBoxed: boolean;
+  /**
+   * The title of the DEMOLITION plan this copy is on, or null. Read from a
+   * scan's text layer (@/lib/scanMatching); such a copy is shown "not
+   * counted" and "Confirm all" leaves it. Null on vector sheets, which
+   * search the whole sheet as before.
+   */
+  onDemolitionPlan: string | null;
 };
 
 export type FindResult =
@@ -67,8 +74,14 @@ export type FindResult =
         width: number;
         height: number;
       };
+      /**
+       * Present when the sheet is a scan and the picture matcher ran: the
+       * plan searched (null = the whole sheet) and the symbol's size in the
+       * scan's own pixels.
+       */
+      scan?: { plan: string | null; pixels: number };
     }
-  | { kind: "scan" | "empty" | "tooBig"; message: string };
+  | { kind: "scan" | "empty" | "tooBig" | "tooPoor"; message: string };
 
 /** A copy must hold at least this share of the symbol's line length. */
 export const MIN_COVERAGE = 0.8;
@@ -1072,6 +1085,7 @@ export function searchSymbol(
       maybeExisting,
       isBoxed:
         opts.boxedHere === true && Math.hypot(f.tx - cx, f.ty - cy) <= 2 * tol,
+      onDemolitionPlan: null,
     };
   });
 

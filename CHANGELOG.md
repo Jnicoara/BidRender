@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-02]
 
+- **The plan reader can no longer be given another plan set's words.** The
+  text read off each sheet (title block, notes, printed scale) was kept by page
+  number only, so page 1 of one plan set could be sent to the reader with page
+  1 of another set's picture — including the wrong printed scale. It is now
+  kept per plan set.
 - **No more lost clicks when you start counting.** Clicking marks straight
   after choosing a legend symbol (or picking an assembly or typing a new count
   name) could silently drop some of them while the app was still setting the
@@ -33,6 +38,15 @@ This is the human-readable companion to the git history — read this to see wha
   compared every material against every other one, and took 4.5 seconds at
   today's catalog size. It now asks the same question in one pass (6 ms).
   That slowness was why the materials tests sometimes timed out.
+- **Find all matching now works on scanned plans (test build, track-c).** Box
+  one symbol on a scanned sheet and every copy on that plan is found by its
+  picture, with no AI. On Old Blueridge it found 85 of the owner's 86 hand
+  marks. It searches only the plan you boxed on, so a demolition plan drawn
+  on the same sheet is never mixed in. Boxed on the demolition plan itself,
+  every find says "not counted". A scan too coarse to match is refused with
+  its size in pixels. Nothing on a scan counts until someone has checked the
+  tag or the "E" beside it. An optional "Ask AI" button reads those from
+  small pictures, about a cent for twelve.
 
 - **Count pins now take their shape from what the item is.** Receptacles and
   junction boxes are circles, lights are squares, data outlets are triangles,

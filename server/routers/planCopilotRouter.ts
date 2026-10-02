@@ -46,8 +46,11 @@ import {
   TIE_BREAK_MAX_CROPS,
   TIE_BREAK_MAX_IMAGE_CHARS,
   TIE_BREAK_MODEL,
+  parseScanFinds,
   parseTieBreak,
+  scanFindsRequest,
   tieBreakRequest,
+  type ScanFindAnswer,
 } from "../tieBreak";
 import { COPILOT_ACTIONS, canPerform } from "../../shared/copilotActions";
 import {
@@ -692,6 +695,71 @@ export const planCopilotRouter = router({
           );
           return none(
             "The reader could not be reached. Nothing was changed — pick these by eye."
+          );
+        }
+      }
+    ),
+
+  /**
+   * Find all matching on a SCAN: what is written beside each find — the same
+   * tag as the picked one, another tag, an "E", or not this symbol
+   * (`server/tieBreak.ts`, `scanFindsRequest`). Small crops in, one closed
+   * answer per crop out. Writes nothing: every answer is shown on a find that
+   * is still unconfirmed. A button, never an effect.
+   */
+  checkScanFinds: procedure
+    .input(
+      z.object({
+        sheetId: z.number().int().positive(),
+        picked: tieImage,
+        crops: z
+          .array(
+            z.object({ id: z.number().int().positive(), picture: tieImage })
+          )
+          .min(1)
+          .max(TIE_BREAK_MAX_CROPS),
+      })
+    )
+    .mutation(
+      async ({
+        input,
+        ctx,
+      }): Promise<{
+        answers: Array<{ cropId: number; answer: ScanFindAnswer | null }>;
+        message: string | null;
+      }> => {
+        if (!aiFeaturesEnabled()) throw readerSwitchedOff();
+        await requireSheet(input.sheetId, ctx.scope.dataUserId);
+        const none = (message: string) => ({
+          answers: input.crops.map(c => ({ cropId: c.id, answer: null })),
+          message,
+        });
+        try {
+          const result = await invokeLLM({
+            feature: "plan-read",
+            user: ctx.user,
+            ...scanFindsRequest({
+              model: TIE_BREAK_MODEL,
+              picked: input.picked,
+              crops: input.crops,
+            }),
+          });
+          const answers = parseScanFinds(result, input.crops);
+          return {
+            answers: input.crops.map(c => ({
+              cropId: c.id,
+              answer: answers.get(c.id) ?? null,
+            })),
+            message: null,
+          };
+        } catch (error) {
+          if (error instanceof AiLimitReached) return none(error.message);
+          noteFailure(
+            "scan finds request rejected",
+            error instanceof Error ? error.message : error
+          );
+          return none(
+            "The reader could not be reached. Nothing was changed — check these by eye."
           );
         }
       }
