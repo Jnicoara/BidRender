@@ -1,6 +1,6 @@
 # Migrations 0098–0105 — one additive batch for Tracks B and C. PLAN ONLY, 2026-09-29
 
-> **RENUMBERED 2026-10-01: this batch is now 0100–0107.** § R below is the
+> **RENUMBERED AGAIN 2026-10-02 — see § S, which overrides § R. The catalog batch is now 0106–0112.** (Was: "RENUMBERED 2026-10-01: this batch is now 0100–0107".) § R below is the
 > one list for every migration after 0095. It overrides § 0 and every
 > number in §§ 1–11. The sections below keep their old numbers as written,
 > and § R.2 maps each one. Nothing is written or run yet.
