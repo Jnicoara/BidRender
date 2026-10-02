@@ -298,7 +298,9 @@ Both are timing, not wrong answers, and both touch the shared test database.
 Fix them together: a green run that sometimes lies about being red trains
 everyone to re-run instead of read.
 
-- [ ] **HANDOFF to whoever owns `server/db.ts` — the root cause of every
+- [x] **DONE 2026-10-01 (Track B), see the materialsLibrary entry below.**
+      No index on `materials.name` added — that is a migration, still open.
+      **HANDOFF to whoever owns `server/db.ts` — the root cause of every
       seed-heavy timeout below, including `materialsLibrary.test.ts`'s four
       failures on `a-fitting-labor` (73c349e).** Found and measured
       2026-09-29 on track-c; NOT committed there because A and B are working
@@ -425,6 +427,17 @@ GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
       back, the same shape as the `seedReactivatesRetired` race above:
       suspect a second writer to shared `materials` rows mid-seed. Capture
       the assertion text on the next failure before changing anything.
+      **FIXED 2026-10-01 (Track B) — not a second writer: a timeout.** It is
+      the `dedupeBaselineRows` entry above. Measured on `bidrender_test_b` at
+      1,554 baseline rows: the duplicate check alone 4,551 ms, and the file
+      now failed ALONE — two "Test timed out in 5000ms", five more at
+      3.4–4.8 s. Under any extra load on the shared MySQL, a different subset
+      tipped over, which is why it looked random. Check AND repair DELETE now
+      use the GROUP BY; every seed test under 300 ms, 34/34 with four
+      connections running the old query alongside. New cases: a duplicate is
+      still found and removed, and a re-seed finishes under 1.5 s (12 red on
+      the old query across the three seed files). Both 60 s `vi.setConfig`
+      limits removed.
 - [x] **`scripts/schemaDrift.mts` says "this database has never been migrated"
       when it simply cannot connect.** Measured 2026-09-27 against production
       with the laptop off the database's trusted list: that line printed, then

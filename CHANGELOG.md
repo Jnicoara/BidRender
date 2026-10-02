@@ -18,6 +18,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-01]
 
+- **The server starts about four seconds faster, and a test that failed at
+  random no longer does.** A start-up check for duplicate catalog rows
+  compared every material against every other one, and took 4.5 seconds at
+  today's catalog size. It now asks the same question in one pass (6 ms).
+  That slowness was why the materials tests sometimes timed out.
+
 - **Count pins now take their shape from what the item is.** Receptacles and
   junction boxes are circles, lights are squares, data outlets are triangles,
   switches are diamonds, panels and disconnects are wide rectangles, and

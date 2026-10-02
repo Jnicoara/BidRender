@@ -1245,6 +1245,17 @@ export async function withSeedLock(
  * is not at 600 — an unconditional DELETE here deadlocked against ordinary
  * inserts elsewhere. The SELECT costs nothing by comparison and, finding
  * nothing, leaves the table untouched.
+ *
+ * ── The check is a GROUP BY, never the self-join ──────────────────────────────
+ * It used to be the same self-join as the DELETE, `LIMIT 1`. `name` has no
+ * index, so MySQL drove it off `userId` — every baseline row against every
+ * other, quadratic. At 1,554 baseline materials that one SELECT measured
+ * 4,551 ms (2026-10-01, bidrender_test_b), on EVERY seed: every server start
+ * and every test that re-seeds. That was the materialsLibrary "flake" — seven
+ * tests that call the seed sat at 3.4–5.0 s against vitest's 5 s limit, so
+ * any extra load on the MySQL tipped some over, and by 1,554 rows two failed
+ * alone. Same question, one pass: 6 ms. A LIMIT on the join does not help when
+ * there is nothing to find — it has to try every pair to say so.
  */
 async function dedupeBaselineRows(
   table: "materials" | "labor_rates" | "modifiers" | "assemblies" | "kits"
@@ -1254,10 +1265,9 @@ async function dedupeBaselineRows(
   // Table name is a compile-time constant from the union above, never user input.
   const result = await db.execute(
     sql.raw(
-      `SELECT 1 FROM \`${table}\` dupe
-     JOIN \`${table}\` keeper
-       ON dupe.name = keeper.name AND dupe.id > keeper.id
-     WHERE dupe.userId IS NULL AND keeper.userId IS NULL
+      `SELECT 1 FROM \`${table}\`
+     WHERE userId IS NULL
+     GROUP BY name HAVING COUNT(*) > 1
      LIMIT 1`
     )
   );
@@ -1265,12 +1275,19 @@ async function dedupeBaselineRows(
   const [rows] = result as unknown as [unknown[], unknown];
   if (rows.length === 0) return;
 
+  // The keepers are found by the same GROUP BY, materialised first, so the
+  // join is every baseline row against the few duplicated names rather than
+  // against every other row.
   await db.execute(
     sql.raw(
       `DELETE dupe FROM \`${table}\` dupe
-     JOIN \`${table}\` keeper
-       ON dupe.name = keeper.name AND dupe.id > keeper.id
-     WHERE dupe.userId IS NULL AND keeper.userId IS NULL`
+     JOIN (
+       SELECT name, MIN(id) AS keepId FROM \`${table}\`
+       WHERE userId IS NULL
+       GROUP BY name HAVING COUNT(*) > 1
+     ) keeper
+       ON dupe.name = keeper.name AND dupe.id > keeper.keepId
+     WHERE dupe.userId IS NULL`
     )
   );
 }
