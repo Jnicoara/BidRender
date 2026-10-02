@@ -113,12 +113,31 @@ All additive and nullable. Specs are in the plans named.
 - [ ] `ai_usage`/ask log `askKind` + `askFingerprint`, and
       `bid_pdf_sheets.contentHash` — so the same tie on the same drawing is
       never paid for twice. `references/legend-and-notes-automation-plan.md`.
+- [ ] A log of every decision on a SCAN find (sheet, box, item, confirmed or
+      rejected, code or AI) — the only thing a trained detector could learn
+      from; the correction log stores no picture or box.
+      `references/scanned-plans-plan.md` § 5. Not needed until the scan branch
+      of Find all matching is built.
+
+### Matcher and check — next code changes (Track C, from the UNCC and Blueridge measurements)
+
+- [ ] **The matcher tries 45° turns**, not only quarter turns and mirrors.
+      UNCC E111: 2 of the 7 odd data outlets are drawn turned 45° on the angled
+      wall and read as "nothing under this mark"
+      (`legend-and-notes-automation-plan.md` § 7b). Applies to the vector
+      matcher (`@/lib/findMatching`) and the proposed scan matcher.
+- [ ] **A mark with a single letter beside it ("F", "E", "WP") is a possible
+      variant of its count**, not just words to show. UNCC E111: 2 data
+      outlets have an "F" under the triangle; one of them read as the fire
+      alarm pull station, whose legend label is also "F". The letter should
+      put the mark in its own variant group (`variantsOfCount`) and must not
+      by itself switch the mark to another legend item.
 
 ### Capture fixes must ship in the next live release
 
 - [ ] **Remove `C:\dev\BidPhase-C-site` after the reader accuracy test, and
       never commit or merge from it.** It is a detached git worktree (at
-      `52a6b0b` since 2026-10-01; was `9851c86`) that serves the counter's
+      `96c96d6` since late 2026-10-01; was `52a6b0b`, then `9851c86`) that serves the counter's
       test site on port 3004
       (2026-09-30), so edits in `C:\dev\BidPhase-C` cannot hot-reload into
       the page he is counting on. Its `.env` points `LOCAL_STORAGE_DIR` at
@@ -302,9 +321,9 @@ everyone to re-run instead of read.
       **The fix, one statement, same answer** — the check only asks whether
       any baseline name appears twice:
       ``sql
-    SELECT 1 FROM `${table}` WHERE userId IS NULL
-    GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
-    ``
+SELECT 1 FROM `${table}` WHERE userId IS NULL
+GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
+``
       4 ms instead of 1,473. Applied temporarily: a full seed 2,000 ms → 20
       ms; `materialsLibrary` + `materialsCatalog` + `seedPreservesUserPrices`,
       101 tests, 2.8 s instead of ~40 s, none over 300 ms; `materialsLibrary`

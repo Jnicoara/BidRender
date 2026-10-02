@@ -4603,6 +4603,13 @@ millisecond. It will not tell two similar symbols apart reliably, and it is not
 being asked to — it is being asked to ORDER three candidates and to veto an
 obviously wrong one. **Honest limit: this is a ranker, not a decider.**
 
+> **Scans are a different case, 2026-10-01** (`references/scanned-plans-plan.md`
+> § 7). The objection above is to correlating against thumbnails stored from
+> OTHER jobs. On a scanned sheet the picked symbol is cut from the same sheet
+> at the same resolution, none of those differences exist, and correlation
+> measured 85 of 86 on Old Blueridge. This section still stands for matching
+> across jobs; nothing here is overridden.
+
 **Stage 3 — the model, on the final yes/no only.** Vision is genuinely good at
 "are these the same symbol, allowing for line weight and scale", and genuinely
 bad value at being run 200 times. So it sees the new crop and the top one or two

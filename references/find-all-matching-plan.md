@@ -104,6 +104,13 @@ duplex, correctly, which is still a disagreement someone has to resolve).
    AI reader is on**, offers "Read this sheet instead" with its cost — a
    button, per the AI rules. With AI off it says "count these by hand", and
    nothing else. A set can mix both; the decision is per sheet.
+
+   > **Proposed replacement, 2026-10-01:** `references/scanned-plans-plan.md`
+   > measured picture matching on scans (85 of 86 found on Old Blueridge, no
+   > AI) and recommends a scan branch of this matcher. The refusal then stays
+   > only for scans too coarse to match (§ 6 step 2 there). Until that is
+   > built, this item stands as written.
+
 3. **Never the reader's results as an answer key.** The matcher reads no AI
    finding, and nothing it does pre-fills the reader-accuracy key.
 4. **Locked bid:** not offered (as built).
@@ -181,7 +188,8 @@ Nothing else. Unconfirmed matches are never stored, so they need no table.
    as proposals for later (a table, and a half-decided state on the bid).
 4. **The look:** **B's pin plan § 8 (recommended)** / keep the test colours.
 5. **Scans:** **say it cannot, and offer the reader by name when AI is on
-   (recommended)** / say it cannot and nothing more.
+   (recommended)** / say it cannot and nothing more. _(2026-10-01: see
+   `scanned-plans-plan.md`, which proposes matching scans instead.)_
 6. **Find from the legend (step 3):** **yes, same set only (recommended)** /
    across sets too (§ 9.4 risk: offices draw symbols differently).
 7. **Every sheet of the set (step 4):** **yes, after step 3 (recommended)** /
