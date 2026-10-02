@@ -24,10 +24,17 @@ setup("sign in the smoke account", async ({ request, baseURL }) => {
   // holds the gate cookie (server/stagingGate.ts). A local server has no gate.
   // Posted whenever a staging password is given, so the same path can be
   // proved against a local server started with STAGING_PASSWORD set.
-  const gatePassword =
+  //
+  // TRIMMED, because the server trims ITS copy (server/stagingGate.ts reads
+  // STAGING_PASSWORD with .trim()) and compares what is posted as sent — so a
+  // secret pasted with a trailing space or newline was refused (401, the
+  // first staging run, 2026-10-02). The account password is NOT trimmed:
+  // there a space could be real, and the server does not trim it either.
+  const gatePassword = (
     baseURL === "https://staging.bidridge.com"
       ? required("SMOKE_STAGING_PASSWORD")
-      : process.env.SMOKE_STAGING_PASSWORD;
+      : (process.env.SMOKE_STAGING_PASSWORD ?? "")
+  ).trim();
   if (gatePassword) {
     const gate = await request.post("/staging-gate", {
       form: { password: gatePassword },
@@ -35,14 +42,14 @@ setup("sign in the smoke account", async ({ request, baseURL }) => {
     });
     expect(
       gate.status(),
-      "staging password page refused the password"
+      "staging password page refused SMOKE_STAGING_PASSWORD — re-enter that secret (it cannot be read back, only replaced)"
     ).toBeLessThan(400);
   }
 
   const login = await request.post("/api/trpc/auth.login", {
     data: {
       json: {
-        email: required("SMOKE_EMAIL"),
+        email: required("SMOKE_EMAIL").trim(),
         password: required("SMOKE_PASSWORD"),
       },
     },

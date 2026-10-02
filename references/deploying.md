@@ -1518,6 +1518,39 @@ additive ones run BEFORE the push (§ 5, three steps).
 5. Then production, in the same order — see the release entry below for the
    current one, and § 5a for the full commands.
 
+### Staging: migrations 0096–0102 (done 2026-10-02) — NOT yet on live
+
+The marks batch (`migrations-0098-batch-plan.md` § S, Batch 1) with the two
+password-reset files from `a-email-reset`. All seven are additive and
+nullable, so they went on the database BEFORE the code (§ 5).
+
+1. **Backed up staging, and proved the backup restores.** Staging has no
+   nightly backup, so the backup is a `mysqldump` over TLS
+   (`--single-transaction`) to `C:\dev\bidrender-backups\` on the owner's
+   laptop: `staging-2026-10-02T05-14-49Z-before-0096-0102.sql` (63 tables),
+   restored into a local scratch database and compared with staging table by
+   table — every count equal.
+2. **Rehearsed on that restored copy**, twice (an earlier copy too): drift
+   before, 8 tables out — exactly the expected set; migrate, **7 applied**;
+   drift after, "matches", 141/141 foreign keys; second migrate, nothing to
+   apply; every data count unchanged; the new code's main reads (bids,
+   dashboard, counts, symbols, plan sets) all answer on it.
+3. **Staging**: drift before, 96 recorded, the same 8 tables. Migrate, **7
+   applied**, 103 recorded. Drift after, "Database matches the schema",
+   141/141. Second run, nothing. Data counts before and after: identical. The
+   OLD code (`9455e5f`) kept answering in between.
+4. **Code**: `c3b1677` pushed to `staging` by hand (a push with `drizzle/`
+   changes is refused by the auto-deploy, by design), then `local-dev`
+   fast-forwarded to the same commit; the auto-deploy then found nothing to
+   refuse and confirmed `/api/version` = `c3b1677`. Drift against the running
+   code: matches.
+
+**For live, later, the same order:** fresh backup of live and prove it
+restores (§ 5a), drift, migrate (**expect 7 applied, 103 recorded** — if the
+number differs, stop and find out why before going on: either this line is
+stale or the database is not where you think), drift, check the old code,
+then release `main` (§ 4).
+
 ### Live release: migrations 0089–0095 (written 2026-09-29, done 2026-09-29)
 
 Staging took this release on 2026-09-29: its drift check went from 6 tables
