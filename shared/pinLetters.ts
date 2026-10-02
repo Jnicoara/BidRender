@@ -6,9 +6,12 @@
  * A letter survives a black-and-white print, colour blindness and a seventh
  * count, which shape and colour do not. It matters most where several items
  * share one assembly: each has its own count (shared/assemblyCounts.ts), but
- * the same assembly gives them the same category and so the same SHAPE, and
+ * the same assembly gave them the same category and so the same SHAPE, and
  * until this file the only thing telling three lights apart on a sheet was a
- * colour hashed from an id — which could repeat.
+ * colour hashed from an id — which could repeat. Since 2026-10-01 the shape
+ * comes from the count's own name too (shared/deviceFamily.ts), so a duplex
+ * and a switch on one assembly differ in shape. Three lights are still three
+ * squares, and their letters and colours tell them apart.
  *
  * ── Where a letter comes from, in order ─────────────────────────────────────
  *  1. The ITEM — the count's own name. A fixture tag in it wins: "Linear 8ft
@@ -38,7 +41,8 @@
  * the letter is what keeps them apart (pin plan § 5 — "colour narrows; the
  * letter decides").
  */
-import { MARK_COLORS, type MarkColor } from "./takeoffMarks";
+import { FAMILY_SHAPE, deviceFamily } from "./deviceFamily";
+import { MARK_COLORS, type MarkColor, type MarkShape } from "./takeoffMarks";
 
 /**
  * The default table (pin plan § 3), most specific first: "3-way switch" must
@@ -46,6 +50,9 @@ import { MARK_COLORS, type MarkColor } from "./takeoffMarks";
  * Matched on whole words of the lower-cased name.
  */
 const DEFAULT_LETTERS: readonly (readonly [RegExp, string])[] = [
+  // A safety switch is a disconnect, not a wall switch, so it sits above
+  // `/\bswitch/` (pin plan decision 4 — it read S until 2026-10-01).
+  [/\b(disconnect|safety switch|fused switch|non-fused|nonfused)/, "DS"],
   // Switches & controls
   [/\b(3[- ]?way|three[- ]way)\b/, "S3"],
   [/\b(4[- ]?way|four[- ]way)\b/, "S4"],
@@ -54,6 +61,14 @@ const DEFAULT_LETTERS: readonly (readonly [RegExp, string])[] = [
   [/\btimer\b/, "SK"],
   [/\bthermostat/, "T"],
   [/\bswitch/, "S"],
+  // Data / telecom — above receptacles, because a "data outlet" or "TV
+  // outlet" is not a receptacle (it read R until the screen check, 2026-10-01;
+  // shared/deviceFamily.ts orders its words the same way).
+  [/\b(data\/voice|voice\/data|combo)\b/, "DV"],
+  [/\b(wap|wireless access|access point)\b/, "WA"],
+  [/\b(tv|catv|coax)\b/, "TV"],
+  [/\b(data|cat ?5e?|cat ?6a?)\b/, "D"],
+  [/\b(voice|phone|telephone)\b/, "V"],
   // Receptacles & boxes
   [/\b(gfci|gfi)\b/, "G"],
   [/\b(quad|fourplex|double duplex)\b/, "Q"],
@@ -64,6 +79,9 @@ const DEFAULT_LETTERS: readonly (readonly [RegExp, string])[] = [
   [/\b(240\s?v?|range|dryer|special purpose|welder)\b/, "P"],
   [/\b(junction|j-box|jbox|j box)\b/, "J"],
   [/\b(receptacle|recep|duplex|outlet|plug)s?\b/, "R"],
+  // A lighting PANEL is a panelboard; an LED flat panel is a light.
+  [/\b(lighting panel|panelboard|panel board|load ?center)\b/, "PN"],
+  [/\b(flat panel|panel light)\b/, "L"],
   // Lighting
   [/\bexit\b/, "X"],
   [/\b(emergency|bug[- ]?eye|egress light)\b/, "E"],
@@ -71,12 +89,6 @@ const DEFAULT_LETTERS: readonly (readonly [RegExp, string])[] = [
     /\b(light|lights|lighting|luminaire|fixture|troffer|linear|downlight|can light|recessed|pendant|sconce)\b/,
     "L",
   ],
-  // Data / telecom
-  [/\b(data\/voice|voice\/data|combo)\b/, "DV"],
-  [/\b(wap|wireless access|access point)\b/, "WA"],
-  [/\b(tv|catv|coax)\b/, "TV"],
-  [/\b(data|cat ?5e?|cat ?6a?)\b/, "D"],
-  [/\b(voice|phone|telephone)\b/, "V"],
   // Fire alarm
   [/\bsmoke/, "SM"],
   [/\bheat detector/, "H"],
@@ -84,7 +96,6 @@ const DEFAULT_LETTERS: readonly (readonly [RegExp, string])[] = [
   [/\b(fire alarm|pull station)\b/, "F"],
   // Equipment
   [/\bpanel/, "PN"],
-  [/\b(disconnect|safety switch)/, "DS"],
   [/\bmotor/, "M"],
   [/\b(rtu|ahu|mechanical|hvac|condenser|furnace)\b/, "ME"],
   // Security
@@ -139,11 +150,41 @@ function initial(name: string): string {
 export type PinCount = {
   id: number;
   label: string;
-  /** The linked assembly's name, for the default letter. */
+  /** The linked assembly's name, for the default letter and family. */
   assemblyName?: string | null;
+  /** The linked assembly's category — the family's last default. */
+  assemblyCategory?: string | null;
 };
 
-export type PinStyle = { letter: string; color: MarkColor };
+/**
+ * Everything a count's pins look like. Shape comes from the count's device
+ * family (shared/deviceFamily.ts) — its OWN name first — so two items on one
+ * assembly can differ in shape as well as letter and colour.
+ */
+export type PinStyle = { letter: string; color: MarkColor; shape: MarkShape };
+
+/*
+ * ── NOT BUILT: chosen looks and mark status — where they plug in ────────────
+ * Both wait for Track A's columns (pin plan § 12); see todo.md, "Pin styles,
+ * step 2 and 3". Nothing below reads them yet, on purpose: a look the
+ * database cannot store would vanish on reload, and a status look drawn
+ * before the bid applies the status would show a price the bid is not using.
+ *
+ * 1. CHOSEN shape / letter / colour (`markShape`, `markLetter`, `markColor` on
+ *    `takeoff_groups`, `symbol_links`, `assemblies`). Add them to `PinCount`
+ *    as `chosen` and resolve here, precedence count → symbol → assembly →
+ *    automatic (plan § 11.4): a COUNT- or SYMBOL-level letter is placed before
+ *    the tags and never bumped (a clash is flagged, not renumbered); an
+ *    ASSEMBLY-level letter is a default and bumps like an automatic one. A
+ *    chosen colour wins and the automatic ones step around it — copy
+ *    `runTypeColor` in shared/takeoffMarks.ts, which is that rule for runs.
+ *    A stored value the code no longer knows (`isMarkColor`, `MARK_SHAPES`)
+ *    reads as automatic.
+ * 2. MARK STATUS (`takeoff_stamps.status`: new / existing / remove /
+ *    relocate, NULL = new). Per MARK, not per count, so it does not belong in
+ *    this per-count map: `markAppearance` gains the stamp's status and the
+ *    overlay draws filled / hollow-solid / X / arrow badge (plan § 7).
+ */
 
 /** The next code after `base` that is neither used nor a table meaning. */
 function bump(base: string, used: ReadonlySet<string>): string {
@@ -193,6 +234,7 @@ export function pinStylesForBid(
     styles.set(count.id, {
       letter: letters.get(count.id) ?? initial(count.label),
       color: MARK_COLORS[i % MARK_COLORS.length],
+      shape: FAMILY_SHAPE[deviceFamily(count)],
     })
   );
   return styles;

@@ -1,6 +1,27 @@
 # Track B — count pins you can tell apart: shape, letter, color, status
 
-> **FINAL PLAN, 2026-10-01. §§ 1–10 are not built; § 11 is (see its box).**
+> **STEP 1 SHAPES BUILT 2026-10-01 (Track B), no migration.**
+> `shared/deviceFamily.ts` puts § 2's family map in code. Each count's
+> `PinStyle` now carries its shape, so two items on one assembly can differ
+> in shape as well as letter and colour. The sixth shape, `rect`, was looked
+> at on screen at 10–26 px beside a square and reads apart from it. Letters
+> fit inside it.
+>
+> **Departs from § 2:** the count's OWN name decides the family first, then
+> the assembly's name, then its category. It is not category-first, because
+> § 11.4 makes the item what a pin follows. The "LED flat panel" case is
+> handled by the order of the words instead.
+>
+> **Fixed:** safety switch / disconnect → DS (decision 4). The screen check
+> caught "Data outlet" reading R2 on a data triangle, so the data words now
+> sit above the receptacle words. A test now checks the letter table against
+> the family map.
+>
+> **Not built:** chosen looks (§ 6), status (§ 7), ring at reading zoom (§ 4),
+> faint marks, the CSV column. The seam is the "NOT BUILT" block in
+> `shared/pinLetters.ts`; the follow-up is in `todo.md`.
+>
+> **FINAL PLAN, 2026-10-01. §§ 1–10 were not built when written; § 11 is (see its box).**
 > Written on `track-b` from the owner's request the same day. **All twelve
 > decisions in § 10 are DECIDED** — the owner delegated them to Claude's
 > judgment, asking to be consulted only on anything that changes a bid number

@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-01]
 
+- **Count pins now take their shape from what the item is.** Receptacles and
+  junction boxes are circles, lights are squares, data outlets are triangles,
+  switches are diamonds, panels and disconnects are wide rectangles, and
+  anything else is a hexagon. Each item's own name decides. So a receptacle
+  and a switch sharing one assembly no longer look alike, and three lights on
+  one assembly differ by letter and colour. **Existing counts may change shape
+  once.** A safety switch now reads DS rather than S, and a data outlet reads
+  D rather than R. Bid numbers are unaffected.
+
 - **Staging now updates itself, and a robot rechecks it.** When a change passes
   the tests on `local-dev`, it goes to staging automatically — unless it
   changes the database, which still waits for Track A to apply by hand with a
