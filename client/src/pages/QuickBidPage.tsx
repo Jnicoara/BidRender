@@ -41,6 +41,7 @@ import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { bidNotPricedCount } from "@/lib/notPricedTotal";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { otherPercentCaption } from "@/lib/percentKind";
+import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 
 const round = (value: number, places = 2) => {
   const factor = 10 ** places;
@@ -74,6 +75,7 @@ export default function QuickBidPage({
   bidId: number;
   onBack: () => void;
 }) {
+  const coarse = useCoarsePointer();
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
   const [qty, setQty] = useState("1");
@@ -242,7 +244,7 @@ export default function QuickBidPage({
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <div className="border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Button
             size="sm"
@@ -261,7 +263,9 @@ export default function QuickBidPage({
               {lines.length} line{lines.length === 1 ? "" : "s"} · counting mode
             </p>
           </div>
-          <div className="text-right shrink-0">
+          {/* On a phone .page-header drops this block to its own line, flush
+              left, so its label aligns left with the figure under it. */}
+          <div className="text-left md:text-right shrink-0">
             <div className="text-xs text-muted-foreground">
               Bid price{" "}
               <IncompletePriceTag show={detail?.incomplete ?? false} />
@@ -377,9 +381,17 @@ export default function QuickBidPage({
                   <>Nothing matches “{query}”.</>
                 ) : (
                   <>
-                    Type to search. <span className="text-foreground">↑↓</span>{" "}
-                    to choose, <span className="text-foreground">Enter</span> to
-                    add, <span className="text-foreground">Esc</span> to clear.
+                    {/* The keys mean nothing to a finger (device audit). */}
+                    {coarse ? (
+                      <>Type to search, then tap one to add it.</>
+                    ) : (
+                      <>
+                        Type to search.{" "}
+                        <span className="text-foreground">↑↓</span> to choose,{" "}
+                        <span className="text-foreground">Enter</span> to add,{" "}
+                        <span className="text-foreground">Esc</span> to clear.
+                      </>
+                    )}{" "}
                     The quantity sticks between adds, and counting the same
                     assembly again adds to its line.
                   </>
@@ -445,9 +457,17 @@ export default function QuickBidPage({
             )}
           </div>
 
-          {/* What has been counted, newest first */}
+          {/* What has been counted, newest first.
+
+              Below md each line is a CARD rather than a table row: the name
+              on its own full-width line, then quantity, cost and remove on
+              the line under it. On a phone a table row left the name about
+              90px, and it ran on under the quantity box and the cost instead
+              of stopping (device audit, 2026-10-01). So the column heads are
+              hidden there too — with no columns they label nothing. From md
+              up every class below resolves to the row it always was. */}
           <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
+            <div className="hidden md:flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
               <span className="flex-1">Counted</span>
               <span className="w-16 text-right shrink-0">Qty</span>
               <span className="w-24 text-right shrink-0">Cost</span>
@@ -466,10 +486,15 @@ export default function QuickBidPage({
               recent.map(line => (
                 <div
                   key={line.id}
-                  className="flex items-center gap-3 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
+                  className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
                 >
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm truncate">{line.name}</span>
+                  {/* basis-full puts the name on a line of its own on a
+                      phone, where it wraps; md:truncate keeps the laptop's
+                      single line. */}
+                  <div className="basis-full md:flex-1 min-w-0">
+                    <span className="text-sm break-words md:truncate">
+                      {line.name}
+                    </span>
                     {line.unitLabel && (
                       <span className="ml-2 text-xs text-muted-foreground">
                         {line.unitLabel}
@@ -488,10 +513,12 @@ export default function QuickBidPage({
                   {/* Never $0 for a line that could not be priced, or that
                       nobody priced — the same cell as BidsPage. */}
                   <LineCost line={line} className="w-24 text-right shrink-0" />
+                  {/* ml-auto pushes remove to the card's right edge on a
+                      phone; on a row the cost's fixed width already places it. */}
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                    className="h-7 w-7 p-0 shrink-0 ml-auto md:ml-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
                     onClick={() => removeLine.mutate({ bidId, id: line.id })}
                     aria-label={`Remove ${line.name}`}
                   >

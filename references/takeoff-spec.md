@@ -72,6 +72,9 @@ from now on.
    reachable only by hovering a mouse, double-clicking, right-clicking or
    pressing a key. Keyboard shortcuts are welcome as extras on top of an
    on-screen control, never instead of one.
+   _Built 2026-10-01 — `references/device-audit.md`. One finger pans, two
+   pinch and pan, and a mark is placed only by a TAP (when the finger lifts),
+   never by a finger landing._
 3. **Nothing silently changes a bid, and AI never finalizes anything.**
 4. **No measurement without a scale you can trust.** Never guess a length.
 5. **Words on the screen must be true.** If the code does not do it, the screen

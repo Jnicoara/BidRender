@@ -1594,6 +1594,12 @@ function PlanPane({
       if (own.has(e)) return;
       if (performance.now() > swallowClicksUntil) return;
       if (!(e.target instanceof Node) || !vp.contains(e.target)) return;
+      // Never a real control's click. A finger tapping the trace pill's
+      // Finish half a second after its last point was being eaten here, and
+      // the run simply did not finish (found by scripts/deviceTouch.mts).
+      // The browser's own click after a held tap lands on the drawing, never
+      // on a button: a touch that starts on a button is not held at all.
+      if ((e.target as Element).closest?.(TOUCH_NATIVE_SELECTOR)) return;
       e.preventDefault();
       e.stopPropagation();
     };
@@ -4928,6 +4934,35 @@ export default function TakeoffPage({
   const findItems =
     findSession?.panel.phase === "results" ? findSession.panel.items : null;
 
+  /*
+    THE PHONE'S SHEET GETS OUT OF THE WAY of a tool that works ON the drawing
+    (device audit, 2026-10-01). Capture, Copy text, Find all matching, a count
+    picked up from the Legend tab and a trace all need the drawing under the
+    finger, and the bottom sheet covers the half they are most likely aimed
+    at. The tool is armed either way; this only puts the sheet down.
+  */
+  const findBoxing = findSession?.panel.phase === "boxing";
+  useEffect(() => {
+    if (!phone) return;
+    if (
+      capturingSymbol ||
+      capturingLegend ||
+      selectingText ||
+      findBoxing ||
+      tracing ||
+      armedGroup
+    )
+      setPhonePanelOpen(false);
+  }, [
+    phone,
+    capturingSymbol,
+    capturingLegend,
+    selectingText,
+    findBoxing,
+    tracing,
+    armedGroup,
+  ]);
+
   // Another sheet is another search; a locked bid takes no marks at all.
   useEffect(() => {
     setFindSession(current =>
@@ -7389,6 +7424,34 @@ export default function TakeoffPage({
           )}
 
           {/*
+            CANCEL, ON SCREEN, for the box tools (device audit, touch #30).
+            With a mouse these stop with Esc or the Legend panel's Cancel; on
+            a tablet there is no Esc, and on a phone the panel has just put
+            itself away so the box can be drawn. So the bar says what is armed
+            and how to put it down, the same way "Counting X ✕" does.
+          */}
+          {(coarse || phone) &&
+            (capturingSymbol || capturingLegend || findBoxing) && (
+              <Button
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => {
+                  setCapturingSymbol(false);
+                  setCapturingLegend(false);
+                  if (findBoxing) setFindSession(null);
+                }}
+              >
+                {capturingLegend
+                  ? "Boxing the legend"
+                  : findBoxing
+                    ? "Box one symbol to find"
+                    : "Box a symbol to capture"}
+                <X className="w-3 h-3" />
+                <span className="sr-only">Cancel</span>
+              </Button>
+            )}
+
+          {/*
             FIND ALL MATCHING sits beside the count it fills, and only there:
             what it finds is offered AS the armed count, so with nothing armed
             it would have nothing to offer them as. Not on a locked bid, which
@@ -7454,6 +7517,7 @@ export default function TakeoffPage({
                 onFocus={() => setReachingForMeasure(true)}
                 onBlur={() => setReachingForMeasure(false)}
                 title={traceCondition ?? "Trace a conduit run"}
+                aria-label={`Trace conduit: ${armedRunType.conduit?.label ?? "Conduit"}`}
               >
                 {/* Plain, deliberately — see runIcons. The shape says which
                     tool this is; colour on the drawing says which TYPE, and a
@@ -7517,6 +7581,7 @@ export default function TakeoffPage({
                   traceCondition ??
                   "Trace a run of self-contained cable — MC or Romex"
                 }
+                aria-label={`Trace cable: ${armedRunType.cable?.label ?? "Cable"}`}
               >
                 <CableIcon className="w-3.5 h-3.5" />{" "}
                 {armedRunType.cable?.label ?? "Cable"}

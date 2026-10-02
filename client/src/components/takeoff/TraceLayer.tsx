@@ -379,6 +379,15 @@ export function TraceLayer({
   onToggleFreePoints?: () => void;
 }) {
   const coarse = useCoarsePointer();
+  /**
+   * The floating pills' shape. One line with a mouse, as always. With a
+   * finger every button in them is 44 px, and on one line the trace pill ran
+   * past both edges of an upright tablet's drawing (seen 2026-10-01: "Run
+   * total" cut to "n Run total"), so there it wraps inside the drawing.
+   */
+  const pillShape = coarse
+    ? "w-max max-w-[calc(100%-1rem)] flex-wrap justify-center rounded-2xl"
+    : "w-max whitespace-nowrap rounded-full";
   const svgRef = useRef<SVGSVGElement | null>(null);
   /** When the last press while tracing landed — see @/lib/traceClick. */
   const lastTracePress = useRef(Number.NEGATIVE_INFINITY);
@@ -1610,7 +1619,9 @@ export function TraceLayer({
             const pts = pointsNow(run);
             const pinned = { start: !!run.startTee, end: !!run.endTee };
             const color = runAppearance(runColors, run).color;
-            const r = runWidthInOverlay(zoom, 5);
+            // A finger needs a bigger handle to land on (and to SEE past its
+            // own tip): 24 px across on a touch screen, 10 with a mouse.
+            const r = runWidthInOverlay(zoom, coarse ? 12 : 5);
             const stroke = runWidthInOverlay(zoom, 1.5);
             const begin = (
               e: React.PointerEvent,
@@ -1756,7 +1767,10 @@ export function TraceLayer({
               pointer events. Delete is also the Delete / Backspace key.
             */
             <div
-              className="absolute top-3 left-1/2 -translate-x-1/2 w-max whitespace-nowrap flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none"
+              className={cn(
+                "absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
+                pillShape
+              )}
               role="status"
               aria-live="polite"
             >
@@ -1827,7 +1841,10 @@ export function TraceLayer({
               not in a mouse user's way either.
             */
             <div
-              className="absolute top-3 left-1/2 -translate-x-1/2 w-max whitespace-nowrap flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none"
+              className={cn(
+                "absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
+                pillShape
+              )}
               role="status"
               aria-live="polite"
             >
@@ -1866,7 +1883,12 @@ export function TraceLayer({
               readout below: a pointer crossing a number must not change the
               cursor, and must not stop the drawing underneath from tracking it.
             */
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-[#F5C518]/50 bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none">
+            <div
+              className={cn(
+                "absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 border border-[#F5C518]/50 bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
+                pillShape
+              )}
+            >
               {/*
                 "Counting", not "Stamping", since phase 6: a plain count has no
                 stamp behind it, and the panel this feeds is called Counted
@@ -1919,7 +1941,12 @@ export function TraceLayer({
               same latent ceiling. It is not over it today, so it is left
               alone — but it is the same one line if it ever gets a term added.
             */
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-max whitespace-nowrap flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none">
+            <div
+              className={cn(
+                "absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
+                pillShape
+              )}
+            >
               <span className="text-xs text-muted-foreground">
                 {pathType === "conduit" ? "Conduit run" : "Cable run"}
               </span>

@@ -436,12 +436,70 @@
       ):not([role="switch"]):not([role="radio"]) {
       min-width: 44px;
     }
+    /* A control that sets its OWN small minimum (min-h-8 on the Totals tab's
+       folded rows) outranks the rule above from the utilities layer. The
+       small ones are listed, so a deliberate min-h-12 is never lowered. */
+    :is(button, [role="button"], [role="tab"]):is(
+      .min-h-5,
+      .min-h-6,
+      .min-h-7,
+      .min-h-8,
+      .min-h-9,
+      .min-h-10
+    ) {
+      min-height: 44px !important;
+    }
+    /* A switch or checkbox keeps its size and LOOK, but its hit area grows
+       to 44 x 44 around it — an invisible ring, so a finger landing beside a
+       32 x 18 switch still flips it. */
+    :where(
+      [role="switch"],
+      [role="checkbox"],
+      input[type="checkbox"],
+      input[type="radio"]
+    ) {
+      position: relative;
+    }
+    :where([role="switch"], [role="checkbox"])::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      transform: translate(-50%, -50%);
+    }
     [class*="group-hover:opacity-100"].opacity-0,
     [class*="group-hover:opacity-100"][class*="opacity-0"] {
       /* !important: this sits in @layer components, and the utilities layer
          (where opacity-0 lives) wins over it otherwise, whatever the
          specificity. */
       opacity: 1 !important;
+    }
+  }
+
+  /*
+    ── EVERY SCREEN'S TITLE ROW, ON A PHONE (device audit, 2026-10-01) ───────
+    Each screen opens with the same row: icon, a title over a line of
+    explanation, then a total or a button or two. At 390 px that row kept one
+    line and squeezed the explanation to ONE WORD PER LINE (the Dashboard's
+    ran 14 lines deep, measured). So on a phone the row wraps: the icon and
+    the title take the first line, everything after it drops below whole.
+    `.page-header` is the opt-in, on the row's outer box; the inner row and
+    the title block are the shape every one of those screens already has.
+  */
+  /* !important on the two that collide with utilities (px-6, flex-1): this
+     is @layer components, which the utilities layer outranks otherwise. */
+  @media (max-width: 767px) {
+    .page-header {
+      padding-inline: 1rem !important;
+    }
+    .page-header > .flex {
+      flex-wrap: wrap;
+      row-gap: 0.5rem;
+    }
+    .page-header > .flex > .flex-1 {
+      flex-basis: calc(100% - 2rem) !important;
     }
   }
 

@@ -10,6 +10,8 @@
     "dev": "cross-env NODE_ENV=development tsx watch server/_core/index.ts",
     "dev:r2": "tsx scripts/devWithR2.mts",
     "r2:ls": "tsx scripts/planStorageCheck.mts",
+    "device:audit": "tsx scripts/deviceAudit.mts",
+    "device:touch": "tsx scripts/deviceTouch.mts",
     "ai:smoke": "tsx scripts/aiSmokeTest.mts",
     "build": "tsx scripts/build.mts",
     "start": "cross-env NODE_ENV=production node dist/index.js",

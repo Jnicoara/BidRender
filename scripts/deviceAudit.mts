@@ -28,7 +28,12 @@
  * Small tap targets are REPORTED, not failed: a dense laptop table is allowed
  * 28 px rows, and the touch sizes list theirs for the reader to judge.
  */
-import { chromium, type Browser, type Page } from "playwright-core";
+import {
+  chromium,
+  type Browser,
+  type Locator,
+  type Page,
+} from "playwright-core";
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 // @ts-expect-error — plain .mjs helper, no types
@@ -152,6 +157,10 @@ export async function openAt(
 
 /** Go to a hash route and wait until the app has painted something real. */
 export async function gotoRoute(page: Page, hash: string): Promise<void> {
+  // Through a blank page first: going to the SAME hash address again is not
+  // a navigation, so the screen kept whatever the last state opened (a panel
+  // left open made the next "open the panel" step find no button).
+  await page.goto("about:blank");
   await page.goto(`${baseUrl()}/#${hash}`, { waitUntil: "domcontentloaded" });
   await page
     .waitForLoadState("networkidle", { timeout: 15000 })
@@ -168,6 +177,10 @@ export type Measure = {
   sidewaysScroll: boolean;
   /** Scroll boxes inside the page that scroll sideways. */
   innerSideways: string[];
+  /** What MAKES a page too wide: wider than the window, no wider child. */
+  tooWide: string[];
+  /** Pieces of text printed over each other, on screen. */
+  overlaps: string[];
   /** Text whose right edge is past the window (scrolled to, or cut off). */
   overflowRight: string[];
   /** Text below the bottom edge with no scrollable ancestor. */
@@ -194,7 +207,8 @@ export function measureInPage(): Measure {
   };
   const visible = (el: Element) => {
     const r = el.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0) return false;
+    // 1 px or less is `sr-only` — there for a screen reader, not a finger.
+    if (r.width <= 1 || r.height <= 1) return false;
     const s = getComputedStyle(el);
     if (s.visibility === "hidden" || s.display === "none") return false;
     if (Number(s.opacity) === 0) return false;
@@ -219,6 +233,7 @@ export function measureInPage(): Measure {
   const overflowRight: string[] = [];
   const cutOffBelow: string[] = [];
   const innerSideways: string[] = [];
+  const tooWide: string[] = [];
   const all = Array.from(document.body.querySelectorAll("*"));
   for (const el of all) {
     if (!visible(el)) continue;
@@ -250,9 +265,60 @@ export function measureInPage(): Measure {
     ) {
       overflowRight.push(describe(el));
     }
+    // The ROOT of a too-wide page: wider than the window, with no child that
+    // is. Its parents are only wide because it is.
+    if (
+      r.width > iw + 1 &&
+      !exempt(el) &&
+      !Array.from(el.children).some(
+        c => c.getBoundingClientRect().width > iw + 1
+      )
+    ) {
+      tooWide.push(`${describe(el).slice(0, 70)} (${Math.round(r.width)} px)`);
+    }
     if (isLeafText && r.top >= ih && !clippedBy(el, "y")) {
       // Below the window AND the page itself cannot scroll to it.
       if (de.scrollHeight <= ih + 1) cutOffBelow.push(describe(el));
+    }
+  }
+
+  /*
+    OVERLAPPING TEXT — two pieces of text printed over each other, which is
+    what a squeezed table looks like on a phone ("names printed over the qty
+    boxes"). None of the numbers above saw it on the Count screen; only a
+    screenshot did. On screen only, neither inside the other, inside the
+    drawing never, and more than a sliver of overlap each way.
+  */
+  const texts = all.filter(el => {
+    if (!visible(el) || exempt(el)) return false;
+    if (el.children.length !== 0 || !(el.textContent || "").trim())
+      return false;
+    const r = el.getBoundingClientRect();
+    if (!(r.bottom > 0 && r.top < ih && r.right > 0 && r.left < iw))
+      return false;
+    // Only text a person can SEE: whatever is on top at its middle must be it
+    // or inside it. Text under an open dialog is covered, not overlapping.
+    const top = document.elementFromPoint(
+      Math.min(iw - 1, Math.max(0, r.left + r.width / 2)),
+      Math.min(ih - 1, Math.max(0, r.top + r.height / 2))
+    );
+    return !!top && (top === el || el.contains(top) || top.contains(el));
+  });
+  const overlaps: string[] = [];
+  for (let i = 0; i < texts.length && overlaps.length < 12; i++) {
+    const a = texts[i].getBoundingClientRect();
+    for (let j = i + 1; j < texts.length; j++) {
+      const ej = texts[j];
+      if (texts[i].contains(ej) || ej.contains(texts[i])) continue;
+      const b = ej.getBoundingClientRect();
+      const ox = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      const oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      if (ox > 4 && oy > 4) {
+        overlaps.push(
+          `${describe(texts[i]).slice(0, 40)} × ${describe(ej).slice(0, 40)}`
+        );
+        break;
+      }
     }
   }
 
@@ -265,7 +331,18 @@ export function measureInPage(): Measure {
     const r = el.getBoundingClientRect();
     if (r.bottom < 0 || r.top > ih || r.right < 0 || r.left > iw) continue;
     controls++;
-    if (r.width < 43.5 || r.height < 43.5)
+    // A switch or checkbox keeps its look and gets a 44 px invisible ring
+    // (index.css, ::after). Measure the ring — it is what a finger hits.
+    const ring = getComputedStyle(el, "::after");
+    const w =
+      ring.content !== "none" && ring.position === "absolute"
+        ? Math.max(r.width, parseFloat(ring.width) || 0)
+        : r.width;
+    const h =
+      ring.content !== "none" && ring.position === "absolute"
+        ? Math.max(r.height, parseFloat(ring.height) || 0)
+        : r.height;
+    if (w < 43.5 || h < 43.5)
       smallTargets.push({
         label: describe(el),
         w: Math.round(r.width),
@@ -279,6 +356,8 @@ export function measureInPage(): Measure {
     scrollWidth: de.scrollWidth,
     sidewaysScroll: de.scrollWidth > iw + 1 || innerSideways.length > 0,
     innerSideways: innerSideways.slice(0, 12),
+    tooWide: tooWide.slice(0, 12),
+    overlaps,
     overflowRight: overflowRight.slice(0, 12),
     cutOffBelow: cutOffBelow.slice(0, 12),
     smallTargets,
@@ -286,18 +365,81 @@ export function measureInPage(): Measure {
   };
 }
 
-export type Screen = { key: string; hash: string; note?: string };
+export type Screen = {
+  key: string;
+  hash: string;
+  /** Reach a state of the screen that is not its first paint (a panel open). */
+  open?: (page: Page, size: DeviceSize) => Promise<void>;
+};
+
+/** A finger taps; a mouse clicks. Either way, through the real input path. */
+async function press(page: Page, size: DeviceSize, locator: Locator) {
+  await locator.first().waitFor({ state: "visible", timeout: 8000 });
+  if (size.touch) await locator.first().tap();
+  else await locator.first().click();
+  await page.waitForTimeout(400);
+}
+
+/** The plan viewer's right panel, open on a tab, in whatever layout. */
+async function openPlanTab(page: Page, size: DeviceSize, tab: RegExp) {
+  if (size.name === "phone")
+    await press(
+      page,
+      size,
+      page.getByRole("button", { name: /Open the panel/ })
+    );
+  await press(page, size, page.getByRole("tab", { name: tab }));
+}
 
 export function screensFor(bidId: number): Screen[] {
   return [
     { key: "dashboard", hash: "/dashboard" },
     { key: "bid", hash: `/bids/${bidId}` },
+    {
+      key: "quoteapp",
+      hash: `/bids/${bidId}`,
+      open: async (page, size) => {
+        await press(page, size, page.getByRole("button", { name: /^Send/ }));
+        await press(
+          page,
+          size,
+          page.getByRole("menuitem", { name: /For your quote app/ })
+        );
+      },
+    },
     { key: "assemblies", hash: "/library/assemblies" },
     { key: "materials", hash: "/library/materials" },
+    { key: "pricing", hash: "/library/materials?view=pricing" },
     { key: "labor", hash: "/library/labor-rates" },
     { key: "plans", hash: `/bids/${bidId}/plans` },
+    {
+      key: "plans-totals",
+      hash: `/bids/${bidId}/plans`,
+      open: (page, size) => openPlanTab(page, size, /^Totals/),
+    },
+    {
+      key: "capture",
+      hash: `/bids/${bidId}/plans`,
+      open: async (page, size) => {
+        await openPlanTab(page, size, /^Legend/);
+        await press(
+          page,
+          size,
+          page.locator('button:visible:text-is("Capture")')
+        );
+      },
+    },
     { key: "count", hash: `/bids/${bidId}/count` },
     { key: "proposal", hash: `/bids/${bidId}/proposal` },
+    {
+      key: "proposal-print",
+      hash: `/bids/${bidId}/proposal`,
+      // What the printer gets: the page's own print stylesheet, applied.
+      open: async page => {
+        await page.emulateMedia({ media: "print" });
+        await page.waitForTimeout(300);
+      },
+    },
     { key: "settings", hash: "/settings/pricing" },
     { key: "clients", hash: "/clients" },
   ];
@@ -345,8 +487,21 @@ async function main() {
       }
       for (const screen of screensFor(bidId)) {
         if (only && !only.includes(screen.key)) continue;
+        await page.emulateMedia({ media: "screen" });
         await gotoRoute(page, screen.hash);
-        if (screen.key === "plans") await page.waitForTimeout(2500);
+        if (screen.hash.endsWith("/plans")) await page.waitForTimeout(2500);
+        if (screen.open) {
+          const opened = await screen
+            .open(page, size)
+            .then(() => true)
+            .catch(e => {
+              console.log(
+                `${size.name.padEnd(17)} ${screen.key.padEnd(11)} could not open: ${(e as Error).message.split("\n")[0]}`
+              );
+              return false;
+            });
+          if (!opened) continue;
+        }
         const m = await page.evaluate(measureInPage);
         const shot = `${size.name}-${screen.key}.jpg`;
         await page.screenshot({
@@ -355,12 +510,43 @@ async function main() {
           quality: 60,
           scale: "css",
         });
+        // A second picture one screen further down the main scroller, since
+        // a list's rows usually start below the first screen — and the rows
+        // are what turns into cards on a phone.
+        const scrolled = await page.evaluate(() => {
+          const boxes = Array.from(document.querySelectorAll("*")).filter(
+            el => {
+              const s = getComputedStyle(el);
+              return (
+                (s.overflowY === "auto" || s.overflowY === "scroll") &&
+                el.scrollHeight > el.clientHeight + 80 &&
+                !el.closest("[role=dialog]")
+              );
+            }
+          );
+          const main = boxes.sort(
+            (a, b) =>
+              b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight
+          )[0];
+          if (!main) return false;
+          main.scrollTop += Math.round(main.clientHeight * 0.8);
+          return true;
+        });
+        if (scrolled) {
+          await page.waitForTimeout(300);
+          await page.screenshot({
+            path: path.join(outDir, shot.replace(".jpg", "-2.jpg")),
+            type: "jpeg",
+            quality: 60,
+            scale: "css",
+          });
+        }
         (report[screen.key] ??= {})[size.name] = { ...m, shot };
         if (m.sidewaysScroll || m.overflowRight.length || m.cutOffBelow.length)
           hard++;
         const small = size.touch ? ` small=${m.smallTargets.length}` : "";
         console.log(
-          `${size.name.padEnd(17)} ${screen.key.padEnd(11)} sideways=${m.sidewaysScroll ? "YES" : "no"} offRight=${m.overflowRight.length} cut=${m.cutOffBelow.length}${small}/${m.controls}`
+          `${size.name.padEnd(17)} ${screen.key.padEnd(11)} sideways=${m.sidewaysScroll ? "YES" : "no"} offRight=${m.overflowRight.length} overlap=${m.overlaps.length} cut=${m.cutOffBelow.length}${small}/${m.controls}`
         );
       }
       await page.context().close();

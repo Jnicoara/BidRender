@@ -45,6 +45,13 @@
 | 6   | What does the "Counted items" number mean? | **Say it plainly**, e.g. "42 marks · 6 items".                                                    |
 | —   | Main direction (new)                       | **The right panel becomes tabs**, one box at a time, ONE scroll area, never a scroll in a scroll. |
 
+> **Answer 5 OVERRIDDEN 2026-10-01** by the owner's device brief
+> (`references/device-audit.md`): a tablet does everything, upright or
+> sideways, with the panel BESIDE the drawing — so an upright tablet now gets
+> a third, **tablet** layout, not the phone's. And § 3's full-screen phone
+> panel became a **bottom sheet**. Touch pan, pinch and guard 3 shipped the
+> same day (device-audit.md § Touch).
+
 ---
 
 ## 1. MAIN DIRECTION — the right-hand panel becomes tabs

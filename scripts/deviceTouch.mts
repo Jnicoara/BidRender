@@ -324,6 +324,98 @@ async function runAt(size: DeviceSize) {
       .catch(() => undefined);
     n = await settle(page, before);
     check(n === before, "Delete in the pill removes them", `${n}`);
+    // Select off again, so the next drag is a box tool's, not a selection's.
+    if (size.name !== "phone") await tapButton(page, /^Select$/);
+    else
+      await page
+        .getByRole("button", { name: /^Select$/ })
+        .first()
+        .tap()
+        .catch(() => undefined);
+    await page.waitForTimeout(300);
+
+    // 7. CAPTURE: a one-finger drag draws the box (the touch router hands it
+    //    to the capture layer) and the name card appears. Cancelled, so the
+    //    shared legend is not touched.
+    if (size.name === "phone")
+      await page
+        .getByRole("button", { name: /Open the panel/ })
+        .first()
+        .tap();
+    await page
+      .getByRole("tab", { name: /^Legend/ })
+      .first()
+      .tap();
+    await page.waitForTimeout(300);
+    await page.locator('button:visible:text-is("Capture")').first().tap();
+    await page.waitForTimeout(400);
+    const cc = await canvasBox(page);
+    await dragOne(
+      cdp,
+      { x: cc.x + cc.width * 0.62, y: cc.y + cc.height * 0.35 },
+      Math.min(60, cc.width * 0.08),
+      Math.min(50, cc.height * 0.08)
+    );
+    const named = await page
+      .getByText("Name this symbol")
+      .first()
+      .waitFor({ state: "visible", timeout: 6000 })
+      .then(() => true)
+      .catch(() => false);
+    check(named, "a finger drag boxes a symbol to capture");
+    if (named)
+      await page
+        .locator('button:visible:has-text("Cancel")')
+        .first()
+        .tap()
+        .catch(() => undefined);
+    await page.waitForTimeout(300);
+    // Put the capture tool down by its on-screen button if it is still up.
+    await page
+      .getByRole("button", { name: /Box a symbol to capture/ })
+      .first()
+      .tap({ timeout: 1500 })
+      .catch(() => undefined);
+
+    // 8. TRACE by taps, on a sheet that has a scale: Trace, two taps, the
+    //    Finish button (a finger has no Enter and no double-click). Then the
+    //    toolbar's Undo takes the run back.
+    await page.getByRole("button", { name: "Next sheet" }).first().tap();
+    await page.waitForTimeout(3500);
+    const lineBefore =
+      (await page.locator("text=/This sheet:/").first().textContent()) ?? "";
+    if (size.name === "phone") {
+      await tapButton(page, /More tools/);
+      await page
+        .getByRole("menuitem", { name: /^Trace/ })
+        .first()
+        .tap();
+    } else {
+      await tapButton(page, /^Trace conduit/);
+    }
+    await page.waitForTimeout(400);
+    const tc = await canvasBox(page);
+    await tapAt(cdp, { x: tc.x + tc.width * 0.35, y: tc.y + tc.height * 0.5 });
+    await page.waitForTimeout(250);
+    await tapAt(cdp, { x: tc.x + tc.width * 0.6, y: tc.y + tc.height * 0.5 });
+    await page.waitForTimeout(250);
+    await page
+      .getByRole("button", { name: /Finish/ })
+      .first()
+      .tap();
+    await page.waitForTimeout(2500);
+    const lineAfter =
+      (await page.locator("text=/This sheet:/").first().textContent()) ?? "";
+    check(
+      lineAfter !== lineBefore && /ft of runs/.test(lineAfter),
+      "two taps and Finish trace a run",
+      `${lineBefore} → ${lineAfter}`
+    );
+    await page.getByRole("button", { name: /^Undo/ }).first().tap();
+    await page.waitForTimeout(2500);
+    const lineUndone =
+      (await page.locator("text=/This sheet:/").first().textContent()) ?? "";
+    check(lineUndone === lineBefore, "Undo takes the run back", lineUndone);
 
     const sidewaysAfter = await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth + 1

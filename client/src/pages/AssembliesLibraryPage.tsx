@@ -675,7 +675,7 @@ function AssemblyBuilder({
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <div className="border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Button
             size="sm"
@@ -807,14 +807,27 @@ function AssemblyBuilder({
                   uses.
                 </div>
               ) : (
+                /*
+                  PHONES GET A TWO-LINE CARD (device audit, 2026-10-01). At
+                  390px the quantity, unit, branch-wire, cost and remove
+                  controls left the name zero width and crushed the quantity
+                  box to a sliver. Below `md` the name and its cost share the
+                  first line (the name may wrap), and the `order-last`
+                  controls drop to a second line after the zero-height
+                  breaker. Every `md:` class restores the one-line row.
+                */
                 draft.materials.map((line, index) => (
                   <div
                     key={line.materialId}
-                    className="flex items-center gap-3 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
+                    className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1 md:gap-3 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
                   >
-                    <span className="flex-1 min-w-0 text-sm truncate">
+                    <span className="flex-1 min-w-0 text-sm break-words md:truncate">
                       {line.name}
                     </span>
+                    <span
+                      aria-hidden
+                      className="basis-full h-0 order-last md:hidden"
+                    />
                     <Input
                       value={String(line.qty)}
                       onChange={e => {
@@ -828,7 +841,7 @@ function AssemblyBuilder({
                           ),
                         }));
                       }}
-                      className="h-7 w-20 text-sm text-right"
+                      className="h-7 w-20 text-sm text-right shrink-0 md:shrink order-last md:order-none"
                       inputMode="decimal"
                       onFocus={e => {
                         const el = e.currentTarget;
@@ -856,7 +869,7 @@ function AssemblyBuilder({
                       }}
                       aria-label={`Quantity of ${line.name}`}
                     />
-                    <span className="text-xs text-muted-foreground w-12 shrink-0">
+                    <span className="text-xs text-muted-foreground w-12 shrink-0 order-last md:order-none">
                       {line.unitOfSale === "foot" ? "ft" : line.unitOfSale}
                     </span>
                     {/*
@@ -877,7 +890,7 @@ function AssemblyBuilder({
                       size="sm"
                       variant={line.isBranchWhip ? "secondary" : "ghost"}
                       className={cn(
-                        "h-7 px-2 text-[0.7rem] shrink-0",
+                        "h-7 px-2 text-[0.7rem] shrink-0 order-last md:order-none",
                         line.isBranchWhip
                           ? "text-foreground"
                           : "text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
@@ -904,7 +917,7 @@ function AssemblyBuilder({
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                      className="h-7 w-7 p-0 ml-auto md:ml-0 order-last md:order-none opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
                       onClick={() =>
                         setDraft(d => ({
                           ...d,
@@ -1377,7 +1390,7 @@ export default function AssembliesLibraryPage() {
   // ── List mode ──
   return (
     <div className="flex flex-col h-full bg-background">
-      <div className="border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Layers className="w-5 h-5 text-primary" />
           <div className="flex-1 min-w-0">
@@ -1425,8 +1438,22 @@ export default function AssembliesLibraryPage() {
           />
         </div>
 
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
+        {/*
+          PHONES GET CARDS, NOT A TABLE (device audit, 2026-10-01).
+
+          At 390px the three action buttons grow to 44px for a finger, which
+          is more than the 5rem column holds — so they spilled over the hours
+          ("0🖉 h") and squeezed the name to three letters ("Ded…"), and a
+          row with a project type showed no name at all. Below `md` each row
+          wraps instead: the name and its badge take a full-width first line
+          and may wrap, and the hours sit on a second line with the actions
+          pushed right. The column heads describe columns that no longer
+          exist at that width, so they are hidden there. Every phone-only
+          class is unprefixed and undone by an `md:` one, so tablet and
+          laptop render exactly as before.
+        */}
+        <div className="rounded-xl border border-border bg-card overflow-hidden min-w-0">
+          <div className="hidden md:flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
             <span className="flex-1">Assembly</span>
             <span className="w-24 text-right shrink-0">Hours</span>
             <span className="w-20 shrink-0" />
@@ -1458,14 +1485,14 @@ export default function AssembliesLibraryPage() {
                 {group.items.map(assembly => (
                   <div
                     key={assembly.id}
-                    className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
+                    className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1 md:gap-3 px-4 py-3 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
                   >
                     <button
                       onClick={() => setEditingId(assembly.id)}
-                      className="flex-1 min-w-0 text-left"
+                      className="basis-full md:flex-1 min-w-0 text-left"
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium truncate">
+                      <div className="flex flex-wrap md:flex-nowrap items-center gap-x-2 gap-y-1 md:gap-2">
+                        <span className="text-sm font-medium min-w-0 break-words md:truncate">
                           {assembly.name}
                         </span>
                         <OriginBadge assembly={assembly} />
@@ -1482,7 +1509,7 @@ export default function AssembliesLibraryPage() {
                         plus its own overhead. Showing the base alone would
                         disagree with what lands on a bid. */}
                     <span
-                      className="font-mono text-sm w-24 text-right shrink-0"
+                      className="font-mono text-sm md:w-24 md:text-right shrink-0"
                       title={
                         Number(assembly.overheadLaborHours) > 0
                           ? `${round(Number(assembly.baseLaborHours), 3)} h of work + ${round(Number(assembly.overheadLaborHours), 3)} h assembly overhead`
@@ -1499,7 +1526,7 @@ export default function AssembliesLibraryPage() {
                       h
                     </span>
 
-                    <div className="flex items-center gap-0.5 w-20 justify-end shrink-0">
+                    <div className="flex items-center gap-0.5 ml-auto md:ml-0 md:w-20 justify-end shrink-0">
                       <Button
                         size="sm"
                         variant="ghost"

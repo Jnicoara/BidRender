@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-01]
 
+- **BidRidge works on a tablet and reads on a phone.** On an iPad or Android
+  tablet, either way round, everything works by finger: two fingers move and
+  zoom the plan, a tap places a mark, and a finger that lands to move the
+  sheet never drops a stray mark (it used to). Shift-select, box-select,
+  removing a run point, a free leg start and cancelling a capture all have
+  on-screen buttons now. Every button is fingertip-sized on a touch screen,
+  and buttons that only appeared under a mouse are always shown. On a phone,
+  every list is a set of readable cards instead of a squashed table, nothing
+  scrolls sideways, the plan's panel is a bottom sheet, and the proposal opens
+  fitted to the screen. The laptop looks exactly as before. Details and before
+  and after screenshots: `references/device-audit.md`.
 - **Every change is now tested automatically on GitHub.** Each push to
   `local-dev`, a track branch or a Track A branch runs the type check and the
   full test suite against a brand-new database, built from every migration and
