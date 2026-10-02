@@ -14,6 +14,29 @@ This is the human-readable companion to the git history — read this to see wha
   every main screen on phone and tablet sizes, and the core flow by touch. It
   never touches the live site and never spends AI money. Live releases still
   happen only when Track A does them, and only from a version that passed.
+- **New: "Check sheet" on the Plans screen.** After reading a legend with
+  Whole legend, one button compares every mark on a sheet with the drawing.
+  It lists the marks that look like something else or have nothing under
+  them, the legend symbols nobody marked, counts whose marks are drawn in
+  more than one way, and heights, (E)/(X) and keynote numbers written beside
+  marks. Each line comes with a picture and a Go to button. Nothing changes
+  until you press Keep, Move, Delete, Count it or Split. On a locked bid it is
+  a report only. It runs without AI. When two legend symbols fit one spot
+  equally well, an optional "Ask AI to pick" button costs about a cent. On a
+  real 243-mark sheet it agreed with 149 hand marks and called none wrong, at
+  no cost. The paid whole-sheet AI reader got 128 right and 33 wrong for $0.61.
+
+- **BidRidge works on a tablet and reads on a phone.** On an iPad or Android
+  tablet, either way round, everything works by finger: two fingers move and
+  zoom the plan, a tap places a mark, and a finger that lands to move the
+  sheet never drops a stray mark (it used to). Shift-select, box-select,
+  removing a run point, a free leg start and cancelling a capture all have
+  on-screen buttons now. Every button is fingertip-sized on a touch screen,
+  and buttons that only appeared under a mouse are always shown. On a phone,
+  every list is a set of readable cards instead of a squashed table, nothing
+  scrolls sideways, the plan's panel is a bottom sheet, and the proposal opens
+  fitted to the screen. The laptop looks exactly as before. Details and before
+  and after screenshots: `references/device-audit.md`.
 - **Every change is now tested automatically on GitHub.** Each push to
   `local-dev`, a track branch or a Track A branch runs the type check and the
   full test suite against a brand-new database, built from every migration and

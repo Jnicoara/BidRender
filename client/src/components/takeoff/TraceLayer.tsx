@@ -67,6 +67,7 @@ import { projectOntoPath } from "@shared/runNetwork";
 import { JOINED_WITHIN_POINTS } from "@shared/quantityDrops";
 import { addsTracePoint } from "@/lib/traceClick";
 import { pastDragThreshold } from "@/lib/dragThreshold";
+import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import {
   insertPoint,
   isPinned,
@@ -264,6 +265,9 @@ export function TraceLayer({
   editableRunId = null,
   onEditPoints,
   onPickEnd,
+  selectMode = false,
+  freePoints = false,
+  onToggleFreePoints,
 }: {
   /**
    * Each count's letter and first-use colour on this bid (shared/pinLetters).
@@ -360,7 +364,30 @@ export function TraceLayer({
   focusPoint: { x: number; y: number } | null;
   /** Untransformed layer for screen-sized chrome. See `withChrome` below. */
   chromeTarget?: HTMLElement | null;
+  /**
+   * SELECT, the touch version of Shift (references/device-audit.md § Touch).
+   * While on, a tap on a mark adds or removes it and a finger drag boxes
+   * marks — exactly what Shift-click and Shift-drag do with a mouse.
+   */
+  selectMode?: boolean;
+  /**
+   * FREE POINTS, the touch version of Alt: the next leg's first point lands
+   * where it is put rather than snapping to the run or a mark (D20).
+   */
+  freePoints?: boolean;
+  /** Shows the Snap / Free switch in the trace pill on a coarse pointer. */
+  onToggleFreePoints?: () => void;
 }) {
+  const coarse = useCoarsePointer();
+  /**
+   * The floating pills' shape. One line with a mouse, as always. With a
+   * finger every button in them is 44 px, and on one line the trace pill ran
+   * past both edges of an upright tablet's drawing (seen 2026-10-01: "Run
+   * total" cut to "n Run total"), so there it wraps inside the drawing.
+   */
+  const pillShape = coarse
+    ? "w-max max-w-[calc(100%-1rem)] flex-wrap justify-center rounded-2xl"
+    : "w-max whitespace-nowrap rounded-full";
   const svgRef = useRef<SVGSVGElement | null>(null);
   /** When the last press while tracing landed — see @/lib/traceClick. */
   const lastTracePress = useRef(Number.NEGATIVE_INFINITY);
@@ -488,7 +515,7 @@ export function TraceLayer({
       window.removeEventListener("blur", clear);
     };
   }, []);
-  const boxing = shiftHeld && !tracing && !stamping;
+  const boxing = (shiftHeld || selectMode) && !tracing && !stamping;
   const [box, setBox] = useState<{ from: PagePoint; to: PagePoint } | null>(
     null
   );
@@ -689,6 +716,27 @@ export function TraceLayer({
     onPickEnd,
   ]);
 
+  /**
+   * Remove the picked point — the Delete key, a right-click on the handle,
+   * and (for a finger, which has neither) the "Remove point" button in the
+   * pill below. One function, so the three cannot disagree about pinned ends.
+   */
+  const pickedRun = pickedVertex
+    ? (existingRuns.find(r => r.id === pickedVertex.runId) ?? null)
+    : null;
+  const pickedRemoval =
+    pickedVertex && pickedRun
+      ? removePoint(pickedRun.points, pickedVertex.index, {
+          start: !!pickedRun.startTee,
+          end: !!pickedRun.endTee,
+        })
+      : null;
+  const removePicked = useCallback(() => {
+    if (!pickedRun || !pickedRemoval) return;
+    setPickedVertex(null);
+    commitEdit(pickedRun.id, pickedRemoval);
+  }, [pickedRun, pickedRemoval, commitEdit]);
+
   /** Delete or Backspace removes the picked point; Escape lets go of it. */
   useEffect(() => {
     if (!pickedVertex) return;
@@ -799,6 +847,9 @@ export function TraceLayer({
           tracing || stamping || boxing || box ? "" : "pointer-events-none",
           (boxing || box) && "cursor-crosshair"
         )}
+        // In Select mode a finger boxes marks instead of panning the sheet
+        // (TakeoffPage's touch router passes it straight through).
+        data-touch-drag={boxing || box ? "" : undefined}
         /*
           The crosshair is the CURSOR, not something drawn into the overlay.
           See @/lib/crosshairCursor — the compositor draws it with the pointer,
@@ -866,7 +917,11 @@ export function TraceLayer({
               Alt — and Shift-click ends this leg and starts the next there.
             */
             if (legs?.busy) return;
-            const at = { point: page, tolerance: snapReach(), free: e.altKey };
+            const at = {
+              point: page,
+              tolerance: snapReach(),
+              free: e.altKey || freePoints,
+            };
             if (legs?.pending) {
               legs.onStart(at);
               return;
@@ -1127,7 +1182,7 @@ export function TraceLayer({
               onClick={e =>
                 !tracing &&
                 !placed.pending &&
-                onStampClick(placed.id, e.shiftKey)
+                onStampClick(placed.id, e.shiftKey || selectMode)
               }
             >
               <path
@@ -1434,7 +1489,7 @@ export function TraceLayer({
                 ? legs.preview({
                     point: hover,
                     tolerance: snapReach(),
-                    free: hoverAlt,
+                    free: hoverAlt || freePoints,
                   })
                 : null;
             const to = points[0] ?? preview?.point ?? null;
@@ -1564,7 +1619,9 @@ export function TraceLayer({
             const pts = pointsNow(run);
             const pinned = { start: !!run.startTee, end: !!run.endTee };
             const color = runAppearance(runColors, run).color;
-            const r = runWidthInOverlay(zoom, 5);
+            // A finger needs a bigger handle to land on (and to SEE past its
+            // own tip): 24 px across on a touch screen, 10 with a mouse.
+            const r = runWidthInOverlay(zoom, coarse ? 12 : 5);
             const stroke = runWidthInOverlay(zoom, 1.5);
             const begin = (
               e: React.PointerEvent,
@@ -1598,6 +1655,7 @@ export function TraceLayer({
                       <g
                         key={`add-${segment}`}
                         className="cursor-copy"
+                        data-touch-drag
                         onPointerDown={e => begin(e, segment + 1, origin, true)}
                       >
                         <circle
@@ -1659,6 +1717,9 @@ export function TraceLayer({
                       stroke={color}
                       strokeWidth={stroke * 1.4}
                       className="cursor-move"
+                      // Dragging a point is this handle's whole job, so a
+                      // finger on it moves the point, not the sheet.
+                      data-touch-drag
                       onPointerDown={e => begin(e, index, run.points, false)}
                       onContextMenu={e => {
                         e.preventDefault();
@@ -1706,7 +1767,10 @@ export function TraceLayer({
               pointer events. Delete is also the Delete / Backspace key.
             */
             <div
-              className="absolute top-3 left-1/2 -translate-x-1/2 w-max whitespace-nowrap flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none"
+              className={cn(
+                "absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
+                pillShape
+              )}
               role="status"
               aria-live="polite"
             >
@@ -1715,7 +1779,12 @@ export function TraceLayer({
                 {selectedStampIds.size === 1 ? "mark" : "marks"} selected
               </span>
               <span className="text-[0.7rem] text-muted-foreground">
-                Shift-click or Shift-drag to add more
+                {/* A finger has no Shift: it has the Select switch. */}
+                {!coarse
+                  ? "Shift-click or Shift-drag to add more"
+                  : selectMode
+                    ? "Tap marks to add or remove · drag to box more"
+                    : "Turn on Select to pick more"}
               </span>
               <Button
                 size="sm"
@@ -1763,6 +1832,50 @@ export function TraceLayer({
             </div>
           )}
 
+          {!tracing && !stamping && pickedVertex && pickedRun && (
+            /*
+              A PICKED POINT, and what can be done to it. Before this pill the
+              only ways to remove a point were Delete and a right-click on the
+              handle — neither of which a finger has (device audit, touch #27).
+              Shown on every device: a button that says what Delete does is
+              not in a mouse user's way either.
+            */
+            <div
+              className={cn(
+                "absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
+                pillShape
+              )}
+              role="status"
+              aria-live="polite"
+            >
+              <span className="text-sm font-medium">Point picked</span>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-6 px-2 text-xs pointer-events-auto"
+                onClick={removePicked}
+                disabled={!pickedRemoval}
+                title={
+                  pickedRemoval
+                    ? "Remove this point from the run (Delete)"
+                    : "A run needs at least two points, and a pinned end stays"
+                }
+              >
+                Remove point
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0 text-muted-foreground pointer-events-auto"
+                onClick={() => setPickedVertex(null)}
+                aria-label="Let go of the point"
+                title="Let go of the point (Esc)"
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          )}
+
           {stamping && armedGroupName && (
             /*
               Nothing in here is clickable — it is a label saying what is armed
@@ -1770,7 +1883,12 @@ export function TraceLayer({
               readout below: a pointer crossing a number must not change the
               cursor, and must not stop the drawing underneath from tracking it.
             */
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-[#F5C518]/50 bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none">
+            <div
+              className={cn(
+                "absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 border border-[#F5C518]/50 bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
+                pillShape
+              )}
+            >
               {/*
                 "Counting", not "Stamping", since phase 6: a plain count has no
                 stamp behind it, and the panel this feeds is called Counted
@@ -1780,7 +1898,9 @@ export function TraceLayer({
               <span className="text-xs text-muted-foreground">Counting</span>
               <span className="text-sm font-medium">{armedGroupName}</span>
               <span className="text-[0.7rem] text-muted-foreground">
-                click to place · Esc to stop
+                {coarse
+                  ? "tap to place · two fingers move the sheet"
+                  : "click to place · Esc to stop"}
               </span>
             </div>
           )}
@@ -1821,7 +1941,12 @@ export function TraceLayer({
               same latent ceiling. It is not over it today, so it is left
               alone — but it is the same one line if it ever gets a term added.
             */
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-max whitespace-nowrap flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none">
+            <div
+              className={cn(
+                "absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
+                pillShape
+              )}
+            >
               <span className="text-xs text-muted-foreground">
                 {pathType === "conduit" ? "Conduit run" : "Cable run"}
               </span>
@@ -1897,7 +2022,7 @@ export function TraceLayer({
                               legs.preview({
                                 point: hover,
                                 tolerance: snapReach(),
-                                free: hoverAlt,
+                                free: hoverAlt || freePoints,
                               })
                             )
                           : "Click where the next leg starts"
@@ -1907,6 +2032,27 @@ export function TraceLayer({
               )}
 
               <div className="w-px h-4 bg-border" />
+
+              {/*
+                SNAP / FREE, the finger's Alt. Only where there is no Alt key
+                to hold; on a laptop the pill stays as it was.
+              */}
+              {coarse && onToggleFreePoints && legs && (
+                <Button
+                  size="sm"
+                  variant={freePoints ? "default" : "outline"}
+                  className="h-6 text-xs pointer-events-auto"
+                  onClick={onToggleFreePoints}
+                  aria-pressed={freePoints}
+                  title={
+                    freePoints
+                      ? "A new leg starts exactly where you tap"
+                      : "A new leg's start snaps to the run or a mark"
+                  }
+                >
+                  {freePoints ? "Free" : "Snap"}
+                </Button>
+              )}
 
               {legs && (
                 <Button

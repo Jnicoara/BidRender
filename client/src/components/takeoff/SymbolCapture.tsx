@@ -355,6 +355,9 @@ export function SymbolCaptureLayer({
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       className={cn("absolute inset-0 w-full h-full z-10")}
+      // A finger drags the box here rather than panning (TakeoffPage touch
+      // router); two fingers still move the sheet.
+      data-touch-drag
       /*
         The same cursor as tracing and calibrating. Boxing a symbol on a legend
         is an aiming job too, and a crosshair that differs between overlays

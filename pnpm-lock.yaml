@@ -278,6 +278,9 @@ importers:
       esbuild:
         specifier: ^0.25.0
         version: 0.25.10
+      playwright-core:
+        specifier: ^1.63.0
+        version: 1.63.0
       pnpm:
         specifier: ^10.15.1
         version: 10.18.1

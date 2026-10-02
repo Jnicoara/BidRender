@@ -12,6 +12,7 @@ export function usePlansLayout(): PlansLayout {
       ? "laptop"
       : plansLayout({
           width: window.innerWidth,
+          height: window.innerHeight,
           coarse: window.matchMedia("(pointer: coarse)").matches,
           portrait: window.matchMedia("(orientation: portrait)").matches,
         });

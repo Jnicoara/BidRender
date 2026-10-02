@@ -46,6 +46,8 @@ export type LegendDraftRow = {
   picture: string | null;
   alreadyCaptured: boolean;
   ticked: boolean;
+  /** The symbol's box on the legend sheet, page points — for "Check sheet". */
+  symbol: Rect;
 };
 
 export type WholeLegend =
@@ -101,6 +103,7 @@ export async function readWholeLegend(opts: {
       match: row.match,
       alreadyCaptured: row.alreadyCaptured,
       ticked: row.ticked,
+      symbol: row.symbol,
       picture: encodeCapture(
         canvas,
         (row.symbol.x - rect.x) * drawn,

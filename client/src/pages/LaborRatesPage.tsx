@@ -311,11 +311,22 @@ function LaborRateRow({
     );
   }
 
+  /*
+    PHONES GET A CARD, NOT A SQUEEZED ROW (device audit, 2026-10-01).
+
+    The fixed columns — type, rate, actions — are nearly as wide as a 390px
+    phone on their own, so the role name was squeezed to nothing and its badge
+    was drawn on top of the type. Below md the row wraps instead: the name
+    takes a whole first line and may wrap, and type, rate and buttons share the
+    line under it. From md up every class below resolves to the old row.
+  */
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate">{rate.name}</span>
+    <div className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1.5 md:gap-3 px-4 py-3 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group">
+      <div className="basis-full md:flex-1 min-w-0">
+        <div className="flex flex-wrap md:flex-nowrap items-center gap-x-2 gap-y-1 md:gap-2">
+          <span className="text-sm font-medium break-words min-w-0 md:truncate">
+            {rate.name}
+          </span>
           <OriginBadge rate={rate} />
         </div>
         {rate.rateType === "salary" && (
@@ -329,7 +340,7 @@ function LaborRateRow({
         )}
       </div>
 
-      <span className="text-xs text-muted-foreground w-14 shrink-0 capitalize">
+      <span className="text-xs text-muted-foreground md:w-14 shrink-0 capitalize">
         {rate.rateType}
       </span>
 
@@ -338,7 +349,7 @@ function LaborRateRow({
           and "$0.00/hr" reads as a real rate of nothing, which prices the
           labor on every line of every bid at zero while still looking like a
           finished number. */}
-      <span className="text-sm font-mono w-28 text-right shrink-0">
+      <span className="text-sm font-mono md:w-28 text-right shrink-0">
         {rate.rateError ? (
           <span className="text-destructive text-xs font-sans">Set hours</span>
         ) : needsRate(rate) ? (
@@ -356,7 +367,7 @@ function LaborRateRow({
         )}
       </span>
 
-      <div className="flex items-center gap-0.5 w-28 justify-end shrink-0">
+      <div className="flex items-center gap-0.5 ml-auto md:ml-0 md:w-28 justify-end shrink-0">
         <Button
           size="sm"
           variant="ghost"
@@ -580,7 +591,7 @@ export default function LaborRatesPage() {
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <HardHat className="w-5 h-5 text-primary" />
           <div className="flex-1 min-w-0">
@@ -654,7 +665,9 @@ export default function LaborRatesPage() {
         )}
 
         <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
+          {/* Column heads — not on a phone, where each row is a card and
+              there are no columns for them to head (see the row above). */}
+          <div className="hidden md:flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
             <span className="flex-1">Role</span>
             <span className="w-14 shrink-0">Type</span>
             <span className="w-28 text-right shrink-0">Effective rate</span>

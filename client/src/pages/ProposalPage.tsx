@@ -159,7 +159,20 @@ export default function ProposalPage({
   );
   const [showDesign, setShowDesign] = useState(false);
   /** Screen zoom only — the printed page is always full size. */
-  const [zoom, setZoom] = useState(0.8);
+  /*
+    On a phone the page opens FITTED to the width (8.5 in is 816 CSS px), so
+    the whole proposal is readable without zooming out first; the − / +
+    buttons still work from there (device audit, 2026-10-01).
+  */
+  const [zoom, setZoom] = useState(() => {
+    if (typeof window === "undefined") return 0.8;
+    const w = window.innerWidth;
+    if (w < 768) return Math.max(0.3, (w - 24) / 816);
+    // Beside the 320 px form and the 64 px app rail, an upright tablet has
+    // about 390 px for the page: 80% overflowed it sideways. A laptop still
+    // opens at 80% — there is room for that and more.
+    return Math.min(0.8, Math.max(0.4, (w - 64 - 320 - 48) / 816));
+  });
 
   const updateBid = trpc.bids.update.useMutation({
     onError: e => toast.error(e.message),
@@ -276,7 +289,10 @@ export default function ProposalPage({
   return (
     <div className="flex flex-col h-full bg-background">
       {/* ── Toolbar ────────────────────────────────────────────────────────── */}
-      <div className="border-b border-border px-6 py-3 flex items-center gap-3 bp-no-print">
+      {/* Wraps on a phone: "← Bid" and the title on the first line, the
+          controls below — on one line the explanation was squeezed to a
+          word per line (device audit, 2026-10-01). */}
+      <div className="border-b border-border px-4 md:px-6 py-3 flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-2 bp-no-print">
         <Button
           size="sm"
           variant="ghost"
@@ -285,7 +301,7 @@ export default function ProposalPage({
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Bid
         </Button>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 basis-[calc(100%-6rem)] md:basis-0">
           <h1 className="text-base font-semibold truncate">
             Proposal — {bid.name}
           </h1>
@@ -360,9 +376,14 @@ export default function ProposalPage({
         </Button>
       </div>
 
-      <div className="flex-1 overflow-hidden flex">
+      {/*
+        ON A PHONE: one column that scrolls as a whole — the page first, since
+        reviewing it is what a phone is for here, then what goes on it, then
+        the design controls if open. Side by side from md up, as before.
+      */}
+      <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row">
         {/* ── Left: what goes on this proposal ───────────────────────────────── */}
-        <aside className="w-80 shrink-0 border-r border-border overflow-y-auto p-4 space-y-5 bp-no-print">
+        <aside className="md:w-80 shrink-0 border-t md:border-t-0 md:border-r border-border md:overflow-y-auto p-4 space-y-5 bp-no-print order-2 md:order-none">
           {doc.letterhead.needsSetup && (
             /*
               The same prompt as Settings, repeated here because this is where
@@ -581,7 +602,7 @@ export default function ProposalPage({
         </aside>
 
         {/* ── Middle: the page ───────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-auto bg-neutral-800/40 p-6 flex justify-center items-start bp-print-area">
+        <div className="md:flex-1 shrink-0 md:shrink overflow-auto bg-neutral-800/40 p-3 md:p-6 flex justify-center items-start bp-print-area order-1 md:order-none">
           <div
             style={{
               // `zoom` rather than `transform: scale()` on purpose: a transform
@@ -601,7 +622,7 @@ export default function ProposalPage({
 
         {/* ── Right: design, on demand ───────────────────────────────────────── */}
         {showDesign && (
-          <aside className="w-96 shrink-0 border-l border-border overflow-y-auto p-4 bp-no-print">
+          <aside className="md:w-96 shrink-0 border-t md:border-t-0 md:border-l border-border md:overflow-y-auto p-4 bp-no-print order-3 md:order-none">
             <ProposalDesignControls compact />
           </aside>
         )}

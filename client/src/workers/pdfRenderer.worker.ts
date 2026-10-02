@@ -13,6 +13,8 @@
  *   Main → Worker:  { type: 'text', pageNum: number, hash: string, reqId: string }
  *   Main → Worker:  { type: 'findMatching', pageNum, hash, reqId, box: {x,y,width,height} }
  *   Worker → Main:  { type: 'matches', reqId, result: FindResult, readMs, findMs }
+ *   Main → Worker:  { type: 'sheetCheck', hash, reqId, legendPage, planPage, input: SheetCheckInput }
+ *   Worker → Main:  { type: 'sheetChecked', reqId, result: SheetCheckResult | null, scan, ms? }
  *   Worker → Main:  { type: 'rendered', reqId: string, bitmap: ImageBitmap, pageNum: number, hash: string,
  *                     scale: number, rect: PageRect, pageWidth: number, pageHeight: number }
  *   Worker → Main:  { type: 'outline', reqId: string, entries: {pageNumber,title}[] }
@@ -40,7 +42,8 @@
 
 import * as pdfjs from "pdfjs-dist";
 import { pdfRangeLoadOptions } from "@shared/pdfRangeLoading";
-import { findMatching } from "@/lib/findMatching";
+import { findMatching, isScan, prepareSheet } from "@/lib/findMatching";
+import { runSheetCheck } from "@/lib/sheetCheck";
 import {
   extractVectorGeometry,
   type VectorGeometry,
@@ -145,12 +148,54 @@ const WORKER_SAFE_OPTIONS = {
 
 let pdfDoc: import("pdfjs-dist").PDFDocumentProxy | null = null;
 let loadedHash: string | null = null;
-/** Find all matching's one cached page. Cleared when another is asked for. */
-let matchPage: {
-  key: string;
-  geo: VectorGeometry;
-  words: WordBox[];
-} | null = null;
+type MatchPage = { key: string; geo: VectorGeometry; words: WordBox[] };
+/**
+ * The line work and words of the last TWO pages searched — a sheet check
+ * needs the legend sheet and the plan sheet at once, and each is a few MB, so
+ * two and no more. Most recent last.
+ */
+let matchPages: MatchPage[] = [];
+
+async function readMatchPage(
+  doc: import("pdfjs-dist").PDFDocumentProxy,
+  hash: string,
+  pageNum: number
+): Promise<MatchPage> {
+  const key = `${hash}#${pageNum}`;
+  const cached = matchPages.find(p => p.key === key);
+  if (cached) {
+    matchPages = [...matchPages.filter(p => p !== cached), cached];
+    return cached;
+  }
+  const page = await doc.getPage(pageNum);
+  const viewport = page.getViewport({ scale: 1 });
+  const [list, content] = await Promise.all([
+    page.getOperatorList(),
+    page.getTextContent(),
+  ]);
+  const items: RawTextItem[] = [];
+  for (const item of content.items)
+    if ("str" in item && item.str)
+      items.push({
+        str: item.str,
+        transform: item.transform,
+        width: item.width,
+      });
+  const read: MatchPage = {
+    key,
+    geo: extractVectorGeometry(
+      list.fnArray,
+      list.argsArray,
+      pdfjs.OPS as unknown as Record<string, number>,
+      viewport.transform,
+      viewport.width,
+      viewport.height
+    ),
+    words: wordBoxes({ items, viewportTransform: viewport.transform }),
+  };
+  matchPages = [...matchPages.slice(-1), read];
+  return read;
+}
 
 self.onmessage = async (e: MessageEvent) => {
   const msg = e.data;
@@ -178,7 +223,7 @@ self.onmessage = async (e: MessageEvent) => {
             });
       pdfDoc = await loadingTask.promise;
       loadedHash = msg.hash;
-      matchPage = null; // another document's line work is no use now
+      matchPages = []; // another document's line work is no use now
       const elapsed = (performance.now() - t0).toFixed(0);
       self.postMessage({
         type: "loaded",
@@ -415,9 +460,9 @@ self.onmessage = async (e: MessageEvent) => {
   /**
    * Find all matching (@/lib/findMatching): every copy on this page of the
    * symbol in `box` (page points). The page's line work and words are read
-   * once and kept for ONE page — a sheet's are a few MB, and the next search
-   * is almost always on the same sheet — so only the first search on a sheet
-   * pays pdf.js's operator list (about a second on Weld 1 E-200).
+   * once and kept (`readMatchPage`) — a sheet's are a few MB, and the next
+   * search is almost always on the same sheet — so only the first search on a
+   * sheet pays pdf.js's operator list (about a second on Weld 1 E-200).
    */
   if (msg.type === "findMatching") {
     const { pageNum, hash, reqId, box } = msg;
@@ -431,36 +476,7 @@ self.onmessage = async (e: MessageEvent) => {
     }
     try {
       const t0 = performance.now();
-      const key = `${hash}#${pageNum}`;
-      if (!matchPage || matchPage.key !== key) {
-        matchPage = null;
-        const page = await pdfDoc.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 1 });
-        const [list, content] = await Promise.all([
-          page.getOperatorList(),
-          page.getTextContent(),
-        ]);
-        const items: RawTextItem[] = [];
-        for (const item of content.items)
-          if ("str" in item && item.str)
-            items.push({
-              str: item.str,
-              transform: item.transform,
-              width: item.width,
-            });
-        matchPage = {
-          key,
-          geo: extractVectorGeometry(
-            list.fnArray,
-            list.argsArray,
-            pdfjs.OPS as unknown as Record<string, number>,
-            viewport.transform,
-            viewport.width,
-            viewport.height
-          ),
-          words: wordBoxes({ items, viewportTransform: viewport.transform }),
-        };
-      }
+      const matchPage = await readMatchPage(pdfDoc, hash, pageNum);
       const t1 = performance.now();
       const result = findMatching(matchPage.geo, matchPage.words, box);
       self.postMessage({
@@ -469,6 +485,52 @@ self.onmessage = async (e: MessageEvent) => {
         result,
         readMs: Math.round(t1 - t0),
         findMs: Math.round(performance.now() - t1),
+      });
+    } catch (err) {
+      self.postMessage({ type: "error", reqId, message: String(err) });
+    }
+    return;
+  }
+
+  /**
+   * Check a sheet against its legend (@/lib/sheetCheck): the legend page's
+   * rows become looks, the plan page is searched for every one, and the
+   * marks are checked. Suggestions only — the reply changes nothing.
+   */
+  if (msg.type === "sheetCheck") {
+    const { hash, reqId, legendPage, planPage, input } = msg;
+    if (!pdfDoc || loadedHash !== hash) {
+      self.postMessage({
+        type: "error",
+        reqId,
+        message: "PDF not loaded for this hash",
+      });
+      return;
+    }
+    try {
+      const t0 = performance.now();
+      const legend = await readMatchPage(pdfDoc, hash, legendPage);
+      const plan = await readMatchPage(pdfDoc, hash, planPage);
+      if (isScan(plan.geo)) {
+        self.postMessage({
+          type: "sheetChecked",
+          reqId,
+          result: null,
+          scan: true,
+        });
+        return;
+      }
+      const result = runSheetCheck(
+        prepareSheet(legend.geo, legend.words),
+        prepareSheet(plan.geo, plan.words),
+        input
+      );
+      self.postMessage({
+        type: "sheetChecked",
+        reqId,
+        result,
+        scan: false,
+        ms: Math.round(performance.now() - t0),
       });
     } catch (err) {
       self.postMessage({ type: "error", reqId, message: String(err) });

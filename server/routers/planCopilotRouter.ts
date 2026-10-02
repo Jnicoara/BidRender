@@ -42,6 +42,13 @@ import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import { AiLimitReached, invokeLLM } from "../llm";
 import { aiFeaturesEnabled } from "../aiFeatures";
+import {
+  TIE_BREAK_MAX_CROPS,
+  TIE_BREAK_MAX_IMAGE_CHARS,
+  TIE_BREAK_MODEL,
+  parseTieBreak,
+  tieBreakRequest,
+} from "../tieBreak";
 import { COPILOT_ACTIONS, canPerform } from "../../shared/copilotActions";
 import {
   buildFindings,
@@ -105,6 +112,15 @@ const imageSchema = z
   .refine(
     v => v.startsWith("data:image/"),
     "Page image must be an image data URL"
+  );
+
+/** A tie-break crop or legend picture: small by construction. */
+const tieImage = z
+  .string()
+  .max(TIE_BREAK_MAX_IMAGE_CHARS, "That picture is too large.")
+  .refine(
+    v => v.startsWith("data:image/"),
+    "Picture must be an image data URL"
   );
 
 async function requireSheet(sheetId: number, userId: number) {
@@ -603,6 +619,83 @@ export const planCopilotRouter = router({
           "I couldn't read the sheet just now. Nothing was changed — try again, or zoom in and check that spot yourself.",
       };
     }),
+
+  /**
+   * Break the ties the sheet check could not settle by code
+   * (`server/tieBreak.ts`). Small crops in, one closed pick per crop out.
+   * Writes nothing: every pick comes back UNCONFIRMED and the panel shows it
+   * as a suggestion the estimator confirms or not. A button, never an effect.
+   */
+  breakTies: procedure
+    .input(
+      z.object({
+        sheetId: z.number().int().positive(),
+        items: z
+          .array(
+            z.object({
+              id: z.number().int().positive(),
+              label: z.string().trim().min(1).max(200),
+              picture: tieImage,
+            })
+          )
+          .min(2)
+          .max(TIE_BREAK_MAX_CROPS),
+        crops: z
+          .array(
+            z.object({
+              id: z.number().int().positive(),
+              picture: tieImage,
+              itemIds: z.array(z.number().int().positive()).min(2).max(6),
+            })
+          )
+          .min(1)
+          .max(TIE_BREAK_MAX_CROPS),
+      })
+    )
+    .mutation(
+      async ({
+        input,
+        ctx,
+      }): Promise<{
+        picks: Array<{ cropId: number; itemId: number | null }>;
+        message: string | null;
+      }> => {
+        if (!aiFeaturesEnabled()) throw readerSwitchedOff();
+        await requireSheet(input.sheetId, ctx.scope.dataUserId);
+        const none = (message: string) => ({
+          picks: input.crops.map(c => ({ cropId: c.id, itemId: null })),
+          message,
+        });
+        try {
+          const result = await invokeLLM({
+            feature: "plan-read",
+            user: ctx.user,
+            ...tieBreakRequest({
+              model: TIE_BREAK_MODEL,
+              items: input.items,
+              crops: input.crops,
+            }),
+          });
+          const picks = parseTieBreak(result, input.crops);
+          return {
+            picks: input.crops.map(c => ({
+              cropId: c.id,
+              itemId: picks.get(c.id) ?? null,
+            })),
+            message: null,
+          };
+        } catch (error) {
+          if (error instanceof AiLimitReached) return none(error.message);
+          noteFailure(
+            "tie-break request rejected",
+            error instanceof Error ? error.message : error
+          );
+          return none(
+            "The reader could not be reached. Nothing was changed — pick these by eye."
+          );
+        }
+      }
+    ),
 
   /**
    * Place the findings the user ticked. **The only procedure here that touches
