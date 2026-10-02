@@ -179,6 +179,32 @@ describe("finding copies of a boxed symbol", () => {
   });
 });
 
+describe("the same symbol drawn in different pieces", () => {
+  /** A circle as `n` chords, centred at (x, y). */
+  const circle = (x: number, y: number, r: number, n: number): Seg[] =>
+    Array.from({ length: n }, (_, k) => {
+      const a = (2 * Math.PI * k) / n;
+      const b = (2 * Math.PI * (k + 1)) / n;
+      return [x + r * Math.cos(a), y + r * Math.sin(a), x + r * Math.cos(b), y + r * Math.sin(b)] as Seg;
+    });
+
+  it("finds a junction box drawn as 8 chords from one drawn as 16, because its J confirms it", () => {
+    // UNCC: the legend's J circle is 14 segments, E111's is 7 — two CAD blocks.
+    const geo = geometry([{ segs: [...circle(100, 100, 5, 16), ...circle(400, 100, 5, 8)] }]);
+    const words = [word("J", 100, 100), word("J", 400, 100)];
+    const matches = okMatches(findMatching(geo, words, boxAround(100, 100, 6)));
+    expect(matches.map(m => Math.round(m.x))).toEqual([100, 400]);
+  });
+
+  it("never matches by shape alone — a wordless circle cut differently is not found", () => {
+    // Shape alone ignores filled-or-not and finds a duplex inside a double
+    // duplex; tried without the word rule, Weld 1 gained 12 false copies.
+    const geo = geometry([{ segs: [...circle(100, 100, 5, 16), ...circle(400, 100, 5, 8)] }]);
+    const matches = okMatches(findMatching(geo, [], boxAround(100, 100, 6)));
+    expect(matches.map(m => Math.round(m.x))).toEqual([100]);
+  });
+});
+
 describe("words", () => {
   it("requires a word drawn inside the box: a circle with J is not a plain circle", () => {
     const sq = (x: number, y: number) => duplex(x, y).slice(0, 4);

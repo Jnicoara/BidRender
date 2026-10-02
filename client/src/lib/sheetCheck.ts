@@ -23,6 +23,8 @@
  * suite tests it, and a script can measure it on a real sheet.
  */
 import {
+  isDeviceWord,
+  scaleTemplate,
   searchSymbol,
   symbolFromBox,
   wordKinds,
@@ -34,7 +36,17 @@ import {
 import type { WordBox } from "./textSelection";
 
 /** A legend item and the symbol(s) that draw it. */
-export type Look = { item: string; template: SymbolTemplate };
+export type Look = {
+  item: string;
+  template: SymbolTemplate;
+  /**
+   * Labels the legend writes BESIDE this symbol ("USB", "GF", "TV"), upper
+   * case. Not required to match — the plan may draw the same symbol for
+   * several items — but when looks tie, the label written beside the spot on
+   * the plan decides (`settleTie`).
+   */
+  qualifiers?: string[];
+};
 
 /** A mark on the sheet, with the legend item its count stands for (if any). */
 export type CheckMark = {
@@ -56,11 +68,20 @@ export type Fit = {
   maybeExisting: string[];
   halfWidth: number;
   halfHeight: number;
+  /** The look's legend labels (`Look.qualifiers`). */
+  qualifiers: string[];
 };
 
 export type SpotDecision =
-  | { kind: "clear"; item: string }
-  | { kind: "tie"; items: string[] }
+  /** `byWords`: a tie the words beside it settled, said so on screen. */
+  | { kind: "clear"; item: string; byWords?: string }
+  /**
+   * `sameOnLegend`: every tied look is drawn the SAME on the legend (UNCC
+   * draws three telecom items as one triangle; only their notes differ). No
+   * picture can tell them apart — not code, not an AI — so it is said, and
+   * never sent to the AI tie-break.
+   */
+  | { kind: "tie"; items: string[]; sameOnLegend?: boolean }
   | { kind: "unsure"; items: string[] };
 
 export type Spot = {
@@ -100,22 +121,68 @@ export function looksFromLegend(
   const looks: Look[] = [];
   const skipped: { name: string; why: string }[] = [];
   for (const row of rows) {
-    const made = symbolFromBox(
-      legendSheet,
-      {
-        x: row.symbol.x - grow,
-        y: row.symbol.y - grow,
-        width: row.symbol.width + 2 * grow,
-        height: row.symbol.height + 2 * grow,
-      },
-      // A lone lowercase letter is a switching leg ("a") or a circuit note,
-      // never what the symbol IS. Capitals and digits stay: "S", the dimmer's
-      // "D", the three-way "3" are the symbol.
-      { ignoreWord: t => /^[a-z]$/.test(t.trim()) }
+    const b = {
+      x: row.symbol.x - grow,
+      y: row.symbol.y - grow,
+      width: row.symbol.width + 2 * grow,
+      height: row.symbol.height + 2 * grow,
+    };
+    /*
+      "(J) OR [J]": one legend row, two ways of drawing it, the word OR
+      between. Taken as one symbol it matches neither (UNCC E111: 0 of 20
+      junction boxes), so it is cut at the OR into a look for each side.
+    */
+    const or = legendSheet.words.find(
+      w =>
+        w.text.trim().toUpperCase() === "OR" &&
+        w.cx > b.x &&
+        w.cx < b.x + b.width &&
+        w.cy > b.y &&
+        w.cy < b.y + b.height
     );
-    if (made.kind === "ok")
-      looks.push({ item: row.name, template: made.symbol });
-    else skipped.push({ name: row.name, why: made.kind });
+    const parts = or
+      ? [
+          { ...b, width: or.x0 - b.x },
+          { ...b, x: or.x1, width: b.x + b.width - or.x1 },
+        ].filter(p => p.width > 1)
+      : [b];
+    let madeAny = false;
+    let why = "";
+    for (const part of parts) {
+      const made = symbolFromBox(legendSheet, part, {
+        // A lone lowercase letter is a switching leg ("a") or a circuit
+        // note, never what the symbol IS. Capitals and digits stay: "S",
+        // the dimmer's "D", the three-way "3" are the symbol.
+        ignoreWord: t => /^[a-z]$/.test(t.trim()),
+        // Labels BESIDE a legend symbol ("TV", "OR") are not drawn on plans.
+        wordsInsideLineWork: true,
+      });
+      if (made.kind === "ok") {
+        // Every other word in this part of the legend box is a qualifier.
+        const kept = new Set(
+          made.symbol.words.map(w => w.trim().toUpperCase())
+        );
+        const qualifiers = Array.from(
+          new Set(
+            legendSheet.words
+              .filter(
+                w =>
+                  w.cx >= part.x &&
+                  w.cx <= part.x + part.width &&
+                  w.cy >= part.y &&
+                  w.cy <= part.y + part.height
+              )
+              .map(w => w.text.trim())
+              .filter(t => t && !/^[a-z]$/.test(t))
+              .map(t => t.toUpperCase().replace(/^"|"$/g, ""))
+              .filter(t => t !== "OR" && !kept.has(t))
+          )
+        );
+        looks.push({ item: row.name, template: made.symbol, qualifiers });
+        madeAny = true;
+      } else why = made.kind;
+    }
+    if (!madeAny) skipped.push({ name: row.name, why });
   }
   return { looks, skipped };
 }
@@ -144,15 +211,16 @@ export function legendItemForCount(
   return unique.length === 1 ? unique[0] : null;
 }
 
-function fitOf(item: string, m: Match): Fit {
+function fitOf(look: Look, m: Match): Fit {
   return {
-    item,
+    item: look.item,
     coverage: m.coverage,
     clean: m.needsLook.length === 0,
     reasons: m.needsLook,
     maybeExisting: m.maybeExisting,
     halfWidth: m.halfWidth,
     halfHeight: m.halfHeight,
+    qualifiers: look.qualifiers ?? [],
   };
 }
 
@@ -171,33 +239,177 @@ export function decideSpot(fits: readonly Fit[]): SpotDecision {
 }
 
 /** Search every look over the sheet and merge the finds into spots. */
+/** The sizes a look is retried at when it misses most of its count's marks. */
+export const RETRY_SCALES = [0.77, 0.87, 1.15, 1.3] as const;
+
+/**
+ * Settle a tie by the words beside the spot (no AI). UNCC's legend draws a
+ * USB outlet and a GFCI as the PLAIN duplex symbol and says the word beside
+ * it makes the difference ('"USB" indicates…', '"GF" indicates…'): the looks
+ * are identical, so code ties them — and the words decide. With a device
+ * word beside the spot, the one tied item whose NAME has that word wins;
+ * with none beside it, the one tied item whose name has no device word wins.
+ * Anything else stays a tie.
+ */
+export function settleTie(
+  tied: readonly { item: string; qualifiers: readonly string[] }[],
+  wordsAtSpot: readonly string[]
+): { item: string; word: string | null } | null {
+  // An item's labels: its legend qualifiers, and device words in its name.
+  const labels = tied.map(t => ({
+    item: t.item,
+    words: new Set([
+      ...t.qualifiers.map(q => q.toUpperCase()),
+      ...t.item
+        .toUpperCase()
+        .split(/[^A-Z0-9]+/)
+        .filter(w => w && isDeviceWord(w)),
+    ]),
+  }));
+  const here = new Set(
+    wordsAtSpot.map(w => w.trim().toUpperCase().replace(/^"|"$/g, ""))
+  );
+  const withWord = labels
+    .map(l => ({ l, w: Array.from(l.words).find(w => here.has(w)) }))
+    .filter(o => o.w !== undefined);
+  if (withWord.length === 1)
+    return { item: withWord[0].l.item, word: withWord[0].w ?? null };
+  if (withWord.length > 1) return null;
+  // No label of any tied item is written here: the one plain item, if one.
+  const plain = labels.filter(l => l.words.size === 0);
+  return plain.length === 1 ? { item: plain[0].item, word: null } : null;
+}
+
+/**
+ * True when every item's looks are drawn alike on the legend: the same
+ * number of strokes (±1), the same total line length (±5%), the same words.
+ * Two legend rows that pass this differ only in the words of their notes.
+ */
+export function drawnTheSame(templates: readonly SymbolTemplate[][]): boolean {
+  const sig = (t: SymbolTemplate) => ({
+    n: t.rel.length,
+    len: t.totalLength,
+    words: t.words
+      .map(w => w.trim().toUpperCase())
+      .sort()
+      .join(" "),
+  });
+  const first = templates[0]?.[0];
+  if (!first) return false;
+  const a = sig(first);
+  return templates.every(list =>
+    list.some(t => {
+      const b = sig(t);
+      return (
+        Math.abs(a.n - b.n) <= 1 &&
+        Math.abs(a.len - b.len) <= 0.05 * Math.max(a.len, b.len) &&
+        a.words === b.words
+      );
+    })
+  );
+}
+
 export function findSpots(
   sheet: PreparedSheet,
   looks: readonly Look[],
-  marks: readonly CheckMark[]
+  marks: readonly CheckMark[],
+  opts: { retryScales?: readonly number[] } = {}
 ): Spot[] {
+  const near = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.hypot(a.x - b.x, a.y - b.y) <= SAME_SPOT_POINTS;
+  const search = (t: SymbolTemplate): Match[] => {
+    const r = searchSymbol(t, sheet);
+    return r.kind === "ok" ? r.matches : [];
+  };
+  const found = looks.map(l => search(l.template));
+
+  /*
+    A legend is not always drawn at the plan's size. For an item the
+    estimator has counted, when its looks explain fewer than half his marks,
+    try them at a few other sizes and keep the size that explains most.
+    Bounded on purpose: only counted items, only when they mostly miss.
+  */
+  const scales = opts.retryScales ?? RETRY_SCALES;
+  const counted = new Set(
+    marks
+      .map(m => m.item)
+      .filter((i): i is string => i !== null)
+      .map(key)
+  );
+  counted.forEach(item => {
+    const mine = marks.filter(m => m.item !== null && key(m.item) === item);
+    const idx = looks
+      .map((l, i) => ({ l, i }))
+      .filter(o => key(o.l.item) === item);
+    if (idx.length === 0) return;
+    const explained = (lists: Match[][]) =>
+      mine.filter(m => lists.some(list => list.some(h => near(h, m)))).length;
+    let best = {
+      n: explained(idx.map(o => found[o.i])),
+      lists: idx.map(o => found[o.i]),
+    };
+    if (best.n * 2 >= mine.length) return;
+    for (const s of scales) {
+      const lists = idx.map(o => search(scaleTemplate(o.l.template, s)));
+      const n = explained(lists);
+      if (n > best.n) best = { n, lists };
+    }
+    idx.forEach((o, k) => (found[o.i] = best.lists[k]));
+  });
+
   const spots: Spot[] = [];
-  for (const look of looks) {
-    const r = searchSymbol(look.template, sheet);
-    if (r.kind !== "ok") continue;
-    for (const m of r.matches) {
+  looks.forEach((look, li) => {
+    for (const m of found[li]) {
       const at = spots.find(
         s => Math.hypot(s.x - m.x, s.y - m.y) <= SAME_SPOT_POINTS
       );
-      if (at) at.fits.push(fitOf(look.item, m));
+      if (at) at.fits.push(fitOf(look, m));
       else
         spots.push({
           id: spots.length + 1,
           x: m.x,
           y: m.y,
-          fits: [fitOf(look.item, m)],
+          fits: [fitOf(look, m)],
           decision: { kind: "unsure", items: [] },
           markId: null,
         });
     }
-  }
+  });
   for (const s of spots) {
     s.decision = decideSpot(s.fits);
+    if (s.decision.kind === "tie") {
+      const tiedItems = s.decision.items;
+      const tied = tiedItems.map(item => ({
+        item,
+        qualifiers: Array.from(
+          new Set(
+            s.fits.filter(f => f.item === item).flatMap(f => f.qualifiers)
+          )
+        ),
+      }));
+      const here = sheet.words
+        .filter(w => Math.hypot(w.cx - s.x, w.cy - s.y) <= WORD_REACH)
+        .map(w => w.text);
+      const won = settleTie(tied, here);
+      if (won)
+        s.decision = {
+          kind: "clear",
+          item: won.item,
+          byWords: won.word
+            ? `"${won.word}" is written beside it`
+            : "none of the look-alikes' labels is written beside it",
+        };
+      else {
+        const templates = tiedItems.map(item =>
+          looks.filter(l => l.item === item).map(l => l.template)
+        );
+        s.decision = {
+          kind: "tie",
+          items: tiedItems,
+          sameOnLegend: drawnTheSame(templates),
+        };
+      }
+    }
     const on = marks
       .map(m => ({ m, d: Math.hypot(m.x - s.x, m.y - s.y) }))
       .filter(o => o.d <= SAME_SPOT_POINTS)
@@ -232,6 +444,30 @@ export function checkMarks(
       .sort((a, b) => a.d - b.d)[0]?.s;
     if (!spot) return { markId: mark.id, kind: "nothing" };
     const own = spot.fits.filter(f => key(f.item) === key(mark.item as string));
+    // A clear spot (one clean look, or a tie the words beside it settled)
+    // answers directly.
+    if (spot.decision.kind === "clear") {
+      const d = spot.decision;
+      if (key(d.item) === key(mark.item))
+        return {
+          markId: mark.id,
+          kind: "matches",
+          notes: Array.from(
+            new Set(own.flatMap(f => [...f.reasons, ...f.maybeExisting]))
+          ),
+        };
+      return {
+        markId: mark.id,
+        kind: "different",
+        suggest: d.item,
+        reasons: [
+          ...(d.byWords
+            ? [`decided by the words beside it: ${d.byWords}`]
+            : []),
+          ...Array.from(new Set(spot.fits.flatMap(f => f.reasons))),
+        ],
+      };
+    }
     const others = Array.from(
       new Set(
         spot.fits

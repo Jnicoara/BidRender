@@ -15,6 +15,7 @@ import {
   findSpots,
   notesForMarks,
   readHeight,
+  settleTie,
   variantsOfCount,
   type CheckMark,
   type Fit,
@@ -107,6 +108,7 @@ const mark = (
 describe("what a spot is", () => {
   const fit = (item: string, clean: boolean): Fit => ({
     item,
+    qualifiers: [],
     coverage: 1,
     clean,
     reasons: clean ? [] : ["more lines run through it"],
@@ -197,6 +199,38 @@ describe("checking the estimator's marks", () => {
       [903, "clear"],
     ]);
     expect(spots.every(s => s.decision.kind !== "tie")).toBe(true);
+  });
+});
+
+describe("settling a tie by what is written beside it", () => {
+  // UNCC draws the USB outlet and the GFCI as the PLAIN duplex, with "USB" /
+  // "GF" written beside: identical looks, so only the words can decide.
+  const tied = [
+    { item: "DUPLEX 18 IN", qualifiers: [] },
+    { item: '"USB" INDICATES DUPLEX WITH USB PORTS', qualifiers: ["USB"] },
+    { item: "DATA OUTLET FOR WALL TV", qualifiers: ["TV"] },
+  ];
+
+  it("gives it to the item whose label is written there", () => {
+    expect(settleTie(tied, ["2B", "-", "27", "USB"])).toEqual({
+      item: '"USB" INDICATES DUPLEX WITH USB PORTS',
+      word: "USB",
+    });
+    expect(settleTie(tied, ["TV"])?.item).toBe("DATA OUTLET FOR WALL TV");
+  });
+
+  it("gives it to the one plain item when no label is written there", () => {
+    expect(settleTie(tied, ["2B", "-", "9"])).toEqual({
+      item: "DUPLEX 18 IN",
+      word: null,
+    });
+  });
+
+  it("leaves it a tie when two plain items tie, or two labels are there", () => {
+    expect(
+      settleTie([...tied, { item: "DUPLEX ON EMERGENCY", qualifiers: [] }], [])
+    ).toBeNull();
+    expect(settleTie(tied, ["USB", "TV"])).toBeNull();
   });
 });
 
@@ -305,14 +339,12 @@ describe("variants inside a count", () => {
       markIds: [1, 2, 3],
       minor: false,
     });
-    const rest = groups
-      .slice(1)
-      .map(g => ({
-        look: g.look,
-        beside: g.beside,
-        ids: g.markIds,
-        minor: g.minor,
-      }));
+    const rest = groups.slice(1).map(g => ({
+      look: g.look,
+      beside: g.beside,
+      ids: g.markIds,
+      minor: g.minor,
+    }));
     expect(rest).toEqual(
       expect.arrayContaining([
         { look: 1, beside: '54"', ids: [5], minor: true },

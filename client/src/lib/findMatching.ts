@@ -99,6 +99,11 @@ const DEVICE_WORDS = new Set([
   "EM",
   "NL",
 ]);
+/** True for a word that makes one device a different device (GF, WP, USB…). */
+export function isDeviceWord(text: string): boolean {
+  return DEVICE_WORDS.has(text.trim().toUpperCase().replace(/^"|"$/g, ""));
+}
+
 /** Words that say what is happening to a device. */
 const EXISTING_WORDS = new Set([
   "(E)",
@@ -346,6 +351,77 @@ function joinedCount(
   return count;
 }
 
+/**
+ * How much of a symbol's SHAPE is drawn at a place, whatever pieces it is
+ * drawn in: points every `step` along each of its lines (turned by `o`,
+ * moved to tx, ty), each counted when some line work no longer than three
+ * symbols lies within `tol` of it (walls and long wires are not shape). The
+ * line work touched is returned, for the look-alike flags.
+ */
+function shapeCoverage(
+  sheet: PreparedSheet,
+  rel: readonly RelSeg[],
+  o: Orient,
+  tx: number,
+  ty: number,
+  tol: number,
+  size: number
+): { coverage: number; touched: Set<number> } {
+  const segs = sheet.geo.segs;
+  const step = Math.max(0.35, size / 40);
+  const points: [number, number][] = [];
+  for (const r of rel) {
+    const n = Math.max(1, Math.ceil(r.length / step));
+    for (let k = 0; k <= n; k++) {
+      const x = r.x1 + ((r.x2 - r.x1) * k) / n;
+      const y = r.y1 + ((r.y2 - r.y1) * k) / n;
+      points.push([o.a * x + o.b * y + tx, o.c * x + o.d * y + ty]);
+    }
+  }
+  if (points.length === 0) return { coverage: 0, touched: new Set() };
+  const grid = sheet.grid(size / 2);
+  const touched = new Set<number>();
+  const hits = (p: [number, number]) => {
+    let hit = -1;
+    grid.near(p[0], p[1], size, i => {
+      if (hit >= 0) return;
+      const ax = segs[i * 4];
+      const ay = segs[i * 4 + 1];
+      const bx = segs[i * 4 + 2];
+      const by = segs[i * 4 + 3];
+      const len2 = (bx - ax) ** 2 + (by - ay) ** 2;
+      if (len2 > (3 * size) ** 2) return;
+      const t =
+        len2 === 0
+          ? 0
+          : Math.max(
+              0,
+              Math.min(
+                1,
+                ((p[0] - ax) * (bx - ax) + (p[1] - ay) * (by - ay)) / len2
+              )
+            );
+      const d = Math.hypot(
+        ax + t * (bx - ax) - p[0],
+        ay + t * (by - ay) - p[1]
+      );
+      if (d <= tol) hit = i;
+    });
+    if (hit >= 0) touched.add(hit);
+    return hit >= 0;
+  };
+  // A cheap look first: 8 points spread over the symbol.
+  const sample = Array.from(
+    { length: 8 },
+    (_, k) => points[Math.floor((k * points.length) / 8)]
+  );
+  if (sample.filter(hits).length < 6)
+    return { coverage: 0, touched: new Set() };
+  touched.clear();
+  const found = points.filter(hits).length;
+  return { coverage: found / points.length, touched };
+}
+
 /** Words within a symbol's reach of (x, y), less the ones that ARE it. */
 function ringWords(
   words: readonly WordBox[],
@@ -400,6 +476,13 @@ export function symbolFromBox(
      * (legs a, b, c…) fails to match — measured: 0 of 4 on Weld 1 E-200.
      */
     ignoreWord?: (text: string) => boolean;
+    /**
+     * Keep only words that sit inside the symbol's own line work. A legend
+     * writes labels BESIDE its symbols — "TV" beside UNCC's data-outlet
+     * triangle, "OR" between two alternatives — and none of them is drawn on
+     * the plan. A "J" inside a circle is inside, and stays.
+     */
+    wordsInsideLineWork?: boolean;
   } = {}
 ): SymbolFromBox {
   const geo = sheet.geo;
@@ -467,9 +550,24 @@ export function symbolFromBox(
   const symbolSegs = boxed.filter(
     i => Math.round(geo.lightness[i] / LIGHTNESS_STEP) === symbolShade
   );
-  const symbolWords = words.filter(
+  let symbolWords = words.filter(
     w => inBox(w.cx, w.cy) && !opts.ignoreWord?.(w.text)
   );
+  if (opts.wordsInsideLineWork && symbolSegs.length > 0) {
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const i of symbolSegs) {
+      x0 = Math.min(x0, segs[i * 4], segs[i * 4 + 2]);
+      x1 = Math.max(x1, segs[i * 4], segs[i * 4 + 2]);
+      y0 = Math.min(y0, segs[i * 4 + 1], segs[i * 4 + 3]);
+      y1 = Math.max(y1, segs[i * 4 + 1], segs[i * 4 + 3]);
+    }
+    symbolWords = symbolWords.filter(
+      w => w.cx >= x0 - 1 && w.cx <= x1 + 1 && w.cy >= y0 - 1 && w.cy <= y1 + 1
+    );
+  }
 
   if (symbolSegs.length === 0 && symbolWords.length === 0) {
     if (geo.imageCoverage > 0.4) return { kind: "scan", message: SCAN_MESSAGE };
@@ -567,6 +665,41 @@ export function symbolFromBox(
       segments: symbolSegs.length,
       words: symbolWords.map(w => w.text),
     },
+  };
+}
+
+/**
+ * The same symbol drawn `scale` times as big. A legend is not always drawn
+ * at the plan's size: UNCC's data-outlet triangle is about 15% smaller on its
+ * legend than on E111, beyond the matcher's tolerance. Searching at a few
+ * sizes is the caller's choice (and its cost); see `sheetCheck.findSpots`.
+ */
+export function scaleTemplate(
+  t: SymbolTemplate,
+  scale: number
+): SymbolTemplate {
+  const size = t.size * scale;
+  return {
+    ...t,
+    rel: t.rel.map(r => ({
+      ...r,
+      x1: r.x1 * scale,
+      y1: r.y1 * scale,
+      x2: r.x2 * scale,
+      y2: r.y2 * scale,
+      length: r.length * scale,
+    })),
+    relWords: t.relWords.map(w => ({
+      ...w,
+      dx: w.dx * scale,
+      dy: w.dy * scale,
+      height: w.height * scale,
+    })),
+    totalLength: t.totalLength * scale,
+    halfW: t.halfW * scale,
+    halfH: t.halfH * scale,
+    size,
+    tol: Math.max(0.75, 0.06 * size),
   };
 }
 
@@ -755,7 +888,27 @@ export function searchSymbol(
         }
       }
     }
-    if (failed) continue;
+    let coverage = totalLength > 0 ? matchedLength / totalLength : 1;
+    if (failed) {
+      /*
+        The same symbol, cut into different pieces. UNCC's legend draws the
+        junction box's circle as 14 short segments and E111 draws it as 7 —
+        two CAD blocks — so segment-to-segment never matches (0 of 20, at any
+        size). Fallback: points along the symbol's lines, each needing some
+        short line work within `tol`, after a cheap 8-point look.
+
+        ONLY for a look with a WORD in it (the J), which the word check below
+        then has to find. Shape alone ignores filled-or-not (all that tells a
+        GFCI from a duplex on Weld 1) and a duplex's shape lies wholly inside
+        a double duplex: tried without the word rule, Weld 1 E-200 went from
+        0 to 12 duplex "copies" on no mark and gained a silent mix-up.
+      */
+      if (relWords.length === 0) continue;
+      const shape = shapeCoverage(sheet, rel, o, tx, ty, tol, size);
+      if (shape.coverage < MIN_COVERAGE) continue;
+      shape.touched.forEach(i => matched.add(i));
+      coverage = shape.coverage;
+    }
 
     const usedWords = new Set<number>();
     let wordsOk = true;
@@ -786,7 +939,7 @@ export function searchSymbol(
       tx,
       ty,
       o,
-      coverage: totalLength > 0 ? matchedLength / totalLength : 1,
+      coverage,
       matched,
       usedWords,
     });

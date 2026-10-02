@@ -168,8 +168,25 @@ const stamps = await db.getStampsForSheet(sheetId, owner);
 const symbols = await db.getSymbolLinks(owner);
 const sameAs = sameAsNamer(readAnswerKeyFile());
 const legendNames = looks.map(l => l.item);
-// The count's own name, its "same as" names (answer-key.json), or a linked symbol.
+// --map "COUNT=legend row start;…": what the panel's "compare with" picker
+// does by hand, for a set whose legend words differ from the count's name.
+const pick = new Map(
+  (arg("map") ?? "")
+    .split(";")
+    .filter(Boolean)
+    .map(p => {
+      const [count, start] = p.split("=");
+      const row = legendNames.find(n =>
+        n.toLowerCase().startsWith(start.trim().toLowerCase())
+      );
+      if (!row) throw new Error(`--map: no legend row starts "${start}"`);
+      return [count.trim().toLowerCase(), row] as const;
+    })
+);
+// The pick, then the count's own name, its "same as" names, or a linked symbol.
 const itemFor = (label: string, assemblyId: number | null) => {
+  const picked = pick.get(label.trim().toLowerCase());
+  if (picked) return picked;
   const direct = sc.legendItemForCount(
     { label, assemblyId },
     legendNames,
@@ -211,7 +228,7 @@ for (const [count, list] of byCount) {
   const cs = list.map(m => checks.find(c => c.markId === m.id)!);
   const n = (k: string) => cs.filter(c => c.kind === k).length;
   console.log(
-    `| ${count} | ${list.length} | ${list[0].item ?? "—"} | ${n("matches")} | ${n("unsure")} | ${n("different")} | ${n("nothing")} | ${n("noLook")} |`
+    `| ${count} | ${list.length} | ${list[0].item?.slice(0, 40) ?? "—"} | ${n("matches")} | ${n("unsure")} | ${n("different")} | ${n("nothing")} | ${n("noLook")} |`
   );
   const diffs = new Map<string, number>();
   cs.forEach(c => {
@@ -275,6 +292,9 @@ if (out)
       {
         pdfName,
         planPage,
+        legendPage,
+        // The legend boxes the reader found, so a result can be looked at.
+        legendRows: rows,
         looks: looks.map(l => l.item),
         skipped,
         spots,
