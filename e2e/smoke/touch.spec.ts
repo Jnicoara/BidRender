@@ -30,17 +30,10 @@ test.afterEach(async ({ request }) => {
 });
 
 test("count, link and send by touch", async ({ page }, info) => {
-  // KNOWN FAULT, found by this test 2026-10-01: on an UPRIGHT tablet
-  // (820x1180) the Plans panel opens full-screen (the phone layout), but at
-  // that width the app's left sidebar is also shown and sits ON TOP of the
-  // panel's "← Plan" button and its left edge — so a finger can open the
-  // panel and cannot get back to the drawing. Expected to fail until fixed;
-  // it goes red ("expected to fail, but passed") the day it is, and this
-  // line comes out.
-  test.fail(
-    info.project.name === "tablet-portrait",
-    "known: the sidebar covers the full-screen panel's ← Plan on an upright tablet"
-  );
+  // History: on 2026-10-01 this test found the app's sidebar covering the
+  // full-screen panel's "← Plan" on an upright tablet, and carried it as an
+  // expected failure. Track B's device work fixed it the same day; the test
+  // reported "expected to fail, but passed" and the marker came out.
   bidId = await createThrowawayBid(page.request, `touch ${info.project.name}`);
   await trpc(
     page.request,

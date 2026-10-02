@@ -370,7 +370,8 @@ test("10. undo and redo a mark; delete one and Undo brings it back", async () =>
 test("11. a traced run measures right; deleting it asks first and Enter does not delete", async () => {
   await page.getByRole("button", { name: "Previous sheet" }).click();
   await expect(page.getByText(/^1\/2$/).first()).toBeVisible();
-  await page.getByRole("button", { name: /^Conduit$/ }).click();
+  // Labelled "Trace conduit: <run type>" since the device work (2026-10-01).
+  await page.getByRole("button", { name: /^Trace conduit/ }).click();
   await placeAt(page, { x: 450, y: 1000 });
   await placeAt(page, { x: 1450, y: 1000 });
   const end = await (

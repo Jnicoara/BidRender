@@ -73,20 +73,16 @@ async function expectNothingLost(
  * entry gets removed rather than outliving the fault. Add one only with the
  * date it was found.
  *
- * All three found 2026-10-01 are one family: a page HEADER row that does not
- * wrap on a 390px phone, so its subtitle stacks a word per line and the
- * buttons at its right run off the screen. They predate the responsiveness
- * rules (CLAUDE.md), so they are reported, not retrofitted as a side effect.
+ * EMPTY today, and that is the list working. On 2026-10-01 it held three:
+ * the Dashboard, bid and Proposal headers did not wrap on a 390px phone (the
+ * Proposal's "Print / Save PDF" sat 103px off the screen). Track B's device
+ * work fixed all three the same day, each run reported "expected to fail, but
+ * passed", and the entries came out. Keep the mechanism for the next one.
+ *
+ * Shape: { "/screen/path": ["phone", "tablet-portrait", …] } — the path as
+ * the tests name it, with "/bids/:id…" for the bid screens.
  */
-const KNOWN_FAULTS: Record<string, string[]> = {
-  // "+ Empty bid" runs 35px past the right edge; "Out for bid" overlaps.
-  "/dashboard": ["phone"],
-  // The bid screen is 497px wide on a 390px phone; cards run off the right.
-  "/bids/:id": ["phone"],
-  // "Print / Save PDF" sits 103px past the right edge, out of reach; the zoom
-  // controls overlap "Design".
-  "/bids/:id/proposal": ["phone"],
-};
+const KNOWN_FAULTS: Record<string, string[]> = {};
 
 function expectKnownFault(screen: string, project: string) {
   test.fail(

@@ -1741,11 +1741,14 @@ AI button), a real phone in a hand, and how a screen feels. Those stay manual.
 uses its own staging account, names every bid it makes `CI smoke …`, archives
 them at the end, and sweeps any a crashed run left behind before it starts.
 
-**Known faults it carries as expected failures** (`test.fail`, visible on every
-run, and they go red the day they are fixed so the entry gets removed — never
-skipped): the Dashboard, bid and Proposal headers on a 390px phone, and the
-sidebar covering the full-screen panel's "← Plan" on an upright tablet. See
-`KNOWN_FAULTS` in `e2e/smoke/screens.spec.ts` and the note in `touch.spec.ts`.
+**Known faults are carried as expected failures, never skipped**
+(`KNOWN_FAULTS` in `e2e/smoke/screens.spec.ts`, `test.fail`): visible on every
+run, and red ("expected to fail, but passed") the day they are fixed, so the
+entry comes out. **The list is empty today.** On its first day it found four —
+the Dashboard, bid and Proposal headers running off a 390px phone, and the
+sidebar covering the full-screen panel's "← Plan" on an upright tablet — and
+all four were fixed by Track B's device work the same day, each one reported
+by this mechanism.
 
 ### Setting it up — the owner's steps, once
 
