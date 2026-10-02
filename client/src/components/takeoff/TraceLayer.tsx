@@ -61,11 +61,21 @@ import {
   type PagePoint,
 } from "@shared/takeoffGeometry";
 import type { Measurability, RunPathType } from "@shared/takeoffQuantities";
-import { legSnapLabel, type LegSnap } from "@/lib/legSnap";
+import {
+  legSnapLabel,
+  snapToMark,
+  type LegSnap,
+  type SnapStamp,
+} from "@/lib/legSnap";
+import {
+  connectLabel,
+  connectShortLabel,
+  type ConnectPoint,
+} from "@shared/connectPoint";
 import { stampsInBox } from "@/lib/stampSelection";
 import { projectOntoPath } from "@shared/runNetwork";
 import { JOINED_WITHIN_POINTS } from "@shared/quantityDrops";
-import { addsTracePoint } from "@/lib/traceClick";
+import { traceClickPoint } from "@/lib/traceClick";
 import { pastDragThreshold } from "@/lib/dragThreshold";
 import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import {
@@ -181,6 +191,18 @@ const RUN_COLOR: Record<RunPathType, string> = {
   cable: "#4ADE80",
 };
 
+/**
+ * Where a run meets a wall device: at the wall (found), or at the centre and
+ * short (amber, dashed, "?" — the drawing's language for provisional).
+ */
+const MEETS_WALL_COLOR = "#22D3EE";
+const MEETS_UNSURE_COLOR = "#F59E0B";
+/** The same two, dark enough to read as text on a white sheet. */
+const MEETS_WALL_TEXT = "#0E7490";
+const MEETS_UNSURE_TEXT = "#B45309";
+/** A run end this close to a mark's point (page points) sits on it. */
+const ON_END_POINTS = 0.75;
+
 export type PlacedStamp = {
   id: number;
   /** What it is counting — the group's label. See shared/takeoffCounts.ts. */
@@ -268,7 +290,14 @@ export function TraceLayer({
   selectMode = false,
   freePoints = false,
   onToggleFreePoints,
+  connects,
 }: {
+  /**
+   * Where a run meets each mark (shared/connectPoint.ts), by stamp id. Every
+   * snap to a mark lands here: at the wall for a wall device, else the centre.
+   * Omitted, a run meets every mark at its centre, as before.
+   */
+  connects?: ReadonlyMap<number, ConnectPoint>;
   /**
    * Each count's letter and first-use colour on this bid (shared/pinLetters).
    * The panel's swatches read the same map, so a card and its pins agree.
@@ -400,6 +429,23 @@ export function TraceLayer({
   /** Alt is held: a new leg's first click places a free point (D20). */
   const [hoverAlt, setHoverAlt] = useState(false);
 
+  /**
+   * The marks a run can snap to, each with where a run MEETS it. A mark still
+   * on its way to the server is not a target: it has no row to link yet.
+   */
+  const snapStamps = useMemo<SnapStamp[]>(
+    () =>
+      stamps
+        .filter(s => !s.pending)
+        .map(s => ({
+          id: s.id,
+          x: s.x,
+          y: s.y,
+          connect: connects?.get(s.id)?.point,
+        })),
+    [stamps, connects]
+  );
+
   /** A leg can be finished with nothing traced yet: the run's legs are saved. */
   const canFinish = points.length >= 2 || Boolean(legs?.active);
 
@@ -439,6 +485,24 @@ export function TraceLayer({
     [pagePerScreenPx]
   );
 
+  /**
+   * An ordinary trace click near a mark lands on the mark's connect point —
+   * since 2026-10-01; before, it stayed where it fell, so a run "ending at" a
+   * wall receptacle ended at the middle of its symbol, short by the stand-off
+   * (references/connect-point-plan.md). Alt, or Free on a touch screen,
+   * places the point exactly where it falls. Null: no mark in reach.
+   */
+  const traceSnap = useCallback(
+    (at: PagePoint, free: boolean) =>
+      free ? null : snapToMark(at, snapReach(), snapStamps),
+    [snapReach, snapStamps]
+  );
+  /** The same snap for where the pointer is, so the ring shows the click. */
+  const hoverSnap =
+    tracing && !legs?.pending && hover
+      ? traceSnap(hover, hoverAlt || freePoints)
+      : null;
+
   const ratio = measurability.ok ? measurability.ratio : null;
 
   /** Page points → the overlay's pixel space. */
@@ -457,6 +521,109 @@ export function TraceLayer({
     (p: PagePoint) => ({ x: p.x * renderScale, y: p.y * renderScale }),
     [renderScale]
   );
+
+  /**
+   * WHERE A RUN MEETS A DEVICE, drawn (connect-point plan § 4.1, § 5.3).
+   *
+   * - At the wall: a short solid tick from the symbol's centre to the foot on
+   *   the wall, ending in a dot — the run stops at the box, and this says why
+   *   it does not reach the middle of the symbol.
+   * - A wall device met at its centre (a scan, no wall found, not read yet):
+   *   a dashed amber ring with "?" — that end is short by the stand-off, and
+   *   nothing else on the screen would say so.
+   * - A centre-mounted device: nothing extra; meeting a light in the middle
+   *   is what everyone expects.
+   *
+   * `label` adds the few words beside it, for the cursor preview only.
+   */
+  const renderMeets = (
+    key: string,
+    stamp: { x: number; y: number },
+    connect: ConnectPoint | undefined,
+    label: boolean,
+    title?: string
+  ) => {
+    if (!connect || connect.kind === "centre") return null;
+    const r = markRadiusInOverlay(zoom) * 0.45;
+    const stroke = markStrokeInOverlay(zoom);
+    const centre = toScreen(stamp);
+    const at = toScreen(connect.point);
+    const text = label ? connectShortLabel(connect) : null;
+    const fontSize = runWidthInOverlay(zoom, 11);
+    const labelSize = runWidthInOverlay(zoom, 13);
+    return (
+      <g key={key} pointerEvents="none">
+        <title>{title ?? connectLabel(connect)}</title>
+        {connect.kind === "wall" ? (
+          <>
+            <line
+              x1={centre.x}
+              y1={centre.y}
+              x2={at.x}
+              y2={at.y}
+              stroke={MEETS_WALL_COLOR}
+              strokeWidth={stroke}
+              strokeLinecap="round"
+            />
+            <circle
+              cx={at.x}
+              cy={at.y}
+              r={r * 0.6}
+              fill={MEETS_WALL_COLOR}
+              stroke="#0b0b0b"
+              strokeWidth={stroke * 0.5}
+            />
+          </>
+        ) : (
+          <>
+            <circle
+              cx={at.x}
+              cy={at.y}
+              r={r * 1.6}
+              fill="none"
+              stroke={MEETS_UNSURE_COLOR}
+              strokeWidth={stroke}
+              strokeDasharray={`${r * 0.5} ${r * 0.35}`}
+            />
+            <text
+              x={at.x}
+              y={at.y + fontSize * 0.35}
+              textAnchor="middle"
+              fontSize={fontSize}
+              fontWeight={700}
+              fill={MEETS_UNSURE_COLOR}
+              stroke="#0b0b0b"
+              strokeWidth={fontSize * 0.18}
+              paintOrder="stroke"
+            >
+              ?
+            </text>
+          </>
+        )}
+        {text && (
+          /*
+            Dark text on a white halo, not the "Next" label's light-on-dark:
+            this one sits right on the line work it is talking about, and a
+            sheet is white. Checked at 1536 px and on a tablet, 2026-10-01 —
+            the dark halo read as a smudge.
+          */
+          <text
+            x={at.x + runWidthInOverlay(zoom, 12)}
+            y={at.y + runWidthInOverlay(zoom, 18)}
+            fontSize={labelSize}
+            fontWeight={600}
+            fill={connect.kind === "wall" ? MEETS_WALL_TEXT : MEETS_UNSURE_TEXT}
+            stroke="#ffffff"
+            strokeWidth={labelSize * 0.3}
+            strokeLinejoin="round"
+            paintOrder="stroke"
+          >
+            {text}
+          </text>
+        )}
+      </g>
+    );
+  };
 
   const clientToPage = useCallback(
     (clientX: number, clientY: number): PagePoint | null => {
@@ -627,26 +794,19 @@ export function TraceLayer({
     [onEditPoints]
   );
 
-  /** An END let go near a mark lands on it, as tracing does. */
+  /**
+   * An END let go near a mark lands on it, as tracing does — at its connect
+   * point, through the same `snapToMark` a click uses, so a dragged end and a
+   * clicked one cannot meet the same device in two places.
+   */
   const snapEnd = useCallback(
     (d: Drag, points: PagePoint[]): PagePoint[] => {
       if (d.index !== 0 && d.index !== points.length - 1) return points;
-      const p = points[d.index];
-      const reach = snapReach();
-      let best: PlacedStamp | null = null;
-      let bestD = reach;
-      for (const s of stamps) {
-        if (s.pending) continue;
-        const dist = Math.hypot(s.x - p.x, s.y - p.y);
-        if (dist <= bestD) {
-          best = s;
-          bestD = dist;
-        }
-      }
-      if (!best) return points;
-      return movePoint(points, d.index, best, d.pinned) ?? points;
+      const hit = snapToMark(points[d.index], snapReach(), snapStamps);
+      if (!hit) return points;
+      return movePoint(points, d.index, hit.point, d.pinned) ?? points;
     },
-    [snapReach, stamps]
+    [snapReach, snapStamps]
   );
 
   useEffect(() => {
@@ -776,8 +936,10 @@ export function TraceLayer({
    * out of the total; its test is what says so.
    */
   const readout = useMemo(
-    () => traceReadout(points, tracing ? hover : null, ratio),
-    [tracing, points, hover, ratio]
+    // The snapped point, so "Next" is the length the click will actually add.
+    () =>
+      traceReadout(points, tracing ? (hoverSnap?.point ?? hover) : null, ratio),
+    [tracing, points, hover, hoverSnap?.point.x, hoverSnap?.point.y, ratio]
   );
   const [showNext] = useShowNextSegment();
 
@@ -834,6 +996,54 @@ export function TraceLayer({
    */
   const withChrome = (chrome: React.ReactNode) =>
     chromeTarget ? createPortal(chrome, chromeTarget) : chrome;
+
+  /**
+   * A glyph for each run end that sits ON a wall device: at its wall foot
+   * (meets the wall), or at its centre (short — a run traced before this, or
+   * placed with Alt). Only a mark the end actually sits on.
+   */
+  const runEndMeets = () =>
+    existingRuns.flatMap(run => {
+      const inSelected =
+        selectedRoot !== null && (run.parentRunId ?? run.id) === selectedRoot;
+      if (!tracing && !inSelected) return [];
+      const pts = pointsNow(run);
+      if (pts.length < 2) return [];
+      return [pts[0], pts[pts.length - 1]].flatMap((end, i) => {
+        const near = (p: PagePoint) =>
+          Math.hypot(p.x - end.x, p.y - end.y) <= ON_END_POINTS;
+        for (const s of snapStamps) {
+          const connect = connects?.get(s.id);
+          // Not read yet: say nothing rather than flash amber for the half
+          // second the worker takes.
+          if (
+            !connect ||
+            (connect.kind === "no-wall" && connect.reason === "reading")
+          )
+            continue;
+          const key = `meets-${run.id}-${i}`;
+          if (connect.kind === "wall" && near(connect.point))
+            return [renderMeets(key, s, connect, false)];
+          if (connect.kind !== "centre" && near(s))
+            return [
+              connect.kind === "wall"
+                ? renderMeets(
+                    key,
+                    s,
+                    {
+                      kind: "no-wall",
+                      point: { x: s.x, y: s.y },
+                      reason: "none-in-reach",
+                    },
+                    false,
+                    "This end stops at the symbol's centre — the wall is beside it. Drag the end onto the mark to meet the wall."
+                  )
+                : renderMeets(key, s, connect, false),
+            ];
+        }
+        return [];
+      });
+    });
 
   return (
     <>
@@ -938,8 +1148,18 @@ export function TraceLayer({
             const now = e.timeStamp;
             const since = now - lastTracePress.current;
             lastTracePress.current = now;
-            if (!addsTracePoint(points, page, pagePerScreenPx(), since)) return;
-            onPointsChange([...points, page]);
+            //
+            // On a mark the point is its connect point (the wall, for a wall
+            // device), and the double-click test reads THAT point, not the
+            // raw press — see traceClickPoint for the stub it stops.
+            const next = traceClickPoint(
+              points,
+              page,
+              traceSnap(page, e.altKey || freePoints)?.point ?? null,
+              pagePerScreenPx(),
+              since
+            );
+            if (next) onPointsChange([...points, next]);
             return;
           }
           // The stamp mechanic: one selection, then a drop per click with
@@ -949,7 +1169,7 @@ export function TraceLayer({
         onDoubleClick={e => {
           // Double-click finishes, which is what every drawing tool does. The
           // first press placed the end point; the second added nothing
-          // (addsTracePoint above).
+          // (traceClickPoint above).
           if (tracing && canFinish) {
             e.preventDefault();
             onFinish();
@@ -1538,11 +1758,45 @@ export function TraceLayer({
                         }
                       />
                     )}
+                    {preview.kind === "stamp" &&
+                      (() => {
+                        const s = snapStamps.find(
+                          st => st.id === preview.stampId
+                        );
+                        return s
+                          ? renderMeets(
+                              "meets-leg",
+                              s,
+                              connects?.get(s.id),
+                              true
+                            )
+                          : null;
+                      })()}
                   </g>
                 )}
               </>
             );
           })()}
+
+        {/* Where the next click lands, when it lands on a mark. */}
+        {hoverSnap && (
+          <g pointerEvents="none">
+            <circle
+              cx={toScreen(hoverSnap.point).x}
+              cy={toScreen(hoverSnap.point).y}
+              r={markRadiusInOverlay(zoom) * 0.7}
+              fill="none"
+              stroke="#F5C518"
+              strokeWidth={markStrokeInOverlay(zoom)}
+            />
+            {renderMeets(
+              "meets-hover",
+              hoverSnap.stamp,
+              connects?.get(hoverSnap.stamp.id),
+              true
+            )}
+          </g>
+        )}
 
         {/* The trace in progress */}
         {tracing && points.length > 0 && (
@@ -1566,8 +1820,8 @@ export function TraceLayer({
               <line
                 x1={toScreen(points[points.length - 1]).x}
                 y1={toScreen(points[points.length - 1]).y}
-                x2={toScreen(hover).x}
-                y2={toScreen(hover).y}
+                x2={toScreen(hoverSnap?.point ?? hover).x}
+                y2={toScreen(hoverSnap?.point ?? hover).y}
                 stroke={RUN_COLOR[pathType]}
                 strokeWidth={runStroke * (1 / 3)}
                 strokeDasharray="6 5"
@@ -1739,6 +1993,17 @@ export function TraceLayer({
               </g>
             );
           })()}
+
+        {/*
+          Where each run's ENDS meet a device — while tracing (every run, so
+          a new one can be lined up against them) or on the selected run. The
+          rest of the time it is clutter on a drawing already full of marks.
+          LAST in the drawing, over the drag handles: on a touch screen a
+          handle is big enough to hide the whole tick (seen on a tablet,
+          2026-10-01), and this takes no pointer events, so it hides nothing
+          from a finger.
+        */}
+        {connects && runEndMeets()}
       </svg>
 
       {withChrome(

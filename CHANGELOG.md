@@ -18,6 +18,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-01]
 
+- **Runs that end at a wall receptacle, switch or data outlet now reach the
+  wall.** The symbol is drawn standing off the wall, and a run traced to it
+  used to stop at the middle of the drawing — about half a foot short at
+  each end at 1/8" scale, on every such device. Clicking on one now places
+  the point where the box is, at the wall line beside it, and a small cyan
+  tick shows where the run meets it. Where no wall can be found (a scanned
+  sheet, or nothing beside it), the end stays at the centre and an amber "?"
+  says so. Lights, J-boxes and panels are still met in the middle. Hold Alt
+  (or tap Free) to place a point exactly. Runs traced before this keep
+  their lengths.
 - **The server starts about four seconds faster, and a test that failed at
   random no longer does.** A start-up check for duplicate catalog rows
   compared every material against every other one, and took 4.5 seconds at

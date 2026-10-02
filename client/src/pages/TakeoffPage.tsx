@@ -84,6 +84,14 @@ import {
   SquareDashedMousePointer,
 } from "lucide-react";
 import { pinStylesForBid } from "@shared/pinLetters";
+import { deviceFamily } from "@shared/deviceFamily";
+import {
+  FAMILY_MOUNTING,
+  markConnects,
+  type ConnectMark,
+  type ConnectPoint,
+  type ConnectRead,
+} from "@shared/connectPoint";
 import {
   countAgainOffer,
   loadLastCount,
@@ -541,6 +549,11 @@ function usePdfWorker() {
         pending.current.delete(msg.reqId);
         return;
       }
+      if (msg.type === "connectPoints") {
+        pending.current.get(msg.reqId)?.resolve(msg.points);
+        pending.current.delete(msg.reqId);
+        return;
+      }
       if (msg.type === "sheetChecked") {
         pending.current.get(msg.reqId)?.resolve({
           result: msg.result,
@@ -696,6 +709,13 @@ function usePdfWorker() {
           pageNum,
           hash,
           box,
+        }),
+      connectPoints: (pageNum: number, hash: string, marks: ConnectMark[]) =>
+        ask<[number, ConnectPoint][]>({
+          type: "connectPoints",
+          pageNum,
+          hash,
+          marks,
         }),
       sheetCheck: (
         legendPage: number,
@@ -920,6 +940,11 @@ function PlanPane({
       box: MatchBox
     ) => Promise<{ result: FindResult; readMs: number; findMs: number }>;
     /**
+     * Where runs meet these wall devices on this page (shared/connectPoint),
+     * read from the page's line work in the worker.
+     */
+    connectPoints: (marks: ConnectMark[]) => Promise<[number, ConnectPoint][]>;
+    /**
      * Check this page against a legend on another page of the same set
      * (@/lib/sheetCheck), in the worker. Suggestions only.
      */
@@ -1001,6 +1026,7 @@ function PlanPane({
     pageText,
     pageTextLayer,
     findMatching: findMatchingOnPage,
+    connectPoints: connectPointsOnPage,
     sheetCheck: sheetCheckOnPage,
   } = usePdfWorker();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -2420,6 +2446,8 @@ function PlanPane({
                     render(page, scale, hash, rect),
                   loadTextLayer: () => pageTextLayer(page, hash),
                   findMatching: box => findMatchingOnPage(page, hash, box),
+                  connectPoints: marks =>
+                    connectPointsOnPage(page, hash, marks),
                   sheetCheck: (legendPage, input) =>
                     sheetCheckOnPage(legendPage, page, hash, input),
                 })}
@@ -5938,6 +5966,49 @@ export default function TakeoffPage({
     () => filterByLayers(layeredStamps, effectiveLayers),
     [layeredStamps, effectiveLayers]
   );
+
+  /**
+   * Where a run meets each mark on this sheet (shared/connectPoint.ts): the
+   * wall for a wall device whose wall the drawing shows, the centre for
+   * everything else. Every snap reads this — a leg's start, an ordinary trace
+   * click, an end let go — so a run ending at a wall receptacle ends at the box
+   * in the wall, not the middle of the drawing of it, and is not short by the
+   * stand-off. The family is the PIN's (same name > assembly > category), so a
+   * device cannot be drawn as one thing and met as another.
+   */
+  const [connectRead, setConnectRead] = useState<{
+    sheetId: number;
+    read: ConnectRead;
+  } | null>(null);
+  const connectMarks = useMemo<ConnectMark[]>(
+    () =>
+      visibleStamps.map(st => ({
+        id: st.id,
+        x: st.x,
+        y: st.y,
+        family:
+          (st.groupId != null ? pinStyles.get(st.groupId)?.family : null) ??
+          deviceFamily({
+            label: st.name,
+            assemblyCategory: st.assemblyCategory ?? null,
+          }),
+      })),
+    [visibleStamps, pinStyles]
+  );
+  const wallMarks = useMemo(
+    () => connectMarks.filter(m => FAMILY_MOUNTING[m.family] === "wall"),
+    [connectMarks]
+  );
+  const connects = useMemo(
+    () =>
+      markConnects(
+        connectMarks,
+        connectRead && connectRead.sheetId === activeSheet?.id
+          ? connectRead.read
+          : null
+      ),
+    [connectMarks, connectRead, activeSheet?.id]
+  );
   const visibleRuns = useMemo(
     () => filterByLayers(layeredRuns, effectiveLayers),
     [layeredRuns, effectiveLayers]
@@ -6847,12 +6918,25 @@ export default function TakeoffPage({
         legs: sheetRuns
           .filter(r => r.id === rootId || r.parentRunId === rootId)
           .map(r => ({ id: r.id, points: r.points as PagePoint[] })),
-        stamps: visibleStamps.map(s => ({ id: s.id, x: s.x, y: s.y })),
+        stamps: visibleStamps.map(s => ({
+          id: s.id,
+          x: s.x,
+          y: s.y,
+          connect: connects.get(s.id)?.point,
+        })),
       });
       // A quantity trace joins without a tee (D21, answer 2).
       return activeTraceMode === "quantity" ? quantitySnap(snap) : snap;
     },
-    [activeSheet, utils, runs, legRootId, visibleStamps, activeTraceMode]
+    [
+      activeSheet,
+      utils,
+      runs,
+      legRootId,
+      visibleStamps,
+      connects,
+      activeTraceMode,
+    ]
   );
 
   /** The first click of a leg: snapped, then the leg's first point. */
@@ -8896,10 +8980,22 @@ export default function TakeoffPage({
                         }}
                       />
                     )}
+                    {activeSheet && (
+                      <ConnectPointReader
+                        // Only when a run can snap: tracing, or a run's
+                        // ends up for dragging. No reading on a mere look.
+                        enabled={tracing || selectedRunId !== null}
+                        sheetId={activeSheet.id}
+                        marks={wallMarks}
+                        read={size.connectPoints}
+                        onRead={setConnectRead}
+                      />
+                    )}
                     <TraceLayer
                       width={size.width}
                       height={size.height}
                       renderScale={size.renderScale}
+                      connects={connects}
                       measurability={measurability}
                       tracing={tracing}
                       pathType={tracePathType}
@@ -9898,4 +9994,61 @@ export default function TakeoffPage({
       </AlertDialog>
     </div>
   );
+}
+
+/**
+ * Asks the PDF worker where runs meet this sheet's wall devices, and hands
+ * the answer up. Renders nothing; it lives inside the drawing pane because
+ * that is where the worker call for THIS page is in scope.
+ *
+ * Re-asks only when the marks it would ask about change (one added, one
+ * moved). The worker keeps the page's line work, so a re-ask is cheap.
+ */
+function ConnectPointReader({
+  enabled,
+  sheetId,
+  marks,
+  read,
+  onRead,
+}: {
+  enabled: boolean;
+  sheetId: number;
+  marks: ConnectMark[];
+  read: (marks: ConnectMark[]) => Promise<[number, ConnectPoint][]>;
+  onRead: (read: { sheetId: number; read: ConnectRead }) => void;
+}) {
+  const key =
+    enabled && marks.length > 0
+      ? `${sheetId}|${marks.map(m => `${m.id}:${m.x}:${m.y}:${m.family}`).join(",")}`
+      : null;
+  useEffect(() => {
+    if (key === null) return;
+    let live = true;
+    const asked = marks;
+    read(asked).then(
+      points => {
+        if (!live) return;
+        const byId = new Map(asked.map(m => [m.id, m] as const));
+        const result = new Map<
+          number,
+          { x: number; y: number; connect: ConnectPoint }
+        >();
+        for (const [id, connect] of points) {
+          const m = byId.get(id);
+          if (m) result.set(id, { x: m.x, y: m.y, connect });
+        }
+        onRead({ sheetId, read: result });
+      },
+      err => {
+        // Snaps go to the centre and say "still reading" — never silent.
+        console.warn("[connect points] could not read the sheet", err);
+      }
+    );
+    return () => {
+      live = false;
+    };
+    // `key` is every input that matters; `read` is a fresh arrow each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return null;
 }

@@ -15,6 +15,8 @@
  *   Worker → Main:  { type: 'matches', reqId, result: FindResult, readMs, findMs }
  *   Main → Worker:  { type: 'sheetCheck', hash, reqId, legendPage, planPage, input: SheetCheckInput }
  *   Worker → Main:  { type: 'sheetChecked', reqId, result: SheetCheckResult | null, scan, ms? }
+ *   Main → Worker:  { type: 'connectPoints', pageNum, hash, reqId, marks: {id,x,y,family}[] }
+ *   Worker → Main:  { type: 'connectPoints', reqId, points: [id, ConnectPoint][] }
  *   Worker → Main:  { type: 'rendered', reqId: string, bitmap: ImageBitmap, pageNum: number, hash: string,
  *                     scale: number, rect: PageRect, pageWidth: number, pageHeight: number }
  *   Worker → Main:  { type: 'outline', reqId: string, entries: {pageNumber,title}[] }
@@ -42,6 +44,7 @@
 
 import * as pdfjs from "pdfjs-dist";
 import { pdfRangeLoadOptions } from "@shared/pdfRangeLoading";
+import { connectPointFor, type ConnectMark } from "@shared/connectPoint";
 import { findMatching, isScan, prepareSheet } from "@/lib/findMatching";
 import { runSheetCheck } from "@/lib/sheetCheck";
 import {
@@ -485,6 +488,43 @@ self.onmessage = async (e: MessageEvent) => {
         result,
         readMs: Math.round(t1 - t0),
         findMs: Math.round(performance.now() - t1),
+      });
+    } catch (err) {
+      self.postMessage({ type: "error", reqId, message: String(err) });
+    }
+    return;
+  }
+
+  /**
+   * Where runs meet these marks (shared/connectPoint.ts): for each wall
+   * device, the foot on the wall line beside it. Reads the same cached line
+   * work as Find all matching, so a sheet already searched pays nothing more.
+   * A scan has no line work, and every wall device on it says so.
+   */
+  if (msg.type === "connectPoints") {
+    const { pageNum, hash, reqId, marks } = msg as {
+      pageNum: number;
+      hash: string;
+      reqId: string;
+      marks: ConnectMark[];
+    };
+    if (!pdfDoc || loadedHash !== hash) {
+      self.postMessage({
+        type: "error",
+        reqId,
+        message: "PDF not loaded for this hash",
+      });
+      return;
+    }
+    try {
+      const matchPage = await readMatchPage(pdfDoc, hash, pageNum);
+      const lines = isScan(matchPage.geo) ? null : matchPage.geo;
+      self.postMessage({
+        type: "connectPoints",
+        reqId,
+        points: marks.map(
+          m => [m.id, connectPointFor(m, m.family, lines)] as const
+        ),
       });
     } catch (err) {
       self.postMessage({ type: "error", reqId, message: String(err) });

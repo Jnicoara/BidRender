@@ -1810,6 +1810,32 @@ path is ever revived, give it the same treatment first.
       (`new`/`existing`/`remove`/`relocate`, NULL read as `new`), recorded in
       Track C's `todo.md` on `track-c`. B's style editor waits for the nine
       columns, and the status looks (§ 7) wait for the status column.
+- [ ] **Track A (migration): the CONNECT POINT columns — put them in the
+      batch above.** Built without them 2026-10-01 (Track B): runs now meet
+      wall devices at the wall found in the drawing, by device family
+      (`shared/connectPoint.ts`, `references/connect-point-plan.md`). What
+      cannot be done without columns is a connect point SET PER SYMBOL. All
+      additive, nullable, no default, no backfill — step 1 of the three:
+      | Table | Column | Type | NULL means |
+      | --- | --- | --- | --- |
+      | `symbol_looks` (if A builds it in this batch; else `symbol_links`, not both) | `connectDx`, `connectDy` | `decimal(10,4)` | never answered — the family default applies. `0,0` is "it's the middle", a real answer, never written for NULL |
+      | `takeoff_stamps` | `rotation` | `smallint` (0/90/180/270) | which way this copy faces is not known |
+      | `takeoff_stamps` | `mirrored` | `boolean` | as `rotation` |
+      The offset is measured from the capture box's centre, so it also needs
+      the box: `captureX/Y/Width/Height decimal(12,4)` on the same row —
+      already requested as R.11 / find-all-matching-plan § 6, ONE handoff, not
+      a second copy. **Optional, owner's call (plan § 9 Q3):** to let an
+      estimator CONFIRM a wall end the app found, `takeoff_runs.startConnect`
+      / `endConnect` `enum('found','confirmed')` NULL — without it a found end
+      counts and is shown, but cannot be marked checked. If the schema A sees
+      does not match this list, stop and find out why before writing the .sql.
+- [ ] **Track B, after the connect-point columns: the picker and per-symbol
+      offsets** (plan § 2, § 3, § 5): the "Where does the pipe meet it?" step
+      at capture with Skip and "It's the middle", the legend-row badge, turning
+      per mark from Find all matching, then `connectPointFor` prefers the
+      symbol's offset over the family default. NOT covered by today's build:
+      an unconfirmed AI mark is still a snap target (the WRONG-NUMBER RISK
+      entry above), because telling one apart needs the mark-status column.
 - [ ] **Track B, after A's columns above: pin styles steps 2 and 3.** Step 1
       shipped 2026-10-01 (computed default shape by device family, the wide
       rectangle, letters and first-use colours, safety switch = DS). Still to

@@ -60,3 +60,27 @@ export function addsTracePoint(
     return false;
   return true;
 }
+
+/**
+ * THE POINT A TRACE CLICK ADDS, or null — the snap first, then the test above
+ * on the SNAPPED point (2026-10-01).
+ *
+ * A click on a mark lands on the mark's connect point, which for a wall device
+ * is ~5 page points from where the press fell. Judging the double-click on the
+ * raw press compared the second press with the first's SNAPPED point — 15 px
+ * apart at 212% — so it was added: a zero-length stub at the run's end, an
+ * elbow nobody drew. Both presses snap to the same point, so judged after the
+ * snap they are the same point and the second adds nothing.
+ */
+export function traceClickPoint(
+  points: readonly Point[],
+  press: Point,
+  snapped: Point | null,
+  pagePerScreenPx: number,
+  msSincePreviousPress: number = Number.POSITIVE_INFINITY
+): Point | null {
+  const next = snapped ?? press;
+  return addsTracePoint(points, next, pagePerScreenPx, msSincePreviousPress)
+    ? { x: next.x, y: next.y }
+    : null;
+}

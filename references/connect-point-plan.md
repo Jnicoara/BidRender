@@ -3,6 +3,35 @@
 **Status: PLAN ONLY, 2026-10-01 (Track B).** No app code, no migration.
 Nothing here is built. Open questions for the owner are in § 9.
 
+> **PARTLY BUILT, 2026-10-01 (Track B) — everything that needs no column.**
+> `shared/connectPoint.ts`, `snapToMark` in `client/src/lib/legSnap.ts`,
+> the `connectPoints` worker request, and the glyphs in `TraceLayer.tsx`.
+>
+> - **Default by family, not by symbol.** The pin's family (name > assembly
+>   > category, `shared/deviceFamily.ts`) says wall or centre:
+>   > receptacle, switch, data → wall; box, lighting, equipment, other →
+>   > centre. A wall device's wall is the § 4.1 fallback — the nearest long
+>   > line beside it — gated by step 0 below, which it passed.
+> - **Every snap uses it, including the ORDINARY trace click.** § 1's table
+>   says a run's first leg and every vertex click were not snapped; that
+>   left the commonest case (click the symbol, double-click the next symbol)
+>   ending at centres, so a click within reach of a mark now lands on its
+>   connect point too. Alt, or Free on touch, still places a raw point.
+>   Previewed before the click (ring + "at the wall" / "centre — no wall
+>   found" at the cursor); the double-click test reads the snapped point
+>   (`traceClickPoint`) — judged on the raw press it left a zero-length stub.
+> - **Shown on screen** while tracing and on the selected run: a cyan tick
+>   from the symbol's centre to a dot on the wall; an amber dashed "?" ring
+>   where a wall device is met at its centre (scan, no wall, or an end
+>   traced before this). Drawn over the touch handles.
+> - **Not built (needs A's columns, § 5 / pin plan § 12):** a per-symbol
+>   offset and "It's the middle", turning per mark, confirming an
+>   unconfirmed wall end (§ 4.1's one-click confirm needs somewhere to keep
+>   the answer), § 3.2's local match, "Re-check ends". § 9 Q3 is answered
+>   provisionally as "count it": a wall end counts its length, unflagged on
+>   the bid, but always visible on the drawing.
+> - **Old runs keep their lengths** (§ 6): nothing re-reads a stored point.
+
 ## The problem
 
 Many plan symbols are drawn standing OFF the wall: a wall receptacle is a
@@ -299,6 +328,37 @@ not be asserted). On Weld 1 E-200 (vector) and the Blueridge set (scan):
   (justifies § 3.2);
 - whether "the nearest long segment" is the wall, out of 10 (the gate in
   § 4.2).
+
+### Step 0 — measured 2026-10-01 (Track B)
+
+`scripts/connectPointCheck.mts`, Weld 1 E-200 (vector, 1/8" = 1'-0"), the
+owner's 46 hand marks on `bidrender_local_c`; 29 are wall families. Each
+found foot was called by eye on a picture of the device.
+
+| Device                   | Wall found | Stand-off (median, range) |
+| ------------------------ | ---------- | ------------------------- |
+| Duplex receptacle        | 8 / 9      | 4.8 pt (4.3–5.3)          |
+| Double duplex receptacle | 5 / 5      | 4.5 pt (4.3–4.9)          |
+| GFCI receptacle          | 1 / 1      | 4.7 pt                    |
+| Telecom (data)           | 10 / 10    | 4.4 pt (4.3–4.8)          |
+| Single-pole switch       | 3 / 4      | 4.9 pt (4.3–8.5)          |
+
+- **The stand-off is about HALF a foot per end at 1/8", not a foot**:
+  ~4.5 pt = 0.5 ft. The symbol touches its wall; the stand-off is its own
+  radius. Still a wrong number on every wall device, at both ends.
+- **The gate (§ 4.2) passed: 25 of the 27 walls found are right (93%).**
+  Wrong: a switch beside a home-run arrow line (black, 4.9 pt), and a hand
+  mark sitting in empty space. Two found nothing and keep the centre, with
+  the "?" ring.
+- **Two rules came out of the pictures**, each now a test: a reach of 14 pt
+  took a room-name rule 13.1 pt away (reach is 9 pt), and a dashed line
+  drawn THROUGH a telecom triangle at 2.4 pt beat the hatched wall at
+  4.4 pt (lines nearer than 3 pt are skipped).
+- **Not measured:** hand-click error (§ 3.2), and any scan — on a scan every
+  wall device keeps its centre and says so.
+- **If this is re-run and the table does not match, stop and find out why**
+  before changing the reach or the length: either the drawing set differs or
+  the finder changed, and those want different answers.
 
 **Pure rules in `shared/connectPoint.ts`** (and `client/src/lib` for the
 snap), each with a test that goes **red** on today's code:

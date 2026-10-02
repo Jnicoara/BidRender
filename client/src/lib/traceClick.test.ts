@@ -4,7 +4,39 @@ import {
   DOUBLE_PRESS_PX,
   REPEAT_CLICK_PX,
   addsTracePoint,
+  traceClickPoint,
 } from "./traceClick";
+
+describe("a double-click that finishes on a wall device", () => {
+  // At 212% one screen pixel is ~0.31 page points. The receptacle's centre is
+  // (636, 1334.2); its wall foot, where both presses snap, is (631.2, 1334.2).
+  const PX = 0.314;
+  const foot = { x: 631.2, y: 1334.2 };
+  const before = [{ x: 608, y: 1199 }];
+
+  it("adds the snapped point on the first press", () => {
+    expect(
+      traceClickPoint(before, { x: 636.5, y: 1334 }, foot, PX, 2000)
+    ).toEqual(foot);
+  });
+
+  it("adds NOTHING on the second press — judged after the snap, not on the raw press", () => {
+    const after = [...before, foot];
+    // The raw press is 5 pt (16 px) from the snapped point: on its own it
+    // would pass the double-click test and leave a zero-length stub.
+    expect(addsTracePoint(after, { x: 636.3, y: 1334.1 }, PX, 120)).toBe(true);
+    expect(
+      traceClickPoint(after, { x: 636.3, y: 1334.1 }, foot, PX, 120)
+    ).toBeNull();
+  });
+
+  it("is the plain press when there is no mark to snap to", () => {
+    expect(traceClickPoint(before, { x: 700, y: 1300 }, null, PX)).toEqual({
+      x: 700,
+      y: 1300,
+    });
+  });
+});
 
 describe("a click while tracing", () => {
   const path = [
