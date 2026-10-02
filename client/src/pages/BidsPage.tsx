@@ -94,6 +94,7 @@ import { otherPercentCaption } from "@/lib/percentKind";
 import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
+import { TapExplain } from "@/components/TapExplain";
 import { lineHoursUnset, lineNotPriced } from "@shared/lineNotPriced";
 import { laborInRunRate } from "@shared/runFittings";
 import { bidNotPricedCount } from "@/lib/notPricedTotal";
@@ -1167,38 +1168,56 @@ export default function BidsPage({
                                    beside a counted fitting reads as a figure
                                    somebody chose — the unset-is-not-zero rule
                                    from the other side. */
-                                <span
-                                  className="text-xs md:w-24 text-right shrink-0 text-muted-foreground"
-                                  title="The run's hours per foot pay for couplings, connectors and straps, so they carry no hours of their own."
-                                >
-                                  in run rate
+                                <span className="text-xs md:w-24 text-right shrink-0 text-muted-foreground">
+                                  <TapExplain explanation="The run's hours per foot pay for couplings, connectors and straps, so they carry no hours of their own.">
+                                    in run rate
+                                  </TapExplain>
                                 </span>
                               ) : (
-                                <span
-                                  className="font-mono text-xs md:w-24 text-right shrink-0 text-muted-foreground"
-                                  title={
+                                <span className="font-mono text-xs md:w-24 text-right shrink-0 text-muted-foreground">
+                                  {(() => {
+                                    const hours = (
+                                      <>
+                                        {round(
+                                          line.breakdown.totalLaborHours,
+                                          2
+                                        )}{" "}
+                                        h
+                                        {/* Only when there ARE hours: "0 h on 111 ft"
+                                            said where nothing sits (seen on screen). */}
+                                        {line.laborQty !== null &&
+                                          line.breakdown.totalLaborHours > 0 &&
+                                          Number(line.laborQty) !==
+                                            Number(line.qty) && (
+                                            <span className="block font-sans text-[0.65rem]">
+                                              on{" "}
+                                              {round(Number(line.laborQty), 2)}{" "}
+                                              ft
+                                            </span>
+                                          )}
+                                      </>
+                                    );
                                     /* Traced footage bought with extra: the
                                        hours are on what is INSTALLED, and the
                                        extra is material only (Q5). Said here,
                                        where a reader would notice the hours
-                                       not following the quantity. */
-                                    line.laborQty !== null &&
-                                    Number(line.laborQty) !== Number(line.qty)
-                                      ? `Labor on ${round(Number(line.laborQty), 2)} ft installed. The other ${round(Number(line.qty) - Number(line.laborQty), 2)} ft is extra — material only, no install hours.`
-                                      : undefined
-                                  }
-                                >
-                                  {round(line.breakdown.totalLaborHours, 2)} h
-                                  {/* Only when there ARE hours: "0 h on 111 ft"
-                                      said where nothing sits (seen on screen). */}
-                                  {line.laborQty !== null &&
-                                    line.breakdown.totalLaborHours > 0 &&
-                                    Number(line.laborQty) !==
-                                      Number(line.qty) && (
-                                      <span className="block font-sans text-[0.65rem]">
-                                        on {round(Number(line.laborQty), 2)} ft
-                                      </span>
-                                    )}
+                                       not following the quantity — and as a
+                                       tap as well as a hover, since a title
+                                       does not exist for a finger. */
+                                    if (
+                                      line.laborQty === null ||
+                                      Number(line.laborQty) === Number(line.qty)
+                                    )
+                                      return hours;
+                                    return (
+                                      <TapExplain
+                                        className="text-right"
+                                        explanation={`Labor on ${round(Number(line.laborQty), 2)} ft installed. The other ${round(Number(line.qty) - Number(line.laborQty), 2)} ft is extra — material only, no install hours.`}
+                                      >
+                                        {hours}
+                                      </TapExplain>
+                                    );
+                                  })()}
                                 </span>
                               )}
                               {/*

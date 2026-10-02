@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-01]
 
+- **Tablets and phones: two "why" notes on a bid now open with a tap.** "in
+  run rate" beside a coupling, connector or strap, and the note on traced
+  footage bought with extra, used to explain themselves only when a mouse
+  hovered over them. A finger could not read them. Tap the dotted-underlined
+  words and the same explanation opens.
+- **Phones: Supplier pricing shows prices sooner.** The header, tabs and
+  filters used to take up more than half the screen before the first price.
+  The filters now sit in one row that scrolls sideways, and the first price
+  starts about 170 px higher. Tablets and laptops are unchanged.
+
 - **New: "Check sheet" on the Plans screen.** After reading a legend with
   Whole legend, one button compares every mark on a sheet with the drawing.
   It lists the marks that look like something else or have nothing under

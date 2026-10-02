@@ -252,8 +252,14 @@ Emulation is Chrome's touch pipeline on a desktop. Not checked:
 
 - Trace on touch has no rubber-band preview between taps (there is no hover).
   A press-hold-drag with a magnifier would fix that and finger-cover too.
-- The phone's Supplier pricing screen spends ~460 px on header, tabs, search
-  and filters before the first card.
-- Tooltip-only explanations on the bid screen ("in run rate", the extra
-  footage note) are still hover-only; the facts are on screen, the "why" is
-  not.
+  **Not simple — a new state in the gesture machine; in `todo.md`.**
+- ~~The phone's Supplier pricing screen spends ~460 px on header, tabs, search
+  and filters before the first card.~~ **Done 2026-10-01:** first card at
+  462 px → 296 px on a 390x844 phone (measured, `[data-index]` top); the
+  description hides on a phone, "Import" sits beside the title, the age filters
+  are one sideways-scrolling row. Upright tablet unchanged at 317 px.
+- ~~Tooltip-only explanations on the bid screen ("in run rate", the extra
+  footage note) are still hover-only.~~ **Done 2026-10-01:** both are
+  `TapExplain` — hover still shows the tooltip, a tap opens the same words.
+  "in run rate" tapped and read on a phone and a laptop; the extra-footage
+  note uses the same component but the fixture bid has no line that shows it.
