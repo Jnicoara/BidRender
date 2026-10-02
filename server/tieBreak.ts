@@ -51,7 +51,10 @@ export function tieBreakRequest(opts: {
     },
   ];
   for (const it of opts.items) {
-    parts.push({ type: "text", text: `Item ${it.id}: ${it.label.slice(0, 120)}` });
+    parts.push({
+      type: "text",
+      text: `Item ${it.id}: ${it.label.slice(0, 120)}`,
+    });
     parts.push({ type: "image_url", image_url: { url: it.picture } });
   }
   parts.push({

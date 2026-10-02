@@ -808,3 +808,87 @@ export function variantsOfCount(
   if (list[0]) list[0].minor = false;
   return list;
 }
+
+// ── The whole check, as the screen runs it ───────────────────────────────────
+
+/** A mark as the page knows it: the count's name and its assembly. */
+export type MarkIn = {
+  id: number;
+  x: number;
+  y: number;
+  count: string;
+  assemblyId: number | null;
+};
+
+export type SheetCheckInput = {
+  legendRows: readonly { name: string; symbol: MatchBox }[];
+  marks: readonly MarkIn[];
+  /** Captured legend symbols, for a count named differently from its row. */
+  symbols: readonly { label: string; assemblyId: number | null }[];
+  /**
+   * The "compare with" picker: count name -> legend item, chosen by hand for
+   * a count whose name the legend does not use. Wins over every guess.
+   */
+  picks?: Readonly<Record<string, string>>;
+};
+
+export type SheetCheckResult = {
+  looks: string[];
+  skipped: { name: string; why: string }[];
+  marks: CheckMark[];
+  spots: Spot[];
+  checks: MarkCheck[];
+  notes: MarkNotes[];
+  /** Only counts that split into more than one group. */
+  variants: { count: string; groups: VariantGroup[] }[];
+};
+
+/**
+ * Legend sheet + plan sheet + marks in, every suggestion out. The same
+ * composition `scripts/sheetCheckMeasure.mts` measured, so a number measured
+ * there is a number this produces.
+ */
+export function runSheetCheck(
+  legendSheet: PreparedSheet,
+  planSheet: PreparedSheet,
+  input: SheetCheckInput
+): SheetCheckResult {
+  const { looks, skipped } = looksFromLegend(legendSheet, input.legendRows);
+  const names = Array.from(new Set(looks.map(l => l.item)));
+  const picks = new Map(
+    Object.entries(input.picks ?? {}).map(([c, item]) => [key(c), item])
+  );
+  const itemFor = (m: MarkIn): string | null => {
+    const picked = picks.get(key(m.count));
+    if (picked && names.includes(picked)) return picked;
+    return legendItemForCount(
+      { label: m.count, assemblyId: m.assemblyId },
+      names,
+      input.symbols
+    );
+  };
+  const marks: CheckMark[] = input.marks.map(m => ({
+    id: m.id,
+    x: m.x,
+    y: m.y,
+    count: m.count,
+    item: itemFor(m),
+  }));
+  const spots = findSpots(planSheet, looks, marks);
+  const checks = checkMarks(marks, spots, names);
+  const notes = notesForMarks(planSheet, marks);
+
+  const byCount = new Map<string, CheckMark[]>();
+  marks.forEach(m => {
+    const list = byCount.get(m.count) ?? [];
+    list.push(m);
+    byCount.set(m.count, list);
+  });
+  const variants: SheetCheckResult["variants"] = [];
+  byCount.forEach((list, count) => {
+    if (list.length < 2) return;
+    const groups = variantsOfCount(planSheet, list, { spots });
+    if (groups.length > 1) variants.push({ count, groups });
+  });
+  return { looks: names, skipped, marks, spots, checks, notes, variants };
+}

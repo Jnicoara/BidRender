@@ -76,6 +76,7 @@ import {
   MoreHorizontal,
   Redo2,
   ScanSearch,
+  ListChecks,
   Undo2,
   PanelRight,
   TriangleAlert,
@@ -289,6 +290,20 @@ import { pastDragThreshold, swallowNextClick } from "@/lib/dragThreshold";
 import { wheelIntent, type WheelGesture } from "@/lib/wheelIntent";
 import type { PageTextLayer } from "@/lib/textSelection";
 import type { FindResult, MatchBox } from "@/lib/findMatching";
+import type { SheetCheckInput, SheetCheckResult } from "@/lib/sheetCheck";
+import {
+  countNameFromLegend,
+  loadSessionLegend,
+  saveSessionLegend,
+  type SessionLegend,
+} from "@/lib/sheetCheckSession";
+import {
+  SheetCheckLayer,
+  SheetCheckPanel,
+  SheetCheckRunner,
+  sheetCheckRings,
+  type SheetCheckState,
+} from "@/components/takeoff/SheetCheck";
 import {
   clearOpen,
   decide,
@@ -505,6 +520,15 @@ function usePdfWorker() {
         pending.current.delete(msg.reqId);
         return;
       }
+      if (msg.type === "sheetChecked") {
+        pending.current.get(msg.reqId)?.resolve({
+          result: msg.result,
+          scan: msg.scan,
+          ms: msg.ms ?? 0,
+        });
+        pending.current.delete(msg.reqId);
+        return;
+      }
       if (msg.type === "error") {
         const waiter = pending.current.get(msg.reqId);
         if (waiter) {
@@ -651,6 +675,19 @@ function usePdfWorker() {
           pageNum,
           hash,
           box,
+        }),
+      sheetCheck: (
+        legendPage: number,
+        planPage: number,
+        hash: string,
+        input: SheetCheckInput
+      ) =>
+        ask<{ result: SheetCheckResult | null; scan: boolean; ms: number }>({
+          type: "sheetCheck",
+          legendPage,
+          planPage,
+          hash,
+          input,
         }),
     }),
     [load, loadUrl, ask]
@@ -855,6 +892,18 @@ function PlanPane({
     findMatching: (
       box: MatchBox
     ) => Promise<{ result: FindResult; readMs: number; findMs: number }>;
+    /**
+     * Check this page against a legend on another page of the same set
+     * (@/lib/sheetCheck), in the worker. Suggestions only.
+     */
+    sheetCheck: (
+      legendPage: number,
+      input: SheetCheckInput
+    ) => Promise<{
+      result: SheetCheckResult | null;
+      scan: boolean;
+      ms: number;
+    }>;
   }) => React.ReactNode;
   /**
    * Ask the server for a fresh URL for this document, and return it.
@@ -925,6 +974,7 @@ function PlanPane({
     pageText,
     pageTextLayer,
     findMatching: findMatchingOnPage,
+    sheetCheck: sheetCheckOnPage,
   } = usePdfWorker();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -2113,6 +2163,8 @@ function PlanPane({
                     render(page, scale, hash, rect),
                   loadTextLayer: () => pageTextLayer(page, hash),
                   findMatching: box => findMatchingOnPage(page, hash, box),
+                  sheetCheck: (legendPage, input) =>
+                    sheetCheckOnPage(legendPage, page, hash, input),
                 })}
             </div>
           </div>
@@ -4843,6 +4895,267 @@ export default function TakeoffPage({
     ]
   );
 
+  /*
+    CHECK SHEET (2026-10-01). The sheet against the legend read by "Whole
+    legend" (@/lib/sheetCheck, in the worker): your marks that disagree with
+    the drawing, legend symbols nobody marked, counts whose marks are drawn
+    differently, and the words beside each mark. Every line is a suggestion;
+    the buttons are the selection's own Move and Delete, the click queue, and
+    a new count. On a locked bid it is a report with no buttons.
+  */
+  const [sessionLegend, setSessionLegend] = useState<SessionLegend | null>(
+    null
+  );
+  const docIdNow = doc?.id ?? null;
+  useEffect(() => {
+    let store: Storage | null = null;
+    try {
+      store = window.sessionStorage;
+    } catch {
+      store = null;
+    }
+    setSessionLegend(
+      docIdNow === null ? null : loadSessionLegend(store, bidId, docIdNow)
+    );
+  }, [bidId, docIdNow]);
+  const keepSessionLegend = useCallback((legend: SessionLegend) => {
+    setSessionLegend(legend);
+    let store: Storage | null = null;
+    try {
+      store = window.sessionStorage;
+    } catch {
+      store = null;
+    }
+    saveSessionLegend(store, legend);
+  }, []);
+
+  type CheckSession = {
+    sheetId: number;
+    /** Asked-for runs; `ran` catches up when one finishes. */
+    run: number;
+    ran: number;
+    state: SheetCheckState;
+    hidden: Set<string>;
+    selected: string | null;
+  };
+  const [checkSession, setCheckSession] = useState<CheckSession | null>(null);
+  useEffect(() => {
+    setCheckSession(current =>
+      current && current.sheetId !== activeSheet?.id ? null : current
+    );
+  }, [activeSheet?.id]);
+  const startCheck = useCallback(() => {
+    if (!activeSheet) return;
+    setFindSession(null);
+    setCheckSession(current => {
+      const run = (current?.run ?? 0) + 1;
+      if (!sessionLegend)
+        return {
+          sheetId: activeSheet.id,
+          run,
+          ran: run,
+          state: { phase: "noLegend" },
+          hidden: new Set(),
+          selected: null,
+        };
+      // A result already on screen stays there while the new one is worked
+      // out — never swapped for a spinner on a re-check.
+      const keep =
+        current?.sheetId === activeSheet.id && current.state.phase === "done";
+      return {
+        sheetId: activeSheet.id,
+        run,
+        ran: current?.ran ?? 0,
+        state: keep ? current.state : { phase: "checking" },
+        hidden: keep ? current.hidden : new Set(),
+        selected: keep ? current.selected : null,
+      };
+    });
+  }, [activeSheet?.id, sessionLegend]);
+  /*
+    The check's numbers are about the marks on the sheet, so when the marks
+    move — a Move, a Delete, a Count it from this very panel — it runs
+    again. Without this, "3 of 5 match" outlives the marks it counted
+    (CLAUDE.md, the staleness class). Code only, so a re-run costs a second.
+  */
+  const checkIsOpen =
+    checkSession !== null && checkSession.state.phase === "done";
+  useEffect(() => {
+    if (checkIsOpen) startCheck();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stamps]);
+
+  const runCheck = useCallback(
+    async (
+      check: (
+        legendPage: number,
+        input: SheetCheckInput
+      ) => Promise<{
+        result: SheetCheckResult | null;
+        scan: boolean;
+        ms: number;
+      }>
+    ) => {
+      if (!sessionLegend) return;
+      const asked = checkSession?.run ?? 0;
+      const set = (state: SheetCheckState) =>
+        setCheckSession(s =>
+          // A newer run has been asked for: this answer is already old.
+          s && s.run === asked ? { ...s, state, ran: asked } : s
+        );
+      try {
+        const { result, scan, ms } = await check(sessionLegend.page, {
+          legendRows: sessionLegend.rows.map(r => ({
+            name: r.name,
+            symbol: r.symbol,
+          })),
+          marks: stamps.map(s => ({
+            id: s.id,
+            x: s.x,
+            y: s.y,
+            count: s.name,
+            assemblyId: s.assemblyId,
+          })),
+          symbols: symbols.map(s => ({
+            label: s.label,
+            assemblyId: s.assemblyId,
+          })),
+          picks: sessionLegend.picks,
+        });
+        if (scan || !result)
+          set({
+            phase: "message",
+            text: "This sheet is a scan — a picture with no line work — so its symbols cannot be compared. Check it by eye.",
+          });
+        else if (result.looks.length === 0)
+          set({
+            phase: "message",
+            text: "None of the legend's symbols could be read as line work. Read the legend again with Whole legend, boxing only the legend.",
+          });
+        else set({ phase: "done", result, ms });
+      } catch (error) {
+        set({
+          phase: "message",
+          text: `The check could not run: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    },
+    [sessionLegend, stamps, symbols, checkSession?.run]
+  );
+
+  const checkResult =
+    checkSession?.state.phase === "done" ? checkSession.state.result : null;
+  /** The bid's ONE count for a legend item, from what the check matched. */
+  const countForItem = useCallback(
+    (item: string) => {
+      if (!checkResult) return null;
+      const labels = Array.from(
+        new Set(
+          checkResult.marks.filter(m => m.item === item).map(m => m.count)
+        )
+      );
+      if (labels.length !== 1) return null;
+      const g = (bidCounts.data?.groups ?? []).find(x => x.label === labels[0]);
+      return g
+        ? { groupId: g.id, label: g.label, assemblyId: g.assemblyId }
+        : null;
+    },
+    [checkResult, bidCounts.data?.groups]
+  );
+  const hideCheckRow = useCallback((key: string) => {
+    setCheckSession(s =>
+      s ? { ...s, hidden: new Set(s.hidden).add(key), selected: null } : s
+    );
+  }, []);
+  const breakTies = trpc.planCopilot.breakTies.useMutation();
+  /**
+   * The one AI call in the check: small crops of the spots code could not
+   * settle, with the legend's own pictures of the tied items
+   * (server/tieBreak.ts). A button press, never an effect. The answer is a
+   * suggestion the panel shows unconfirmed.
+   */
+  const askTieBreak = useCallback(
+    async (
+      batch: {
+        items: { id: number; name: string; picture: string }[];
+        crops: {
+          id: number;
+          spotId: number;
+          x: number;
+          y: number;
+          itemIds: number[];
+        }[];
+      },
+      renderRegion: (
+        rect: PageRect,
+        scale: number
+      ) => Promise<{ bitmap: ImageBitmap }>
+    ): Promise<{
+      picks: Map<number, string | null>;
+      message: string | null;
+    }> => {
+      if (!activeSheet || batch.crops.length === 0)
+        return { picks: new Map(), message: null };
+      const half = 20;
+      const scale = 6;
+      const crops = await Promise.all(
+        batch.crops.map(async c => {
+          const { bitmap } = await renderRegion(
+            { x: c.x - half, y: c.y - half, width: 2 * half, height: 2 * half },
+            scale
+          );
+          const canvas = document.createElement("canvas");
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const ctx = canvas.getContext("2d")!;
+          ctx.fillStyle = "#fff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(bitmap, 0, 0);
+          bitmap.close();
+          // The red square the request tells the model to look inside.
+          const k = canvas.width / (2 * half);
+          ctx.strokeStyle = "#e11d48";
+          ctx.lineWidth = 2;
+          ctx.strokeRect((half - 8) * k, (half - 8) * k, 16 * k, 16 * k);
+          return {
+            id: c.id,
+            picture: canvas.toDataURL("image/png"),
+            itemIds: c.itemIds,
+          };
+        })
+      );
+      try {
+        const r = await breakTies.mutateAsync({
+          sheetId: activeSheet.id,
+          items: batch.items.map(i => ({
+            id: i.id,
+            label: i.name.slice(0, 200),
+            picture: i.picture,
+          })),
+          crops,
+        });
+        const nameOf = new Map(batch.items.map(i => [i.id, i.name] as const));
+        const spotOf = new Map(batch.crops.map(c => [c.id, c.spotId] as const));
+        const picks = new Map<number, string | null>();
+        r.picks.forEach(p => {
+          const spot = spotOf.get(p.cropId);
+          if (spot !== undefined)
+            picks.set(
+              spot,
+              p.itemId === null ? null : (nameOf.get(p.itemId) ?? null)
+            );
+        });
+        return { picks, message: r.message };
+      } catch (error) {
+        return {
+          picks: new Map(),
+          message: `The AI could not be asked: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    },
+    [activeSheet?.id, breakTies]
+  );
+
   const selectFound = useCallback((id: number | null) => {
     setFindSession(s =>
       s && s.panel.phase === "results"
@@ -7059,6 +7372,30 @@ export default function TakeoffPage({
               Find all matching
             </Button>
           )}
+          {/*
+            CHECK SHEET needs no armed count: it reads every count on the
+            sheet against the legend. Shown on a locked bid too — there it is
+            a report with no buttons.
+          */}
+          {activeSheet && !tracing && (
+            <Button
+              size="sm"
+              variant={checkSession ? "secondary" : "outline"}
+              className="h-7 gap-1.5 text-xs"
+              onClick={() =>
+                checkSession ? setCheckSession(null) : startCheck()
+              }
+              title={
+                sessionLegend
+                  ? `Compare every mark on this sheet with the legend on ${sessionLegend.sheetName}. Nothing changes until you press a button.`
+                  : "Compare every mark on this sheet with the legend. Read the legend first with Whole legend."
+              }
+              aria-pressed={Boolean(checkSession)}
+            >
+              <ListChecks className="w-3.5 h-3.5" />
+              Check sheet
+            </Button>
+          )}
 
           {activeSheet && !tracing && <div className="w-px h-4 bg-border" />}
 
@@ -7839,10 +8176,25 @@ export default function TakeoffPage({
                             library: allAssemblies.map(a => a.name),
                             captured: symbols.map(s => s.label),
                           }).then(
-                            state =>
+                            state => {
                               setLegendDraft(current =>
                                 current ? { ...current, state } : current
-                              ),
+                              );
+                              // Kept for "Check sheet", whatever is saved.
+                              if (state.kind === "rows" && doc && activeSheet)
+                                keepSessionLegend({
+                                  bidId,
+                                  docId: doc.id,
+                                  page,
+                                  sheetName: activeSheet.name,
+                                  rows: state.rows.map(r => ({
+                                    name: r.name,
+                                    symbol: r.symbol,
+                                    picture: r.picture,
+                                  })),
+                                  picks: sessionLegend?.picks ?? {},
+                                });
+                            },
                             error => {
                               setLegendDraft(null);
                               toast.error(
@@ -8079,6 +8431,103 @@ export default function TakeoffPage({
                             onReject={ids => decideFound(ids, "rejected")}
                             onNext={nextFound}
                             onClose={() => setFindSession(null)}
+                          />
+                        </>
+                      )}
+                    {checkSession &&
+                      activeSheet &&
+                      checkSession.sheetId === activeSheet.id && (
+                        <>
+                          {checkSession.run !== checkSession.ran && (
+                            <SheetCheckRunner
+                              key={checkSession.run}
+                              run={() => void runCheck(size.sheetCheck)}
+                            />
+                          )}
+                          {checkResult && (
+                            <SheetCheckLayer
+                              width={size.width}
+                              height={size.height}
+                              renderScale={size.renderScale}
+                              rings={sheetCheckRings(
+                                checkResult,
+                                checkSession.hidden
+                              )}
+                              selected={checkSession.selected}
+                            />
+                          )}
+                          <SheetCheckPanel
+                            state={checkSession.state}
+                            legendName={sessionLegend?.sheetName ?? null}
+                            legendRows={sessionLegend?.rows ?? []}
+                            picks={sessionLegend?.picks ?? {}}
+                            locked={quantitiesLocked}
+                            countForItem={countForItem}
+                            moveTargets={moveTargets}
+                            hidden={checkSession.hidden}
+                            selected={checkSession.selected}
+                            canAskAi={readerAvailable}
+                            renderRegion={size.renderRegion}
+                            chromeTarget={size.chromeTarget}
+                            onPick={(count, item) => {
+                              if (!sessionLegend) return;
+                              const picks = { ...sessionLegend.picks };
+                              const k = count.trim().toLowerCase();
+                              if (item) picks[k] = item;
+                              else delete picks[k];
+                              keepSessionLegend({ ...sessionLegend, picks });
+                              startCheck();
+                            }}
+                            onHide={hideCheckRow}
+                            onSelectRing={(key, at) => {
+                              setCheckSession(s =>
+                                s ? { ...s, selected: key } : s
+                              );
+                              jumpTo(at);
+                            }}
+                            onJump={jumpTo}
+                            onMove={(ids, groupId) =>
+                              moveStamps.mutate({ ids, groupId })
+                            }
+                            onDelete={deleteMarks}
+                            onSelectMarks={ids =>
+                              setSelectedStampIds(new Set(ids))
+                            }
+                            onCount={(group, at) => queueMarksFor(group, at)}
+                            onCountNew={(item, at) => {
+                              void createGroup
+                                .mutateAsync({
+                                  bidId,
+                                  label: countNameFromLegend(item),
+                                  reuseExisting: true,
+                                })
+                                .then(g => {
+                                  queueMarksFor(
+                                    {
+                                      groupId: g.id,
+                                      label: g.label,
+                                      assemblyId: null,
+                                    },
+                                    at
+                                  );
+                                  void bidCounts.refetch();
+                                })
+                                .catch(() => {});
+                            }}
+                            onSplit={(_count, ids, label) => {
+                              void createGroup
+                                .mutateAsync({ bidId, label })
+                                .then(g => {
+                                  moveStamps.mutate({ ids, groupId: g.id });
+                                  void bidCounts.refetch();
+                                })
+                                .catch(() => {});
+                            }}
+                            onAskAi={batch =>
+                              askTieBreak(batch, size.renderRegion)
+                            }
+                            onRerun={startCheck}
+                            onClose={() => setCheckSession(null)}
                           />
                         </>
                       )}

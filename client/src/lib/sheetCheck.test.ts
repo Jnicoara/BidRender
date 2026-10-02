@@ -15,6 +15,7 @@ import {
   findSpots,
   notesForMarks,
   readHeight,
+  runSheetCheck,
   settleTie,
   variantsOfCount,
   type CheckMark,
@@ -351,5 +352,49 @@ describe("variants inside a count", () => {
         { look: 2, beside: "", ids: [4], minor: true },
       ])
     );
+  });
+});
+
+describe("the whole check, as the screen runs it", () => {
+  const geo = geometry([
+    ...duplex(5000, 100),
+    ...doubleDuplex(5000, 200),
+    ...duplex(100, 100),
+    ...duplex(300, 100),
+  ]);
+  const sheet = prepareSheet(geo, []);
+  const legendRows = [
+    { name: "DUPLEX", symbol: box(5002.5, 100, 9) },
+    { name: "DOUBLE DUPLEX", symbol: box(5002.5, 197.5, 10.5) },
+  ];
+  const marks = [
+    { id: 1, x: 102.5, y: 100, count: "Plugs", assemblyId: null },
+    { id: 2, x: 302.5, y: 100, count: "Plugs", assemblyId: null },
+  ];
+
+  it("has nothing to compare a count with when its name is not on the legend", () => {
+    const r = runSheetCheck(sheet, sheet, { legendRows, marks, symbols: [] });
+    expect(r.looks).toEqual(["DUPLEX", "DOUBLE DUPLEX"]);
+    expect(r.checks.map(c => c.kind)).toEqual(["noLook", "noLook"]);
+  });
+
+  it("checks it against the legend item picked by hand", () => {
+    const r = runSheetCheck(sheet, sheet, {
+      legendRows,
+      marks,
+      symbols: [],
+      picks: { plugs: "DUPLEX" },
+    });
+    expect(r.checks.map(c => c.kind)).toEqual(["matches", "matches"]);
+  });
+
+  it("ignores a pick naming an item the legend does not have", () => {
+    const r = runSheetCheck(sheet, sheet, {
+      legendRows,
+      marks,
+      symbols: [],
+      picks: { Plugs: "QUAD" },
+    });
+    expect(r.checks.map(c => c.kind)).toEqual(["noLook", "noLook"]);
   });
 });

@@ -64,7 +64,7 @@ describe("tie-break request", () => {
       model: "claude-sonnet-5",
       items: [
         { id: 10, label: "DUPLEX", picture: PIC },
-        { id: 11, label: "DUPLEX 48\"", picture: PIC },
+        { id: 11, label: 'DUPLEX 48"', picture: PIC },
       ],
       crops: crops.slice(0, 2),
     });
