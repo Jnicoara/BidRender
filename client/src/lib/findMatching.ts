@@ -392,7 +392,15 @@ export function findMatching(
 /** The symbol inside `boxIn`, on the sheet it was drawn on. */
 export function symbolFromBox(
   sheet: PreparedSheet,
-  boxIn: MatchBox
+  boxIn: MatchBox,
+  opts: {
+    /**
+     * Words in the box that are NOT part of the symbol. A legend writes a
+     * switching leg ("a") beside every switch; taken in, every plan switch
+     * (legs a, b, c…) fails to match — measured: 0 of 4 on Weld 1 E-200.
+     */
+    ignoreWord?: (text: string) => boolean;
+  } = {}
 ): SymbolFromBox {
   const geo = sheet.geo;
   const words = sheet.words;
@@ -459,7 +467,9 @@ export function symbolFromBox(
   const symbolSegs = boxed.filter(
     i => Math.round(geo.lightness[i] / LIGHTNESS_STEP) === symbolShade
   );
-  const symbolWords = words.filter(w => inBox(w.cx, w.cy));
+  const symbolWords = words.filter(
+    w => inBox(w.cx, w.cy) && !opts.ignoreWord?.(w.text)
+  );
 
   if (symbolSegs.length === 0 && symbolWords.length === 0) {
     if (geo.imageCoverage > 0.4) return { kind: "scan", message: SCAN_MESSAGE };
@@ -855,6 +865,23 @@ export function searchSymbol(
           "more lines are joined onto it than the one you boxed — it may be part of a bigger symbol"
         );
     }
+
+    /*
+      A word INSIDE it that the boxed one does not have: a letter in a circle
+      is a different symbol from the circle. On Weld 1 the legend's "open
+      downlight" is a plain circle, which fits inside every junction box's
+      circle-with-a-J — 5 junction boxes tied with a downlight until this.
+    */
+    const inside = words.filter(
+      (w, i) =>
+        !f.usedWords.has(i) &&
+        Math.abs(w.cx - f.tx) <= 0.8 * hw &&
+        Math.abs(w.cy - f.ty) <= 0.8 * hh
+    );
+    if (inside.length)
+      needsLook.push(
+        `"${inside[0].text.trim()}" is written inside it — the one you boxed has no "${inside[0].text.trim()}"`
+      );
 
     // Words beside it.
     const q = qualifiers(
