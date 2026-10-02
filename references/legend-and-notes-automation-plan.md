@@ -268,6 +268,47 @@ labels every crop"** — it is cheaper than the whole-sheet reader but less
 accurate than code. And **do not spend more on the whole-sheet reader for
 vector sheets**: locating is the part it is worst at and code does for free.
 
+## 7b. BUILT and MEASURED on UNCC E111 — code labels, AI breaks ties, 2026-10-01
+
+Built on track-c as **Check sheet** (`@/lib/sheetCheck`,
+`components/takeoff/SheetCheck.tsx`, `server/tieBreak.ts`). Legend: the
+"Whole legend" rows of E001 (105 rows with a usable symbol). His hand count
+on E111: **243 marks** in 5 counts. All UNCC numbers below were measured
+against those marks.
+
+| Who labels                                        | Agrees with his mark | Wrong item | Not found / unsure           | Cost   |
+| ------------------------------------------------- | -------------------- | ---------- | ---------------------------- | ------ |
+| Whole-sheet reader, one picture (a)               | 3                    | 5          | 235 missed                   | $0.065 |
+| Whole-sheet reader, 12 zoomed pieces (c)          | 128                  | 33         | 82 missed, 57 extra          | $0.612 |
+| **Code only (Check sheet)**                       | **149**              | **0**      | 25 nothing under, 69 unsure  | **$0** |
+| …of which data outlets drawn the same as 2 others | 66 of 73             | 0          | not decidable by any picture | $0     |
+
+- **Without the 73 data outlets** (the (c) run scored them apart): code
+  agrees on **145 of 170**, 0 wrong, 22 nothing under, 3 unsure. (c) found
+  128, with 21 wrong.
+- **Data outlets:** UNCC draws "typical telecom outlet", "outlet in
+  furniture" and "data outlet for wall-mounted TV" as the SAME triangle; only
+  the notes differ. Code says so and never sends them to the AI, because no
+  picture can decide them. (c) found 0 of 73.
+- **The 7 odd data outlets**, looked at one by one: **2 are drawn turned 45°**
+  on the angled wall, and the matcher only tries quarter turns, so it sees
+  nothing under them. **2 have an "F" written under the triangle**; one of
+  those reads as the fire-alarm pull station, whose legend label is also
+  "F". **3 touch another symbol** (a duplex, a J box) and are flagged
+  "more lines run through it" but still match. Most of them are fixable in
+  code: 45° turns are the next matcher change, and the "F" pair needs the
+  label rule to look at what the word is beside. None of it needs AI.
+- **AI tie-break:** 12 spots tied between switch-like "S" looks (single-pole
+  switch, motor starter, smoke detector and a subscript note row). **One call,
+  Sonnet, 1,745 tokens in / 109 out, $0.005: 12 of 12 picked "ceiling
+  mounted smoke detector"**, checked by eye (a hexagon with an S). None were
+  on his marks. Weld 1, measured earlier: 4 of 4 for $0.003.
+- **Time:** about 3.3 s per check on E111 (legend + plan read once, then
+  cached in the worker).
+- **Spent on this request:** $0.68 for the (c)+(a) baseline and $0.01 for the
+  tie-break (one run was repeated after the script hung on exit). Total
+  **about $0.69** of the $3 limit; the estimate given beforehand was $0.65.
+
 ## 8. Open questions for the owner
 
 > **DECIDED 2026-10-01 by Track C where no money, bid number or undoable

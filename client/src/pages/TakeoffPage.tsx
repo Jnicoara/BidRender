@@ -307,6 +307,7 @@ import type { SheetCheckInput, SheetCheckResult } from "@/lib/sheetCheck";
 import {
   countNameFromLegend,
   loadSessionLegend,
+  mergeLegendRows,
   saveSessionLegend,
   type SessionLegend,
 } from "@/lib/sheetCheckSession";
@@ -8691,17 +8692,25 @@ export default function TakeoffPage({
                                 current ? { ...current, state } : current
                               );
                               // Kept for "Check sheet", whatever is saved.
+                              // A legend in three columns is three boxes on
+                              // one sheet, so they add up (mergeLegendRows).
                               if (state.kind === "rows" && doc && activeSheet)
                                 keepSessionLegend({
                                   bidId,
                                   docId: doc.id,
                                   page,
                                   sheetName: activeSheet.name,
-                                  rows: state.rows.map(r => ({
-                                    name: r.name,
-                                    symbol: r.symbol,
-                                    picture: r.picture,
-                                  })),
+                                  rows: mergeLegendRows(
+                                    sessionLegend?.docId === doc.id &&
+                                      sessionLegend.page === page
+                                      ? sessionLegend.rows
+                                      : [],
+                                    state.rows.map(r => ({
+                                      name: r.name,
+                                      symbol: r.symbol,
+                                      picture: r.picture,
+                                    }))
+                                  ),
                                   picks: sessionLegend?.picks ?? {},
                                 });
                             },
@@ -9015,6 +9024,17 @@ export default function TakeoffPage({
                                   reuseExisting: true,
                                 })
                                 .then(g => {
+                                  // The count is named from the row's first
+                                  // sentence, so it would no longer match the
+                                  // row by name: record the row as its pick.
+                                  if (sessionLegend)
+                                    keepSessionLegend({
+                                      ...sessionLegend,
+                                      picks: {
+                                        ...sessionLegend.picks,
+                                        [g.label.trim().toLowerCase()]: item,
+                                      },
+                                    });
                                   queueMarksFor(
                                     {
                                       groupId: g.id,

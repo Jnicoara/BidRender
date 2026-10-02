@@ -53,37 +53,69 @@ function SpotPicture({
   ) => Promise<{ bitmap: ImageBitmap }>;
 }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
+  /*
+    The latest renderer, read when the picture is drawn. NOT an effect
+    dependency: the overlay hands down a new function on every render, and
+    as a dependency it cancelled each picture's draw before it landed —
+    the "Not marked" list stayed blank on a tablet (seen 2026-10-01).
+  */
+  const render = useRef(renderRegion);
+  render.current = renderRegion;
   useEffect(() => {
     let live = true;
     const canvas = ref.current;
     if (!canvas) return;
     const half = 14;
-    renderRegion(
-      { x: x - half, y: y - half, width: 2 * half, height: 2 * half },
-      3
-    )
-      .then(({ bitmap }) => {
-        if (!live) return bitmap.close();
-        canvas.width = bitmap.width;
-        canvas.height = bitmap.height;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.fillStyle = "#fff";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(bitmap, 0, 0);
-          ctx.strokeStyle = "#e11d48";
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 4, 0, 7);
-          ctx.stroke();
-        }
-        bitmap.close();
-      })
-      .catch(() => {});
+    const draw = () =>
+      render
+        .current(
+          { x: x - half, y: y - half, width: 2 * half, height: 2 * half },
+          3
+        )
+        .then(({ bitmap }) => {
+          if (!live) return bitmap.close();
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(bitmap, 0, 0);
+            ctx.strokeStyle = "#e11d48";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(
+              canvas.width / 2,
+              canvas.height / 2,
+              canvas.width / 4,
+              0,
+              7
+            );
+            ctx.stroke();
+          }
+          bitmap.close();
+        })
+        .catch(() => {});
+    // Only the pictures scrolled into the panel are drawn: one list can hold
+    // dozens, and each is a render in the same worker as the sheet itself.
+    if (typeof IntersectionObserver === "undefined") {
+      void draw();
+      return () => {
+        live = false;
+      };
+    }
+    const seen = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) {
+        seen.disconnect();
+        void draw();
+      }
+    });
+    seen.observe(canvas);
     return () => {
       live = false;
+      seen.disconnect();
     };
-  }, [x, y, renderRegion]);
+  }, [x, y]);
   return (
     <canvas
       ref={ref}
@@ -181,6 +213,23 @@ export function sheetCheckRings(
 
 type Tab = "marks" | "unmarked" | "variants" | "notes";
 
+/** Below this the drawing pane cannot spare a 320px column for the panel. */
+const NARROW_PANE_PX = 720;
+
+function usePaneNarrow(pane: HTMLElement | null): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    if (!pane) return;
+    const measure = () => setNarrow(pane.clientWidth < NARROW_PANE_PX);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(pane);
+    return () => ro.disconnect();
+  }, [pane]);
+  return narrow;
+}
+
 export function SheetCheckPanel({
   state,
   legendName,
@@ -242,6 +291,7 @@ export function SheetCheckPanel({
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("marks");
+  const narrow = usePaneNarrow(chromeTarget);
   const [aiPicks, setAiPicks] = useState<Map<number, string | null>>(new Map());
   const [asking, setAsking] = useState(false);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
@@ -588,9 +638,10 @@ export function SheetCheckPanel({
                       >
                         <p className="text-[11px]">
                           <span className="font-medium">
-                            {g.markIds.length}
+                            {g.markIds.length}{" "}
+                            {g.markIds.length === 1 ? "mark" : "marks"}
                           </span>{" "}
-                          {variantLabel(g)}
+                          — {variantLabel(g, v.groups)}
                           {!g.minor && (
                             <span className="text-muted-foreground">
                               {" "}
@@ -759,7 +810,12 @@ export function SheetCheckPanel({
   const card = (
     <div
       className={cn(
-        "absolute top-14 left-3 z-20 w-80 max-w-[calc(100%-1.5rem)] max-h-[calc(100%-4.25rem)] overflow-y-auto",
+        // A narrow pane (a tablet held upright) is mostly panel at w-80, and
+        // "Go to" then moved the sheet underneath it. There the panel is a
+        // sheet along the bottom, leaving the top half of the drawing clear.
+        narrow
+          ? "absolute bottom-3 left-3 right-3 z-20 max-h-[45%] overflow-y-auto"
+          : "absolute top-14 left-3 z-20 w-80 max-w-[calc(100%-1.5rem)] max-h-[calc(100%-4.25rem)] overflow-y-auto",
         "pointer-events-auto rounded-xl border border-border bg-card/98 p-3 shadow-xl"
       )}
     >

@@ -6,6 +6,18 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-01]
 
+- **New: "Check sheet" on the Plans screen.** After reading a legend with
+  Whole legend, one button compares every mark on a sheet with the drawing.
+  It lists the marks that look like something else or have nothing under
+  them, the legend symbols nobody marked, counts whose marks are drawn in
+  more than one way, and heights, (E)/(X) and keynote numbers written beside
+  marks. Each line comes with a picture and a Go to button. Nothing changes
+  until you press Keep, Move, Delete, Count it or Split. On a locked bid it is
+  a report only. It runs without AI. When two legend symbols fit one spot
+  equally well, an optional "Ask AI to pick" button costs about a cent. On a
+  real 243-mark sheet it agreed with 149 hand marks and called none wrong, at
+  no cost. The paid whole-sheet AI reader got 128 right and 33 wrong for $0.61.
+
 - **BidRidge works on a tablet and reads on a phone.** On an iPad or Android
   tablet, either way round, everything works by finger: two fingers move and
   zoom the plan, a tap places a mark, and a finger that lands to move the

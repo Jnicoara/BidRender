@@ -95,6 +95,25 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
 
 ## Pending / Future
 
+### Requests to Track A from Check sheet (Track C, 2026-10-01) — A numbers these
+
+Check sheet shipped code-only on track-c without any of these; each is behind
+an OFF switch in `shared/sheetCheckSwitches.ts` or is said plainly on screen.
+All additive and nullable. Specs are in the plans named.
+
+- [ ] `symbol_looks` table — a legend look WITH its box, so the check needs no
+      "Whole legend" in this tab first (today the boxes live in sessionStorage,
+      `@/lib/sheetCheckSession`). `references/multiple-looks-plan.md` § 6.
+- [ ] `takeoff_stamps.mountHeightInches decimal(7,2) NULL` +
+      `mountHeightSource` — lets a height read beside a mark be SAVED on it
+      (`MARK_HEIGHT_COLUMN`). NULL must stay distinct from 0.
+      `references/check-my-marks-plan.md` § 10.
+- [ ] `takeoff_stamps.checkAcceptedAt timestamp NULL` — "Keep" remembered past
+      this check (`MARK_CHECK_ACCEPTED_COLUMN`). check-my-marks-plan § 7.
+- [ ] `ai_usage`/ask log `askKind` + `askFingerprint`, and
+      `bid_pdf_sheets.contentHash` — so the same tie on the same drawing is
+      never paid for twice. `references/legend-and-notes-automation-plan.md`.
+
 ### Capture fixes must ship in the next live release
 
 - [ ] **Remove `C:\dev\BidPhase-C-site` after the reader accuracy test, and
@@ -282,10 +301,10 @@ everyone to re-run instead of read.
       possible second cause; the lock covers that one already.)
       **The fix, one statement, same answer** — the check only asks whether
       any baseline name appears twice:
-      ```sql
-      SELECT 1 FROM `${table}` WHERE userId IS NULL
-      GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
-      ```
+      ``sql
+    SELECT 1 FROM `${table}` WHERE userId IS NULL
+    GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
+    ``
       4 ms instead of 1,473. Applied temporarily: a full seed 2,000 ms → 20
       ms; `materialsLibrary` + `materialsCatalog` + `seedPreservesUserPrices`,
       101 tests, 2.8 s instead of ~40 s, none over 300 ms; `materialsLibrary`
@@ -1760,7 +1779,7 @@ path is ever revived, give it the same treatment first.
       Track C's `todo.md` on `track-c`. B's style editor waits for the nine
       columns, and the status looks (§ 7) wait for the status column.
 - [ ] **Track A (migration, optional): `symbol_links.originalLabel
-  varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
+varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
       (Track B) WITHOUT a column: `label` is the new name and `lookupKey` keeps
       the captured name's key, which is what matching uses. The one loss is
       capitals — "Reset to original" gives "linear type", not "LINEAR TYPE",
@@ -2365,7 +2384,7 @@ refuses to count without 0082. (Run 2026-09-26 without 0082: production has
       `strapFamily` returns null for flex, so flex straps say "No catalog
       strap" until sized flex straps ship.
       **BUILT 2026-09-29 (retail plan § R7):** `<size> flexible conduit
-  one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
+one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
       `server/raceStrapCatalog.test.ts` checks every raceway's strap ships.
 - [ ] **MC above a lay-in ceiling defaults to the ceiling-wire clip** (owner,
       2026-09-29). An MC run counted today buys `MC one-hole strap` every

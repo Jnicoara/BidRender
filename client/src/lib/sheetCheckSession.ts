@@ -310,13 +310,42 @@ export function tieBreakBatch(
 }
 
 /** A variant group's name on screen. */
-export function variantLabel(g: VariantGroup): string {
+export function variantLabel(
+  g: VariantGroup,
+  /** The count's other groups — two named the same need telling apart. */
+  siblings: readonly VariantGroup[] = []
+): string {
+  const twin =
+    g.lookName !== null &&
+    siblings.some(
+      s => s !== g && s.lookName === g.lookName && s.beside === g.beside
+    );
+  // Two DIFFERENT legend rows that read the same once cut short (UNCC: three
+  // "CONVENIENCE RECEPTACLE, 120V, NEMA 5-20R DUPLEX. MOUNT …" rows): show
+  // where this one's words part from the other's.
+  const cut = g.lookName ? short(g.lookName, 32) : "";
+  const lookalike = siblings.find(
+    s =>
+      s !== g &&
+      s.lookName !== null &&
+      s.lookName !== g.lookName &&
+      short(s.lookName, 32) === cut
+  );
+  let name = cut;
+  if (g.lookName && lookalike?.lookName) {
+    const a = g.lookName;
+    const b = lookalike.lookName;
+    let i = 0;
+    while (i < a.length && a[i] === b[i]) i++;
+    const wordStart = a.lastIndexOf(" ", i) + 1;
+    name = `${short(a, 20)} … ${short(a.slice(wordStart), 24)}`;
+  }
   const look =
     g.look === 0
-      ? "can't tell the symbol"
+      ? "symbol not recognised"
       : g.lookName
-        ? `drawn as ${short(g.lookName, 32)}`
-        : `look ${g.look}`;
+        ? `drawn as ${name}${twin ? ` (shape ${g.look})` : ""}`
+        : `drawn another way (shape ${g.look})`;
   return g.beside ? `${look}, ${g.beside} beside it` : look;
 }
 
@@ -328,4 +357,18 @@ export function variantLabel(g: VariantGroup): string {
 export function countNameFromLegend(item: string): string {
   const first = item.split(/\.(\s|$)/)[0].trim() || item.trim();
   return first.length > 60 ? `${first.slice(0, 59).trimEnd()}…` : first;
+}
+
+/**
+ * Rows from another "Whole legend" box on the same sheet join the ones
+ * already read: a legend in three columns is three boxes. A row read again
+ * (same name) takes the newer box — the estimator boxed it again for a
+ * reason.
+ */
+export function mergeLegendRows(
+  kept: readonly SessionLegendRow[],
+  read: readonly SessionLegendRow[]
+): SessionLegendRow[] {
+  const names = new Set(read.map(r => r.name));
+  return [...kept.filter(r => !names.has(r.name)), ...read];
 }

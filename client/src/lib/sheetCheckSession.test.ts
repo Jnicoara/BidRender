@@ -5,9 +5,11 @@ import {
   countNameFromLegend,
   loadSessionLegend,
   markReport,
+  mergeLegendRows,
   saveSessionLegend,
   tieBreakBatch,
   unmarkedSpots,
+  variantLabel,
   type SessionLegend,
 } from "./sheetCheckSession";
 
@@ -166,5 +168,67 @@ describe("a count named from a legend row", () => {
     // A decimal point is not the end of a sentence.
     expect(countNameFromLegend("2.5 IN FLOOR BOX")).toBe("2.5 IN FLOOR BOX");
     expect(countNameFromLegend("x".repeat(80))).toHaveLength(60);
+  });
+});
+
+describe("a legend read in several boxes", () => {
+  const row = (name: string, x: number) => ({
+    name,
+    symbol: { x, y: 0, width: 5, height: 5 },
+    picture: null,
+  });
+  it("adds each box's rows, the newer box winning a row read twice", () => {
+    const merged = mergeLegendRows(
+      [row("A", 1), row("B", 1)],
+      [row("B", 2), row("C", 2)]
+    );
+    expect(merged.map(r => [r.name, r.symbol.x])).toEqual([
+      ["A", 1],
+      ["B", 2],
+      ["C", 2],
+    ]);
+  });
+});
+
+describe("a variant group's name", () => {
+  const g = (look: number, lookName: string | null, beside = "") => ({
+    look,
+    lookName,
+    beside,
+    markIds: [1],
+    minor: true,
+  });
+  it("tells apart two groups drawn as the same legend item", () => {
+    const a = g(1, "DUPLEX");
+    const b = g(2, "DUPLEX");
+    const c = g(3, null);
+    expect(variantLabel(a, [a, b, c])).toBe("drawn as DUPLEX (shape 1)");
+    expect(variantLabel(b, [a, b, c])).toBe("drawn as DUPLEX (shape 2)");
+    expect(variantLabel(c, [a, b, c])).toBe("drawn another way (shape 3)");
+    expect(variantLabel(g(1, "DUPLEX", "USB"), [a, b])).toBe(
+      "drawn as DUPLEX, USB beside it"
+    );
+  });
+});
+
+describe("two legend rows that read the same when cut short", () => {
+  it("shows where their words part", () => {
+    const g = (look: number, lookName: string) => ({
+      look,
+      lookName,
+      beside: "",
+      markIds: [1],
+      minor: true,
+    });
+    const a = g(
+      1,
+      'CONVENIENCE RECEPTACLE, 120V, NEMA 5-20R DUPLEX. MOUNT 18" AFF'
+    );
+    const b = g(
+      2,
+      'CONVENIENCE RECEPTACLE, 120V, NEMA 5-20R DUPLEX. MOUNT 48" AFF'
+    );
+    expect(variantLabel(a, [a, b])).toContain('18" AFF');
+    expect(variantLabel(b, [a, b])).toContain('48" AFF');
   });
 });
