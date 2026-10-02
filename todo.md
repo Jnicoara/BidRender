@@ -1788,8 +1788,12 @@ path is ever revived, give it the same treatment first.
       They are saved company-wide the way run colors are, and a shipped
       assembly forks on edit. NULL means automatic, so they are additive with
       no backfill (step 1 of the three). Spec: Track B's
-      `references/track-b-count-pin-styles-plan.md` § 6 (on `track-b`, not yet
-      on `local-dev`). The batch-mate is nullable `takeoff_stamps.status`
+      `references/track-b-count-pin-styles-plan.md` § 6. **§ 12 of that plan
+      (2026-10-01) is the EXACT list for A — 15 columns on five tables: these
+      nine, the status, `takeoff_groups.symbolLookupKey`, and the connect
+      point's `connectDx/Dy` (on `symbol_looks`) plus
+      `takeoff_stamps.rotation/mirrored`.** Its 12 decisions are made. The
+      batch-mate is nullable `takeoff_stamps.status`
       (`new`/`existing`/`remove`/`relocate`, NULL read as `new`), recorded in
       Track C's `todo.md` on `track-c`. B's style editor waits for the nine
       columns, and the status looks (§ 7) wait for the status column.
