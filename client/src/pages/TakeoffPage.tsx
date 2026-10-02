@@ -305,6 +305,7 @@ import {
   lostMarksMessage,
 } from "@/lib/provisionalCount";
 import { earlyTextKey, sheetsToCatchUp } from "@/lib/scaleCatchUp";
+import { pageTextFor, rememberPageText } from "@/lib/pageText";
 import { loadUndo, saveUndo, tabStorage } from "@/lib/undoPersist";
 import { pastDragThreshold, swallowNextClick } from "@/lib/dragThreshold";
 import { wheelIntent, type WheelGesture } from "@/lib/wheelIntent";
@@ -4510,7 +4511,10 @@ export default function TakeoffPage({
    * wrong place.
    */
   const pageCanvasScale = useRef(RENDER_SCALE);
-  const pageTextByPage = useRef<Map<number, string>>(new Map());
+  // Keyed by (plan set, page), never page alone: page 1 of two sets must not
+  // share words — the reader would get another drawing's text and printed
+  // scale (@/lib/pageText).
+  const pageTextByPage = useRef<Map<string, string>>(new Map());
   const [renderedPage, setRenderedPage] = useState<number | null>(null);
   const [renderedPageSize, setRenderedPageSize] = useState<{
     docId: number | null;
@@ -4748,13 +4752,21 @@ export default function TakeoffPage({
         bidId,
         sheetId: activeSheet.id,
         pageImage: snapshot.image,
-        pageText: pageTextByPage.current.get(page) ?? "",
+        pageText: pageTextFor(pageTextByPage.current, doc?.id, page),
         pageWidthPoints: snapshot.pageWidthPoints,
         pageHeightPoints: snapshot.pageHeightPoints,
         force,
       });
     },
-    [activeSheet?.id, canRead, bidId, page, readSheet, copilot?.readerModel]
+    [
+      activeSheet?.id,
+      canRead,
+      bidId,
+      doc?.id,
+      page,
+      readSheet,
+      copilot?.readerModel,
+    ]
   );
 
   /** A question is about the sheet on screen, so the answer goes with it. */
@@ -7182,7 +7194,8 @@ export default function TakeoffPage({
       // Kept for the plan reader too. The extraction has already happened for
       // scale detection, so the reader gets the sheet's own words — title
       // block, general notes, keynotes — for free alongside the picture.
-      pageTextByPage.current.set(pageNumber, text);
+      if (doc)
+        rememberPageText(pageTextByPage.current, doc.id, pageNumber, text);
       const sheet = sheets.find(s => s.pageNumber === pageNumber);
       /*
         Nothing to attach a reading to yet: ensureSheets is still in flight.
@@ -9610,7 +9623,11 @@ export default function TakeoffPage({
                         sheetId: activeSheet.id,
                         question,
                         pageImage: snapshot.image,
-                        pageText: pageTextByPage.current.get(page) ?? "",
+                        pageText: pageTextFor(
+                          pageTextByPage.current,
+                          doc?.id,
+                          page
+                        ),
                       });
                     }}
                     asking={askCopilot.isPending}
