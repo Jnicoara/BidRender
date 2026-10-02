@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-02]
 
+- **The plan reader can no longer be given another plan set's words.** The
+  text read off each sheet (title block, notes, printed scale) was kept by page
+  number only, so page 1 of one plan set could be sent to the reader with page
+  1 of another set's picture — including the wrong printed scale. It is now
+  kept per plan set.
 - **No more lost clicks when you start counting.** Clicking marks straight
   after choosing a legend symbol (or picking an assembly or typing a new count
   name) could silently drop some of them while the app was still setting the
