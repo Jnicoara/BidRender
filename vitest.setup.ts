@@ -40,6 +40,19 @@ import { BASELINE_RUN_TYPES } from "./server/seed/baselineRunTypes";
 process.env.JWT_SECRET ||= "test-jwt-secret-not-used-outside-vitest";
 
 /**
+ * ── VITE_APP_ID, for the same reason ────────────────────────────────────────
+ * A session token carries the app id, and `sdk.verifySession` refuses one
+ * whose app id is empty. `.env` sets it, so every local run passed — and on
+ * GitHub, where there is no `.env`, every session the app itself issued (a
+ * login, a password change) failed to verify. The suite went red there and
+ * green here on the same commit (passwordReset.test.ts, found 2026-10-02:
+ * reproduced locally by running with VITE_APP_ID unset). A suite's
+ * environment must not depend on whose machine it runs on. `||=`, so a real
+ * value always wins.
+ */
+process.env.VITE_APP_ID ||= "test-app";
+
+/**
  * ── The AI environment is decided HERE, not by whoever's `.env` this is ──────
  *
  * Unconditional, unlike `JWT_SECRET` above, and the difference is the point: a
