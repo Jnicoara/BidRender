@@ -29,15 +29,7 @@
  * Fixture ids are distinct from every other suite — vitest runs files in
  * parallel and shared ids delete each other's rows mid-run.
  */
-import {
-  describe,
-  it,
-  expect,
-  afterAll,
-  beforeAll,
-  beforeEach,
-  vi,
-} from "vitest";
+import { describe, it, expect, afterAll, beforeAll, beforeEach } from "vitest";
 import { and, eq, isNull } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb, seedBaselineMaterials } from "./db";
@@ -45,13 +37,11 @@ import { materials, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 
 /*
-  A 60 s limit for this file, because each case runs the whole catalog seed.
-  Measured 2026-09-28 with the limit lifted, at 1,455 rows: the first case
-  took 5.4 s against vitest's default 5 s, and failed on every run — a slow
-  answer, not a wrong one (todo.md, "Flaky tests"). The catalog had just grown
-  by 135 rows. Same remedy and reasoning as seedReactivatesRetired.test.ts.
+  This file had a 60 s limit from 2026-09-28 (a seed measured at 5.4 s). That
+  limit was covering the seeder's quadratic duplicate check, not a slow test;
+  removed 2026-10-01 with the check (server/db.ts, dedupeBaselineRows). The
+  default 5 s applies again.
 */
-vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 
 const USER = 6464;
 const hasDb = Boolean(process.env.DATABASE_URL);

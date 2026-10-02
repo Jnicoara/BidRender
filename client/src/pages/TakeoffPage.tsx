@@ -84,6 +84,14 @@ import {
   SquareDashedMousePointer,
 } from "lucide-react";
 import { pinStylesForBid } from "@shared/pinLetters";
+import { deviceFamily } from "@shared/deviceFamily";
+import {
+  FAMILY_MOUNTING,
+  markConnects,
+  type ConnectMark,
+  type ConnectPoint,
+  type ConnectRead,
+} from "@shared/connectPoint";
 import {
   countAgainOffer,
   loadLastCount,
@@ -327,11 +335,14 @@ import {
   type SheetCheckState,
 } from "@/components/takeoff/SheetCheck";
 import {
+  aiBatch,
+  applyAiAnswers,
   clearOpen,
   decide,
   matchItems,
   nextToLookAt,
   type MatchItem,
+  type ScanFindAnswer,
 } from "@/lib/findMatchingSession";
 import {
   MatchLayer,
@@ -542,6 +553,11 @@ function usePdfWorker() {
         pending.current.delete(msg.reqId);
         return;
       }
+      if (msg.type === "connectPoints") {
+        pending.current.get(msg.reqId)?.resolve(msg.points);
+        pending.current.delete(msg.reqId);
+        return;
+      }
       if (msg.type === "sheetChecked") {
         pending.current.get(msg.reqId)?.resolve({
           result: msg.result,
@@ -697,6 +713,13 @@ function usePdfWorker() {
           pageNum,
           hash,
           box,
+        }),
+      connectPoints: (pageNum: number, hash: string, marks: ConnectMark[]) =>
+        ask<[number, ConnectPoint][]>({
+          type: "connectPoints",
+          pageNum,
+          hash,
+          marks,
         }),
       sheetCheck: (
         legendPage: number,
@@ -921,6 +944,11 @@ function PlanPane({
       box: MatchBox
     ) => Promise<{ result: FindResult; readMs: number; findMs: number }>;
     /**
+     * Where runs meet these wall devices on this page (shared/connectPoint),
+     * read from the page's line work in the worker.
+     */
+    connectPoints: (marks: ConnectMark[]) => Promise<[number, ConnectPoint][]>;
+    /**
      * Check this page against a legend on another page of the same set
      * (@/lib/sheetCheck), in the worker. Suggestions only.
      */
@@ -1002,6 +1030,7 @@ function PlanPane({
     pageText,
     pageTextLayer,
     findMatching: findMatchingOnPage,
+    connectPoints: connectPointsOnPage,
     sheetCheck: sheetCheckOnPage,
   } = usePdfWorker();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -2421,6 +2450,8 @@ function PlanPane({
                     render(page, scale, hash, rect),
                   loadTextLayer: () => pageTextLayer(page, hash),
                   findMatching: box => findMatchingOnPage(page, hash, box),
+                  connectPoints: marks =>
+                    connectPointsOnPage(page, hash, marks),
                   sheetCheck: (legendPage, input) =>
                     sheetCheckOnPage(legendPage, page, hash, input),
                 })}
@@ -5226,6 +5257,9 @@ export default function TakeoffPage({
                   selectedId: null,
                   readMs,
                   findMs,
+                  box: region,
+                  scan: result.scan ?? null,
+                  ai: { busy: false, message: null },
                 },
               }
             : s
@@ -5573,6 +5607,119 @@ export default function TakeoffPage({
       }
     },
     [activeSheet?.id, breakTies]
+  );
+
+  const checkScanFinds = trpc.planCopilot.checkScanFinds.useMutation();
+  /**
+   * Find all matching on a SCAN: ask the AI what is written beside the next
+   * few copies (server/tieBreak.ts `scanFindsRequest`). A button press,
+   * never an effect; small crops of the spots, never the sheet; the answers
+   * become reasons on copies that stay unconfirmed (applyAiAnswers).
+   */
+  const askAboutScanFinds = useCallback(
+    async (
+      renderRegion: (
+        rect: PageRect,
+        scale: number
+      ) => Promise<{ bitmap: ImageBitmap }>
+    ) => {
+      if (!activeSheet || !findSession || findSession.panel.phase !== "results")
+        return;
+      const panel = findSession.panel;
+      const batch = aiBatch(panel.items);
+      if (batch.length === 0) return;
+      const setAi = (ai: { busy: boolean; message: string | null }) =>
+        setFindSession(s =>
+          s && s.panel.phase === "results"
+            ? { ...s, panel: { ...s.panel, ai } }
+            : s
+        );
+      setAi({ busy: true, message: null });
+      // 180 dpi (2.5 px a point), a crop of 52–68 pt round the spot and a
+      // red box on the symbol: the sizes measured in scanned-plans-plan.md
+      // § 4.
+      const scale = 2.5;
+      const crop = async (
+        x: number,
+        y: number,
+        halfWidth: number,
+        halfHeight: number
+      ) => {
+        const half = Math.max(26, 1.6 * Math.max(halfWidth, halfHeight));
+        const { bitmap } = await renderRegion(
+          { x: x - half, y: y - half, width: 2 * half, height: 2 * half },
+          scale
+        );
+        const canvas = document.createElement("canvas");
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        const k = canvas.width / (2 * half);
+        ctx.strokeStyle = "#e11d48";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+          (half - halfWidth - 2) * k,
+          (half - halfHeight - 2) * k,
+          (2 * halfWidth + 4) * k,
+          (2 * halfHeight + 4) * k
+        );
+        return canvas.toDataURL("image/jpeg", 0.85);
+      };
+      try {
+        const b = panel.box;
+        const picked = await crop(
+          b.x + b.width / 2,
+          b.y + b.height / 2,
+          Math.abs(b.width) / 2,
+          Math.abs(b.height) / 2
+        );
+        const crops = await Promise.all(
+          batch.map(async (item, k) => ({
+            id: k + 1,
+            itemId: item.id,
+            picture: await crop(
+              item.x,
+              item.y,
+              item.halfWidth,
+              item.halfHeight
+            ),
+          }))
+        );
+        const r = await checkScanFinds.mutateAsync({
+          sheetId: activeSheet.id,
+          picked,
+          crops: crops.map(c => ({ id: c.id, picture: c.picture })),
+        });
+        const itemOf = new Map(crops.map(c => [c.id, c.itemId] as const));
+        const answers = new Map<number, ScanFindAnswer | null>();
+        r.answers.forEach(a => {
+          const id = itemOf.get(a.cropId);
+          if (id !== undefined) answers.set(id, a.answer);
+        });
+        setFindSession(s =>
+          s && s.panel.phase === "results"
+            ? {
+                ...s,
+                panel: {
+                  ...s.panel,
+                  items: applyAiAnswers(s.panel.items, answers),
+                  ai: { busy: false, message: r.message },
+                },
+              }
+            : s
+        );
+      } catch (error) {
+        setAi({
+          busy: false,
+          message: `The AI could not be asked: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    },
+    [activeSheet?.id, findSession, checkScanFinds]
   );
 
   const selectFound = useCallback((id: number | null) => {
@@ -5949,6 +6096,49 @@ export default function TakeoffPage({
   const visibleStamps = useMemo(
     () => filterByLayers(layeredStamps, effectiveLayers),
     [layeredStamps, effectiveLayers]
+  );
+
+  /**
+   * Where a run meets each mark on this sheet (shared/connectPoint.ts): the
+   * wall for a wall device whose wall the drawing shows, the centre for
+   * everything else. Every snap reads this — a leg's start, an ordinary trace
+   * click, an end let go — so a run ending at a wall receptacle ends at the box
+   * in the wall, not the middle of the drawing of it, and is not short by the
+   * stand-off. The family is the PIN's (same name > assembly > category), so a
+   * device cannot be drawn as one thing and met as another.
+   */
+  const [connectRead, setConnectRead] = useState<{
+    sheetId: number;
+    read: ConnectRead;
+  } | null>(null);
+  const connectMarks = useMemo<ConnectMark[]>(
+    () =>
+      visibleStamps.map(st => ({
+        id: st.id,
+        x: st.x,
+        y: st.y,
+        family:
+          (st.groupId != null ? pinStyles.get(st.groupId)?.family : null) ??
+          deviceFamily({
+            label: st.name,
+            assemblyCategory: st.assemblyCategory ?? null,
+          }),
+      })),
+    [visibleStamps, pinStyles]
+  );
+  const wallMarks = useMemo(
+    () => connectMarks.filter(m => FAMILY_MOUNTING[m.family] === "wall"),
+    [connectMarks]
+  );
+  const connects = useMemo(
+    () =>
+      markConnects(
+        connectMarks,
+        connectRead && connectRead.sheetId === activeSheet?.id
+          ? connectRead.read
+          : null
+      ),
+    [connectMarks, connectRead, activeSheet?.id]
   );
   const visibleRuns = useMemo(
     () => filterByLayers(layeredRuns, effectiveLayers),
@@ -6859,12 +7049,25 @@ export default function TakeoffPage({
         legs: sheetRuns
           .filter(r => r.id === rootId || r.parentRunId === rootId)
           .map(r => ({ id: r.id, points: r.points as PagePoint[] })),
-        stamps: visibleStamps.map(s => ({ id: s.id, x: s.x, y: s.y })),
+        stamps: visibleStamps.map(s => ({
+          id: s.id,
+          x: s.x,
+          y: s.y,
+          connect: connects.get(s.id)?.point,
+        })),
       });
       // A quantity trace joins without a tee (D21, answer 2).
       return activeTraceMode === "quantity" ? quantitySnap(snap) : snap;
     },
-    [activeSheet, utils, runs, legRootId, visibleStamps, activeTraceMode]
+    [
+      activeSheet,
+      utils,
+      runs,
+      legRootId,
+      visibleStamps,
+      connects,
+      activeTraceMode,
+    ]
   );
 
   /** The first click of a leg: snapped, then the leg's first point. */
@@ -8909,10 +9112,22 @@ export default function TakeoffPage({
                         }}
                       />
                     )}
+                    {activeSheet && (
+                      <ConnectPointReader
+                        // Only when a run can snap: tracing, or a run's
+                        // ends up for dragging. No reading on a mere look.
+                        enabled={tracing || selectedRunId !== null}
+                        sheetId={activeSheet.id}
+                        marks={wallMarks}
+                        read={size.connectPoints}
+                        onRead={setConnectRead}
+                      />
+                    )}
                     <TraceLayer
                       width={size.width}
                       height={size.height}
                       renderScale={size.renderScale}
+                      connects={connects}
                       measurability={measurability}
                       tracing={tracing}
                       pathType={tracePathType}
@@ -9079,6 +9294,10 @@ export default function TakeoffPage({
                             existingLabel={existingTwin?.label ?? null}
                             state={findSession.panel}
                             chromeTarget={size.chromeTarget}
+                            canAskAi={readerAvailable}
+                            onAskAi={() =>
+                              void askAboutScanFinds(size.renderRegion)
+                            }
                             onConfirm={confirmFound}
                             onConfirmExisting={ids =>
                               void confirmFoundExisting(ids)
@@ -9915,4 +10134,61 @@ export default function TakeoffPage({
       </AlertDialog>
     </div>
   );
+}
+
+/**
+ * Asks the PDF worker where runs meet this sheet's wall devices, and hands
+ * the answer up. Renders nothing; it lives inside the drawing pane because
+ * that is where the worker call for THIS page is in scope.
+ *
+ * Re-asks only when the marks it would ask about change (one added, one
+ * moved). The worker keeps the page's line work, so a re-ask is cheap.
+ */
+function ConnectPointReader({
+  enabled,
+  sheetId,
+  marks,
+  read,
+  onRead,
+}: {
+  enabled: boolean;
+  sheetId: number;
+  marks: ConnectMark[];
+  read: (marks: ConnectMark[]) => Promise<[number, ConnectPoint][]>;
+  onRead: (read: { sheetId: number; read: ConnectRead }) => void;
+}) {
+  const key =
+    enabled && marks.length > 0
+      ? `${sheetId}|${marks.map(m => `${m.id}:${m.x}:${m.y}:${m.family}`).join(",")}`
+      : null;
+  useEffect(() => {
+    if (key === null) return;
+    let live = true;
+    const asked = marks;
+    read(asked).then(
+      points => {
+        if (!live) return;
+        const byId = new Map(asked.map(m => [m.id, m] as const));
+        const result = new Map<
+          number,
+          { x: number; y: number; connect: ConnectPoint }
+        >();
+        for (const [id, connect] of points) {
+          const m = byId.get(id);
+          if (m) result.set(id, { x: m.x, y: m.y, connect });
+        }
+        onRead({ sheetId, read: result });
+      },
+      err => {
+        // Snaps go to the centre and say "still reading" — never silent.
+        console.warn("[connect points] could not read the sheet", err);
+      }
+    );
+    return () => {
+      live = false;
+    };
+    // `key` is every input that matters; `read` is a fresh arrow each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return null;
 }

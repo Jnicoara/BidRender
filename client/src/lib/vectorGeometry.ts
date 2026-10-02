@@ -48,6 +48,13 @@ export type VectorGeometry = {
   filled: Uint8Array;
   /** Painted image area as a share of the page, 0 … 1 (capped). */
   imageCoverage: number;
+  /**
+   * Picture pixels per page point of the LARGEST image painted, 0 with none.
+   * A 300 dpi scan reads 4.17. The scan matcher's "too poor to match" test
+   * is measured in these (@/lib/scanMatching): a symbol's size in the scan's
+   * own pixels is known before anything is searched.
+   */
+  imagePixelsPerPoint: number;
 };
 
 type Matrix = [number, number, number, number, number, number];
@@ -162,6 +169,8 @@ export function extractVectorGeometry(
   const light: number[] = [];
   const filledOut: number[] = [];
   let imageArea = 0;
+  let largestImage = 0;
+  let imagePixelsPerPoint = 0;
 
   let ctm: Matrix = [1, 0, 0, 1, 0, 0];
   let stroke = 0;
@@ -182,7 +191,15 @@ export function extractVectorGeometry(
     else if (imageOps.has(fn)) {
       // An image fills the unit square under the current matrix.
       const m = multiply(vt, ctm);
-      imageArea += Math.abs(m[0] * m[3] - m[1] * m[2]);
+      const area = Math.abs(m[0] * m[3] - m[1] * m[2]);
+      imageArea += area;
+      // pdf.js hands an XObject image over as [objId, width, height].
+      const pixelsWide = Number(args?.[1]);
+      const pointsWide = Math.hypot(m[0], m[1]);
+      if (area > largestImage && pixelsWide > 0 && pointsWide > 0) {
+        largestImage = area;
+        imagePixelsPerPoint = pixelsWide / pointsWide;
+      }
     } else if (fn === ops.constructPath && args) {
       const paint = args[0] as number;
       const isStroke = strokeOps.has(paint);
@@ -266,5 +283,6 @@ export function extractVectorGeometry(
     lightness: Uint8Array.from(light),
     filled: Uint8Array.from(filledOut),
     imageCoverage: Math.min(1, imageArea / pageArea),
+    imagePixelsPerPoint,
   };
 }

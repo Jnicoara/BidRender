@@ -41,7 +41,7 @@
  * the letter is what keeps them apart (pin plan § 5 — "colour narrows; the
  * letter decides").
  */
-import { FAMILY_SHAPE, deviceFamily } from "./deviceFamily";
+import { FAMILY_SHAPE, deviceFamily, type DeviceFamily } from "./deviceFamily";
 import { MARK_COLORS, type MarkColor, type MarkShape } from "./takeoffMarks";
 
 /**
@@ -161,7 +161,17 @@ export type PinCount = {
  * family (shared/deviceFamily.ts) — its OWN name first — so two items on one
  * assembly can differ in shape as well as letter and colour.
  */
-export type PinStyle = { letter: string; color: MarkColor; shape: MarkShape };
+export type PinStyle = {
+  letter: string;
+  color: MarkColor;
+  shape: MarkShape;
+  /**
+   * The family the shape came from — also what says whether a run meets this
+   * device at the wall or in the middle (shared/connectPoint.ts), so the pin
+   * and the connect point can never disagree about what a device is.
+   */
+  family: DeviceFamily;
+};
 
 /*
  * ── NOT BUILT: chosen looks and mark status — where they plug in ────────────
@@ -230,12 +240,14 @@ export function pinStylesForBid(
   }
 
   const styles = new Map<number, PinStyle>();
-  byFirstUse.forEach((count, i) =>
+  byFirstUse.forEach((count, i) => {
+    const family = deviceFamily(count);
     styles.set(count.id, {
       letter: letters.get(count.id) ?? initial(count.label),
       color: MARK_COLORS[i % MARK_COLORS.length],
-      shape: FAMILY_SHAPE[deviceFamily(count)],
-    })
-  );
+      shape: FAMILY_SHAPE[family],
+      family,
+    });
+  });
   return styles;
 }

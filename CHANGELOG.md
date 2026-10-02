@@ -31,6 +31,31 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-01]
 
+- **Runs that end at a wall receptacle, switch or data outlet now reach the
+  wall.** The symbol is drawn standing off the wall, and a run traced to it
+  used to stop at the middle of the drawing — about half a foot short at
+  each end at 1/8" scale, on every such device. Clicking on one now places
+  the point where the box is, at the wall line beside it, and a small cyan
+  tick shows where the run meets it. Where no wall can be found (a scanned
+  sheet, or nothing beside it), the end stays at the centre and an amber "?"
+  says so. Lights, J-boxes and panels are still met in the middle. Hold Alt
+  (or tap Free) to place a point exactly. Runs traced before this keep
+  their lengths.
+- **The server starts about four seconds faster, and a test that failed at
+  random no longer does.** A start-up check for duplicate catalog rows
+  compared every material against every other one, and took 4.5 seconds at
+  today's catalog size. It now asks the same question in one pass (6 ms).
+  That slowness was why the materials tests sometimes timed out.
+- **Find all matching now works on scanned plans (test build, track-c).** Box
+  one symbol on a scanned sheet and every copy on that plan is found by its
+  picture, with no AI. On Old Blueridge it found 85 of the owner's 86 hand
+  marks. It searches only the plan you boxed on, so a demolition plan drawn
+  on the same sheet is never mixed in. Boxed on the demolition plan itself,
+  every find says "not counted". A scan too coarse to match is refused with
+  its size in pixels. Nothing on a scan counts until someone has checked the
+  tag or the "E" beside it. An optional "Ask AI" button reads those from
+  small pictures, about a cent for twelve.
+
 - **Count pins now take their shape from what the item is.** Receptacles and
   junction boxes are circles, lights are squares, data outlets are triangles,
   switches are diamonds, panels and disconnects are wide rectangles, and

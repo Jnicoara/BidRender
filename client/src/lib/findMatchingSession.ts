@@ -13,6 +13,7 @@
  * a button that swept those in would make every flag decorative.
  */
 import type { Match } from "./findMatching";
+import { SCAN_UNREAD_REASON } from "./scanMatching";
 
 export type MatchState =
   | "open"
@@ -25,7 +26,17 @@ export type MatchItem = Match & {
   state: MatchState;
   /** The name of a mark already on the sheet at this copy, if there is one. */
   alreadyCounted: string | null;
+  /**
+   * What the AI read beside this copy when asked (scans only, a button —
+   * server/tieBreak.ts `scanFindsRequest`): null when not asked, "noAnswer"
+   * when asked and nothing usable came back. A suggestion: it adds a
+   * reason, never a decision.
+   */
+  ai: ScanFindAnswer | "noAnswer" | null;
 };
+
+/** The AI's answers for a scan find (server/tieBreak.ts). */
+export type ScanFindAnswer = "same" | "otherLabel" | "existing" | "notThis";
 
 export type PlacedMark = { x: number; y: number; name: string };
 
@@ -41,15 +52,33 @@ export function matchItems(
   return matches.map((m, id) => {
     const reach = Math.max(4, Math.max(m.halfWidth, m.halfHeight));
     const on = marks.find(p => Math.hypot(p.x - m.x, p.y - m.y) <= reach);
-    return { ...m, id, state: "open", alreadyCounted: on?.name ?? null };
+    return {
+      ...m,
+      id,
+      state: "open",
+      alreadyCounted: on?.name ?? null,
+      ai: null,
+    };
   });
 }
 
-export type ItemKind = "clear" | "needsLook" | "maybeExisting" | "already";
+export type ItemKind =
+  | "clear"
+  | "needsLook"
+  | "maybeExisting"
+  | "already"
+  | "demolition";
 
-/** How a copy is drawn and offered. Needs-a-look wins over maybe-existing. */
+/**
+ * How a copy is drawn and offered. Needs-a-look wins over maybe-existing.
+ * A copy on a DEMOLITION plan (a scan, @/lib/scanMatching) is its own kind,
+ * whatever else is true of it: it is a device being taken out, so it is
+ * never "clear" and "Confirm all" never counts it. "Count it" still can —
+ * the estimator decides, not the title.
+ */
 export function itemKind(item: MatchItem): ItemKind {
   if (item.alreadyCounted) return "already";
+  if (item.onDemolitionPlan) return "demolition";
   if (item.needsLook.length) return "needsLook";
   if (item.maybeExisting.length) return "maybeExisting";
   return "clear";
@@ -68,6 +97,7 @@ export function summary(items: readonly MatchItem[]) {
     needsLook: open.filter(i => itemKind(i) === "needsLook").length,
     maybeExisting: open.filter(i => itemKind(i) === "maybeExisting").length,
     already: items.filter(i => itemKind(i) === "already").length,
+    demolition: open.filter(i => itemKind(i) === "demolition").length,
     confirmed: items.filter(
       i => i.state === "confirmed" || i.state === "confirmedExisting"
     ).length,
@@ -96,10 +126,67 @@ export function nextToLookAt(
     i => i.state === "open" && itemKind(i) !== "already"
   );
   if (waiting.length === 0) return null;
-  const order = [
-    ...waiting.filter(i => itemKind(i) !== "clear"),
-    ...waiting.filter(i => itemKind(i) === "clear"),
-  ];
+  // Flagged first, then clear; demolition copies last — not counted unless
+  // somebody chooses to, so they are the least likely to want a look.
+  const rank = (i: MatchItem) =>
+    ({ needsLook: 0, maybeExisting: 0, clear: 1, demolition: 2, already: 3 })[
+      itemKind(i)
+    ];
+  const order = [...waiting].sort((p, q) => rank(p) - rank(q));
   const at = order.findIndex(i => i.id === from);
   return order[(at + 1) % order.length] ?? null;
+}
+
+/** The AI's batch limit (server/tieBreak.ts TIE_BREAK_MAX_CROPS). */
+export const AI_BATCH = 12;
+
+/**
+ * The copies to send with the next press of "Ask AI": open, not already
+ * counted, not asked before; flagged ones first, demolition ones last. One
+ * batch per press, so a press costs at most one small call.
+ */
+export function aiBatch(items: readonly MatchItem[]): MatchItem[] {
+  const waiting = items.filter(
+    i => i.state === "open" && itemKind(i) !== "already" && i.ai === null
+  );
+  const rank = (i: MatchItem) =>
+    ({ needsLook: 0, maybeExisting: 0, clear: 1, demolition: 2, already: 3 })[
+      itemKind(i)
+    ];
+  return [...waiting].sort((p, q) => rank(p) - rank(q)).slice(0, AI_BATCH);
+}
+
+export const AI_REASONS = {
+  otherLabel: "The AI reads a different tag or label beside it.",
+  existing: "The AI sees an E beside it, so it may be existing.",
+  notThis: "The AI says this is not the same symbol.",
+} as const;
+
+/**
+ * Put the AI's answers on the copies it was asked about. An answer that
+ * disagrees with the boxed one becomes a reason, so the copy stops being
+ * clear and "Confirm all" leaves it; "same" adds nothing. Nothing is
+ * confirmed or set aside here: the person still decides every copy.
+ */
+export function applyAiAnswers(
+  items: readonly MatchItem[],
+  answers: ReadonlyMap<number, ScanFindAnswer | null>
+): MatchItem[] {
+  return items.map(i => {
+    if (!answers.has(i.id)) return i;
+    const a = answers.get(i.id) ?? null;
+    if (a === null) return { ...i, ai: "noAnswer" };
+    // Any answer means the words beside it HAVE been read.
+    const read = i.needsLook.filter(r => r !== SCAN_UNREAD_REASON);
+    if (a === "existing")
+      return {
+        ...i,
+        ai: a,
+        needsLook: read,
+        maybeExisting: [...i.maybeExisting, AI_REASONS.existing],
+      };
+    if (a === "otherLabel" || a === "notThis")
+      return { ...i, ai: a, needsLook: [...read, AI_REASONS[a]] };
+    return { ...i, ai: a, needsLook: read };
+  });
 }

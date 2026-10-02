@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { Match } from "./findMatching";
 import {
+  AI_BATCH,
+  AI_REASONS,
+  aiBatch,
+  applyAiAnswers,
   clearOpen,
   decide,
   itemKind,
   matchItems,
   nextToLookAt,
   summary,
+  type MatchItem,
+  type ScanFindAnswer,
 } from "./findMatchingSession";
 
 const m = (x: number, over: Partial<Match> = {}): Match => ({
@@ -20,6 +26,7 @@ const m = (x: number, over: Partial<Match> = {}): Match => ({
   needsLook: [],
   maybeExisting: [],
   isBoxed: false,
+  onDemolitionPlan: null,
   ...over,
 });
 
@@ -71,6 +78,7 @@ describe("a Find all matching session", () => {
       needsLook: 0,
       maybeExisting: 0,
       already: 1,
+      demolition: 0,
       confirmed: 3,
       rejected: 1,
     });
@@ -88,5 +96,68 @@ describe("a Find all matching session", () => {
       at = next.id;
     }
     expect(order).toEqual([200, 300, 100, 500, 200]);
+  });
+});
+
+describe("scan finds and the AI button", () => {
+  const scanItems = () =>
+    matchItems(
+      [
+        m(100),
+        m(200),
+        m(300, { needsLook: ["coarse"] }),
+        m(400, { onDemolitionPlan: "DEMOLITION PLAN" }),
+      ],
+      []
+    );
+
+  it("a demolition copy is visited last by Next and never confirmed by Confirm all", () => {
+    const list = scanItems();
+    expect(clearOpen(list).map(i => i.x)).toEqual([100, 200]);
+    const order: number[] = [];
+    let at: number | null = null;
+    for (let k = 0; k < 4; k++) {
+      const next: MatchItem = nextToLookAt(list, at)!;
+      order.push(next.x);
+      at = next.id;
+    }
+    expect(order).toEqual([300, 100, 200, 400]);
+  });
+
+  it("sends flagged ones first, at most one batch, and never the same copy twice", () => {
+    const many = matchItems(
+      Array.from({ length: 20 }, (_, k) =>
+        m(k * 10, k === 19 ? { needsLook: ["coarse"] } : {})
+      ),
+      []
+    );
+    const first = aiBatch(many);
+    expect(first).toHaveLength(AI_BATCH);
+    expect(first[0].x).toBe(190);
+    const answered = applyAiAnswers(
+      many,
+      new Map(first.map(i => [i.id, "same" as const]))
+    );
+    const second = aiBatch(answered);
+    expect(second).toHaveLength(20 - AI_BATCH);
+    expect(second.some(i => first.some(f => f.id === i.id))).toBe(false);
+  });
+
+  it("an answer that disagrees becomes a reason; nothing is confirmed by it", () => {
+    const list = applyAiAnswers(
+      scanItems(),
+      new Map<number, ScanFindAnswer | null>([
+        [0, "otherLabel"],
+        [1, "existing"],
+        [2, null],
+      ])
+    );
+    expect(itemKind(list[0])).toBe("needsLook");
+    expect(list[0].needsLook).toEqual([AI_REASONS.otherLabel]);
+    expect(itemKind(list[1])).toBe("maybeExisting");
+    expect(list[2].ai).toBe("noAnswer");
+    expect(list.every(i => i.state === "open")).toBe(true);
+    // Neither is clear any more, so Confirm all takes neither.
+    expect(clearOpen(list)).toEqual([]);
   });
 });

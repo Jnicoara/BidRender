@@ -31,6 +31,7 @@ function geometry(segs: Seg[], filled: number[] = []): VectorGeometry {
     lightness: new Uint8Array(segs.length),
     filled: Uint8Array.from(segs.map((_, i) => filled[i] ?? 0)),
     imageCoverage: 0,
+    imagePixelsPerPoint: 0,
   };
 }
 

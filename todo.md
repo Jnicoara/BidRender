@@ -298,7 +298,9 @@ Both are timing, not wrong answers, and both touch the shared test database.
 Fix them together: a green run that sometimes lies about being red trains
 everyone to re-run instead of read.
 
-- [ ] **HANDOFF to whoever owns `server/db.ts` — the root cause of every
+- [x] **DONE 2026-10-01 (Track B), see the materialsLibrary entry below.**
+      No index on `materials.name` added — that is a migration, still open.
+      **HANDOFF to whoever owns `server/db.ts` — the root cause of every
       seed-heavy timeout below, including `materialsLibrary.test.ts`'s four
       failures on `a-fitting-labor` (73c349e).** Found and measured
       2026-09-29 on track-c; NOT committed there because A and B are working
@@ -425,6 +427,17 @@ GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
       back, the same shape as the `seedReactivatesRetired` race above:
       suspect a second writer to shared `materials` rows mid-seed. Capture
       the assertion text on the next failure before changing anything.
+      **FIXED 2026-10-01 (Track B) — not a second writer: a timeout.** It is
+      the `dedupeBaselineRows` entry above. Measured on `bidrender_test_b` at
+      1,554 baseline rows: the duplicate check alone 4,551 ms, and the file
+      now failed ALONE — two "Test timed out in 5000ms", five more at
+      3.4–4.8 s. Under any extra load on the shared MySQL, a different subset
+      tipped over, which is why it looked random. Check AND repair DELETE now
+      use the GROUP BY; every seed test under 300 ms, 34/34 with four
+      connections running the old query alongside. New cases: a duplicate is
+      still found and removed, and a re-seed finishes under 1.5 s (12 red on
+      the old query across the three seed files). Both 60 s `vi.setConfig`
+      limits removed.
 - [x] **`scripts/schemaDrift.mts` says "this database has never been migrated"
       when it simply cannot connect.** Measured 2026-09-27 against production
       with the laptop off the database's trusted list: that line printed, then
@@ -1797,6 +1810,32 @@ path is ever revived, give it the same treatment first.
       (`new`/`existing`/`remove`/`relocate`, NULL read as `new`), recorded in
       Track C's `todo.md` on `track-c`. B's style editor waits for the nine
       columns, and the status looks (§ 7) wait for the status column.
+- [ ] **Track A (migration): the CONNECT POINT columns — put them in the
+      batch above.** Built without them 2026-10-01 (Track B): runs now meet
+      wall devices at the wall found in the drawing, by device family
+      (`shared/connectPoint.ts`, `references/connect-point-plan.md`). What
+      cannot be done without columns is a connect point SET PER SYMBOL. All
+      additive, nullable, no default, no backfill — step 1 of the three:
+      | Table | Column | Type | NULL means |
+      | --- | --- | --- | --- |
+      | `symbol_looks` (if A builds it in this batch; else `symbol_links`, not both) | `connectDx`, `connectDy` | `decimal(10,4)` | never answered — the family default applies. `0,0` is "it's the middle", a real answer, never written for NULL |
+      | `takeoff_stamps` | `rotation` | `smallint` (0/90/180/270) | which way this copy faces is not known |
+      | `takeoff_stamps` | `mirrored` | `boolean` | as `rotation` |
+      The offset is measured from the capture box's centre, so it also needs
+      the box: `captureX/Y/Width/Height decimal(12,4)` on the same row —
+      already requested as R.11 / find-all-matching-plan § 6, ONE handoff, not
+      a second copy. **Optional, owner's call (plan § 9 Q3):** to let an
+      estimator CONFIRM a wall end the app found, `takeoff_runs.startConnect`
+      / `endConnect` `enum('found','confirmed')` NULL — without it a found end
+      counts and is shown, but cannot be marked checked. If the schema A sees
+      does not match this list, stop and find out why before writing the .sql.
+- [ ] **Track B, after the connect-point columns: the picker and per-symbol
+      offsets** (plan § 2, § 3, § 5): the "Where does the pipe meet it?" step
+      at capture with Skip and "It's the middle", the legend-row badge, turning
+      per mark from Find all matching, then `connectPointFor` prefers the
+      symbol's offset over the family default. NOT covered by today's build:
+      an unconfirmed AI mark is still a snap target (the WRONG-NUMBER RISK
+      entry above), because telling one apart needs the mark-status column.
 - [ ] **Track B, after A's columns above: pin styles steps 2 and 3.** Step 1
       shipped 2026-10-01 (computed default shape by device family, the wide
       rectangle, letters and first-use colours, safety switch = DS). Still to

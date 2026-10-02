@@ -20,7 +20,7 @@ Read before specifying (CLAUDE.md, "Where decisions live"):
 | "Full-page template matching across a set" is listed as **not realistic** — the same symbol at different sizes, line weights, soft thumbnails.        | `plan-viewer-overhaul.md` § 9.3                       | **Narrowed, not reversed.** That rejected matching PIXELS of stored thumbnails across a SET. This matches the PDF's own LINE WORK, on ONE sheet, from a box drawn on that sheet — so size, line weight and thumbnail quality do not arise. Measured below (§ 2): 44 of 46 hand marks on Weld 1 E-200, 0.1 s a search. Pixel matching across a set stays rejected. § 9.3 now points here. |
 | The app outlines, the estimator confirms.                                                                                                             | `plan-viewer-overhaul.md` § 5c                        | Kept whole: every match starts unconfirmed and is never stored until confirmed.                                                                                                                                                                                                                                                                                                          |
 | A remembered symbol may be SUGGESTED on a new set, never APPLIED.                                                                                     | `plan-viewer-overhaul.md` § 9.4                       | Kept: the legend-driven version (§ 4 step 3) only ever proposes.                                                                                                                                                                                                                                                                                                                         |
-| The reader never reads on its own (D11); every AI call is a button.                                                                                   | `takeoff-spec.md` D11, CLAUDE.md AI rules             | Find all matching makes no AI call. It is still a button, never on load. The AI reader stays the route for SCANS (§ 3).                                                                                                                                                                                                                                                                  |
+| The reader never reads on its own (D11); every AI call is a button.                                                                                   | `takeoff-spec.md` D11, CLAUDE.md AI rules             | Find all matching makes no AI call of its own. It is still a button, never on load. On a SCAN the results carry one more button, "Ask AI about N" — small crops, closed answers, never pressed for you (§ 3, as changed 2026-10-01).                                                                                                                                                     |
 | Manual mode is the product.                                                                                                                           | CLAUDE.md                                             | It IS manual mode — no model, no allowance, works with `DISABLE_AI_FEATURES`. An accelerator over clicking, not a replacement: every copy can still be clicked.                                                                                                                                                                                                                          |
 | Unconfirmed matches: dashed, hollow, "?", in the count's colour; status not drawn until confirmed; never counted, never snapped to; "· N to confirm". | `track-b-count-pin-styles-plan.md` § 8 (on `track-b`) | **Adopted for the product.** The test build draws by flag instead (cyan / amber "?" / gray "E?") because pin colours are not built yet. That is a test-account look, to be replaced, not kept beside B's.                                                                                                                                                                                |
 | Status on a pin: new filled, existing hollow-SOLID, remove X, relocate arrow — after Track A's column.                                                | `track-b-count-pin-styles-plan.md` § 7                | Adopted. "Count as existing" sets the status once the column exists (§ 5).                                                                                                                                                                                                                                                                                                               |
@@ -42,7 +42,11 @@ Read before specifying (CLAUDE.md, "Where decisions live"):
   same filled state, same words. Flags: **needs a look** (a device word such
   as GF/WP/USB that differs, lines running through it, more line work joined
   on, drawn darker, "(X)", "(R)") and **maybe existing** (drawn lighter,
-  "(E)"). A scan is refused with a sentence.
+  "(E)").
+- `client/src/lib/scanMatching.ts` — **the scan branch (2026-10-01)**: a
+  scanned sheet is matched by PICTURE (opencv.js, fetched only then), on the
+  plan the box is on only, with a too-poor refusal and the demolition plan
+  kept apart. `references/scanned-plans-plan.md` § 9 has what it measured.
 - In the PDF worker, one sheet's geometry kept at a time.
 - On screen: "Find all matching" beside the armed count; rings; a panel with
   **Confirm all clear**, **Next**, **Count it**, **Count as existing** (the
@@ -81,8 +85,10 @@ checked by eye:
 - **Speed:** 0.09–0.3 s a search; reading the sheet once 0.7–1.6 s (pdf.js),
   in the worker. Seen on screen: 23 found in 0.1 s.
 - **Scans:** Old Blueridge E1.01 and E1.02 (one picture, 0 segments, an OCR
-  text layer) — 128 boxes, 128 refused. Before a fix that day, 2 boxes landing
-  on OCR'd words were "matched" as words-only symbols.
+  text layer) — 128 boxes, 128 refused by the LINE matcher, rightly. Before a
+  fix that day, 2 boxes landing on OCR'd words were "matched" as words-only
+  symbols. **Since the scan branch they go to the picture matcher instead: 85
+  of his 86 marks found** (`scanned-plans-plan.md` § 9).
 - **UNCC E111** is vector (87,186 segments); no hand count yet to score it.
 
 **What it cannot do, said plainly:** a symbol drawn at a different size on
@@ -98,12 +104,26 @@ duplex, correctly, which is still a disagreement someone has to resolve).
 1. **Entry point: beside the armed count, as built.** What it finds is
    offered AS the armed count, so with nothing armed it has nothing to offer
    them as. The legend panel gets a second entry in step 3 below.
-2. **Vector sheet → the matcher. Scan → the reader, by name.** The sheet
+2. **Vector sheet → the line matcher. Scan → the PICTURE matcher.**
+   **Superseded 2026-10-01: scans are matched, not refused.** What follows
+   was the decision until then, kept as the record. Today a scan is searched
+   by `@/lib/scanMatching` (`scanned-plans-plan.md` § 9): only the plan the
+   box is on, every find unconfirmed and flagged until the words beside it
+   are read, finds on a demolition plan "not counted", and a symbol too
+   coarse on the scan (under 16 px) refused with its size — the one refusal
+   left. The AI is a button on the results ("Ask AI about N"), never the
+   route in.
+
+   _As decided before:_ **Vector sheet → the matcher. Scan → the reader, by name.** The sheet
    decides (picture over 40% of the page and under 500 segments is a scan).
    On a scan the panel says it cannot see the symbols and, **only when the
    AI reader is on**, offers "Read this sheet instead" with its cost — a
    button, per the AI rules. With AI off it says "count these by hand", and
    nothing else. A set can mix both; the decision is per sheet.
+
+   > **Built 2026-10-01:** the replacement proposed here is on `track-c`;
+   > see the paragraph above and `scanned-plans-plan.md` § 9.
+
 3. **Never the reader's results as an answer key.** The matcher reads no AI
    finding, and nothing it does pre-fills the reader-accuracy key.
 4. **Locked bid:** not offered (as built).
@@ -180,8 +200,10 @@ Nothing else. Unconfirmed matches are never stored, so they need no table.
 3. **Unconfirmed when leaving the sheet:** **dropped (recommended)** / kept
    as proposals for later (a table, and a half-decided state on the bid).
 4. **The look:** **B's pin plan § 8 (recommended)** / keep the test colours.
-5. **Scans:** **say it cannot, and offer the reader by name when AI is on
-   (recommended)** / say it cannot and nothing more.
+5. **Scans:** ~~say it cannot, and offer the reader by name when AI is on~~ —
+   **decided 2026-10-01: match them by picture** (`scanned-plans-plan.md`
+   § 9), refusing only a symbol too coarse to match. The open question there
+   is Confirm all on a scan (its Q6).
 6. **Find from the legend (step 3):** **yes, same set only (recommended)** /
    across sets too (§ 9.4 risk: offices draw symbols differently).
 7. **Every sheet of the set (step 4):** **yes, after step 3 (recommended)** /
@@ -197,8 +219,8 @@ Nothing else. Unconfirmed matches are never stored, so they need no table.
   turned and mirrored too, no AI. Nothing counts until confirmed.
 - Weld 1 E-200: 44 of 46 hand marks found; both misses are spots where the
   drawing and the mark disagree. Look-alikes (duplex inside double duplex,
-  triangle inside a bow-tie) are flagged, not counted silently. Scans refused
-  128 of 128.
+  triangle inside a bow-tie) are flagged, not counted silently. Scans are
+  now matched by picture (85 of 86 on Old Blueridge), not refused.
 - Narrows overhaul § 9.3 (pixel matching across a set stays rejected); keeps
   § 5c, § 9.4, D11; adopts B's unconfirmed and status looks.
 - Two Track A migrations: mark status (needed for existing to price right)

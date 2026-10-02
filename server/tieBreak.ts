@@ -102,15 +102,7 @@ export function parseTieBreak(
   result: InvokeResult,
   crops: readonly TieCrop[]
 ): Map<number, number | null> {
-  const message = result.choices?.[0]?.message;
-  const text =
-    typeof message?.content === "string"
-      ? message.content
-      : Array.isArray(message?.content)
-        ? message.content
-            .map(p => ("text" in p && typeof p.text === "string" ? p.text : ""))
-            .join("\n")
-        : "";
+  const text = replyText(result);
   const picks = new Map<number, number | null>();
   for (const c of crops) {
     const m = text.match(new RegExp(`Picture\\s+${c.id}\\s*:\\s*(\\d+)`));
@@ -118,4 +110,110 @@ export function parseTieBreak(
     picks.set(c.id, c.itemIds.includes(id) ? id : null);
   }
   return picks;
+}
+
+function replyText(result: InvokeResult): string {
+  const message = result.choices?.[0]?.message;
+  return typeof message?.content === "string"
+    ? message.content
+    : Array.isArray(message?.content)
+      ? message.content
+          .map(p => ("text" in p && typeof p.text === "string" ? p.text : ""))
+          .join("\n")
+      : "";
+}
+
+// ── Find all matching on a SCAN: what is written beside each find ─────────
+
+/*
+  The scan matcher (client/src/lib/scanMatching.ts) finds every copy of a
+  picked symbol by its picture, and a picture cannot read the words beside
+  it: A2 and A2EM are the same rectangle, and an "E" makes a receptacle an
+  existing one. Measured on Old Blueridge (references/scanned-plans-plan.md
+  § 4): asked about small crops, Sonnet read 12 of 12 unread tags and 8 of 8
+  "E"s, with every control right, for half a cent. So the same rules as the
+  tie-break: a button, small crops, a closed set of answers, and the answer
+  is a SUGGESTION shown on an unconfirmed find — it never counts anything.
+*/
+
+/** The closed set of answers per crop. Anything else reads as no answer. */
+export const SCAN_FIND_ANSWERS = {
+  1: "same",
+  2: "otherLabel",
+  3: "existing",
+  0: "notThis",
+} as const;
+export type ScanFindAnswer =
+  (typeof SCAN_FIND_ANSWERS)[keyof typeof SCAN_FIND_ANSWERS];
+
+export type ScanFindCrop = { id: number; picture: string };
+
+export function scanFindsRequest(opts: {
+  model: string;
+  picked: string;
+  crops: readonly ScanFindCrop[];
+}): Pick<InvokeParams, "model" | "messages" | "maxTokens" | "thinking"> {
+  const parts: Array<
+    | { type: "text"; text: string }
+    | { type: "image_url"; image_url: { url: string } }
+  > = [
+    {
+      type: "text",
+      text: "Picture 0 is the symbol the estimator picked on a scanned floor plan, inside the red square, with whatever is written beside it.",
+    },
+    { type: "image_url", image_url: { url: opts.picked } },
+    {
+      type: "text",
+      text:
+        "Each numbered picture below is cut from the same plan. Look ONLY at the symbol inside its red square and the words touching it. " +
+        "Answer 1 if it is the same symbol with the same tag or label beside it as picture 0 (or no tag on either); " +
+        "2 if it is the same symbol but a DIFFERENT tag or label is beside it; " +
+        "3 if it is the same symbol marked existing (an E or (E) beside it); " +
+        "0 if it is not the same symbol. Symbols may be turned.",
+    },
+  ];
+  for (const c of opts.crops) {
+    parts.push({ type: "text", text: `Picture ${c.id}` });
+    parts.push({ type: "image_url", image_url: { url: c.picture } });
+  }
+  parts.push({
+    type: "text",
+    text: 'Reply with one line per numbered picture, exactly "Picture N: A", nothing else.',
+  });
+  return {
+    model: opts.model,
+    maxTokens: MAX_TOKENS,
+    thinking: { type: "disabled" },
+    messages: [
+      {
+        role: "system",
+        content:
+          "You compare electrical plan symbols on a scanned drawing. Be exact about the letters beside a symbol; if you cannot read them, say it is the same symbol only when nothing different is visible.",
+      },
+      { role: "user", content: parts },
+    ],
+  };
+}
+
+/**
+ * One answer per crop from the closed set, or null for anything else — a
+ * missing line, an answer outside 0–3, a reply cut off.
+ */
+export function parseScanFinds(
+  result: InvokeResult,
+  crops: readonly ScanFindCrop[]
+): Map<number, ScanFindAnswer | null> {
+  const text = replyText(result);
+  const out = new Map<number, ScanFindAnswer | null>();
+  for (const c of crops) {
+    const m = text.match(new RegExp(`Picture\\s+${c.id}\\s*:\\s*(\\d+)`));
+    const key = m ? Number(m[1]) : NaN;
+    out.set(
+      c.id,
+      key in SCAN_FIND_ANSWERS
+        ? SCAN_FIND_ANSWERS[key as keyof typeof SCAN_FIND_ANSWERS]
+        : null
+    );
+  }
+  return out;
 }

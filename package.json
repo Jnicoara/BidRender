@@ -55,6 +55,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tanstack/react-query": "^5.90.2",
     "@tanstack/react-virtual": "^3.14.9",
+    "@techstark/opencv-js": "4.10.0-release.1",
     "@trpc/client": "^11.6.0",
     "@trpc/react-query": "^11.6.0",
     "@trpc/server": "^11.6.0",
