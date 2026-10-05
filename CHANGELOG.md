@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-05]
 
+- **A check that no bid's total moves when a release goes live.** A new
+  read-only tool records every bid's "Total due" and not-priced count before
+  and after a release and lists any that changed. It cannot write to the
+  database even by accident. Rehearsed on a copy of real data: 4,234 bids, no
+  number moved.
+
 - **Mark a device as existing, to be removed or relocated, and it is never
   priced as new.** Select marks and choose "Mark as…". Existing devices draw
   as hollow pins, removals get a red X, relocations an arrow badge, and each

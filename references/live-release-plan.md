@@ -108,11 +108,36 @@ main..<commit> --oneline`; `git status --porcelain` empty; the gate AND the
    "matches", foreign keys **141 of 141** (135 after the 2026-09-29 release,
    - 5 on `symbol_looks`, + 1 on `password_reset_tokens`). Run it again → 0.
      Data counts before/after (users, bids, materials, stamps, groups, runs,
-     line items) → identical. → **Approval B.**
-4. **Measure every live bid's total, BEFORE** — read-only, a script that
-   calls `bids.list`/the list pricing (`priceForList`) per company and writes
-   `{bidId, totalDue, notPriced}` to a local file. Not written yet: writing it
-   is part of preparing this release. It is what step 9 compares against.
+     line items) → identical. **Bid totals on the copy, too**: step 4's
+     command against the copy BEFORE `migrate.mts`, the released commit's
+     after it, then `--compare` → "all N bid(s) … unchanged". That rehearses
+     step 9 on live's own data before live is touched. → **Approval B.**
+4. **Measure every live bid's total, BEFORE** — `scripts/bidTotals.mts`
+   (written 2026-10-05). It must run from the code LIVE SERVES, because this
+   checkout's code reads columns live does not have yet, and "before" means
+   what users see today:
+
+   ```bash
+   git worktree add ../bidrender-before 0af50a6
+   cp scripts/bidTotals.mts ../bidrender-before/scripts/
+   cd ../bidrender-before && pnpm install --frozen-lockfile
+   DOTENV_CONFIG_PATH=../BidPhase/.env.production.local pnpm tsx scripts/bidTotals.mts ../bidrender-backups/live-totals-before.json
+   ```
+
+   → `ok read only: MySQL refused a write`, then `N bid(s) priced for M
+owner(s); the bids table holds N` — the two N must match, and the script
+   exits 1 if they do not. Read only by construction: every connection is
+   `SET SESSION TRANSACTION READ ONLY` and the script proves MySQL refuses a
+   write before reading anything. **Rehearsed 2026-10-05** on a copy of
+   `bidrender_local` (4,234 bids, 1,210 with a non-zero total): `0af50a6` on
+   98 migrations against this checkout on 105 → all 4,234 unchanged.
+
+   **If it prints `FAIL owner N: Failed query: insert into pricing_defaults`**,
+   that owner has never had a pricing-defaults row and the app would create
+   one on first read. The read-only session refused it, so that owner's
+   bids are unmeasured. Stop and decide with the owner before going on. Do not
+   switch the guard off to get a number.
+
 5. **Live drift before:** `DOTENV_CONFIG_PATH=.env.production.local pnpm tsx
 scripts/schemaDrift.mts` → 96 recorded, the same tables as step 3.
 6. **Migrate live:** `ALLOW_REMOTE_DATABASE=yes
@@ -125,9 +150,16 @@ https://bidridge.com/api/version` still `0af50a6`; open a real bid, its
 origin main && git checkout local-dev`. The ruleset accepts it only
    because the gate passed on that exact commit. Watch DigitalOcean →
    Activity (3–6 min); `/api/version` → the commit and a fresh `builtAt`.
-9. **Every live bid's total, AFTER** — the same script. **Every `totalDue` and
-   `notPriced` must equal step 4's.** A difference is a stop: roll back the
-   code first (§ 3), then find out why on the restored copy. → **Approval D.**
+9. **Every live bid's total, AFTER** — the same script, from the released
+   commit (this checkout at `<commit>`), then
+   `pnpm tsx scripts/bidTotals.mts --compare live-totals-before.json live-totals-after.json`.
+   **Every `totalDue`, not-priced count and `incomplete` must equal step 4's.**
+   A difference is a stop: roll back the code first (§ 3), then find out why
+   on the restored copy. One honest exception to check before rolling back:
+   a contractor can edit a bid during the window, and that is a real change,
+   not a fault. `--compare` adds "bid edited at …, after before was measured"
+   to such a line; check that bid before rolling anything back.
+   → **Approval D.**
 10. **Unfreeze; record it** in `deploying.md` § 11 (what printed, the backup
     run id, the times), and mark Batches 1 and 1b live in
     `migrations-0098-batch-plan.md` § S.
@@ -153,7 +185,8 @@ origin main && git checkout local-dev`. The ruleset accepts it only
   works on the migrated database), done (every bid total unchanged).
 - Rollback is the DigitalOcean button for code; migrations need none, because
   old code runs on them — proven on live before the push.
-- A bid-totals before/after comparison is the wrong-number check; its
-  read-only script is still to be written.
+- A bid-totals before/after comparison is the wrong-number check:
+  `scripts/bidTotals.mts`, read only by construction, rehearsed 2026-10-05
+  (4,234 bids unchanged across 0098–0104 on a local copy).
 - Live needs `RESEND_API_KEY` for reset email, and must NOT get the staging
   settings.
