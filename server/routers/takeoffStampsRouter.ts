@@ -52,6 +52,36 @@ import { lockedEditRefusal } from "../../shared/quantityLock";
 import { TAKEOFF_LOCATIONS } from "../../drizzle/schema";
 import { SYMBOL_THUMBNAIL_MAX_CHARS } from "../../shared/symbolCapture";
 import * as db from "../db";
+import { planViewerUrl } from "../storage";
+import {
+  isSameLook,
+  lookConfirmsSet,
+  lookCount,
+  looksForSearch,
+  type LookBox,
+} from "../../shared/symbolLooks";
+
+/** A look row's capture box, or null when it was saved without one. */
+function lookBoxOf(row: {
+  captureX: string | null;
+  captureY: string | null;
+  captureWidth: string | null;
+  captureHeight: string | null;
+}): LookBox | null {
+  if (
+    row.captureX === null ||
+    row.captureY === null ||
+    row.captureWidth === null ||
+    row.captureHeight === null
+  )
+    return null;
+  return {
+    x: Number(row.captureX),
+    y: Number(row.captureY),
+    width: Number(row.captureWidth),
+    height: Number(row.captureHeight),
+  };
+}
 import {
   STAMPS_PACKET,
   openPacket,
@@ -609,7 +639,10 @@ export const takeoffStampsRouter = router({
   /** Every symbol this user has captured, across all their jobs. */
   symbols: procedure.query(async ({ ctx }) => {
     const rows = await db.getSymbolLinks(ctx.scope.dataUserId);
+    const looks = await db.countSymbolLooks(ctx.scope.dataUserId);
     return rows.map(row => ({
+      /** Pictures of how it is drawn (multiple-looks-plan.md § 2). */
+      looks: lookCount(looks.get(row.id) ?? 0, Boolean(row.thumbnail)),
       id: row.id,
       label: row.label,
       /** The captured name, when it has been renamed since; else null. */
@@ -637,6 +670,24 @@ export const takeoffStampsRouter = router({
         capturedFromSheetId: z.number().int().positive().optional(),
         /** Supplied when the user links at capture time rather than later. */
         assemblyId: z.number().int().positive().nullable().default(null),
+        /**
+         * The box it was captured with, page points on `capturedFromSheetId`.
+         * Kept on the LOOK, so Find all matching can rebuild it later.
+         */
+        box: z
+          .object({
+            x: z.number().finite(),
+            y: z.number().finite(),
+            width: z.number().finite().positive(),
+            height: z.number().finite().positive(),
+          })
+          .optional(),
+        /**
+         * The name is already an item and the person said "Yes, another
+         * look" (multiple-looks-plan.md § 1). Without it a matching name
+         * keeps today's answer: the item is left as it is.
+         */
+        addAsLook: z.boolean().default(false),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -648,6 +699,81 @@ export const takeoffStampsRouter = router({
         (await db.getSymbolLinks(ctx.scope.dataUserId)).find(row =>
           nameMatchesSymbol(input.label, row)
         );
+
+      // The sheet the box is on, owned by this company, and its plan set.
+      const sheet = input.capturedFromSheetId
+        ? await db.getBidPdfSheet(
+            input.capturedFromSheetId,
+            ctx.scope.dataUserId
+          )
+        : undefined;
+      const lookFields = {
+        userId: ctx.scope.dataUserId,
+        thumbnail: input.thumbnail,
+        bidPdfId: sheet?.bidPdfId ?? null,
+        sheetId: sheet?.id ?? null,
+        captureX: input.box && sheet ? String(input.box.x) : null,
+        captureY: input.box && sheet ? String(input.box.y) : null,
+        captureWidth: input.box && sheet ? String(input.box.width) : null,
+        captureHeight: input.box && sheet ? String(input.box.height) : null,
+        // The PERSON, for "who added it"; userId above decides what is read.
+        createdByUserId: ctx.scope.actorUserId,
+      };
+
+      if (existing && input.addAsLook) {
+        const looks = await db.getSymbolLooks(
+          existing.id,
+          ctx.scope.dataUserId
+        );
+        const box = input.box && sheet ? input.box : null;
+        if (
+          looks.some(l =>
+            isSameLook(
+              { sheetId: l.sheetId, box: lookBoxOf(l) },
+              { sheetId: sheet?.id ?? null, box }
+            )
+          )
+        )
+          return {
+            id: existing.id,
+            alreadyKnown: true,
+            lookAdded: false,
+            lookAlreadySaved: true,
+            looks: looks.length,
+            assemblyId: existing.assemblyId,
+            isLinked: existing.assemblyId !== null,
+            autoLinked: false,
+          };
+        // The item's old picture is its first look (plan § 2). Written as a
+        // box-less row now, or adding a row would hide it.
+        if (looks.length === 0 && existing.thumbnail) {
+          const from = existing.capturedFromSheetId
+            ? await db.getBidPdfSheet(
+                existing.capturedFromSheetId,
+                ctx.scope.dataUserId
+              )
+            : undefined;
+          await db.createSymbolLook({
+            userId: ctx.scope.dataUserId,
+            symbolLinkId: existing.id,
+            thumbnail: existing.thumbnail,
+            bidPdfId: from?.bidPdfId ?? null,
+            sheetId: from?.id ?? null,
+            createdByUserId: null,
+          });
+        }
+        await db.createSymbolLook({ ...lookFields, symbolLinkId: existing.id });
+        return {
+          id: existing.id,
+          alreadyKnown: true,
+          lookAdded: true,
+          lookAlreadySaved: false,
+          looks: Math.max(looks.length, existing.thumbnail ? 1 : 0) + 1,
+          assemblyId: existing.assemblyId,
+          isLinked: existing.assemblyId !== null,
+          autoLinked: false,
+        };
+      }
 
       if (existing) {
         // Fill in a thumbnail or a link if this capture supplies one the
@@ -665,9 +791,13 @@ export const takeoffStampsRouter = router({
           existing.id,
           ctx.scope.dataUserId
         );
+        const rows = await db.getSymbolLooks(existing.id, ctx.scope.dataUserId);
         return {
           id: existing.id,
           alreadyKnown: true,
+          lookAdded: false,
+          lookAlreadySaved: false,
+          looks: lookCount(rows.length, Boolean(updated?.thumbnail)),
           assemblyId: updated?.assemblyId ?? null,
           isLinked: (updated?.assemblyId ?? null) !== null,
           autoLinked: false,
@@ -698,12 +828,84 @@ export const takeoffStampsRouter = router({
         thumbnail: input.thumbnail,
         capturedFromSheetId: input.capturedFromSheetId ?? null,
       });
+      // Its first look, with the box, so Find all matching can search it
+      // later from any sheet. Without a box the old picture stands for it.
+      const firstLook = Boolean(input.box && sheet);
+      if (firstLook)
+        await db.createSymbolLook({ ...lookFields, symbolLinkId: id });
       return {
         id,
         alreadyKnown: false,
+        lookAdded: firstLook,
+        lookAlreadySaved: false,
+        looks: lookCount(firstLook ? 1 : 0, Boolean(input.thumbnail)),
         assemblyId,
         isLinked: assemblyId !== null,
         autoLinked,
+      };
+    }),
+
+  /**
+   * The looks Find all matching searches for one item, from the sheet open
+   * now: only looks with a box, this plan set's first, newest first, at most
+   * MAX_LOOKS_PER_SEARCH (shared/symbolLooks.ts). A look from ANOTHER set
+   * comes with that set's viewer url, so the worker can rebuild the symbol
+   * from that set's drawing — and with `confirmsThisSet: false`, so every
+   * find only it makes is a suggestion (the design rule in that file).
+   *
+   * The url is minted here, after the look and its plan set were both found
+   * under this company — the same authorization `bidPdfsRouter` gives it —
+   * and is never stored or logged.
+   */
+  searchLooks: procedure
+    .input(
+      z.object({
+        symbolId: z.number().int().positive(),
+        sheetId: z.number().int().positive(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const owner = ctx.scope.dataUserId;
+      const [item, sheet] = await Promise.all([
+        db.getSymbolLinkById(input.symbolId, owner),
+        db.getBidPdfSheet(input.sheetId, owner),
+      ]);
+      if (!item || !sheet)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Symbol not found.",
+        });
+      const rows = await db.getSymbolLooks(item.id, owner);
+      const chosen = looksForSearch(
+        rows.map(r => ({ ...r, box: lookBoxOf(r) })),
+        sheet.bidPdfId
+      );
+      const looks = await Promise.all(
+        chosen.map(async l => {
+          const here = lookConfirmsSet(l, sheet.bidPdfId);
+          const pdf =
+            here || l.bidPdfId === null
+              ? undefined
+              : await db.getBidPdf(l.bidPdfId, owner);
+          return {
+            id: l.id,
+            box: l.box!,
+            pageNumber: l.pageNumber,
+            setName: l.setName,
+            confirmsThisSet: here,
+            url: pdf ? await planViewerUrl(pdf.storageKey, new Date()) : null,
+          };
+        })
+      );
+      return {
+        // A look whose sheet was deleted has nowhere to be rebuilt from.
+        looks: looks.flatMap(l =>
+          l.pageNumber === null ? [] : [{ ...l, pageNumber: l.pageNumber }]
+        ),
+        /** Looks with no box: shown in the legend, cannot seed a search. */
+        withoutBox:
+          lookCount(rows.length, Boolean(item.thumbnail)) -
+          rows.filter(r => lookBoxOf(r) !== null).length,
       };
     }),
 

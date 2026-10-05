@@ -4,6 +4,23 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-05]
+
+- **A legend item can now have several looks (test build, track-c).** When
+  you capture a symbol whose name is already in your legend, the app asks
+  whether it is another look of that item. Yes keeps the new picture, and it
+  is still one item, one count and one price. Find all matching then searches
+  every saved look as well as the one you box. You can also search the saved
+  looks without boxing anything.
+- **A look from another set of plans only suggests.** The same-looking symbol
+  can mean different things on different jobs. On Old Blueridge the
+  half-filled duplex is a duplex above the backsplash, not a GFCI. So a find
+  that only another set's look made is always flagged for you to check, and
+  "Confirm all" never counts it.
+- **The accuracy answer key was corrected for Old Blueridge.** The "point"
+  marks were the 7 occupancy/daylight sensors. The "GFCI" count is the duplex
+  above the backsplash. Names are now matched per plan set.
+
 ## [2026-10-02]
 
 - **The database is ready for pin looks, mark status, mark heights and

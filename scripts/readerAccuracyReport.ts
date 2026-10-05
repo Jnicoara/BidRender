@@ -125,11 +125,22 @@ export function buildReport(
 
   // Every name through the "same as" lists first, so a hand count and the
   // AI's legend-symbol name for one item are one item everywhere below.
-  const sameAs = sameAsNamer(file);
   for (const raw of readings) {
+    // Per sheet: a sheet's own "same as" lists win (a look means what its
+    // own set's legend says), and marks the owner has struck are left out.
+    const sameAs = sameAsNamer(file, raw.sheet);
+    const drop = file?.sheets?.[raw.sheet]?.dropMarks ?? [];
+    const kept = raw.marks.filter(
+      m =>
+        !drop.some(
+          d =>
+            labelKey(d.label) === labelKey(m.label) &&
+            Math.hypot(d.x - m.x, d.y - m.y) <= radius
+        )
+    );
     const r: Reading = {
       ...raw,
-      marks: raw.marks.map(m => ({ ...m, label: sameAs(m.label) ?? "" })),
+      marks: kept.map(m => ({ ...m, label: sameAs(m.label) ?? "" })),
       suggestions: raw.suggestions.map(s => ({
         ...s,
         label: sameAs(s.label),

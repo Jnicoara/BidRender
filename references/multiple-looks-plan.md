@@ -1,7 +1,13 @@
 # Several LOOKS for one legend item — PLAN ONLY, 2026-10-01 (Track C)
 
-**Status: PLAN ONLY.** No app code, no migration, no merge. Nothing here is
-built.
+**Status: BUILT IN PART, 2026-10-05 (track-c), on `symbol_looks` (0102).**
+Built: § 1 single capture (the three choices), § 2 storage, § 3 Find all
+matching over every look (vector and scan), the per-set rule below, the
+look count on the legend row (§ 5, display only). **Not built yet:** § 1's
+per-row choice in whole-legend capture (it keeps "left as it is", which is
+§ 9 Q3's default), § 4's look-alike warning at add time, § 5's remove /
+move / find-from-this-look actions, § 3's Reader pictures, § 4's "from a
+new look" marking. § 10 has what was built and measured.
 
 **The ask, in the owner's words:** "when I capture a symbol into the legend
 and its name matches an item that already exists (for example a GFCI from a
@@ -14,6 +20,35 @@ row, one name, at most one assembly. A **look** is one picture of how that
 item is drawn on some plan set, with where it was boxed. Today an item has
 exactly one look. This plan lets it have several, and keeps it ONE item: one
 name, one count, one price.
+
+---
+
+## A look is per plan set — the owner's design rule, 2026-10-05
+
+> **The same-looking symbol can mean different things on different plan
+> sets. A look saved from another set may SUGGEST a match, but must never
+> auto-label on a new set without that set's own legend confirming it.**
+
+Found on Old Blueridge: the half-filled duplex the owner had counted as
+"GFCI receptacle" is, on that set, a **duplex above the backsplash** (its
+legend: "DUPLEX RECEPTACLE OUTLET ABOVE BACKSPLASH OR COUNTER", and NOTE 7 —
+verify height). On other sets a near-identical picture is a GFCI. A look
+carried over from those sets would have labelled every one of them wrong,
+in the confident voice of a right answer.
+
+**What "this set's own legend confirms it" means, today:** a look of the
+item captured on THIS plan set, or the symbol boxed on this sheet for the
+search. Nothing else — not the item's name, not a look from another job.
+(When A's per-set legend, `bid_pdf_legend_entries`, exists, a confirmed entry
+for the item on this set is the third way.) This narrows
+`plan-viewer-overhaul.md` § 9.4 ("suggested, never applied") from whole
+SYMBOLS to each LOOK, and says what turns a suggestion into a label.
+
+**Where it is enforced:** `shared/symbolLooks.ts` (`lookConfirmsSet`),
+`client/src/lib/lookMatching.ts` (every find that ONLY another set's looks
+made gets "Found only by a look saved on …" and is never clear, so Confirm
+all never takes it), and the scan branch, which does not compare another
+set's look at all (§ 9.3: a picture from another scan is not comparable).
 
 ---
 
@@ -310,3 +345,55 @@ Each goes red on today's code and green with the change:
   before saving.
 - No look change ever moves a mark, a count or a locked bid. Seven
   questions for the owner in § 9.
+
+## 10. Built, 2026-10-05 (track-c) — and what was seen on screen
+
+**Code:** `shared/symbolLooks.ts` (the rules: this set's first, at most five,
+the same picture twice, the per-set test), `server/db.ts` (`createSymbolLook`,
+`getSymbolLooks`, `countSymbolLooks`), `takeoffStampsRouter.captureSymbol`
+(`box`, `addAsLook`) and `searchLooks`, `client/src/lib/lookMatching.ts` (the
+merge and the per-set flag), the PDF worker (`findOnVectorPage`,
+`findOnScanPage`), `scanMatching.ts` (the scan search split into prepare once,
+search per look), the naming card's question (`SymbolCapture.tsx`) and the
+panel lines (`FindMatching.tsx`).
+
+**Choices made in building it, each to the plan's own decisions:**
+
+- A NEW item captured with a box gets its first look row then, with the box,
+  so it can seed a search later. An item from before keeps its old picture as
+  a box-less first look; when a second look is added, that old picture is
+  written as a box-less row so it is not hidden (still no backfill).
+- A look from another plan set is rebuilt from THAT set's drawing (the
+  worker opens it by a viewer url minted in `searchLooks`, after both are
+  found under the company). On a scan, another set's look is not compared at
+  all, and the panel says how many were left out and why.
+- With looks, the box is optional: "Search the saved looks without a box".
+
+**Tests that fail without it** (checked by breaking each): `server/symbolLooks.test.ts`
+— the second picture kept as a look of the SAME item, one legend row, the
+same box not saved twice, an old picture kept, no count moved, another set's
+look marked not confirming with its url, another company not found (4 of 10
+go red with the add-a-look branch switched off). `client/src/lib/lookMatching.test.ts`
+— one device one find, and a find only another set's look made is never
+clear (red with the per-set flag switched off).
+
+**Seen on screen, 2026-10-05** (local, the reader-test account; the looks
+made were removed afterwards):
+
+- Capturing a UNCC duplex as "DUPLEX RECEPTACLE": the card asked, showing the
+  item's look beside the new one; "Yes" → "Added look 2 for DUPLEX
+  RECEPTACLE. It is still one item: one count, one price."; the legend row
+  read "· 2 looks".
+- On Weld 1 E-200: "Its 1 saved look will be searched too — 1 from other plan
+  sets, which only suggest…". The UNCC look found **0** there: UNCC draws
+  the duplex at another size, and the line matcher compares exact sizes
+  (`find-all-matching-plan.md` § 2, "what it cannot do"). Said, not hidden.
+- On a second upload of UNCC (bid 1728359, another plan set to the app):
+  looks only → 142 found, 141 already counted, the last **needs a look:
+  "Found only by a look saved on UNCC.pdf…"**, 0 clear. Box drawn there plus
+  the look → 151 found, "Also searched 1 saved look", merged.
+- A look of the "USB" duplex block found only itself — that block is drawn
+  differently (15 segments, not 14). Measured in node too; the screen was
+  right.
+
+**Not built:** see the status line at the top.

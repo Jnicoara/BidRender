@@ -157,6 +157,18 @@ duplex, correctly, which is still a disagreement someone has to resolve).
    match.
 6. **Status** (§ 5).
 
+## 4a. Every look of the item, and the per-set rule (2026-10-05)
+
+Built on `symbol_looks` (`multiple-looks-plan.md` § 10): with a count armed
+that is a legend item, the search uses the box drawn now AND up to five of
+the item's saved looks (this plan set's first), merged so one device is one
+find ("found by 2 looks"). It can also run on the saved looks alone, with no
+box. **The owner's rule:** a find that only a look from ANOTHER plan set
+made is a suggestion — "Found only by a look saved on <set>" — never clear,
+never taken by Confirm all. On a scan, another set's look is not compared
+at all. Before looks, both branches already followed the rule by
+construction: the only symbol searched was the one boxed on this sheet.
+
 ## 5. Existing devices and the mark status
 
 - **Until Track A's `takeoff_stamps.status`:** "Count as existing" puts the

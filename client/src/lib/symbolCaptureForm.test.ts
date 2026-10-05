@@ -57,6 +57,7 @@ describe("SymbolCaptureForm placement", () => {
         sharpening: false,
         soft: false,
         chromeTarget: screenLayer,
+        existingFor: () => null,
         onSave: noop,
         onCancel: noop,
       })
@@ -77,6 +78,7 @@ describe("SymbolCaptureForm placement", () => {
         sharpening: false,
         soft: false,
         chromeTarget: null,
+        existingFor: () => null,
         onSave: noop,
         onCancel: noop,
       })
@@ -95,6 +97,7 @@ describe("SymbolCaptureForm while the sharp picture is coming", () => {
         sharpening,
         soft,
         chromeTarget: null,
+        existingFor: () => null,
         onSave: noop,
         onCancel: noop,
       })

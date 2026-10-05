@@ -46,13 +46,21 @@ import * as pdfjs from "pdfjs-dist";
 import { pdfRangeLoadOptions } from "@shared/pdfRangeLoading";
 import { connectPointFor, type ConnectMark } from "@shared/connectPoint";
 import {
-  findMatching,
   isScan,
   prepareSheet,
+  searchSymbol,
+  symbolFromBox,
   type FindResult,
   type MatchBox,
+  type SymbolTemplate,
 } from "@/lib/findMatching";
-import { findOnScan, type OpenCv } from "@/lib/scanMatching";
+import { findOnScan, type OpenCv, type ScanImage } from "@/lib/scanMatching";
+import {
+  mergeLookResults,
+  type LookResult,
+  type LookSource,
+  type SavedLook,
+} from "@/lib/lookMatching";
 import { runSheetCheck } from "@/lib/sheetCheck";
 import {
   extractVectorGeometry,
@@ -257,61 +265,231 @@ function loadOpenCv(): Promise<OpenCv> {
   return openCv;
 }
 
+/** Part of a page drawn grey at `scale` pixels a point, for the scan matcher. */
+async function renderGray(
+  page: import("pdfjs-dist").PDFPageProxy,
+  rect: { x: number; y: number; width: number; height: number },
+  scale: number
+): Promise<ScanImage> {
+  const viewport = page.getViewport({
+    scale,
+    offsetX: -rect.x * scale,
+    offsetY: -rect.y * scale,
+  });
+  const width = Math.max(1, Math.ceil(rect.width * scale));
+  const height = Math.max(1, Math.ceil(rect.height * scale));
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, width, height);
+  await page.render({
+    canvasContext: ctx as unknown as CanvasRenderingContext2D,
+    canvas: null as unknown as HTMLCanvasElement,
+    viewport,
+  }).promise;
+  const rgba = ctx.getImageData(0, 0, width, height).data;
+  const gray = new Uint8Array(width * height);
+  for (let k = 0; k < gray.length; k++)
+    gray[k] =
+      (rgba[4 * k] * 0.299 +
+        rgba[4 * k + 1] * 0.587 +
+        rgba[4 * k + 2] * 0.114) |
+      0;
+  return { gray, width, height, x0: rect.x, y0: rect.y, scale };
+}
+
+type WorkerLook = SavedLook;
+
+const sourceOf = (look: WorkerLook): LookSource => ({
+  kind: "look",
+  lookId: look.id,
+  setName: look.setName,
+  confirmsThisSet: look.confirmsThisSet,
+});
+
+/**
+ * Templates rebuilt from other plan sets, by look id: opening another set's
+ * drawing costs a document load and an operator list, and the next search on
+ * the next sheet wants the same looks. A few dozen KB each; capped.
+ */
+const otherSetTemplates = new Map<number, SymbolTemplate | null>();
+
+/** The look's symbol, rebuilt from the line work of its own sheet. */
+async function vectorLookTemplate(
+  doc: import("pdfjs-dist").PDFDocumentProxy,
+  hash: string,
+  look: WorkerLook
+): Promise<SymbolTemplate | null> {
+  if (look.url === null) {
+    const page = await readMatchPage(doc, hash, look.pageNumber);
+    const made = symbolFromBox(prepareSheet(page.geo, page.words), look.box);
+    return made.kind === "ok" ? made.symbol : null;
+  }
+  if (otherSetTemplates.has(look.id))
+    return otherSetTemplates.get(look.id) ?? null;
+  const other = await pdfjs.getDocument({
+    ...pdfRangeLoadOptions(look.url, null, self.location.href),
+    ...WORKER_SAFE_OPTIONS,
+  }).promise;
+  try {
+    const page = await other.getPage(look.pageNumber);
+    const viewport = page.getViewport({ scale: 1 });
+    const [list, content] = await Promise.all([
+      page.getOperatorList(),
+      page.getTextContent(),
+    ]);
+    const items: RawTextItem[] = [];
+    for (const item of content.items)
+      if ("str" in item && item.str)
+        items.push({
+          str: item.str,
+          transform: item.transform,
+          width: item.width,
+        });
+    const geo = extractVectorGeometry(
+      list.fnArray,
+      list.argsArray,
+      pdfjs.OPS as unknown as Record<string, number>,
+      viewport.transform,
+      viewport.width,
+      viewport.height
+    );
+    const words = wordBoxes({ items, viewportTransform: viewport.transform });
+    const made = symbolFromBox(prepareSheet(geo, words), look.box);
+    const template = made.kind === "ok" ? made.symbol : null;
+    if (otherSetTemplates.size >= 40) otherSetTemplates.clear();
+    otherSetTemplates.set(look.id, template);
+    return template;
+  } finally {
+    await other.destroy();
+  }
+}
+
+const lookNote = (n: number, what: string) =>
+  `${n} saved look${n === 1 ? "" : "s"} ${what}`;
+
+/**
+ * Find all matching on a VECTOR page: the box drawn now (if any), and every
+ * saved look, each matched on the line work and merged so one device is one
+ * find (@/lib/lookMatching). A find only another set's look made is flagged
+ * there, never clear.
+ */
+async function findOnVectorPage(
+  doc: import("pdfjs-dist").PDFDocumentProxy,
+  hash: string,
+  matchPage: MatchPage,
+  box: MatchBox | null,
+  looks: readonly WorkerLook[]
+): Promise<FindResult> {
+  const sheet = prepareSheet(matchPage.geo, matchPage.words);
+  const results: LookResult[] = [];
+  const notes: string[] = [];
+  let symbol: SymbolTemplate | null = null;
+  if (box) {
+    const made = symbolFromBox(sheet, box);
+    if (made.kind !== "ok" && looks.length === 0) return made;
+    if (made.kind === "ok") {
+      symbol = made.symbol;
+      const found = searchSymbol(made.symbol, sheet, { boxedHere: true });
+      if (found.kind !== "ok") return found;
+      results.push({ source: { kind: "box" }, matches: found.matches });
+    } else notes.push(made.message);
+  }
+  let unusable = 0;
+  for (const look of looks) {
+    let t: SymbolTemplate | null = null;
+    try {
+      t = await vectorLookTemplate(doc, hash, look);
+    } catch {
+      t = null; // another set that cannot be opened is a look left out
+    }
+    // The open sheet back on top of the two-page cache.
+    await readMatchPage(doc, hash, Number(matchPage.key.split("#")[1]));
+    if (!t) {
+      unusable++;
+      continue;
+    }
+    symbol ??= t;
+    const found = searchSymbol(t, sheet);
+    if (found.kind === "ok")
+      results.push({ source: sourceOf(look), matches: found.matches });
+  }
+  if (unusable)
+    notes.push(
+      lookNote(unusable, "could not be rebuilt here and were left out.")
+    );
+  if (!symbol)
+    return {
+      kind: "empty",
+      message:
+        notes[0] ??
+        "None of this item's saved looks could be rebuilt. Box one on the drawing.",
+    };
+  return {
+    kind: "ok",
+    matches: mergeLookResults(results),
+    symbol: {
+      segments: symbol.segments,
+      words: symbol.words,
+      width: symbol.halfW * 2,
+      height: symbol.halfH * 2,
+    },
+    looks: {
+      searched: results.filter(r => r.source.kind === "look").length,
+      notes,
+    },
+  };
+}
+
 /** Find all matching on a scanned page (@/lib/scanMatching), as a FindResult. */
 async function findOnScanPage(
   doc: import("pdfjs-dist").PDFDocumentProxy,
   pageNum: number,
   matchPage: MatchPage,
-  box: MatchBox
+  box: MatchBox | null,
+  looks: readonly WorkerLook[]
 ): Promise<FindResult> {
   const page = await doc.getPage(pageNum);
   const base = page.getViewport({ scale: 1 });
+  // The owner's rule and § 9.3 together: a picture from another set's scan
+  // is not compared at all, only this set's own looks.
+  const here = looks.filter(l => l.url === null);
+  const away = looks.length - here.length;
   const result = await findOnScan({
     box,
+    looks: here.map(look => ({
+      source: sourceOf(look) as Extract<LookSource, { kind: "look" }>,
+      box: look.box,
+      render: async (rect, scale) =>
+        renderGray(await doc.getPage(look.pageNumber), rect, scale),
+    })),
     pixelsPerPoint: matchPage.geo.imagePixelsPerPoint,
     words: matchPage.words,
     pageWidth: base.width,
     pageHeight: base.height,
     loadCv: loadOpenCv,
-    render: async (rect, scale) => {
-      const viewport = page.getViewport({
-        scale,
-        offsetX: -rect.x * scale,
-        offsetY: -rect.y * scale,
-      });
-      const width = Math.max(1, Math.ceil(rect.width * scale));
-      const height = Math.max(1, Math.ceil(rect.height * scale));
-      const canvas = new OffscreenCanvas(width, height);
-      const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(0, 0, width, height);
-      await page.render({
-        canvasContext: ctx as unknown as CanvasRenderingContext2D,
-        canvas: null as unknown as HTMLCanvasElement,
-        viewport,
-      }).promise;
-      const rgba = ctx.getImageData(0, 0, width, height).data;
-      const gray = new Uint8Array(width * height);
-      for (let k = 0; k < gray.length; k++)
-        gray[k] =
-          (rgba[4 * k] * 0.299 +
-            rgba[4 * k + 1] * 0.587 +
-            rgba[4 * k + 2] * 0.114) |
-          0;
-      return { gray, width, height, x0: rect.x, y0: rect.y, scale };
-    },
+    render: (rect, scale) => renderGray(page, rect, scale),
   });
   if (result.kind !== "ok") return result;
+  const notes = [...result.notes];
+  if (away)
+    notes.push(
+      lookNote(
+        away,
+        "from other plan sets were not searched: on a scan a picture from another set does not compare."
+      )
+    );
   return {
     kind: "ok",
     matches: result.matches,
     symbol: {
       segments: 0,
       words: [],
-      width: Math.abs(box.width),
-      height: Math.abs(box.height),
+      width: Math.abs(box?.width ?? here[0]?.box.width ?? 0),
+      height: Math.abs(box?.height ?? here[0]?.box.height ?? 0),
     },
     scan: { plan: result.plan?.title ?? null, pixels: result.pixels },
+    looks: { searched: here.length, notes },
   };
 }
 
@@ -584,6 +762,7 @@ self.onmessage = async (e: MessageEvent) => {
    */
   if (msg.type === "findMatching") {
     const { pageNum, hash, reqId, box } = msg;
+    const looks: WorkerLook[] = msg.looks ?? [];
     if (!pdfDoc || loadedHash !== hash) {
       self.postMessage({
         type: "error",
@@ -597,8 +776,8 @@ self.onmessage = async (e: MessageEvent) => {
       const matchPage = await readMatchPage(pdfDoc, hash, pageNum);
       const t1 = performance.now();
       const result = isScan(matchPage.geo)
-        ? await findOnScanPage(pdfDoc, pageNum, matchPage, box)
-        : findMatching(matchPage.geo, matchPage.words, box);
+        ? await findOnScanPage(pdfDoc, pageNum, matchPage, box, looks)
+        : await findOnVectorPage(pdfDoc, hash, matchPage, box, looks);
       self.postMessage({
         type: "matches",
         reqId,

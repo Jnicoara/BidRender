@@ -4639,6 +4639,14 @@ enough labelled data to make any of it better than the funnel above.
 
 ### 9.4 THE THING THAT NEEDS CARE: a remembered match must never apply itself
 
+> **Applied to LOOKS, 2026-10-05 (owner).** An item may now carry several
+> looks (`symbol_looks`, `multiple-looks-plan.md`). The owner's rule there
+> is this section, one level down: a look saved from another plan set may
+> suggest a match but never labels one until THAT set's own legend confirms
+> the item — a look captured on the set, or the symbol boxed on its sheet.
+> Proven on Old Blueridge, where the half-filled duplex means "above the
+> backsplash", not GFCI. Enforced in `client/src/lib/lookMatching.ts`.
+
 **Engineering firms use different symbols.** There are common conventions and
 every office has a house style. The same shape means different things on two
 sets — a filled triangle might be an exit sign on one job and a special-purpose

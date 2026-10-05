@@ -53,6 +53,7 @@ import { trpc } from "@/lib/trpc";
 import { useCompany } from "@/hooks/useCompany";
 import { TakeoffExportDialog } from "@/components/TakeoffExportDialog";
 import { toast } from "sonner";
+import { normaliseCaptureBox } from "@shared/symbolCapture";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -319,6 +320,7 @@ import { pastDragThreshold, swallowNextClick } from "@/lib/dragThreshold";
 import { wheelIntent, type WheelGesture } from "@/lib/wheelIntent";
 import type { PageTextLayer } from "@/lib/textSelection";
 import type { FindResult, MatchBox } from "@/lib/findMatching";
+import type { SavedLook } from "@/lib/lookMatching";
 import type { SheetCheckInput, SheetCheckResult } from "@/lib/sheetCheck";
 import {
   countNameFromLegend,
@@ -707,12 +709,18 @@ function usePdfWorker() {
         ask<string>({ type: "text", pageNum, hash }),
       pageTextLayer: (pageNum: number, hash: string) =>
         ask<PageTextLayer>({ type: "textItems", pageNum, hash }),
-      findMatching: (pageNum: number, hash: string, box: MatchBox) =>
+      findMatching: (
+        pageNum: number,
+        hash: string,
+        box: MatchBox | null,
+        looks: readonly SavedLook[]
+      ) =>
         ask<{ result: FindResult; readMs: number; findMs: number }>({
           type: "findMatching",
           pageNum,
           hash,
           box,
+          looks,
         }),
       connectPoints: (pageNum: number, hash: string, marks: ConnectMark[]) =>
         ask<[number, ConnectPoint][]>({
@@ -941,7 +949,8 @@ function PlanPane({
      * every copy of the symbol in `box` (page points).
      */
     findMatching: (
-      box: MatchBox
+      box: MatchBox | null,
+      looks: readonly SavedLook[]
     ) => Promise<{ result: FindResult; readMs: number; findMs: number }>;
     /**
      * Where runs meet these wall devices on this page (shared/connectPoint),
@@ -2449,7 +2458,8 @@ function PlanPane({
                   renderRegion: (rect, scale) =>
                     render(page, scale, hash, rect),
                   loadTextLayer: () => pageTextLayer(page, hash),
-                  findMatching: box => findMatchingOnPage(page, hash, box),
+                  findMatching: (box, looks) =>
+                    findMatchingOnPage(page, hash, box, looks),
                   connectPoints: marks =>
                     connectPointsOnPage(page, hash, marks),
                   sheetCheck: (legendPage, input) =>
@@ -3033,6 +3043,9 @@ export default function TakeoffPage({
    */
   const [pendingCapture, setPendingCapture] = useState<{
     id: number;
+    /** The box, page points, kept on the LOOK (multiple-looks-plan.md § 2). */
+    region: CaptureRegion;
+    sheetId: number | undefined;
     thumbnail: string | null;
     sharpening: boolean;
     soft: boolean;
@@ -5111,6 +5124,12 @@ export default function TakeoffPage({
     sheetId: number;
     group: { groupId: number; label: string; assemblyId: number | null };
     panel: MatchPanelState;
+    /**
+     * The armed item's saved looks, searched with the box
+     * (multiple-looks-plan.md § 3). Empty for a plain count, or while they
+     * load — a search then uses the box alone, as before looks.
+     */
+    looks: SavedLook[];
   };
   const [findSession, setFindSession] = useState<FindSession | null>(null);
   const findItems =
@@ -5218,23 +5237,53 @@ export default function TakeoffPage({
   const startFind = useCallback(() => {
     if (!activeSheet || !armedGroup || quantitiesLocked) return;
     setSelectingText(false);
+    const sheetId = activeSheet.id;
     setFindSession({
-      sheetId: activeSheet.id,
+      sheetId,
       group: armedGroup,
       panel: { phase: "boxing" },
+      looks: [],
     });
-  }, [activeSheet?.id, armedGroup, quantitiesLocked]);
+    /*
+      The legend item this count is, for its saved looks: the one it was
+      picked up from, or the one its name is. A plain count with no item has
+      none, and the search is the box alone, as before looks.
+    */
+    const key = symbolLookupKey(armedGroup.label);
+    const symbolId =
+      armedGroup.symbolId ??
+      symbols.find(
+        s =>
+          symbolLookupKey(s.label) === key ||
+          (s.originalName !== null && symbolLookupKey(s.originalName) === key)
+      )?.id ??
+      null;
+    if (symbolId === null) return;
+    void utils.takeoffStamps.searchLooks
+      .fetch({ symbolId, sheetId })
+      .then(r =>
+        setFindSession(s =>
+          s && s.sheetId === sheetId ? { ...s, looks: r.looks } : s
+        )
+      )
+      .catch(() => {
+        /* no looks: the box alone, which is what the panel then offers */
+      });
+  }, [activeSheet?.id, armedGroup, quantitiesLocked, symbols, utils]);
 
   const runFind = useCallback(
     async (
-      region: CaptureRegion,
+      /** The box drawn now, or null to search the saved looks alone. */
+      region: CaptureRegion | null,
       find: (
-        box: MatchBox
+        box: MatchBox | null,
+        looks: readonly SavedLook[]
       ) => Promise<{ result: FindResult; readMs: number; findMs: number }>
     ) => {
+      const looks = findSession?.looks ?? [];
       setFindSession(s => (s ? { ...s, panel: { phase: "finding" } } : s));
       try {
-        const { result, readMs, findMs } = await find(region);
+        const { result, readMs, findMs } = await find(region, looks);
         if (result.kind !== "ok") {
           setFindSession(s =>
             s ? { ...s, panel: { phase: "message", text: result.message } } : s
@@ -5259,6 +5308,7 @@ export default function TakeoffPage({
                   findMs,
                   box: region,
                   scan: result.scan ?? null,
+                  looks: result.looks ?? null,
                   ai: { busy: false, message: null },
                 },
               }
@@ -5278,7 +5328,7 @@ export default function TakeoffPage({
         );
       }
     },
-    [stamps, activeSheet?.id]
+    [stamps, activeSheet?.id, findSession?.looks]
   );
 
   /** Record decisions and move the selection on to what is still open. */
@@ -5626,6 +5676,8 @@ export default function TakeoffPage({
       if (!activeSheet || !findSession || findSession.panel.phase !== "results")
         return;
       const panel = findSession.panel;
+      const b = panel.box;
+      if (!b) return; // the button is only offered with a box (FindMatching)
       const batch = aiBatch(panel.items);
       if (batch.length === 0) return;
       const setAi = (ai: { busy: boolean; message: string | null }) =>
@@ -5670,7 +5722,6 @@ export default function TakeoffPage({
         return canvas.toDataURL("image/jpeg", 0.85);
       };
       try {
-        const b = panel.box;
         const picked = await crop(
           b.x + b.width / 2,
           b.y + b.height / 2,
@@ -8941,6 +8992,8 @@ export default function TakeoffPage({
                           setCapturingSymbol(false);
                           setPendingCapture({
                             id,
+                            region,
+                            sheetId: activeSheet?.id,
                             thumbnail: preview,
                             sharpening: true,
                             soft: false,
@@ -8977,28 +9030,56 @@ export default function TakeoffPage({
                         soft={pendingCapture.soft}
                         chromeTarget={size.chromeTarget}
                         onCancel={() => setPendingCapture(null)}
-                        onSave={label => {
+                        existingFor={name => {
+                          const key = symbolLookupKey(name);
+                          const hit = symbols.find(
+                            s =>
+                              symbolLookupKey(s.label) === key ||
+                              (s.originalName !== null &&
+                                symbolLookupKey(s.originalName) === key)
+                          );
+                          return hit
+                            ? {
+                                label: hit.label,
+                                looks: hit.looks,
+                                thumbnail: hit.thumbnail,
+                              }
+                            : null;
+                        }}
+                        onSave={(label, { addAsLook }) => {
+                          const box = normaliseCaptureBox(
+                            pendingCapture.region
+                          );
                           captureSymbol.mutate(
                             {
                               label,
                               thumbnail: pendingCapture.thumbnail,
-                              capturedFromSheetId: activeSheet?.id,
+                              capturedFromSheetId: pendingCapture.sheetId,
+                              box:
+                                box.width > 0 && box.height > 0
+                                  ? box
+                                  : undefined,
+                              addAsLook,
                             },
                             {
                               onSuccess: r =>
                                 toast.success(
-                                  r.alreadyKnown
-                                    ? "Already in your legend."
-                                    : r.autoLinked
-                                      ? `Captured and linked to “${
-                                          allAssemblies.find(
-                                            a => a.id === r.assemblyId
-                                          )?.name ?? label
-                                        }”, the assembly of the same name.`
-                                      : // A click on it COUNTS (legend plan
-                                        // § 8a); linking is the row's own
-                                        // control, never the first step.
-                                        "Captured — click it in the legend to start counting. Link it to an assembly from its row whenever you like."
+                                  r.lookAlreadySaved
+                                    ? "This look is already saved."
+                                    : r.alreadyKnown && r.lookAdded
+                                      ? `Added look ${r.looks} for ${label}. It is still one item: one count, one price.`
+                                      : r.alreadyKnown
+                                        ? "Already in your legend."
+                                        : r.autoLinked
+                                          ? `Captured and linked to “${
+                                              allAssemblies.find(
+                                                a => a.id === r.assemblyId
+                                              )?.name ?? label
+                                            }”, the assembly of the same name.`
+                                          : // A click on it COUNTS (legend plan
+                                            // § 8a); linking is the row's own
+                                            // control, never the first step.
+                                            "Captured — click it in the legend to start counting. Link it to an assembly from its row whenever you like."
                                 ),
                             }
                           );
@@ -9297,6 +9378,15 @@ export default function TakeoffPage({
                             canAskAi={readerAvailable}
                             onAskAi={() =>
                               void askAboutScanFinds(size.renderRegion)
+                            }
+                            savedLooks={{
+                              total: findSession.looks.length,
+                              thisSet: findSession.looks.filter(
+                                l => l.confirmsThisSet
+                              ).length,
+                            }}
+                            onSearchLooks={() =>
+                              void runFind(null, size.findMatching)
                             }
                             onConfirm={confirmFound}
                             onConfirmExisting={ids =>

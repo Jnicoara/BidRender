@@ -61,6 +61,11 @@ export type Match = {
    * search the whole sheet as before.
    */
   onDemolitionPlan: string | null;
+  /**
+   * How many sources found it — the box drawn now and each saved look
+   * (@/lib/lookMatching). Absent when only the box was searched.
+   */
+  foundBy?: number;
 };
 
 export type FindResult =
@@ -80,6 +85,11 @@ export type FindResult =
        * scan's own pixels.
        */
       scan?: { plan: string | null; pixels: number };
+      /**
+       * Present when the item's saved looks were searched too
+       * (@/lib/lookMatching): how many, and what was left out and why.
+       */
+      looks?: { searched: number; notes: string[] };
     }
   | { kind: "scan" | "empty" | "tooBig" | "tooPoor"; message: string };
 
