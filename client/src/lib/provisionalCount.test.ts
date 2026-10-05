@@ -12,6 +12,7 @@ type Mark = {
   sheetId: number;
   groupId: number;
   name: string;
+  status: "new";
   sent: boolean;
 };
 
@@ -20,6 +21,7 @@ const mark = (key: number, groupId: number, name = "count"): Mark => ({
   sheetId: 7,
   groupId,
   name,
+  status: "new",
   sent: false,
 });
 

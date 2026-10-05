@@ -18,6 +18,7 @@ import {
   saveStampQueue,
   loadStampQueue,
   clearStampQueue,
+  queuedStampStatus,
 } from "./traceDraft";
 
 /** localStorage does not exist in the node test environment. */
@@ -287,6 +288,29 @@ describe("the stamp queue", () => {
         bidId: 9,
         savedAt: Date.now(),
         stamps: [{ assemblyId: 1, assemblyName: "", x: 1, y: 2 }],
+      })
+    );
+    expect(loadStampQueue(1)).toBeNull();
+  });
+
+  it("keeps what a click was placed as, and reads an absent one as new", () => {
+    saveStampQueue(1, 9, [
+      { groupId: 5, x: 1, y: 2, status: "existing" },
+      { groupId: 5, x: 3, y: 4 },
+    ]);
+    const stamps = loadStampQueue(1)!.stamps;
+    expect(stamps.map(queuedStampStatus)).toEqual(["existing", "new"]);
+  });
+
+  it("refuses a queue with a status it does not know", () => {
+    // Read as new, an unknown status would put an existing device on the bid.
+    store.set(
+      "helixbid:stamp-queue:1",
+      JSON.stringify({
+        sheetId: 1,
+        bidId: 9,
+        savedAt: Date.now(),
+        stamps: [{ groupId: 5, x: 1, y: 2, status: "unconfirmed" }],
       })
     );
     expect(loadStampQueue(1)).toBeNull();

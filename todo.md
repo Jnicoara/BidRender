@@ -1858,10 +1858,17 @@ path is ever revived, give it the same treatment first.
       assembly, editor from the card's swatch, "this job / every job") and
       mark status (looks, "Mark as…", the split in words, priced only when
       new).** Still open from this entry: the ring-around-the-symbol, faint
-      marks, the CSV "Pin" column, step 0's `LETTER_MIN_PX`, a "placing as"
-      choice in the count pill (status is set after placing today, or by
-      `drop`'s `status`), and the editor on the Legend tab and the assembly
-      editor (it opens from the count card only).
+      marks, the CSV "Pin" column, step 0's `LETTER_MIN_PX`, and the editor
+      on the Legend tab and the assembly editor (it opens from the count card
+      only). "Placing as" (New / Existing in the count pill) BUILT
+      2026-10-05.
+- [ ] **New and existing pins look the same once a letter is drawn**
+      (seen 2026-10-05, laptop, high zoom, "Sheet numbers check" E-200; the
+      stored statuses were right). New's fill is a 0.22-opacity tint
+      (`TraceLayer`, `statusLook`) and the letter's white halo covers most
+      of it, so "filled vs hollow" does not read. Matters more now that
+      "placing as" makes a whole run existing: the amber pill is the only
+      reliable cue. Wants a stronger new fill, or a mark for existing.
       **Track B, after A's columns above: pin styles steps 2 and 3.** Step 1
       shipped 2026-10-01 (computed default shape by device family, the wide
       rectangle, letters and first-use colours, safety switch = DS). Still to
