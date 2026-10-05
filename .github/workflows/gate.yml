@@ -25,10 +25,18 @@ on:
     branches: [local-dev, "track-*", "a-*"]
   pull_request:
 
-# One run per branch at a time; a newer push cancels the older run.
+# One run per branch at a time; a newer push cancels the older run —
+# EXCEPT on local-dev, where it waits. A local-dev run ends in the staging
+# deploy and the smoke test, about 20 minutes, and three tracks merge there:
+# on 2026-10-05 two smoke runs in an hour were cancelled part-way by the next
+# merge, so no commit ever got a finished smoke (and Approval A in
+# live-release-plan.md needs one). Queued, each run finishes; GitHub keeps
+# only the NEWEST pending run, so a burst of merges still costs one extra run,
+# not one per merge. Only local-dev runs deploy staging, so a smoke always
+# tests the commit its own run deployed.
 concurrency:
   group: gate-${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/local-dev' }}
 
 permissions:
   contents: read
