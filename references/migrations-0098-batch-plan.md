@@ -29,6 +29,11 @@ still one statement).
 
 ### S.1 The batches, in the order they deploy
 
+> **Status, 2026-10-05:** Batches 1 and 1b are **written and ON STAGING**
+> (0096–0104; `deploying.md` § 11), **not on live**. Everything from Batch 2
+> on moved up two numbers when 1b took 0103–0104 — none of it is written, so
+> that cost nothing (R.1).
+
 **Batch 1 — "marks", now (B builds pin styles; C's Check sheet waits behind
 OFF switches).** Goes with the already-written 0096/0097, which must be
 applied first anyway (they are below it, and 0096 is restated by later role
@@ -51,28 +56,48 @@ old catalog batch: it is a `takeoff_stamps` column, and splitting one table
 across two batches would mean two `ALTER`s where one does). **Column names are
 B's** (`mark*`, settled in its § 12), not the `pin*` names R.10 proposed.
 
+**Batch 1b — "connect point and unconfirmed marks", 2026-10-05 (written, on
+staging).** Most of B's connect-point request was already in Batch 1:
+`connectDx/Dy` and the capture box are on `symbol_looks` (0102 — the pick,
+not also on `symbol_links`), `rotation`/`mirrored` on `takeoff_stamps` (0098).
+What was left:
+
+| #    | File                           | Adds                                                                                                   |
+| ---- | ------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| 0103 | `0103_mark_status_unconfirmed` | `'unconfirmed'` appended to `takeoff_stamps.status` (every row NULL; the list is 0098's + 1)           |
+| 0104 | `0104_run_end_connect`         | `takeoff_runs.startConnect`, `endConnect` `enum('found','confirmed')` NULL (connect-point-plan § 9 Q3) |
+
+**Shipped with it, as code (the owner's two rules, `shared/markStatus.ts`):**
+only a NEW mark (or NULL) is a quantity — bid lines, the counts compared with
+them, the materials list, the export and the drops all go through one SQL
+condition (`markIsQuantity` in `server/db.ts`); and a run never snaps to or
+attaches to an `unconfirmed` mark (`snapToMark` skips it; the server's
+`setEnds` and leg start refuse it). Pricing `remove`/`relocate` as labor is
+still the owner's decision; until then they count toward nothing rather than
+as new parts.
+
 **Batch 2 — "before the first outside invite".**
 
 | #    | File                      | Adds                                                                                                                                                                                |
 | ---- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0103 | `0103_signup_invites`     | the invite gate's table (invite-gate plan § 7)                                                                                                                                      |
-| 0104 | `0104_ai_correction_log`  | the correction log (its plan § 4) **plus C's** `askKind enum('crop','note')`, `askFingerprint varchar(64)` and index `(dataUserId, askFingerprint)` — in the CREATE, no second file |
-| 0105 | `0105_sheet_content_hash` | `bid_pdf_sheets.contentHash varchar(64)` (NULL = never read) — C's "never pay twice for the same drawing"                                                                           |
+| 0105 | `0105_signup_invites`     | the invite gate's table (invite-gate plan § 7)                                                                                                                                      |
+| 0106 | `0106_ai_correction_log`  | the correction log (its plan § 4) **plus C's** `askKind enum('crop','note')`, `askFingerprint varchar(64)` and index `(dataUserId, askFingerprint)` — in the CREATE, no second file |
+| 0107 | `0107_sheet_content_hash` | `bid_pdf_sheets.contentHash varchar(64)` (NULL = never read) — C's "never pay twice for the same drawing"                                                                           |
 
 **Batch 3 — "catalog", with C's catalog code.** The old 0100–0107, minus
 `dropExcluded` (now in 0098):
 
 | #    | File                           | Adds                                                        |
 | ---- | ------------------------------ | ----------------------------------------------------------- |
-| 0106 | `0106_new_material_categories` | 3 values appended to `materials.category`                   |
-| 0107 | `0107_locknut_bushing_roles`   | `'locknut'`, `'bushing'` appended (list = 0096's + 2)       |
-| 0108 | `0108_materials_parent_id`     | `materials.parentId int`                                    |
-| 0109 | `0109_materials_parent_id_fk`  | self-FK, `ON DELETE RESTRICT`                               |
-| 0110 | `0110_materials_brand`         | `materials.brand varchar(64)`                               |
-| 0111 | `0111_assembly_categories`     | 2 values appended to `assemblies.category`, `NOT NULL` kept |
-| 0112 | `0112_assembly_hours_nullable` | `assemblies.baseLaborHours` may be NULL                     |
+| 0108 | `0108_new_material_categories` | 3 values appended to `materials.category`                   |
+| 0109 | `0109_locknut_bushing_roles`   | `'locknut'`, `'bushing'` appended (list = 0096's + 2)       |
+| 0110 | `0110_materials_parent_id`     | `materials.parentId int`                                    |
+| 0111 | `0111_materials_parent_id_fk`  | self-FK, `ON DELETE RESTRICT`                               |
+| 0112 | `0112_materials_brand`         | `materials.brand varchar(64)`                               |
+| 0113 | `0113_assembly_categories`     | 2 values appended to `assemblies.category`, `NOT NULL` kept |
+| 0114 | `0114_assembly_hours_nullable` | `assemblies.baseLaborHours` may be NULL                     |
 
-**Batch 4 — "legend reading"**: `0113_bid_pdf_legend_entries`, **with**
+**Batch 4 — "legend reading"**: `0115_bid_pdf_legend_entries`, **with**
 `lookId int NULL -> symbol_looks, set null` in its `CREATE` — possible now
 because `symbol_looks` (0102) lands first, which settles the ordering question
 R.11 left open.
@@ -137,7 +162,7 @@ From `references/materials-naming-and-pricing-plan.md` § 7 (on
    search tables updated in the same commit. **No migration**: rows keep
    their ids, so bid lines, assemblies and contractors' own copies are
    untouched.
-4. **Then pricing:** Batch 3's `parentId`/`brand` (0108–0110) before brand
+4. **Then pricing:** Batch 3's `parentId`/`brand` (0110–0112) before brand
    variants are seeded, and **Batch 5's example-price columns and their code
    before ANY non-zero price goes into a seed file** (R.5 item 2).
 
