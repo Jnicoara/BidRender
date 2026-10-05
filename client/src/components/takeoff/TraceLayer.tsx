@@ -68,10 +68,11 @@ import {
   type SnapStamp,
 } from "@/lib/legSnap";
 import {
-  MARK_STATUSES,
   MARK_STATUS_LABEL,
-  isMarkStatus,
+  USER_MARK_STATUSES,
+  isUserMarkStatus,
   type MarkStatus,
+  type UserMarkStatus,
 } from "@shared/markStatus";
 import {
   connectLabel,
@@ -211,8 +212,6 @@ const ON_END_POINTS = 0.75;
 
 export type PlacedStamp = {
   id: number;
-  /** `takeoff_stamps.status` — NULL is new; drawn per pin plan § 7. */
-  status?: string | null;
   /** What it is counting — the group's label. See shared/takeoffCounts.ts. */
   name: string;
   /** Which count this belongs to — decides its shape and colour. */
@@ -223,6 +222,11 @@ export type PlacedStamp = {
   assemblyCategory: string | null;
   x: number;
   y: number;
+  /**
+   * NULL = new. Required, like SnapStamp's: the snap reads it, and a list that
+   * left it out would let a run snap to an unconfirmed mark (@shared/markStatus).
+   */
+  status: MarkStatus | null;
   /**
    * Clicked, drawn, and not yet acknowledged by the server.
    *
@@ -398,7 +402,7 @@ export function TraceLayer({
   moveTargets?: { id: number; label: string }[];
   onMoveSelected?: (groupId: number) => void;
   /** Set the selected marks' status. Omitted (a locked bid), no control. */
-  onSetStatusSelected?: (status: MarkStatus) => void;
+  onSetStatusSelected?: (status: UserMarkStatus) => void;
   onClearSelection: () => void;
   /** Highlighted after a jump from the counted-items list. */
   focusPoint: { x: number; y: number } | null;
@@ -452,6 +456,7 @@ export function TraceLayer({
           id: s.id,
           x: s.x,
           y: s.y,
+          status: s.status,
           connect: connects?.get(s.id)?.point,
         })),
     [stamps, connects]
@@ -1433,6 +1438,9 @@ export function TraceLayer({
                   (isSelected ? stroke * 1.4 : stroke) *
                   (status.filled ? 1 : 1.5)
                 }
+                strokeDasharray={
+                  status.dashed ? `${r * 0.45} ${r * 0.3}` : undefined
+                }
                 strokeLinejoin="round"
               />
               {status.cross && (
@@ -2151,12 +2159,12 @@ export function TraceLayer({
                   aria-label="Mark the selected marks as new, existing, remove or relocate"
                   title="New is priced. Existing to remain, remove and relocate are not priced as new devices."
                   onChange={e => {
-                    if (isMarkStatus(e.target.value))
+                    if (isUserMarkStatus(e.target.value))
                       onSetStatusSelected(e.target.value);
                   }}
                 >
                   <option value="">Mark as…</option>
-                  {MARK_STATUSES.map(s => (
+                  {USER_MARK_STATUSES.map(s => (
                     <option key={s} value={s}>
                       {MARK_STATUS_LABEL[s]}
                     </option>

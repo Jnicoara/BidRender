@@ -19,6 +19,7 @@ import {
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2/promise";
 import {
+  QUANTITY_MARK_STATUSES,
   emptySplit,
   isPricedMark,
   markStatusOf,
@@ -5275,6 +5276,25 @@ export async function updateBidPdfSheet(
  * rows that are already in scope. The callers below have verified the bid
  * before they get here.
  */
+/**
+ * Rule 1 of shared/markStatus.ts as SQL: a mark is a QUANTITY only when its
+ * status is NULL (placed before the column — new) or a quantity status. An
+ * existing device, a remove, a relocate or an unconfirmed mark counts toward
+ * nothing. Built from the same list the rule reads, so the two cannot drift.
+ *
+ * Applied at every source a quantity is made from: the bid's line counts
+ * (`stampCountsForBid`), the counts the screens compare them with
+ * (`countStampsByGroup` — the SAME rule, or a count with an existing mark in
+ * it would look out of date with its line forever), and the marks the
+ * materials list, the takeoff export and the drops read (`getStampsForBid`).
+ */
+function markIsQuantity() {
+  return or(
+    isNull(takeoffStamps.status),
+    inArray(takeoffStamps.status, [...QUANTITY_MARK_STATUSES])
+  );
+}
+
 async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
   const db = await getDb();
   if (!db) return new Map();
@@ -5286,7 +5306,7 @@ async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
         eq(takeoffStamps.bidId, bidId),
         onLivePlanSheet(takeoffStamps.sheetId, bidId),
         // Every bid line's live quantity comes from here: new marks only.
-        pricedMarkWhere()
+        markIsQuantity()
       )
     )
     .groupBy(takeoffStamps.groupId);
@@ -7640,17 +7660,6 @@ export async function getRunsForSheet(
  * key checks off and holds every read against a bid that never had them; it
  * also fails if a bid-wide read of marks or runs is written without this.
  */
-/**
- * A mark that counts toward a quantity: a NEW one (status NULL or `new`).
- * `isPricedMark` in shared/markStatus.ts, as SQL — the two must say the same
- * thing, and `server/markStatusPricing.test.ts` holds both against one bid.
- * Every SQL count of marks that can reach a price carries this; a count that
- * is for display says why it does not.
- */
-function pricedMarkWhere() {
-  return or(isNull(takeoffStamps.status), eq(takeoffStamps.status, "new"));
-}
-
 function onLivePlanSheet(
   sheetId: typeof takeoffRuns.sheetId | typeof takeoffStamps.sheetId,
   bidId: number
@@ -8524,7 +8533,11 @@ export async function getStampsForBid(
       and(
         eq(takeoffStamps.bidId, bidId),
         eq(takeoffStamps.userId, userId),
-        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        // The materials list, the export and the drops read this: quantities
+        // only (`markIsQuantity`). The sheet's own drawing reads
+        // getStampsForSheet, which shows every mark whatever its status.
+        markIsQuantity()
       )
     )
     .orderBy(asc(takeoffStamps.id));
@@ -8872,7 +8885,7 @@ export async function deleteTakeoffGroup(
 /**
  * How many marks of each STATUS each group has — for the card's words
  * ("12 new · 4 existing"). DISPLAY ONLY, which is why it carries no
- * `pricedMarkWhere`: it is the one count whose job is to show the marks the
+ * `markIsQuantity`: it is the one count whose job is to show the marks the
  * priced counts leave out. Nothing may read a quantity from it.
  */
 export async function statusSplitByGroup(
@@ -8929,7 +8942,7 @@ export async function countStampsByGroup(
         eq(takeoffStamps.userId, userId),
         onLivePlanSheet(takeoffStamps.sheetId, bidId),
         // "Send N to bid" sends this N: new marks only.
-        pricedMarkWhere()
+        markIsQuantity()
       )
     )
     .groupBy(takeoffStamps.groupId);

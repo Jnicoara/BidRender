@@ -11,11 +11,17 @@ This is the human-readable companion to the git history — read this to see wha
   as hollow pins, removals get a red X, relocations an arrow badge, and each
   count's card says the split in words ("1 new · 1 existing · 1 remove").
   Only new marks reach the bid line, "Send to bid", the supplier list, the
-  takeoff export and the drop footage. Remove and relocate labour is not on
-  the bid yet, and the card says so.
+  takeoff export and the drop footage; the others still show on the drawing.
+  Remove and relocate labor is not on the bid yet, and the card says so.
 - **Choose how a count's pins look.** Click a count's swatch to pick its
   shape, letter and color, for this job or for every job (on its legend
   symbol or assembly). Anything left on Automatic keeps today's look.
+- **A run can never attach to an unconfirmed mark.** A run that snaps to a
+  mark copies its position, so a misplaced AI mark used to become a wrong
+  length. An unconfirmed mark is now skipped by the snap, and the server
+  refuses one too, with a plain message.
+- **The database can record whether each run end's wall connection was
+  checked** (migrations 0103–0104). Nothing uses it yet.
 
 ## [2026-10-02]
 

@@ -287,8 +287,10 @@ right.
 > as…", also accepted by `takeoffStamps.drop`), drawn as tabled below, and
 > said in words on the card. **Pricing, decided on the hard rule "an existing
 > mark must never price as new":** only a NEW mark (NULL or `new`) is a
-> quantity — `isPricedMark` (shared/markStatus.ts) and `pricedMarkWhere`
-> (server/db.ts), at the four places a mark becomes a number: a bid line's
+> quantity — rule 1 in shared/markStatus.ts (`markCountsAsQuantity`, Track
+> A's; `isPricedMark` is the same rule for a row) and `markIsQuantity`
+> (server/db.ts) — built by A and B the same day and merged into one, at the
+> four places a mark becomes a number: a bid line's
 > live quantity and "Send N", the count list, the per-mark drops, and
 > `groupStamps` (supplier list, export). **Remove and relocate are kept off
 > every quantity too** and the card says "labour not on the bid": they buy no

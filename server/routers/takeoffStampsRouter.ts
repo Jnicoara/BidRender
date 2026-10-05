@@ -49,7 +49,8 @@ import {
   tracedRunOf,
 } from "../../shared/takeoffQuantities";
 import { lockedEditRefusal } from "../../shared/quantityLock";
-import { MARK_STATUSES } from "../../shared/markStatus";
+// A person's choices only: `unconfirmed` is the reader's, not a menu item.
+import { USER_MARK_STATUSES } from "../../shared/markStatus";
 import { TAKEOFF_LOCATIONS } from "../../drizzle/schema";
 import { SYMBOL_THUMBNAIL_MAX_CHARS } from "../../shared/symbolCapture";
 import * as db from "../db";
@@ -243,7 +244,7 @@ export const takeoffStampsRouter = router({
          * What these ones ARE (shared/markStatus.ts). Omitted or null is new,
          * which is what every mark was before the column existed.
          */
-        status: z.enum(MARK_STATUSES).nullable().default(null),
+        status: z.enum(USER_MARK_STATUSES).nullable().default(null),
         /** One entry per click. Bounded so a runaway loop cannot flood a sheet. */
         at: z
           .array(z.object({ x: coordSchema, y: coordSchema }))
@@ -503,7 +504,11 @@ export const takeoffStampsRouter = router({
         location: row.location,
         x: Number(row.x),
         y: Number(row.y),
-        /** NULL is new (shared/markStatus.ts); drawn, and counted only if new. */
+        /**
+         * NULL = new (0098, 0103). The drawing shows every mark; only a new
+         * one is counted, and a run never snaps to an `unconfirmed` one
+         * (shared/markStatus.ts, rules 1 and 2).
+         */
         status: row.status,
       }));
     }),
@@ -521,7 +526,7 @@ export const takeoffStampsRouter = router({
       z.object({
         bidId: z.number().int().positive(),
         ids: z.array(z.number().int().positive()).min(1).max(2000),
-        status: z.enum(MARK_STATUSES).nullable(),
+        status: z.enum(USER_MARK_STATUSES).nullable(),
       })
     )
     .mutation(async ({ input, ctx }) => {

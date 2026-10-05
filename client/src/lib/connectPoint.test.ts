@@ -178,7 +178,13 @@ describe("every mark on a sheet", () => {
 });
 
 describe("a run snaps to where it meets the device", () => {
-  const stamp = { id: 7, x: 100, y: 100, connect: { x: 95.5, y: 100 } };
+  const stamp = {
+    id: 7,
+    x: 100,
+    y: 100,
+    status: null,
+    connect: { x: 95.5, y: 100 },
+  };
 
   it("an ordinary click on a mark lands on its connect point (red before: the centre)", () => {
     expect(snapToMark({ x: 101, y: 99 }, 5, [stamp])?.point).toEqual({
@@ -211,15 +217,29 @@ describe("a run snaps to where it meets the device", () => {
 
   it("a mark with no connect point is met at its centre, as before", () => {
     expect(
-      snapToMark({ x: 101, y: 99 }, 5, [{ id: 8, x: 100, y: 100 }])?.point
+      snapToMark({ x: 101, y: 99 }, 5, [
+        { id: 8, x: 100, y: 100, status: null },
+      ])?.point
     ).toEqual({ x: 100, y: 100 });
   });
 
   it('a run between two wall receptacles is longer by both stand-offs — a foot at 1/8" scale', () => {
     // A on the left wall, B on the right wall, 300 pt apart centre to
     // centre, each standing 4.5 pt off its wall.
-    const a = { id: 1, x: 100, y: 100, connect: { x: 95.5, y: 100 } };
-    const b = { id: 2, x: 400, y: 100, connect: { x: 404.5, y: 100 } };
+    const a = {
+      id: 1,
+      x: 100,
+      y: 100,
+      status: null,
+      connect: { x: 95.5, y: 100 },
+    };
+    const b = {
+      id: 2,
+      x: 400,
+      y: 100,
+      status: null,
+      connect: { x: 404.5, y: 100 },
+    };
     const clicks = [
       { x: 100.5, y: 100.5 },
       { x: 399.5, y: 99.5 },

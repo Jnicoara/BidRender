@@ -131,7 +131,13 @@ describe.skipIf(!hasDb)("an existing mark is never priced as new", () => {
       g => g.id === id
     )!;
     expect(row.count).toBe(5);
-    expect(row.split).toEqual({ new: 5, existing: 3, remove: 0, relocate: 0 });
+    expect(row.split).toEqual({
+      new: 5,
+      existing: 3,
+      remove: 0,
+      relocate: 0,
+      unconfirmed: 0,
+    });
     // All eight are on the drawing, with their status.
     const marks = await marksOn(sheetId);
     expect(marks).toHaveLength(8);

@@ -94,6 +94,11 @@ import { rootOf } from "../../shared/runNetwork";
 import { traceModeOf } from "../../shared/traceMode";
 import { quantityTraceSummary } from "../../shared/quantityDrops";
 import { runTypeColorOrder } from "../../shared/takeoffMarks";
+import { markIsSnapTarget } from "../../shared/markStatus";
+
+/** Said when a run end is pointed at a mark nobody has checked yet. */
+export const UNCONFIRMED_MARK_REFUSAL =
+  "That mark has not been confirmed yet, so a run cannot attach to it. Confirm the mark first, or end the run beside it.";
 import {
   circuitPlan,
   findMatchingRunType,
@@ -1279,13 +1284,20 @@ export const takeoffRunsRouter = router({
         start.kind === "tee" ? start.stampId : null,
       ].filter((id): id is number => id !== null);
       if (stampIds.length > 0) {
-        const onSheet = new Set(
-          (await db.getStampsForSheet(root.sheetId, userId)).map(s => s.id)
-        );
+        const marks = await db.getStampsForSheet(root.sheetId, userId);
+        const onSheet = new Map(marks.map(s => [s.id, s]));
         if (stampIds.some(id => !onSheet.has(id)))
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "That mark is not on this sheet.",
+          });
+        // The client never snaps to an unconfirmed mark; the server refuses
+        // one too, so an old or modified client cannot copy an unchecked
+        // spot into a run (shared/markStatus.ts, rule 2).
+        if (stampIds.some(id => !markIsSnapTarget(onSheet.get(id)!.status)))
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: UNCONFIRMED_MARK_REFUSAL,
           });
       }
       if (start.kind !== "tee") await requireKnownKind(start.startKind, userId);
@@ -1663,12 +1675,21 @@ export const takeoffRunsRouter = router({
       );
       if (claiming.length > 0) {
         const onSheet = await db.getStampsForSheet(run.sheetId, userId);
-        const ids = new Set(onSheet.map(stamp => stamp.id));
+        const byId = new Map(onSheet.map(stamp => [stamp.id, stamp]));
         for (const stampId of claiming) {
-          if (!ids.has(stampId)) {
+          const stamp = byId.get(stampId);
+          if (!stamp) {
             throw new TRPCError({
               code: "BAD_REQUEST",
               message: "That mark is not on this sheet.",
+            });
+          }
+          // Rule 2 of shared/markStatus.ts, enforced here as well as in the
+          // client's snap.
+          if (!markIsSnapTarget(stamp.status)) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: UNCONFIRMED_MARK_REFUSAL,
             });
           }
         }

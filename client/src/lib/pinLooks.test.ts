@@ -208,7 +208,17 @@ describe("a mark's status: drawn, counted, and said", () => {
       existing: 1,
       remove: 1,
       relocate: 0,
+      unconfirmed: 0,
     });
+  });
+
+  it("draws an UNCONFIRMED mark dashed and hollow — never like existing", () => {
+    expect(statusLook("unconfirmed")).toMatchObject({
+      filled: false,
+      dashed: true,
+    });
+    expect(statusLook("existing").dashed).toBe(false);
+    expect(isPricedMark({ status: "unconfirmed" })).toBe(false);
   });
 
   it("says the split in words, and says what is left off the bid", () => {
@@ -219,7 +229,7 @@ describe("a mark's status: drawn, counted, and said", () => {
     ]);
     expect(statusSplitText(split)).toBe("12 new · 4 existing · 1 remove");
     expect(unpricedStatusNote(split)).toBe(
-      "4 existing — not priced. 1 remove — labour not on the bid"
+      "4 existing — not priced. 1 remove — labor not on the bid"
     );
     // All new: nothing to say.
     expect(statusSplitText(statusSplit([{ status: null }]))).toBeNull();

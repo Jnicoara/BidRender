@@ -233,6 +233,12 @@ export type StatusLook = {
   filled: boolean;
   cross: boolean;
   arrow: boolean;
+  /**
+   * `unconfirmed` (0103): DASHED and hollow — the drawing's one language for
+   * provisional (§ 8). Hollow-solid is "existing"; the two never share a
+   * line style, so they are never told apart by fill alone.
+   */
+  dashed: boolean;
 };
 
 export function statusLook(value: string | null | undefined): StatusLook {
@@ -242,6 +248,7 @@ export function statusLook(value: string | null | undefined): StatusLook {
     filled: status === "new" || status === "relocate",
     cross: status === "remove",
     arrow: status === "relocate",
+    dashed: status === "unconfirmed",
   };
 }
 

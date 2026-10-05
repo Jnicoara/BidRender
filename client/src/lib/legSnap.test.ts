@@ -1,5 +1,56 @@
 import { describe, expect, it } from "vitest";
-import { legSnapLabel, quantitySnap, resolveLegStart } from "./legSnap";
+import {
+  legSnapLabel,
+  quantitySnap,
+  resolveLegStart,
+  snapToMark,
+} from "./legSnap";
+
+describe("a run never snaps to an UNCONFIRMED mark", () => {
+  // The fault (todo.md, WRONG-NUMBER RISK): a snap copies the mark's spot into
+  // the run, so a misplaced AI mark became a wrong length — up to ~10 ft at
+  // 1/4" = 1'-0" on staging's E-100. Red before: every mark was a target.
+  const unchecked = { id: 3, x: 600, y: 100, status: "unconfirmed" as const };
+
+  it("does not snap to an unconfirmed mark in reach", () => {
+    expect(snapToMark({ x: 601, y: 99 }, 5, [unchecked])).toBeNull();
+  });
+
+  it("takes a confirmed mark further away over a nearer unconfirmed one", () => {
+    const confirmed = { id: 4, x: 604, y: 100, status: null };
+    expect(
+      snapToMark({ x: 601, y: 100 }, 5, [unchecked, confirmed])?.stamp.id
+    ).toBe(4);
+  });
+
+  it("starts a leg where the click was, not on the unconfirmed mark", () => {
+    expect(
+      resolveLegStart({
+        at: { x: 601, y: 99 },
+        tolerance: 5,
+        legs: [],
+        stamps: [unchecked],
+        free: false,
+      })
+    ).toEqual({ kind: "free", point: { x: 601, y: 99 } });
+  });
+
+  it("still snaps to every confirmed status, an existing device included", () => {
+    for (const status of [
+      null,
+      "new",
+      "existing",
+      "remove",
+      "relocate",
+    ] as const) {
+      expect(
+        snapToMark({ x: 601, y: 99 }, 5, [{ id: 9, x: 600, y: 100, status }])
+          ?.stamp.id,
+        String(status)
+      ).toBe(9);
+    }
+  });
+});
 
 // A main east along y=0, then south. Tolerance 5 page points.
 const MAIN = {
@@ -60,7 +111,10 @@ describe("where a new leg starts", () => {
   });
 
   it("prefers a mark over the leg it sits on — the mark is the box", () => {
-    const s = snap({ x: 201, y: 2 }, { stamps: [{ id: 7, x: 200, y: 1 }] });
+    const s = snap(
+      { x: 201, y: 2 },
+      { stamps: [{ id: 7, x: 200, y: 1, status: null }] }
+    );
     expect(s).toMatchObject({
       kind: "tee",
       fitting: "mark",
@@ -71,7 +125,10 @@ describe("where a new leg starts", () => {
 
   it("starts AT a mark that is not on the run", () => {
     expect(
-      snap({ x: 601, y: 99 }, { stamps: [{ id: 8, x: 600, y: 100 }] })
+      snap(
+        { x: 601, y: 99 },
+        { stamps: [{ id: 8, x: 600, y: 100, status: null }] }
+      )
     ).toEqual({
       kind: "stamp",
       stampId: 8,
@@ -118,7 +175,10 @@ describe("the same snap on a quantity trace (D21)", () => {
 
   it("does not claim a mark, and leaves a free start alone", () => {
     const onMark = quantitySnap(
-      snap({ x: 700, y: 700 }, { stamps: [{ id: 5, x: 701, y: 700 }] })
+      snap(
+        { x: 700, y: 700 },
+        { stamps: [{ id: 5, x: 701, y: 700, status: null }] }
+      )
     );
     expect(onMark).toEqual({ kind: "free", point: { x: 701, y: 700 } });
     const free = snap({ x: 900, y: 900 });
