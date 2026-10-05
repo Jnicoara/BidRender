@@ -452,11 +452,13 @@ withDb("removing a look", () => {
         bidId: set.bidId,
         assemblyId,
       });
+      // A count TYPED by the item's name. Not a symbol click: the item is
+      // linked, and a click on a linked item counts its assembly however it
+      // arrives (server/legendLinkCount.test.ts, 2026-10-05), so it would be
+      // `priced` again rather than a second, free count.
       const free = await caller().takeoffGroups.create({
         bidId: set.bidId,
         label: "Duplex",
-        reuseExisting: true,
-        symbolId: item.id,
       });
       for (const [g, n] of [
         [priced.id, 3],

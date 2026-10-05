@@ -339,6 +339,36 @@ export const takeoffGroupsRouter = router({
         const symbol = input.symbolId
           ? await db.getSymbolLinkById(input.symbolId, ctx.scope.dataUserId)
           : undefined;
+        /*
+          A SYMBOL THAT IS LINKED counts its assembly, whichever click asked.
+          The screen picks "by name" or "this assembly" from the symbols it
+          last fetched, so a click straight after "Link" could arrive here
+          asking for a plain count of a symbol the database already has
+          linked — and the count went to the bid as a free count with no
+          price and no hours (the staging smoke test, 2026-10-05, flow 6).
+          The screen now updates its copy at once as well; this is the half
+          that does not depend on timing. server/legendLinkCount.test.ts.
+        */
+        if (symbol && symbol.assemblyId !== null) {
+          const assembly = await db.getAssemblyById(
+            symbol.assemblyId,
+            ctx.scope.dataUserId
+          );
+          if (assembly) {
+            const group = await groupForAssembly(
+              input.bidId,
+              ctx.scope.dataUserId,
+              assembly,
+              { symbol }
+            );
+            return {
+              id: group.id,
+              label: group.label,
+              kind: group.kind,
+              count: 0,
+            };
+          }
+        }
         const existing =
           (symbol &&
             symbolCountsOn(

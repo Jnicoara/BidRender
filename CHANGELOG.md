@@ -11,6 +11,19 @@ This is the human-readable companion to the git history — read this to see wha
   picture and box; counted marks stay in their counts on every bid, locked or
   not. It is refused if the other item already has that same look.
 
+- **Fixed: a legend symbol linked to an assembly could still go to the bid
+  with no price.** Clicking the symbol straight after linking it started a
+  count by name, which reached the bid as a line with no price and no hours.
+  The link now shows at once, and the server counts a linked symbol as its
+  assembly whichever way the click arrives. Found by the first browser smoke
+  test to run on staging.
+
+- **A check that no bid's total moves when a release goes live.** A new
+  read-only tool records every bid's "Total due" and not-priced count before
+  and after a release and lists any that changed. It cannot write to the
+  database even by accident. Rehearsed on a copy of real data: 4,234 bids, no
+  number moved.
+
 - **A wrong look can be removed.** On the Legend tab, "N looks" now opens the
   item's pictures, each with an × that asks once. Removing a look changes what
   future searches find and nothing else — no mark, count or bid line moves, on
@@ -25,6 +38,7 @@ This is the human-readable companion to the git history — read this to see wha
   as existing to remain, so they never reach the bid as parts to buy. A
   crash or reload in the middle of placing them brings them back as
   existing too.
+
 - **Mark a device as existing, to be removed or relocated, and it is never
   priced as new.** Select marks and choose "Mark as…". Existing devices draw
   as hollow pins, removals get a red X, relocations an arrow badge, and each
