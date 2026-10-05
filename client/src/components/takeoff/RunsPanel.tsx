@@ -221,6 +221,11 @@ import { unmatchedKindWords, type FittingKind } from "@shared/runFittings";
 import { fittingRowSpeaks } from "@shared/runFittingMaterials";
 import type { TraceMode } from "@shared/traceMode";
 import type { RunTotalsLeftOut } from "@shared/runOnBid";
+import {
+  statusSplitText,
+  unpricedStatusNote,
+  type StatusSplit,
+} from "@shared/markStatus";
 
 /**
  * One run's bends and pull points, as the server works them out
@@ -992,7 +997,12 @@ export type PanelStampGroup = {
   groupId: number | null;
   assemblyId: number | null;
   name: string;
+  /** NEW marks — priced (shared/markStatus.ts). */
   count: number;
+  /** Every mark on this sheet, whatever its status. */
+  placed: number;
+  /** How many of each status, for the words on the card. */
+  split: StatusSplit;
   stamps: {
     id: number;
     x: number;
@@ -1110,7 +1120,7 @@ export function ThisSheetLine({
   runs,
   className,
 }: {
-  stampGroups: readonly { count: number }[];
+  stampGroups: readonly { placed: number }[];
   runs: readonly {
     runTypeId: number | null;
     isSuggestion: boolean;
@@ -1193,6 +1203,7 @@ export function RunsPanel({
   pins,
   hideOtherRuns,
   onToggleHideOtherRuns,
+  lookEditor,
 }: {
   runs: PanelRun[];
   /**
@@ -1200,6 +1211,16 @@ export function RunsPanel({
    * drawing reads (shared/pinLetters.ts), so a card's swatch is its pins.
    */
   pins?: ReadonlyMap<number, PinStyle>;
+  /**
+   * Wraps a count's swatch in the pin-look editor (PinLookEditor), or
+   * returns it unchanged. A render prop so the save lives with the page's
+   * other mutations and its refresh helper.
+   */
+  lookEditor?: (
+    groupId: number,
+    name: string,
+    swatch: React.ReactNode
+  ) => React.ReactNode;
   /** Which colour each run type gets on this bid — `takeoffRuns.typeColors`. */
   runColors: RunTypeColors;
   /**
@@ -1598,16 +1619,38 @@ export function RunsPanel({
                 className="border-b border-border px-3 py-2 hover:bg-muted/40 transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  {/* The swatch IS the legend — see CountSwatch. */}
-                  <CountSwatch
-                    groupId={group.groupId}
-                    assemblyId={group.assemblyId}
-                    assemblyCategory={group.stamps[0]?.assemblyCategory ?? null}
-                    pins={pins}
-                  />
+                  {/* The swatch IS the legend — see CountSwatch. Opens the
+                      look editor where there is one. */}
+                  {(() => {
+                    const swatch = (
+                      <CountSwatch
+                        groupId={group.groupId}
+                        assemblyId={group.assemblyId}
+                        assemblyCategory={
+                          group.stamps[0]?.assemblyCategory ?? null
+                        }
+                        pins={pins}
+                      />
+                    );
+                    return lookEditor && group.groupId !== null
+                      ? lookEditor(group.groupId, group.name, swatch)
+                      : swatch;
+                  })()}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate">{group.name}</p>
-                    <p className="text-xs">{group.count} placed</p>
+                    {/*
+                      The split in WORDS (pin plan § 7): a pin's fill does not
+                      survive a printout, and the number beside this is the
+                      NEW marks only — the ones that are priced.
+                    */}
+                    <p className="text-xs">
+                      {statusSplitText(group.split) ?? `${group.placed} placed`}
+                    </p>
+                    {unpricedStatusNote(group.split) && (
+                      <p className="text-[0.7rem] text-amber-600 dark:text-amber-400">
+                        {unpricedStatusNote(group.split)}
+                      </p>
+                    )}
                   </div>
                   <span className="font-mono text-sm tabular-nums">
                     {group.count}
@@ -1637,7 +1680,7 @@ export function RunsPanel({
                       title={
                         quantitiesLocked
                           ? "This bid's quantities are locked — unlock them on the bid to delete."
-                          : `Delete the ${group.count} ${group.name} ${group.count === 1 ? "mark" : "marks"} on this sheet — the count stays`
+                          : `Delete the ${group.placed} ${group.name} ${group.placed === 1 ? "mark" : "marks"} on this sheet — the count stays`
                       }
                       aria-label={`Delete ${group.name} marks on this sheet`}
                     >

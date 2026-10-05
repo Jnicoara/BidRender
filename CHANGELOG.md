@@ -4,6 +4,19 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-05]
+
+- **Mark a device as existing, to be removed or relocated, and it is never
+  priced as new.** Select marks and choose "Mark as…". Existing devices draw
+  as hollow pins, removals get a red X, relocations an arrow badge, and each
+  count's card says the split in words ("1 new · 1 existing · 1 remove").
+  Only new marks reach the bid line, "Send to bid", the supplier list, the
+  takeoff export and the drop footage. Remove and relocate labour is not on
+  the bid yet, and the card says so.
+- **Choose how a count's pins look.** Click a count's swatch to pick its
+  shape, letter and color, for this job or for every job (on its legend
+  symbol or assembly). Anything left on Automatic keeps today's look.
+
 ## [2026-10-02]
 
 - **The database is ready for pin looks, mark status, mark heights and

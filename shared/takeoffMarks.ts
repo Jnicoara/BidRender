@@ -27,6 +27,7 @@
  * asks for it, and this file becomes the DEFAULT rather than the answer.
  */
 import { CATEGORY_FAMILY, FAMILY_SHAPE } from "./deviceFamily";
+import { markStatusOf, type MarkStatus } from "./markStatus";
 
 // ─── Shapes ───────────────────────────────────────────────────────────────────
 
@@ -178,6 +179,8 @@ export function markAppearance(
     groupId: number | null;
     assemblyId: number | null;
     assemblyCategory?: string | null;
+    /** `takeoff_stamps.status` — NULL is new (shared/markStatus.ts). */
+    status?: string | null;
   },
   /**
    * The bid's letters and first-use colours (`pinStylesForBid`,
@@ -191,16 +194,54 @@ export function markAppearance(
     number,
     { letter: string; color: MarkColor; shape: MarkShape }
   >
-): { shape: MarkShape; color: MarkColor; letter: string | null } {
+): {
+  shape: MarkShape;
+  color: MarkColor;
+  letter: string | null;
+  status: StatusLook;
+} {
   const id = mark.groupId ?? (mark.assemblyId !== null ? -mark.assemblyId : 0);
   const pin = mark.groupId !== null ? pins?.get(mark.groupId) : undefined;
   return {
+    status: statusLook(mark.status),
     // The COUNT's shape (its own name first), not its assembly's category:
     // two items on one assembly can be a duplex and a switch.
     shape:
       pin?.shape ?? shapeFor({ id, assemblyCategory: mark.assemblyCategory }),
     color: pin?.color ?? colorFor({ id }),
     letter: pin?.letter ?? null,
+  };
+}
+
+/**
+ * How a mark's STATUS is drawn (pin plan § 7, decision 8):
+ *
+ * | Status   | Fill                     | Extra                 |
+ * | -------- | ------------------------ | --------------------- |
+ * | new      | filled (~45%)            | —                     |
+ * | existing | hollow, SOLID outline    | —                     |
+ * | remove   | hollow                   | an X through it       |
+ * | relocate | filled                   | an arrow badge        |
+ *
+ * Hollow is always a SOLID outline: dashed already means provisional (an
+ * unconfirmed match, § 8), and "existing" must never be told apart from
+ * "unconfirmed" by fill alone. The card says the split in words too
+ * (shared/markStatus.ts), because a fill does not survive a printout.
+ */
+export type StatusLook = {
+  status: MarkStatus;
+  filled: boolean;
+  cross: boolean;
+  arrow: boolean;
+};
+
+export function statusLook(value: string | null | undefined): StatusLook {
+  const status = markStatusOf(value);
+  return {
+    status,
+    filled: status === "new" || status === "relocate",
+    cross: status === "remove",
+    arrow: status === "relocate",
   };
 }
 

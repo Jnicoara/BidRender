@@ -49,6 +49,7 @@ import {
   tracedRunOf,
 } from "../../shared/takeoffQuantities";
 import { lockedEditRefusal } from "../../shared/quantityLock";
+import { MARK_STATUSES } from "../../shared/markStatus";
 import { TAKEOFF_LOCATIONS } from "../../drizzle/schema";
 import { SYMBOL_THUMBNAIL_MAX_CHARS } from "../../shared/symbolCapture";
 import * as db from "../db";
@@ -238,6 +239,11 @@ export const takeoffStampsRouter = router({
         groupId: z.number().int().positive(),
         /** Where these ones sit. Optional — tagging can happen after placing. */
         location: z.enum(TAKEOFF_LOCATIONS).nullable().default(null),
+        /**
+         * What these ones ARE (shared/markStatus.ts). Omitted or null is new,
+         * which is what every mark was before the column existed.
+         */
+        status: z.enum(MARK_STATUSES).nullable().default(null),
         /** One entry per click. Bounded so a runaway loop cannot flood a sheet. */
         at: z
           .array(z.object({ x: coordSchema, y: coordSchema }))
@@ -294,6 +300,7 @@ export const takeoffStampsRouter = router({
           location: input.location,
           x: point.x.toFixed(4),
           y: point.y.toFixed(4),
+          status: input.status === "new" ? null : input.status,
         }))
       );
 
@@ -496,7 +503,43 @@ export const takeoffStampsRouter = router({
         location: row.location,
         x: Number(row.x),
         y: Number(row.y),
+        /** NULL is new (shared/markStatus.ts); drawn, and counted only if new. */
+        status: row.status,
       }));
+    }),
+
+  /**
+   * Say what these marks ARE: new, existing to remain, to be removed, or to
+   * be relocated (pin plan § 7). `null` puts them back to new.
+   *
+   * Refused on a locked bid with the standard sentence, like every other
+   * mark edit: a status moves the quantity (only a new mark is priced), and a
+   * locked bid's quantities are exactly what the lock promises not to move.
+   */
+  setStatus: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        ids: z.array(z.number().int().positive()).min(1).max(2000),
+        status: z.enum(MARK_STATUSES).nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("a mark's status cannot be changed"),
+        });
+      // NULL, not "new": NULL already means new, and one spelling of it is
+      // one thing to query for.
+      const updated = await db.setStampStatus(
+        input.bidId,
+        ctx.scope.dataUserId,
+        input.ids,
+        input.status === "new" ? null : input.status
+      );
+      return { updated };
     }),
 
   /** Tag one stamp's Location. */
@@ -582,6 +625,7 @@ export const takeoffStampsRouter = router({
           assemblyId: s.assemblyId,
           x: Number(s.x),
           y: Number(s.y),
+          status: s.status,
         })),
         runs
           // A suggestion is not counted work; it stays out of the list that
@@ -618,6 +662,14 @@ export const takeoffStampsRouter = router({
       thumbnail: row.thumbnail,
       /** The whole point of the panel: is this one click away from stamping? */
       isLinked: row.assemblyId !== null,
+      /** The captured name's key — how a renamed symbol still finds its counts. */
+      lookupKey: row.lookupKey,
+      /** Its chosen pin look, every job (shared/pinLetters.ts). NULL = automatic. */
+      look: {
+        shape: row.markShape,
+        letter: row.markLetter,
+        color: row.markColor,
+      },
     }));
   }),
 

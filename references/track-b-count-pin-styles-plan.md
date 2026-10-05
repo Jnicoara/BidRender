@@ -282,6 +282,21 @@ right.
 
 ## 7. Status on the pin — the look now, built after Track A's column
 
+> **BUILT 2026-10-05 (Track B), on migration 0098, together with § 6's
+> chosen looks (0099–0101).** Status is set from the selection pill ("Mark
+> as…", also accepted by `takeoffStamps.drop`), drawn as tabled below, and
+> said in words on the card. **Pricing, decided on the hard rule "an existing
+> mark must never price as new":** only a NEW mark (NULL or `new`) is a
+> quantity — `isPricedMark` (shared/markStatus.ts) and `pricedMarkWhere`
+> (server/db.ts), at the four places a mark becomes a number: a bid line's
+> live quantity and "Send N", the count list, the per-mark drops, and
+> `groupStamps` (supplier list, export). **Remove and relocate are kept off
+> every quantity too** and the card says "labour not on the bid": they buy no
+> new device, and what their labour costs is still the owner's call.
+> Measured on screen: hollow had to be truly hollow (a white fill hid the
+> symbol, § 4), and the relocate arrow had to be a filled arrowhead (a
+> stroked one read as "+").
+
 | Status             | Look                                                     |
 | ------------------ | -------------------------------------------------------- |
 | New (and NULL)     | **Filled** — the count's color at ~45%, letter on it     |
@@ -596,6 +611,14 @@ automatic, unchanged in ORDER; what changes is how a SHARED default behaves):
   squares; shape says "lighting", and § 2's map is not overridden per item
   (a light drawn as a hexagon would teach the wrong family). Letter and color
   carry the difference.
+
+  > **OVERRIDDEN 2026-10-05 by the owner's request** ("the user picks a
+  > shape/letter/color per count"). A CHOSEN shape now wins at every level
+  > (count → symbol → assembly); the family's shape is the AUTOMATIC one, so
+  > nobody who chooses nothing sees any change. The risk named above is real
+  > and is the chooser's to take. Built in `shared/pinLetters.ts`, which says
+  > the same.
+
 - **An assembly-level letter or color is a DEFAULT, so it bumps.** This is
   the one new rule. § 3 says a CHOSEN letter is never renumbered; that stays
   true for a letter chosen on the item or the count. But a letter chosen on

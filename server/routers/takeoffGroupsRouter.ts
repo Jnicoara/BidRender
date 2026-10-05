@@ -44,9 +44,12 @@ import {
 import { lockedEditRefusal } from "../../shared/quantityLock";
 import { DISTRIBUTION_KIND } from "../../shared/takeoffHeights";
 import { resolveRunType } from "../../shared/runTypeLookup";
-import { symbolCountsOn } from "../../shared/takeoffCounts";
+import { symbolCountsOn, symbolLookupKey } from "../../shared/takeoffCounts";
+import { cleanLetter } from "../../shared/pinLetters";
+import { MARK_SHAPES, isMarkColor } from "../../shared/takeoffMarks";
 import { mayShareAssembly } from "../../shared/assemblyCounts";
 import { whipFeetOf } from "../../shared/branchWire";
+import { emptySplit } from "../../shared/markStatus";
 import {
   countsWaitingToSend,
   countsWithNoPrice,
@@ -169,9 +172,12 @@ export const takeoffGroupsRouter = router({
     .query(async ({ input, ctx }) => {
       const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
       const userId = ctx.scope.dataUserId;
-      const [groups, counts] = await Promise.all([
+      const [groups, counts, splits] = await Promise.all([
         db.getGroupsForBid(input.bidId, userId),
+        // NEW marks only — the quantity (shared/markStatus.ts).
         db.countStampsByGroup(input.bidId, userId),
+        // Every status, for the card's words. Display only.
+        db.statusSplitByGroup(input.bidId, userId),
       ]);
       const lines = await db.getBidLineItems(input.bidId);
       const bridgeLines = lines.map(toBridgeLine);
@@ -224,7 +230,16 @@ export const takeoffGroupsRouter = router({
         materialId: group.materialId,
         unitCost: group.unitCost === null ? null : Number(group.unitCost),
         unitHours: group.unitHours === null ? null : Number(group.unitHours),
+        /** NEW marks: what is priced and what "Send N" sends. */
         count: counts.get(group.id) ?? 0,
+        /** Every mark by status — "12 new · 4 existing". Display only. */
+        split: splits.get(group.id) ?? emptySplit(),
+        /** This job's chosen pin look (shared/pinLetters.ts). NULL = automatic. */
+        look: {
+          shape: group.markShape,
+          letter: group.markLetter,
+          color: group.markColor,
+        },
       }));
       const dropOf = (group: (typeof groups)[number]) => ({
         /** What was stored — the picker opens on these. */
@@ -424,6 +439,95 @@ export const takeoffGroupsRouter = router({
         label: input.label,
       });
       return { id: input.id, label: input.label };
+    }),
+
+  /**
+   * Choose how a count's pins look — shape, letter, colour (pin plan § 6).
+   *
+   * `where: "job"` saves it on this count, this bid only. `"everyJob"` saves
+   * it on the library row the count comes from — its captured legend symbol
+   * if it has one (the symbol outranks the assembly, § 11.4), else its
+   * assembly, forking a shipped one as any edit does — and clears this
+   * count's own choice so the library look is the one showing. A count typed
+   * by name has no library row (decision 6) and is told so.
+   *
+   * Each field: omitted leaves it, `null` sets it back to automatic. A value
+   * the palette does not hold is refused here, not stored and ignored. Not
+   * refused on a locked bid: a look moves no number, and the lock is about
+   * quantities.
+   */
+  setLook: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        where: z.enum(["job", "everyJob"]).default("job"),
+        shape: z.enum(MARK_SHAPES).nullable().optional(),
+        letter: z
+          .string()
+          .trim()
+          .max(4)
+          .nullable()
+          .optional()
+          .refine(v => v == null || v === "" || cleanLetter(v) !== null, {
+            message:
+              "A pin's letter is up to four letters or digits, like R, S3 or A7.",
+          }),
+        color: z
+          .string()
+          .nullable()
+          .optional()
+          .refine(v => v == null || isMarkColor(v), {
+            message: "Pick one of the six pin colors.",
+          }),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const group = await requireGroup(input.id, userId);
+      const patch: {
+        markShape?: string | null;
+        markLetter?: string | null;
+        markColor?: string | null;
+      } = {};
+      if (input.shape !== undefined) patch.markShape = input.shape;
+      if (input.letter !== undefined)
+        patch.markLetter = input.letter ? cleanLetter(input.letter) : null;
+      if (input.color !== undefined) patch.markColor = input.color;
+
+      if (input.where === "job") {
+        await db.updateTakeoffGroup(group.id, userId, patch);
+        return { savedOn: "count" as const };
+      }
+
+      const key = symbolLookupKey(group.label);
+      const symbol = (await db.getSymbolLinks(userId)).find(
+        s => s.lookupKey === key || symbolLookupKey(s.label) === key
+      );
+      const clearCount = { markShape: null, markLetter: null, markColor: null };
+      if (symbol) {
+        await db.updateSymbolLink(symbol.id, userId, patch);
+        await db.updateTakeoffGroup(group.id, userId, clearCount);
+        return { savedOn: "symbol" as const, name: symbol.label };
+      }
+      if (group.assemblyId !== null) {
+        const assembly = await db.getAssemblyById(group.assemblyId, userId);
+        if (assembly) {
+          // A shipped assembly is shared by every company: choosing a look
+          // writes this company's own copy, never the shared row.
+          const ownId =
+            assembly.userId === null
+              ? await db.forkAssembly(assembly.id, userId)
+              : assembly.id;
+          await db.updateAssembly(ownId, userId, patch);
+          await db.updateTakeoffGroup(group.id, userId, clearCount);
+          return { savedOn: "assembly" as const, name: assembly.name };
+        }
+      }
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "This count was typed by name, so there is no library row to keep its look on. It is kept on this job. Capture its legend symbol to use the look on every job.",
+      });
     }),
 
   /**

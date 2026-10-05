@@ -130,8 +130,11 @@ export function tabForSelection(kind: "run" | "mark"): PanelTab {
  * the line says how many, rather than presenting a short total as whole.
  */
 export function sheetLine(input: {
-  /** Marks on this sheet, per count. */
-  counts: readonly { count: number }[];
+  /**
+   * Marks on this sheet, per count — every mark PLACED, whatever its status:
+   * this line says what is on the paper. What is priced is the card's number.
+   */
+  counts: readonly { placed: number }[];
   runs: readonly {
     runTypeId: number | null;
     isSuggestion: boolean;
@@ -139,10 +142,10 @@ export function sheetLine(input: {
     feet: number | null;
   }[];
 }): string {
-  const marks = input.counts.reduce((n, c) => n + c.count, 0);
+  const marks = input.counts.reduce((n, c) => n + c.placed, 0);
   const real = input.runs.filter(r => !r.isSuggestion);
   const types = new Set(real.map(r => r.runTypeId ?? "untyped"));
-  const items = input.counts.filter(c => c.count > 0).length + types.size;
+  const items = input.counts.filter(c => c.placed > 0).length + types.size;
 
   const parts = [
     `${marks} ${marks === 1 ? "mark" : "marks"}`,
