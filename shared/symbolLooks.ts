@@ -85,3 +85,30 @@ export function looksForSearch<T extends LookRow>(
 export function lookCount(rows: number, legacyThumbnail: boolean): number {
   return rows > 0 ? rows : legacyThumbnail ? 1 : 0;
 }
+
+/**
+ * The picture the item shows after one of its looks is removed (plan § 5).
+ *
+ * `symbol_links.thumbnail` is what the legend row and the Reader show. When
+ * the removed look IS that picture, the item takes its first remaining look
+ * (the oldest), or none when no look is left — "Removing the LAST look
+ * leaves the item with no picture". Otherwise the shown picture stays.
+ * `remaining` is in any order; only createdAt and id decide which is first.
+ */
+export function thumbnailAfterRemoval(
+  shown: string | null,
+  removed: { thumbnail: string | null },
+  remaining: readonly {
+    id: number;
+    thumbnail: string | null;
+    createdAt: Date | string;
+  }[]
+): string | null {
+  if (shown === null || shown !== removed.thumbnail) return shown;
+  const time = (l: { createdAt: Date | string }) =>
+    new Date(l.createdAt).getTime();
+  const first = [...remaining]
+    .filter(l => l.thumbnail !== null)
+    .sort((p, q) => time(p) - time(q) || p.id - q.id)[0];
+  return first?.thumbnail ?? null;
+}

@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-05]
 
+- **A wrong look can be removed.** On the Legend tab, "N looks" now opens the
+  item's pictures, each with an × that asks once. Removing a look changes what
+  future searches find and nothing else — no mark, count or bid line moves, on
+  any bid, locked or not. If the removed look was the picture the item shows,
+  it shows its next one. In an open Find all matching, unconfirmed finds that look made
+  are dropped (unless the box drawn on the sheet found them too), and the
+  message says how many.
+
 - **Count a run of existing devices without fixing each one afterwards.**
   While counting, a New / Existing switch sits beside "Counting …" and stays
   where you put it until you change it. Marks placed as Existing are saved

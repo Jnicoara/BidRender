@@ -9287,6 +9287,30 @@ export async function countSymbolLooks(
   return new Map(rows.map(r => [r.id, Number(r.n)]));
 }
 
+/** One look, scoped by the company owner: another company's id finds nothing. */
+export async function getSymbolLook(
+  id: number,
+  userId: number
+): Promise<SymbolLook | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db
+    .select()
+    .from(symbolLooks)
+    .where(and(eq(symbolLooks.id, id), eq(symbolLooks.userId, userId)))
+    .limit(1);
+  return row;
+}
+
+/** Delete one look row. Writes nothing else — no mark, count or bid line. */
+export async function deleteSymbolLook(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .delete(symbolLooks)
+    .where(and(eq(symbolLooks.id, id), eq(symbolLooks.userId, userId)));
+}
+
 export async function deleteSymbolLink(id: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");

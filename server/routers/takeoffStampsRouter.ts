@@ -60,6 +60,7 @@ import {
   lookConfirmsSet,
   lookCount,
   looksForSearch,
+  thumbnailAfterRemoval,
   type LookBox,
 } from "../../shared/symbolLooks";
 
@@ -963,6 +964,64 @@ export const takeoffStampsRouter = router({
         withoutBox:
           lookCount(rows.length, Boolean(item.thumbnail)) -
           rows.filter(r => lookBoxOf(r) !== null).length,
+      };
+    }),
+
+  /**
+   * One item's saved looks, for the legend row's list (plan § 5): the
+   * picture, and where each came from. Newest first. No url — opening the
+   * look's sheet is the viewer's job, from `sheetId`.
+   */
+  looksFor: procedure
+    .input(z.object({ symbolId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      const item = await db.getSymbolLinkById(
+        input.symbolId,
+        ctx.scope.dataUserId
+      );
+      if (!item)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Symbol not found.",
+        });
+      const rows = await db.getSymbolLooks(item.id, ctx.scope.dataUserId);
+      return rows.map(r => ({
+        id: r.id,
+        thumbnail: r.thumbnail,
+        sheetId: r.sheetId,
+        pageNumber: r.pageNumber,
+        setName: r.setName,
+        hasBox: lookBoxOf(r) !== null,
+        createdAt: r.createdAt,
+      }));
+    }),
+
+  /**
+   * Remove one look (plan § 5). Changes what FUTURE searches find, never
+   * what is counted: no mark, count, bid line or snapshot is written, on any
+   * bid, locked or not (§ 7) — symbolLooks.test.ts reads them on both sides.
+   * When the removed look was the picture the item shows, the item takes its
+   * first remaining look, or none (`thumbnailAfterRemoval`).
+   */
+  removeLook: procedure
+    .input(z.object({ lookId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const owner = ctx.scope.dataUserId;
+      const look = await db.getSymbolLook(input.lookId, owner);
+      const item = look
+        ? await db.getSymbolLinkById(look.symbolLinkId, owner)
+        : undefined;
+      if (!look || !item)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Look not found." });
+      await db.deleteSymbolLook(look.id, owner);
+      const remaining = await db.getSymbolLooks(item.id, owner);
+      const thumbnail = thumbnailAfterRemoval(item.thumbnail, look, remaining);
+      if (thumbnail !== item.thumbnail)
+        await db.updateSymbolLink(item.id, owner, { thumbnail });
+      return {
+        symbolId: item.id,
+        looks: lookCount(remaining.length, thumbnail !== null),
+        hasPicture: thumbnail !== null,
       };
     }),
 
