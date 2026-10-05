@@ -515,3 +515,177 @@ withDb("removing a look", () => {
     expect(await looksOf(item.id)).toHaveLength(1);
   });
 });
+
+// ── Moving a look to another item (plan § 5, § 8 test 4) ─────────────────────
+
+withDb("moving a look", () => {
+  it("moves the look with its picture and box; each item's picture follows", async () => {
+    const set = await aSet();
+    const gfci = await capture("GFCI receptacle", set.sheetId);
+    await capture("GFCI receptacle", set.sheetId, {
+      thumbnail: PIC2,
+      box: { ...BOX, x: 400 },
+      addAsLook: true,
+    });
+    const duplex = await caller().takeoffStamps.captureSymbol({
+      label: "Duplex",
+      thumbnail: null,
+    });
+    // The first look — the picture GFCI shows — was really a duplex.
+    const [, first] = await caller().takeoffStamps.looksFor({
+      symbolId: gfci.id,
+    });
+    const r = await caller().takeoffStamps.moveLook({
+      lookId: first.id,
+      toSymbolId: duplex.id,
+    });
+    expect(r).toMatchObject({ fromLooks: 1, toLooks: 1, toLabel: "Duplex" });
+
+    const moved = await looksOf(duplex.id);
+    expect(moved).toHaveLength(1);
+    expect(moved[0]).toMatchObject({
+      id: first.id,
+      thumbnail: PIC,
+      sheetId: set.sheetId,
+      captureX: "100.0000",
+    });
+    const legend = await caller().takeoffStamps.symbols();
+    const by = (id: number) => legend.find(l => l.id === id)!;
+    expect(by(gfci.id)).toMatchObject({ looks: 1, thumbnail: PIC2 });
+    expect(by(duplex.id)).toMatchObject({ looks: 1, thumbnail: PIC });
+  });
+
+  it("is refused when the target already has the same look, and nothing moves", async () => {
+    const set = await aSet();
+    const a = await capture("Duplex", set.sheetId);
+    const b = await capture("Receptacle", set.sheetId, {
+      box: { ...BOX, x: BOX.x + 1 },
+    });
+    const [look] = await caller().takeoffStamps.looksFor({ symbolId: a.id });
+    await expect(
+      caller().takeoffStamps.moveLook({ lookId: look.id, toSymbolId: b.id })
+    ).rejects.toThrow(/already has this look/);
+    expect(await looksOf(a.id)).toHaveLength(1);
+    expect(await looksOf(b.id)).toHaveLength(1);
+  });
+
+  it("a target from before looks keeps its old picture as its first look", async () => {
+    const set = await aSet();
+    const database = await getDb();
+    const [old] = await database!.insert(symbolLinks).values({
+      userId: USER,
+      label: "Junction box",
+      lookupKey: "junction box",
+      thumbnail: PIC2,
+    });
+    const item = await capture("Duplex", set.sheetId);
+    const [look] = await caller().takeoffStamps.looksFor({ symbolId: item.id });
+    await caller().takeoffStamps.moveLook({
+      lookId: look.id,
+      toSymbolId: old.insertId,
+    });
+    expect((await looksOf(old.insertId)).map(l => l.thumbnail).sort()).toEqual([
+      PIC,
+      PIC2,
+    ]);
+  });
+
+  it("moves no count: marks, bid lines and snapshots are identical on an open and a locked bid", async () => {
+    const assemblyId = await ownAssembly("Duplex receptacle");
+    const open = await aSet(USER, "Open.pdf");
+    const locked = await aSet(USER, "Locked.pdf");
+    const duplex = await caller().takeoffStamps.captureSymbol({
+      label: "Duplex",
+      thumbnail: PIC,
+      capturedFromSheetId: open.sheetId,
+      box: BOX,
+      assemblyId,
+    });
+    const gfci = await capture("GFCI", open.sheetId, {
+      box: { ...BOX, x: 700 },
+    });
+    for (const set of [open, locked]) {
+      const counts = [
+        await caller().takeoffGroups.forAssembly({
+          bidId: set.bidId,
+          assemblyId,
+        }),
+        await caller().takeoffGroups.create({
+          bidId: set.bidId,
+          label: "GFCI",
+          reuseExisting: true,
+          symbolId: gfci.id,
+        }),
+      ];
+      for (let i = 0; i < counts.length; i++) {
+        const g = counts[i];
+        await caller().takeoffStamps.drop({
+          bidId: set.bidId,
+          sheetId: set.sheetId,
+          groupId: g.id,
+          at: Array.from({ length: i + 2 }, (_, k) => ({ x: 10 + k, y: 10 })),
+        });
+        await caller().takeoffGroups.sendToBid({ id: g.id });
+      }
+    }
+    await caller().bids.lockQuantities({ bidId: locked.bidId });
+
+    const database = await getDb();
+    const read = async () =>
+      JSON.stringify(
+        await Promise.all(
+          [open, locked].map(async set => ({
+            groups: await caller().takeoffGroups.list({ bidId: set.bidId }),
+            bid: await caller().bids.get({ id: set.bidId }),
+            stored: await database!
+              .select()
+              .from(bidLineItems)
+              .where(eq(bidLineItems.bidId, set.bidId)),
+          }))
+        )
+      );
+    const before = await read();
+    expect(before).toContain('"qty"');
+
+    const [look] = await caller().takeoffStamps.looksFor({
+      symbolId: duplex.id,
+    });
+    await caller().takeoffStamps.moveLook({
+      lookId: look.id,
+      toSymbolId: gfci.id,
+    });
+
+    // The move happened (outcome) ...
+    expect(await looksOf(duplex.id)).toHaveLength(0);
+    expect(await looksOf(gfci.id)).toHaveLength(2);
+    // ... and nothing counted moved.
+    expect(await read()).toBe(before);
+  });
+
+  it("another company's look or item is not found, and nothing moves", async () => {
+    const set = await aSet();
+    const a = await capture("Duplex", set.sheetId);
+    const b = await capture("GFCI", set.sheetId, { box: { ...BOX, x: 500 } });
+    const [look] = await caller().takeoffStamps.looksFor({ symbolId: a.id });
+    await expect(
+      caller(OTHER).takeoffStamps.moveLook({
+        lookId: look.id,
+        toSymbolId: b.id,
+      })
+    ).rejects.toThrow(/not found/i);
+    const theirSet = await aSet(OTHER);
+    const theirs = await caller(OTHER).takeoffStamps.captureSymbol({
+      label: "Theirs",
+      thumbnail: PIC,
+      capturedFromSheetId: theirSet.sheetId,
+      box: BOX,
+    });
+    await expect(
+      caller().takeoffStamps.moveLook({
+        lookId: look.id,
+        toSymbolId: theirs.id,
+      })
+    ).rejects.toThrow(/not found/i);
+    expect(await looksOf(a.id)).toHaveLength(1);
+  });
+});

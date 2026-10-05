@@ -9311,6 +9311,20 @@ export async function deleteSymbolLook(id: number, userId: number) {
     .where(and(eq(symbolLooks.id, id), eq(symbolLooks.userId, userId)));
 }
 
+/** Point one look at another item. Writes nothing else. */
+export async function moveSymbolLook(
+  id: number,
+  symbolLinkId: number,
+  userId: number
+) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .update(symbolLooks)
+    .set({ symbolLinkId })
+    .where(and(eq(symbolLooks.id, id), eq(symbolLooks.userId, userId)));
+}
+
 export async function deleteSymbolLink(id: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");

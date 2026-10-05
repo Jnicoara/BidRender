@@ -357,6 +357,7 @@ export function LegendPanel({
               {looksOpenId === symbol.id && (symbol.looks ?? 0) > 1 && (
                 <LookList
                   symbol={symbol}
+                  others={symbols.filter(s => s.id !== symbol.id)}
                   onRemoved={lookId => onLookRemoved?.(lookId) ?? null}
                 />
               )}
@@ -401,24 +402,60 @@ export function LegendPanel({
 
 /**
  * One item's looks, under its row (multiple-looks-plan.md § 5): each picture,
- * where it came from, and an × that asks once before removing it.
+ * where it came from, an × that asks once before removing it, and "Move"
+ * for a look saved under the wrong item.
  *
  * Removing a look changes what FUTURE searches find and nothing else — no
  * mark, count or bid line moves (server: takeoffStamps.removeLook, and
  * symbolLooks.test.ts reads them on both sides). The confirm says so,
- * because "remove" beside a count reads as removing counted marks.
+ * because "remove" beside a count reads as removing counted marks. Moving
+ * is the same: the look goes, the marks it once found stay in their count.
  */
 function LookList({
   symbol,
+  others,
   onRemoved,
 }: {
   symbol: SymbolEntry;
-  /** Returns a line about a running search it changed, or null. */
+  /** The legend's other items: where a look can be moved to. */
+  others: SymbolEntry[];
+  /**
+   * The look left this item (removed or moved). Returns a line about a
+   * running search it changed, or null.
+   */
   onRemoved: (lookId: number) => string | null;
 }) {
   const utils = trpc.useUtils();
   const looks = trpc.takeoffStamps.looksFor.useQuery({ symbolId: symbol.id });
-  const [asking, setAsking] = useState<number | null>(null);
+  /** The look whose remove confirm, or move picker, is open. */
+  const [asking, setAsking] = useState<{
+    lookId: number;
+    to: "remove" | "move";
+  } | null>(null);
+  const [filter, setFilter] = useState("");
+  const settle = () => {
+    setAsking(null);
+    setFilter("");
+    // Everything that shows or searches an item's looks — both items'.
+    void utils.takeoffStamps.symbols.invalidate();
+    void utils.takeoffStamps.looksFor.invalidate();
+    void utils.takeoffStamps.searchLooks.invalidate();
+  };
+  const move = trpc.takeoffStamps.moveLook.useMutation({
+    onSuccess: (r, { lookId }) => {
+      const search = onRemoved(lookId);
+      toast.success(
+        [
+          `Look moved to “${r.toLabel}”. Marks already counted stay where they are.`,
+          search,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
+    },
+    onError: e => toast.error(e.message),
+    onSettled: settle,
+  });
   const remove = trpc.takeoffStamps.removeLook.useMutation({
     onSuccess: (r, { lookId }) => {
       const search = onRemoved(lookId);
@@ -434,14 +471,10 @@ function LookList({
       );
     },
     onError: e => toast.error(e.message),
-    onSettled: () => {
-      setAsking(null);
-      // Everything that shows or searches an item's looks.
-      void utils.takeoffStamps.symbols.invalidate();
-      void utils.takeoffStamps.looksFor.invalidate({ symbolId: symbol.id });
-      void utils.takeoffStamps.searchLooks.invalidate();
-    },
+    onSettled: settle,
   });
+  const q = filter.trim().toLowerCase();
+  const targets = others.filter(o => !q || o.label.toLowerCase().includes(q));
 
   return (
     <div
@@ -449,63 +482,143 @@ function LookList({
       onClick={e => e.stopPropagation()}
     >
       {looks.data?.map(look => (
-        <div key={look.id} className="flex items-center gap-2 text-xs">
-          {look.thumbnail ? (
-            <img
-              src={look.thumbnail}
-              alt=""
-              className="w-6 h-6 object-contain rounded bg-white shrink-0"
-            />
-          ) : (
-            <div className="w-6 h-6 rounded bg-muted shrink-0" />
-          )}
-          {asking === look.id ? (
-            <>
-              <span className="flex-1 min-w-0 truncate">
-                Remove this look? Counts stay.
-              </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-5 px-1.5 text-xs text-destructive"
-                disabled={remove.isPending}
-                onClick={() => remove.mutate({ lookId: look.id })}
-              >
-                Remove
-              </Button>
+        <div key={look.id}>
+          <div className="flex items-center gap-2 text-xs">
+            {look.thumbnail ? (
+              <img
+                src={look.thumbnail}
+                alt=""
+                className="w-6 h-6 object-contain rounded bg-white shrink-0"
+              />
+            ) : (
+              <div className="w-6 h-6 rounded bg-muted shrink-0" />
+            )}
+            {asking?.lookId === look.id && asking.to === "remove" ? (
+              <>
+                <span className="flex-1 min-w-0 truncate">
+                  Remove this look? Counts stay.
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-5 px-1.5 text-xs text-destructive"
+                  disabled={remove.isPending}
+                  onClick={() => remove.mutate({ lookId: look.id })}
+                >
+                  Remove
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-5 px-1.5 text-xs"
+                  onClick={() => setAsking(null)}
+                >
+                  Keep
+                </Button>
+              </>
+            ) : (
+              <>
+                <span
+                  className="flex-1 min-w-0 truncate text-muted-foreground"
+                  title={
+                    look.hasBox
+                      ? undefined
+                      : "Saved without a box: shown here, not searched"
+                  }
+                >
+                  {look.setName ?? "A deleted plan set"}
+                  {look.pageNumber !== null && ` · page ${look.pageNumber}`}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-5 px-1.5 shrink-0 text-xs text-muted-foreground hover:text-foreground"
+                  disabled={others.length === 0}
+                  onClick={() =>
+                    setAsking(
+                      asking?.lookId === look.id && asking.to === "move"
+                        ? null
+                        : { lookId: look.id, to: "move" }
+                    )
+                  }
+                  title={
+                    others.length === 0
+                      ? "No other item in the legend to move it to"
+                      : "Move this look to another item"
+                  }
+                  aria-label={`Move this look of ${symbol.label} to another item`}
+                >
+                  Move
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-5 w-5 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => setAsking({ lookId: look.id, to: "remove" })}
+                  title="Remove this look"
+                  aria-label={`Remove this look of ${symbol.label}`}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </>
+            )}
+          </div>
+          {asking?.lookId === look.id && asking.to === "move" && (
+            <div className="mt-1 mb-2 space-y-1">
+              <p className="text-xs">
+                Move this look to which item? Marks already counted stay where
+                they are.
+              </p>
+              {others.length > 6 && (
+                <Input
+                  value={filter}
+                  placeholder="Filter items"
+                  aria-label="Filter items to move the look to"
+                  className="h-6 px-1.5 text-xs"
+                  onChange={e => setFilter(e.target.value)}
+                  onKeyDown={e => {
+                    // The page's own keys must not see typing in the filter.
+                    e.stopPropagation();
+                    if (e.key === "Escape") setAsking(null);
+                  }}
+                />
+              )}
+              {targets.slice(0, 6).map(t => (
+                <button
+                  key={t.id}
+                  type="button"
+                  disabled={move.isPending}
+                  className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-xs hover:bg-muted/60"
+                  onClick={() =>
+                    move.mutate({ lookId: look.id, toSymbolId: t.id })
+                  }
+                >
+                  {t.thumbnail ? (
+                    <img
+                      src={t.thumbnail}
+                      alt=""
+                      className="w-5 h-5 object-contain rounded bg-white shrink-0"
+                    />
+                  ) : (
+                    <span className="w-5 h-5 rounded bg-muted shrink-0" />
+                  )}
+                  <span className="truncate">{t.label}</span>
+                </button>
+              ))}
+              {targets.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No item by that name.
+                </p>
+              )}
               <Button
                 size="sm"
                 variant="ghost"
                 className="h-5 px-1.5 text-xs"
                 onClick={() => setAsking(null)}
               >
-                Keep
+                Cancel
               </Button>
-            </>
-          ) : (
-            <>
-              <span
-                className="flex-1 min-w-0 truncate text-muted-foreground"
-                title={
-                  look.hasBox
-                    ? undefined
-                    : "Saved without a box: shown here, not searched"
-                }
-              >
-                {look.setName ?? "A deleted plan set"}
-                {look.pageNumber !== null && ` · page ${look.pageNumber}`}
-              </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-5 w-5 p-0 shrink-0 text-muted-foreground hover:text-destructive"
-                onClick={() => setAsking(look.id)}
-                title="Remove this look"
-                aria-label={`Remove this look of ${symbol.label}`}
-              >
-                <X className="w-3 h-3" />
-              </Button>
-            </>
+            </div>
           )}
         </div>
       ))}

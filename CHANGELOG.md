@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-05]
 
+- **A look saved under the wrong item can be moved.** Each look in a legend
+  item's list has "Move", which lists the other items. The look keeps its
+  picture and box; counted marks stay in their counts on every bid, locked or
+  not. It is refused if the other item already has that same look.
+
 - **A wrong look can be removed.** On the Legend tab, "N looks" now opens the
   item's pictures, each with an × that asks once. Removing a look changes what
   future searches find and nothing else — no mark, count or bid line moves, on

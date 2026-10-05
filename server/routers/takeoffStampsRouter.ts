@@ -130,6 +130,35 @@ const thumbnailSchema = z
   )
   .nullable();
 
+/**
+ * An item from before looks has its old picture and no look rows; that
+ * picture is its first look (multiple-looks-plan.md § 2), read rather than
+ * backfilled. Written as a box-less row the moment a row is ADDED to such an
+ * item, or the new row would hide it.
+ */
+async function keepOldPictureAsFirstLook(
+  item: {
+    id: number;
+    thumbnail: string | null;
+    capturedFromSheetId: number | null;
+  },
+  lookRows: number,
+  owner: number
+) {
+  if (lookRows > 0 || !item.thumbnail) return;
+  const from = item.capturedFromSheetId
+    ? await db.getBidPdfSheet(item.capturedFromSheetId, owner)
+    : undefined;
+  await db.createSymbolLook({
+    userId: owner,
+    symbolLinkId: item.id,
+    thumbnail: item.thumbnail,
+    bidPdfId: from?.bidPdfId ?? null,
+    sheetId: from?.id ?? null,
+    createdByUserId: null,
+  });
+}
+
 async function requireSheet(sheetId: number, userId: number) {
   const sheet = await db.getBidPdfSheet(sheetId, userId);
   if (!sheet)
@@ -802,24 +831,11 @@ export const takeoffStampsRouter = router({
             isLinked: existing.assemblyId !== null,
             autoLinked: false,
           };
-        // The item's old picture is its first look (plan § 2). Written as a
-        // box-less row now, or adding a row would hide it.
-        if (looks.length === 0 && existing.thumbnail) {
-          const from = existing.capturedFromSheetId
-            ? await db.getBidPdfSheet(
-                existing.capturedFromSheetId,
-                ctx.scope.dataUserId
-              )
-            : undefined;
-          await db.createSymbolLook({
-            userId: ctx.scope.dataUserId,
-            symbolLinkId: existing.id,
-            thumbnail: existing.thumbnail,
-            bidPdfId: from?.bidPdfId ?? null,
-            sheetId: from?.id ?? null,
-            createdByUserId: null,
-          });
-        }
+        await keepOldPictureAsFirstLook(
+          existing,
+          looks.length,
+          ctx.scope.dataUserId
+        );
         await db.createSymbolLook({ ...lookFields, symbolLinkId: existing.id });
         return {
           id: existing.id,
@@ -1022,6 +1038,78 @@ export const takeoffStampsRouter = router({
         symbolId: item.id,
         looks: lookCount(remaining.length, thumbnail !== null),
         hasPicture: thumbnail !== null,
+      };
+    }),
+
+  /**
+   * Move one look to another item (plan § 5) — a look saved under the wrong
+   * item. The look keeps its picture and box. Refused when the target already
+   * has the same look (same sheet, same box: `isSameLook`).
+   *
+   * Like removing, it moves NO counted mark (§ 7): marks belong to a count,
+   * not to the look that found them. Moving marks is "Move to…", a separate
+   * step. Each item's shown picture follows: the source falls to its next
+   * look (`thumbnailAfterRemoval`), and a target with no picture takes this
+   * one. A target from before looks keeps its old picture as its first look.
+   */
+  moveLook: procedure
+    .input(
+      z.object({
+        lookId: z.number().int().positive(),
+        toSymbolId: z.number().int().positive(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const owner = ctx.scope.dataUserId;
+      const look = await db.getSymbolLook(input.lookId, owner);
+      const [from, to] = await Promise.all([
+        look ? db.getSymbolLinkById(look.symbolLinkId, owner) : undefined,
+        db.getSymbolLinkById(input.toSymbolId, owner),
+      ]);
+      if (!look || !from)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Look not found." });
+      if (!to)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Symbol not found.",
+        });
+      if (to.id === from.id)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `This look is already on “${to.label}”.`,
+        });
+      const targetLooks = await db.getSymbolLooks(to.id, owner);
+      const box = lookBoxOf(look);
+      if (
+        targetLooks.some(l =>
+          isSameLook(
+            { sheetId: l.sheetId, box: lookBoxOf(l) },
+            { sheetId: look.sheetId, box }
+          )
+        )
+      )
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `“${to.label}” already has this look, from the same box on the same sheet.`,
+        });
+
+      await keepOldPictureAsFirstLook(to, targetLooks.length, owner);
+      await db.moveSymbolLook(look.id, to.id, owner);
+
+      const left = await db.getSymbolLooks(from.id, owner);
+      const fromThumbnail = thumbnailAfterRemoval(from.thumbnail, look, left);
+      if (fromThumbnail !== from.thumbnail)
+        await db.updateSymbolLink(from.id, owner, { thumbnail: fromThumbnail });
+      if (to.thumbnail === null && look.thumbnail !== null)
+        await db.updateSymbolLink(to.id, owner, { thumbnail: look.thumbnail });
+
+      const now = await db.getSymbolLooks(to.id, owner);
+      return {
+        fromSymbolId: from.id,
+        toSymbolId: to.id,
+        toLabel: to.label,
+        fromLooks: lookCount(left.length, fromThumbnail !== null),
+        toLooks: now.length,
       };
     }),
 
