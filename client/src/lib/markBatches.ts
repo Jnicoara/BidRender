@@ -13,23 +13,38 @@
  * queue's first entry.
  *
  * So a batch is decided HERE, by the only rule that cannot be wrong: every
- * mark in it shares its sheet and its count. Anything else waits for the next
- * batch. Pure, so the suite can reach it (CLAUDE.md: a rule with no red to go
- * to is an instruction).
+ * mark in it shares its sheet, its count, and what it was placed as. Anything
+ * else waits for the next batch. Pure, so the suite can reach it (CLAUDE.md: a
+ * rule with no red to go to is an instruction).
+ *
+ * ── Placed as: the third thing a batch shares (2026-10-05) ────────────────
+ * "Placing as" on the counting pill lets a run of devices go down as
+ * existing. `drop` takes ONE status per request, so a batch holding both
+ * would send them all as whichever came first — an existing device sent as
+ * new is PRICED, a new one sent as existing is dropped off the bid. Same
+ * failure as two counts in one batch, one column over.
  */
 
+import type { UserMarkStatus } from "@shared/markStatus";
 import { isProvisionalGroup } from "./provisionalCount";
+import { queuedStampStatus, type QueuedStamp } from "./traceDraft";
 
 export type QueuedMark = {
   sheetId: number;
   groupId: number;
+  /**
+   * What the mark was placed as. Required, so no queue can be built that
+   * forgets it and lets an existing device go over as new.
+   */
+  status: UserMarkStatus;
   /** In flight already; not part of the next batch. */
   sent: boolean;
 };
 
 /**
- * The next batch: the unsent marks sharing the sheet and count of the OLDEST
- * unsent mark, in queue order. Empty when nothing is waiting.
+ * The next batch: the unsent marks sharing the sheet, count and placed-as
+ * status of the OLDEST unsent mark, in queue order. Empty when nothing is
+ * waiting.
  *
  * Marks under a PROVISIONAL count (a negative id: picked, not yet made by the
  * server — @/lib/provisionalCount) are never batched. They wait until the
@@ -40,7 +55,11 @@ export function nextMarkBatch<T extends QueuedMark>(queue: readonly T[]): T[] {
   const first = queue.find(m => !m.sent && !isProvisionalGroup(m.groupId));
   if (!first) return [];
   return queue.filter(
-    m => !m.sent && m.sheetId === first.sheetId && m.groupId === first.groupId
+    m =>
+      !m.sent &&
+      m.sheetId === first.sheetId &&
+      m.groupId === first.groupId &&
+      m.status === first.status
   );
 }
 
@@ -61,6 +80,21 @@ export function hasMoreBatches<T extends QueuedMark>(
  * current shape, or, in the older shape with no group, its assembly or its
  * typed name. Entries with the same key go together, in first-seen order.
  */
+/**
+ * The key a recovered click is split by: what it counted, AND what it was
+ * placed as — a part goes over with one status, for the same reason a batch
+ * does (see the top of this file).
+ */
+export function recoveredMarkKey(stamp: QueuedStamp): string {
+  const counted =
+    typeof stamp.groupId === "number" && stamp.groupId > 0
+      ? `group:${stamp.groupId}`
+      : typeof stamp.assemblyId === "number" && stamp.assemblyId > 0
+        ? `assembly:${stamp.assemblyId}`
+        : `name:${stamp.assemblyName?.trim() || "Recovered count"}`;
+  return `${counted}|${queuedStampStatus(stamp)}`;
+}
+
 export function splitRecoveredMarks<T>(
   stamps: readonly T[],
   key: (stamp: T) => string

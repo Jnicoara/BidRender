@@ -89,6 +89,25 @@ export function clearOpen(items: readonly MatchItem[]): MatchItem[] {
   return items.filter(i => i.state === "open" && itemKind(i) === "clear");
 }
 
+/**
+ * A saved look was removed while this session is open (multiple-looks-plan.md
+ * § 7): every OPEN find that look helped make is dropped, never re-pointed to
+ * another source — unless the box drawn on this sheet found it too, since
+ * that find stands without the look. A decided item is left alone: a confirmed
+ * one is already a mark, and a removed look never moves a mark.
+ */
+export function dropLookMatches(
+  items: readonly MatchItem[],
+  lookId: number
+): { items: MatchItem[]; dropped: number } {
+  const goes = (i: MatchItem) =>
+    i.state === "open" &&
+    !i.foundByBox &&
+    (i.foundByLooks ?? []).includes(lookId);
+  const kept = items.filter(i => !goes(i));
+  return { items: kept, dropped: items.length - kept.length };
+}
+
 export function summary(items: readonly MatchItem[]) {
   const open = items.filter(i => i.state === "open");
   return {

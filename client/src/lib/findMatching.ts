@@ -66,6 +66,13 @@ export type Match = {
    * (@/lib/lookMatching). Absent when only the box was searched.
    */
   foundBy?: number;
+  /** The box drawn now found it. Absent when only the box was searched. */
+  foundByBox?: boolean;
+  /**
+   * The saved looks that found it, by id — so removing a look mid-search
+   * can drop what only it found (multiple-looks-plan.md § 7).
+   */
+  foundByLooks?: number[];
 };
 
 export type FindResult =
