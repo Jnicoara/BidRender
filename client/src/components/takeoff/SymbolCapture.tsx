@@ -177,6 +177,7 @@ export function SymbolCaptureForm({
   sharpening,
   soft,
   chromeTarget,
+  existingFor,
   onSave,
   onCancel,
 }: {
@@ -190,11 +191,22 @@ export function SymbolCaptureForm({
   soft: boolean;
   /** PlanPane's screen-space layer. Null only before it has mounted. */
   chromeTarget: HTMLElement | null;
-  onSave: (label: string) => void;
+  /**
+   * The legend item this name already belongs to, if any — then saving asks
+   * whether this picture is another LOOK of it (multiple-looks-plan.md § 1).
+   */
+  existingFor: (label: string) => {
+    label: string;
+    looks: number;
+    thumbnail: string | null;
+  } | null;
+  onSave: (label: string, opts: { addAsLook: boolean }) => void;
   onCancel: () => void;
 }) {
   const [label, setLabel] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [asking, setAsking] = useState<ReturnType<typeof existingFor>>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -205,7 +217,12 @@ export function SymbolCaptureForm({
     // Blank writes nothing — a symbol with no name cannot be found again, and
     // the label is what the link is keyed on.
     if (!trimmed || sharpening) return;
-    onSave(trimmed);
+    const existing = existingFor(trimmed);
+    if (existing) {
+      setAsking(existing);
+      return;
+    }
+    onSave(trimmed, { addAsLook: false });
   };
 
   // pointer-events-auto: the screen layer is click-through by default.
@@ -259,25 +276,107 @@ export function SymbolCaptureForm({
         </p>
       )}
 
-      <div className="flex items-center gap-1.5 mt-2.5">
-        <Button
-          size="sm"
-          className="h-7 gap-1.5 text-xs flex-1"
-          onClick={commit}
-          disabled={!label.trim() || sharpening}
+      {note && !asking && (
+        <p className="text-xs text-[#F5C518] mt-2" role="status">
+          {note}
+        </p>
+      )}
+
+      {asking ? (
+        <div
+          className="mt-2.5 rounded-lg border border-border p-2"
+          role="group"
         >
-          <Check className="w-3 h-3" />{" "}
-          {sharpening ? "Sharpening picture…" : "Save symbol"}
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 gap-1.5 text-xs"
-          onClick={onCancel}
-        >
-          <X className="w-3 h-3" /> Cancel
-        </Button>
-      </div>
+          <p className="text-xs font-medium">
+            “{asking.label}” is already in your legend.
+          </p>
+          <div className="flex items-center gap-2 mt-1.5">
+            {asking.thumbnail ? (
+              <img
+                src={asking.thumbnail}
+                alt={`${asking.label}, as saved`}
+                className="w-10 h-10 object-contain rounded bg-white border border-border"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded bg-muted" />
+            )}
+            <span className="text-[0.65rem] text-muted-foreground">
+              {asking.looks === 1 ? "its look" : `${asking.looks} looks`}
+            </span>
+            <span className="text-muted-foreground">·</span>
+            {thumbnail ? (
+              <img
+                src={thumbnail}
+                alt="This one"
+                className="w-10 h-10 object-contain rounded bg-white border border-border"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded bg-muted" />
+            )}
+            <span className="text-[0.65rem] text-muted-foreground">
+              this one
+            </span>
+          </div>
+          <p className="text-xs mt-1.5">
+            Add this as another look for {asking.label}? It stays one item: one
+            count, one price.
+          </p>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <Button
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => onSave(label.trim(), { addAsLook: true })}
+            >
+              Yes, another look
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => {
+                // Two items cannot share a name (plan § 9 Q1): back to the
+                // name, the old one ready to edit.
+                setAsking(null);
+                setNote(
+                  `Two items cannot share a name — give this one its own, e.g. ${asking.label} — weather resistant.`
+                );
+                inputRef.current?.focus();
+                inputRef.current?.select();
+              }}
+            >
+              No, a separate item
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs"
+              onClick={onCancel}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 mt-2.5">
+          <Button
+            size="sm"
+            className="h-7 gap-1.5 text-xs flex-1"
+            onClick={commit}
+            disabled={!label.trim() || sharpening}
+          >
+            <Check className="w-3 h-3" />{" "}
+            {sharpening ? "Sharpening picture…" : "Save symbol"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 gap-1.5 text-xs"
+            onClick={onCancel}
+          >
+            <X className="w-3 h-3" /> Cancel
+          </Button>
+        </div>
+      )}
     </div>
   );
 

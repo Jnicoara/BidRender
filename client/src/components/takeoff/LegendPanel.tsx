@@ -54,6 +54,11 @@ export type SymbolEntry = {
   assemblyId: number | null;
   thumbnail: string | null;
   isLinked: boolean;
+  /**
+   * How many pictures of it are saved (multiple-looks-plan.md § 5). Shown
+   * from two up: one look is every item, and saying so is noise.
+   */
+  looks?: number;
 };
 
 export type PickableAssembly = { id: number; name: string; category: string };
@@ -253,6 +258,11 @@ export function LegendPanel({
                     </>
                   ) : (
                     "Counts by name · no assembly"
+                  )}
+                  {(symbol.looks ?? 0) > 1 && (
+                    <span title="Several pictures of this one item, from different plan sets or sheets. Find all matching searches every one.">
+                      · {symbol.looks} looks
+                    </span>
                   )}
                 </p>
               </div>

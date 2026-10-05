@@ -342,7 +342,15 @@ panel in `components/takeoff/FindMatching.tsx`, and
 | Timer switch (2)   | **2 / 2**   | 0                              | MAIN FLOOR - POWER PLAN    |
 |                    | **85 / 86** |                                |                            |
 
-The miss is the "(A-8)" C fixture (§ 2). **Demolition:** a switch boxed on
+The miss is the "(A-8)" C fixture (§ 2). **Corrected 2026-10-05 by the
+owner:** the "wall-mounted point" marks were the **7 OS occupancy/daylight
+sensors** (ceiling mounted), and the 8th, on that C fixture, is not one —
+struck in `reader-accuracy/answer-key.json` (`dropMarks`), which the check
+script now reads. So the circle is **7 / 7** and the total **85 / 85**. On
+E1.02 the owner's "GFCI receptacle" count is the **half-filled duplex, a
+duplex above the backsplash** (NOTE 7, verify height) — not a GFCI on this
+set; the answer key now maps it per sheet (§ Q2 of § 8 is answered by it).
+**Demolition:** a switch boxed on
 E1.01's demolition plan found 8, a receptacle on E1.02's found 37; every one
 labelled, none on his new-plan marks. **Too poor:** the switch box refuses at
 50 and 72 dpi (10, 14 px), is flagged at 100 (19 px), plain at 150 and 300.
@@ -386,7 +394,8 @@ worker, opencv.js fetched on the first search). Every number here is from
     every white pixel was a "find". A window must hold 0.5–2x the picked
     symbol's ink.
 
-6. **New, for the owner: Confirm all on a scan.** Today nothing on a scan is
+6. **DECIDED 2026-10-05 by the owner: keep scans as built** — no "Confirm
+   all — checked by eye" button. _The question as asked:_ **Confirm all on a scan.** Today nothing on a scan is
    "clear" until the AI has read the words beside it. **Recommended: keep
    it** — the alternative counted 18 existing receptacles as new on E1.02 —
    / or add "Confirm all N — I've checked the words by eye" as a second,

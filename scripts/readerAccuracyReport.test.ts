@@ -143,3 +143,89 @@ describe("the report against the smaller key", () => {
     expect(text).toMatch(/data \/ telecom/);
   });
 });
+
+describe("a look means what its own plan set's legend says (2026-10-05)", () => {
+  // On Weld 1 "GFCI receptacle" is a GFCI. On Old Blueridge the owner's
+  // "GFCI receptacle" count was the half-filled duplex, which its legend and
+  // NOTE 7 call a duplex above the backsplash.
+  const file = {
+    sameAs: [["GFCI receptacle", "DUPLEX RECEPTACLE, GFCI", "GFCI"]],
+    sheets: {
+      "Old Blueridge school.pdf p4": {
+        sameAs: [
+          [
+            "DUPLEX RECEPTACLE OUTLET ABOVE BACKSPLASH OR COUNTER",
+            "GFCI receptacle",
+          ],
+        ],
+      },
+    },
+  };
+  const gfciMark = [{ label: "GFCI receptacle", x: 0, y: 0 }];
+
+  it("on the set whose legend says so, the AI naming it GFCI is WRONG", () => {
+    const blueridge = reading({
+      sheet: "Old Blueridge school.pdf p4",
+      marks: gfciMark,
+      suggestions: [{ label: "GFCI", x: 1, y: 1, unreadable: false }],
+    });
+    expect(buildReport([blueridge], file, R).main[0].perRun[0]).toMatchObject({
+      found: 0,
+      wrong: 1,
+    });
+    const right = reading({
+      sheet: "Old Blueridge school.pdf p4",
+      marks: gfciMark,
+      suggestions: [
+        {
+          label: "DUPLEX RECEPTACLE OUTLET ABOVE BACKSPLASH OR COUNTER",
+          x: 1,
+          y: 1,
+          unreadable: false,
+        },
+      ],
+    });
+    expect(buildReport([right], file, R).main[0].perRun[0]).toMatchObject({
+      found: 1,
+      wrong: 0,
+    });
+  });
+
+  it("on another set the same names still mean GFCI", () => {
+    const weld = reading({
+      marks: gfciMark,
+      suggestions: [{ label: "GFCI", x: 1, y: 1, unreadable: false }],
+    });
+    expect(buildReport([weld], file, R).main[0].perRun[0]).toMatchObject({
+      found: 1,
+      wrong: 0,
+    });
+  });
+
+  it("a mark the owner struck is left out of the score, matched by place", () => {
+    const r = reading({
+      sheet: "Old Blueridge school.pdf p3",
+      marks: [
+        { label: "Point", x: 0, y: 0 },
+        { label: "Point", x: 400, y: 0 },
+      ],
+      suggestions: [{ label: "Point", x: 1, y: 1, unreadable: false }],
+    });
+    const struck = {
+      sheets: {
+        "Old Blueridge school.pdf p3": {
+          dropMarks: [{ label: "point", x: 401, y: 1, why: "a C fixture" }],
+        },
+      },
+    };
+    expect(buildReport([r], null, R).main[0].perRun[0]).toMatchObject({
+      byHand: 2,
+      missed: 1,
+    });
+    expect(buildReport([r], struck, R).main[0].perRun[0]).toMatchObject({
+      byHand: 1,
+      found: 1,
+      missed: 0,
+    });
+  });
+});

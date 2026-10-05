@@ -394,11 +394,32 @@ for (const spec of PAGES) {
     return { gray, width, height, x0: rect.x, y0: rect.y, scale };
   };
 
-  const marks = (await db.getStampsForSheet(spec.sheetId, user.id)).map(m => ({
-    label: m.groupLabel ?? "",
-    x: Number(m.x),
-    y: Number(m.y),
-  }));
+  // Marks the owner has struck in reader-accuracy/answer-key.json (since
+  // 2026-10-05: the C fixture on E1.01 is not one of the 7 OS sensors) are
+  // left out, as the accuracy report leaves them out.
+  const struck = (() => {
+    try {
+      const key = JSON.parse(
+        readFileSync(path.join("reader-accuracy", "answer-key.json"), "utf8")
+      );
+      return (key.sheets?.[`Old Blueridge school.pdf p${spec.page}`]
+        ?.dropMarks ?? []) as { label: string; x: number; y: number }[];
+    } catch {
+      return [];
+    }
+  })();
+  const marks = (await db.getStampsForSheet(spec.sheetId, user.id))
+    .map(m => ({
+      label: m.groupLabel ?? "",
+      x: Number(m.x),
+      y: Number(m.y),
+    }))
+    .filter(
+      m =>
+        !struck.some(
+          d => d.label === m.label && Math.hypot(d.x - m.x, d.y - m.y) <= 2
+        )
+    );
 
   const run = async (box: {
     x: number;
@@ -472,6 +493,9 @@ for (const spec of PAGES) {
       } else offMark.push(f);
     }
     const found = own.filter((_, k) => used.has(marks.indexOf(own[k]))).length;
+    for (const m of own)
+      if (!used.has(marks.indexOf(m)))
+        console.log(`      missed his: (${m.x.toFixed(1)}, ${m.y.toFixed(1)})`);
     const flagged = r.matches.filter(f => f.needsLook.length).length;
     total.marks += own.length;
     total.found += found;

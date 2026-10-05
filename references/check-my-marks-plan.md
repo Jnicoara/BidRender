@@ -16,6 +16,36 @@ changes a mark; the estimator decides each one.
 
 ---
 
+## A look is per plan set — the owner's design rule, 2026-10-05
+
+> **The same-looking symbol can mean different things on different plan
+> sets. A look saved from another set may SUGGEST a match, but must never
+> auto-label on a new set without that set's own legend confirming it.**
+
+Found on Old Blueridge: the half-filled duplex the owner had counted as
+"GFCI receptacle" is, on that set, a **duplex above the backsplash** (its
+legend: "DUPLEX RECEPTACLE OUTLET ABOVE BACKSPLASH OR COUNTER", and NOTE 7 —
+verify height). On other sets a near-identical picture is a GFCI. A look
+carried over from those sets would have labelled every one of them wrong,
+in the confident voice of a right answer.
+
+**What "this set's own legend confirms it" means, today:** a look of the
+item captured on THIS plan set, or the symbol boxed on this sheet for the
+search. Nothing else — not the item's name, not a look from another job.
+(When A's per-set legend, `bid_pdf_legend_entries`, exists, a confirmed entry
+for the item on this set is the third way.) This narrows
+`plan-viewer-overhaul.md` § 9.4 ("suggested, never applied") from whole
+SYMBOLS to each LOOK, and says what turns a suggestion into a label.
+
+**What it changes here:** § 1 compares a mark with every look of every
+item. A verdict of "looks like a different item" that rests ONLY on a look
+from another plan set is a suggestion and says so ("looks like X as drawn on
+<set> — check this set's legend"); it never offers itself as the answer, and
+the "change it" button is not the default. Matching the mark's OWN item by a
+look from this set (or the legend sheet of this set) is the only "matches".
+
+---
+
 ## 0. What this rests on — cited, not re-decided
 
 | Decision / fact                                                                                     | Where                                                         | How this plan stands                                                                                                                              |

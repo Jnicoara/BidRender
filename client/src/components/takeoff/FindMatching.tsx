@@ -140,10 +140,12 @@ export type MatchPanelState =
       selectedId: number | null;
       readMs: number;
       findMs: number;
-      /** The box that was searched for, page points. */
-      box: MatchBox;
+      /** The box that was searched for, page points; null = looks only. */
+      box: MatchBox | null;
       /** Present on a scan (@/lib/scanMatching): the plan searched. */
       scan: { plan: string | null; pixels: number } | null;
+      /** The item's saved looks searched too, and what was left out. */
+      looks: { searched: number; notes: string[] } | null;
       /** The AI button's state (scans only): asking, and its last word. */
       ai: { busy: boolean; message: string | null };
     };
@@ -155,6 +157,8 @@ export function MatchPanel({
   chromeTarget,
   canAskAi,
   onAskAi,
+  savedLooks,
+  onSearchLooks,
   onConfirm,
   onConfirmExisting,
   onReject,
@@ -165,6 +169,14 @@ export function MatchPanel({
   canAskAi: boolean;
   /** One press, one small call, about the next AI_BATCH copies. */
   onAskAi: () => void;
+  /**
+   * The armed item's saved looks (multiple-looks-plan.md § 3): searched with
+   * the box, and searchable without one. How many come from THIS plan set
+   * decides the wording — a look from another set only suggests.
+   */
+  savedLooks: { total: number; thisSet: number };
+  /** Search the saved looks alone, no box. */
+  onSearchLooks: () => void;
   /** The count a confirmed copy goes to. */
   label: string;
   /** Its existing-to-remain twin, when there is one to put a copy in. */
@@ -193,10 +205,32 @@ export function MatchPanel({
   let body: React.ReactNode;
   if (state.phase === "boxing") {
     body = (
-      <p className="text-xs text-muted-foreground">
-        Drag a box snugly round ONE {label} on the drawing. Every copy on this
-        sheet will be found. Esc to stop.
-      </p>
+      <>
+        <p className="text-xs text-muted-foreground">
+          Drag a box snugly round ONE {label} on the drawing. Every copy on this
+          sheet will be found. Esc to stop.
+        </p>
+        {savedLooks.total > 0 && (
+          <>
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Its {savedLooks.total} saved look
+              {savedLooks.total === 1 ? "" : "s"} will be searched too
+              {savedLooks.thisSet < savedLooks.total
+                ? ` — ${savedLooks.total - savedLooks.thisSet} from other plan sets, which only suggest: the same symbol can mean something else on this set.`
+                : "."}
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs mt-2"
+              onClick={onSearchLooks}
+            >
+              Search the saved look{savedLooks.total === 1 ? "" : "s"} without a
+              box
+            </Button>
+          </>
+        )}
+      </>
     );
   } else if (state.phase === "finding") {
     body = (
@@ -237,6 +271,17 @@ export function MatchPanel({
           </span>
           . None is counted until you confirm it.
         </p>
+        {state.looks && state.looks.searched > 0 && (
+          <p className="text-xs text-muted-foreground mt-1">
+            {state.box ? "Also searched" : "Searched"} {state.looks.searched}{" "}
+            saved look{state.looks.searched === 1 ? "" : "s"}.
+          </p>
+        )}
+        {state.looks?.notes.map(n => (
+          <p key={n} className="text-xs text-muted-foreground mt-1">
+            {n}
+          </p>
+        ))}
         {state.scan && (
           <p className="text-xs text-muted-foreground mt-1">
             A scan: matched by picture, so the tag or an E beside each one is
@@ -300,7 +345,7 @@ export function MatchPanel({
           >
             Next <ChevronRight className="w-3 h-3" />
           </Button>
-          {canAskAi && state.scan && askable.length > 0 && (
+          {canAskAi && state.scan && state.box && askable.length > 0 && (
             <Button
               size="sm"
               variant="outline"
@@ -337,6 +382,9 @@ export function MatchPanel({
             {[
               ...sel.needsLook,
               ...sel.maybeExisting,
+              ...(sel.foundBy && sel.foundBy > 1
+                ? [`Found by ${sel.foundBy} looks.`]
+                : []),
               ...(sel.ai === "same"
                 ? ["The AI reads the same tag or label beside it."]
                 : sel.ai === "noAnswer"

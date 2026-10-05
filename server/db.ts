@@ -114,6 +114,9 @@ import {
   InsertSymbolLink,
   SymbolLink,
   symbolLinks,
+  InsertSymbolLook,
+  SymbolLook,
+  symbolLooks,
   EarlyAccessSignup,
   earlyAccessSignups,
   InsertPlanCopilotRun,
@@ -9219,6 +9222,69 @@ export async function updateSymbolLink(
     .update(symbolLinks)
     .set({ ...safe, updatedAt: new Date() })
     .where(and(eq(symbolLinks.id, id), eq(symbolLinks.userId, userId)));
+}
+
+// ─── Looks: several pictures of one legend item (symbol_looks, 0102) ──────────
+// references/multiple-looks-plan.md. An item with no look rows is read as one
+// box-less look, its old `symbol_links.thumbnail` (§ 2): no backfill.
+
+export async function createSymbolLook(
+  data: InsertSymbolLook
+): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db.insert(symbolLooks).values(data);
+  return result.insertId;
+}
+
+/**
+ * One item's looks, newest first, with the plan set each came from. Scoped
+ * by the company owner and the item both, so another company's item id
+ * finds nothing.
+ */
+export async function getSymbolLooks(
+  symbolLinkId: number,
+  userId: number
+): Promise<
+  (SymbolLook & { pageNumber: number | null; setName: string | null })[]
+> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      look: symbolLooks,
+      pageNumber: bidPdfSheets.pageNumber,
+      setName: bidPdfs.filename,
+    })
+    .from(symbolLooks)
+    .leftJoin(bidPdfSheets, eq(bidPdfSheets.id, symbolLooks.sheetId))
+    .leftJoin(bidPdfs, eq(bidPdfs.id, symbolLooks.bidPdfId))
+    .where(
+      and(
+        eq(symbolLooks.symbolLinkId, symbolLinkId),
+        eq(symbolLooks.userId, userId)
+      )
+    )
+    .orderBy(desc(symbolLooks.createdAt), desc(symbolLooks.id));
+  return rows.map(r => ({
+    ...r.look,
+    pageNumber: r.pageNumber ?? null,
+    setName: r.setName ?? null,
+  }));
+}
+
+/** How many look rows each of a company's items has, for the legend list. */
+export async function countSymbolLooks(
+  userId: number
+): Promise<Map<number, number>> {
+  const db = await getDb();
+  if (!db) return new Map();
+  const rows = await db
+    .select({ id: symbolLooks.symbolLinkId, n: sql<number>`count(*)` })
+    .from(symbolLooks)
+    .where(eq(symbolLooks.userId, userId))
+    .groupBy(symbolLooks.symbolLinkId);
+  return new Map(rows.map(r => [r.id, Number(r.n)]));
 }
 
 export async function deleteSymbolLink(id: number, userId: number) {

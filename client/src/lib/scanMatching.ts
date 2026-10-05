@@ -38,6 +38,12 @@
  */
 import type { WordBox } from "./textSelection";
 import type { Match, MatchBox } from "./findMatching";
+import {
+  mergeLookResults,
+  type LookResult,
+  type LookSource,
+  type MergedMatch,
+} from "./lookMatching";
 
 /** Work resolution: 150 dpi, in pixels per page point. Measured at this. */
 export const SCAN_WORK_SCALE = 150 / 72;
@@ -365,15 +371,14 @@ export const OFF_PLAN_REASON =
 export function scanMatches(
   peaks: readonly ScanPeak[],
   opts: {
-    box: MatchBox;
+    /** The box drawn on THIS sheet; null for a saved look from another. */
+    box: MatchBox | null;
     quality: ScanQuality;
     plan: PlanRegion | null;
     regions: readonly PlanRegion[];
   }
 ): Match[] {
   const { box, quality, plan, regions } = opts;
-  const bx = box.x + box.width / 2;
-  const by = box.y + box.height / 2;
   const out: Match[] = [];
   for (const p of onePerSpot(peaks)) {
     const at = regionAt(regions, p.x, p.y);
@@ -395,8 +400,9 @@ export function scanMatches(
       needsLook,
       maybeExisting: [],
       isBoxed:
-        Math.abs(p.x - bx) <= Math.abs(box.width) / 2 &&
-        Math.abs(p.y - by) <= Math.abs(box.height) / 2,
+        box !== null &&
+        Math.abs(p.x - (box.x + box.width / 2)) <= Math.abs(box.width) / 2 &&
+        Math.abs(p.y - (box.y + box.height / 2)) <= Math.abs(box.height) / 2,
       onDemolitionPlan: demolition,
     });
   }
@@ -505,18 +511,25 @@ export type ScanImage = {
 const TURNS: Match["rotation"][] = [0, 90, 180, 270];
 
 /**
- * Every place on `img` that looks like the picture inside `box` (page
- * points), at SCAN_SIZES x four quarter turns, as raw peaks in page points.
- * Frees every opencv Mat it makes: they live outside the JS heap and a
- * leaked one is a leaked plan-sized block per search.
+ * The searched picture, cleaned once: black-and-white (ink white),
+ * straightened, specks removed, softened — plus an integral of its ink, and
+ * the maps between page points and its pixels. One per search, whatever
+ * number of looks is then run against it. `free()` releases its opencv Mats:
+ * they live outside the JS heap, and a leaked one is a plan-sized block.
  */
-export function searchScanImage(
-  cv: OpenCv,
-  img: ScanImage,
-  box: MatchBox,
-  opts: { score?: number } = {}
-): { peaks: ScanPeak[]; skew: number; empty: boolean } {
-  const threshold = opts.score ?? SCAN_MATCH_SCORE;
+type PreparedScan = {
+  img: ScanImage;
+  soft: CvMat;
+  skew: number;
+  /** Ink pixels in a window of the cleaned picture. */
+  inkIn: (x: number, y: number, w: number, h: number) => number;
+  /** Page point → cleaned-picture pixel, and back. */
+  toPx: (x: number, y: number) => [number, number];
+  toPage: (px: number, py: number) => [number, number];
+  free: () => void;
+};
+
+function prepareScan(cv: OpenCv, img: ScanImage): PreparedScan {
   const { width: W, height: H, scale: K } = img;
   const made: CvMat[] = [];
   const keep = <T extends CvMat>(m: T) => (made.push(m), m);
@@ -602,23 +615,6 @@ export function searchScanImage(
     const soft = keep(new cv.Mat());
     cv.GaussianBlur(bw, soft, new cv.Size(3, 3), 0);
 
-    // The picked symbol: the box, moved with the straightening.
-    const [bcx, bcy] = fwd(
-      (box.x + box.width / 2 - img.x0) * K,
-      (box.y + box.height / 2 - img.y0) * K
-    );
-    const tw = Math.max(3, Math.round(Math.abs(box.width) * K));
-    const th = Math.max(3, Math.round(Math.abs(box.height) * K));
-    const tx = Math.round(bcx - tw / 2);
-    const ty = Math.round(bcy - th / 2);
-    if (tx < 0 || ty < 0 || tx + tw > W || ty + th > H)
-      return { peaks: [], skew, empty: true };
-    const roi = keep(soft.roi(new cv.Rect(tx, ty, tw, th)));
-    const base = keep(roi.clone());
-    let inked = 0;
-    for (let i = 0; i < base.data.length; i++) if (base.data[i] > 127) inked++;
-    if (inked < 4) return { peaks: [], skew, empty: true };
-
     /*
       Ink per window, from an integral of the cleaned picture. Normalised
       correlation is 0 / 0 on blank paper, and opencv answers +1 there — so
@@ -640,74 +636,195 @@ export function searchScanImage(
       sum[y * (W + 1) + x + w] -
       sum[(y + h) * (W + 1) + x] +
       sum[y * (W + 1) + x];
-    const pickedInk = Math.max(1, inkIn(tx, ty, tw, th));
 
-    const peaks: ScanPeak[] = [];
-    const rotateCodes = [
-      cv.ROTATE_90_CLOCKWISE,
-      cv.ROTATE_180,
-      cv.ROTATE_90_COUNTERCLOCKWISE,
-    ];
-    for (const size of SCAN_SIZES)
-      for (const rotation of TURNS) {
-        const sized = new cv.Mat();
-        const turned = new cv.Mat();
-        const res = new cv.Mat();
-        try {
-          cv.resize(
-            base,
-            sized,
-            new cv.Size(
-              Math.max(3, Math.round(tw * size)),
-              Math.max(3, Math.round(th * size))
-            ),
-            0,
-            0,
-            cv.INTER_LINEAR
-          );
-          if (rotation)
-            cv.rotate(sized, turned, rotateCodes[rotation / 90 - 1]);
-          const t = rotation ? turned : sized;
-          if (t.cols >= W || t.rows >= H) continue;
-          cv.matchTemplate(soft, t, res, cv.TM_CCOEFF_NORMED);
-          const rw = res.cols;
-          const rh = res.rows;
-          const f = res.data32F;
-          for (let y = 1; y < rh - 1; y++)
-            for (let x = 1; x < rw - 1; x++) {
-              const v = f[y * rw + x];
-              if (!(v >= threshold)) continue;
-              // Strictly above the left and upper neighbours, so a plateau
-              // gives one peak, not one per pixel.
-              if (
-                v <= f[y * rw + x - 1] ||
-                v < f[y * rw + x + 1] ||
-                v <= f[(y - 1) * rw + x] ||
-                v < f[(y + 1) * rw + x]
-              )
-                continue;
-              const ink = inkIn(x, y, t.cols, t.rows) / (size * size);
-              if (ink < 0.5 * pickedInk || ink > 2 * pickedInk) continue;
-              const [ox, oy] = back(x + t.cols / 2, y + t.rows / 2);
-              peaks.push({
-                x: img.x0 + ox / K,
-                y: img.y0 + oy / K,
-                halfWidth: t.cols / K / 2,
-                halfHeight: t.rows / K / 2,
-                score: v,
-                size,
-                rotation,
-              });
-            }
-        } finally {
-          sized.delete();
-          turned.delete();
-          res.delete();
-        }
-      }
-    return { peaks, skew, empty: false };
+    // Everything but the softened picture can go now.
+    const kept = soft;
+    made.filter(m => m !== kept).forEach(m => m.delete());
+    made.length = 0;
+    return {
+      img,
+      soft: kept,
+      skew,
+      inkIn,
+      toPx: (x, y) => fwd((x - img.x0) * K, (y - img.y0) * K),
+      toPage: (px2, py) => {
+        const [ox, oy] = back(px2, py);
+        return [img.x0 + ox / K, img.y0 + oy / K];
+      },
+      free: () => kept.delete(),
+    };
+  } catch (error) {
+    made.forEach(m => m.delete());
+    throw error;
+  }
+}
+
+/** A template ready to search for: softened picture, size, ink. */
+type ScanTemplate = { base: CvMat; tw: number; th: number; ink: number };
+
+/** The picture inside `box` (page points) on the prepared picture itself. */
+function templateHere(
+  cv: OpenCv,
+  p: PreparedScan,
+  box: MatchBox
+): ScanTemplate | null {
+  const K = p.img.scale;
+  const [bcx, bcy] = p.toPx(box.x + box.width / 2, box.y + box.height / 2);
+  const tw = Math.max(3, Math.round(Math.abs(box.width) * K));
+  const th = Math.max(3, Math.round(Math.abs(box.height) * K));
+  const tx = Math.round(bcx - tw / 2);
+  const ty = Math.round(bcy - th / 2);
+  if (tx < 0 || ty < 0 || tx + tw > p.img.width || ty + th > p.img.height)
+    return null;
+  const roi = p.soft.roi(new cv.Rect(tx, ty, tw, th));
+  const base = roi.clone();
+  roi.delete();
+  let inked = 0;
+  for (let i = 0; i < base.data.length; i++) if (base.data[i] > 127) inked++;
+  if (inked < 4) {
+    base.delete();
+    return null;
+  }
+  return { base, tw, th, ink: Math.max(1, p.inkIn(tx, ty, tw, th)) };
+}
+
+/**
+ * The picture inside `box` on ANOTHER sheet of the same scanned set — a
+ * saved look (multiple-looks-plan.md § 3). `from` is that sheet's region
+ * round the box, rendered at the same scale; it is cleaned the same way
+ * (black-and-white, softened) so the template compares like for like.
+ */
+function templateFrom(
+  cv: OpenCv,
+  from: ScanImage,
+  box: MatchBox
+): ScanTemplate | null {
+  const made: CvMat[] = [];
+  const keep = <T extends CvMat>(m: T) => (made.push(m), m);
+  try {
+    const K = from.scale;
+    const src = keep(
+      cv.matFromArray(from.height, from.width, cv.CV_8UC1, from.gray)
+    );
+    const bw = keep(new cv.Mat());
+    cv.threshold(src, bw, 0, 255, cv.THRESH_BINARY_INV | cv.THRESH_OTSU);
+    const soft = keep(new cv.Mat());
+    cv.GaussianBlur(bw, soft, new cv.Size(3, 3), 0);
+    const tw = Math.max(3, Math.round(Math.abs(box.width) * K));
+    const th = Math.max(3, Math.round(Math.abs(box.height) * K));
+    const tx = Math.round((box.x - from.x0) * K);
+    const ty = Math.round((box.y - from.y0) * K);
+    if (tx < 0 || ty < 0 || tx + tw > from.width || ty + th > from.height)
+      return null;
+    let ink = 0;
+    for (let y = ty; y < ty + th; y++)
+      for (let x = tx; x < tx + tw; x++) if (bw.data[y * from.width + x]) ink++;
+    if (ink < 4) return null;
+    const roi = keep(soft.roi(new cv.Rect(tx, ty, tw, th)));
+    return { base: roi.clone(), tw, th, ink };
   } finally {
     made.forEach(m => m.delete());
+  }
+}
+
+/** Every place on the prepared picture that looks like `t`, as peaks. */
+function searchTemplate(
+  cv: OpenCv,
+  p: PreparedScan,
+  t: ScanTemplate,
+  threshold: number
+): ScanPeak[] {
+  const { width: W, height: H, scale: K } = p.img;
+  const peaks: ScanPeak[] = [];
+  const rotateCodes = [
+    cv.ROTATE_90_CLOCKWISE,
+    cv.ROTATE_180,
+    cv.ROTATE_90_COUNTERCLOCKWISE,
+  ];
+  for (const size of SCAN_SIZES)
+    for (const rotation of TURNS) {
+      const sized = new cv.Mat();
+      const turned = new cv.Mat();
+      const res = new cv.Mat();
+      try {
+        cv.resize(
+          t.base,
+          sized,
+          new cv.Size(
+            Math.max(3, Math.round(t.tw * size)),
+            Math.max(3, Math.round(t.th * size))
+          ),
+          0,
+          0,
+          cv.INTER_LINEAR
+        );
+        if (rotation) cv.rotate(sized, turned, rotateCodes[rotation / 90 - 1]);
+        const m = rotation ? turned : sized;
+        if (m.cols >= W || m.rows >= H) continue;
+        cv.matchTemplate(p.soft, m, res, cv.TM_CCOEFF_NORMED);
+        const rw = res.cols;
+        const rh = res.rows;
+        const f = res.data32F;
+        for (let y = 1; y < rh - 1; y++)
+          for (let x = 1; x < rw - 1; x++) {
+            const v = f[y * rw + x];
+            if (!(v >= threshold)) continue;
+            // Strictly above the left and upper neighbours, so a plateau
+            // gives one peak, not one per pixel.
+            if (
+              v <= f[y * rw + x - 1] ||
+              v < f[y * rw + x + 1] ||
+              v <= f[(y - 1) * rw + x] ||
+              v < f[(y + 1) * rw + x]
+            )
+              continue;
+            const ink = p.inkIn(x, y, m.cols, m.rows) / (size * size);
+            if (ink < 0.5 * t.ink || ink > 2 * t.ink) continue;
+            const [px2, py] = p.toPage(x + m.cols / 2, y + m.rows / 2);
+            peaks.push({
+              x: px2,
+              y: py,
+              halfWidth: m.cols / K / 2,
+              halfHeight: m.rows / K / 2,
+              score: v,
+              size,
+              rotation,
+            });
+          }
+      } finally {
+        sized.delete();
+        turned.delete();
+        res.delete();
+      }
+    }
+  return peaks;
+}
+
+/**
+ * Every place on `img` that looks like the picture inside `box` (page
+ * points), at SCAN_SIZES x four quarter turns, as raw peaks in page points.
+ */
+export function searchScanImage(
+  cv: OpenCv,
+  img: ScanImage,
+  box: MatchBox,
+  opts: { score?: number } = {}
+): { peaks: ScanPeak[]; skew: number; empty: boolean } {
+  const p = prepareScan(cv, img);
+  try {
+    const t = templateHere(cv, p, box);
+    if (!t) return { peaks: [], skew: p.skew, empty: true };
+    try {
+      return {
+        peaks: searchTemplate(cv, p, t, opts.score ?? SCAN_MATCH_SCORE),
+        skew: p.skew,
+        empty: false,
+      };
+    } finally {
+      t.base.delete();
+    }
+  } finally {
+    p.free();
   }
 }
 
@@ -725,14 +842,33 @@ const INK_CELL_POINTS = 2;
 const INK_DARK = 240;
 
 /**
+ * A saved look of the item, for a scan search (multiple-looks-plan.md § 3):
+ * its box on another sheet of THIS plan set, and how to render round it.
+ * Looks from other plan sets never come here — a picture from another set's
+ * scan is a different resolution and line weight, the comparison
+ * plan-viewer-overhaul.md § 9.3 rejects — and the worker says so.
+ */
+export type ScanLook = {
+  source: Extract<LookSource, { kind: "look" }>;
+  box: MatchBox;
+  render: (
+    rect: { x: number; y: number; width: number; height: number },
+    scale: number
+  ) => Promise<ScanImage>;
+};
+
+/**
  * Find all matching on a SCANNED page: refuse a symbol too coarse to
  * match, find the plans by their titles, search only the plan the box is
- * on, and hand back unconfirmed matches. `render` draws a part of the page
- * grey at a scale; `loadCv` is called only once the symbol has passed the
- * size check, so a refusal never downloads opencv.js (10 MB).
+ * on, and hand back unconfirmed matches. With saved looks, each is searched
+ * too and the results merged (@/lib/lookMatching); with no box, the looks
+ * alone are searched, across the whole sheet. `render` draws a part of the
+ * page grey at a scale; `loadCv` is called only once something has passed
+ * the size check, so a refusal never downloads opencv.js (10 MB).
  */
 export async function findOnScan(opts: {
-  box: MatchBox;
+  box: MatchBox | null;
+  looks?: readonly ScanLook[];
   pixelsPerPoint: number;
   words: readonly WordBox[];
   pageWidth: number;
@@ -745,18 +881,38 @@ export async function findOnScan(opts: {
 }): Promise<
   | {
       kind: "ok";
-      matches: Match[];
+      matches: MergedMatch[];
       plan: PlanRegion | null;
       regions: PlanRegion[];
       pixels: number;
       skew: number;
+      /** What could not be used, said plainly for the panel. */
+      notes: string[];
     }
   | { kind: "tooPoor" | "empty"; message: string }
 > {
   const { box, pageWidth, pageHeight } = opts;
-  const quality = scanQuality(box, opts.pixelsPerPoint);
-  if (quality.kind === "tooPoor")
+  const notes: string[] = [];
+  const quality = box ? scanQuality(box, opts.pixelsPerPoint) : null;
+  if (quality?.kind === "tooPoor")
     return { kind: "tooPoor", message: quality.message };
+  const looks = (opts.looks ?? []).flatMap(look => {
+    const q = scanQuality(look.box, opts.pixelsPerPoint);
+    if (q.kind === "tooPoor") {
+      notes.push(
+        `A saved look is ${q.pixels} pixels across on this scan — too coarse to search, so it was left out.`
+      );
+      return [];
+    }
+    return [{ ...look, quality: q }];
+  });
+  if (!box && looks.length === 0)
+    return {
+      kind: "empty",
+      message:
+        notes[0] ??
+        "This item has no saved look from this plan set to search with. Box one on the drawing.",
+    };
 
   const overview = await opts.render(
     { x: 0, y: 0, width: pageWidth, height: pageHeight },
@@ -774,28 +930,76 @@ export async function findOnScan(opts: {
     pageHeight,
     ink
   );
-  const area = searchArea(regions, box, pageWidth, pageHeight);
+  // With a box, the plan it is on; with only saved looks, the whole sheet
+  // (each find still says which plan it is on, demolition included).
+  const area = box
+    ? searchArea(regions, box, pageWidth, pageHeight)
+    : { x: 0, y: 0, width: pageWidth, height: pageHeight, plan: null };
 
   const cv = await opts.loadCv();
   const img = await opts.render(area, SCAN_WORK_SCALE);
-  const found = searchScanImage(cv, img, box);
-  if (found.empty)
-    return {
-      kind: "empty",
-      message:
-        "There is no drawing inside that box on this scan. Box the symbol itself.",
-    };
+  const prepared = prepareScan(cv, img);
+  const results: LookResult[] = [];
+  try {
+    if (box && quality) {
+      const t = templateHere(cv, prepared, box);
+      if (!t && looks.length === 0)
+        return {
+          kind: "empty",
+          message:
+            "There is no drawing inside that box on this scan. Box the symbol itself.",
+        };
+      if (t)
+        try {
+          results.push({
+            source: { kind: "box" },
+            matches: scanMatches(
+              searchTemplate(cv, prepared, t, SCAN_MATCH_SCORE),
+              { box, quality, plan: area.plan, regions }
+            ),
+          });
+        } finally {
+          t.base.delete();
+        }
+    }
+    for (const look of looks) {
+      const pad = 4;
+      const from = await look.render(
+        {
+          x: look.box.x - pad,
+          y: look.box.y - pad,
+          width: look.box.width + 2 * pad,
+          height: look.box.height + 2 * pad,
+        },
+        SCAN_WORK_SCALE
+      );
+      const t = templateFrom(cv, from, look.box);
+      if (!t) {
+        notes.push("A saved look has no drawing in its box and was left out.");
+        continue;
+      }
+      try {
+        results.push({
+          source: look.source,
+          matches: scanMatches(
+            searchTemplate(cv, prepared, t, SCAN_MATCH_SCORE),
+            { box: null, quality: look.quality, plan: area.plan, regions }
+          ),
+        });
+      } finally {
+        t.base.delete();
+      }
+    }
+  } finally {
+    prepared.free();
+  }
   return {
     kind: "ok",
-    matches: scanMatches(found.peaks, {
-      box,
-      quality,
-      plan: area.plan,
-      regions,
-    }).sort((p, q) => p.y - q.y || p.x - q.x),
+    matches: mergeLookResults(results),
     plan: area.plan,
     regions,
-    pixels: quality.pixels,
-    skew: found.skew,
+    pixels: quality?.pixels ?? looks[0]?.quality.pixels ?? 0,
+    skew: prepared.skew,
+    notes,
   };
 }

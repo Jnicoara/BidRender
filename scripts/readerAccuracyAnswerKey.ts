@@ -65,6 +65,22 @@ export type AnswerKeyFile = {
       alsoPicked?: string[];
       /** Picked types scored as data / telecom, replacing the word rule. */
       dataTelecom?: string[];
+      /**
+       * "Same as" lists for THIS SHEET, read before the file-wide ones: a
+       * name this sheet's list holds means what this sheet says. Added
+       * 2026-10-05. The same picture means different things on different
+       * plan sets: on Old Blueridge the half-filled duplex is a duplex above
+       * the backsplash (its NOTE 7), not the GFCI it is on other sets. So a
+       * legend name belongs to the set whose legend says it, never to the
+       * whole file (multiple-looks-plan.md, "a look is per plan set").
+       */
+      sameAs?: string[][];
+      /**
+       * Hand marks the owner has since said are not what their count says,
+       * left out of scoring. Matched by label and place (within the scoring
+       * radius), never by index. The marks stay in the app, as he made them.
+       */
+      dropMarks?: { label: string; x: number; y: number; why: string }[];
     }
   >;
   verdicts?: VerdictEntry[];
@@ -85,23 +101,33 @@ export type AnswerKeyFile = {
  * still folds into its symbol the way `labelKey` already does.
  */
 export function sameAsNamer(
-  file: AnswerKeyFile | null
+  file: AnswerKeyFile | null,
+  /** The sheet being scored: its own lists win over the file-wide ones. */
+  sheet?: string
 ): (label: string | null) => string | null {
-  const canonical = new Map<string, string>();
-  for (const group of file?.sameAs ?? []) {
-    const first = group.find(n => n.trim());
-    if (!first) continue;
-    for (const name of group) {
-      const key = labelKey(name);
-      // A name in two lists would make the answer depend on file order.
-      const already = canonical.get(key);
-      if (already !== undefined && labelKey(already) !== labelKey(first))
-        throw new Error(
-          `"${name}" is in two "same as" lists in answer-key.json — keep it in one.`
-        );
-      canonical.set(key, first.trim());
+  const build = (lists: string[][] | undefined) => {
+    const canonical = new Map<string, string>();
+    for (const group of lists ?? []) {
+      const first = group.find(n => n.trim());
+      if (!first) continue;
+      for (const name of group) {
+        const key = labelKey(name);
+        // A name in two lists would make the answer depend on file order.
+        const already = canonical.get(key);
+        if (already !== undefined && labelKey(already) !== labelKey(first))
+          throw new Error(
+            `"${name}" is in two "same as" lists in answer-key.json — keep it in one.`
+          );
+        canonical.set(key, first.trim());
+      }
     }
-  }
+    return canonical;
+  };
+  const canonical = build(file?.sameAs);
+  if (sheet !== undefined)
+    build(file?.sheets?.[sheet]?.sameAs).forEach((name, key) =>
+      canonical.set(key, name)
+    );
   return label => {
     if (label === null) return null;
     const { base, existing } = splitExistingToRemain(label);
