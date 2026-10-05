@@ -78,6 +78,7 @@ import { JOINED_WITHIN_POINTS } from "@shared/quantityDrops";
 import { traceClickPoint } from "@/lib/traceClick";
 import { pastDragThreshold } from "@/lib/dragThreshold";
 import { useCoarsePointer } from "@/hooks/useCoarsePointer";
+import type { MarkStatus } from "@shared/markStatus";
 import {
   insertPoint,
   isPinned,
@@ -215,6 +216,11 @@ export type PlacedStamp = {
   assemblyCategory: string | null;
   x: number;
   y: number;
+  /**
+   * NULL = new. Required, like SnapStamp's: the snap reads it, and a list that
+   * left it out would let a run snap to an unconfirmed mark (@shared/markStatus).
+   */
+  status: MarkStatus | null;
   /**
    * Clicked, drawn, and not yet acknowledged by the server.
    *
@@ -441,6 +447,7 @@ export function TraceLayer({
           id: s.id,
           x: s.x,
           y: s.y,
+          status: s.status,
           connect: connects?.get(s.id)?.point,
         })),
     [stamps, connects]

@@ -2940,6 +2940,15 @@ export const takeoffRuns = mysqlTable(
       { onDelete: "set null" }
     ),
 
+    /**
+     * Whether each end's wall connection was checked (0104; connect-point-plan
+     * § 9 Q3). NULL = not answered (counts and shows, as before); "found" =
+     * the app found the wall; "confirmed" = the estimator checked it. Never
+     * moves a length — that comes from the points.
+     */
+    startConnect: mysqlEnum("startConnect", ["found", "confirmed"]),
+    endConnect: mysqlEnum("endConnect", ["found", "confirmed"]),
+
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -3543,8 +3552,18 @@ export type InsertTakeoffGroup = typeof takeoffGroups.$inferInsert;
  * on `takeoff_stamps.status` reads as "new" — every mark placed before the
  * column. Appending a value later keeps every stored index, like the other
  * enums here; never reorder.
+ *
+ * `unconfirmed` (0103) is a mark nobody has checked yet — placed by the AI
+ * reader or offered by Find all matching. It is never counted toward a
+ * quantity and never a snap target for a run (shared/markStatus.ts).
  */
-export const MARK_STATUSES = ["new", "existing", "remove", "relocate"] as const;
+export const MARK_STATUSES = [
+  "new",
+  "existing",
+  "remove",
+  "relocate",
+  "unconfirmed",
+] as const;
 
 /**
  * One placed instance of an assembly on a sheet — a single click of the stamp
