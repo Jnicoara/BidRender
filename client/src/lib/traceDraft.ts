@@ -17,6 +17,7 @@
  * would have one silently overwrite the other on switching sheets, which is
  * exactly the kind of quiet loss this exists to prevent.
  */
+import { isUserMarkStatus, type UserMarkStatus } from "@shared/markStatus";
 import type { PagePoint } from "@shared/takeoffGeometry";
 import type { RunPathType } from "@shared/takeoffQuantities";
 
@@ -192,9 +193,20 @@ export type QueuedStamp = {
   assemblyId?: number | null;
   /** Pre-phase-6 only. */
   assemblyName?: string | null;
+  /**
+   * What the click was placed as ("placing as", 2026-10-05). Absent on a
+   * queue written before it existed, and absent means new — which is what
+   * every click was then. Read it through `queuedStampStatus`.
+   */
+  status?: UserMarkStatus;
   x: number;
   y: number;
 };
+
+/** What a stored click was placed as. Absent is new (see `status`). */
+export function queuedStampStatus(stamp: QueuedStamp): UserMarkStatus {
+  return stamp.status ?? "new";
+}
 
 export type StampQueue = {
   sheetId: number;
@@ -270,6 +282,13 @@ export function loadStampQueue(
       const hasLegacyName =
         typeof stamp.assemblyName === "string" && stamp.assemblyName.length > 0;
       if (!hasGroup && !hasLegacyName) return null;
+      /*
+        A status this build does not know is refused rather than read as new:
+        read as new, an existing device would be restored onto the bid as a
+        part to buy. Absent is fine — that is the older shape, and new.
+      */
+      if (stamp.status !== undefined && !isUserMarkStatus(stamp.status))
+        return null;
     }
 
     return {

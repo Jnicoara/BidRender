@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-05]
 
+- **Count a run of existing devices without fixing each one afterwards.**
+  While counting, a New / Existing switch sits beside "Counting …" and stays
+  where you put it until you change it. Marks placed as Existing are saved
+  as existing to remain, so they never reach the bid as parts to buy. A
+  crash or reload in the middle of placing them brings them back as
+  existing too.
 - **Mark a device as existing, to be removed or relocated, and it is never
   priced as new.** Select marks and choose "Mark as…". Existing devices draw
   as hollow pins, removals get a red X, relocations an arrow badge, and each

@@ -87,7 +87,7 @@ import {
 import { pinStylesForBid } from "@shared/pinLetters";
 import { pinCountsFor } from "@/lib/pinCounts";
 import { PinLookEditor } from "@/components/takeoff/PinLookEditor";
-import { MARK_STATUS_LABEL } from "@shared/markStatus";
+import { MARK_STATUS_LABEL, type UserMarkStatus } from "@shared/markStatus";
 import { deviceFamily } from "@shared/deviceFamily";
 import {
   FAMILY_MOUNTING,
@@ -309,7 +309,11 @@ import {
   type UndoState,
 } from "@/lib/undoStack";
 import { emptiedCountCard } from "@/lib/emptiedCountCard";
-import { nextMarkBatch, splitRecoveredMarks } from "@/lib/markBatches";
+import {
+  nextMarkBatch,
+  recoveredMarkKey,
+  splitRecoveredMarks,
+} from "@/lib/markBatches";
 import {
   adoptRealGroup,
   dropProvisional,
@@ -396,6 +400,7 @@ import {
   hasUnsavedWork,
   loadDraft,
   loadStampQueue,
+  queuedStampStatus,
   saveDraft,
   saveStampQueue,
 } from "@/lib/traceDraft";
@@ -2535,6 +2540,8 @@ type PendingMark = {
   assemblyCategory: string | null;
   x: number;
   y: number;
+  /** "Placing as" when it was clicked. Sent with it, and drawn by it. */
+  status: UserMarkStatus;
   /** In flight. Still drawn, no longer waiting to be sent. */
   sent: boolean;
 };
@@ -3068,6 +3075,18 @@ export default function TakeoffPage({
     setPendingMarks(next);
   }, []);
   const nextPendingKey = useRef(-1);
+  /**
+   * PLACING AS (pin plan § 7, 2026-10-05): what a click puts down — a new
+   * device, or one already on the wall. STICKY: it stays across counts and
+   * sheets until changed, because a run of existing devices is the case it
+   * is for, and choosing it per click is the form-on-every-mark D3 rejected.
+   * Shown in the counting pill while anything is armed, amber when it is
+   * "existing" — that pill is the cue for a forgotten choice. The marks are
+   * NOT a reliable one yet: drawn with their status from the click, but on
+   * 2026-10-05 a new and an existing pin with a letter looked the same on
+   * screen (new's fill is a 0.22 tint the letter's halo covers). todo.md.
+   */
+  const [placingStatus, setPlacingStatus] = useState<UserMarkStatus>("new");
   /** Which layers are showing. Null until a sheet's contents are known. */
   const [layerState, setLayerState] = useState<LayerState | null>(null);
   const hadSystem = useRef<Set<string>>(new Set());
@@ -4939,7 +4958,7 @@ export default function TakeoffPage({
           // A provisional count's id means nothing after a reload; its marks
           // are mirrored once the count exists (`armWhileCreating`).
           .filter(m => m.sheetId === sheetId && !isProvisionalGroup(m.groupId))
-          .map(m => ({ groupId: m.groupId, x: m.x, y: m.y }))
+          .map(m => ({ groupId: m.groupId, x: m.x, y: m.y, status: m.status }))
       );
     },
     [bidId]
@@ -4978,6 +4997,8 @@ export default function TakeoffPage({
 
       const sheetId = batch[0].sheetId;
       const groupId = batch[0].groupId;
+      // One status per batch — nextMarkBatch never mixes them.
+      const status = batch[0].status;
       const keys = new Set(batch.map(m => m.key));
       // Still drawn, no longer waiting to be sent — which is also what stops
       // the next turn of this loop picking the same marks up again.
@@ -4993,6 +5014,7 @@ export default function TakeoffPage({
           sheetId,
           groupId,
           at: batch.map(m => ({ x: m.x, y: m.y })),
+          status,
         })
         /*
           The drawn copy goes only once the refetch has LANDED, which is what
@@ -5070,6 +5092,7 @@ export default function TakeoffPage({
           assemblyCategory: armedCategory,
           x: mark.x,
           y: mark.y,
+          status: placingStatus,
           sent: false,
         },
       ]);
@@ -5084,6 +5107,7 @@ export default function TakeoffPage({
       armedGroupHeld,
       sheetKey,
       armedCategory,
+      placingStatus,
       flushStamps,
       mirrorQueue,
       setPending,
@@ -5262,6 +5286,7 @@ export default function TakeoffPage({
           assemblyCategory: category,
           x: point.x,
           y: point.y,
+          status: placingStatus,
           sent: false,
         })),
       ]);
@@ -5270,7 +5295,14 @@ export default function TakeoffPage({
       // not a run of clicks still in progress.
       flushStamps();
     },
-    [activeSheet?.id, allAssemblies, flushStamps, mirrorQueue, setPending]
+    [
+      activeSheet?.id,
+      allAssemblies,
+      placingStatus,
+      flushStamps,
+      mirrorQueue,
+      setPending,
+    ]
   );
 
   /**
@@ -5878,15 +5910,10 @@ export default function TakeoffPage({
     /*
       ONE PART PER COUNT. This used to send the whole stored queue under its
       FIRST entry's count, so a crash with two counts' clicks waiting put all of
-      them on one (audit #4, fixed 2026-09-29 — @/lib/markBatches).
+      them on one (audit #4, fixed 2026-09-29 — @/lib/markBatches). And one
+      part per placed-as status, so existing clicks come back as existing.
     */
-    const keyOf = (st: Stored) =>
-      typeof st.groupId === "number" && st.groupId > 0
-        ? `group:${st.groupId}`
-        : typeof st.assemblyId === "number" && st.assemblyId > 0
-          ? `assembly:${st.assemblyId}`
-          : `name:${st.assemblyName?.trim() || "Recovered count"}`;
-    const parts = splitRecoveredMarks(queued.stamps, keyOf);
+    const parts = splitRecoveredMarks(queued.stamps, recoveredMarkKey);
 
     // Older shape. The assembly is the honest reading of what was counted; a
     // queue with only a name becomes a plain count under that name, reusing
@@ -5925,6 +5952,7 @@ export default function TakeoffPage({
             sheetId,
             groupId: group.id,
             at: part.map(st => ({ x: st.x, y: st.y })),
+            status: queuedStampStatus(part[0]),
           });
           recovered += part.length;
           /*
@@ -8103,15 +8131,55 @@ export default function TakeoffPage({
               what is being stamped — and the only way to stop — must not
               disappear on an unscaled sheet.
             */
-            <Button
-              size="sm"
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => setArmedGroup(null)}
-            >
-              <MapPin className="w-3.5 h-3.5" />
-              Counting {armedGroup.label}
-              <X className="w-3 h-3" />
-            </Button>
+            <>
+              <Button
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => setArmedGroup(null)}
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                Counting {armedGroup.label}
+                <X className="w-3 h-3" />
+              </Button>
+              {/*
+                PLACING AS — beside the count it qualifies, and only while one
+                is armed, which is the only time it does anything. Two
+                choices, not the four "Mark as…" offers: a run of existing
+                devices is the case that comes in runs; remove and relocate
+                are set on a selection afterwards. Sticky (see
+                `placingStatus`). Not on a locked bid, which takes no marks.
+              */}
+              {!quantitiesLocked && (
+                <div
+                  role="group"
+                  aria-label="Place marks as"
+                  className="inline-flex h-7 items-center rounded-md border border-border p-0.5 text-xs"
+                >
+                  {(["new", "existing"] as const).map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      aria-pressed={placingStatus === s}
+                      onClick={() => setPlacingStatus(s)}
+                      title={
+                        s === "new"
+                          ? "Place new devices — counted and priced on the bid"
+                          : "Place existing devices to remain — drawn hollow, not priced"
+                      }
+                      className={`h-full rounded px-2 transition-colors ${
+                        placingStatus === s
+                          ? s === "new"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-amber-500 text-black"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {s === "new" ? "New" : "Existing"}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           ) : (
             activeSheet &&
             !tracing && (
@@ -9358,8 +9426,9 @@ export default function TakeoffPage({
                             assemblyCategory: m.assemblyCategory,
                             x: m.x,
                             y: m.y,
-                            // A click being placed now is new by definition.
-                            status: null,
+                            // What "placing as" said when it was clicked, so
+                            // an existing device is hollow before the reply.
+                            status: m.status === "new" ? null : m.status,
                             pending: true,
                           })),
                       ]}
