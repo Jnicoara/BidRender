@@ -238,6 +238,8 @@ export const materialsListRouter = router({
           assemblyId: stamp.assemblyId,
           x: Number(stamp.x),
           y: Number(stamp.y),
+          // An existing device is not bought (shared/markStatus.ts).
+          status: stamp.status,
         }))
       )) {
         if (group.groupId !== null && countedOnBid.has(group.groupId)) continue;

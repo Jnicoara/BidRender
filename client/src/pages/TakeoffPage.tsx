@@ -85,6 +85,9 @@ import {
   SquareDashedMousePointer,
 } from "lucide-react";
 import { pinStylesForBid } from "@shared/pinLetters";
+import { pinCountsFor } from "@/lib/pinCounts";
+import { PinLookEditor } from "@/components/takeoff/PinLookEditor";
+import { MARK_STATUS_LABEL } from "@shared/markStatus";
 import { deviceFamily } from "@shared/deviceFamily";
 import {
   FAMILY_MOUNTING,
@@ -4415,6 +4418,67 @@ export default function TakeoffPage({
       refreshFor("marksMoved");
     },
   });
+  /*
+    MARKING WHAT A MARK IS — new, existing to remain, remove, relocate (pin
+    plan § 7). Only a new mark is priced (shared/markStatus.ts), so this moves
+    the count, its bid line and its drops: `markStatus` refreshes all of them.
+    The toast says what happened to the price, because that is the point.
+  */
+  const setMarkStatus = trpc.takeoffStamps.setStatus.useMutation({
+    onSuccess: (r, input) => {
+      const n = r.updated;
+      const what = n === 1 ? "mark" : "marks";
+      toast.success(
+        input.status === null || input.status === "new"
+          ? `${n} ${what} marked new — counted and priced.`
+          : `${n} ${what} marked ${MARK_STATUS_LABEL[input.status].toLowerCase()} — not priced as new.`
+      );
+    },
+    onError: e => toast.error(e.message),
+    onSettled: () => {
+      setSelectedStampIds(new Set());
+      refreshFor("markStatus");
+    },
+  });
+  /*
+    A count's PIN LOOK (pin plan § 6). "Every job" lands on the legend symbol
+    or the assembly, which are not per bid, so those two lists are dropped as
+    well as the count list — or the swatch would keep the old look until a
+    reload, the staleness CLAUDE.md warns about.
+  */
+  const setLook = trpc.takeoffGroups.setLook.useMutation({
+    onSuccess: r =>
+      toast.success(
+        r.savedOn === "count"
+          ? "Look saved on this job."
+          : `Look saved on ${r.savedOn === "symbol" ? "the legend symbol" : "the assembly"} “${r.name}” — every job.`
+      ),
+    onError: e => toast.error(e.message),
+    onSettled: () => {
+      refreshFor("pinLook");
+      void utils.takeoffStamps.symbols.invalidate();
+      void utils.assemblies.list.invalidate();
+    },
+  });
+  /** Where "every job" would keep a count's look — the same rule as setLook. */
+  const everyJobTarget = useCallback(
+    (row: { label: string; assemblyId: number | null }) => {
+      const key = symbolLookupKey(row.label);
+      const symbol = symbols.find(
+        s => s.lookupKey === key || symbolLookupKey(s.label) === key
+      );
+      if (symbol) return { name: `legend symbol “${symbol.label}”` };
+      const assembly =
+        row.assemblyId === null
+          ? undefined
+          : allAssemblies.find(a => a.id === row.assemblyId);
+      if (assembly) return { name: `assembly “${assembly.name}”` };
+      return {
+        none: "Typed by name, so the look stays on this job. Capture its legend symbol to use it on every job.",
+      };
+    },
+    [symbols, allAssemblies]
+  );
   const selectedStamps = useMemo(
     () => stamps.filter(s => selectedStampIds.has(s.id)),
     [stamps, selectedStampIds]
@@ -5892,21 +5956,14 @@ export default function TakeoffPage({
    * and its pins cannot disagree. It follows `takeoffGroups.list`, which every
    * count change already refreshes.
    */
-  const pinStyles = useMemo(() => {
-    const byId = new Map(allAssemblies.map(a => [a.id, a] as const));
-    return pinStylesForBid(
-      (bidCounts.data?.groups ?? []).map(g => {
-        const assembly =
-          g.assemblyId === null ? undefined : byId.get(g.assemblyId);
-        return {
-          id: g.id,
-          label: g.label,
-          assemblyName: assembly?.name ?? null,
-          assemblyCategory: assembly?.category ?? null,
-        };
-      })
-    );
-  }, [bidCounts.data?.groups, allAssemblies]);
+  const pinStyles = useMemo(
+    () =>
+      pinStylesForBid(
+        // Chosen looks at every level — count, legend symbol, assembly.
+        pinCountsFor(bidCounts.data?.groups ?? [], allAssemblies, symbols)
+      ),
+    [bidCounts.data?.groups, allAssemblies, symbols]
+  );
 
   /**
    * R re-arms the last count ("Count again", @/lib/countAgain). Only while
@@ -6229,6 +6286,7 @@ export default function TakeoffPage({
           assemblyCategory: st.assemblyCategory ?? null,
           x: st.x,
           y: st.y,
+          status: st.status,
         }))
       ),
     [visibleStamps]
@@ -9329,6 +9387,18 @@ export default function TakeoffPage({
                           groupId,
                         })
                       }
+                      onSetStatusSelected={
+                        quantitiesLocked || !bidId
+                          ? undefined
+                          : status =>
+                              setMarkStatus.mutate({
+                                bidId,
+                                ids: Array.from(selectedStampIds).filter(
+                                  id => id > 0
+                                ),
+                                status,
+                              })
+                      }
                       onClearSelection={() => setSelectedStampIds(new Set())}
                       selectMode={touchSelect}
                       freePoints={freeLegPoints}
@@ -9555,6 +9625,23 @@ export default function TakeoffPage({
             <RunsPanel
               runColors={runColors}
               pins={pinStyles}
+              lookEditor={(groupId, name, swatch) => {
+                const style = pinStyles.get(groupId);
+                const row = bidCounts.data?.groups.find(g => g.id === groupId);
+                if (!style || !row) return swatch;
+                return (
+                  <PinLookEditor
+                    name={name}
+                    style={style}
+                    own={row.look}
+                    everyJob={everyJobTarget(row)}
+                    busy={setLook.isPending}
+                    onSave={look => setLook.mutate({ id: groupId, ...look })}
+                  >
+                    {swatch}
+                  </PinLookEditor>
+                );
+              }}
               hideOtherRuns={hideOtherRuns}
               onToggleHideOtherRuns={() => setHideOtherRuns(on => !on)}
               onAddLeg={run => {

@@ -116,6 +116,8 @@ export const takeoffExportRouter = router({
             assemblyId: stamp.assemblyId,
             x: Number(stamp.x),
             y: Number(stamp.y),
+            // The export goes to the supply house: new devices only.
+            status: stamp.status,
           }))
         )) {
           counts.push({

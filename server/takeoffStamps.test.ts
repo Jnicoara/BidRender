@@ -120,7 +120,7 @@ const stamp = (
   name: string,
   x = 0,
   y = 0
-) => ({ id, sheetId: 1, groupId: null, assemblyId, name, x, y });
+) => ({ id, sheetId: 1, groupId: null, assemblyId, name, x, y, status: null });
 
 /** A mark placed since phase 6: it belongs to a group, and that is its identity. */
 const inGroup = (id: number, groupId: number, name: string, x = 0, y = 0) => ({
@@ -131,6 +131,8 @@ const inGroup = (id: number, groupId: number, name: string, x = 0, y = 0) => ({
   name,
   x,
   y,
+  // NULL is new — what every mark was before the status column existed.
+  status: null as string | null,
 });
 
 /**

@@ -68,6 +68,13 @@ import {
   type SnapStamp,
 } from "@/lib/legSnap";
 import {
+  MARK_STATUS_LABEL,
+  USER_MARK_STATUSES,
+  isUserMarkStatus,
+  type MarkStatus,
+  type UserMarkStatus,
+} from "@shared/markStatus";
+import {
   connectLabel,
   connectShortLabel,
   type ConnectPoint,
@@ -78,7 +85,6 @@ import { JOINED_WITHIN_POINTS } from "@shared/quantityDrops";
 import { traceClickPoint } from "@/lib/traceClick";
 import { pastDragThreshold } from "@/lib/dragThreshold";
 import { useCoarsePointer } from "@/hooks/useCoarsePointer";
-import type { MarkStatus } from "@shared/markStatus";
 import {
   insertPoint,
   isPinned,
@@ -282,6 +288,7 @@ export function TraceLayer({
   onDeleteSelected,
   moveTargets,
   onMoveSelected,
+  onSetStatusSelected,
   onClearSelection,
   focusPoint,
   chromeTarget,
@@ -394,6 +401,8 @@ export function TraceLayer({
    */
   moveTargets?: { id: number; label: string }[];
   onMoveSelected?: (groupId: number) => void;
+  /** Set the selected marks' status. Omitted (a locked bid), no control. */
+  onSetStatusSelected?: (status: UserMarkStatus) => void;
   onClearSelection: () => void;
   /** Highlighted after a jump from the counted-items list. */
   focusPoint: { x: number; y: number } | null;
@@ -1378,7 +1387,7 @@ export function TraceLayer({
         {stamps.map(placed => {
           const at = toScreen({ x: placed.x, y: placed.y });
           const isSelected = !placed.pending && selectedStampIds.has(placed.id);
-          const { shape, color, letter } = markAppearance(placed, pins);
+          const { shape, color, letter, status } = markAppearance(placed, pins);
           // Below the size a letter can be read at, shape + colour remain.
           const showLetter =
             letter !== null && markScreenDiameter(zoom) >= LETTER_MIN_PX;
@@ -1412,14 +1421,58 @@ export function TraceLayer({
                 onStampClick(placed.id, e.shiftKey || selectMode)
               }
             >
+              {/*
+                STATUS (pin plan § 7, shared/takeoffMarks.ts `statusLook`):
+                new is filled; existing is HOLLOW with a SOLID outline — never
+                dashed, which is "unconfirmed"; remove adds an X; relocate an
+                arrow badge. The card says the same split in words.
+              */}
               <path
                 d={markPath(shape, at.x, at.y, r)}
-                fill={color}
-                fillOpacity={0.22}
+                // Hollow is truly hollow: a white fill hid the plan symbol
+                // underneath (seen 2026-10-05), which § 4 forbids.
+                fill={status.filled ? color : "none"}
+                fillOpacity={status.filled ? 0.22 : 0}
                 stroke={color}
-                strokeWidth={isSelected ? stroke * 1.4 : stroke}
+                strokeWidth={
+                  (isSelected ? stroke * 1.4 : stroke) *
+                  (status.filled ? 1 : 1.5)
+                }
+                strokeDasharray={
+                  status.dashed ? `${r * 0.45} ${r * 0.3}` : undefined
+                }
                 strokeLinejoin="round"
               />
+              {status.cross && (
+                <path
+                  d={`M${at.x - r * 0.75},${at.y - r * 0.75}L${at.x + r * 0.75},${at.y + r * 0.75}M${at.x + r * 0.75},${at.y - r * 0.75}L${at.x - r * 0.75},${at.y + r * 0.75}`}
+                  stroke="#DC2626"
+                  strokeWidth={stroke * 1.4}
+                  strokeLinecap="round"
+                  pointerEvents="none"
+                />
+              )}
+              {status.arrow && (
+                /*
+                  A filled arrowhead on a dark disc: a thin stroked arrow
+                  read as a "+" at the size a pin is drawn (seen at 212%,
+                  2026-10-05).
+                */
+                <g pointerEvents="none">
+                  <circle
+                    cx={at.x + r * 0.9}
+                    cy={at.y - r * 0.9}
+                    r={r * 0.6}
+                    fill="#0b0b0b"
+                    stroke={color}
+                    strokeWidth={stroke * 0.8}
+                  />
+                  <path
+                    d={`M${at.x + r * 0.55},${at.y - r * 1.02}H${at.x + r * 0.95}V${at.y - r * 1.25}L${at.x + r * 1.32},${at.y - r * 0.9}L${at.x + r * 0.95},${at.y - r * 0.55}V${at.y - r * 0.78}H${at.x + r * 0.55}Z`}
+                    fill="#ffffff"
+                  />
+                </g>
+              )}
               {/*
                 The centre dot is what makes a mark point at something. Kept at
                 a fixed fraction of the shape so it stays a dot rather than
@@ -1452,7 +1505,10 @@ export function TraceLayer({
                 <circle cx={at.x} cy={at.y} r={r * 0.28} fill={color} />
               )}
               <title>
-                {letter ? `${letter} — ${placed.name}` : placed.name}
+                {(letter ? `${letter} — ${placed.name}` : placed.name) +
+                  (status.status === "new"
+                    ? ""
+                    : ` — ${MARK_STATUS_LABEL[status.status]}, not priced`)}
               </title>
             </g>
           );
@@ -2087,6 +2143,30 @@ export function TraceLayer({
                   {moveTargets.map(t => (
                     <option key={t.id} value={t.id}>
                       {t.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {onSetStatusSelected && (
+                /*
+                  What these marks ARE (pin plan § 7). Existing, remove and
+                  relocate are drawn differently and are NOT priced as new
+                  (shared/markStatus.ts) — the card says how many.
+                */
+                <select
+                  className="h-6 rounded-md border border-border bg-background px-1.5 text-xs pointer-events-auto"
+                  value=""
+                  aria-label="Mark the selected marks as new, existing, remove or relocate"
+                  title="New is priced. Existing to remain, remove and relocate are not priced as new devices."
+                  onChange={e => {
+                    if (isUserMarkStatus(e.target.value))
+                      onSetStatusSelected(e.target.value);
+                  }}
+                >
+                  <option value="">Mark as…</option>
+                  {USER_MARK_STATUSES.map(s => (
+                    <option key={s} value={s}>
+                      {MARK_STATUS_LABEL[s]}
                     </option>
                   ))}
                 </select>

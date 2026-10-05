@@ -1776,7 +1776,24 @@ path is ever revived, give it the same treatment first.
       Needs a nullable `takeoff_stamps.dropExcluded` (NULL = follows the
       count; additive). Spec and B's follow-up in
       `references/quote-app-panel-plan.md` § 10, H3.
-- [ ] **Track A (migration): a STATUS on each mark — new / existing to
+- [x] **DONE — column 0098 (A, batch 1); code 2026-10-05 (Track B).** Only a
+      NEW mark is a quantity anywhere (`shared/markStatus.ts`,
+      `server/markStatusPricing.test.ts`). Still open, below: what remove and
+      relocate cost, and folding C's "… - EXISTING TO REMAIN" twin counts.
+- [ ] **Owner: what do REMOVE and RELOCATE cost?** Since 2026-10-05 neither
+      is priced as a new device (correct: neither buys one) and the card says
+      "N remove/relocate — labour not on the bid". Their LABOUR is not on the
+      bid anywhere yet. Recommendation: one labour line per status per count,
+      at a rate the owner sets (demo hours each, relocate hours each).
+- [ ] **Track A (step 3 file) + C: fold the "… - EXISTING TO REMAIN" twin
+      counts into `status`.** The code now reads `status`; the twin counts
+      (`shared/existingToRemain.ts`) still price as NEW if sent. Per 0098's
+      header this is a separate step-3 migration, now unblocked.
+- [ ] **Decide: a RUN ending on an existing mark.** A run end can claim a
+      mark (`startStampId`/`endStampId`) and then prices its own drop there.
+      Not a mark count, so the status rule does not touch it; new conduit to
+      an existing device can be real work. Found by the 2026-10-05 audit.
+- [ ] **(was) Track A (migration): a STATUS on each mark — new / existing to
       remain / remove / relocate — so an existing device is never priced as
       new.** Asked for 2026-10-01 from the reader-accuracy hand count: many
       devices on the test sheets are drawn as existing to remain, and a count
@@ -1795,7 +1812,8 @@ path is ever revived, give it the same treatment first.
       Find all matching's "maybe existing" flag:
       `references/find-all-matching-plan.md`. Batched with B's nine pin-style
       columns (next entry).
-- [ ] **Track A (migration): nine nullable pin-style columns, BATCHED with
+- [x] **DONE — 0099–0101 (A, batch 1).**
+      **Track A (migration): nine nullable pin-style columns, BATCHED with
       the mark-status column.** Not built; queued 2026-10-01. Shape, letter
       and color on each of `assemblies`, `symbol_links` and `takeoff_groups`.
       They are saved company-wide the way run colors are, and a shipped
@@ -1836,7 +1854,15 @@ path is ever revived, give it the same treatment first.
       symbol's offset over the family default. NOT covered by today's build:
       an unconfirmed AI mark is still a snap target (the WRONG-NUMBER RISK
       entry above), because telling one apart needs the mark-status column.
-- [ ] **Track B, after A's columns above: pin styles steps 2 and 3.** Step 1
+- [x] **BUILT 2026-10-05 (Track B): chosen looks (count → symbol →
+      assembly, editor from the card's swatch, "this job / every job") and
+      mark status (looks, "Mark as…", the split in words, priced only when
+      new).** Still open from this entry: the ring-around-the-symbol, faint
+      marks, the CSV "Pin" column, step 0's `LETTER_MIN_PX`, a "placing as"
+      choice in the count pill (status is set after placing today, or by
+      `drop`'s `status`), and the editor on the Legend tab and the assembly
+      editor (it opens from the count card only).
+      **Track B, after A's columns above: pin styles steps 2 and 3.** Step 1
       shipped 2026-10-01 (computed default shape by device family, the wide
       rectangle, letters and first-use colours, safety switch = DS). Still to
       build. The seam is the "NOT BUILT" block in `shared/pinLetters.ts`,

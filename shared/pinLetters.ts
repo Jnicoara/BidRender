@@ -42,7 +42,13 @@
  * letter decides").
  */
 import { FAMILY_SHAPE, deviceFamily, type DeviceFamily } from "./deviceFamily";
-import { MARK_COLORS, type MarkColor, type MarkShape } from "./takeoffMarks";
+import {
+  MARK_COLORS,
+  MARK_SHAPES,
+  isMarkColor,
+  type MarkColor,
+  type MarkShape,
+} from "./takeoffMarks";
 
 /**
  * The default table (pin plan § 3), most specific first: "3-way switch" must
@@ -147,6 +153,19 @@ function initial(name: string): string {
   return match ? match[0].toUpperCase() : "?";
 }
 
+/**
+ * A look somebody CHOSE, as stored (`markShape`, `markLetter`, `markColor` on
+ * `takeoff_groups`, `symbol_links` and `assemblies`, migrations 0099–0101).
+ * NULL is automatic. A value the code no longer knows — a shape or colour
+ * since dropped from the palette, a letter that is not a letter — reads as
+ * automatic too, so a palette change never needs a migration.
+ */
+export type PinLook = {
+  shape?: string | null;
+  letter?: string | null;
+  color?: string | null;
+};
+
 export type PinCount = {
   id: number;
   label: string;
@@ -154,7 +173,38 @@ export type PinCount = {
   assemblyName?: string | null;
   /** The linked assembly's category — the family's last default. */
   assemblyCategory?: string | null;
+  /**
+   * Looks chosen at each level (pin plan § 6, § 11.4). `count` is this job
+   * only; `symbol` is the captured legend item, every job; `assembly` is the
+   * library assembly, every job, and a DEFAULT — it bumps when two counts on
+   * a bid share it, where a count or symbol choice never does.
+   */
+  chosen?: {
+    count?: PinLook | null;
+    symbol?: PinLook | null;
+    assembly?: PinLook | null;
+  };
 };
+
+/** Where each part of a pin's look came from — the editor says it. */
+export type LookSource = "count" | "symbol" | "assembly" | "automatic";
+
+/** A chosen letter, tidied — or null when it is not one a pin can carry. */
+export function cleanLetter(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const tidy = value.trim().toUpperCase();
+  return /^[A-Z0-9][A-Z0-9.]{0,3}$/.test(tidy) ? tidy : null;
+}
+
+function cleanShape(value: string | null | undefined): MarkShape | null {
+  return (MARK_SHAPES as readonly string[]).includes(value ?? "")
+    ? (value as MarkShape)
+    : null;
+}
+
+function cleanColor(value: string | null | undefined): MarkColor | null {
+  return isMarkColor(value) ? value : null;
+}
 
 /**
  * Everything a count's pins look like. Shape comes from the count's device
@@ -171,29 +221,32 @@ export type PinStyle = {
    * and the connect point can never disagree about what a device is.
    */
   family: DeviceFamily;
+  /** Where the shape, letter and colour each came from. */
+  source: { shape: LookSource; letter: LookSource; color: LookSource };
+  /**
+   * Other counts on this bid wearing the SAME chosen letter. A count- or
+   * symbol-level letter is never renumbered (§ 11.4): a clash is shown, and
+   * the estimator changes one. Empty when there is none.
+   */
+  clashesWith: number[];
 };
 
 /*
- * ── NOT BUILT: chosen looks and mark status — where they plug in ────────────
- * Both wait for Track A's columns (pin plan § 12); see todo.md, "Pin styles,
- * step 2 and 3". Nothing below reads them yet, on purpose: a look the
- * database cannot store would vanish on reload, and a status look drawn
- * before the bid applies the status would show a price the bid is not using.
+ * ── BUILT 2026-10-05 (Track B), on migrations 0098–0101 ─────────────────────
+ * 1. CHOSEN looks, resolved below: precedence count → symbol → assembly →
+ *    automatic (plan § 11.4). A count- or symbol-level letter is placed before
+ *    the tags and never bumped (a clash is flagged in `clashesWith`); an
+ *    assembly-level letter or colour is a default and bumps like an automatic
+ *    one. A chosen colour wins and the automatic ones step around it — the
+ *    `runTypeColor` rule for runs.
  *
- * 1. CHOSEN shape / letter / colour (`markShape`, `markLetter`, `markColor` on
- *    `takeoff_groups`, `symbol_links`, `assemblies`). Add them to `PinCount`
- *    as `chosen` and resolve here, precedence count → symbol → assembly →
- *    automatic (plan § 11.4): a COUNT- or SYMBOL-level letter is placed before
- *    the tags and never bumped (a clash is flagged, not renumbered); an
- *    ASSEMBLY-level letter is a default and bumps like an automatic one. A
- *    chosen colour wins and the automatic ones step around it — copy
- *    `runTypeColor` in shared/takeoffMarks.ts, which is that rule for runs.
- *    A stored value the code no longer knows (`isMarkColor`, `MARK_SHAPES`)
- *    reads as automatic.
- * 2. MARK STATUS (`takeoff_stamps.status`: new / existing / remove /
- *    relocate, NULL = new). Per MARK, not per count, so it does not belong in
- *    this per-count map: `markAppearance` gains the stamp's status and the
- *    overlay draws filled / hollow-solid / X / arrow badge (plan § 7).
+ *    THE SHAPE CAN BE CHOSEN TOO. § 11.4 said "the shape stays the family's,
+ *    always"; the owner asked on 2026-10-05 for shape, letter and colour per
+ *    count, so a chosen shape wins and the family's is the automatic one. The
+ *    plan says so where § 11.4 is.
+ * 2. MARK STATUS is per MARK, so it is not in this per-count map:
+ *    `markAppearance` (shared/takeoffMarks.ts) takes the stamp's status, and
+ *    what a status may COST is shared/markStatus.ts.
  */
 
 /** The next code after `base` that is neither used nor a table meaning. */
@@ -216,38 +269,120 @@ export function pinStylesForBid(
 ): Map<number, PinStyle> {
   const byFirstUse = [...counts].sort((a, b) => a.id - b.id);
   const letters = new Map<number, string>();
+  const letterSource = new Map<number, LookSource>();
   const used = new Set<string>();
 
-  const place = (count: PinCount, base: string) => {
+  /** The first level that chose a valid value, and which level it was. */
+  const firm = <T>(
+    count: PinCount,
+    clean: (v: string | null | undefined) => T | null,
+    key: keyof PinLook
+  ): { value: T; source: "count" | "symbol" } | null => {
+    const c = clean(count.chosen?.count?.[key]);
+    if (c !== null) return { value: c, source: "count" };
+    const s = clean(count.chosen?.symbol?.[key]);
+    if (s !== null) return { value: s, source: "symbol" };
+    return null;
+  };
+
+  const place = (count: PinCount, base: string, source: LookSource) => {
     const code = used.has(base) ? bump(base, used) : base;
     used.add(code);
     letters.set(count.id, code);
+    letterSource.set(count.id, source);
   };
 
-  // Tags first: a drawing prints them, so nothing automatic may take one.
+  // A letter somebody chose for this count or its symbol: first, and never
+  // renumbered — two of them that collide are SHOWN, not silently fixed.
+  const firmLetterOwners = new Map<string, number[]>();
   for (const count of byFirstUse) {
+    const chosen = firm(count, cleanLetter, "letter");
+    if (!chosen) continue;
+    letters.set(count.id, chosen.value);
+    letterSource.set(count.id, chosen.source);
+    used.add(chosen.value);
+    firmLetterOwners.set(chosen.value, [
+      ...(firmLetterOwners.get(chosen.value) ?? []),
+      count.id,
+    ]);
+  }
+  // Tags next: a drawing prints them, so nothing automatic may take one.
+  for (const count of byFirstUse) {
+    if (letters.has(count.id)) continue;
     const tag = fixtureTag(count.label);
-    if (tag) place(count, tag);
+    if (tag) place(count, tag, "automatic");
   }
   for (const count of byFirstUse) {
     if (letters.has(count.id)) continue;
+    // An assembly's letter is a DEFAULT for every count of it, so it bumps.
+    const fromAssembly = cleanLetter(count.chosen?.assembly?.letter);
     place(
       count,
-      tableLetter(count.label) ??
+      fromAssembly ??
+        tableLetter(count.label) ??
         tableLetter(count.assemblyName) ??
-        initial(count.label)
+        initial(count.label),
+      fromAssembly ? "assembly" : "automatic"
     );
   }
 
-  const styles = new Map<number, PinStyle>();
-  byFirstUse.forEach((count, i) => {
-    const family = deviceFamily(count);
-    styles.set(count.id, {
-      letter: letters.get(count.id) ?? initial(count.label),
-      color: MARK_COLORS[i % MARK_COLORS.length],
-      shape: FAMILY_SHAPE[family],
-      family,
+  // Colours. A count/symbol choice wins outright; an assembly's colour goes to
+  // the first count of it that is free to take it (a default, so the second
+  // steps aside); the rest take what is left, in first-use order.
+  const colors = new Map<number, { color: MarkColor; source: LookSource }>();
+  const reserved = new Set<MarkColor>();
+  for (const count of byFirstUse) {
+    const chosen = firm(count, cleanColor, "color");
+    if (!chosen) continue;
+    colors.set(count.id, { color: chosen.value, source: chosen.source });
+    reserved.add(chosen.value);
+  }
+  for (const count of byFirstUse) {
+    if (colors.has(count.id)) continue;
+    const fromAssembly = cleanColor(count.chosen?.assembly?.color);
+    if (fromAssembly && !reserved.has(fromAssembly)) {
+      colors.set(count.id, { color: fromAssembly, source: "assembly" });
+      reserved.add(fromAssembly);
+    }
+  }
+  const free = MARK_COLORS.filter(c => !reserved.has(c));
+  const palette = free.length > 0 ? free : [...MARK_COLORS];
+  let k = 0;
+  for (const count of byFirstUse) {
+    if (colors.has(count.id)) continue;
+    colors.set(count.id, {
+      color: palette[k++ % palette.length],
+      source: "automatic",
     });
-  });
+  }
+
+  const styles = new Map<number, PinStyle>();
+  for (const count of byFirstUse) {
+    const family = deviceFamily(count);
+    const shape =
+      firm(count, cleanShape, "shape") ??
+      (cleanShape(count.chosen?.assembly?.shape)
+        ? {
+            value: cleanShape(count.chosen?.assembly?.shape)!,
+            source: "assembly" as const,
+          }
+        : null);
+    const letter = letters.get(count.id) ?? initial(count.label);
+    const color = colors.get(count.id)!;
+    styles.set(count.id, {
+      letter,
+      color: color.color,
+      shape: shape?.value ?? FAMILY_SHAPE[family],
+      family,
+      source: {
+        shape: shape?.source ?? "automatic",
+        letter: letterSource.get(count.id) ?? "automatic",
+        color: color.source,
+      },
+      clashesWith: (firmLetterOwners.get(letter) ?? []).filter(
+        id => id !== count.id
+      ),
+    });
+  }
   return styles;
 }

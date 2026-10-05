@@ -1,0 +1,95 @@
+# Track B handoff — 2026-10-05
+
+State at handoff: `track-b` = `origin/track-b` = `origin/local-dev` at
+**`d9d805d`**, working tree clean. Nothing on `main`, no deploy. Track B's own
+databases (`bidrender_local_b_new`, `bidrender_test_b`) are migrated to 105
+and `scripts/schemaDrift.mts` says both match. Last gate: `pnpm check` clean,
+292 test files / 4,976 passing / 5 skipped.
+
+## Done
+
+### Pin looks — chosen shape, letter, color (pin plan § 6, § 11.4)
+
+- Columns 0099–0101 (A, batch 1). Resolver in `shared/pinLetters.ts`:
+  count → legend symbol → assembly → automatic. Count/symbol letters are
+  never renumbered (a clash is flagged in `clashesWith`); an assembly letter
+  or color is a default and bumps. A value the palette no longer holds reads
+  as automatic.
+- **Shape can be chosen** — this overrides § 11.4's "shape is always the
+  family's", on the owner's request; recorded in the plan and in
+  `pinLetters.ts`.
+- Where a count takes its look from: `client/src/lib/pinCounts.ts` (reads
+  the company's FORK of a shipped assembly; finds a renamed symbol by its
+  captured key).
+- Saving: `takeoffGroups.setLook` (`where: "job" | "everyJob"`). Every job =
+  the legend symbol, else the assembly (forked if shipped), and the count's
+  own choice is cleared. A typed-name count is refused with the reason.
+- Editor: `client/src/components/takeoff/PinLookEditor.tsx`, opened from the
+  count card's swatch. Opens left with a capped height (it was cut off on a
+  tablet).
+
+### Mark status (pin plan § 7)
+
+- Columns 0098 + 0103 (`unconfirmed`, A). Set with "Mark as…" on a
+  selection (`takeoffStamps.setStatus`, refused on a locked bid, scoped to the
+  bid) or by `drop`'s `status`. People choose only `USER_MARK_STATUSES`;
+  `unconfirmed` is the reader's.
+- Drawn: new filled · existing hollow + SOLID outline · remove red X ·
+  relocate filled arrowhead badge · unconfirmed dashed hollow
+  (`statusLook`, `shared/takeoffMarks.ts`). Card says the split in words and
+  what is off the bid (`statusSplitText`, `unpricedStatusNote`).
+- Refresh: `markStatus` and `pinLook` in `client/src/lib/takeoffRefresh.ts`
+  (checked on screen: the card number moves without a reload).
+
+### One "only NEW marks are priced" rule — merged with Track A's
+
+A and B built the same rule the same day; the merge kept ONE of each:
+`markCountsAsQuantity` (`shared/markStatus.ts`, A's; `isPricedMark` is the
+same rule for a row) and `markIsQuantity` in `server/db.ts` (A's SQL).
+Applied where a mark becomes a number: `stampCountsForBid` (bid lines),
+`countStampsByGroup` ("Send N", the count list), `getStampsForBid`
+(materials list, export, drops), and `groupStamps` (pure; `StampRecord.status`
+is REQUIRED so no mapping can drop it). `statusSplitByGroup` is the one
+display-only count and says so. Tests: `server/markStatusPricing.test.ts`
+(red with either half of the rule removed), `client/src/lib/pinLooks.test.ts`,
+and A's `server/markStatusQuantities.test.ts`.
+
+## Open
+
+1. **Owner: what do REMOVE and RELOCATE cost?** Today neither is priced
+   (neither buys a device) and the card says "labor not on the bid".
+   Recommendation in todo.md: a labor line per status per count.
+2. **Owner: a run ENDING on an existing mark** still prices its own drop
+   (a run end claims a mark; not a mark count, so the rule does not reach
+   it). New conduit to an existing device can be real work. todo.md.
+3. **Track A: the step-3 fold** of Track C's "… - EXISTING TO REMAIN" twin
+   counts (`shared/existingToRemain.ts`) into `status`. Until then those
+   twins still PRICE AS NEW if sent — the one remaining way an existing
+   device reaches a bid.
+4. **"Placing as" while counting** — a New / Existing… choice in the count
+   pill so a run of existing devices is placed as existing. The server side
+   exists (`drop` takes `status`); only the control is missing.
+5. **The look editor on the Legend tab and in the assembly editor.** It
+   opens from the count card only; pin plan § 6 wants the one editor from
+   all three places.
+
+Also still open from step 1 of the pin plan (todo.md): ring around the
+symbol at reading zoom, faint marks, the CSV "Pin" column, step 0's
+`LETTER_MIN_PX`.
+
+## Exact next step
+
+Start with **open item 4, "placing as"**: it is the only one that needs no
+decision and no migration. In `client/src/pages/TakeoffPage.tsx`, add a
+sticky `placingStatus` (default new) beside the armed count, shown in the
+counting pill; pass it as `status` in the `dropStamps` mutation and on the
+pending marks (so they draw right before the reply). Test that a drop with
+`status: "existing"` is not counted (extend `server/markStatusPricing.test.ts`,
+which already places existing marks this way), then look at it on screen at
+laptop and tablet widths.
+
+Fixture for screen checks: bid "Sheet numbers check" (1728350, user 1),
+sheet E-200 (234209, 1/8" scale): four duplex marks are new / existing /
+remove / relocate, and the switch count has a chosen look (orange hexagon
+"SW"). The `deviceAudit.mts` helpers (`openAt`, `gotoRoute`) drive it; a probe
+script must live in `scripts/` to resolve playwright-core.

@@ -125,6 +125,19 @@ export type TakeoffChange =
    * mark now ends on a different thing.
    */
   | "marksMoved"
+  /**
+   * Marks marked new, existing, remove or relocate (shared/markStatus.ts).
+   * Only a new mark is a quantity, so every bid figure the marks feed moves —
+   * the count's number, its line, its drop's footage on the run-type lines,
+   * the materials list — exactly as a move between counts does.
+   */
+  | "markStatus"
+  /**
+   * A count's pin look chosen (shape, letter, colour). No number moves; the
+   * count list carries the look. The legend's `symbols` and the assemblies
+   * list are not per bid and are the caller's to drop.
+   */
+  | "pinLook"
   /** A sheet's row: its scale, its number, its title. */
   | "sheet"
   /**
@@ -218,6 +231,13 @@ export const QUERIES_MOVED_BY: Readonly<
     ...RUN_QUERIES,
     ...BID_QUANTITY_QUERIES,
   ]),
+  markStatus: unique([
+    ...MARK_QUERIES,
+    ...RUN_QUERIES,
+    ...BID_QUANTITY_QUERIES,
+  ]),
+  // The summary lists every count with its swatch, so it follows too.
+  pinLook: unique([...MARK_QUERIES, "takeoffSummary.forBid"]),
   sheet: unique(SHEET_QUERIES),
   planRemoved: unique([
     "bidPdfs.list",

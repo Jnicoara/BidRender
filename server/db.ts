@@ -18,8 +18,15 @@ import {
 } from "drizzle-orm";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2/promise";
+import {
+  QUANTITY_MARK_STATUSES,
+  emptySplit,
+  isPricedMark,
+  markStatusOf,
+  type MarkStatus,
+  type StatusSplit,
+} from "../shared/markStatus";
 import { mysqlConnection } from "./databaseConnection";
-import { QUANTITY_MARK_STATUSES } from "../shared/markStatus";
 import {
   InsertUser,
   InsertProject,
@@ -5301,6 +5308,7 @@ async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
       and(
         eq(takeoffStamps.bidId, bidId),
         onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        // Every bid line's live quantity comes from here: new marks only.
         markIsQuantity()
       )
     )
@@ -8877,7 +8885,48 @@ export async function deleteTakeoffGroup(
     .where(and(eq(takeoffGroups.id, id), eq(takeoffGroups.userId, userId)));
 }
 
-/** How many marks each group has, for a list that says so without a second query. */
+/**
+ * How many marks of each STATUS each group has — for the card's words
+ * ("12 new · 4 existing"). DISPLAY ONLY, which is why it carries no
+ * `markIsQuantity`: it is the one count whose job is to show the marks the
+ * priced counts leave out. Nothing may read a quantity from it.
+ */
+export async function statusSplitByGroup(
+  bidId: number,
+  userId: number
+): Promise<Map<number, StatusSplit>> {
+  const db = await getDb();
+  if (!db) return new Map();
+  const rows = await db
+    .select({
+      groupId: takeoffStamps.groupId,
+      status: takeoffStamps.status,
+      total: sql<number>`count(*)`,
+    })
+    .from(takeoffStamps)
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        eq(takeoffStamps.userId, userId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+      )
+    )
+    .groupBy(takeoffStamps.groupId, takeoffStamps.status);
+  const splits = new Map<number, StatusSplit>();
+  for (const row of rows) {
+    if (row.groupId === null) continue;
+    const split = splits.get(row.groupId) ?? emptySplit();
+    split[markStatusOf(row.status)] += Number(row.total);
+    splits.set(row.groupId, split);
+  }
+  return splits;
+}
+
+/**
+ * How many NEW marks each group has — the number "Send N to bid" sends and the
+ * list prints as the count. Existing, remove and relocate marks are in
+ * `statusSplitByGroup`, never here (shared/markStatus.ts).
+ */
 export async function countStampsByGroup(
   bidId: number,
   userId: number
@@ -8895,6 +8944,7 @@ export async function countStampsByGroup(
         eq(takeoffStamps.bidId, bidId),
         eq(takeoffStamps.userId, userId),
         onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        // "Send N to bid" sends this N: new marks only.
         markIsQuantity()
       )
     )
@@ -8914,6 +8964,33 @@ export async function createStamps(rows: InsertTakeoffStamp[]): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   await db.insert(takeoffStamps).values(rows);
+}
+
+/**
+ * Set what these marks are (shared/markStatus.ts). NULL is new. Scoped to the
+ * bid AND the company, so an id from another bid changes nothing; returns how
+ * many rows changed.
+ */
+export async function setStampStatus(
+  bidId: number,
+  userId: number,
+  ids: number[],
+  status: Exclude<MarkStatus, "new"> | null
+): Promise<number> {
+  const database = await getDb();
+  if (!database) throw new Error("DB unavailable");
+  const [result] = await database
+    .update(takeoffStamps)
+    .set({ status, updatedAt: new Date() })
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        eq(takeoffStamps.userId, userId),
+        inArray(takeoffStamps.id, ids)
+      )
+    );
+  return (result as { affectedRows?: number }).affectedRows ?? 0;
 }
 
 /** Tag where a placed stamp sits — the Location layer. */
@@ -12965,7 +13042,9 @@ export async function loadGroupDrops(
       dropHeightInches: g.dropHeightInches,
       dropRunTypeId: g.dropRunTypeId,
     })),
-    marks: stamps.map(s => ({
+    // A drop is pipe and wire bought for a NEW device. An existing one is
+    // already fed, so its mark buys no drop (shared/markStatus.ts).
+    marks: stamps.filter(isPricedMark).map(s => ({
       id: s.id,
       groupId: s.groupId,
       sheetId: s.sheetId,

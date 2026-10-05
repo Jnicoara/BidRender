@@ -19,6 +19,12 @@
  */
 import { heightTypeLabel } from "./takeoffHeights";
 import type { PagePoint } from "./takeoffGeometry";
+import {
+  emptySplit,
+  isPricedMark,
+  markStatusOf,
+  type StatusSplit,
+} from "./markStatus";
 
 /**
  * A stamp as the counter needs it.
@@ -49,6 +55,13 @@ export type StampRecord = {
   assemblyCategory?: string | null;
   x: number;
   y: number;
+  /**
+   * `takeoff_stamps.status` — NULL is new. REQUIRED, not optional, so every
+   * mapping from a row has to say it: a mapping that dropped it would count
+   * an existing device as a new one, and nothing would look wrong
+   * (shared/markStatus.ts, the hard rule).
+   */
+  status: string | null;
 };
 
 /**
@@ -296,8 +309,16 @@ export type CountedAssembly = {
   /** Null for a plain count, or an assembly deleted since it was stamped. */
   assemblyId: number | null;
   name: string;
-  /** How many were dropped. Derived from the stamps themselves. */
+  /**
+   * How many are NEW — the quantity anything bought or priced may use. A
+   * mark that is existing, to be removed or relocated is not a new device
+   * (shared/markStatus.ts), so it is in `placed` and `split`, never here.
+   */
   count: number;
+  /** Every mark placed, whatever its status. Display only. */
+  placed: number;
+  /** How many of each status. */
+  split: StatusSplit;
   /** Every instance, so the list can walk through them one at a time. */
   stamps: StampRecord[];
 };
@@ -342,21 +363,25 @@ export function groupStamps(stamps: StampRecord[]): CountedAssembly[] {
 
   for (const stamp of stamps) {
     const key = countKey(stamp);
-
-    const existing = groups.get(key);
-    if (existing) {
-      existing.count += 1;
-      existing.stamps.push(stamp);
-      continue;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        kind: "assembly",
+        groupId: stamp.groupId,
+        assemblyId: stamp.assemblyId,
+        name: stamp.name,
+        count: 0,
+        placed: 0,
+        split: emptySplit(),
+        stamps: [],
+      };
+      groups.set(key, group);
     }
-    groups.set(key, {
-      kind: "assembly",
-      groupId: stamp.groupId,
-      assemblyId: stamp.assemblyId,
-      name: stamp.name,
-      count: 1,
-      stamps: [stamp],
-    });
+    group.placed += 1;
+    group.split[markStatusOf(stamp.status)] += 1;
+    // The hard rule: only a NEW mark is a quantity.
+    if (isPricedMark(stamp)) group.count += 1;
+    group.stamps.push(stamp);
   }
 
   return Array.from(groups.values());

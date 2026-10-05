@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-05]
 
+- **Mark a device as existing, to be removed or relocated, and it is never
+  priced as new.** Select marks and choose "Mark as…". Existing devices draw
+  as hollow pins, removals get a red X, relocations an arrow badge, and each
+  count's card says the split in words ("1 new · 1 existing · 1 remove").
+  Only new marks reach the bid line, "Send to bid", the supplier list, the
+  takeoff export and the drop footage; the others still show on the drawing.
+  Remove and relocate labor is not on the bid yet, and the card says so.
+- **Choose how a count's pins look.** Click a count's swatch to pick its
+  shape, letter and color, for this job or for every job (on its legend
+  symbol or assembly). Anything left on Automatic keeps today's look.
 - **A legend item can now have several looks (test build, track-c).** When
   you capture a symbol whose name is already in your legend, the app asks
   whether it is another look of that item. Yes keeps the new picture, and it
@@ -20,13 +30,6 @@ This is the human-readable companion to the git history — read this to see wha
 - **The accuracy answer key was corrected for Old Blueridge.** The "point"
   marks were the 7 occupancy/daylight sensors. The "GFCI" count is the duplex
   above the backsplash. Names are now matched per plan set.
-
-- **An existing device can never be priced as new.** A mark can now say what
-  it is on the job — new, existing to remain, remove, relocate, or not yet
-  confirmed. Only new marks go into bid quantities, the materials list, the
-  takeoff export and drops; the others still show on the drawing. Nothing sets
-  these yet, so no bid changes today — this is the guard, in place before the
-  screens that set them.
 - **A run can never attach to an unconfirmed mark.** A run that snaps to a
   mark copies its position, so a misplaced AI mark used to become a wrong
   length. An unconfirmed mark is now skipped by the snap, and the server

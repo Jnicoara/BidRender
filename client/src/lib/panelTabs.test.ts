@@ -35,7 +35,7 @@ describe("selecting on the drawing opens its tab (rule 4)", () => {
 describe("the pinned 'This sheet' line (answer 6)", () => {
   it("never adds marks to runs — the fixture's '9' was 3 marks + 6 runs", () => {
     const line = sheetLine({
-      counts: [{ count: 3 }],
+      counts: [{ placed: 3 }],
       runs: Array.from({ length: 6 }, (_, i) => ({
         runTypeId: i < 4 ? 1 : 2,
         isSuggestion: false,
@@ -61,7 +61,7 @@ describe("the pinned 'This sheet' line (answer 6)", () => {
   it("leaves suggestions out, and says nothing about runs when there are none", () => {
     expect(
       sheetLine({
-        counts: [{ count: 1 }],
+        counts: [{ placed: 1 }],
         runs: [{ runTypeId: 1, isSuggestion: true, feet: 40 }],
       })
     ).toBe("This sheet: 1 mark · 1 item");
