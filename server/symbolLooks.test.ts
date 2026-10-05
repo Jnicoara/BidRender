@@ -17,8 +17,13 @@ import { eq, inArray } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
 import {
+  assemblies,
+  assemblyMaterials,
+  bidLineItems,
   bidPdfs,
   bids,
+  laborRates,
+  materials,
   symbolLinks,
   symbolLooks,
   users,
@@ -28,6 +33,7 @@ import {
   isSameLook,
   lookCount,
   looksForSearch,
+  thumbnailAfterRemoval,
 } from "../shared/symbolLooks";
 import type { TrpcContext } from "./_core/context";
 
@@ -150,6 +156,15 @@ beforeEach(async () => {
   await database
     .delete(symbolLinks)
     .where(inArray(symbolLinks.userId, [USER, OTHER]));
+  await database
+    .delete(assemblies)
+    .where(inArray(assemblies.userId, [USER, OTHER]));
+  await database
+    .delete(materials)
+    .where(inArray(materials.userId, [USER, OTHER]));
+  await database
+    .delete(laborRates)
+    .where(inArray(laborRates.userId, [USER, OTHER]));
 });
 
 withDb("capturing a name that is already an item", () => {
@@ -309,5 +324,194 @@ withDb("the looks Find all matching is given", () => {
         sheetId: theirs.sheetId,
       })
     ).rejects.toThrow(/not found/i);
+  });
+});
+
+// ── Removing a look (plan § 5, § 8 test 4) ───────────────────────────────────
+
+describe("the picture an item shows after a look is removed", () => {
+  const row = (id: number, thumbnail: string | null, at: string) => ({
+    id,
+    thumbnail,
+    createdAt: at,
+  });
+
+  it("takes the first remaining look when the shown picture was removed", () => {
+    expect(
+      thumbnailAfterRemoval(PIC, { thumbnail: PIC }, [
+        row(3, "C", "2026-10-04"),
+        row(2, PIC2, "2026-10-02"),
+      ])
+    ).toBe(PIC2);
+  });
+
+  it("keeps the shown picture when another look was removed", () => {
+    expect(
+      thumbnailAfterRemoval(PIC, { thumbnail: PIC2 }, [
+        row(1, PIC, "2026-10-01"),
+      ])
+    ).toBe(PIC);
+  });
+
+  it("is none once the last look is gone", () => {
+    expect(thumbnailAfterRemoval(PIC, { thumbnail: PIC }, [])).toBeNull();
+  });
+});
+
+/** A priced assembly of this company's own — never a shipped price. */
+async function ownAssembly(name: string) {
+  const database = await getDb();
+  const [material] = await database!.insert(materials).values({
+    userId: USER,
+    name: `${name} material`,
+    unitOfSale: "each",
+    costPerUnit: "3.2500",
+  });
+  const [rate] = await database!.insert(laborRates).values({
+    userId: USER,
+    name: `${name} role`,
+    hourlyCost: "70.0000",
+  });
+  const [assembly] = await database!.insert(assemblies).values({
+    userId: USER,
+    name,
+    category: "Devices",
+    baseLaborHours: "0.5000",
+    laborRateId: rate.insertId,
+  });
+  await database!.insert(assemblyMaterials).values({
+    assemblyId: assembly.insertId,
+    materialId: material.insertId,
+    qty: "1.0000",
+  });
+  return assembly.insertId;
+}
+
+const looksOf = async (symbolLinkId: number) => {
+  const database = await getDb();
+  return database!
+    .select()
+    .from(symbolLooks)
+    .where(eq(symbolLooks.symbolLinkId, symbolLinkId));
+};
+
+withDb("removing a look", () => {
+  it("removes that one look, and the item shows a picture it still has", async () => {
+    const weld = await aSet(USER, "Weld 1.pdf");
+    const blue = await aSet(USER, "Old Blueridge school.pdf");
+    const item = await capture("GFCI receptacle", weld.sheetId);
+    await capture("GFCI receptacle", blue.sheetId, {
+      thumbnail: PIC2,
+      addAsLook: true,
+    });
+    const listed = await caller().takeoffStamps.looksFor({ symbolId: item.id });
+    expect(listed.map(l => l.setName)).toEqual([
+      "Old Blueridge school.pdf",
+      "Weld 1.pdf",
+    ]);
+
+    // Remove the FIRST look — the picture the legend row has been showing.
+    const first = listed[1];
+    const r = await caller().takeoffStamps.removeLook({ lookId: first.id });
+    expect(r).toEqual({ symbolId: item.id, looks: 1, hasPicture: true });
+
+    expect((await looksOf(item.id)).map(l => l.thumbnail)).toEqual([PIC2]);
+    const [legend] = await caller().takeoffStamps.symbols();
+    expect(legend).toMatchObject({ id: item.id, looks: 1, thumbnail: PIC2 });
+  });
+
+  it("removing the last look leaves the item with no picture, and still one item", async () => {
+    const set = await aSet();
+    const item = await capture("Duplex", set.sheetId);
+    const [only] = await caller().takeoffStamps.looksFor({ symbolId: item.id });
+    const r = await caller().takeoffStamps.removeLook({ lookId: only.id });
+    expect(r).toEqual({ symbolId: item.id, looks: 0, hasPicture: false });
+    const legend = await caller().takeoffStamps.symbols();
+    expect(legend).toHaveLength(1);
+    expect(legend[0]).toMatchObject({ looks: 0, thumbnail: null });
+  });
+
+  it("moves no count: marks, bid lines and snapshots are identical on an open and a locked bid", async () => {
+    const assemblyId = await ownAssembly("Duplex receptacle");
+    const open = await aSet(USER, "Open.pdf");
+    const locked = await aSet(USER, "Locked.pdf");
+    const item = await caller().takeoffStamps.captureSymbol({
+      label: "Duplex",
+      thumbnail: PIC,
+      capturedFromSheetId: open.sheetId,
+      box: BOX,
+      assemblyId,
+    });
+    await capture("Duplex", locked.sheetId, {
+      thumbnail: PIC2,
+      addAsLook: true,
+    });
+
+    for (const set of [open, locked]) {
+      const priced = await caller().takeoffGroups.forAssembly({
+        bidId: set.bidId,
+        assemblyId,
+      });
+      const free = await caller().takeoffGroups.create({
+        bidId: set.bidId,
+        label: "Duplex",
+        reuseExisting: true,
+        symbolId: item.id,
+      });
+      for (const [g, n] of [
+        [priced.id, 3],
+        [free.id, 2],
+      ] as const) {
+        await caller().takeoffStamps.drop({
+          bidId: set.bidId,
+          sheetId: set.sheetId,
+          groupId: g,
+          at: Array.from({ length: n }, (_, i) => ({ x: 10 + i, y: 10 })),
+        });
+        await caller().takeoffGroups.sendToBid({ id: g });
+      }
+    }
+    await caller().bids.lockQuantities({ bidId: locked.bidId });
+
+    const database = await getDb();
+    const read = async () =>
+      JSON.stringify(
+        await Promise.all(
+          [open, locked].map(async set => ({
+            groups: await caller().takeoffGroups.list({ bidId: set.bidId }),
+            bid: await caller().bids.get({ id: set.bidId }),
+            stored: await database!
+              .select()
+              .from(bidLineItems)
+              .where(eq(bidLineItems.bidId, set.bidId)),
+          }))
+        )
+      );
+    const before = await read();
+    // Something to move: lines exist and carry marks, or "identical" means nothing.
+    expect(before).toContain('"qty"');
+
+    const [newest] = await caller().takeoffStamps.looksFor({
+      symbolId: item.id,
+    });
+    await caller().takeoffStamps.removeLook({ lookId: newest.id });
+
+    // The removal happened (outcome, not intent) ...
+    expect(await looksOf(item.id)).toHaveLength(1);
+    // ... and nothing counted moved.
+    expect(await read()).toBe(before);
+  });
+
+  it("another company's look is not found, and is not removed", async () => {
+    const set = await aSet();
+    const item = await capture("Duplex", set.sheetId);
+    const [look] = await caller().takeoffStamps.looksFor({ symbolId: item.id });
+    await expect(
+      caller(OTHER).takeoffStamps.removeLook({ lookId: look.id })
+    ).rejects.toThrow(/not found/i);
+    await expect(
+      caller(OTHER).takeoffStamps.looksFor({ symbolId: item.id })
+    ).rejects.toThrow(/not found/i);
+    expect(await looksOf(item.id)).toHaveLength(1);
   });
 });

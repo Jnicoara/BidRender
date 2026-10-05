@@ -344,6 +344,7 @@ import {
   applyAiAnswers,
   clearOpen,
   decide,
+  dropLookMatches,
   matchItems,
   nextToLookAt,
   type MatchItem,
@@ -9985,6 +9986,38 @@ export default function TakeoffPage({
                     }
                     onResetName={id => resetSymbolName.mutate({ id, bidId })}
                     onRemove={id => setSymbolDeleteId(id)}
+                    onLookRemoved={lookId => {
+                      // An open find that look made is dropped unless the
+                      // box found it too — never re-pointed
+                      // (multiple-looks-plan.md § 7).
+                      const dropped =
+                        findSession?.panel.phase === "results"
+                          ? dropLookMatches(findSession.panel.items, lookId)
+                              .dropped
+                          : 0;
+                      setFindSession(s =>
+                        s
+                          ? {
+                              ...s,
+                              looks: s.looks.filter(l => l.id !== lookId),
+                              panel:
+                                s.panel.phase === "results"
+                                  ? {
+                                      ...s.panel,
+                                      items: dropLookMatches(
+                                        s.panel.items,
+                                        lookId
+                                      ).items,
+                                      selectedId: null,
+                                    }
+                                  : s.panel,
+                            }
+                          : s
+                      );
+                      return dropped > 0
+                        ? `${dropped} unconfirmed find${dropped === 1 ? "" : "s"} that look made ${dropped === 1 ? "was" : "were"} dropped from this search.`
+                        : null;
+                    }}
                     onUseSymbol={symbol => {
                       const assembly = allAssemblies.find(
                         a => a.id === symbol.assemblyId

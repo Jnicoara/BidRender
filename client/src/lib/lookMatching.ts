@@ -46,6 +46,8 @@ const unique = (xs: readonly string[]) => Array.from(new Set(xs));
 export type MergedMatch = Match & {
   /** How many sources (the box, each look) found this spot. */
   foundBy: number;
+  foundByBox: boolean;
+  foundByLooks: number[];
 };
 
 export function mergeLookResults(
@@ -89,6 +91,10 @@ export function mergeLookResults(
         onDemolitionPlan:
           s.all.find(m => m.onDemolitionPlan)?.onDemolitionPlan ?? null,
         foundBy: s.sources.length,
+        foundByBox: s.sources.some(src => src.kind === "box"),
+        foundByLooks: s.sources.flatMap(src =>
+          src.kind === "look" ? [src.lookId] : []
+        ),
       };
     })
     .sort((p, q) => p.y - q.y || p.x - q.x);

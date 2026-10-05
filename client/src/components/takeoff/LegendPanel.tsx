@@ -35,7 +35,9 @@ import {
   RotateCcw,
   Rows3,
   Trash2,
+  X,
 } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { selectOnFocus } from "@/lib/selectOnFocus";
@@ -82,6 +84,7 @@ export function LegendPanel({
   onRemove,
   onUseSymbol,
   onCountSymbol,
+  onLookRemoved,
 }: {
   symbols: SymbolEntry[];
   assemblies: PickableAssembly[];
@@ -115,11 +118,18 @@ export function LegendPanel({
   onUseSymbol: (symbol: SymbolEntry) => void;
   /** Count an UNLINKED symbol as a plain count under its own name. */
   onCountSymbol: (symbol: SymbolEntry) => void;
+  /**
+   * A look was removed. The page drops any open find that look made in a
+   * running Find all matching (multiple-looks-plan.md § 7) and says how many.
+   */
+  onLookRemoved?: (lookId: number) => string | null;
 }) {
   /** The symbol whose "which assembly?" question is open. */
   const [linking, setLinking] = useState<SymbolEntry | null>(null);
   /** The symbol whose name is being edited. */
   const [renamingId, setRenamingId] = useState<number | null>(null);
+  /** The item whose looks are open under its row. */
+  const [looksOpenId, setLooksOpenId] = useState<number | null>(null);
 
   return (
     <div className="border-t border-border shrink-0">
@@ -190,147 +200,166 @@ export function LegendPanel({
           </p>
         ) : (
           symbols.map(symbol => (
-            <div
-              key={symbol.id}
-              className={cn(
-                "group flex items-center gap-2 px-3 py-1.5 border-t border-border/50 transition-colors cursor-pointer hover:bg-muted/40",
-                (activeSymbolId !== null
-                  ? symbol.id === activeSymbolId
-                  : symbol.assemblyId !== null &&
-                    symbol.assemblyId === activeAssemblyId) && "bg-[#F5C518]/10"
-              )}
-              title={
-                symbol.isLinked
-                  ? "Count this assembly"
-                  : `Count “${symbol.label}” — no assembly needed`
-              }
-              onClick={() => {
-                // A click inside the name being edited is not a count.
-                if (renamingId === symbol.id) return;
-                // Either way, straight into the mark tool (§ 8a). Linking is
-                // the row's own control, never a gate on counting.
-                if (symbol.isLinked) onUseSymbol(symbol);
-                else onCountSymbol(symbol);
-              }}
-            >
-              {symbol.thumbnail ? (
-                <img
-                  src={symbol.thumbnail}
-                  alt=""
-                  className="w-8 h-8 object-contain rounded bg-white shrink-0"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded bg-muted shrink-0" />
-              )}
-
-              <div className="flex-1 min-w-0">
-                {renamingId === symbol.id ? (
-                  <SymbolNameEditor
-                    symbol={symbol}
-                    onSave={label => {
-                      setRenamingId(null);
-                      if (label !== symbol.label) onRename(symbol.id, label);
-                    }}
-                    onReset={() => {
-                      setRenamingId(null);
-                      onResetName(symbol.id);
-                    }}
-                    onCancel={() => setRenamingId(null)}
+            <div key={symbol.id}>
+              <div
+                className={cn(
+                  "group flex items-center gap-2 px-3 py-1.5 border-t border-border/50 transition-colors cursor-pointer hover:bg-muted/40",
+                  (activeSymbolId !== null
+                    ? symbol.id === activeSymbolId
+                    : symbol.assemblyId !== null &&
+                      symbol.assemblyId === activeAssemblyId) &&
+                    "bg-[#F5C518]/10"
+                )}
+                title={
+                  symbol.isLinked
+                    ? "Count this assembly"
+                    : `Count “${symbol.label}” — no assembly needed`
+                }
+                onClick={() => {
+                  // A click inside the name being edited is not a count.
+                  if (renamingId === symbol.id) return;
+                  // Either way, straight into the mark tool (§ 8a). Linking is
+                  // the row's own control, never a gate on counting.
+                  if (symbol.isLinked) onUseSymbol(symbol);
+                  else onCountSymbol(symbol);
+                }}
+              >
+                {symbol.thumbnail ? (
+                  <img
+                    src={symbol.thumbnail}
+                    alt=""
+                    className="w-8 h-8 object-contain rounded bg-white shrink-0"
                   />
                 ) : (
-                  <p
-                    className="text-xs truncate"
-                    title={
-                      symbol.originalName
-                        ? `Captured as “${symbol.originalName}”`
-                        : undefined
-                    }
-                  >
-                    {symbol.label}
-                  </p>
+                  <div className="w-8 h-8 rounded bg-muted shrink-0" />
                 )}
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  {symbol.isLinked ? (
-                    <>
-                      <Link2 className="w-2.5 h-2.5" />{" "}
-                      {assemblies.find(a => a.id === symbol.assemblyId)?.name ??
-                        "Linked"}
-                    </>
-                  ) : (
-                    "Counts by name · no assembly"
-                  )}
-                  {(symbol.looks ?? 0) > 1 && (
-                    <span title="Several pictures of this one item, from different plan sets or sheets. Find all matching searches every one.">
-                      · {symbol.looks} looks
-                    </span>
-                  )}
-                </p>
-              </div>
 
-              {/* Always visible, unlike the hover controls: a phone has no
+                <div className="flex-1 min-w-0">
+                  {renamingId === symbol.id ? (
+                    <SymbolNameEditor
+                      symbol={symbol}
+                      onSave={label => {
+                        setRenamingId(null);
+                        if (label !== symbol.label) onRename(symbol.id, label);
+                      }}
+                      onReset={() => {
+                        setRenamingId(null);
+                        onResetName(symbol.id);
+                      }}
+                      onCancel={() => setRenamingId(null)}
+                    />
+                  ) : (
+                    <p
+                      className="text-xs truncate"
+                      title={
+                        symbol.originalName
+                          ? `Captured as “${symbol.originalName}”`
+                          : undefined
+                      }
+                    >
+                      {symbol.label}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    {symbol.isLinked ? (
+                      <>
+                        <Link2 className="w-2.5 h-2.5" />{" "}
+                        {assemblies.find(a => a.id === symbol.assemblyId)
+                          ?.name ?? "Linked"}
+                      </>
+                    ) : (
+                      "Counts by name · no assembly"
+                    )}
+                    {(symbol.looks ?? 0) > 1 && (
+                      <button
+                        type="button"
+                        className="whitespace-nowrap underline decoration-dotted underline-offset-2 hover:text-foreground"
+                        title="Several pictures of this one item, from different plan sets or sheets. Find all matching searches every one. Click to see them."
+                        aria-expanded={looksOpenId === symbol.id}
+                        onClick={e => {
+                          e.stopPropagation();
+                          setLooksOpenId(
+                            looksOpenId === symbol.id ? null : symbol.id
+                          );
+                        }}
+                      >
+                        · {symbol.looks} looks
+                      </button>
+                    )}
+                  </p>
+                </div>
+
+                {/* Always visible, unlike the hover controls: a phone has no
                   hover, and renaming is something done on a phone too. */}
-              {renamingId !== symbol.id && (
+                {renamingId !== symbol.id && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-5 w-5 p-0 shrink-0 text-muted-foreground hover:text-foreground"
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (renameRefusal) {
+                        toast.error(renameRefusal);
+                        return;
+                      }
+                      setLinking(null);
+                      setRenamingId(symbol.id);
+                    }}
+                    title="Rename — the name read off the plan is kept for matching"
+                    aria-label={`Rename ${symbol.label}`}
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </Button>
+                )}
+                {!symbol.isLinked && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-5 px-1.5 shrink-0 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={e => {
+                      e.stopPropagation();
+                      setLinking(linking?.id === symbol.id ? null : symbol);
+                    }}
+                    title="Link this symbol to an assembly, for this job and every job after it"
+                    aria-label={`Link ${symbol.label} to an assembly`}
+                  >
+                    <Link2 className="w-3 h-3 mr-0.5" /> Link
+                  </Button>
+                )}
+                {symbol.isLinked && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-5 w-5 p-0 shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground"
+                    onClick={e => {
+                      e.stopPropagation();
+                      onUnlink(symbol.id);
+                    }}
+                    title="Break this link"
+                    aria-label={`Unlink ${symbol.label}`}
+                  >
+                    <Link2Off className="w-3 h-3" />
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-5 w-5 p-0 shrink-0 text-muted-foreground hover:text-foreground"
+                  className="h-5 w-5 p-0 shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
                   onClick={e => {
                     e.stopPropagation();
-                    if (renameRefusal) {
-                      toast.error(renameRefusal);
-                      return;
-                    }
-                    setLinking(null);
-                    setRenamingId(symbol.id);
+                    onRemove(symbol.id);
                   }}
-                  title="Rename — the name read off the plan is kept for matching"
-                  aria-label={`Rename ${symbol.label}`}
+                  aria-label={`Remove ${symbol.label}`}
                 >
-                  <Pencil className="w-3 h-3" />
+                  <Trash2 className="w-3 h-3" />
                 </Button>
+              </div>
+              {looksOpenId === symbol.id && (symbol.looks ?? 0) > 1 && (
+                <LookList
+                  symbol={symbol}
+                  onRemoved={lookId => onLookRemoved?.(lookId) ?? null}
+                />
               )}
-              {!symbol.isLinked && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-5 px-1.5 shrink-0 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={e => {
-                    e.stopPropagation();
-                    setLinking(linking?.id === symbol.id ? null : symbol);
-                  }}
-                  title="Link this symbol to an assembly, for this job and every job after it"
-                  aria-label={`Link ${symbol.label} to an assembly`}
-                >
-                  <Link2 className="w-3 h-3 mr-0.5" /> Link
-                </Button>
-              )}
-              {symbol.isLinked && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-5 w-5 p-0 shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground"
-                  onClick={e => {
-                    e.stopPropagation();
-                    onUnlink(symbol.id);
-                  }}
-                  title="Break this link"
-                  aria-label={`Unlink ${symbol.label}`}
-                >
-                  <Link2Off className="w-3 h-3" />
-                </Button>
-              )}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-5 w-5 p-0 shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                onClick={e => {
-                  e.stopPropagation();
-                  onRemove(symbol.id);
-                }}
-                aria-label={`Remove ${symbol.label}`}
-              >
-                <Trash2 className="w-3 h-3" />
-              </Button>
             </div>
           ))
         )}
@@ -366,6 +395,120 @@ export function LegendPanel({
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * One item's looks, under its row (multiple-looks-plan.md § 5): each picture,
+ * where it came from, and an × that asks once before removing it.
+ *
+ * Removing a look changes what FUTURE searches find and nothing else — no
+ * mark, count or bid line moves (server: takeoffStamps.removeLook, and
+ * symbolLooks.test.ts reads them on both sides). The confirm says so,
+ * because "remove" beside a count reads as removing counted marks.
+ */
+function LookList({
+  symbol,
+  onRemoved,
+}: {
+  symbol: SymbolEntry;
+  /** Returns a line about a running search it changed, or null. */
+  onRemoved: (lookId: number) => string | null;
+}) {
+  const utils = trpc.useUtils();
+  const looks = trpc.takeoffStamps.looksFor.useQuery({ symbolId: symbol.id });
+  const [asking, setAsking] = useState<number | null>(null);
+  const remove = trpc.takeoffStamps.removeLook.useMutation({
+    onSuccess: (r, { lookId }) => {
+      const search = onRemoved(lookId);
+      toast.success(
+        [
+          r.hasPicture
+            ? "Look removed. Marks already counted stay where they are."
+            : "Look removed — this item has no picture now. Marks already counted stay where they are.",
+          search,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
+    },
+    onError: e => toast.error(e.message),
+    onSettled: () => {
+      setAsking(null);
+      // Everything that shows or searches an item's looks.
+      void utils.takeoffStamps.symbols.invalidate();
+      void utils.takeoffStamps.looksFor.invalidate({ symbolId: symbol.id });
+      void utils.takeoffStamps.searchLooks.invalidate();
+    },
+  });
+
+  return (
+    <div
+      className="px-3 pb-2 pl-12 space-y-1 bg-muted/20"
+      onClick={e => e.stopPropagation()}
+    >
+      {looks.data?.map(look => (
+        <div key={look.id} className="flex items-center gap-2 text-xs">
+          {look.thumbnail ? (
+            <img
+              src={look.thumbnail}
+              alt=""
+              className="w-6 h-6 object-contain rounded bg-white shrink-0"
+            />
+          ) : (
+            <div className="w-6 h-6 rounded bg-muted shrink-0" />
+          )}
+          {asking === look.id ? (
+            <>
+              <span className="flex-1 min-w-0 truncate">
+                Remove this look? Counts stay.
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-5 px-1.5 text-xs text-destructive"
+                disabled={remove.isPending}
+                onClick={() => remove.mutate({ lookId: look.id })}
+              >
+                Remove
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-5 px-1.5 text-xs"
+                onClick={() => setAsking(null)}
+              >
+                Keep
+              </Button>
+            </>
+          ) : (
+            <>
+              <span
+                className="flex-1 min-w-0 truncate text-muted-foreground"
+                title={
+                  look.hasBox
+                    ? undefined
+                    : "Saved without a box: shown here, not searched"
+                }
+              >
+                {look.setName ?? "A deleted plan set"}
+                {look.pageNumber !== null && ` · page ${look.pageNumber}`}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-5 w-5 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                onClick={() => setAsking(look.id)}
+                title="Remove this look"
+                aria-label={`Remove this look of ${symbol.label}`}
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

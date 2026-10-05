@@ -10,7 +10,13 @@ import {
   mergeLookResults,
   type LookSource,
 } from "./lookMatching";
-import { clearOpen, itemKind, matchItems } from "./findMatchingSession";
+import {
+  clearOpen,
+  decide,
+  dropLookMatches,
+  itemKind,
+  matchItems,
+} from "./findMatchingSession";
 
 const m = (x: number, over: Partial<Match> = {}): Match => ({
   x,
@@ -92,5 +98,39 @@ describe("a look from another plan set only SUGGESTS (owner, 2026-10-05)", () =>
       expect(one.needsLook).toEqual([]);
       expect(clearOpen(matchItems([one], []))).toHaveLength(1);
     }
+  });
+});
+
+describe("a look removed mid-search (multiple-looks-plan.md § 7)", () => {
+  // 100: box + look 1.  200: look 1 only.  300: looks 1 and 2.  400: look 2.
+  const session = () =>
+    matchItems(
+      mergeLookResults([
+        { source: box, matches: [m(100)] },
+        { source: here, matches: [m(100), m(200), m(300)] },
+        { source: weld, matches: [m(300), m(400)] },
+      ]),
+      []
+    );
+
+  it("drops every open find the look helped make, unless the box found it too", () => {
+    const r = dropLookMatches(session(), 1);
+    expect(r.items.map(i => i.x)).toEqual([100, 400]);
+    expect(r.dropped).toBe(2);
+  });
+
+  it("never touches a decided find: a confirmed one is already a mark", () => {
+    const before = session();
+    const confirmed = decide(before, [before[1].id], "confirmed");
+    const r = dropLookMatches(confirmed, 1);
+    expect(r.items.map(i => [i.x, i.state])).toEqual([
+      [100, "open"],
+      [200, "confirmed"],
+      [400, "open"],
+    ]);
+  });
+
+  it("a look that found nothing drops nothing", () => {
+    expect(dropLookMatches(session(), 99).dropped).toBe(0);
   });
 });

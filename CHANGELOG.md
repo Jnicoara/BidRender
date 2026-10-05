@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-05]
 
+- **A wrong look can be removed.** On the Legend tab, "N looks" now opens the
+  item's pictures, each with an × that asks once. Removing a look changes what
+  future searches find and nothing else — no mark, count or bid line moves, on
+  any bid, locked or not. If the removed look was the picture the item shows,
+  it shows its next one. Unconfirmed finds that only that look made in an open
+  Find all matching are dropped, and the message says how many.
+
 - **Mark a device as existing, to be removed or relocated, and it is never
   priced as new.** Select marks and choose "Mark as…". Existing devices draw
   as hollow pins, removals get a red X, relocations an arrow badge, and each
