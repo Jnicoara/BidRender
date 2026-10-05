@@ -7053,6 +7053,8 @@ export default function TakeoffPage({
           id: s.id,
           x: s.x,
           y: s.y,
+          // snapToMark skips an unconfirmed mark (@shared/markStatus).
+          status: s.status,
           connect: connects.get(s.id)?.point,
         })),
       });
@@ -9196,6 +9198,7 @@ export default function TakeoffPage({
                           assemblyCategory: st.assemblyCategory ?? null,
                           x: st.x,
                           y: st.y,
+                          status: st.status,
                         })),
                         /*
                           Clicked and not yet saved, drawn the same way.
@@ -9216,6 +9219,8 @@ export default function TakeoffPage({
                             assemblyCategory: m.assemblyCategory,
                             x: m.x,
                             y: m.y,
+                            // A click being placed now is new by definition.
+                            status: null,
                             pending: true,
                           })),
                       ]}

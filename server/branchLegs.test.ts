@@ -24,6 +24,7 @@ import {
   users,
 } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { UNCONFIRMED_MARK_REFUSAL } from "./routers/takeoffRunsRouter";
 
 const USER = 9811;
 const STRANGER = 9812;
@@ -270,6 +271,39 @@ withDb("a branch along a leg cuts it at the tee", () => {
       .from(takeoffPullPoints)
       .where(eq(takeoffPullPoints.userId, USER));
     expect(after).toHaveLength(0);
+  });
+
+  it("refuses to attach a run end to an UNCONFIRMED mark, and accepts a confirmed one", async () => {
+    // shared/markStatus.ts rule 2, server side: the client never snaps to an
+    // unchecked mark, and an old or modified client cannot either. Red before
+    // 0103 and this check: any mark on the sheet was accepted.
+    const { bidId, sheetId } = await aBid();
+    const rootId = await aMain(bidId, sheetId);
+    const database = (await getDb())!;
+    const [unchecked] = await database.insert(takeoffStamps).values({
+      bidId,
+      sheetId,
+      userId: USER,
+      x: String(ft(40)),
+      y: String(ft(30)),
+      status: "unconfirmed",
+    });
+    await expect(
+      caller().takeoffRuns.setEnds({
+        id: rootId,
+        endStampId: unchecked.insertId,
+      })
+    ).rejects.toThrow(UNCONFIRMED_MARK_REFUSAL);
+
+    // Confirmed — here, an existing device to remain — it attaches.
+    await database
+      .update(takeoffStamps)
+      .set({ status: "existing" })
+      .where(eq(takeoffStamps.id, unchecked.insertId));
+    await caller().takeoffRuns.setEnds({
+      id: rootId,
+      endStampId: unchecked.insertId,
+    });
   });
 
   it("carries the host's end mark to the far piece", async () => {

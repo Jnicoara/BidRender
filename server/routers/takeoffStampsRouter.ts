@@ -496,6 +496,11 @@ export const takeoffStampsRouter = router({
         location: row.location,
         x: Number(row.x),
         y: Number(row.y),
+        /**
+         * NULL = new (0098, 0103). The drawing shows every mark; a run never
+         * snaps to an `unconfirmed` one (shared/markStatus.ts, rule 2).
+         */
+        status: row.status,
       }));
     }),
 

@@ -4,6 +4,21 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-05]
+
+- **An existing device can never be priced as new.** A mark can now say what
+  it is on the job — new, existing to remain, remove, relocate, or not yet
+  confirmed. Only new marks go into bid quantities, the materials list, the
+  takeoff export and drops; the others still show on the drawing. Nothing sets
+  these yet, so no bid changes today — this is the guard, in place before the
+  screens that set them.
+- **A run can never attach to an unconfirmed mark.** A run that snaps to a
+  mark copies its position, so a misplaced AI mark used to become a wrong
+  length. An unconfirmed mark is now skipped by the snap, and the server
+  refuses one too, with a plain message.
+- **The database can record whether each run end's wall connection was
+  checked** (migrations 0103–0104). Nothing uses it yet.
+
 ## [2026-10-02]
 
 - **The database is ready for pin looks, mark status, mark heights and

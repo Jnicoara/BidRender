@@ -22,6 +22,7 @@
  */
 import { projectOntoPath } from "@shared/runNetwork";
 import type { PagePoint } from "@shared/takeoffGeometry";
+import { markIsSnapTarget, type MarkStatus } from "@shared/markStatus";
 
 export type LegSnap =
   | {
@@ -52,6 +53,12 @@ export type SnapStamp = {
   x: number;
   y: number;
   /**
+   * The mark's status (NULL = new). REQUIRED, not optional, on purpose: every
+   * list of snap targets must say it, so a new caller cannot forget it and
+   * quietly let a run snap to an unconfirmed mark (shared/markStatus.ts).
+   */
+  status: MarkStatus | null;
+  /**
    * Where a run MEETS this device (shared/connectPoint.ts) — at the wall for a
    * wall receptacle, switch or data outlet whose wall was found in the
    * drawing. Omitted, the run meets it at the mark, as before.
@@ -76,6 +83,10 @@ export function snapToMark(
   let best: SnapStamp | null = null;
   let bestD = tolerance;
   for (const s of stamps) {
+    // Never an UNCONFIRMED mark: a snap copies the mark's spot into the run,
+    // so a misplaced AI mark would become a wrong length (shared/markStatus.ts
+    // rule 2; todo.md WRONG-NUMBER RISK). The click lands where it was made.
+    if (!markIsSnapTarget(s.status)) continue;
     const d = Math.hypot(at.x - s.x, at.y - s.y);
     if (d <= bestD && (!best || d < bestD)) {
       best = s;
