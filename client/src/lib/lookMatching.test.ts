@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { Match } from "./findMatching";
 import {
   OTHER_SET_REASON,
+  lookAlikeCheck,
   mergeLookResults,
   type LookSource,
 } from "./lookMatching";
@@ -132,5 +133,40 @@ describe("a look removed mid-search (multiple-looks-plan.md § 7)", () => {
 
   it("a look that found nothing drops nothing", () => {
     expect(dropLookMatches(session(), 99).dropped).toBe(0);
+  });
+});
+
+describe("what a new look's own search gives the look-alike check (plan § 4)", () => {
+  const symbol = { segments: 12, words: [], width: 12, height: 12 };
+
+  it("on a vector sheet: every copy, with how far it reaches", () => {
+    expect(
+      lookAlikeCheck({
+        kind: "ok",
+        matches: [m(100, { halfWidth: 4, halfHeight: 7 })],
+        symbol,
+      })
+    ).toEqual({ spots: [{ x: 100, y: 100, reach: 7 }] });
+  });
+
+  it("on a scan: says it cannot compare, rather than nothing", () => {
+    for (const r of [
+      { kind: "scan" as const, message: "scan" },
+      {
+        kind: "ok" as const,
+        matches: [m(100)],
+        symbol,
+        scan: { plan: null, pixels: 30 },
+      },
+    ])
+      expect(lookAlikeCheck(r)).toEqual({
+        cannotCompare: expect.stringMatching(/scan.*could not be compared/),
+      });
+  });
+
+  it("when the search failed: still says so", () => {
+    expect(lookAlikeCheck(null)).toEqual({
+      cannotCompare: expect.stringMatching(/could not be compared/),
+    });
   });
 });

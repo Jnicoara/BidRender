@@ -46,15 +46,34 @@ this file is stale or the state moved.
   `pnpm tsx scripts/scanMatchingCheck.mts` (about 2 min; it reads `dropMarks`).
 - **Q6 decided:** scans stay as built, with no "Confirm all — checked by eye"
   button.
+- **Remove and move a look** (plan § 5, done 2026-10-05). "N looks" on the
+  legend row opens the item's looks; each has "Move" (a list of the other
+  items) and an × that asks once. `takeoffStamps.removeLook` / `moveLook` /
+  `looksFor`. Neither writes a mark, count, bid line or snapshot — the tests
+  read all of them on an open and a locked bid, before and after. The item's
+  shown picture follows (`thumbnailAfterRemoval`). A move onto an item that
+  already has the same look is refused. In an open Find all matching,
+  unconfirmed finds the look made are dropped unless the box found them too
+  (`dropLookMatches`, plan § 7).
+- **Look-alike warning** (plan § 4 point 2, done 2026-10-05). "Yes, another
+  look" first runs the look through Find all matching on its own sheet. If it
+  lands on marks counted as another item, `captureSymbol` saves nothing and
+  returns them, and the card asks "This look also matches N marks counted as
+  X on this sheet. Add it anyway?" with Cancel focused. On a scan (or if the
+  search fails) it saves and the message says it could not be compared
+  (`lookAlikeCheck`). Seen on screen on Weld 1 E-200 (vector) and Old
+  Blueridge E1.01 (scan).
 
 ## Not built yet
 
-1. **Look-alike warning when a look is added** (plan § 4): a new look that
-   also matches another item's marks should warn, with Cancel as the
-   default. Vector only; on a scan the card should say it cannot compare.
-2. **Remove / move a look** (plan § 5): the legend row's actions are Remove
-   this look, Move to another item…, and Find on this sheet from one look.
-   None of them may move a counted mark (§ 7).
+1. **The rest of plan § 4.** Point 1 (the device words differ from the item's
+   other looks: "Your other look has 'GF' beside it") and the second half of
+   point 2 (another item's LOOK on this set finds the same spots, not just
+   its marks). Also "from a new look" tagging so Confirm all skips a new
+   look's finds for the session (§ 4, § 8 test 7). The warning runs only on
+   an ADDED look, not on a new item's first look.
+2. **"Find on this sheet" from one look** (plan § 5), the third action on a
+   look.
 3. **The per-row choice in whole-legend capture** (`LegendCapture.tsx`): a
    matching name keeps "left as it is", which is the decided default. The
    choice to make it another look is missing.
@@ -70,16 +89,11 @@ this file is stale or the state moved.
 
 ## The exact next step
 
-**Item 2, "Remove this look"**, because it is the smallest and an estimator
-who adds a wrong look today has no way to undo it:
-
-- `takeoffStamps.removeLook({ lookId })`, scoped by `ctx.scope.dataUserId`,
-  deleting one `symbol_looks` row.
-- A small "×" per look on the legend row, behind a one-line confirm.
-- A test that counts, bid-line quantities and snapshots are identical before
-  and after (plan § 8 test 4).
-
-Then move-a-look, then item 1.
+**Item 1's "from a new look" tag** (plan § 8 test 7): a look added this
+session should not have its finds swept in by Confirm all. It is the
+remaining guard against a wrong look that the person said "Add anyway" to.
+Pure, in `client/src/lib/findMatchingSession.ts` (`clearOpen`), using the
+`foundByLooks` ids that `mergeLookResults` now records.
 
 ## Migrations Track A would need
 

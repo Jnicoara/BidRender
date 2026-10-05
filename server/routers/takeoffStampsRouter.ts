@@ -61,6 +61,7 @@ import {
   lookCount,
   looksForSearch,
   thumbnailAfterRemoval,
+  lookAlikes,
   type LookBox,
 } from "../../shared/symbolLooks";
 
@@ -775,6 +776,28 @@ export const takeoffStampsRouter = router({
          * keeps today's answer: the item is left as it is.
          */
         addAsLook: z.boolean().default(false),
+        /**
+         * Where the new look found copies on its own sheet, run by the client
+         * (Find all matching lives in the PDF worker), and whether the person
+         * has already said "Add anyway" (plan § 4). With spots and no yes, a
+         * look that lands on marks counted as ANOTHER item is not saved: the
+         * answer names those items instead. Absent on a scan, where the
+         * comparison cannot be made — the client says so.
+         */
+        lookAlike: z
+          .object({
+            spots: z
+              .array(
+                z.object({
+                  x: z.number().finite(),
+                  y: z.number().finite(),
+                  reach: z.number().finite().nonnegative(),
+                })
+              )
+              .max(5000),
+            accepted: z.boolean(),
+          })
+          .optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -831,6 +854,38 @@ export const takeoffStampsRouter = router({
             isLinked: existing.assemblyId !== null,
             autoLinked: false,
           };
+        // Does it also match another item's marks? Asked before saving,
+        // and nothing is written until the person says yes (plan § 4).
+        if (input.lookAlike && !input.lookAlike.accepted && sheet) {
+          const marks = (
+            await db.getStampsForSheet(sheet.id, ctx.scope.dataUserId)
+          ).map(row => ({
+            x: Number(row.x),
+            y: Number(row.y),
+            name: stampName(row),
+            assemblyId: row.assemblyId,
+          }));
+          const alike = lookAlikes(
+            input.lookAlike.spots,
+            marks,
+            mark =>
+              nameMatchesSymbol(mark.name, existing) ||
+              (existing.assemblyId !== null &&
+                mark.assemblyId === existing.assemblyId)
+          );
+          if (alike.length > 0)
+            return {
+              id: existing.id,
+              alreadyKnown: true,
+              lookAdded: false,
+              lookAlreadySaved: false,
+              lookAlike: alike,
+              looks: lookCount(looks.length, Boolean(existing.thumbnail)),
+              assemblyId: existing.assemblyId,
+              isLinked: existing.assemblyId !== null,
+              autoLinked: false,
+            };
+        }
         await keepOldPictureAsFirstLook(
           existing,
           looks.length,
