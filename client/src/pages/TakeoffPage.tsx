@@ -327,7 +327,7 @@ import { pastDragThreshold, swallowNextClick } from "@/lib/dragThreshold";
 import { wheelIntent, type WheelGesture } from "@/lib/wheelIntent";
 import type { PageTextLayer } from "@/lib/textSelection";
 import type { FindResult, MatchBox } from "@/lib/findMatching";
-import type { SavedLook } from "@/lib/lookMatching";
+import { lookAlikeCheck, type SavedLook } from "@/lib/lookMatching";
 import type { SheetCheckInput, SheetCheckResult } from "@/lib/sheetCheck";
 import {
   countNameFromLegend,
@@ -4552,7 +4552,13 @@ export default function TakeoffPage({
   );
   const captureSymbol = trpc.takeoffStamps.captureSymbol.useMutation({
     onError: e => toast.error(e.message),
-    onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
+    onSettled: () => {
+      // A capture can add a look, so the legend row's open look list and
+      // Find all matching's looks move with it.
+      void utils.takeoffStamps.symbols.invalidate();
+      void utils.takeoffStamps.looksFor.invalidate();
+      void utils.takeoffStamps.searchLooks.invalidate();
+    },
   });
   /**
    * The same procedure for "Capture whole legend", without the per-call
@@ -9175,7 +9181,55 @@ export default function TakeoffPage({
                               }
                             : null;
                         }}
-                        onSave={(label, { addAsLook }) => {
+                        onAddLook={async (label, accepted) => {
+                          // Look-alikes (multiple-looks-plan.md § 4): the new
+                          // look is searched on its own sheet first, and the
+                          // server refuses to save it over marks counted as
+                          // another item until the person says "Add anyway".
+                          const capture = pendingCapture;
+                          const box = normaliseCaptureBox(capture.region);
+                          const boxed = box.width > 0 && box.height > 0;
+                          let check: ReturnType<typeof lookAlikeCheck> = {
+                            spots: [],
+                          };
+                          if (!accepted)
+                            check = lookAlikeCheck(
+                              boxed && capture.sheetId === activeSheet?.id
+                                ? await size
+                                    .findMatching(box, [])
+                                    .then(r => r.result)
+                                    .catch(() => null)
+                                : null
+                            );
+                          const r = await captureSymbol.mutateAsync({
+                            label,
+                            thumbnail: capture.thumbnail,
+                            capturedFromSheetId: capture.sheetId,
+                            box: boxed ? box : undefined,
+                            addAsLook: true,
+                            lookAlike:
+                              "spots" in check
+                                ? { spots: check.spots, accepted }
+                                : undefined,
+                          });
+                          if ("lookAlike" in r && r.lookAlike)
+                            return r.lookAlike;
+                          toast.success(
+                            [
+                              r.lookAlreadySaved
+                                ? "This look is already saved."
+                                : `Added look ${r.looks} for ${label}. It is still one item: one count, one price.`,
+                              "cannotCompare" in check
+                                ? check.cannotCompare
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" ")
+                          );
+                          setPendingCapture(null);
+                          return null;
+                        }}
+                        onSave={label => {
                           const box = normaliseCaptureBox(
                             pendingCapture.region
                           );
@@ -9188,7 +9242,6 @@ export default function TakeoffPage({
                                 box.width > 0 && box.height > 0
                                   ? box
                                   : undefined,
-                              addAsLook,
                             },
                             {
                               onSuccess: r =>

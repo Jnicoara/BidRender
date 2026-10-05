@@ -19,7 +19,8 @@
  * this set's own legend. The box drawn on this sheet, and a look captured on
  * this set, both count as this set's own.
  */
-import type { Match } from "./findMatching";
+import type { FindResult, Match } from "./findMatching";
+import type { LookSpot } from "@shared/symbolLooks";
 
 export type LookSource =
   /** The symbol boxed on this sheet for this search. */
@@ -114,3 +115,29 @@ export type SavedLook = {
   confirmsThisSet: boolean;
   url: string | null;
 };
+
+/**
+ * What a new look's own search tells the look-alike check (plan § 4): the
+ * spots it found, for the server to compare with marks counted as other
+ * items — or, when the comparison cannot be made, the sentence that says so.
+ * A scan has no line work to compare, and saying nothing there would read as
+ * "checked, nothing alike".
+ */
+export function lookAlikeCheck(
+  result: FindResult | null
+): { spots: LookSpot[] } | { cannotCompare: string } {
+  if (result?.kind === "ok" && !result.scan)
+    return {
+      spots: result.matches.map(m => ({
+        x: m.x,
+        y: m.y,
+        reach: Math.max(m.halfWidth, m.halfHeight),
+      })),
+    };
+  return {
+    cannotCompare:
+      result?.kind === "scan" || (result?.kind === "ok" && result.scan)
+        ? "This sheet is a scan, so this look could not be compared with marks counted as other items."
+        : "This look could not be compared with marks counted as other items on this sheet.",
+  };
+}

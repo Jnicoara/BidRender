@@ -37,6 +37,7 @@ import {
   normaliseCaptureBox,
   type CaptureBox,
 } from "@shared/symbolCapture";
+import { lookAlikeWarning, type LookAlike } from "@shared/symbolLooks";
 
 /** Longest edge of the instant PREVIEW, in pixels. Not what is saved. */
 const THUMBNAIL_MAX_EDGE = 96;
@@ -179,6 +180,7 @@ export function SymbolCaptureForm({
   chromeTarget,
   existingFor,
   onSave,
+  onAddLook,
   onCancel,
 }: {
   thumbnail: string | null;
@@ -200,13 +202,32 @@ export function SymbolCaptureForm({
     looks: number;
     thumbnail: string | null;
   } | null;
-  onSave: (label: string, opts: { addAsLook: boolean }) => void;
+  /** A new item, or a name already in the legend left as it is. */
+  onSave: (label: string) => void;
+  /**
+   * "Yes, another look" (multiple-looks-plan.md § 1). Resolves with the other
+   * items the look also lands on when it was NOT saved for that reason
+   * (plan § 4) — the card then asks, Cancel first — or null once saved.
+   * `accepted` is the person's "Add anyway".
+   */
+  onAddLook: (label: string, accepted: boolean) => Promise<LookAlike[] | null>;
   onCancel: () => void;
 }) {
   const [label, setLabel] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [asking, setAsking] = useState<ReturnType<typeof existingFor>>(null);
   const [note, setNote] = useState<string | null>(null);
+  /** Adding a look: checking it, or the look-alike question it raised. */
+  const [lookStep, setLookStep] = useState<
+    null | "checking" | { alike: LookAlike[] }
+  >(null);
+  const addLook = (accepted: boolean) => {
+    setLookStep("checking");
+    onAddLook(label.trim(), accepted).then(
+      alike => setLookStep(alike ? { alike } : null),
+      () => setLookStep(null)
+    );
+  };
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -222,7 +243,7 @@ export function SymbolCaptureForm({
       setAsking(existing);
       return;
     }
-    onSave(trimmed, { addAsLook: false });
+    onSave(trimmed);
   };
 
   // pointer-events-auto: the screen layer is click-through by default.
@@ -317,44 +338,81 @@ export function SymbolCaptureForm({
               this one
             </span>
           </div>
-          <p className="text-xs mt-1.5">
-            Add this as another look for {asking.label}? It stays one item: one
-            count, one price.
-          </p>
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            <Button
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => onSave(label.trim(), { addAsLook: true })}
-            >
-              Yes, another look
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
-              onClick={() => {
-                // Two items cannot share a name (plan § 9 Q1): back to the
-                // name, the old one ready to edit.
-                setAsking(null);
-                setNote(
-                  `Two items cannot share a name — give this one its own, e.g. ${asking.label} — weather resistant.`
-                );
-                inputRef.current?.focus();
-                inputRef.current?.select();
-              }}
-            >
-              No, a separate item
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 text-xs"
-              onClick={onCancel}
-            >
-              Cancel
-            </Button>
-          </div>
+          {lookStep !== null && typeof lookStep === "object" ? (
+            // Default is Cancel (plan § 4): it takes the focus, and Enter
+            // on it adds nothing.
+            <div role="alert">
+              <p className="text-xs mt-1.5 text-[#F5C518]">
+                {lookAlikeWarning(lookStep.alike)}
+              </p>
+              <p className="text-xs mt-1 text-muted-foreground">
+                If it is drawn like {lookStep.alike[0].name} on this set, every{" "}
+                {lookStep.alike[0].name} would be offered as {asking.label}.
+              </p>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                <Button
+                  size="sm"
+                  className="h-7 text-xs"
+                  autoFocus
+                  onClick={onCancel}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  onClick={() => addLook(true)}
+                >
+                  Add anyway
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs mt-1.5">
+                Add this as another look for {asking.label}? It stays one item:
+                one count, one price.
+              </p>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                <Button
+                  size="sm"
+                  className="h-7 text-xs"
+                  disabled={lookStep === "checking"}
+                  onClick={() => addLook(false)}
+                >
+                  {lookStep === "checking"
+                    ? "Checking against this sheet…"
+                    : "Yes, another look"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    // Two items cannot share a name (plan § 9 Q1): back to the
+                    // name, the old one ready to edit.
+                    setAsking(null);
+                    setNote(
+                      `Two items cannot share a name — give this one its own, e.g. ${asking.label} — weather resistant.`
+                    );
+                    inputRef.current?.focus();
+                    inputRef.current?.select();
+                  }}
+                >
+                  No, a separate item
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={onCancel}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <div className="flex items-center gap-1.5 mt-2.5">

@@ -112,3 +112,59 @@ export function thumbnailAfterRemoval(
     .sort((p, q) => time(p) - time(q) || p.id - q.id)[0];
   return first?.thumbnail ?? null;
 }
+
+// ── Look-alikes (plan § 4) ───────────────────────────────────────────────────
+
+/** Where a new look found a copy on its own sheet: page points, and how far it reaches. */
+export type LookSpot = { x: number; y: number; reach: number };
+
+/** A mark already on that sheet, with the count it belongs to. */
+export type SheetMark = {
+  x: number;
+  y: number;
+  /** The count's name (`stampName`). */
+  name: string;
+  assemblyId: number | null;
+};
+
+export type LookAlike = { name: string; marks: number };
+
+/**
+ * Marks counted as a DIFFERENT item that a new look also lands on — the
+ * "GFCI look that is really drawn like a duplex" case, which would turn every
+ * duplex into a GFCI. Grouped by count name, most marks first; each mark
+ * counted once however many spots reach it.
+ *
+ * A mark is the item's OWN when its count carries one of the item's names
+ * (`isOwn`) or counts the item's assembly — the same item a click on the
+ * row would count. Everything else is another item, and is warned about.
+ */
+export function lookAlikes(
+  spots: readonly LookSpot[],
+  marks: readonly SheetMark[],
+  isOwn: (mark: SheetMark) => boolean
+): LookAlike[] {
+  const tally = new Map<string, number>();
+  for (const mark of marks) {
+    if (isOwn(mark)) continue;
+    const hit = spots.some(
+      s => Math.hypot(s.x - mark.x, s.y - mark.y) <= s.reach
+    );
+    if (hit) tally.set(mark.name, (tally.get(mark.name) ?? 0) + 1);
+  }
+  return Array.from(tally, ([name, n]) => ({ name, marks: n })).sort(
+    (p, q) => q.marks - p.marks || p.name.localeCompare(q.name)
+  );
+}
+
+/** The warning's words: "8 marks counted as DUPLEX RECEPTACLE", and so on. */
+export function lookAlikeWarning(alikes: readonly LookAlike[]): string {
+  const parts = alikes.map(
+    a => `${a.marks} mark${a.marks === 1 ? "" : "s"} counted as ${a.name}`
+  );
+  const list =
+    parts.length <= 1
+      ? (parts[0] ?? "")
+      : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  return `This look also matches ${list} on this sheet. Add it anyway?`;
+}
