@@ -1518,6 +1518,31 @@ additive ones run BEFORE the push (§ 5, three steps).
 5. Then production, in the same order — see the release entry below for the
    current one, and § 5a for the full commands.
 
+### Staging: migrations 0103–0104 (done 2026-10-05) — NOT yet on live
+
+Batch 1b (`migrations-0098-batch-plan.md` § S): `'unconfirmed'` appended to
+`takeoff_stamps.status` (every row NULL) and `takeoff_runs.startConnect` /
+`endConnect`. Both additive. Shipped with the two mark-status rules in
+`shared/markStatus.ts` (only new marks are quantities; a run never snaps to or
+attaches to an unconfirmed mark) — which move no number while every status is
+NULL, as it is on staging and live.
+
+1. **Backup**: `staging-2026-10-05T19-41-13Z-before-0103-0104.sql` (65 tables)
+   in `C:\dev\bidrender-backups\`, restored locally, every count equal to
+   staging's.
+2. **Rehearsal on it**: drift before, 103 recorded, the 2 expected
+   differences; **2 applied**, 105; "matches", 141/141; second run nothing;
+   data counts unchanged; no mark has a status.
+3. **Gate green** on `af65f84` (full suite on a fresh database through 0104).
+4. **Staging**: the same 2 differences before; **2 applied**, 105; "matches",
+   141/141; second run nothing; data unchanged; old code (`fe2df5e`) answered
+   throughout.
+5. **Code**: `af65f84` pushed to `staging` by hand, `local-dev` fast-forwarded
+   to it; `/api/version` = `af65f84` (built 19:58 UTC); drift against it:
+   matches.
+
+**Live takes 0096–0104 together**: `references/live-release-plan.md`.
+
 ### Staging: migrations 0096–0102 (done 2026-10-02) — NOT yet on live
 
 The marks batch (`migrations-0098-batch-plan.md` § S, Batch 1) with the two
