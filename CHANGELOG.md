@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-05]
 
+- **Fixed: a legend symbol linked to an assembly could still go to the bid
+  with no price.** Clicking the symbol straight after linking it started a
+  count by name, which reached the bid as a line with no price and no hours.
+  The link now shows at once, and the server counts a linked symbol as its
+  assembly whichever way the click arrives. Found by the first browser smoke
+  test to run on staging.
+
 - **A check that no bid's total moves when a release goes live.** A new
   read-only tool records every bid's "Total due" and not-priced count before
   and after a release and lists any that changed. It cannot write to the

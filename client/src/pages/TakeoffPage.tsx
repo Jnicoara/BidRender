@@ -4541,14 +4541,45 @@ export default function TakeoffPage({
    * a toast per row.
    */
   const captureLegendSymbol = trpc.takeoffStamps.captureSymbol.useMutation();
+  /*
+    Link and unlink write into the legend's copy AT ONCE. The Legend picks
+    "count this assembly" or "count by name" from that copy, so until the
+    refetch landed a click straight after Link counted the symbol by name
+    and it went to the bid as a free count (staging smoke, 2026-10-05,
+    flow 6). The server also turns such a click into the assembly's count
+    (`takeoffGroups.create`, server/legendLinkCount.test.ts); this half
+    keeps the screen from saying "Count by name" for a linked symbol.
+  */
+  const setSymbolAssembly = async (id: number, assemblyId: number | null) => {
+    await utils.takeoffStamps.symbols.cancel();
+    const before = utils.takeoffStamps.symbols.getData();
+    utils.takeoffStamps.symbols.setData(undefined, rows =>
+      rows?.map(row =>
+        row.id === id
+          ? { ...row, assemblyId, isLinked: assemblyId !== null }
+          : row
+      )
+    );
+    return { before };
+  };
   const linkSymbol = trpc.takeoffStamps.linkSymbol.useMutation({
-    onError: e => toast.error(e.message),
+    onMutate: vars => setSymbolAssembly(vars.id, vars.assemblyId),
+    onError: (e, _vars, context) => {
+      if (context)
+        utils.takeoffStamps.symbols.setData(undefined, context.before);
+      toast.error(e.message);
+    },
     onSuccess: r =>
       toast.success(`Linked to ${r.assemblyName} — one click from now on.`),
     onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
   });
   const unlinkSymbol = trpc.takeoffStamps.unlinkSymbol.useMutation({
-    onError: e => toast.error(e.message),
+    onMutate: vars => setSymbolAssembly(vars.id, null),
+    onError: (e, _vars, context) => {
+      if (context)
+        utils.takeoffStamps.symbols.setData(undefined, context.before);
+      toast.error(e.message);
+    },
     onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
   });
   /*
