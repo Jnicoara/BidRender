@@ -1,4 +1,4 @@
-# Track C — handoff, 2026-10-05
+# Track C — handoff, 2026-10-06
 
 Written for a restart. Worktree `C:\dev\BidPhase-C`, branch `track-c`.
 At the time of writing, track-c and local-dev were the same commit, everything
@@ -55,23 +55,41 @@ this file is stale or the state moved.
   already has the same look is refused. In an open Find all matching,
   unconfirmed finds the look made are dropped unless the box found them too
   (`dropLookMatches`, plan § 7).
-- **Look-alike warning** (plan § 4 point 2, done 2026-10-05). "Yes, another
-  look" first runs the look through Find all matching on its own sheet. If it
-  lands on marks counted as another item, `captureSymbol` saves nothing and
-  returns them, and the card asks "This look also matches N marks counted as
-  X on this sheet. Add it anyway?" with Cancel focused. On a scan (or if the
-  search fails) it saves and the message says it could not be compared
-  (`lookAlikeCheck`). Seen on screen on Weld 1 E-200 (vector) and Old
-  Blueridge E1.01 (scan).
+- **Look-alike warning, all of plan § 4** (2026-10-05/06). Before ANY
+  capture saves — a new item's first look or a look added to one — the
+  boxed symbol is searched on its sheet together with other items' looks on
+  that set (`looksOnSet`, max 12) and, when adding, the item's own looks.
+  `takeoffStamps.checkLookAlikes` (read-only) names every other item whose
+  marks it lands on, or whose looks find the same spots; the card also says
+  when device words differ ("Your other look has 'GF' beside it; this one
+  doesn't", `lookWordNotes`, from DEVICE_WORDS only, no AI). Cancel first;
+  "Save anyway" / "Add anyway". On a scan it saves and says it could not
+  compare. **The check moved OUT of `captureSymbol` on 2026-10-06**: the
+  spots come from the client either way, so a gate there guaranteed nothing,
+  and it gave the save a second result shape.
+- **"From a new look"** (plan § 8 test 7, 2026-10-06). A find only an added,
+  never-confirmed look made needs a look; Confirm all leaves it. Confirming
+  one by hand trusts that look (`trustLooks`). The item's first look
+  (`searchLooks.isFirst`) and the box are trusted. "Confirmed once" is kept
+  in the browser (`@/lib/trustedLooks`) for want of a column — it fails
+  toward untrusted; see the migration request below.
+- **Lines crossing symbols** (2026-10-06): measured, then built.
+  `find-all-matching-plan.md` § 4b has the numbers; `scripts/lineCrossingCheck.mts`
+  re-runs them. On Weld 1 E-200 crossing lines cost nothing: the 2 misses are
+  not crossing lines, nothing is falsely found, no template is dirty (a first
+  reading said the GFCI's was; it was the GFCI's own lines). Built anyway,
+  for other exports, each made to happen in a fixture: lines running through
+  the box kept out of the template, a copy cut by a crossing line offered as
+  "maybe — a line crosses it" (never clear), a second anchor. E-200 reads
+  exactly as before. Scans: 85/85, nothing to build.
 
 ## Not built yet
 
-1. **The rest of plan § 4.** Point 1 (the device words differ from the item's
-   other looks: "Your other look has 'GF' beside it") and the second half of
-   point 2 (another item's LOOK on this set finds the same spots, not just
-   its marks). Also "from a new look" tagging so Confirm all skips a new
-   look's finds for the session (§ 4, § 8 test 7). The warning runs only on
-   an ADDED look, not on a new item's first look.
+1. **Not seen on screen this session:** jobs 1–4 above changed the capture
+   card and the Find panel. The laptop was low on memory with A and B
+   running; code and tests are green, the on-screen pass is owed — the
+   two warnings on the card, and a new look's find showing "Found only by
+   a look added recently" with Confirm all leaving it.
 2. **"Find on this sheet" from one look** (plan § 5), the third action on a
    look.
 3. **The per-row choice in whole-legend capture** (`LegendCapture.tsx`): a
@@ -89,15 +107,22 @@ this file is stale or the state moved.
 
 ## The exact next step
 
-**Item 1's "from a new look" tag** (plan § 8 test 7): a look added this
-session should not have its finds swept in by Confirm all. It is the
-remaining guard against a wrong look that the person said "Add anyway" to.
-Pure, in `client/src/lib/findMatchingSession.ts` (`clearOpen`), using the
-`foundByLooks` ids that `mergeLookResults` now records.
+**Item 1, the on-screen pass**, then item 2. For the screen: Weld 1 E-200
+(vector) on "Legend capture check" (bid 1728356) and the trick from
+2026-10-05 — a mark on a tag square, then box the same square as another
+item — gives the card its warning in one capture.
 
 ## Migrations Track A would need
 
 **None for anything above.** Everything listed runs on existing tables.
+**New, 2026-10-06:**
+
+- `symbol_looks.confirmedAt` (timestamp NULL, additive): when a look was
+  first confirmed by hand. Today that lives in each browser
+  (`@/lib/trustedLooks`), so a colleague's browser asks again — safe, but
+  not shared. With the column, `searchLooks` returns it and the browser
+  copy goes.
+
 Requests that already stand, unchanged:
 
 - `bid_pdf_legend_entries.lookId` (nullable, set null): only if A builds its

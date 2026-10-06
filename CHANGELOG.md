@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **Find all matching handles lines running through symbols more safely.**
+  Measured first on the hand-counted Weld 1 power plan: walls and wires
+  crossing devices caused no misses there, and the two known misses are
+  drawing disagreements. For other drawings: a wall or wire passing through
+  the box you draw is no longer taken as part of the symbol, and a device
+  whose own line is cut where another line crosses it is now offered as
+  "maybe — a line crosses it" for you to check, instead of being skipped
+  without a word. Confirm all never takes those.
+
 - **Adding a look compares the little words beside the symbol.** If your
   other look of an item has "GF" (or WP, IG and the like) beside it and the
   new one does not — or the other way round — the card says so before saving,
