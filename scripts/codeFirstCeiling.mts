@@ -1098,7 +1098,124 @@ async function labels() {
   );
 }
 
+// ── layered: Find all matching with the PDF's layers passed in (b, built) ──
+async function layered() {
+  const { findMatching } = await import("../client/src/lib/findMatching");
+  const regionB = { x0: 1350, y0: 820, x1: 2300, y1: 1680 };
+  const inB = (x: number, y: number) =>
+    x >= regionB.x0 && x <= regionB.x1 && y >= regionB.y0 && y <= regionB.y1;
+  const p = await load("Weld 1.pdf", 5);
+  const marks = await weldMarks();
+  const withLayers = extractVectorGeometry(
+    p.list.fnArray,
+    p.list.argsArray,
+    ops,
+    p.viewport.transform,
+    p.viewport.width,
+    p.viewport.height,
+    p.layerName
+  );
+  for (const [label, geo] of [
+    ["WITHOUT layers (before)", p.geo],
+    ["WITH layers (after)", withLayers],
+  ] as const) {
+    let found = 0;
+    let other = 0;
+    let silent = 0;
+    let nothing = 0;
+    let ms = 0;
+    let bFinds = 0;
+    let bDemolition = 0;
+    let bClear = 0;
+    let aMarkedDemolition = 0;
+    let existingSaid = 0;
+    for (const [type, t] of Object.entries(TEMPLATES)) {
+      const box = {
+        x: t.at[0] + t.box[0],
+        y: t.at[1] + t.box[1],
+        width: t.box[2] - t.box[0],
+        height: t.box[3] - t.box[1],
+      };
+      const started = performance.now();
+      const r = findMatching(geo, p.words, box);
+      ms += performance.now() - started;
+      if (r.kind !== "ok") continue;
+      const mine = marks.filter(m => m.type === type);
+      const used = new Set<number>();
+      for (const m of r.matches) {
+        if (inB(m.x, m.y)) {
+          bFinds++;
+          if (m.onDemolitionPlan) bDemolition++;
+          if (
+            !m.onDemolitionPlan &&
+            !m.needsLook.length &&
+            !m.maybeExisting.length
+          ) {
+            bClear++;
+            if (geo === withLayers)
+              console.log(
+                `    clear in plan B: ${type} at (${m.x.toFixed(0)}, ${m.y.toFixed(0)})`
+              );
+          }
+          continue;
+        }
+        if (!inA(m.x, m.y)) continue;
+        if (m.onDemolitionPlan) aMarkedDemolition++;
+        if (m.maybeExisting.some(x => /existing layer/.test(x))) existingSaid++;
+        const i = mine.findIndex(
+          (h, k) => !used.has(k) && Math.hypot(h.x - m.x, h.y - m.y) <= 6
+        );
+        if (i >= 0) {
+          used.add(i);
+          found++;
+        } else if (
+          marks.some(
+            h => h.type !== type && Math.hypot(h.x - m.x, h.y - m.y) <= 6
+          )
+        ) {
+          other++;
+          if (
+            !m.needsLook.length &&
+            !m.maybeExisting.length &&
+            !m.onDemolitionPlan
+          )
+            silent++;
+        } else nothing++;
+      }
+    }
+    console.log(
+      `Weld 1 E-200 ${label}: ${found}/46 found; on another type's mark ${other} (${silent} silent); on no mark ${nothing}; ` +
+        `${ms.toFixed(0)} ms for 7 searches; demolition plan B finds ${bFinds}, marked demolition ${bDemolition}, CLEAR (Confirm all would take as new) ${bClear}; ` +
+        `plan A finds wrongly marked demolition ${aMarkedDemolition}; plan A finds saying "existing layer" ${existingSaid}`
+    );
+  }
+  // UNCC declares layers and tags nothing: must fall back, identical.
+  const u = await load("UNCC.pdf", 5);
+  const uWith = extractVectorGeometry(
+    u.list.fnArray,
+    u.list.argsArray,
+    ops,
+    u.viewport.transform,
+    u.viewport.width,
+    u.viewport.height,
+    u.layerName
+  );
+  const box = { x: 1229.6, y: 969, width: 12, height: 12 };
+  for (const [label, geo] of [
+    ["without layers", u.geo],
+    ["with layers", uWith],
+  ] as const) {
+    const started = performance.now();
+    const r = findMatching(geo, u.words, box);
+    const ms = performance.now() - started;
+    console.log(
+      `UNCC E111 ${label}: ${r.kind === "ok" ? r.matches.length : r.kind} finds, ${ms.toFixed(0)} ms (layers tagged on ${uWith.layer ? Array.from(uWith.layer).filter(l => l >= 0).length : 0} segments)`
+    );
+  }
+}
+
 const sections: Record<string, () => Promise<void>> = {
+  layered,
   labels,
   layers,
   matching,

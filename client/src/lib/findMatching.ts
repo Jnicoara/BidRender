@@ -35,6 +35,7 @@
  * neighbour. A flag costs one look; a silent wrong answer costs a bid.
  */
 import type { VectorGeometry } from "./vectorGeometry";
+import { drawnOn, electricalView } from "./cadLayers";
 import type { WordBox } from "./textSelection";
 
 export type MatchBox = { x: number; y: number; width: number; height: number };
@@ -55,10 +56,11 @@ export type Match = {
   /** The very one that was boxed. Still a device to count. */
   isBoxed: boolean;
   /**
-   * The title of the DEMOLITION plan this copy is on, or null. Read from a
-   * scan's text layer (@/lib/scanMatching); such a copy is shown "not
-   * counted" and "Confirm all" leaves it. Null on vector sheets, which
-   * search the whole sheet as before.
+   * The DEMOLITION plan this copy is on, or null; such a copy is shown "not
+   * counted" and "Confirm all" leaves it. On a scan, the plan's title read
+   * from its text layer (@/lib/scanMatching); on a vector sheet drawn by CAD
+   * layer, "CAD layer <name>" when its line work is on a demolition layer
+   * (@/lib/cadLayers, since 2026-10-06). Null otherwise.
    */
   onDemolitionPlan: string | null;
   /**
@@ -680,9 +682,12 @@ class SpanGrid {
 }
 
 export function prepareSheet(
-  geo: VectorGeometry,
+  drawn: VectorGeometry,
   words: readonly WordBox[]
 ): PreparedSheet {
+  // When the PDF draws by CAD layer, only the electrical layers are searched
+  // (@/lib/cadLayers); a file without usable layers is searched as before.
+  const geo = electricalView(drawn);
   const segs = geo.segs;
   const n = segs.length / 4;
   const lengthOf = (i: number) =>
@@ -1597,6 +1602,12 @@ export function searchSymbol(
       needsLook.push(
         `tag "${tags[0]}" beside it — the one you boxed has "${boxedQ.tags[0]}"`
       );
+    // The CAD layer it is drawn on (@/lib/cadLayers): a demolition layer is
+    // demolition — shown "not counted", never taken by Confirm all — and an
+    // existing layer says so beside the other existing signs.
+    const on = drawnOn(geo, f.matched);
+    if (on?.role === "existing")
+      maybeExisting.push(`drawn on the existing layer "${on.name}"`);
     const shared = ties[k].filter(t => t.shared).map(t => words[t.word].text);
     if (shared.length)
       needsLook.push(
@@ -1616,7 +1627,8 @@ export function searchSymbol(
       maybeExisting,
       isBoxed:
         opts.boxedHere === true && Math.hypot(f.tx - cx, f.ty - cy) <= 2 * tol,
-      onDemolitionPlan: null,
+      onDemolitionPlan:
+        on?.role === "demolition" ? `CAD layer ${on.name}` : null,
     };
   });
 

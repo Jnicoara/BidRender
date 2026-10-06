@@ -128,15 +128,23 @@ red run is not by itself a red suite:
      **Found on screen and fixed:** a click with no drag opened the name card
      and saved an item with no picture, no look and no check
      (`isCaptureBox`, `shared/symbolCapture.ts`).
-2. **"Find on this sheet" from one look** (plan § 5), the third action on a
+2. **Demolition plans on VECTOR sheets by their title** (found building CAD
+   layers, 2026-10-06). On Weld 1 E-200 the demolition plan draws its
+   devices on the EXISTING layer (E-POWR-E) and 4 panelboards on the NEW
+   one (E-POWR); only 2 devices sit on E-POWR-D. So layers alone leave 4 of
+   21 demolition-plan finds clear (was 6). Scans already find the
+   demolition plan by its title (`planTitles` / `planRegions`,
+   `scanMatching.ts`); the same reading on a vector sheet's text would
+   close it. Small, pure, testable.
+3. **"Find on this sheet" from one look** (plan § 5), the third action on a
    look.
-3. **The per-row choice in whole-legend capture** (`LegendCapture.tsx`): a
+4. **The per-row choice in whole-legend capture** (`LegendCapture.tsx`): a
    matching name keeps "left as it is", which is the decided default. The
    choice to make it another look is missing.
-4. **Sending looks to the Reader** (plan § 3): every look under the item's
+5. **Sending looks to the Reader** (plan § 3): every look under the item's
    one label, the set's own first, up to the cap. Measure first with
    `scripts/readerAccuracy.mts` methods (b)/(d), 1 look against 3.
-5. **Size-aware matching across plan sets.** The line matcher compares exact
+6. **Size-aware matching across plan sets.** The line matcher compares exact
    sizes, so a look from a set drawn at another size finds nothing. Seen on
    screen: a UNCC duplex look found 0 on Weld 1 E-200. Candidate:
    `scaleTemplate` (already in `findMatching.ts`, used by the sheet check)

@@ -55,6 +55,13 @@ export type VectorGeometry = {
    * own pixels is known before anything is searched.
    */
   imagePixelsPerPoint: number;
+  /**
+   * The CAD layer (PDF optional content group) each segment was drawn on,
+   * as an index into `layerNames`; -1 for none. Present only when the
+   * caller passed the PDF's layer names (@/lib/cadLayers).
+   */
+  layer?: Int16Array;
+  layerNames?: string[];
 };
 
 type Matrix = [number, number, number, number, number, number];
@@ -112,9 +119,26 @@ export function extractVectorGeometry(
   ops: OpsTable,
   viewportTransform: readonly number[],
   pageWidth: number,
-  pageHeight: number
+  pageHeight: number,
+  /**
+   * The PDF's layers, optional-content id -> name
+   * (`doc.getOptionalContentConfig()`). Given, each segment records the
+   * layer it was drawn on; omitted, nothing about layers is read.
+   */
+  layerIds?: ReadonlyMap<string, string>
 ): VectorGeometry {
   const vt = viewportTransform as unknown as Matrix;
+  // Layers: names in first-seen order, and the open marked-content stack
+  // (an OC entry carries its group's id; any other marked content is null).
+  const layerNames: string[] = [];
+  const layerIndex = new Map<string, number>();
+  const marked: (number | null)[] = [];
+  const layerOut: number[] = [];
+  const currentLayer = () => {
+    for (let k = marked.length - 1; k >= 0; k--)
+      if (marked[k] !== null) return marked[k] as number;
+    return -1;
+  };
   const strokeOps = new Set(
     [
       "stroke",
@@ -180,6 +204,33 @@ export function extractVectorGeometry(
   for (let i = 0; i < fnArray.length; i++) {
     const fn = fnArray[i];
     const args = argsArray[i] as unknown[] | undefined;
+    if (layerIds) {
+      if (fn === ops.beginMarkedContentProps) {
+        // pdf.js gives ["OC", { type: "OCG", id }] for a layer.
+        const ref = args?.[1] as { id?: string } | string | undefined;
+        const id = typeof ref === "string" ? ref : ref?.id;
+        const name = args?.[0] === "OC" && id ? layerIds.get(id) : undefined;
+        if (name === undefined) marked.push(null);
+        else {
+          let k = layerIndex.get(name);
+          if (k === undefined) {
+            k = layerNames.length;
+            layerNames.push(name);
+            layerIndex.set(name, k);
+          }
+          marked.push(k);
+        }
+        continue;
+      }
+      if (fn === ops.beginMarkedContent) {
+        marked.push(null);
+        continue;
+      }
+      if (fn === ops.endMarkedContent) {
+        marked.pop();
+        continue;
+      }
+    }
     if (fn === ops.save) stack.push({ ctm, stroke, fill });
     else if (fn === ops.restore) {
       const top = stack.pop();
@@ -206,6 +257,7 @@ export function extractVectorGeometry(
       const isFill = fillOps.has(paint);
       if (!isStroke && !isFill) continue; // a clip, not line work
       const lightness = isStroke ? stroke : fill;
+      const onLayer = layerIds ? currentLayer() : -1;
       const m = multiply(vt, ctm);
       const packed = args[1] as ArrayLike<ArrayLike<number> | null> | undefined;
       const data = packed?.[0];
@@ -223,6 +275,7 @@ export function extractVectorGeometry(
         out.push(x1, y1, x2, y2);
         light.push(lightness);
         filledOut.push(isFill ? 1 : 0);
+        layerOut.push(onLayer);
       };
       let j = 0;
       while (j < data.length) {
@@ -284,5 +337,6 @@ export function extractVectorGeometry(
     filled: Uint8Array.from(filledOut),
     imageCoverage: Math.min(1, imageArea / pageArea),
     imagePixelsPerPoint,
+    ...(layerIds ? { layer: Int16Array.from(layerOut), layerNames } : {}),
   };
 }

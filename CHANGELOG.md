@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **Find all matching uses the drawing's CAD layers when the PDF keeps
+  them.** On plans exported with layers (Weld 1 does), it searches only the
+  electrical layers — about ten times faster, same finds — and a device
+  drawn on a demolition layer is shown as demolition, never as a new
+  device; one on an "existing" layer says so. Plans without usable layers
+  work exactly as before.
+
 - **Find all matching now reads the little labels beside each device.**
   "USB", "GF", "(E)", a mounting height like 54" or a fixture tag like A2
   is tied to the nearest find and shown on it. A "GF" beside a plain
