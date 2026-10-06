@@ -322,8 +322,12 @@ import {
   isProvisionalGroup,
   isProvisionalSheet,
   lostMarksMessage,
+  marksOnlyHere,
+  settleLateMarks,
+  type ProvisionalOutcome,
 } from "@/lib/provisionalCount";
 import { earlyTextKey, sheetsToCatchUp } from "@/lib/scaleCatchUp";
+import { plansPane } from "@/lib/plansPane";
 import { startPageTextRead, type PageTextReads } from "@/lib/pageTextRead";
 import { pageTextFor, rememberPageText } from "@/lib/pageText";
 import { loadUndo, saveUndo, tabStorage } from "@/lib/undoPersist";
@@ -2743,7 +2747,24 @@ export default function TakeoffPage({
 }) {
   const utils = trpc.useUtils();
   const { data: bid } = trpc.bids.get.useQuery({ id: bidId });
-  const { data: docs = [], isLoading } = trpc.bidPdfs.list.useQuery({ bidId });
+  const {
+    data: docs = [],
+    isLoading,
+    isError: docsFailed,
+    refetch: refetchDocs,
+  } = trpc.bidPdfs.list.useQuery({ bidId });
+  /*
+    The pane, and whether the list is KNOWN. A list that failed arrives as the
+    default [], which is not "this bid has no plans": the pane must not offer
+    the upload box for it, and nothing may settle the address or judge a link
+    against it (@/lib/plansPane).
+  */
+  const pane = plansPane({
+    isLoading,
+    isError: docsFailed,
+    count: docs.length,
+  });
+  const docsKnown = pane === "plans" || pane === "empty";
 
   /*
     THE PLAN SET AND SHEET START FROM THE ADDRESS (owner, 2026-09-30): F5 on
@@ -3254,6 +3275,24 @@ export default function TakeoffPage({
     pendingStamps.current = next;
     setPendingMarks(next);
   }, []);
+  /*
+    Marks under a count or sheet the server has not made yet live ONLY here —
+    not sent, not mirrored. Leaving the page then loses them without a word
+    (measured: a reload during a slow count-create, 1 mark kept of 2), so ask
+    first, as an unsaved trace does (@/lib/provisionalCount, `marksOnlyHere`).
+    Read through the ref, so the listener is added once rather than per click.
+  */
+  const holdsMarksOnlyHere = marksOnlyHere(pendingMarks) > 0;
+  useEffect(() => {
+    if (!holdsMarksOnlyHere) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (marksOnlyHere(pendingStamps.current) === 0) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [holdsMarksOnlyHere]);
   const nextPendingKey = useRef(-1);
   /**
    * PLACING AS (pin plan § 7, 2026-10-05): what a click puts down — a new
@@ -3303,12 +3342,12 @@ export default function TakeoffPage({
   */
   const addressSettled = useRef(false);
   useEffect(() => {
-    if (addressSettled.current || isLoading) return;
+    if (addressSettled.current || !docsKnown) return;
     addressSettled.current = true;
     const resolved = resolvePlanAddress(askedAddress, docs);
     setSelectedDocId(resolved.setId);
     setPage(resolved.page);
-  }, [isLoading, docs, askedAddress]);
+  }, [docsKnown, docs, askedAddress]);
   // A set opened for the first time reports its page count only once its
   // file is read; a page asked for past that end drops to the first.
   useEffect(() => {
@@ -3362,7 +3401,7 @@ export default function TakeoffPage({
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
   useEffect(() => {
-    if (!spotLink || isLoading) return;
+    if (!spotLink || !docsKnown) return;
     const clear = () => {
       setSpotLink(null);
       window.history.replaceState(
@@ -3379,7 +3418,7 @@ export default function TakeoffPage({
     if (doc?.id !== spotLink.pdfId || page !== spotLink.page) return;
     jumpTo({ x: spotLink.x, y: spotLink.y });
     clear();
-  }, [spotLink, isLoading, docs, doc?.id, page, jumpTo]);
+  }, [spotLink, docsKnown, docs, doc?.id, page, jumpTo]);
 
   /** A different plan is a different set of pictures. */
   useEffect(() => {
@@ -5318,6 +5357,8 @@ export default function TakeoffPage({
   );
 
   const flushTimer = useRef<number | null>(null);
+  /** What the server said about each provisional count (`armWhileCreating`). */
+  const provisionalOutcomes = useRef(new Map<number, ProvisionalOutcome>());
 
   /**
    * Send every click that has not been sent yet — one batch per sheet and
@@ -5343,6 +5384,27 @@ export default function TakeoffPage({
     if (flushTimer.current !== null) {
       window.clearTimeout(flushTimer.current);
       flushTimer.current = null;
+    }
+    /*
+      A click taken by the render BEFORE a provisional count was re-armed
+      under its real id carries the provisional id after the queue was
+      adopted, and would never be sent (@/lib/provisionalCount,
+      `settleLateMarks`). Settled here because every queued mark passes
+      through this flush, whichever render or tool queued it.
+    */
+    const refusedName = pendingStamps.current.find(
+      m => provisionalOutcomes.current.get(m.groupId) === "refused"
+    )?.name;
+    const late = settleLateMarks(
+      pendingStamps.current,
+      provisionalOutcomes.current
+    );
+    if (late.changed) {
+      setPending(late.queue);
+      for (const sheetId of Array.from(new Set(late.queue.map(m => m.sheetId))))
+        if (!isProvisionalSheet(sheetId)) mirrorQueue(sheetId);
+      if (late.lost > 0)
+        toast.error(lostMarksMessage(late.lost, refusedName ?? "", null));
     }
     for (;;) {
       const batch = nextMarkBatch(pendingStamps.current);
@@ -5526,6 +5588,9 @@ export default function TakeoffPage({
       armGroup({ id: provisionalId, label }, assemblyId, symbolId);
       create()
         .then(real => {
+          // Remembered FIRST, so a click taken after this by the render that
+          // still holds the provisional id is moved too (`flushStamps`).
+          provisionalOutcomes.current.set(provisionalId, real);
           setPending(
             adoptRealGroup(pendingStamps.current, provisionalId, real)
           );
@@ -5550,6 +5615,7 @@ export default function TakeoffPage({
           afterCreate?.();
         })
         .catch((error: unknown) => {
+          provisionalOutcomes.current.set(provisionalId, "refused");
           const { kept, lost } = dropProvisional(
             pendingStamps.current,
             provisionalId
@@ -9284,11 +9350,34 @@ export default function TakeoffPage({
         onRetry={id => void retryUpload(id)}
       />
 
-      {isLoading ? (
+      {pane === "loading" ? (
         <div className="flex-1 p-6">
           <div className="h-full rounded-xl border border-border bg-card animate-pulse" />
         </div>
-      ) : docs.length === 0 ? (
+      ) : pane === "failed" ? (
+        // Never the upload box: that would say this bid has no plans.
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div
+            role="alert"
+            className="w-full max-w-lg rounded-2xl border border-border bg-card p-10 text-center"
+          >
+            <p className="text-base font-medium">
+              Could not load this bid&apos;s plans
+            </p>
+            <p className="text-sm text-muted-foreground mt-1.5">
+              The list of plan sets did not arrive. That is not the same as the
+              bid having none — try again in a moment.
+            </p>
+            <Button
+              size="sm"
+              className="mt-4"
+              onClick={() => void refetchDocs()}
+            >
+              Try again
+            </Button>
+          </div>
+        </div>
+      ) : pane === "empty" ? (
         <div className="flex-1 flex items-center justify-center p-6">
           <button
             type="button"

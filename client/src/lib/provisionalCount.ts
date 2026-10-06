@@ -76,6 +76,57 @@ export function adoptRealGroup<T extends Queued>(
   );
 }
 
+/*
+  ── A CLICK THAT ARRIVES AFTER THE ANSWER, BEFORE THE RE-RENDER ─────────────
+  Found 2026-10-06 by the local smoke (flow 5, 1 run in 3): three clicks for a
+  count, the server made it between the first and second, and one mark stayed
+  drawn and was NEVER sent — "This sheet" one short, no message, for good.
+  The answer is handled in a promise callback that moves the queued marks
+  (`adoptRealGroup`) and then asks React to re-arm under the real id. A click
+  landing after that callback but before React re-renders is taken by the
+  click handler of the PREVIOUS render, which still holds the provisional id;
+  it is queued under an id that has already been adopted, so nothing adopts
+  it again and `nextMarkBatch` skips it forever. A short count on screen.
+  Forced in the smoke test by clicking from inside that callback.
+
+  So the outcome of every provisional count is REMEMBERED, and a mark that
+  turns up under one late is settled by the same rule as the ones that were
+  waiting: moved onto the real count, or — if it was refused — taken off and
+  counted in the message. It does not depend on which render took the click.
+*/
+
+/** What the server said about a provisional count: made as this, or refused. */
+export type ProvisionalOutcome = { id: number; label: string } | "refused";
+
+/**
+ * Settle marks queued under a provisional count the server has ALREADY
+ * answered for — the late clicks above. Marks under a count still waiting,
+ * and real marks, are left exactly as they are.
+ */
+export function settleLateMarks<T extends Queued>(
+  queue: readonly T[],
+  outcomes: ReadonlyMap<number, ProvisionalOutcome>
+): { queue: T[]; lost: number; changed: boolean } {
+  let lost = 0;
+  let changed = false;
+  const settled: T[] = [];
+  for (const mark of queue) {
+    const outcome = isProvisionalGroup(mark.groupId)
+      ? outcomes.get(mark.groupId)
+      : undefined;
+    if (outcome === undefined) {
+      settled.push(mark);
+    } else if (outcome === "refused") {
+      lost += 1;
+      changed = true;
+    } else {
+      settled.push({ ...mark, groupId: outcome.id, name: outcome.label });
+      changed = true;
+    }
+  }
+  return { queue: changed ? settled : [...queue], lost, changed };
+}
+
 /** A provisional count the server refused: its marks come out, counted. */
 export function dropProvisional<T extends Queued>(
   queue: readonly T[],
@@ -83,6 +134,32 @@ export function dropProvisional<T extends Queued>(
 ): { kept: T[]; lost: number } {
   const kept = queue.filter(mark => mark.groupId !== provisionalId);
   return { kept, lost: queue.length - kept.length };
+}
+
+/*
+  ── A RELOAD WHILE THE SERVER IS SLOW (staging smoke, 2026-10-06) ───────────
+  Smoke flow 10 failed once with a mark drawn and "This sheet" not moving for
+  20 s: the request making the count had not answered (forced by holding
+  `takeoffGroups.create`; the picture matched the CI screenshot exactly). The
+  mark is right to wait — it is counted when the answer comes. But it waits
+  ONLY in this tab's memory: a provisional id is kept out of the crash mirror
+  because it means nothing after a reload. Measured: reloading in that window
+  lost the mark with no word, 1 mark on the sheet where 2 were clicked. So a
+  page holding such marks asks before it is left (`marksOnlyHere`), the way an
+  unsaved trace already does.
+*/
+
+/**
+ * How many queued marks exist ONLY in this tab — under a count or a sheet the
+ * server has not made yet, so neither sent nor in the crash mirror. A reload
+ * or a closed tab loses exactly these, silently, unless the page asks first.
+ */
+export function marksOnlyHere(
+  queue: readonly { groupId: number; sheetId: number }[]
+): number {
+  return queue.filter(
+    mark => isProvisionalGroup(mark.groupId) || isProvisionalSheet(mark.sheetId)
+  ).length;
 }
 
 /**

@@ -527,6 +527,68 @@ All additive and nullable. Specs are in the plans named.
       after reload — the screenshot is in that run's `smoke-failures`
       artifact (7 days). If it recurs, look at what the Plans screen waits
       on after a reload before calling it staging.
+      **FIXED 2026-10-06 (Track A) — a real bug, two faults.** The screenshot
+      is the `isLoading` skeleton: `bidPdfs.list` (and `bids.get`) never
+      answered. They ride in ONE batched GET of 16 reads (measured locally:
+      with `materials.list`, `takeoffSummary.forBid`, …), and nothing bounded
+      it — React Query retries a request that FAILS, and a hung one never
+      fails. (1) Every GET now gives up at 20 s if no response has started,
+      and is retried (`@/lib/queryDeadline`; POSTs never, a write may have
+      happened). (2) Found on the way: a list that FAILED arrived as `[]` and
+      drew "Drop plan PDFs here" — "this bid has no plans". Now "Could not
+      load this bid's plans" + Try again (`@/lib/plansPane`; looked at, laptop
+      and phone width). **Forced in smoke flow 9:** the first post-reload
+      batch carrying `bidPdfs.list` is held and never answered. Without (1)
+      the run reproduced the CI screenshot exactly (blank, no bid name, 60 s);
+      with it, the sheet is back at ~22 s. **Why staging stalled is NOT
+      known:** its database (read-only, 2026-10-06) had 0 slow queries in 20
+      days, longest row-lock wait 40 ms, max 31 of 76 connections — so the
+      stall was between the browser and the app. DigitalOcean's runtime logs
+      for that time are the next place to look if it matters.
+
+- [x] **The "flaky undo" — smoke flow 10, run 37416743573 (local-dev
+      `38d2751`, 2026-10-06 ~05:05 UTC, desktop).** Failed at its FIRST
+      line, `toBe(start + 1)` after one click: the mark was drawn and "This
+      sheet" stayed at 1 for 20 s. Not undo at all. **Cause, forced:**
+      holding `takeoffGroups.create` (the by-name count the legend click
+      makes) reproduced the CI screenshot pixel for pixel; holding
+      `takeoffStamps.drop` gives the same picture, so it was a write to
+      staging that took >20 s — the same stall as flow 9, after the same
+      reload. A slow answer is not a wrong count: the mark is counted when it
+      comes. **But one path was:** marks under a not-yet-made count live
+      only in memory (never mirrored), and a reload in that window lost one
+      with no word (measured: 1 mark where 2 were clicked). **FIXED:** the
+      page now asks before it is left while such marks exist
+      (`marksOnlyHere`). Forced in flow 10 (hold the create, reload → must
+      ask; release → exactly start + 1); red without the guard.
+- [x] **FOUND WHILE CHASING THE ABOVE — a real short count, flow 5 (1 local
+      run in 3, 2026-10-06).** Three clicks for CI SWITCH; the server made
+      the count between the first and second; the FIRST mark stayed drawn
+      and was never sent, "5 marks" for good. Cause: the answer's callback
+      adopts the queued marks and then re-arms through React state; a click
+      in between is taken by the previous render's handler, still holding
+      the provisional id, after adoption — so nothing ever adopts it and
+      `nextMarkBatch` skips it forever. **FIXED:** each provisional count's
+      outcome is remembered and every flush settles late marks onto it, or
+      drops them with the "not counted" message if it was refused
+      (`settleLateMarks`). **Forced in flow 5:** the first click is fired
+      from inside that callback (its `last-count` sessionStorage write). Red
+      without the fix (5 for 6, same picture as the flake); green 3 of 3
+      repeats. The touch flow takes the same path, so this was a possible
+      cause of its old flakes too.
+- [x] **`touch.spec` after its 2026-10-06 fixes: STABLE.** Since `24105ad`
+      every staging smoke passed it — 9 runs (8 on local-dev, f8fdec3 →
+      6e2c683, plus the release candidate's two attempts) × two tablet
+      projects, 0 failures, against 4 failing runs in a row before. Its two
+      holds are one-shot (1.5 s, 1.2 s), so they cannot starve a refresh,
+      and both sit far under the new 20 s read deadline. Local: 4 of 4
+      green with the changes above.
+- [ ] **`server/materialsList.test.ts` "does not contain the actual costs"
+      failed once in CI** (run 37420713101, `6877993`): "expected
+      '{"bidName":"Matlist bid 1791266041322…' not to contain '1.42'". Looks
+      like a fixture price that can also appear inside a generated
+      timestamp-or-id string. Not investigated; noted so the next red run is
+      recognised.
 
 Both are timing, not wrong answers, and both touch the shared test database.
 Fix them together: a green run that sometimes lies about being red trains
