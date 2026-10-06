@@ -6,6 +6,17 @@ databases (`bidrender_local_b_new`, `bidrender_test_b`) are migrated to 105
 and `scripts/schemaDrift.mts` says both match. Last gate: `pnpm check` clean,
 292 test files / 4,976 passing / 5 skipped.
 
+## Session 2026-10-06 (later) — starter assemblies, labor sheet tab 2, run bends
+
+- **All 168 starters are in the seed**, 160 HELD until Track A's 0123
+  (hours NULL) and 0122 (two categories); DV34 until surface raceway. The
+  holds lift by themselves from `drizzle/schema.ts`. todo.md, "Starter
+  assemblies", has the files, the order rule, and the one owner question
+  (LT1/LT2's new fixture line on existing databases).
+- `pricing/labor-units-starter.xlsx` tab 2 = all 168, most-used first.
+- `references/run-bends-plan.md` § 7: all three owner answers recorded;
+  build after A's three columns.
+
 ## Standing rules (owner, 2026-10-05) — read before doing anything
 
 **1. Merging: CI is the gate, not the laptop.** Do not run the full suite

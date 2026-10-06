@@ -204,9 +204,11 @@ NULL`, `createdAt`, `updatedAt`. Index (`userId`, `bidId`).
       in its seed row.
 
 **Run bends** (Track B, 2026-10-06; references/run-bends-plan.md § 6). All
-ADDITIVE, nullable, **no DEFAULT**, no backfill. The first waits on the
-owner's answer to Q1 there (a typed count per run reverses D15/D19's
-"nothing typed per run" for this one field).
+ADDITIVE, nullable, **no DEFAULT**, no backfill. **Owner answered all three
+questions 2026-10-06**: yes to an optional typed count (reverses D15/D19 for
+this one field, recorded in both), yes to a starter of 1 kick per box end,
+inert until accepted, and kicks at in-wall devices for conduit only. Track B
+builds it once these columns land.
 
 - [ ] **`takeoff_runs.typedBendCount INT NULL`** — "Bends on this run",
       typed. NULL = drawn + allowance.
@@ -2639,11 +2641,32 @@ one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
       the pack a part is sold in (a box of 100 wire nuts), because the catalog
       has no pack size yet — `references/material-markup.md` D3. When pack
       sizes land, round there too, in the same function.
-- [ ] **Starter assemblies: build the 168 once Track A lands H1 and H2**
+- [ ] **Starter assemblies: the 168 are IN THE SEED (Track B, 2026-10-06);
+      160 are held until Track A's 0122 and 0123.**
       (`references/starter-assemblies-plan.md`,
-      `references/track-a-handoff-starter-assemblies.md`). Order matters for
-      H2: the null-hours code ships BEFORE the migration that clears the 8
-      starters' placeholder hours, or every one prices at zero hours.
+      `references/track-a-handoff-starter-assemblies.md`). Built:
+      `server/seed/starterAssemblies.ts` (the 160 new), parts by stable key
+      in `server/seed/starterParts.ts` (the one place a starter names a
+      catalog row; resolved through the rename map, then to this database's
+      id), the hold rule in `server/seed/assemblyRecipe.ts`. Matches the plan
+      line for line (checked by script, 168/168). Every new starter's hours
+      are NULL = not set; the seeder **holds** a starter it cannot store
+      rather than writing 0, and logs one line per reason. Today a database
+      gets the same 8 as before; the holds lift by themselves: - **0123** (hours nullable) lifts the hours hold for all 160. **Its
+      `drizzle/schema.ts` edit must ship WITH H2's step-2 code** (every
+      reader of `baseLaborHours` reads NULL as not set), because the
+      moment the schema says nullable, 160 starters seed with NULL hours.
+      `server/starterAssembliesSeed.test.ts` then switches on a check that
+      they read NULL. - **0122** (two categories) lifts 29 more: DR1–DR20, MS1–MS5,
+      MS12–MS14, CS16. - **DV34** stays held until surface raceway is in the catalog (R3,
+      0117): its 4 missing parts are listed in the seed, never added. - Order still matters for H2: the null-hours code ships BEFORE the
+      migration that clears the 8 starters' placeholder hours. - **Open, owner:** LT1 and LT2 gained their fixture line (D2) in the
+      seed, which reaches a NEW database only — the seeder never edits a
+      starter that exists. Add the line to existing databases' shared rows
+      (a narrow repair pass, like the whip one), or leave them? - Categories for RS/CS rows are the seed's choice ("natural
+      category"): appliances → Equipment Connections, twist-locks and
+      poles → Devices, fire alarm and doorbells → Low Voltage/EMS, time
+      clock → Lighting, generator inlet → Panels, Knox box → General.
 - [ ] **Double counting from a user's own box assembly.** No starter assembly
       carries a connector or strap, so nothing overlaps today. A company
       whose own box or device assembly includes an EMT connector will count

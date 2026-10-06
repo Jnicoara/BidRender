@@ -3,6 +3,14 @@
 PLAN ONLY. No code, no migration. § 6 lists the columns Track A would add,
 and they are in todo.md, "Track A next migration batch".
 
+**Owner answered all three questions, 2026-10-06 (§ 7): DECIDED, build
+later.** Yes to an optional typed bend count per run (the automatic count
+still runs); yes to a starter allowance of 1 kick per box end, inert until
+accepted; kicks at in-wall devices for CONDUIT only, not MC or NM cable.
+Building waits on Track A's three columns in § 6 — nothing here can be
+built code-first, because the typed count and the accepted allowance must
+be stored.
+
 ## 0. Read this first: most of this is already counted
 
 The request said runs "don't count field bends, elbows or LBs, so their
@@ -47,8 +55,9 @@ plain code (`shared/runBends.ts`, `shared/runFittings.ts`):
 | A user assembly that holds an elbow is left unguarded (double count), by decision                                                                        | D19 answer 6                       |
 
 **The request asks for a TYPED bend count on a run.** That reverses D15's
-and D19's "nothing typed per run" for this one field. It is the owner's
-call (§ 7, Q1). The plan below is built so the typed number is an
+and D19's "nothing typed per run" for this one field. **The owner said yes,
+2026-10-06 (§ 7, Q1)**; takeoff-spec.md D15 and D19 each carry a line
+saying so. The plan below is built so the typed number is an
 **override, never a form**: a run nobody touches gets the drawn count plus
 an allowance, and the field is one number on the run row, collapsed with
 the rest of the run's "more" (CLAUDE.md § "Customization available, but
@@ -74,7 +83,10 @@ the knockout. The plans never show it.
   already use, so the allowance cannot price a kick differently from a
   drawn corner.
 - **Which ends:** an end whose kind is a device or a panel (the same ends
-  that take a drop), not a tee and not "carries on at run height".
+  that take a drop), not a tee and not "carries on at run height". **At a
+  device in a wall, conduit runs only** (owner, Q3): an MC or NM cable run
+  takes no kick there, because cable is bent by hand into the box and buys
+  neither a fitting nor bending labor.
 
 The run row shows the arithmetic, never a lump: "Bends: 3 drawn (at least)
 
@@ -120,24 +132,33 @@ All ADDITIVE, nullable, **no DEFAULT**, no backfill.
 
 | Column                                                   | Meaning                                                                                              |
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `takeoff_runs.typedBendCount INT NULL`                   | "Bends on this run", typed. NULL = drawn + allowance. Only if the owner says yes to Q1.              |
+| `takeoff_runs.typedBendCount INT NULL`                   | "Bends on this run", typed. NULL = drawn + allowance. Owner said yes to Q1, 2026-10-06.              |
 | `takeoff_bend_defaults.kicksPerBoxEnd DECIMAL(4,2) NULL` | The company's allowance for kicks/offsets at a box end. NULL = not counted, said in amber.           |
 | `takeoff_bend_defaults.kicksAcceptedAt TIMESTAMP NULL`   | When the starter allowance was accepted; NULL = the starter is shown and inert (the extras pattern). |
 
 No column is needed for the labor units themselves: `materials.laborHours`
 and `materials.fieldBendLaborHours` exist (0065, 0084).
 
-## 7. Owner questions
+## 7. Owner questions — ANSWERED 2026-10-06
 
 1. **A typed bend count per run** (§ 3) reverses D15/D19's "nothing typed
    per run" for this one field. Yes, as an override that defaults to drawn
    - allowance? Or no, and the company allowance (§ 2) alone?
+     **Answer: YES — optional.** The automatic count (drawn + allowance)
+     still runs on every run; a typed number replaces it on that run only.
+     Empty stays the default, never 0.
 2. **The starter allowance:** 1 kick per box end, shown and inert until
    accepted — or a different number, or none shipped?
+   **Answer: YES — 1 kick per box end, inert until accepted.** Shown,
+   dated and labelled as a starter; applies nothing until the company
+   accepts it (CLAUDE.md § "Unaccepted starters apply nothing").
 3. **Ends at a device in a stud wall** (where pipe enters the box straight
    from above): count a kick there too, or only at surface boxes and
    panels? (Recommended: every device or panel end; the estimator lowers it
    per run if the job is all straight-in.)
+   **Answer: kicks at in-wall devices for CONDUIT only — not MC or NM
+   cable.** A conduit run's device end takes the allowance; a cable run's
+   does not (§ 2, "Which ends"). Panel and surface-box ends are unchanged.
 
 ## 8. Test plan
 

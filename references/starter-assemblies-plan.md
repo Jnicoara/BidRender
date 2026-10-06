@@ -1,5 +1,13 @@
 # Starter assemblies — parts lists (PLAN, 2026-09-29)
 
+> **IN THE SEED 2026-10-06 (Track B)**: all 168, line for line as below,
+> in `server/seed/baselineAssemblies.ts` + `starterAssemblies.ts`, parts by
+> stable key (`starterParts.ts`). 160 are HELD from seeding until Track A's
+> 0123 (hours can be NULL) and 0122 (the two categories); DV34 until surface
+> raceway ships. A recipe change from here on is made in the seed file —
+> this document is the record of the decisions, no longer the recipe list.
+> todo.md, "Starter assemblies", has the detail.
+
 **Status (2026-09-29, owner): DECIDED; the ASSEMBLIES are not built yet.**
 The owner answered all seven questions — § Decisions, D1–D7. Built on
 `track-c` since: the 11 catalog rows the lists needed (§ Gaps) and whole-piece

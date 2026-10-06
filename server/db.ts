@@ -211,6 +211,15 @@ import {
   BASELINE_ASSEMBLIES,
   DEFAULT_ASSEMBLY_ROLE,
 } from "./seed/baselineAssemblies";
+import {
+  STARTER_HOLD_REASON,
+  liveStarterSchema,
+  schemaCategory,
+  starterHolds,
+  type BaselineAssembly,
+  type StarterHold,
+} from "./seed/assemblyRecipe";
+import { starterPartName } from "./seed/starterParts";
 import { BASELINE_KITS } from "./seed/baselineKits";
 import { TRADE_ALL, normalizeTradeId, resolveForTrade } from "../shared/trades";
 import {
@@ -3514,6 +3523,26 @@ export async function revertAssemblyToBaseline(id: number, userId: number) {
  * all present is skipped rather than half-built — a recipe missing lines prices
  * the job too low, which is worse than the recipe being absent.
  */
+/**
+ * What a starter's hours are written as. NEVER 0 for "hours not set" (plan
+ * D1): a null spec only gets here when `starterHolds` found the column can
+ * hold NULL, and if it somehow arrives otherwise this throws rather than
+ * returning undefined, which would let the column's DEFAULT 0 in.
+ */
+function starterHoursValue(
+  spec: BaselineAssembly
+): InsertAssembly["baseLaborHours"] {
+  if (spec.baseLaborHours !== null) return spec.baseLaborHours.toFixed(4);
+  if (!liveStarterSchema().hoursCanBeUnset) {
+    throw new Error(
+      `"${spec.name}" has hours not set and assemblies.baseLaborHours cannot hold NULL yet — refusing to write 0`
+    );
+  }
+  // Through `unknown` only while drizzle/schema.ts still types the column
+  // NOT NULL; once Track A's 0123 lands there, this cast is redundant.
+  return null as unknown as InsertAssembly["baseLaborHours"];
+}
+
 export async function seedBaselineAssemblies(): Promise<void> {
   await withSeedLock("helixbid:seed:assemblies", async () => {
     const db = await getDb();
@@ -3582,7 +3611,10 @@ export async function seedBaselineAssemblies(): Promise<void> {
     const whipPairs = BASELINE_ASSEMBLIES.flatMap(spec =>
       spec.materials
         .filter(line => line.branchWhip)
-        .map(line => ({ assembly: spec.name, material: line.material }))
+        .map(line => ({
+          assembly: spec.name,
+          material: starterPartName(line.part),
+        }))
     );
     for (const pair of whipPairs) {
       await db
@@ -3625,7 +3657,29 @@ export async function seedBaselineAssemblies(): Promise<void> {
       .where(isNull(assemblies.userId));
     const alreadySeeded = new Set(existingRows.map(row => row.name));
 
-    const pending = BASELINE_ASSEMBLIES.filter(a => !alreadySeeded.has(a.name));
+    /**
+     * Starters the schema cannot hold yet wait, named, rather than seeding
+     * half-built or at a made-up 0 hours. One log line per reason, not one per
+     * starter: 160 near-identical warnings on every boot hide the one that
+     * matters. The holds lift by themselves as Track A's migrations land.
+     */
+    const schema = liveStarterSchema();
+    const held = new Map<StarterHold, BaselineAssembly[]>();
+    const pending = BASELINE_ASSEMBLIES.filter(spec => {
+      if (alreadySeeded.has(spec.name)) return false;
+      const holds = starterHolds(spec, schema);
+      for (const hold of holds)
+        held.set(hold, [...(held.get(hold) ?? []), spec]);
+      return holds.length === 0;
+    });
+    held.forEach((specs, hold) => {
+      console.warn(
+        `[BaselineAssemblies] Holding ${specs.length} starter(s) — ${STARTER_HOLD_REASON[hold]}: ${specs
+          .slice(0, 10)
+          .map(spec => spec.ref)
+          .join(", ")}${specs.length > 10 ? ", …" : ""}`
+      );
+    });
     if (pending.length === 0) return;
 
     const baselineMaterialRows = await db
@@ -3645,15 +3699,17 @@ export async function seedBaselineAssemblies(): Promise<void> {
     );
 
     for (const spec of pending) {
+      // By part KEY, resolved to the name the part goes by now and then to
+      // this database's id — never a name typed in the recipe.
       const lines = spec.materials.map(line => ({
-        materialId: materialIdByName.get(line.material),
+        materialId: materialIdByName.get(starterPartName(line.part)),
         qty: line.qty.toFixed(4),
         isBranchWhip: line.branchWhip ?? false,
       }));
       if (lines.some(line => line.materialId === undefined)) {
         const missing = spec.materials
-          .filter(line => !materialIdByName.has(line.material))
-          .map(line => line.material);
+          .map(line => starterPartName(line.part))
+          .filter(name => !materialIdByName.has(name));
         console.warn(
           `[BaselineAssemblies] Skipping "${spec.name}" — missing materials: ${missing.join(", ")}`
         );
@@ -3663,9 +3719,9 @@ export async function seedBaselineAssemblies(): Promise<void> {
       const [result] = await db.insert(assemblies).values({
         userId: null,
         name: spec.name,
-        category: spec.category,
+        category: schemaCategory(spec),
         projectType: spec.projectType,
-        baseLaborHours: spec.baseLaborHours.toFixed(4),
+        baseLaborHours: starterHoursValue(spec),
         // Without this the hours above cost nothing — see DEFAULT_ASSEMBLY_ROLE.
         laborRateId: defaultRole?.id ?? null,
       });

@@ -27,6 +27,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import mysql from "mysql2/promise";
 import { BASELINE_ASSEMBLIES } from "../server/seed/baselineAssemblies";
+import {
+  STARTER_HOLD_REASON,
+  liveStarterSchema,
+  starterHolds,
+} from "../server/seed/assemblyRecipe";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const url = process.env.DATABASE_URL;
@@ -362,35 +367,66 @@ for (const [family, name, unit] of NOT_IN_CATALOG)
   });
 
 /*
-  Tab 2, MOST-USED FIRST. No usage data exists (nothing counts bid lines per
-  assembly), so this order is a judgement of how often each appears on a
-  typical job, and the sheet says so.
+  Tab 2: ALL 168 starters, MOST-USED FIRST, by plan row
+  (references/starter-assemblies-plan.md). No usage data exists (nothing
+  counts bid lines per assembly), so this order is a judgement of how often
+  each appears on a typical mixed resi / light-commercial / retail-service
+  workload, and the sheet says so. Every starter must appear exactly once —
+  the script stops otherwise, so a starter added later cannot be left off.
+
+  A starter not in the database READ has no ID and is greyed, with the reason
+  it is held (`starterHolds`). The import skips a row with no ID, so hours
+  typed there are kept in the sheet but reach nothing until the starter seeds
+  and the sheet is rebuilt.
 */
-const ASSEMBLY_ORDER = [
-  "Duplex receptacle standard",
-  "Single-pole switch",
-  "GFCI receptacle",
-  "Dedicated 20A receptacle",
-  "Surface-mount ceiling fixture",
-  "Dimmer switch",
-  "Ceiling fan standard",
-  "200A main panel furnish and install",
-];
-const starterNames = new Set(BASELINE_ASSEMBLIES.map(a => a.name));
-const assemblyRows = ASSEMBLY_ORDER.filter(n => starterNames.has(n))
-  .concat(
-    BASELINE_ASSEMBLIES.map(a => a.name).filter(
-      n => !ASSEMBLY_ORDER.includes(n)
-    )
-  )
-  .map(name => {
-    const a = shippedAssemblies.find(s => s.name === name);
-    return {
-      id: a?.id ?? null,
-      name,
-      notes: a ? "" : "missing from this database",
-    };
-  });
+const ASSEMBLY_ORDER = `
+  DV1 DV4 DV2 LT1 LT4 LT7 DV3 DV13 DV5 DV20 DV26 LT19 DV7 DV9 LT2 MS1 DV21
+  DV16 DV8 LT27 LT28 LT22 LT20 DV6 LT6 LT8 LT5 PG7 PG8 RS7 RS9 DV22 DV11
+  DV27 DV29 DV30 MS6 MS7 MS2 LT12 LT13 LT10 LT15 LT14 DV10 DV12 DV14 DV15
+  DV17 DV18 DV19 DV23 RS4 RS5 RS6 RS1 RS2 RS3 MH1 MH2 PG1 PG9 DR16 DR17 DR18
+  DR2 DR1 DR7 DR8 DR6 DR3 DR4 DR5 DR19 DR20 LT21 LT23 LT24 LT25 LT26 LT29
+  LT16 LT9 LT3 LT11 RS8 RS17 RS12 RS13 RS10 RS11 RS20 RS19 MS4 MS13 MS8 MS9
+  MS10 MS12 MS5 MS3 MS14 MS11 DV24 DV25 DV28 DV31 DV32 DV33 DV34 CS3 CS4 CS5
+  CS6 CS7 CS8 CS1 CS2 CS11 CS12 CS13 CS14 CS9 CS10 CS15 CS16 PG10 PG11 PG5
+  PG4 PG2 PG3 PG6 PG12 PG13 PG14 PG15 PG17 PG18 PG16 PG19 PG20 RS18 RS14 RS15
+  RS16 MH4 MH3 MH13 MH14 MH5 MH6 MH9 MH12 MH7 MH8 MH10 MH11 LT17 LT18 LT30
+  DR9 DR10 DR11 DR12 DR13 DR14 DR15
+`
+  .trim()
+  .split(/\s+/);
+const starterByRef = new Map(BASELINE_ASSEMBLIES.map(a => [a.ref, a]));
+const unordered = BASELINE_ASSEMBLIES.filter(
+  a => !ASSEMBLY_ORDER.includes(a.ref)
+).map(a => a.ref);
+const unknownOrRepeated = ASSEMBLY_ORDER.filter(
+  (ref, i) => !starterByRef.has(ref) || ASSEMBLY_ORDER.indexOf(ref) !== i
+);
+if (unordered.length || unknownOrRepeated.length) {
+  throw new Error(
+    `ASSEMBLY_ORDER must list every starter once. Missing: ${unordered.join(" ") || "none"}; unknown or repeated: ${unknownOrRepeated.join(" ") || "none"}`
+  );
+}
+const schema = liveStarterSchema();
+const assemblyRows = ASSEMBLY_ORDER.map(ref => {
+  const spec = starterByRef.get(ref)!;
+  const a = shippedAssemblies.find(s => s.name === spec.name);
+  const holds = starterHolds(spec, schema);
+  return {
+    id: a?.id ?? null,
+    ref,
+    name: spec.name,
+    category: spec.category,
+    notes: a
+      ? ""
+      : holds.length
+        ? `not seeded yet: ${holds.map(h => STARTER_HOLD_REASON[h]).join("; ")}${
+            spec.missingParts?.length
+              ? ` (${spec.missingParts.join(", ")})`
+              : ""
+          }`
+        : "missing from this database",
+  };
+});
 
 const out = {
   builtFrom: url.replace(/\/\/[^@]*@/, "//***@"),

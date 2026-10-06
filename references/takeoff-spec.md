@@ -774,6 +774,12 @@ against this.**
 
 **D15 — Bringing back the old per-run estimating details (R6). Decided 2026-09-14: as picked.**
 
+> **Narrowed 2026-10-06 by the owner, for ONE field:** an optional typed
+> bend count per run, as an override of the automatic count (which still
+> runs). Everything else stays off the Takeoff screen.
+> references/run-bends-plan.md § 7 Q1; not built, waits on Track A's
+> `takeoff_runs.typedBendCount`.
+
 - **Pick:** not on the Takeoff screen. Put anything that is really needed into
   assemblies or company defaults, set once.
 - **Bloat warning:** this was the single most complicated part of the old screen.
@@ -1013,6 +1019,13 @@ deliberately-zero must not be the same value.
 
 **D19 — Bends and pull points, counted from the trace (R6). Decided and built
 2026-09-26.**
+
+> **Narrowed 2026-10-06 by the owner (references/run-bends-plan.md § 7):**
+> "nothing here is typed per run" gains one exception, an optional typed
+> bend count that overrides drawn + allowance on that run; and the count
+> gains a company allowance of kicks at box ends (starter 1, inert until
+> accepted; at in-wall devices for conduit only, not MC or NM cable). Not
+> built — waits on Track A's three columns in that plan's § 6.
 
 The owner's design, and six answers given the same day:
 

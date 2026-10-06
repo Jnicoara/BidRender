@@ -6,6 +6,23 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **All 168 planned starter assemblies are written into the app's starter
+  library** — devices (including commercial MC versions), lighting, resi and
+  commercial specials, panels and gear, motor/HVAC hookups, demo/retrofit and
+  misc, each with its parts list and the fixture or appliance as its own
+  line. Their labor hours are "not set", never 0, so most of them wait for
+  two small database changes before they appear: until then a database gets
+  the same 8 as before, and nothing is ever added at zero hours. Parts are
+  tied to the catalog by a stable key, so the coming materials rename cannot
+  quietly drop a starter. A company's own assemblies are never touched.
+- **The labor-unit sheet's "Assembly hours" tab lists all 168**, most-used
+  first, with each one's plan number and category, and says why any is not
+  in the database yet.
+- **Run bends: the owner's answers recorded** — an optional typed bend count
+  per run, a starter allowance of 1 kick per box end (inert until accepted),
+  and kicks at in-wall devices for conduit only. Built later, once the
+  columns exist.
+
 - **A starter labor-unit sheet, and a way to import it.**
   `pricing/labor-units-starter.xlsx` lists 180 common items (pipe and wire
   per 100 ft, fittings, boxes, panels, breakers, disconnects, transformers,

@@ -109,15 +109,25 @@ ws.autoFilter = { from: "A1", to: `${L(HEADERS.length)}1` };
 const wa = wb.addWorksheet("Assembly hours", {
   views: [{ state: "frozen", ySplit: 1 }],
 });
-wa.addRow(["Assembly ID", "Assembly", "MY HOURS", "Notes"]);
+// The import finds columns by header ("Assembly ID", "Assembly", "MY HOURS"),
+// so "Plan #" and "Category" ride along without being read.
+wa.addRow([
+  "Assembly ID",
+  "Plan #",
+  "Assembly",
+  "Category",
+  "MY HOURS",
+  "Notes",
+]);
 wa.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
 wa.getRow(1).fill = HEAD_FILL;
-[12, 44, 11, 60].forEach((w, i) => (wa.getColumn(i + 1).width = w));
+[12, 8, 44, 22, 11, 70].forEach((w, i) => (wa.getColumn(i + 1).width = w));
 for (const a of assemblyRows) {
-  const row = wa.addRow([a.id, a.name, null, a.notes]);
-  if (a.id !== null) row.getCell(3).fill = YELLOW;
+  const row = wa.addRow([a.id, a.ref, a.name, a.category, null, a.notes]);
+  if (a.id !== null) row.getCell(5).fill = YELLOW;
   else row.font = GREY_FONT;
 }
+wa.autoFilter = { from: "A1", to: "F1" };
 
 // ── Tab 3: How to use ───────────────────────────────────────────────────────
 const wh = wb.addWorksheet("How to use");
@@ -134,7 +144,8 @@ wh.getColumn(1).width = 110;
   "7. To import: Materials → Supplier pricing → Import labor sheet. Copy ONE tab from its header row down, paste, Preview, read every change, Apply.",
   "8. The import writes hours ONLY — never a price, a name, or a new material.",
   "",
-  "Assembly hours: the starter assemblies, in a judged most-used-first order (no usage data exists yet). Their hours are the assembly's own typed hours.",
+  "Assembly hours: ALL 168 starter assemblies (Plan # is the row in references/starter-assemblies-plan.md), in a judged most-used-first order (no usage data exists yet). Their hours are the assembly's own typed hours, and every one is NOT SET until you type it.",
+  "Grey assembly rows are not in this database yet — the Notes say why (most wait on two database changes: hours that can be 'not set', and two new categories). You can type hours there now to plan; the import skips a row with no ID, so rebuild the sheet once they are seeded and copy your hours across.",
   "",
   `Keyed by material ID. These IDs are from: ${builtFrom}, built ${builtAt}.`,
   "IDs belong to ONE database. The import checks each row's name against its ID and refuses a mismatch, so a sheet built from another database writes nothing. To import into production, build this sheet from production.",

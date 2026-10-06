@@ -17,6 +17,7 @@ import {
   RETIRED_BASELINE_MATERIALS,
 } from "./seed/baselineMaterials";
 import { BASELINE_ASSEMBLIES } from "./seed/baselineAssemblies";
+import { STARTER_PARTS } from "./seed/starterParts";
 import { MATERIAL_CATEGORIES } from "../drizzle/schema";
 import { materials, users } from "../drizzle/schema";
 import {
@@ -1055,44 +1056,40 @@ describe("the Panels / Breakers split", () => {
 });
 
 /**
- * Starter assemblies find their materials by EXACT name (seedBaselineAssemblies
- * in server/db.ts), and they do not read RENAMED_BASELINE_MATERIALS. So an
- * assembly line still naming a renamed spelling can never resolve, and the
- * seeder skips the whole assembly with nothing but a console warning.
+ * Starter assemblies name parts by stable KEY, and STARTER_PARTS is the one
+ * place a starter mentions a catalog name (server/seed/starterParts.ts). The
+ * seeder follows RENAMED_BASELINE_MATERIALS from there, so a stale spelling
+ * still resolves — but the table should say the current one, or the next
+ * reader is sent looking for a row that no longer goes by it.
  *
- * That is not hypothetical. "200A main panel furnish and install" named
- * "20/2 breaker" from the day that row became "20A 2-Pole breaker" until
- * 2026-09-24, and was missing from every database seeded in between. Nothing
- * failed, which is why this test exists.
- *
- * It asks the narrow question deliberately. Some starters wait on materials
- * that are not shipped yet and are skipped ON PURPOSE (assemblies.test.ts,
- * "only seeds assemblies whose materials all exist"), so "every line resolves"
- * would be the wrong rule. A line naming a spelling that was renamed away is
- * never on purpose.
+ * Why the care: "200A main panel furnish and install" named "20/2 breaker"
+ * from the day that row became "20A 2-Pole breaker" until 2026-09-24, and was
+ * missing from every database seeded in between. Nothing failed.
+ * `starterAssembliesSeed.test.ts` asks the wider question — every part
+ * resolves to a shipped row.
  */
 describe("starter assemblies", () => {
-  it("never name a material by a spelling that was renamed away", () => {
-    const stale = BASELINE_ASSEMBLIES.flatMap(spec =>
-      spec.materials
-        .filter(line => line.material in RENAMED_BASELINE_MATERIALS)
-        .map(
-          line =>
-            `${spec.name}: "${line.material}" is now "${RENAMED_BASELINE_MATERIALS[line.material]}"`
-        )
-    );
+  it("name no part by a spelling that was renamed away", () => {
+    const stale = Object.entries(STARTER_PARTS)
+      .filter(([, name]) => name in RENAMED_BASELINE_MATERIALS)
+      .map(
+        ([part, name]) =>
+          `${part}: "${name}" is now "${RENAMED_BASELINE_MATERIALS[name]}"`
+      );
     expect(stale).toEqual([]);
   });
 
   it("name only shipped breakers", () => {
     // Breakers are the rows this rename touched, and every one is shipped.
     const shipped = new Set(BASELINE_MATERIALS.map(m => m.name));
-    const unresolved = BASELINE_ASSEMBLIES.flatMap(spec =>
-      spec.materials
-        .filter(line => /breaker/i.test(line.material))
-        .filter(line => !shipped.has(line.material))
-        .map(line => `${spec.name}: "${line.material}"`)
+    const breakerParts = new Set(
+      BASELINE_ASSEMBLIES.flatMap(spec => spec.materials.map(l => l.part))
+        .map(part => STARTER_PARTS[part])
+        .filter(name => /breaker/i.test(name))
     );
-    expect(unresolved).toEqual([]);
+    expect(breakerParts.size).toBeGreaterThan(0);
+    expect(
+      Array.from(breakerParts).filter(name => !shipped.has(name))
+    ).toEqual([]);
   });
 });

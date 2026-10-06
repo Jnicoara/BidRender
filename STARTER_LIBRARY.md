@@ -145,6 +145,8 @@ Each entry carries a **Project Type** tag: Residential / Commercial / Both.
 >
 > **What the app ships instead.** The Assembly Builder needs a non-zero number to price against, because a zero prices the work at nothing — a far more dangerous default than a visible guess. So `shared/laborHourDefaults.ts` holds placeholder hours keyed by task type, and the seeded starter assemblies carry them. They are placeholders in exactly the sense this document means: a starting figure the user replaces, labelled as a guess everywhere it appears, and never presented as a labor unit. This document stays the hours-free reference; that file is the app's editable default.
 >
+> **Overridden 2026-09-29 by the owner (starter-assemblies-plan.md D1): starter hours are NOT SET, never a guess and never 0.** Built in the seed 2026-10-06 for the 160 starters added then (hours null, held from seeding until the column can hold NULL — Track A's 0123). The first 8 keep their placeholders until Track A's step-3 file clears them.
+>
 > **Being replaced (owner, 2026-09-29).** Starters will ship with hours NOT SET, shown as "Hours not set", and the placeholders on the shipped starters are cleared — `references/starter-assemblies-plan.md` D1. The paragraph above describes the app until that lands, which needs a Track A migration (`references/track-a-handoff-starter-assemblies.md` H2).
 
 ### CORE — build first
