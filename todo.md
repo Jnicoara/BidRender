@@ -206,6 +206,10 @@ All additive and nullable. Specs are in the plans named.
 
 ### Before beta: price an unpriced line right where it blocks you
 
+> **2026-10-05:** quote items (references/quote-items-plan.md § 8) need the
+> SAME per-bid price column as this item (`bidUnitCost`). Build it once:
+> ship this first or together, never as two columns.
+
 - [ ] **Owner, 2026-09-30.** When a bid has unpriced lines, "For your quote
       app" refuses to show figures ("This bid has lines without a price. Price
       them on the bid…", `QuoteAppPanel.tsx` `Blocked`). The bid page's

@@ -151,6 +151,10 @@ Supplier-quoted gear and fixture packages, with their own markup %. Not built
 yet, but it has its slot in the order: item override → **quoted line** →
 category → price band → company default.
 
+> **Planned 2026-10-05:** references/quote-items-plan.md builds this line
+> type ("quote items": poles, switchgear, fixture packages), the markup slot
+> included (§ 5). It agrees with D4 and changes nothing here.
+
 **D5. User-added categories are allowed.** (2026-09-25) This OVERRIDES
 `ASSEMBLIES_PLAN.md` § Customization model, "Category is NOT
 user-extendable", which was written to keep the takeoff layers free of clutter.
