@@ -6,6 +6,20 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **A count can no longer quietly come up one short when you click fast.**
+  If a click on the drawing landed in the split second after a new count was
+  made, that mark was drawn but never saved, so the bid was one item short
+  with nothing on screen to say so. Such a click now joins the count like
+  the others. And while a mark is still waiting for a new count to be made,
+  leaving or reloading the page asks first instead of losing it.
+
+- **Reloading the Plans screen on a slow connection no longer leaves it blank
+  for good.** If the server did not answer, the screen used to wait forever
+  with an empty pane; now it gives up after 20 seconds and asks again. And if
+  the list of plans really cannot be loaded, the screen says so with a "Try
+  again" button, instead of showing "Drop plan PDFs here" as if the bid had
+  no plans.
+
 - **A starter labor-unit sheet, and a way to import it.**
   `pricing/labor-units-starter.xlsx` lists 180 common items (pipe and wire
   per 100 ft, fittings, boxes, panels, breakers, disconnects, transformers,

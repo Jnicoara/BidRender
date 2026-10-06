@@ -11,6 +11,7 @@ import { markStagingEnvironment } from "@/lib/appEnvironment";
 import StagingBand from "@/components/StagingBand";
 import { NewVersionBar } from "@/components/NewVersionBar";
 import { markPageOutOfDate } from "@/lib/versionCheck";
+import { withQueryDeadline } from "@/lib/queryDeadline";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -67,8 +68,10 @@ const trpcClient = trpc.createClient({
         }
         return {};
       },
+      // A read that never answers is given up on and retried, rather than
+      // holding a screen blank for good (@/lib/queryDeadline).
       fetch(input, init) {
-        return globalThis.fetch(input, {
+        return withQueryDeadline(globalThis.fetch)(input, {
           ...(init ?? {}),
           credentials: "include",
         });

@@ -4,6 +4,8 @@ import {
   dropProvisional,
   isProvisionalGroup,
   lostMarksMessage,
+  marksOnlyHere,
+  settleLateMarks,
 } from "./provisionalCount";
 import { nextMarkBatch } from "./markBatches";
 
@@ -90,5 +92,67 @@ describe("a count armed before the server has made it", () => {
       adoptRealGroup(queue, -1, { id: 5, label: "a" }).map(m => m.groupId)
     ).toEqual([5, -2]);
     expect(dropProvisional(queue, -2).kept.map(m => m.groupId)).toEqual([-1]);
+  });
+});
+
+describe("marks a reload would lose", () => {
+  it("counts a mark under a count the server has not made yet", () => {
+    // Smoke flow 10, forced: the count's request held, one click, then a
+    // reload. That mark was in no mirror and was lost without a word.
+    expect(marksOnlyHere([mark(1, -1)])).toBe(1);
+  });
+
+  it("counts a mark on a sheet whose row has not arrived", () => {
+    expect(marksOnlyHere([{ ...mark(1, 5), sheetId: -3 }])).toBe(1);
+  });
+
+  it("does not count a real mark, sent or not — the mirror keeps those", () => {
+    expect(marksOnlyHere([mark(1, 5), { ...mark(2, 5), sent: true }])).toBe(0);
+  });
+
+  it("goes to zero the moment the count is made", () => {
+    const queue = [mark(1, -1), mark(2, -1)];
+    expect(marksOnlyHere(queue)).toBe(2);
+    expect(
+      marksOnlyHere(adoptRealGroup(queue, -1, { id: 9, label: "a" }))
+    ).toBe(0);
+  });
+});
+
+describe("a click that arrives after the server answered", () => {
+  // Flow 5, local smoke: the count was made between the first and second
+  // click; a click handled by the previous render still carried the
+  // provisional id after the queue had been adopted, and was never sent.
+  it("goes to the count the server made, like the clicks that waited", () => {
+    const late = [mark(1, 8), mark(2, -1, "provisional")];
+    const outcomes = new Map([[-1, { id: 8, label: "CI SWITCH" }]]);
+    const { queue, lost, changed } = settleLateMarks(late, outcomes);
+    expect(queue.map(m => [m.groupId, m.name])).toEqual([
+      [8, "count"],
+      [8, "CI SWITCH"],
+    ]);
+    expect(lost).toBe(0);
+    expect(changed).toBe(true);
+    // And it is now sendable — the whole point.
+    expect(nextMarkBatch(queue).map(m => m.key)).toEqual([1, 2]);
+  });
+
+  it("comes off, counted, when that count was refused", () => {
+    const { queue, lost } = settleLateMarks(
+      [mark(1, -1), mark(2, 5)],
+      new Map([[-1, "refused" as const]])
+    );
+    expect(queue.map(m => m.key)).toEqual([2]);
+    expect(lost).toBe(1);
+  });
+
+  it("leaves a count still waiting for its answer alone", () => {
+    const queue = [mark(1, -2), mark(2, 5)];
+    const result = settleLateMarks(
+      queue,
+      new Map([[-1, { id: 8, label: "x" }]])
+    );
+    expect(result.queue).toEqual(queue);
+    expect(result.changed).toBe(false);
   });
 });

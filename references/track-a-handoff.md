@@ -17,6 +17,14 @@ release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
 ## What is queued, in order
 
+**All three DONE 2026-10-06 (session 6)** — see `todo.md` § Flaky tests:
+blank Plans was a real bug (an unbounded read batch; plus a failed list drew
+"Drop plan PDFs here"); the "flaky undo" was a slow count-create, and its
+reload path lost marks silently; and chasing it found a real short count
+(a click between the server's answer and React's re-render, flow 5).
+`touch.spec` is stable (0 failures in 18 executions since `24105ad`). The
+original entries follow for the record.
+
 1. **The blank Plans screen after a reload: MUST INVESTIGATE FIRST**
    (owner). Smoke flow 9 failed once on the `24105ad` candidate (run
    37512445462 attempt 1): after `page.reload()` the screen stayed blank for
