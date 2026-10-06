@@ -900,6 +900,18 @@ const MONEY_KEY =
   /cost|price|pricing|rate|markup|overhead|profit|margin|tax|total|amount|subtotal|charge|dollar|usd/i;
 const MONEY_VALUE = /[$£€]|\b\d{1,3}(,\d{3})+(\.\d{2})?\b/;
 
+/**
+ * A cost as a NUMBER in the text: not inside a longer run of digits. A plain
+ * substring check failed whenever the clock lined up — `preparedOn`
+ * "05:54:01.424Z" contains "1.42", the test's device cost (gate run
+ * 37420713101, 2026-10-06) — and random fixture names carry digits too.
+ * Still catches the figure written as 1.42, "1.42" or 1.4200.
+ */
+function asAFigure(cost: number): RegExp {
+  const fixed = cost.toFixed(2).replace(".", "\\.");
+  return new RegExp(`(?<![\\d.])${fixed}0*(?!\\d)`);
+}
+
 function moneyKeysIn(value: unknown, path = ""): string[] {
   if (value === null || typeof value !== "object") return [];
   if (Array.isArray(value)) {
@@ -990,7 +1002,7 @@ describeDb("carries no pricing", () => {
       deviceCost * 11,
       wireCost * 330,
     ]) {
-      expect(text).not.toContain(figure.toFixed(2));
+      expect(text).not.toMatch(asAFigure(figure));
     }
   });
 
@@ -999,7 +1011,7 @@ describeDb("carries no pricing", () => {
     const doc = await caller().materialsList.get({ bidId });
     const csv = toCsv(doc);
     expect(csv).not.toMatch(/[$£€]/);
-    expect(csv).not.toContain(deviceCost.toFixed(2));
+    expect(csv).not.toMatch(asAFigure(deviceCost));
     // The header row names every column the file will ever have.
     const header = csv.split("\r\n").find(l => l.startsWith('"Item"'))!;
     expect(header).toBe('"Item","Unit","Quantity","Category","From"');
