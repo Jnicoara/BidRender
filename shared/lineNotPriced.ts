@@ -109,6 +109,33 @@ export function lineHoursUnset(line: {
   );
 }
 
+/**
+ * Whether an ASSEMBLY or count line's hours are NOT SET — its labor is not
+ * priced, and its hours cell says so, never "0 h" (D1, owner 2026-09-29).
+ *
+ * A line freezes NULL when its assembly's hours were not set at the time
+ * (`snapshotHoursFor`, shared/assemblyHours.ts). The money then holds no
+ * labor, and the line counts its labor as ONE thing not priced, the way a
+ * line with no material does (`lineMaterialNotPriced`) — in
+ * `linePartsNotPriced`, so every total that counts parts counts it.
+ *
+ * A line with neither hours nor material is "Not priced" as a whole (its
+ * direct cost is $0), and is not counted here as well.
+ *
+ * A hand-priced line has its own rule (`shared/handPricedLines.ts`); a traced
+ * line has `lineHoursUnset` above, because the fix there is a labor unit on
+ * the Materials screen rather than the assembly's hours.
+ */
+export function lineHoursNotSet(line: {
+  qty: string | number;
+  assemblyId: number | null;
+  snapshotLaborHours: string | number | null;
+}): boolean {
+  const qty = Number(line.qty);
+  if (!Number.isFinite(qty) || qty <= 0) return false;
+  return line.assemblyId !== null && line.snapshotLaborHours === null;
+}
+
 // ─── Material missing from a line that has labor ─────────────────────────────
 
 /**
@@ -189,7 +216,12 @@ export function linePartsNotPriced(
   const parts = Math.max(0, Math.floor(line.unpricedParts));
   // Material missing entirely counts once — not on top of $0 recipe parts,
   // which already say the material is short (2026-10-05).
-  return lineMaterialNotPriced(line, directCost) ? Math.max(parts, 1) : parts;
+  const material = lineMaterialNotPriced(line, directCost)
+    ? Math.max(parts, 1)
+    : parts;
+  // Hours not set: the labor is one more thing not priced (D1). Its own
+  // count, never folded into the material's.
+  return material + (lineHoursNotSet(line) ? 1 : 0);
 }
 
 /**

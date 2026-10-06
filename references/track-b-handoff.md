@@ -6,6 +6,19 @@ databases (`bidrender_local_b_new`, `bidrender_test_b`) are migrated to 105
 and `scripts/schemaDrift.mts` says both match. Last gate: `pnpm check` clean,
 292 test files / 4,976 passing / 5 skipped.
 
+## Session 2026-10-06 (evening) — H2 step 2, LT1/LT2 repair
+
+- **H2 step 2 is built**: NULL assembly hours read as "not set" everywhere
+  (`shared/assemblyHours.ts`; todo.md has the list). **It ships in the SAME
+  release as Track A's 0122/0123, never apart** — written in todo.md and
+  beside 0122/0123 in `references/migrations-next-batch.md`.
+- **LT1/LT2 fixture repair**: `scripts/repairStarterFixtureLines.mts`,
+  tested on `bidrender_test_b` and a dropped copy of the local database.
+  NOT run on staging or live; listed in migrations-next-batch.md § "Data
+  repairs" to ride the release.
+- Open for the owner: should a user's own NEW assembly still pre-fill hours
+  from `laborHourDefaults` or start "not set"?
+
 ## Session 2026-10-06 (later) — starter assemblies, labor sheet tab 2, run bends
 
 - **All 168 starters are in the seed**, 160 HELD until Track A's 0123

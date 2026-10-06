@@ -2724,21 +2724,58 @@ one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
       line for line (checked by script, 168/168). Every new starter's hours
       are NULL = not set; the seeder **holds** a starter it cannot store
       rather than writing 0, and logs one line per reason. Today a database
-      gets the same 8 as before; the holds lift by themselves: - **0123** (hours nullable) lifts the hours hold for all 160. **Its
-      `drizzle/schema.ts` edit must ship WITH H2's step-2 code** (every
-      reader of `baseLaborHours` reads NULL as not set), because the
-      moment the schema says nullable, 160 starters seed with NULL hours.
-      `server/starterAssembliesSeed.test.ts` then switches on a check that
-      they read NULL. - **0122** (two categories) lifts 29 more: DR1–DR20, MS1–MS5,
-      MS12–MS14, CS16. - **DV34** stays held until surface raceway is in the catalog (R3,
-      0117): its 4 missing parts are listed in the seed, never added. - Order still matters for H2: the null-hours code ships BEFORE the
-      migration that clears the 8 starters' placeholder hours. - **Open, owner:** LT1 and LT2 gained their fixture line (D2) in the
-      seed, which reaches a NEW database only — the seeder never edits a
-      starter that exists. Add the line to existing databases' shared rows
-      (a narrow repair pass, like the whip one), or leave them? - Categories for RS/CS rows are the seed's choice ("natural
-      category"): appliances → Equipment Connections, twist-locks and
-      poles → Devices, fire alarm and doorbells → Low Voltage/EMS, time
-      clock → Lighting, generator inlet → Panels, Knox box → General.
+      gets the same 8 as before.
+
+      **0123** (hours nullable) lifts the hours hold for all 160; **0122**
+      (two categories) lifts 29 more (DR1–DR20, MS1–MS5, MS12–MS14, CS16);
+      **DV34** stays held until surface raceway is in the catalog (R3, 0117)
+      — its 4 missing parts are listed in the seed, never added.
+      Categories for RS/CS rows are the seed's choice ("natural category"):
+      appliances → Equipment Connections, twist-locks and poles → Devices,
+      fire alarm and doorbells → Low Voltage/EMS, time clock → Lighting,
+      generator inlet → Panels, Knox box → General.
+
+- [x] **H2 step 2 BUILT 2026-10-06 (Track B): every reader of an assembly's
+      hours reads NULL as NOT SET** — shown "hours not set", priced as not
+      priced, never 0. One reader, `assemblyHours` / `snapshotHoursFor` /
+      `previewAssembly` (`shared/assemblyHours.ts`); one door for writes,
+      `assemblyHoursColumnValue` (`server/db.ts`), which refuses NULL with a
+      plain message until the column can hold it. A bid line made from such
+      an assembly freezes NULL hours and counts its labor as ONE thing not
+      priced (`lineHoursNotSet` in `linePartsNotPriced`, and its SQL copy in
+      `costSums.frozenParts`); its cost cell says "+ hours not set", its
+      hours cell "Hours not set", the quote panel blocks on it. Also: the
+      assembly editor (blank box = not set, saves as NULL), the library list,
+      Quick bid, kit totals ("+ N assemblies with hours not set"), closeout
+      suggestions (none from not set), the labor-sheet import (from "not set",
+      never "unchanged"), save-line-as-assembly. Tests:
+      `server/assemblyHoursNotSet.test.ts` and the "hours not set" case of
+      `server/dashboardNotPriced.test.ts` — each checked red with its half of
+      the fix removed.
+
+      > **PAIRING RULE — THIS CODE SHIPS IN THE SAME RELEASE AS TRACK A's
+      > 0122 AND 0123, NEVER APART** (owner, 2026-10-06). 0123's
+      > `drizzle/schema.ts` edit opens the starter hold, so without this code
+      > 160 starters would seed with NULL hours that an old reader prices at
+      > 0 h. Without 0123, this code only refuses "not set" on save. Written
+      > beside 0122/0123 in `references/migrations-next-batch.md` too.
+      > Order still matters for H2: this code ships BEFORE step 3 (i), the
+      > migration that clears the 8 starters' placeholder hours.
+
+      Still open, owner: whether a user's own NEW assembly should still
+      pre-fill hours from `shared/laborHourDefaults.ts` (it does today) or
+      start "not set" (H2's note; D1 covered the shipped starters only).
+
+- [x] **LT1/LT2 fixture-line repair BUILT 2026-10-06 (Track B), owner YES.**
+      `scripts/repairStarterFixtureLines.mts` (report; `--apply` writes) over
+      `server/starterFixtureRepair.ts`: adds the fixture line ONLY to the
+      shared LT1/LT2 rows that no company has forked and whose lines are
+      exactly the old shipped recipe; skips and logs anything else;
+      repeatable. Tested on `bidrender_test_b` (including a forked row that
+      stays byte-identical) and on a throwaway copy of the local database.
+      **NOT run on staging or live** — it rides the next release, listed in
+      `references/migrations-next-batch.md` § "Data repairs".
+
 - [ ] **Double counting from a user's own box assembly.** No starter assembly
       carries a connector or strap, so nothing overlaps today. A company
       whose own box or device assembly includes an EMT connector will count

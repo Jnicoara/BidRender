@@ -87,11 +87,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  addAssemblyOverheadHours,
-  calculateBidPrice,
-  calculateLineItem,
-} from "@shared/pricing";
+import { addAssemblyOverheadHours, calculateBidPrice } from "@shared/pricing";
+import { assemblyHours, previewAssembly } from "@shared/assemblyHours";
 import {
   defaultLaborHoursFor,
   isPlaceholderHours,
@@ -246,12 +243,13 @@ function CostPreview({
 
   const line = useMemo(() => {
     try {
-      return calculateLineItem({
+      // A blank hours box is NOT SET (D1): no labor, flagged, never 0 h.
+      return previewAssembly({
         materials: draft.materials.map(m => ({
           costPerUnit: m.costPerUnit,
           qty: m.qty,
         })),
-        baseLaborHours: Number(draft.baseLaborHours) || 0,
+        baseLaborHours: draft.baseLaborHours,
         overheadLaborHours: Number(draft.overheadLaborHours) || 0,
         modifiers: modifierPcts,
         laborRate,
@@ -373,12 +371,21 @@ function CostPreview({
       )}
       <Row
         label={
-          line.modifierPct !== 0
-            ? `Labor ${round(line.baseHoursWithOverhead, 3)} h → ${round(line.adjustedLaborHours, 3)} h`
-            : `Labor ${round(line.adjustedLaborHours, 3)} h`
+          line.hoursNotSet
+            ? "Labor"
+            : line.modifierPct !== 0
+              ? `Labor ${round(line.baseHoursWithOverhead, 3)} h → ${round(line.adjustedLaborHours, 3)} h`
+              : `Labor ${round(line.adjustedLaborHours, 3)} h`
         }
-        value={money(line.laborCost)}
+        value={line.hoursNotSet ? "hours not set" : money(line.laborCost)}
+        warn={line.hoursNotSet}
       />
+      {line.hoursNotSet && (
+        <div className="text-xs text-[#F5C518] pl-1 pb-1">
+          Hours not set, so the cost below has no labor in it. A bid line made
+          from this says "hours not set" until you type them.
+        </div>
+      )}
       {/* Named where it lands, so an estimator reading the preview can see
           which part of the hours is setup rather than device work. */}
       {line.overheadLaborHours > 0 && (
@@ -560,6 +567,7 @@ function AssemblyBuilder({
   );
   const showsPlaceholderHours =
     !hoursTouched &&
+    assemblyHours(draft.baseLaborHours) !== null &&
     isPlaceholderHours(draft.name, Number(draft.baseLaborHours));
 
   /**
@@ -573,7 +581,7 @@ function AssemblyBuilder({
    */
   const crossCheck = useMemo(() => {
     const labor = laborForAssembly({
-      typedHours: Number(draft.baseLaborHours) || 0,
+      typedHours: assemblyHours(draft.baseLaborHours),
       components: draft.materials.map(m => ({
         qty: m.qty,
         laborHours: m.laborHours,
@@ -583,7 +591,8 @@ function AssemblyBuilder({
     return {
       hours: labor.crossCheckHours,
       unsetCount: labor.crossCheckUnsetCount,
-      typed: Number(draft.baseLaborHours) || 0,
+      // NULL = not set (D1): the sentence below says so, never "0 h".
+      typed: assemblyHours(draft.baseLaborHours),
       /*
         Nothing to compare against is not a comparison. With no components, or
         with none of them costed, "your parts add to 0 h" reads as a claim that
@@ -674,13 +683,14 @@ function AssemblyBuilder({
       toast.error("Give the assembly a name.");
       return;
     }
+    // Blank is NOT SET (D1) and saves as such; anything else must be a
+    // number of 0 or more. A blank never becomes 0.
     const hours = Number(draft.baseLaborHours);
     if (
-      draft.baseLaborHours.trim() === "" ||
-      Number.isNaN(hours) ||
-      hours < 0
+      draft.baseLaborHours.trim() !== "" &&
+      (Number.isNaN(hours) || hours < 0)
     ) {
-      toast.error("Enter labor hours (0 or more).");
+      toast.error("Labor hours must be 0 or more, or left blank for not set.");
       return;
     }
     const overhead = Number(draft.overheadLaborHours);
@@ -1017,6 +1027,8 @@ function AssemblyBuilder({
                     className="h-8 w-24 text-sm text-right"
                     inputMode="decimal"
                     onFocus={selectOnFocus}
+                    // Blank is NOT SET (D1), shown as such — never a 0.
+                    placeholder="not set"
                     aria-label="Base labor hours"
                   />
                   <span className="text-xs text-muted-foreground">
@@ -1048,8 +1060,10 @@ function AssemblyBuilder({
               */}
               {crossCheck.shown && (
                 <p className="text-xs text-muted-foreground">
-                  Your parts add to {round(crossCheck.hours, 3)} h; you typed{" "}
-                  {round(crossCheck.typed, 3)} h.
+                  Your parts add to {round(crossCheck.hours, 3)} h;{" "}
+                  {crossCheck.typed === null
+                    ? "the assembly's hours are not set."
+                    : `you typed ${round(crossCheck.typed, 3)} h.`}
                   {crossCheck.unsetCount > 0 && (
                     <>
                       {" "}
@@ -1116,20 +1130,28 @@ function AssemblyBuilder({
                   this one assembly — not a percentage, and nothing to do with
                   the company-wide productivity factor in Settings.
                 </p>
-                {Number(draft.overheadLaborHours) > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    {round(Number(draft.baseLaborHours) || 0, 3)} h +{" "}
-                    {round(Number(draft.overheadLaborHours) || 0, 3)} h ={" "}
-                    <span className="text-foreground font-medium">
-                      {round(
-                        (Number(draft.baseLaborHours) || 0) +
-                          (Number(draft.overheadLaborHours) || 0),
-                        3
-                      )}{" "}
-                      h
-                    </span>{" "}
-                    before modifiers.
+                {Number(draft.overheadLaborHours) > 0 &&
+                assemblyHours(draft.baseLaborHours) === null ? (
+                  <p className="text-xs text-[#F5C518]">
+                    Hours not set — the overhead hours are not priced on their
+                    own until the work hours are.
                   </p>
+                ) : (
+                  Number(draft.overheadLaborHours) > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {round(Number(draft.baseLaborHours) || 0, 3)} h +{" "}
+                      {round(Number(draft.overheadLaborHours) || 0, 3)} h ={" "}
+                      <span className="text-foreground font-medium">
+                        {round(
+                          (Number(draft.baseLaborHours) || 0) +
+                            (Number(draft.overheadLaborHours) || 0),
+                          3
+                        )}{" "}
+                        h
+                      </span>{" "}
+                      before modifiers.
+                    </p>
+                  )
                 )}
               </div>
             </div>
@@ -1324,7 +1346,7 @@ export default function AssembliesLibraryPage() {
             category: draft.category,
             trade: draft.trade,
             projectType: draft.projectType,
-            baseLaborHours: Number(draft.baseLaborHours),
+            baseLaborHours: assemblyHours(draft.baseLaborHours),
             overheadLaborHours: Number(draft.overheadLaborHours),
             laborRateId: draft.laborRateId,
             materials: draft.materials.map(m => ({
@@ -1356,7 +1378,11 @@ export default function AssembliesLibraryPage() {
       category: detail.category as Category,
       trade: detail.trade,
       projectType: (detail.projectType as ProjectType | null) ?? null,
-      baseLaborHours: String(Number(detail.baseLaborHours)),
+      // NULL loads as a blank box — not set — never "0" (D1).
+      baseLaborHours:
+        assemblyHours(detail.baseLaborHours) === null
+          ? ""
+          : String(Number(detail.baseLaborHours)),
       overheadLaborHours: String(Number(detail.overheadLaborHours)),
       laborRateId: detail.laborRateId,
       materials: detail.materials.map(m => ({
@@ -1387,7 +1413,7 @@ export default function AssembliesLibraryPage() {
               category: draft.category,
               trade: draft.trade,
               projectType: draft.projectType,
-              baseLaborHours: Number(draft.baseLaborHours),
+              baseLaborHours: assemblyHours(draft.baseLaborHours),
               overheadLaborHours: Number(draft.overheadLaborHours),
               laborRateId: draft.laborRateId,
               materials: draft.materials.map(m => ({
@@ -1534,23 +1560,30 @@ export default function AssembliesLibraryPage() {
                     {/* The hours this assembly actually costs — material work
                         plus its own overhead. Showing the base alone would
                         disagree with what lands on a bid. */}
-                    <span
-                      className="font-mono text-sm md:w-24 md:text-right shrink-0"
-                      title={
-                        Number(assembly.overheadLaborHours) > 0
-                          ? `${round(Number(assembly.baseLaborHours), 3)} h of work + ${round(Number(assembly.overheadLaborHours), 3)} h assembly overhead`
-                          : undefined
-                      }
-                    >
-                      {round(
-                        addAssemblyOverheadHours(
-                          Number(assembly.baseLaborHours),
-                          Number(assembly.overheadLaborHours)
-                        ),
-                        3
-                      )}{" "}
-                      h
-                    </span>
+                    {assemblyHours(assembly.baseLaborHours) === null ? (
+                      /* Hours not set (D1): said, never "0 h". */
+                      <span className="text-xs md:w-24 md:text-right shrink-0 text-[#F5C518]">
+                        hours not set
+                      </span>
+                    ) : (
+                      <span
+                        className="font-mono text-sm md:w-24 md:text-right shrink-0"
+                        title={
+                          Number(assembly.overheadLaborHours) > 0
+                            ? `${round(Number(assembly.baseLaborHours), 3)} h of work + ${round(Number(assembly.overheadLaborHours), 3)} h assembly overhead`
+                            : undefined
+                        }
+                      >
+                        {round(
+                          addAssemblyOverheadHours(
+                            Number(assembly.baseLaborHours),
+                            Number(assembly.overheadLaborHours)
+                          ),
+                          3
+                        )}{" "}
+                        h
+                      </span>
+                    )}
 
                     <div className="flex items-center gap-0.5 ml-auto md:ml-0 md:w-20 justify-end shrink-0">
                       <Button

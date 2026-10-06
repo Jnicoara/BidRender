@@ -33,7 +33,9 @@
  */
 import {
   countNotPriced,
+  lineHoursNotSet,
   lineMaterialNotPriced,
+  linePartsNotPriced,
   type NotPricedTally,
   type PartsLineLike,
 } from "@shared/lineNotPriced";
@@ -89,6 +91,48 @@ export function notPricedHeadline(notPriced: NotPricedTally): {
         : `${pieces.join(" and ")} ${one ? "is" : "are"} not priced`,
     one,
   };
+}
+
+/**
+ * What a priced assembly line says it leaves out, beside its money —
+ * "material not priced", "2 parts not priced", "hours not set", or both
+ * joined: "1 part not priced, hours not set". "" when nothing is left out.
+ *
+ * The count is `linePartsNotPriced` (the total's rule); this only names the
+ * pieces, so the cell and the total cannot disagree about how many there
+ * are. Hours not set (D1) is said as what it is, never as a "part": there
+ * is no part to price, the fix is the assembly's hours.
+ */
+export function lineShortfallWords(
+  line: PartsLineLike,
+  directCost: number | null
+): string {
+  const total = whole(linePartsNotPriced(line, directCost));
+  if (total === 0) return "";
+  const hours = lineHoursNotSet(line) ? 1 : 0;
+  const parts = total - hours;
+  const materialMissing =
+    lineMaterialNotPriced(line, directCost) && whole(line.unpricedParts) === 0;
+  return [
+    parts === 0
+      ? ""
+      : materialMissing
+        ? "material not priced"
+        : partsNotPricedWords(parts),
+    hours ? "hours not set" : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+/**
+ * "1 assembly with hours not set" / "3 assemblies with hours not set" — for
+ * a preview that adds assemblies up (a kit). "" for none.
+ */
+export function hoursNotSetWords(assemblies: number): string {
+  const n = whole(assemblies);
+  if (n === 0) return "";
+  return `${n} ${n === 1 ? "assembly" : "assemblies"} with hours not set`;
 }
 
 /** Whether a total leaves anything out at all. */

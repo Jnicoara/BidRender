@@ -95,7 +95,11 @@ import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { TapExplain } from "@/components/TapExplain";
-import { lineHoursUnset, lineNotPriced } from "@shared/lineNotPriced";
+import {
+  lineHoursNotSet,
+  lineHoursUnset,
+  lineNotPriced,
+} from "@shared/lineNotPriced";
 import { laborInRunRate } from "@shared/runFittings";
 import { bidNotPricedCount, materialMissingLines } from "@/lib/notPricedTotal";
 import { planCountLabel } from "@shared/planCounts";
@@ -1161,6 +1165,12 @@ export default function BidsPage({
                               {lineHoursUnset(line) ? (
                                 <span className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]">
                                   Not priced
+                                </span>
+                              ) : lineHoursNotSet(line) ? (
+                                /* An assembly whose hours were not set when
+                                   this line was added (D1): never "0 h". */
+                                <span className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]">
+                                  Hours not set
                                 </span>
                               ) : line.takeoffRunTypeId !== null &&
                                 laborInRunRate(line.runMaterialRole) ? (

@@ -19,7 +19,9 @@ import {
   LIBRARY_STATUSES,
   PROJECT_TYPES,
 } from "../../drizzle/schema";
-import { calculateLineItem, calculateBidPrice } from "../../shared/pricing";
+import { calculateBidPrice } from "../../shared/pricing";
+import { previewAssembly } from "../../shared/assemblyHours";
+import { assemblyHoursToWrite } from "../assemblyHoursWrite";
 import { hourlyCostOf, resolveLaborRate } from "../../shared/laborRateLookup";
 import { appliedModifiers } from "../../shared/modifierLookup";
 import * as db from "../db";
@@ -69,7 +71,8 @@ const createSchema = z.object({
   category: z.enum(ASSEMBLY_CATEGORIES),
   trade: tradeSchema.default("electrical"),
   projectType: z.enum(PROJECT_TYPES).nullable().default(null),
-  baseLaborHours: hoursSchema,
+  // NULL = HOURS NOT SET (D1), never 0. Required, so a caller says which.
+  baseLaborHours: hoursSchema.nullable(),
   /**
    * Setup, testing, cleanup and trip time — hours this assembly costs that no
    * material line explains. Defaults to 0 so an assembly created without one
@@ -87,7 +90,8 @@ const updateSchema = z.object({
   category: z.enum(ASSEMBLY_CATEGORIES).optional(),
   trade: tradeSchema.optional(),
   projectType: z.enum(PROJECT_TYPES).nullable().optional(),
-  baseLaborHours: hoursSchema.optional(),
+  // Omitted leaves the hours; null clears them to NOT SET (D1).
+  baseLaborHours: hoursSchema.nullable().optional(),
   // Plainly optional, with no default underneath — see the note above. A
   // partial update that omits this must leave the overhead hours alone, not
   // silently reset them to 0.
@@ -150,7 +154,7 @@ export const assembliesRouter = router({
       category: input.category,
       trade: input.trade,
       projectType: input.projectType,
-      baseLaborHours: toDecimal(input.baseLaborHours),
+      baseLaborHours: assemblyHoursToWrite(input.baseLaborHours, input.name),
       overheadLaborHours: toDecimal(input.overheadLaborHours),
       laborRateId: input.laborRateId,
     });
@@ -183,6 +187,12 @@ export const assembliesRouter = router({
         message: "Assembly not found.",
       });
 
+    // Resolved BEFORE the fork, so a refused "not set" leaves no fork behind.
+    const hours =
+      rest.baseLaborHours === undefined
+        ? undefined
+        : assemblyHoursToWrite(rest.baseLaborHours, target.name);
+
     const isBaseline = target.userId === null;
     const editableId = isBaseline
       ? await db.forkAssembly(id, ctx.scope.dataUserId)
@@ -194,8 +204,7 @@ export const assembliesRouter = router({
     if (rest.trade !== undefined) patch.trade = rest.trade;
     if (rest.projectType !== undefined) patch.projectType = rest.projectType;
     if (rest.laborRateId !== undefined) patch.laborRateId = rest.laborRateId;
-    if (rest.baseLaborHours !== undefined)
-      patch.baseLaborHours = toDecimal(rest.baseLaborHours);
+    if (hours !== undefined) patch.baseLaborHours = hours;
     // Reaches the fork, never the starter — `editableId` above is already the
     // user's own copy when the target was a shipped row. Setting overhead
     // hours on a starter gives you your own assembly, exactly like editing
@@ -428,12 +437,14 @@ export const assembliesRouter = router({
       const role = resolveLaborRate(laborRates, detail.laborRateId);
       const laborRate = hourlyCostOf(role);
 
-      const line = calculateLineItem({
+      // Hours not set add no labor and are flagged (`hoursNotSet`), never
+      // priced as 0 h — shared/assemblyHours.ts.
+      const line = previewAssembly({
         materials: detail.materials.map(m => ({
           costPerUnit: Number(m.costPerUnit),
           qty: Number(m.qty),
         })),
-        baseLaborHours: Number(detail.baseLaborHours),
+        baseLaborHours: detail.baseLaborHours,
         overheadLaborHours: Number(detail.overheadLaborHours),
         modifiers: applied,
         laborRate,

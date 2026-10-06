@@ -33,6 +33,7 @@ import {
 import { bidRollup, companyDefaultsFor } from "../bidPricing";
 import { refuseIfIncomplete, reportPricingProblems } from "../pricingProblems";
 import * as db from "../db";
+import { assemblyHours } from "../../shared/assemblyHours";
 
 /** Recording what a job took is bid work. */
 const procedure = scoped("bids.view", "bids.edit");
@@ -406,7 +407,10 @@ async function recomputeSuggestions(userId: number): Promise<number> {
     if (!assembly) continue;
 
     const samples = await db.getAssemblySamples(userId, assemblyId);
-    const suggestion = suggestHours(Number(assembly.baseLaborHours), samples);
+    // Hours not set (D1) have nothing to scale: no suggestion, rather than
+    // reading NULL as 0 h and suggesting from that.
+    const current = assemblyHours(assembly.baseLaborHours);
+    const suggestion = current === null ? null : suggestHours(current, samples);
 
     if (!suggestion) {
       await db.clearPendingSuggestion(userId, assemblyId);

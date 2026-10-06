@@ -68,6 +68,7 @@ import {
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { smartSearch } from "@/lib/smartSearch";
 import { money } from "@/lib/money";
+import { hoursNotSetWords } from "@/lib/notPricedTotal";
 
 const round = (value: number, places = 2) => {
   const factor = 10 ** places;
@@ -439,6 +440,14 @@ function KitBuilder({
                       {money(priceQuery.data.totals.laborCost)}
                     </span>
                   </div>
+                  {/* Hours not set (D1): their labor is not in the figures,
+                      and the panel says so rather than letting a short labor
+                      total read as the whole job. */}
+                  {priceQuery.data.totals.hoursNotSet > 0 && (
+                    <p className="text-[11px] text-[#F5C518] text-right">
+                      + {hoursNotSetWords(priceQuery.data.totals.hoursNotSet)}
+                    </p>
+                  )}
                   <div className="border-t border-border my-2" />
                   <div className="flex items-baseline justify-between gap-3 py-1">
                     <span className="text-xs font-medium">Direct cost</span>

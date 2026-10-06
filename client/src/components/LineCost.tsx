@@ -13,12 +13,12 @@
 import { money } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import {
+  lineHoursNotSet,
   lineMaterialNotPriced,
   lineNotPriced,
-  linePartsNotPriced,
   type PartsLineLike,
 } from "@shared/lineNotPriced";
-import { partsNotPricedWords } from "@/lib/notPricedTotal";
+import { lineShortfallWords } from "@/lib/notPricedTotal";
 
 export function LineCost({
   line,
@@ -71,11 +71,16 @@ export function LineCost({
     count, because there may be no parts to count: a light pole whose
     assembly is all labor read "$510.00" and looked finished.
   */
+  /*
+    Hours not set (D1, 2026-09-29): the labor adds nothing and says so —
+    "+ hours not set" — rather than leaving the material figure to read as
+    the whole cost of the work. The words come from `lineShortfallWords`,
+    which counts with the total's own rule.
+  */
   const materialMissing =
     lineMaterialNotPriced(line, cost) && Math.floor(line.unpricedParts) <= 0;
-  const parts = materialMissing
-    ? "material not priced"
-    : partsNotPricedWords(linePartsNotPriced(line, cost));
+  const hoursMissing = lineHoursNotSet(line);
+  const parts = lineShortfallWords(line, cost);
   if (parts) {
     return (
       <span
@@ -88,9 +93,11 @@ export function LineCost({
         <span
           className="text-[11px] text-[#F5C518] whitespace-nowrap"
           title={
-            materialMissing
-              ? `${money(cost)} of labor is in the total. This line has no material price, so its material is not.`
-              : "This line's price was frozen when it was added, and some of the assembly's parts had no price then. They add nothing to it."
+            hoursMissing && parts === "hours not set"
+              ? `${money(cost)} of material is in the total. The assembly's hours were not set when this line was added, so its labor is not.`
+              : materialMissing
+                ? `${money(cost)} of labor is in the total. This line has no material price, so its material is not.`
+                : "This line's price was frozen when it was added, and some of the assembly's parts (or its hours) had no price then. They add nothing to it."
           }
         >
           + {parts}

@@ -108,6 +108,26 @@ index after the drop (the new key starts with `bidId`). Detail:
 | 0122 | `0122_assembly_categories`     | 2 values appended to `assemblies.category`, NOT NULL kept                                 | C        | No.                                                                                                                                                                                                                                                   | Step 1.                                  |
 | 0123 | `0123_assembly_hours_nullable` | `assemblies.baseLaborHours` may be NULL ("hours not set", § 11)                           | C (H2)   | Applying: no. Code must read NULL as "not set" everywhere BEFORE step 3 (i) below.                                                                                                                                                                    | Step 1. Code second; step 3 (i) third.   |
 
+> **0122 + 0123 SHIP IN THE SAME RELEASE AS TRACK B's H2 STEP-2 CODE — NEVER
+> APART** (Track B, 2026-10-06, owner's instruction). The code is
+> `shared/assemblyHours.ts` and every reader that goes through it: on
+> `track-b`, merged to `local-dev` in the commit "H2 step 2" (todo.md,
+> "Starter assemblies"). Why each direction is unsafe:
+>
+> - **0123's `drizzle/schema.ts` edit without the code**: the 160 held starter
+>   assemblies seed on the next start with NULL hours (`starterHolds` opens on
+>   the schema), and any reader still doing `Number(baseLaborHours)` prices
+>   them at 0 h with nothing on screen to say so.
+> - **The code without 0123 on the database**: harmless but useless — saving
+>   an assembly with hours left blank is refused with "hours can't be left
+>   not set until the next database update"; nothing is written as 0.
+>
+> Order inside the release is the usual three steps: 0122 and 0123 applied
+> (step 1), then the push that carries the code AND the `schema.ts` edit
+> (step 2), then step 3 (i) below. **0122 lifts 29 held starters, 0123 lifts
+> all 160** — expect the next boot to log fewer "Holding" lines; if it logs
+> the same, stop and find out why (the schema edit did not ship).
+
 ## Batch 4 — legend reading
 
 | #    | File                          | What it is                                                       | Asked by | Bid number? | Order                      |
@@ -128,6 +148,23 @@ prices; example prices become non-zero), which is why it waits for the
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | (ii) **Fold the twin counts**       | Track C's "… - EXISTING TO REMAIN" twin counts become marks with `status = 'existing'` on the base count (R.9). | C / B (handoff 3) | **YES, on purpose:** an existing device stops pricing as new. Totals must move **only** by what was existing — measured with `bidTotals.mts` before/after on a restored copy of whichever database has twins (live may have none). | After the `status` code (0098, in `f8fdec3`) is LIVE. Not before. |
 | (i) **Clear the 8 starters' hours** | Starter assemblies' 0 hours → NULL "not set" (§ 11 c).                                                          | C (H2)            | No amounts move (line snapshots are frozen); new lines from those starters read "hours not set" instead of a silent 0.                                                                                                             | After 0123 AND its code are live.                                 |
+
+## Data repairs that ride the release — scripts, not migrations
+
+| Repair                                                                                               | What it does                                                                                                                                                                                                                                                                                                                             | Asked by                 | Bid number?                                                                                         | When                                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **LT1/LT2 fixture line** — `pnpm tsx scripts/repairStarterFixtureLines.mts` (report), then `--apply` | Adds "Surface-mount ceiling fixture" to the SHARED LT1 starter and "Ceiling fan" to the SHARED LT2 (plan D2) — only where no company has forked the row and its lines are exactly the old shipped recipe. Anything else is skipped and logged ("skipped: forked", "skipped: edited"). Repeatable: a second run reports "already has it". | B (owner YES 2026-10-06) | No: bid lines are frozen snapshots, the fixture rows are $0, and no fork or company row is touched. | After the release's push (step 3 slot), with `ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local`. Run the report first; on live expect `would add` or `skipped: forked` for each of LT1 and LT2. **Not on staging or live before the release.** |
+
+If the report prints anything other than `would add` / `skipped: forked` for
+LT1 and LT2 (for example `skipped: edited` or `skipped: not found`), **stop
+and find out why before `--apply`**: either this line is stale or the live
+rows are not in the state they are thought to be in.
+
+Tested 2026-10-06 on `bidrender_test_b` (`server/starterFixtureRepair.test.ts`:
+dry run writes nothing, unforked row gains the line, forked row and the fork
+byte-identical, second run no-op, edited row skipped) and on a throwaway copy
+of `bidrender_local_b_new` (report: LT1, LT2 `would add`; apply: `added`;
+again: `already has it`; original untouched; copy dropped).
 
 ## Not numbered — and why
 

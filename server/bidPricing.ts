@@ -217,7 +217,12 @@ export function priceLine(line: BidLineItem, productivityPct: number) {
      * server/assemblyOverhead.test.ts asserts a bid line prices to exactly the
      * assembly it came from, which is what would catch that.
      */
-    baseLaborHours: Number(line.snapshotLaborHours),
+    //
+    // NULL (hours not set, D1) prices NO labor here — and the line is not
+    // read as priced for it: `lineHoursNotSet` (shared/lineNotPriced.ts)
+    // counts its labor as not priced and its hours cell says so. That
+    // predicate is the guard; this 0 is only the absence of money.
+    baseLaborHours: Number(line.snapshotLaborHours ?? 0),
     modifiers: [{ laborAdjustmentPct: Number(line.snapshotModifierPct) }],
     laborRate: Number(line.snapshotLaborRate),
     quantity: Number(line.qty),

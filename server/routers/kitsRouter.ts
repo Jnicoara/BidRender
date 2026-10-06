@@ -14,7 +14,8 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import { LIBRARY_STATUSES } from "../../drizzle/schema";
-import { calculateLineItem, sumDirectCost } from "../../shared/pricing";
+import { sumDirectCost } from "../../shared/pricing";
+import { previewAssembly } from "../../shared/assemblyHours";
 import { hourlyCostFor } from "../../shared/laborRateLookup";
 import { appliedModifiers } from "../../shared/modifierLookup";
 import { DEFAULT_TRADE } from "../../shared/trades";
@@ -91,12 +92,13 @@ async function priceAssemblyAt(
 
   const laborRate = hourlyCostFor(cache.rates, detail.laborRateId);
 
-  return calculateLineItem({
+  // Hours not set add no labor and are flagged, never priced as 0 h (D1).
+  return previewAssembly({
     materials: detail.materials.map(m => ({
       costPerUnit: Number(m.costPerUnit),
       qty: Number(m.qty),
     })),
-    baseLaborHours: Number(detail.baseLaborHours),
+    baseLaborHours: detail.baseLaborHours,
     // A kit is its assemblies, so it carries their overhead hours too — a
     // package of six assemblies each with 10 minutes of setup really is an hour
     // of setup, and a kit preview that dropped it would disagree with the bid.
@@ -176,6 +178,11 @@ export const kitsRouter = router({
             (s, p) => s + p.breakdown.totalLaborHours,
             0
           ),
+          /**
+           * Assemblies in the kit whose hours are NOT SET (D1): their labor
+           * is not in the figures above, and the screen says how many.
+           */
+          hoursNotSet: priced.filter(p => p.breakdown.hoursNotSet).length,
         },
       };
     }),

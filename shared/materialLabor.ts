@@ -179,8 +179,12 @@ export function componentLabor(
  * the model, and would teach the estimator to make their honest number worse.
  */
 export type AssemblyLabor = {
-  /** What prices. The typed number, plus the assembly's own overhead hours. */
-  pricedHours: number;
+  /**
+   * What prices. The typed number, plus the assembly's own overhead hours —
+   * or NULL when the typed number is NOT SET (D1): then nothing prices, and
+   * overhead alone is not offered as the answer.
+   */
+  pricedHours: number | null;
   /** The parts' own total. SHOWN beside `pricedHours`, never added to it. */
   crossCheckHours: number;
   /** Components with no labor unit anywhere — `crossCheckHours` is short. */
@@ -188,8 +192,11 @@ export type AssemblyLabor = {
 };
 
 export function laborForAssembly(input: {
-  /** `assemblies.baseLaborHours` — entered by hand, and the whole answer. */
-  typedHours: number;
+  /**
+   * `assemblies.baseLaborHours` — entered by hand, and the whole answer.
+   * NULL = not set (D1).
+   */
+  typedHours: number | null;
   /** `assemblies.overheadLaborHours` — setup and trip time, also by hand. */
   overheadHours?: number;
   components: readonly ComponentLine[];
@@ -197,7 +204,10 @@ export function laborForAssembly(input: {
   const components = componentLabor(input.components);
   return {
     // Nothing from `components` reaches this line, and that is the guard.
-    pricedHours: round4(input.typedHours + (input.overheadHours ?? 0)),
+    pricedHours:
+      input.typedHours === null
+        ? null
+        : round4(input.typedHours + (input.overheadHours ?? 0)),
     crossCheckHours: components.hours,
     crossCheckUnsetCount: components.unsetCount,
   };

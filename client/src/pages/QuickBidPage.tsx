@@ -34,7 +34,7 @@ import { InlineNumberField } from "@/components/InlineNumberField";
 import { DuplicateUnitPanel } from "@/components/DuplicateUnitPanel";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { smartSearch } from "@/lib/smartSearch";
-import { addAssemblyOverheadHours } from "@shared/pricing";
+import { snapshotHoursFor } from "@shared/assemblyHours";
 import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
@@ -353,17 +353,24 @@ export default function QuickBidPage({
                       {assembly.category}
                     </span>
                     {/* Work hours plus the assembly's own overhead — the same
-                        figure that gets snapshotted when this is added. */}
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {round(
-                        addAssemblyOverheadHours(
-                          Number(assembly.baseLaborHours),
-                          Number(assembly.overheadLaborHours)
-                        ),
-                        2
-                      )}{" "}
-                      h
-                    </span>
+                        figure that gets snapshotted when this is added
+                        (`snapshotHoursFor`), so not set reads "hours not
+                        set" here exactly as it will on the bid (D1). */}
+                    {(() => {
+                      const hours = snapshotHoursFor(
+                        assembly.baseLaborHours,
+                        assembly.overheadLaborHours
+                      );
+                      return hours === null ? (
+                        <span className="text-xs text-[#F5C518]">
+                          hours not set
+                        </span>
+                      ) : (
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {round(Number(hours), 2)} h
+                        </span>
+                      );
+                    })()}
                     {index === highlight && (
                       <Badge
                         variant="outline"

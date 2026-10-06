@@ -265,6 +265,39 @@ beforeAll(async () => {
     }
   );
 
+  /*
+    HOURS NOT SET (D1, H2 step 2): a line frozen from an assembly whose hours
+    were not set holds a NULL `snapshotLaborHours`. Its labor is ONE thing
+    not priced (`lineHoursNotSet`), on top of any parts — never 0 h of labor
+    read as finished. With no material either, the whole line is not priced.
+  */
+  await add("hours not set", { lines: 1, parts: 5 }, async bidId => {
+    // Material, no hours: priced for material, + 1 for the hours.
+    await line(bidId, { assemblyId: pricedRecipe, snapshotLaborHours: null });
+    // Neither: the whole line is not priced, and nothing on top.
+    await line(bidId, {
+      assemblyId: pricedRecipe,
+      snapshotMaterialCost: "0.0000",
+      snapshotLaborHours: null,
+    });
+    // Two $0 parts AND no hours: 2 + 1.
+    await line(bidId, {
+      assemblyId: recipe,
+      snapshotLaborHours: null,
+      snapshotUnpricedParts: 2,
+    });
+    // From before 0087 (parts read live, and that recipe's are all priced):
+    // the hours still count, through the frozen branch of the SQL.
+    await line(bidId, {
+      assemblyId: pricedRecipe,
+      snapshotLaborHours: null,
+      snapshotUnpricedParts: null,
+    });
+    // Priced BY HAND with no hours: its typed price is the answer, and its
+    // hours are the hand-priced rule's business, not this one's.
+    await line(bidId, { snapshotLaborHours: null });
+  });
+
   await add("no quantity", { lines: 0, parts: 0 }, async bidId => {
     await line(bidId, { qty: "0", snapshotMaterialCost: null });
     await line(bidId, {
@@ -339,6 +372,7 @@ withDb("the dashboard card's not-priced count", () => {
     "from an assembly",
     "from before 0087",
     "labor only, from before 0087",
+    "hours not set",
     "no quantity",
     "broken lines",
     "archived lines",

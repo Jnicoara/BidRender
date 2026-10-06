@@ -6,6 +6,19 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **An assembly's hours can now be "not set", and the app says so
+  everywhere instead of treating them as zero.** The assembly editor takes a
+  blank, the library and Quick bid say "hours not set", and a bid line made
+  from such an assembly reads "Hours not set" with "+ hours not set" beside
+  its cost, so the bid total admits the missing labor rather than looking
+  finished. Kits, the quote panel, hour suggestions and the labor-sheet
+  import all follow the same rule. It switches on with the database update
+  that lets hours be blank; until then a blank is refused with a plain
+  message, and nothing is saved as 0.
+- **A one-time fix for older databases: the surface-mount fixture and
+  ceiling fan starters get their fixture line** — only where no company has
+  copied or changed them. Run by hand with the next release; not run on any
+  live site yet.
 - **All 168 planned starter assemblies are written into the app's starter
   library** — devices (including commercial MC versions), lighting, resi and
   commercial specials, panels and gear, motor/HVAC hookups, demo/retrofit and

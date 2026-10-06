@@ -311,14 +311,16 @@ export function planLaborImport(
 export type ImportAssembly = {
   id: number;
   name: string;
-  baseLaborHours: number;
+  /** NULL = HOURS NOT SET (D1): any typed hours are a change from it. */
+  baseLaborHours: number | null;
 };
 
 export type AssemblyChange = {
   line: number;
   assemblyId: number;
   name: string;
-  from: number;
+  /** NULL = was not set; the preview says "not set", never "0 h". */
+  from: number | null;
   to: number;
 };
 
@@ -370,7 +372,8 @@ export function planAssemblyHoursImport(
       miss(`over the ${MAX_IMPORT_ASSEMBLY_HOURS} h limit`);
       continue;
     }
-    if (round4(a.baseLaborHours) === to) {
+    // Not set is never "unchanged", even against a typed 0 — 0 is an answer.
+    if (a.baseLaborHours !== null && round4(a.baseLaborHours) === to) {
       plan.unchanged += 1;
       continue;
     }

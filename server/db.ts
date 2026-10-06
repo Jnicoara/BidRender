@@ -299,7 +299,7 @@ import {
   toSqlTimestamp,
   usableTerm,
 } from "../shared/bidSearch";
-import { addAssemblyOverheadHours } from "../shared/pricing";
+import { assemblyHours, snapshotHoursFor } from "../shared/assemblyHours";
 import {
   markupDiffers,
   materialItemKey,
@@ -3552,23 +3552,42 @@ export async function revertAssemblyToBaseline(id: number, userId: number) {
  * the job too low, which is worse than the recipe being absent.
  */
 /**
- * What a starter's hours are written as. NEVER 0 for "hours not set" (plan
- * D1): a null spec only gets here when `starterHolds` found the column can
- * hold NULL, and if it somehow arrives otherwise this throws rather than
- * returning undefined, which would let the column's DEFAULT 0 in.
+ * Thrown when "hours not set" is written before the column can hold it.
+ * Its message is shown to the person saving, so it says what to do.
  */
-function starterHoursValue(
-  spec: BaselineAssembly
+export class AssemblyHoursNotSetUnsupported extends Error {}
+
+/**
+ * What an assembly's hours are WRITTEN as — the one door for every write of
+ * `assemblies.baseLaborHours`. NEVER 0 for "hours not set" (D1).
+ *
+ * Until Track A's 0123 the column is NOT NULL DEFAULT 0, so NULL cannot be
+ * stored: this throws rather than returning undefined, which would let the
+ * DEFAULT 0 in, or writing 0 itself. Once 0123 is in drizzle/schema.ts, NULL
+ * is written. This code ships in the same release as 0123 (todo.md), so on
+ * the live site the throw is never reached; before then it can only fire on
+ * a local copy or staging.
+ */
+export function assemblyHoursColumnValue(
+  hours: number | null,
+  what: string
 ): InsertAssembly["baseLaborHours"] {
-  if (spec.baseLaborHours !== null) return spec.baseLaborHours.toFixed(4);
+  if (hours !== null) return hours.toFixed(4);
   if (!liveStarterSchema().hoursCanBeUnset) {
-    throw new Error(
-      `"${spec.name}" has hours not set and assemblies.baseLaborHours cannot hold NULL yet — refusing to write 0`
+    throw new AssemblyHoursNotSetUnsupported(
+      `${what}: hours can't be left "not set" until the next database update — type the hours for now.`
     );
   }
   // Through `unknown` only while drizzle/schema.ts still types the column
   // NOT NULL; once Track A's 0123 lands there, this cast is redundant.
   return null as unknown as InsertAssembly["baseLaborHours"];
+}
+
+/** A starter's hours as written — see `assemblyHoursColumnValue`. */
+function starterHoursValue(
+  spec: BaselineAssembly
+): InsertAssembly["baseLaborHours"] {
+  return assemblyHoursColumnValue(spec.baseLaborHours, `"${spec.name}"`);
 }
 
 export async function seedBaselineAssemblies(): Promise<void> {
@@ -6023,7 +6042,7 @@ async function snapshotForAssembly(
   detail: Awaited<ReturnType<typeof getAssemblyDetail>> & object
 ): Promise<{
   snapshotMaterialCost: string;
-  snapshotLaborHours: string;
+  snapshotLaborHours: string | null;
   snapshotModifierPct: string;
   snapshotLaborRate: string;
   snapshotModifierNames: string[];
@@ -6079,11 +6098,15 @@ async function snapshotForAssembly(
      *
      * The split stays visible on the assembly itself, which is where an
      * estimator would go to ask what the hours are made of.
+     *
+     * NULL when the assembly's hours are NOT SET (D1): the line then reads
+     * "Hours not set" and counts its labor as not priced, never 0 h
+     * (`snapshotHoursFor`, shared/assemblyHours.ts).
      */
-    snapshotLaborHours: addAssemblyOverheadHours(
-      Number(detail.baseLaborHours),
-      Number(detail.overheadLaborHours)
-    ).toFixed(4),
+    snapshotLaborHours: snapshotHoursFor(
+      detail.baseLaborHours,
+      detail.overheadLaborHours
+    ),
     snapshotModifierPct: modifierPct.toFixed(4),
     snapshotLaborRate: laborRate.toFixed(4),
     snapshotModifierNames: applied.map(m => m.name),
@@ -6599,7 +6622,13 @@ export async function saveLineAsAssembly(input: {
 }): Promise<{ assemblyId: number; materialId: number | null }> {
   const { userId, bidId, line } = input;
   const cost = Number(line.snapshotMaterialCost);
-  const hours = Number(line.snapshotLaborHours);
+  // A line whose hours were never typed makes an assembly whose hours are
+  // NOT SET — never 0 (D1). Resolved before anything is written, so a
+  // refusal leaves no half-made material behind.
+  const hours = assemblyHoursColumnValue(
+    assemblyHours(line.snapshotLaborHours),
+    line.name
+  );
 
   const materialId =
     cost > 0
@@ -6615,7 +6644,7 @@ export async function saveLineAsAssembly(input: {
     userId,
     name: line.name,
     category: input.category,
-    baseLaborHours: hours.toFixed(4),
+    baseLaborHours: hours,
     overheadLaborHours: "0",
     laborRateId: input.laborRateId,
   });
@@ -11430,7 +11459,13 @@ function costSums(productivityPct: number) {
       missing — `lineMaterialNotPriced`, owner 2026-10-05), never on top of
       the recipe parts that already say so.
     */
-    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} AND ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}, CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 THEN 1 ELSE 0 END) ELSE 0 END), 0)`,
+    /*
+      And a line whose HOURS are not set (NULL frozen from an assembly with
+      hours not set, D1) counts ONE more — `lineHoursNotSet` in
+      `linePartsNotPriced`. Counted whether or not the line froze its parts,
+      because the live-recipe path below counts parts only.
+    */
+    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} THEN (CASE WHEN ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}, CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 THEN 1 ELSE 0 END) ELSE 0 END) + (CASE WHEN ${bidLineItems.snapshotLaborHours} IS NULL THEN 1 ELSE 0 END) ELSE 0 END), 0)`,
     materialCents: sql<string>`COALESCE(SUM(${materialCents}), 0)`,
     laborCents: sql<string>`COALESCE(SUM(${laborCents}), 0)`,
     directCents: sql<string>`COALESCE(SUM(ROUND(${materialCents} + ${laborCents})), 0)`,

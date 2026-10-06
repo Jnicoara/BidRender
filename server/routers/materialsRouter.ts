@@ -37,6 +37,7 @@ import {
   parseAliasResponse,
 } from "../../shared/aliasSuggestions";
 import * as db from "../db";
+import { assemblyHours } from "../../shared/assemblyHours";
 import { STICK_JOINTS } from "../../shared/runFittings";
 import { MAX_LABOR_UNIT_HOURS } from "../../shared/materialLabor";
 import { RENAMED_BASELINE_MATERIALS } from "../../shared/renamedMaterials";
@@ -663,7 +664,7 @@ export const materialsRouter = router({
             ? {
                 id: a.id,
                 name: a.name,
-                baseLaborHours: Number(a.baseLaborHours),
+                baseLaborHours: assemblyHours(a.baseLaborHours),
               }
             : null;
         });

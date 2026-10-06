@@ -37,6 +37,7 @@
 import { apportionWorkPrice, toCents } from "./pricing";
 import { runsNotOnBidText } from "./runsNotOnBid";
 import {
+  lineHoursNotSet,
   lineHoursUnset,
   lineMaterialNotPriced,
   lineNotPriced,
@@ -168,23 +169,42 @@ export function quoteGaps(
         fix: "Set an hourly rate on the Labor rates screen.",
       });
     } else {
-      const parts = linePartsNotPriced(line, directCost);
+      // Hours not set (D1) is counted in `linePartsNotPriced` and said apart:
+      // the fix is the assembly's hours, not a part.
+      const hoursNotSet = lineHoursNotSet(line);
+      const parts =
+        linePartsNotPriced(line, directCost) - (hoursNotSet ? 1 : 0);
       // Labor and no material at all (2026-10-06): there is no part to
       // name, so it is said as what it is.
       const noMaterial =
         lineMaterialNotPriced(line, directCost) &&
         Math.floor(line.unpricedParts) <= 0;
-      if (parts > 0)
+      const details = [
+        parts <= 0
+          ? ""
+          : noMaterial
+            ? "no material price"
+            : `${parts} ${parts === 1 ? "part" : "parts"} with no price`,
+        hoursNotSet ? "labor hours not set" : "",
+      ].filter(Boolean);
+      const partsFix =
+        parts <= 0
+          ? ""
+          : noMaterial
+            ? "Add the material to the assembly"
+            : "Price the parts on the Materials screen";
+      const fix = partsFix
+        ? hoursNotSet
+          ? `${partsFix} and set the assembly's hours`
+          : partsFix
+        : "Set the assembly's hours";
+      if (details.length > 0)
         gaps.push({
           lineId: line.id,
           name,
           status: "Not priced",
-          detail: noMaterial
-            ? "no material price"
-            : `${parts} ${parts === 1 ? "part" : "parts"} with no price`,
-          fix: noMaterial
-            ? "Add the material to the assembly, then remove the line and add the assembly again."
-            : "Price the parts on the Materials screen, then remove the line and add the assembly again.",
+          detail: details.join(", "),
+          fix: `${fix}, then remove the line and add the assembly again.`,
         });
     }
   }
