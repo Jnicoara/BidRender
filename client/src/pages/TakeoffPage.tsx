@@ -5067,8 +5067,19 @@ export default function TakeoffPage({
    * the request, and those clicks exist nowhere else. `saveStampQueue` removes
    * the key when the list is empty, so this is also how the mirror is cleared.
    */
+  /**
+   * Sheets whose stored queue THIS TAB wrote. Their marks are in memory, so
+   * the crash recovery below must not read them back as left over — that
+   * sent every tap twice (staging smoke, 2026-10-06: 6 marks for 3) when
+   * taps held for a sheet row were mirrored on the same render the row
+   * arrived and recovery ran for it. True by construction rather than by
+   * effect order: what this tab mirrored, this tab still holds; after a
+   * reload the set is empty and recovery reads the storage as before.
+   */
+  const mirroredHere = useRef(new Set<number>());
   const mirrorQueue = useCallback(
     (sheetId: number) => {
+      mirroredHere.current.add(sheetId);
       saveStampQueue(
         sheetId,
         bidId,
@@ -5151,6 +5162,17 @@ export default function TakeoffPage({
               redo: null,
               subject: { kind: "count", id: groupId },
             });
+          /*
+            CANCEL first, then refresh. React Query's invalidate does NOT
+            cancel a query that is still on its FIRST fetch (no data yet): it
+            waits for that request and keeps its answer. So when these marks
+            were sent while the sheet's list was first loading — exactly what
+            happens to taps held for a fresh upload's sheet row — the list
+            fetched BEFORE the write came back empty and stayed that way:
+            "0 marks" on screen, 3 on the server (local smoke, 2026-10-06).
+            Cancelling makes the refresh a new request, sent after the write.
+          */
+          await utils.takeoffStamps.listForSheet.cancel({ sheetId });
           await utils.takeoffStamps.listForSheet.invalidate({ sheetId });
           setPending(pendingStamps.current.filter(m => !keys.has(m.key)));
           mirrorQueue(sheetId);
@@ -6057,6 +6079,9 @@ export default function TakeoffPage({
    */
   useEffect(() => {
     if (!activeSheet) return;
+    // Written by this tab: those marks are in the live queue, not lost
+    // (`mirroredHere`). Recovering them would send them a second time.
+    if (mirroredHere.current.has(activeSheet.id)) return;
     const queued = loadStampQueue(activeSheet.id);
     if (!queued || queued.stamps.length === 0) return;
 

@@ -1,6 +1,24 @@
 # Track A handoff — 2026-10-05
 
-## Session 3 (2026-10-06, ~03:45 UTC) — read this first
+## Session 4 (2026-10-06, ~06:00 UTC) — read this first
+
+- **Do NOT release `44f0f5f` or `6323a7b`.** Both carry this session's
+  provisional-sheet code without its two follow-up fixes: taps held for a
+  missing sheet row could be **counted twice** (crash recovery re-read them
+  as left over), and the panel could show **"0 marks"** after a save (React
+  Query does not cancel a first fetch on invalidate). Staging run
+  37415935629 caught the double (6 for 3). Live (`0af50a6`) never had this
+  code. The release candidate is the first commit after the fixes that gets
+  a green smoke on staging.
+- **Flow test 2's local failures were a real bug**, now fixed (`6323a7b`,
+  `client/src/lib/pageTextRead.ts`): a fresh upload's printed scale was
+  thrown away when the sheet list arrived mid-read. No wrong lengths: the
+  sheet sat unscaled.
+- `touch.spec` now forces both orders (rows created late; the first mark
+  list answered with pre-save data) and fails without either fix:
+  6/6 runs red each way, 6/6 green with both.
+
+## Session 3 (2026-10-06, ~03:45 UTC)
 
 - **First fully green smoke run on staging:** run 37408880584, `44f0f5f`,
   96 passed, 0 failed, 2 skipped (they skip locally too). This is what

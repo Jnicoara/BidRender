@@ -59,6 +59,48 @@ test("count, link and send by touch", async ({ page }, info) => {
     downloadThroughput: -1,
     uploadThroughput: -1,
   });
+  // AND the sheet rows arriving LATE, after the count exists (2026-10-06).
+  // That order is what staging produced and a laptop does not: taps kept
+  // for the missing row were mirrored the moment it arrived, the crash
+  // recovery for that same sheet read them back as left over from a crash,
+  // and every tap was sent twice — 6 marks for 3. Holding back the ONE call
+  // that creates the rows (ensureSheets, once) makes that order certain
+  // instead of a matter of luck. Not every sheet-list request: delaying the
+  // refreshes too starves the mark list itself, and the test then fails for
+  // a reason no user can meet.
+  let rowsHeld = false;
+  await page.route(
+    url =>
+      url.pathname.includes("/api/trpc/") &&
+      url.pathname.includes("bidPdfs.ensureSheets"),
+    async route => {
+      if (!rowsHeld) {
+        rowsHeld = true;
+        await new Promise(r => setTimeout(r, 1500));
+      }
+      await route.continue();
+    }
+  );
+  // AND the sheet's FIRST mark list answering late, with what it read BEFORE
+  // the marks were saved (fetched at once, delivered after a pause). That is
+  // the moment the held taps go out, and React Query's refresh does not
+  // cancel a query still on its first fetch — so the screen kept the empty
+  // early answer: "0 marks" with 3 on the server (2026-10-06). Holding the
+  // RESPONSE rather than the request is the point: a late request would be
+  // answered after the save and hide the fault.
+  let firstListHeld = false;
+  await page.route(
+    url =>
+      url.pathname.includes("/api/trpc/") &&
+      url.pathname.includes("takeoffStamps.listForSheet"),
+    async route => {
+      if (firstListHeld) return route.continue();
+      firstListHeld = true;
+      const early = await route.fetch();
+      await new Promise(r => setTimeout(r, 1200));
+      await route.fulfill({ response: early });
+    }
+  );
 
   await openPlans(page, bidId);
   await uploadFixturePlan(page);

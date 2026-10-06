@@ -28,6 +28,14 @@ This is the human-readable companion to the git history — read this to see wha
   as a duplex without a word. On the UNCC test plan the USB receptacles
   went from 0 of 33 recognised to 33 of 33, and the three duplexes the
   GFCI search used to pick up silently are now flagged.
+
+- **Fixed two faults in this morning's "taps are kept" change, before it
+  reached the live site.** On the test site, taps made before a new plan's
+  sheet was ready could be counted twice (6 marks for 3), and the panel could
+  show "0 marks" for marks that had been saved. Both are fixed, and the
+  browser test now forces the exact timing that caused each one, so it fails
+  if either comes back.
+
 - **Fixed: a freshly uploaded plan could skip reading its printed scale.** On
   a fast connection the sheet list arrived while the page's text was still
   being read, and the reading was thrown away, so the sheet sat on "Set
