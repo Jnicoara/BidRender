@@ -211,6 +211,60 @@ withDb("asking for a reset link", () => {
     expect(sent).toHaveLength(0);
   });
 
+  /*
+    A STOP THAT SENDS NOTHING MUST SAY SO IN THE LOG (2026-10-06). These two
+    stops wrote nothing, so a reset that never arrived could not be explained
+    from the logs — the staging reset test stalled at step 4 with nothing to
+    read. The screen still answers alike (above); only the log differs.
+  */
+  it("logs why nothing was sent for an unknown address, masked", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const address = `nobody-${USER}@example.com`;
+      await publicCaller().caller.auth.requestPasswordReset({ email: address });
+      const lines = warn.mock.calls.map(c => c.join(" "));
+      const line = lines.find(l => l.includes("[auth] password reset"));
+      expect(line, lines.join("\n")).toMatch(
+        /no account uses no…@example\.com/
+      );
+      expect(line).toMatch(/nothing sent/);
+      expect(line).not.toContain(address);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("logs why nothing was sent for an account with no password", async () => {
+    const database = await getDb();
+    const [row] = await database!
+      .select({ passwordHash: users.passwordHash })
+      .from(users)
+      .where(eq(users.id, USER));
+    await database!
+      .update(users)
+      .set({ passwordHash: null })
+      .where(eq(users.id, USER));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      sent.length = 0;
+      await publicCaller().caller.auth.requestPasswordReset({ email: EMAIL });
+      expect(sent).toHaveLength(0);
+      const lines = warn.mock.calls.map(c => c.join(" "));
+      expect(
+        lines.some(l =>
+          l.includes(`[auth] password reset: account ${USER} has no password`)
+        ),
+        lines.join("\n")
+      ).toBe(true);
+    } finally {
+      warn.mockRestore();
+      await database!
+        .update(users)
+        .set({ passwordHash: row.passwordHash })
+        .where(eq(users.id, USER));
+    }
+  });
+
   it("refuses a fourth request for one address inside the hour", async () => {
     for (let i = 0; i < 3; i++)
       await publicCaller().caller.auth.requestPasswordReset({ email: EMAIL });
