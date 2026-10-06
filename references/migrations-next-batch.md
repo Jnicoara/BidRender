@@ -2,7 +2,8 @@
 
 **Nothing here is written, migrated or deployed.** This is the single
 numbered list of every column and table any track has asked Track A for,
-after the 105 already on staging (0000–0104). **It supersedes the numbers in
+after the 105 already on staging AND live (0000–0104; live since
+2026-10-06). **It supersedes the numbers in
 `migrations-0098-batch-plan.md` § S from 0105 on**, which had two problems
 fixed here: its Batch 3 still reused 0108–0114 (the same numbers as Batch
 2), and Batch 2 had two separate `ALTER`s on `bid_pdf_sheets` and three on

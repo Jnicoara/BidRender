@@ -35,8 +35,9 @@ still one statement).
 
 ### S.1 The batches, in the order they deploy
 
-> **Status, 2026-10-05:** Batches 1 and 1b are **written and ON STAGING**
-> (0096–0104; `deploying.md` § 11), **not on live**. Everything from Batch 2
+> **Status, 2026-10-06: Batches 1 and 1b (0096–0104) are ON LIVE**, with
+> code `24105ad` (`deploying.md` § 11, "LIVE: `24105ad`"). They were on staging
+> since 2026-10-02 and 2026-10-05. Everything from Batch 2
 > on moved up two numbers when 1b took 0103–0104 — none of it is written, so
 > that cost nothing (R.1).
 

@@ -1,6 +1,11 @@
-# Live release: `f8fdec3` and migrations 0096–0104. PLAN ONLY, updated 2026-10-06
+# Live release: `24105ad` and migrations 0096–0104. DONE 2026-10-06
 
-**Nothing here has been run on live.** Checked 2026-10-06 17:19 UTC: live
+> **RELEASED 2026-10-06 on `24105ad`** with the owner's four approvals —
+> live migrated ~20:11 UTC, code live 20:42 UTC, every bid total unchanged.
+> The record of what each step printed is `deploying.md` § 11, "LIVE:
+> `24105ad`". What follows is the plan as it stood when it was run.
+
+**(As written before the release:) Nothing here has been run on live.** Checked 2026-10-06 17:19 UTC: live
 serves **`0af50a6`** (built 2026-10-01) and its database records **96**
 migrations (0000–0095, as of the last check — step 5 asks again). Staging
 serves **`f8fdec3`** with all 105, and that commit has a **green gate (run 37421570630) and a green smoke test on staging (run 37422435526: 96 passed,
