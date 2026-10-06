@@ -16,6 +16,11 @@ This is the human-readable companion to the git history — read this to see wha
   blank cell stays "not set", never 0. Until hours are set, every pipe, wire,
   elbow and field-bend line on a bid reads "Not priced" for labor.
 
+- **A used or expired reset link now says so as soon as it opens.** Before,
+  it showed the "Choose a new password" form and only refused after a new
+  password had been typed. Also, when a reset email cannot be sent, the
+  server's log now always says why.
+
 - **Small fixes on the Plans screen, so nothing quietly goes wrong:**
   - A scale you type that the app can't read now says so, and names the
     scale still in effect, instead of vanishing.
