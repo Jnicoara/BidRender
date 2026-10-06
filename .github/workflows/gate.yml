@@ -250,3 +250,9 @@ jobs:
             !e2e/.auth/**
           retention-days: 7
           if-no-files-found: ignore
+          # REQUIRED: the screenshots live under e2e/.results, a dot-folder,
+          # and upload-artifact@v4 skips hidden paths by default — so until
+          # 2026-10-06 this step never uploaded a single screenshot ("No files
+          # were found"), and the one failure that needed a picture had none.
+          # The pattern is still .png only and e2e/.auth stays excluded.
+          include-hidden-files: true
