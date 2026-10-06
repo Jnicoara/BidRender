@@ -6,6 +6,18 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **Homeruns are read off the plan and shown on the sheet.** On a vector
+  drawing that draws homeruns, a "Homeruns" button appears; turn it on and
+  each homerun arrow is labelled with what it says — "Homerun to 3LP-23,25,
+  wires not marked" — and what the panel schedule says about each circuit,
+  or that no schedule for that panel was read. It reads the wire count only
+  where the drawing writes or ticks it, never guesses, and saves nothing.
+  Checked by hand against 23 homeruns: 19 found, none with the wrong tag.
+
+- **Fixed a wrong scale note in our own Weld test plans.** Sheet E-100 said
+  1/4" but was drawn at 1/8" (the scale check had flagged it from the door
+  swings). The test file now says 1/8", and the scale check passes it clean.
+
 - **A starter labor-unit sheet, and a way to import it.**
   `pricing/labor-units-starter.xlsx` lists 180 common items (pipe and wire
   per 100 ft, fittings, boxes, panels, breakers, disconnects, transformers,

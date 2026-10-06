@@ -1318,7 +1318,9 @@ async function scalecheck() {
   const { isScan } = await import("../client/src/lib/findMatching");
   const cases: [string, number, string][] = [
     ["Weld 1.pdf", 5, '1/8" = 1\'-0"'],
-    ["Weld 1.pdf", 4, '1/4" = 1\'-0"'], // what its notes say
+    // Our own generated test set: its notes said 1/4" until 2026-10-06,
+    // when the doors caught the typo and the file was fixed to 1/8".
+    ["Weld 1.pdf", 4, '1/8" = 1\'-0"'],
     ["UNCC.pdf", 5, '1/4" = 1\'-0"'],
     ["UNCC.pdf", 6, '1/4" = 1\'-0"'],
     ["UNCC.pdf", 7, '1/8" = 1\'-0"'],
@@ -1439,7 +1441,55 @@ async function schedreader() {
   );
 }
 
+// ── d, built: the shipped homerun reader (@/lib/homeruns) ──────────────────
+/**
+ * Every homerun the product code reads on the sheets that draw wiring, and
+ * the false-positive check: UNCC draws none, so every find there is wrong.
+ * weld2 is not in reader-accuracy/plans; it is read from the local upload
+ * (bid 1728350) when that copy is on this machine.
+ *
+ * The hand check (2026-10-06, by eye on rendered crops, before reading this
+ * output) is in references/code-first-ceiling.md § d.
+ */
+async function homerunreader() {
+  const { readHomeruns, homerunLabel, tieLines, tieToSchedule } = await import(
+    "../client/src/lib/homeruns"
+  );
+  const weld2 = path.join(
+    "..",
+    "..",
+    ".local-storage",
+    "bid-plans",
+    "1",
+    "1728350",
+    "weld2_bd573a7d.pdf"
+  );
+  const sets: [string, number[]][] = [
+    ["Weld 1.pdf", [4, 5]],
+    ["UNCC.pdf", [1, 3, 4, 5, 6, 7]],
+  ];
+  try {
+    readFileSync(path.join(PLANS, weld2));
+    sets.push([weld2, [8, 12, 13, 14]]);
+  } catch {
+    console.log("weld2 not on this machine — skipped");
+  }
+  for (const [file, pages] of sets)
+    for (const pageNo of pages) {
+      const p = await load(file, pageNo);
+      const found = readHomeruns(p.words, p.geo);
+      console.log(
+        `${path.basename(file)} p${pageNo}: ${found.length} homeruns`
+      );
+      for (const h of found)
+        console.log(
+          `  @${Math.round(h.arrow.x)},${Math.round(h.arrow.y)} heads ${h.arrow.heads}: ${homerunLabel(h)} | ${tieLines(tieToSchedule(h.tag, []), h.tag).join("; ")}`
+        );
+    }
+}
+
 const sections: Record<string, () => Promise<void>> = {
+  homerunreader,
   schedreader,
   scalecheck,
   demotitles,

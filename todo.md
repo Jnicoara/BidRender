@@ -180,6 +180,33 @@ on UNCC E003 (3 of 3 panels, 42/42 circuits each):
   overlaps `fixtureTag`, which A lists as undecided — decide that first,
   then one table, not two.
 
+**Homeruns read from the plan** (Track C, 2026-10-06; built read-only on
+track-c — `@/lib/homeruns`, the "Homeruns" toggle on a sheet — writing
+NOTHING until these land; `code-first-ceiling.md` § d). A homerun is READ
+at view time from the drawing, like CAD layers, so it needs **no table of
+its own**: what is worth keeping is the tie from a traced run's circuit to
+a schedule row. Fitted to A's `bid_panels` + `bid_panel_circuits` above;
+both ADDITIVE, nullable, **no DEFAULT**, no backfill. Searched first:
+nothing in this file or in `migrations-next-batch.md` (a-migrations-plan)
+asks for a column on `takeoff_run_circuits`.
+
+- [ ] **`takeoff_run_circuits.panelCircuitId INT NULL`** — FK
+      `bid_panel_circuits.id` ON DELETE SET NULL: the schedule row this
+      run's circuit is ("Homerun to 2B-14" → 2B's circuit 14). NULL = not
+      tied (typed by hand, or no schedule for that panel). `name` keeps the
+      tag as printed ("2B-14"), which it already holds today. Lands with or
+      after `bid_panel_circuits`.
+- [ ] **`takeoff_run_circuits.conductorSource VARCHAR(8) NULL`** — where
+      `conductorCount` / `groundCount` came from when the drawing said:
+      `'ticks'` or `'note'` ("(3 #12 THWN CU & 1 #12 CU GRD)"). NULL =
+      entered by the estimator, as every row is today.
+- **Deliberately NOT asked: `conductorCount` nullable.** It is NOT NULL
+  with DEFAULT 3, and a read homerun usually has no marked wire count (21
+  of 23 in the hand check). Making it nullable would change what an existing
+  column means — not additive. Instead a homerun whose wires are "not
+  marked" never creates a circuit row; the count stays the estimator's, as
+  the column's own comment in `drizzle/schema.ts` requires.
+
 **Quote items** (Track B, owner-answered 2026-10-05;
 references/quote-items-plan.md § 8). All ADDITIVE, nullable, **no
 DEFAULT**, no backfill — step 1 of the three-step deploy.

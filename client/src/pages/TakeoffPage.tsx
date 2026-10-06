@@ -479,6 +479,11 @@ import { describeScale, type ScaleCandidate } from "@shared/planScale";
 import { checkScale, type ScaleDoubt } from "@/lib/scaleCheck";
 import type { SheetSchedules } from "@/lib/panelSchedules";
 import { SchedulesView } from "@/components/takeoff/SchedulesView";
+import {
+  HomerunLayer,
+  HomerunsToggle,
+  type SheetHomeruns,
+} from "@/components/takeoff/HomerunsView";
 
 // The upload queue's shape and its operations live in lib/uploadQueue.ts, so
 // that retrying and dismissing can be tested without rendering this page.
@@ -598,6 +603,14 @@ function usePdfWorker() {
         pending.current.get(msg.reqId)?.resolve({
           schedules: msg.schedules,
           scan: msg.scan,
+        });
+        pending.current.delete(msg.reqId);
+        return;
+      }
+      if (msg.type === "homeruns") {
+        pending.current.get(msg.reqId)?.resolve({
+          homeruns: msg.homeruns,
+          panels: msg.panels,
         });
         pending.current.delete(msg.reqId);
         return;
@@ -775,6 +788,8 @@ function usePdfWorker() {
           pageNum,
           hash,
         }),
+      homeruns: (pageNum: number, hash: string) =>
+        ask<SheetHomeruns>({ type: "homeruns", pageNum, hash }),
       connectPoints: (pageNum: number, hash: string, marks: ConnectMark[]) =>
         ask<[number, ConnectPoint][]>({
           type: "connectPoints",
@@ -897,6 +912,7 @@ function PlanPane({
   scaleSet = null,
   onScaleDoubt,
   onSchedules,
+  onHomeruns,
   controlsTarget,
   fitOnly = false,
   thumbnailWants,
@@ -956,6 +972,11 @@ function PlanPane({
     pageNumber: number,
     read: { schedules: SheetSchedules; scan: boolean }
   ) => void;
+  /**
+   * The homeruns read off a page once it is on screen (@/lib/homeruns),
+   * with the set's panel schedules to tie them to. Code only, writes nothing.
+   */
+  onHomeruns?: (pageNumber: number, read: SheetHomeruns) => void;
   /** The check's verdict for that page and that ratio. Never acted on here. */
   onScaleDoubt?: (pageNumber: number, ratio: number, doubt: ScaleDoubt) => void;
   /**
@@ -1113,6 +1134,7 @@ function PlanPane({
     connectPoints: connectPointsOnPage,
     scaleEvidence: scaleEvidenceOnPage,
     schedules: schedulesOnPage,
+    homeruns: homerunsOnPage,
     sheetCheck: sheetCheckOnPage,
   } = usePdfWorker();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -2272,6 +2294,26 @@ function PlanPane({
     };
   }, [page, pageCount, loading, error, hash, schedulesOnPage]);
 
+  /*
+    HOMERUNS ON THIS SHEET, the same way: read once per page in the worker,
+    tied to the set's schedules there, and reported. Plain code, no AI.
+  */
+  const onHomerunsRef = useRef(onHomeruns);
+  onHomerunsRef.current = onHomeruns;
+  useEffect(() => {
+    if (loading || error || pageCount === 0) return;
+    let cancelled = false;
+    homerunsOnPage(page, hash)
+      .then(read => {
+        if (!cancelled) onHomerunsRef.current?.(page, read);
+      })
+      // A failed read shows no homeruns, which is what it found.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [page, pageCount, loading, error, hash, homerunsOnPage]);
+
   const onScaleDoubtRef = useRef(onScaleDoubt);
   onScaleDoubtRef.current = onScaleDoubt;
   const scaleRatio = scaleSet?.ratio ?? null;
@@ -3416,6 +3458,24 @@ export default function TakeoffPage({
       setSchedulesByPage(prev => ({
         ...prev,
         [`${docIdForScale}:${pageNumber}`]: read.schedules,
+      }));
+    },
+    [docIdForScale]
+  );
+  /** Homeruns read off each page, keyed like the schedules. */
+  const [homerunsByPage, setHomerunsByPage] = useState<
+    Record<string, SheetHomeruns>
+  >({});
+  const activeHomeruns = doc
+    ? (homerunsByPage[`${doc.id}:${page}`] ?? null)
+    : null;
+  const [showHomeruns, setShowHomeruns] = useState(false);
+  const handleHomeruns = useCallback(
+    (pageNumber: number, read: SheetHomeruns) => {
+      if (docIdForScale === null) return;
+      setHomerunsByPage(prev => ({
+        ...prev,
+        [`${docIdForScale}:${pageNumber}`]: read,
       }));
     },
     [docIdForScale]
@@ -9153,6 +9213,15 @@ export default function TakeoffPage({
               />
             )}
 
+            {/* Homeruns read off the sheet, read-only; only where it has one. */}
+            {!phone && activeHomeruns && (
+              <HomerunsToggle
+                count={activeHomeruns.homeruns.length}
+                on={showHomeruns}
+                onChange={setShowHomeruns}
+              />
+            )}
+
             {/*
               The heights this job measures its DROPS from, beside the scale it
               measures its LENGTHS against. Same kind of setting, same bar: one
@@ -9424,6 +9493,7 @@ export default function TakeoffPage({
               }
               onScaleDoubt={handleScaleDoubt}
               onSchedules={handleSchedules}
+              onHomeruns={handleHomeruns}
               onPageRendered={handlePageRendered}
               /**
                * Re-read the sheet list and hand back this document's
@@ -10077,6 +10147,16 @@ export default function TakeoffPage({
                             onClose={() => setFindSession(null)}
                           />
                         </>
+                      )}
+                    {showHomeruns &&
+                      activeHomeruns &&
+                      activeHomeruns.homeruns.length > 0 && (
+                        <HomerunLayer
+                          width={size.width}
+                          height={size.height}
+                          renderScale={size.renderScale}
+                          read={activeHomeruns}
+                        />
                       )}
                     {checkSession &&
                       activeSheet &&

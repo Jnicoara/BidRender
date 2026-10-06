@@ -109,7 +109,15 @@ red run is not by itself a red suite:
   the scale, "Use X" / "Keep"; never applied by itself. No test sheet has a
   scale bar or a dimension line (measured), so doors are the check.
   12/12 deliberate 2x mis-settings caught on Weld 1 + UNCC; Weld E-100's
-  own "1/4"" note is questioned (its doors say 1/8") — owner to confirm.
+  own "1/4"" note was questioned (its doors say 1/8"). **Owner, 2026-10-06:
+  Weld is our own generated set, the note was our mistake — FIXED in the
+  file** (`reader-accuracy/plans/Weld 1.pdf`, git-ignored, both E-100 notes
+  now 1/8"; an incremental update, every other byte original). E-100 now
+  passes clean (seen on screen: 1/8" no warning; 1/4" → "title and door
+  swings say 1/8""). The three `.local-storage` copies and C's local DB rows
+  (`bid_pdf_sheet_text`, `detectedScaleText`, `byteSize`) were updated to
+  match. **Not updated:** staging's copy and the other worktrees' copies
+  (A, B, the OneDrive folder) — copy C's file over theirs if it matters.
   Scans say they cannot check. `code-first-ceiling.md` § g. SEEN ON SCREEN
   (UNCC E111 set to 1/8"): "Scale may be wrong: title says 1/4" Use it
   Keep"; "Use it" set 1/4" and the warning cleared on the re-check.
@@ -123,6 +131,22 @@ red run is not by itself a red suite:
   text — code cannot read them. Columns for Track A, fitted to A's ONE
   table `bid_panels` + `bid_panel_circuits`: todo.md § "Track A next
   migration batch".
+- **Homeruns, read-only** (2026-10-06, `@/lib/homeruns`, worker
+  `homeruns`, `HomerunsView`: a "Homeruns N" toggle on a sheet that has
+  any, labels beside each arrow). **UNCC draws NO homeruns** (every device
+  is tagged "2B-1"; its arrows are keynote leaders) — the homeruns are on
+  Weld 1 E-100/E-200 and weld2. Hand check of 23 by eye: **19 found, 0
+  wrong tag, 0 false on UNCC's 273 device tags; 1 false on weld2 p8**.
+  Stacked heads = circuits 7/7; wire notes 2/2 ("3 wires + ground (from
+  the note)"); no sheet draws ticks and none are claimed. **Tied to a
+  schedule: none possible on the test sets** — UNCC has the readable
+  schedule but no homeruns, Weld's schedules have no text; every label says
+  "Panel 3LP: no schedule read on this set" and the tie is fixture-tested.
+  Wire counts are never inferred. Seen on screen (E-200, bid 1728356);
+  labels covering their own tags and two boxes stacked were caught there
+  and fixed. `code-first-ceiling.md` § d has the misses; section
+  `homerunreader` of `codeFirstCeiling.mts` re-measures. Columns for A:
+  todo.md § "Homeruns read from the plan".
 - **Code-first ceiling study** (2026-10-06, plan only, NOT merged):
   `references/code-first-ceiling.md`, numbers from
   `scripts/codeFirstCeiling.mts`. Top 3 by payoff: tie labels to devices
