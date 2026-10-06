@@ -19,6 +19,8 @@
  *   Worker → Main:  { type: 'connectPoints', reqId, points: [id, ConnectPoint][] }
  *   Main → Worker:  { type: 'scaleEvidence', pageNum, hash, reqId }
  *   Worker → Main:  { type: 'scaleEvidence', reqId, arcRadii: number[] | null, titleScales }
+ *   Main → Worker:  { type: 'schedules', pageNum, hash, reqId }
+ *   Worker → Main:  { type: 'schedules', reqId, schedules: SheetSchedules, scan: boolean }
  *   Worker → Main:  { type: 'rendered', reqId: string, bitmap: ImageBitmap, pageNum: number, hash: string,
  *                     scale: number, rect: PageRect, pageWidth: number, pageHeight: number }
  *   Worker → Main:  { type: 'outline', reqId: string, entries: {pageNumber,title}[] }
@@ -66,6 +68,7 @@ import {
 import { runSheetCheck } from "@/lib/sheetCheck";
 import { layerIdsFrom } from "@/lib/cadLayers";
 import { quarterArcRadii } from "@/lib/scaleCheck";
+import { readSchedules } from "@/lib/panelSchedules";
 import { detectScaleFromText } from "@shared/planScale";
 import {
   extractVectorGeometry,
@@ -866,6 +869,37 @@ self.onmessage = async (e: MessageEvent) => {
         titleScales: detectScaleFromText(
           matchPage.words.map(w => w.text).join(" ")
         ).candidates,
+      });
+    } catch (err) {
+      self.postMessage({ type: "error", reqId, message: String(err) });
+    }
+    return;
+  }
+
+  if (msg.type === "schedules") {
+    // Panel and fixture schedules read from the page's text
+    // (@/lib/panelSchedules). Read-only; `scan` so the view can say why a
+    // scanned sheet shows none.
+    const { pageNum, hash, reqId } = msg as {
+      pageNum: number;
+      hash: string;
+      reqId: string;
+    };
+    if (!pdfDoc || loadedHash !== hash) {
+      self.postMessage({
+        type: "error",
+        reqId,
+        message: "PDF not loaded for this hash",
+      });
+      return;
+    }
+    try {
+      const matchPage = await readMatchPage(pdfDoc, hash, pageNum);
+      self.postMessage({
+        type: "schedules",
+        reqId,
+        schedules: readSchedules(matchPage.words),
+        scan: isScan(matchPage.geo),
       });
     } catch (err) {
       self.postMessage({ type: "error", reqId, message: String(err) });

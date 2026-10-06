@@ -585,16 +585,17 @@ export function ScaleControl({
           role="status"
         >
           <TriangleAlert className="w-3 h-3" />
-          <span title={doubt.message}>Scale may be wrong</span>
+          <span title={doubt.message}>Scale may be wrong: {doubt.brief}</span>
+          <span className="sr-only">{doubt.message}</span>
           <button
             type="button"
             className="underline underline-offset-2 hover:text-warning/80"
-            title={doubt.message}
+            title={`Set this sheet to ${describeScale(doubt.suggest.ratio)}`}
             onClick={() =>
               onRefused ? onRefused() : void pick(doubt.suggest.text)
             }
           >
-            Use {describeScale(doubt.suggest.ratio)}
+            Use it
           </button>
           {onKeepScale && (
             <button

@@ -106,6 +106,8 @@ describe("checkScale", () => {
     expect(doubt.suggest.ratio).toBe(EIGHTH);
     expect(doubt.message).toContain(`Scale may be wrong: set to 1/4"`);
     expect(doubt.message).toContain(`the title says 1/8"`);
+    // The toolbar shows WHY, not only that (seen on screen 2026-10-06).
+    expect(doubt.brief).toBe(`title and door swings say 1/8"`);
     expect(doubt.message).toContain(`read 18" wide`);
   });
 
@@ -157,6 +159,7 @@ describe("checkScale", () => {
     if (doubt.kind !== "mayBeWrong") return;
     expect(doubt.suggest.ratio).toBe(EIGHTH);
     expect(doubt.message).toContain(`but the title says 1/8"`);
+    expect(doubt.brief).toBe(`title says 1/8"`);
   });
 
   it("a scan says plainly it cannot check", () => {

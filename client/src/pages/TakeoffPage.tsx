@@ -477,6 +477,8 @@ import type { PagePoint } from "@shared/takeoffGeometry";
 import type { RunPathType } from "@shared/takeoffQuantities";
 import { describeScale, type ScaleCandidate } from "@shared/planScale";
 import { checkScale, type ScaleDoubt } from "@/lib/scaleCheck";
+import type { SheetSchedules } from "@/lib/panelSchedules";
+import { SchedulesView } from "@/components/takeoff/SchedulesView";
 
 // The upload queue's shape and its operations live in lib/uploadQueue.ts, so
 // that retrying and dismissing can be tested without rendering this page.
@@ -588,6 +590,14 @@ function usePdfWorker() {
         pending.current.get(msg.reqId)?.resolve({
           arcRadii: msg.arcRadii,
           titleScales: msg.titleScales,
+        });
+        pending.current.delete(msg.reqId);
+        return;
+      }
+      if (msg.type === "schedules") {
+        pending.current.get(msg.reqId)?.resolve({
+          schedules: msg.schedules,
+          scan: msg.scan,
         });
         pending.current.delete(msg.reqId);
         return;
@@ -759,6 +769,12 @@ function usePdfWorker() {
           arcRadii: number[] | null;
           titleScales: ScaleCandidate[];
         }>({ type: "scaleEvidence", pageNum, hash }),
+      schedules: (pageNum: number, hash: string) =>
+        ask<{ schedules: SheetSchedules; scan: boolean }>({
+          type: "schedules",
+          pageNum,
+          hash,
+        }),
       connectPoints: (pageNum: number, hash: string, marks: ConnectMark[]) =>
         ask<[number, ConnectPoint][]>({
           type: "connectPoints",
@@ -880,6 +896,7 @@ function PlanPane({
   onUrlExpired,
   scaleSet = null,
   onScaleDoubt,
+  onSchedules,
   controlsTarget,
   fitOnly = false,
   thumbnailWants,
@@ -931,6 +948,14 @@ function PlanPane({
    * (@/lib/scaleCheck). NULL = none set, nothing to check.
    */
   scaleSet?: { ratio: number; text: string } | null;
+  /**
+   * The panel and fixture schedules read from a page's text once it is on
+   * screen (@/lib/panelSchedules). Code only, no AI, writes nothing.
+   */
+  onSchedules?: (
+    pageNumber: number,
+    read: { schedules: SheetSchedules; scan: boolean }
+  ) => void;
   /** The check's verdict for that page and that ratio. Never acted on here. */
   onScaleDoubt?: (pageNumber: number, ratio: number, doubt: ScaleDoubt) => void;
   /**
@@ -1087,6 +1112,7 @@ function PlanPane({
     findMatching: findMatchingOnPage,
     connectPoints: connectPointsOnPage,
     scaleEvidence: scaleEvidenceOnPage,
+    schedules: schedulesOnPage,
     sheetCheck: sheetCheckOnPage,
   } = usePdfWorker();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -2225,6 +2251,27 @@ function PlanPane({
     ratio, so a new scale is checked afresh. Delivered through a ref for the
     same reason as the text read above.
   */
+  /*
+    SCHEDULES ON THIS SHEET. Read once per page from its text, in the worker
+    (the same cached page read the scale check uses), and reported. Plain
+    code — a page view never spends an AI call (CLAUDE.md § AI features).
+  */
+  const onSchedulesRef = useRef(onSchedules);
+  onSchedulesRef.current = onSchedules;
+  useEffect(() => {
+    if (loading || error || pageCount === 0) return;
+    let cancelled = false;
+    schedulesOnPage(page, hash)
+      .then(read => {
+        if (!cancelled) onSchedulesRef.current?.(page, read);
+      })
+      // A failed read shows no schedules, which is what it found.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [page, pageCount, loading, error, hash, schedulesOnPage]);
+
   const onScaleDoubtRef = useRef(onScaleDoubt);
   onScaleDoubtRef.current = onScaleDoubt;
   const scaleRatio = scaleSet?.ratio ?? null;
@@ -3355,7 +3402,24 @@ export default function TakeoffPage({
     activeScaleKey && !keptScales.has(activeScaleKey)
       ? (scaleDoubts[activeScaleKey] ?? null)
       : null;
+  /** Schedules read from each page's text, keyed by document and page. */
+  const [schedulesByPage, setSchedulesByPage] = useState<
+    Record<string, SheetSchedules>
+  >({});
+  const activeSchedules = doc
+    ? (schedulesByPage[`${doc.id}:${page}`] ?? null)
+    : null;
   const docIdForScale = doc?.id ?? null;
+  const handleSchedules = useCallback(
+    (pageNumber: number, read: { schedules: SheetSchedules }) => {
+      if (docIdForScale === null) return;
+      setSchedulesByPage(prev => ({
+        ...prev,
+        [`${docIdForScale}:${pageNumber}`]: read.schedules,
+      }));
+    },
+    [docIdForScale]
+  );
   const handleScaleDoubt = useCallback(
     (pageNumber: number, ratio: number, doubt: ScaleDoubt) => {
       if (docIdForScale === null) return;
@@ -9068,6 +9132,14 @@ export default function TakeoffPage({
               />
             )}
 
+            {/* The drawing's own schedules, read-only; only where it has one. */}
+            {!phone && activeSheet && (
+              <SchedulesView
+                schedules={activeSchedules}
+                sheetName={activeSheet.name}
+              />
+            )}
+
             {/*
               The heights this job measures its DROPS from, beside the scale it
               measures its LENGTHS against. Same kind of setting, same bar: one
@@ -9338,6 +9410,7 @@ export default function TakeoffPage({
                   : null
               }
               onScaleDoubt={handleScaleDoubt}
+              onSchedules={handleSchedules}
               onPageRendered={handlePageRendered}
               /**
                * Re-read the sheet list and hand back this document's

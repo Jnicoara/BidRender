@@ -110,7 +110,19 @@ red run is not by itself a red suite:
   scale bar or a dimension line (measured), so doors are the check.
   12/12 deliberate 2x mis-settings caught on Weld 1 + UNCC; Weld E-100's
   own "1/4"" note is questioned (its doors say 1/8") — owner to confirm.
-  Scans say they cannot check. `code-first-ceiling.md` § g.
+  Scans say they cannot check. `code-first-ceiling.md` § g. SEEN ON SCREEN
+  (UNCC E111 set to 1/8"): "Scale may be wrong: title says 1/4" Use it
+  Keep"; "Use it" set 1/4" and the warning cleared on the re-check.
+- **Panel + fixture schedules, read-only** (2026-10-06,
+  `@/lib/panelSchedules`, worker `schedules`, `SchedulesView`): a
+  "Schedules" button on a sheet that has one. UNCC E003: panels 2A / 2B /
+  2HA, 42/42 each, name read from "PANEL 2B" UNDER the table (the study
+  had said it was not in the text); E004: 6/6 fixture types. Writes
+  nothing. Seen on screen; the look caught an even-side description losing
+  its first word (fixed, test). weld2's PANELBOARD SCHEDULES sheets have no
+  text — code cannot read them. Columns for Track A, fitted to A's ONE
+  table `bid_panels` + `bid_panel_circuits`: todo.md § "Track A next
+  migration batch".
 - **Code-first ceiling study** (2026-10-06, plan only, NOT merged):
   `references/code-first-ceiling.md`, numbers from
   `scripts/codeFirstCeiling.mts`. Top 3 by payoff: tie labels to devices

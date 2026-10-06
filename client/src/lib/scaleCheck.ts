@@ -125,8 +125,15 @@ export type ScaleDoubt =
   | { kind: "agrees" }
   | {
       kind: "mayBeWrong";
-      /** The one sentence shown in amber. */
+      /** The whole case, one sentence: the chip's hover and screen-reader text. */
       message: string;
+      /**
+       * What says otherwise, short enough for the toolbar beside the
+       * scale: `title says 1/4"`, `door swings say 1/8"`. Seen on screen
+       * 2026-10-06: with the reason only in the hover, the chip said THAT
+       * the scale may be wrong and not WHY.
+       */
+      brief: string;
       /** The scale the evidence points to: one click applies it. */
       suggest: { text: string; ratio: number };
     };
@@ -213,6 +220,10 @@ export function checkScale(input: {
     return {
       kind: "mayBeWrong",
       message: `Scale may be wrong: set to ${set} — ${titleSays}${pick.doors} door swings read ${inchesNow}" wide at that scale; at ${short(pick.text)} they read a normal 30–44".`,
+      brief:
+        title && same(title.ratio, pick.ratio)
+          ? `title and door swings say ${short(pick.text)}`
+          : `door swings say ${short(pick.text)}`,
       suggest: { text: pick.text, ratio: pick.ratio },
     };
   }
@@ -220,6 +231,7 @@ export function checkScale(input: {
     return {
       kind: "mayBeWrong",
       message: `Scale may be wrong: set to ${set}, but the title says ${short(title.text)} — and door swings read a normal width at ${short(title.text)}.`,
+      brief: `title says ${short(title.text)}`,
       suggest: { text: title.text, ratio: title.ratio },
     };
   return { kind: "agrees" };

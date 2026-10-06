@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **Panel and fixture schedules on a sheet can now be read without zooming
+  into the drawing.** On a sheet that has a panel schedule or a lighting
+  fixture schedule, a "Schedules" button opens the tables as printed: each
+  panel's name, supply, mains, breakers, wire sizes, descriptions and
+  loads, and each fixture type with its description and watts. It is read
+  from the drawing's own text with no AI, and it is read-only, so nothing
+  is added to the bid. Drawings whose schedules are pictures rather than
+  text show no button.
+
 - **The plans screen now warns when a sheet's scale looks wrong.** Once a
   scale is set, the app measures the door swings on the drawing: at the
   right scale they read as normal 30–44" doors, at a wrong one they read as
