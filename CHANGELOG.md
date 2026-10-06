@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **Fixed: a freshly uploaded plan could skip reading its printed scale.** On
+  a fast connection the sheet list arrived while the page's text was still
+  being read, and the reading was thrown away, so the sheet sat on "Set
+  scale" instead of picking up the scale printed on it. Nothing was measured
+  wrong (tracing waits for a scale), but the scale had to be typed by hand.
+  The reading now always lands.
+
 - **A click on the plan no longer captures an empty symbol.** With Capture
   on, a click that is not a drag used to open "Name this symbol" and save an
   item with no picture, which also skipped every check. Now only a real box
