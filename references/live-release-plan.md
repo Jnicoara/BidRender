@@ -19,8 +19,9 @@ nine migration files below.
 material is "not priced". The priced print refuses any bid with a "not
 priced" line, with no way past (`ProposalPage.tsx`), and nothing a person can
 type clears this one. A labor-only assembly (demo, pull wire) would block its
-bid's priced print. The owner's fix, `assemblies.laborOnly`, is migration
-**0105** (`migrations-next-batch.md`) plus Track B's code. Neither exists yet.
+bid's priced print. The owner's fix, `assemblies.laborOnly` (plus its frozen
+copy on the line), is migrations **0105–0106** (`migrations-next-batch.md`)
+and Track B's code. Neither exists yet.
 (The 8 shipped starter assemblies include no labor-only one, so nothing
 shipped is caught today, but any contractor-built one would be.)
 
@@ -34,7 +35,7 @@ not-priced and incomplete alike, with not even an EXPECTED line.
 **What `24105ad` does NOT have, compared with `f8fdec3`:** Track B's rule
 (on purpose), Track C's tie-labels and CAD layers (`e6fcde3`, `68fe317`), and
 two test-only fixes. They go live in the NEXT release, **together with
-0105 and Track B's `laborOnly` code**, so the rule never reaches live
+0105–0106 and Track B's `laborOnly` code**, so the rule never reaches live
 without its way out.
 
 **Still needed before the window, and not done yet:**
