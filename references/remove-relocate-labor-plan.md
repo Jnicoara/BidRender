@@ -29,11 +29,23 @@ Earlier records this agrees with or touches:
 
 ## What it needs
 
+### Drops — matches Track B's code, nothing to build
+
+Track B's vertical-drops plan § 10.4 (answer d) parked relocate drops "until
+remove/relocate labor pricing is decided". Question 2 decides it: relocate is
+labor only, and new wire or boxes are counted as normal new work. So a remove
+or relocate mark gets **no count drop**, which is what the code already does
+(`markIsQuantity` in `server/db.ts`, read by the drops). Recorded in both
+files on 2026-10-06. A run that ENDS on such a device follows option C
+(owner-questions § 3, built by B in `faeaab8`): its drop prices, says so,
+and has "Leave it off".
+
 ### Columns — Batch 2, three additive files (none written)
 
 Batch 2 (`migrations-0098-batch-plan.md` § S, on `a-migrations-plan`) is
-0105–0107 today. These become **0108–0110**, and Batch 3 onward shifts by
-three when written (none of it is).
+0105–0107 today. These become **0108–0110**. Track B's two columns
+(vertical-drops-plan § 7) follow as **0111–0112**, so Batch 3 onward shifts
+by five when written (none of it is).
 
 | #    | Table            | Adds                                                                                           | Why                                                                         |
 | ---- | ---------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |

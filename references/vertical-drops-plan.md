@@ -452,3 +452,8 @@ Delete the test counts afterwards.
 4. **Remove and relocate:** **wait** until remove/relocate labor pricing is
    decided. Until then a relocate mark gets no count drop (the existing
    `isPricedMark` rule) and nothing here changes that.
+   **Decided 2026-10-06 (owner-questions § 2):** relocate is labor only, and
+   new wire or boxes are counted as normal new work, so **no count drop on a
+   remove or relocate mark**, which is what the code already does. Nothing
+   to build here. The labor lines are `remove-relocate-labor-plan.md`
+   (Track A). Track A slots § 7's two columns as Batch 2 files 0111–0112.
