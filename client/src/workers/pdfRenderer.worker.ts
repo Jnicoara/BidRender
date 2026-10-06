@@ -62,6 +62,7 @@ import {
   type SavedLook,
 } from "@/lib/lookMatching";
 import { runSheetCheck } from "@/lib/sheetCheck";
+import { layerIdsFrom } from "@/lib/cadLayers";
 import {
   extractVectorGeometry,
   type VectorGeometry,
@@ -174,6 +175,28 @@ type MatchPage = { key: string; geo: VectorGeometry; words: WordBox[] };
  */
 let matchPages: MatchPage[] = [];
 
+/**
+ * The document's CAD layers, optional-content id -> name, read once per
+ * document (@/lib/cadLayers). Empty when it has none or they cannot be read
+ * — the matcher then searches everything, as before layers.
+ */
+const layerIdsByDoc = new Map<string, Promise<Map<string, string>>>();
+function layerIdsOf(
+  doc: import("pdfjs-dist").PDFDocumentProxy,
+  hash: string
+): Promise<Map<string, string>> {
+  let ids = layerIdsByDoc.get(hash);
+  if (!ids) {
+    ids = doc
+      .getOptionalContentConfig()
+      .then(config => layerIdsFrom(config))
+      .catch(() => new Map<string, string>());
+    if (layerIdsByDoc.size >= 8) layerIdsByDoc.clear();
+    layerIdsByDoc.set(hash, ids);
+  }
+  return ids;
+}
+
 async function readMatchPage(
   doc: import("pdfjs-dist").PDFDocumentProxy,
   hash: string,
@@ -187,9 +210,10 @@ async function readMatchPage(
   }
   const page = await doc.getPage(pageNum);
   const viewport = page.getViewport({ scale: 1 });
-  const [list, content] = await Promise.all([
+  const [list, content, layerIds] = await Promise.all([
     page.getOperatorList(),
     page.getTextContent(),
+    layerIdsOf(doc, hash),
   ]);
   const items: RawTextItem[] = [];
   for (const item of content.items)
@@ -207,7 +231,8 @@ async function readMatchPage(
       pdfjs.OPS as unknown as Record<string, number>,
       viewport.transform,
       viewport.width,
-      viewport.height
+      viewport.height,
+      layerIds
     ),
     words: wordBoxes({ items, viewportTransform: viewport.transform }),
   };
@@ -334,9 +359,14 @@ async function vectorLookTemplate(
   try {
     const page = await other.getPage(look.pageNumber);
     const viewport = page.getViewport({ scale: 1 });
-    const [list, content] = await Promise.all([
+    const [list, content, layerIds] = await Promise.all([
       page.getOperatorList(),
       page.getTextContent(),
+      // That set's own layers, not cached: the document is closed below.
+      other
+        .getOptionalContentConfig()
+        .then(config => layerIdsFrom(config))
+        .catch(() => new Map<string, string>()),
     ]);
     const items: RawTextItem[] = [];
     for (const item of content.items)
@@ -352,7 +382,8 @@ async function vectorLookTemplate(
       pdfjs.OPS as unknown as Record<string, number>,
       viewport.transform,
       viewport.width,
-      viewport.height
+      viewport.height,
+      layerIds
     );
     const words = wordBoxes({ items, viewportTransform: viewport.transform });
     const made = symbolFromBox(prepareSheet(geo, words), look.box);

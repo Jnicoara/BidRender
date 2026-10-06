@@ -8,6 +8,26 @@ was committed and pushed, and `main` was untouched (`0af50a6`). C's databases
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
+## How C merges (owner's rule, 2026-10-06)
+
+**CI is the full suite, not the laptop.** Before merging into local-dev:
+
+1. `pnpm check` and the tests the change touches, locally.
+2. Push `track-c`, then wait for the GitHub Actions **Gate** run's `test` job
+   to go green: `gh run list --branch track-c` / `gh run watch <id>`.
+3. Pull local-dev, merge, push, and confirm the local-dev run's `test` job
+   is green too.
+
+A full local suite only when CI cannot tell you something. `gh` lives at
+`C:\Program Files\GitHub CLI\gh.exe`; a shell started before it was
+installed does not have it on PATH, so use the full path there.
+
+**Read the JOB, not the run.** A local-dev run also deploys staging and runs
+the `smoke` job; on 2026-10-06 every local-dev run was red on `smoke`
+(`touch.spec.ts`, tracked in `track-a-handoff.md`) while `test` was green. A
+red run is not by itself a red suite:
+`gh run view <id> --json jobs --jq '.jobs[] | "\(.name): \(.conclusion)"'`.
+
 ## Done
 
 - **Multiple looks** (`references/multiple-looks-plan.md` § 10), on A's
@@ -83,26 +103,60 @@ this file is stale or the state moved.
   "maybe — a line crosses it" (never clear), a second anchor. E-200 reads
   exactly as before. Scans: 85/85, nothing to build.
 
+- **Code-first ceiling study** (2026-10-06, plan only, NOT merged):
+  `references/code-first-ceiling.md`, numbers from
+  `scripts/codeFirstCeiling.mts`. Top 3 by payoff: tie labels to devices
+  (USB 0 -> 38/38, GF 1 -> 4/4 on UNCC E111), use CAD layers when present
+  (Weld 1: demolition / existing / telecom sorted free, search 14x faster),
+  read panel schedules from text (UNCC 3/3 panels, 42/42 circuits). New
+  this study: UNCC E111 HAS a hand count (243, sheet 234268) — 93% found.
+
 ## Not built yet
 
 1. **Seen on screen 2026-10-06 (Weld 1 E-200):** a NEW item's capture
    warned "1 mark counted as Look test tag", and one warned "12 places a
    look of Look test third also finds and 1 mark counted as …", Cancel
-   first. **Not seen on screen:** the device-word note (no two looks with
-   different GF/WP words were staged) and a new look's find in the panel
-   ("Found only by a look added recently"); both rest on their tests.
-   **Found on screen and fixed:** a click with no drag opened the name card
-   and saved an item with no picture, no look and no check
-   (`isCaptureBox`, `shared/symbolCapture.ts`).
-2. **"Find on this sheet" from one look** (plan § 5), the third action on a
+   first. **Still not seen on screen (second try, 2026-10-06):**
+   - the device-word note — **and it cannot show on today's sheets**: the
+     matcher's word ring reads 1 of 45 labelled devices on UNCC E111 (USB
+     labels sit 14.3 pt out, just past it) and Weld 1 has no GF text at the
+     GFCI. A GFCI + plain-duplex look pair was added on E-200 and correctly
+     said nothing. Fix the ring first (`code-first-ceiling.md` § b, rank 1);
+   - "Found only by a look added recently" in the Find panel — the setup
+     was in place (GFCI item with an added duplex look) when the Chrome
+     window was minimized and the tab went hidden. Rests on its tests.
+     **Found on screen and fixed:** a click with no drag opened the name card
+     and saved an item with no picture, no look and no check
+     (`isCaptureBox`, `shared/symbolCapture.ts`).
+   - **Labels tied to devices: SEEN ON SCREEN 2026-10-06 (UNCC E111).** A
+     plain duplex boxed: 141 found, 97 clear, 44 need a look; 36 rings say
+     "USB" and 3 say "may be a GFCI", each with "Beside it: …"; the selected
+     USB find reads "Needs a look — "USB" is written beside it — it may be a
+     USB receptacle … Beside it: USB", and Confirm all takes only the 97.
+     The ring fix also makes the device-word NOTE on the capture card able
+     to show — not re-checked on screen. CAD layers (job b) were not seen on
+     screen: the tab went hidden; they rest on the measurement and tests.
+   - **Driving the browser:** the extension's drags often send no
+     pointermove, so boxes come out empty and short pans do nothing.
+     Dispatch PointerEvents in-page instead (memory: local verification
+     gotchas).
+2. **Demolition plans on VECTOR sheets by their title** (found building CAD
+   layers, 2026-10-06). On Weld 1 E-200 the demolition plan draws its
+   devices on the EXISTING layer (E-POWR-E) and 4 panelboards on the NEW
+   one (E-POWR); only 2 devices sit on E-POWR-D. So layers alone leave 4 of
+   21 demolition-plan finds clear (was 6). Scans already find the
+   demolition plan by its title (`planTitles` / `planRegions`,
+   `scanMatching.ts`); the same reading on a vector sheet's text would
+   close it. Small, pure, testable.
+3. **"Find on this sheet" from one look** (plan § 5), the third action on a
    look.
-3. **The per-row choice in whole-legend capture** (`LegendCapture.tsx`): a
+4. **The per-row choice in whole-legend capture** (`LegendCapture.tsx`): a
    matching name keeps "left as it is", which is the decided default. The
    choice to make it another look is missing.
-4. **Sending looks to the Reader** (plan § 3): every look under the item's
+5. **Sending looks to the Reader** (plan § 3): every look under the item's
    one label, the set's own first, up to the cap. Measure first with
    `scripts/readerAccuracy.mts` methods (b)/(d), 1 look against 3.
-5. **Size-aware matching across plan sets.** The line matcher compares exact
+6. **Size-aware matching across plan sets.** The line matcher compares exact
    sizes, so a look from a set drawn at another size finds nothing. Seen on
    screen: a UNCC duplex look found 0 on Weld 1 E-200. Candidate:
    `scaleTemplate` (already in `findMatching.ts`, used by the sheet check)
@@ -126,6 +180,14 @@ item — gives the card its warning in one capture.
   (`@/lib/trustedLooks`), so a colleague's browser asks again — safe, but
   not shared. With the column, `searchLooks` returns it and the browser
   copy goes.
+- **Words on a mark** — `takeoff_stamps.labelWords` (text NULL, additive):
+  the labels Find all matching tied to a device when it was confirmed
+  (`tieLabels`: "USB", `54"`, "(E)", "A2"). Today they show on the FIND
+  only and are gone once the mark is placed, so a mark cannot say "54 inch
+  height" or "tag A2" later, and the bid cannot price by them. NULL = never
+  read (a hand mark, or before the column). If the owner wants heights
+  priced, a dedicated `mountingHeightIn` (int NULL) beside it beats parsing
+  text. Status "existing" needs nothing new: mark status already holds it.
 
 Requests that already stand, unchanged:
 

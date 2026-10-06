@@ -324,6 +324,7 @@ import {
   lostMarksMessage,
 } from "@/lib/provisionalCount";
 import { earlyTextKey, sheetsToCatchUp } from "@/lib/scaleCatchUp";
+import { startPageTextRead, type PageTextReads } from "@/lib/pageTextRead";
 import { pageTextFor, rememberPageText } from "@/lib/pageText";
 import { loadUndo, saveUndo, tabStorage } from "@/lib/undoPersist";
 import { pastDragThreshold, swallowNextClick } from "@/lib/dragThreshold";
@@ -1750,8 +1751,11 @@ function PlanPane({
     page,
   });
   const [error, setError] = useState<string | null>(null);
-  /** Pages already sent for scale detection, so it runs once each. */
-  const detected = useRef(new Set<number>());
+  /**
+   * Pages whose text has been DELIVERED for scale detection, so it runs once
+   * each — counted on delivery, not on asking (@/lib/pageTextRead).
+   */
+  const detected = useRef<PageTextReads>({ delivered: new Set<number>() });
 
   /**
    * Held in a ref, and deliberately NOT in the effect's dependencies.
@@ -1780,7 +1784,7 @@ function PlanPane({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    detected.current.clear();
+    detected.current.delivered.clear();
 
     (async () => {
       try {
@@ -2165,25 +2169,29 @@ function PlanPane({
     })();
   }, [wantsKey, loading, error, pageCount, hash, render, canvasSize.width]);
 
-  // Pull the page's text once, for scale detection.
+  /*
+    Pull the page's text once, for scale detection (@/lib/pageTextRead).
+
+    Until 2026-10-06 this marked the page read when the pull STARTED and had
+    `onSheetVisible` in its dependencies. That handler changes when the sheet
+    list arrives, so on a fast machine the rows landed mid-pull: the effect
+    re-ran, saw "already read" and stopped, the first run was cancelled, and
+    the text went nowhere — a fresh upload sat on "Set scale" (local flow
+    test 2, about 4 runs in 5). Now the page counts as read only once its
+    text is delivered, and it is delivered to the CURRENT handler via a ref,
+    so a new handler is not a reason to start again.
+  */
+  const onSheetVisibleRef = useRef(onSheetVisible);
+  onSheetVisibleRef.current = onSheetVisible;
   useEffect(() => {
     if (loading || error || pageCount === 0) return;
-    if (detected.current.has(page)) return;
-    detected.current.add(page);
-    let cancelled = false;
-
-    pageText(page, hash)
-      .then(text => {
-        if (!cancelled) onSheetVisible(page, text);
-      })
-      // Detection is a convenience. A page whose text will not extract simply
-      // stays unscaled until someone sets it.
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [page, pageCount, loading, error, pageText, hash, onSheetVisible]);
+    return startPageTextRead(
+      detected.current,
+      page,
+      () => pageText(page, hash),
+      (p, text) => onSheetVisibleRef.current(p, text)
+    );
+  }, [page, pageCount, loading, error, pageText, hash]);
 
   const go = useCallback(
     (to: number) => {

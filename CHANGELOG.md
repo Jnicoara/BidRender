@@ -14,6 +14,27 @@ This is the human-readable companion to the git history — read this to see wha
   "+ N not priced", the bid explains what to do, and the assembly editor's
   cost preview says the material is missing.
 
+- **Find all matching uses the drawing's CAD layers when the PDF keeps
+  them.** On plans exported with layers (Weld 1 does), it searches only the
+  electrical layers — about ten times faster, same finds — and a device
+  drawn on a demolition layer is shown as demolition, never as a new
+  device; one on an "existing" layer says so. Plans without usable layers
+  work exactly as before.
+
+- **Find all matching now reads the little labels beside each device.**
+  "USB", "GF", "(E)", a mounting height like 54" or a fixture tag like A2
+  is tied to the nearest find and shown on it. A "GF" beside a plain
+  receptacle shape now flags it as a possible GFCI instead of counting it
+  as a duplex without a word. On the UNCC test plan the USB receptacles
+  went from 0 of 33 recognised to 33 of 33, and the three duplexes the
+  GFCI search used to pick up silently are now flagged.
+- **Fixed: a freshly uploaded plan could skip reading its printed scale.** On
+  a fast connection the sheet list arrived while the page's text was still
+  being read, and the reading was thrown away, so the sheet sat on "Set
+  scale" instead of picking up the scale printed on it. Nothing was measured
+  wrong (tracing waits for a scale), but the scale had to be typed by hand.
+  The reading now always lands.
+
 - **A click on the plan no longer captures an empty symbol.** With Capture
   on, a click that is not a drag used to open "Name this symbol" and save an
   item with no picture, which also skipped every check. Now only a real box

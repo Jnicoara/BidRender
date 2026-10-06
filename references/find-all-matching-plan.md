@@ -80,6 +80,11 @@ checked by eye:
   flagged "more lines run through it", and no GFCI ("GF" beside it) was ever
   offered as a duplex. Four bow-tie symbols contain telecom triangles; all
   flagged "more lines joined onto it".
+  **Corrected 2026-10-06 (`code-first-ceiling.md` § b):** on E-200 there is
+  NO "GF" text at the GFCI — the only word there is a circuit number. The
+  GFCI was kept apart from the duplex by its filled half, not by a word. On
+  UNCC E111, where GF and USB ARE written, the word ring misses them (USB
+  0/38), and a GFCI box finds 3 duplexes with no flag.
 - **All 31 copies in the uncounted plans checked by eye: real copies**,
   including turned and mirrored ones.
 - **Speed:** 0.09–0.3 s a search; reading the sheet once 0.7–1.6 s (pdf.js),

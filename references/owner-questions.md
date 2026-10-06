@@ -88,7 +88,7 @@ Relocate is labor only; new wire or boxes are counted as normal new work.
 
 ---
 
-## 3. A run that ENDS on an existing device — does it price its drop? — OPEN
+## 3. A run that ENDS on an existing device — does it price its drop? — ANSWERED AND BUILT 2026-10-05
 
 **The question.** When a traced conduit or cable run ends on a device marked
 **existing**, the run still prices its own drop there (the vertical piece of
@@ -99,9 +99,9 @@ because it is existing. Should the drop stay on the bid?
 new pipe down to an old box is real material and real labor. Dropping it
 would make a bid read short exactly where existing work is being tied into.
 To keep it visible, the run would say "ends on an existing device", so an
-estimator who meant to leave that drop off can see it. (A switch to leave one
-drop off does not exist yet. It needs a small new column; it is listed in
-`todo.md`, and would be its own question.)
+estimator who meant to leave that drop off can see it. (Written before
+Track B built it: the "Leave it off" switch in the answer below needs no
+new column, so the note that stood here, that one was needed, was wrong.)
 
 **Other choice:** never price a drop at an existing device (a bid can then
 come out short wherever new work joins old).
@@ -113,7 +113,8 @@ run panel (Track B).
 
 **Answer:** **2026-10-05 — option C:** keep pricing the drop, with a
 one-click "Leave it off" on the run row; no new column. Built by Track B
-the same day (references/vertical-drops-plan.md § 4).
+the same day (references/vertical-drops-plan.md § 4; commit `faeaab8`, in
+`local-dev` and on staging). Track A builds nothing for this.
 
 ---
 
