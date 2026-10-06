@@ -561,6 +561,13 @@ All additive and nullable. Specs are in the plans named.
       page now asks before it is left while such marks exist
       (`marksOnlyHere`). Forced in flow 10 (hold the create, reload → must
       ask; release → exactly start + 1); red without the guard.
+      **Then, on the first staging smoke of the fix (run 37538885610,
+      `3a2dc03`):** flows 5 and 9 (forced) and touch passed; flow 10 timed
+      out on its FIRST click — `armFromLegend`'s `getByText(…).first()`
+      resolved to a mark's SVG `<title>` ("ci duplex", TraceLayer) instead of
+      the legend row on screen. A test-locator fault, fixed with
+      `.filter({ visible: true })` there and in touch.spec. Why it matched
+      this run and not the earlier ones is not known.
 - [x] **FOUND WHILE CHASING THE ABOVE — a real short count, flow 5 (1 local
       run in 3, 2026-10-06).** Three clicks for CI SWITCH; the server made
       the count between the first and second; the FIRST mark stayed drawn
