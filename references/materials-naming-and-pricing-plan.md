@@ -16,7 +16,8 @@ reopened):**
 - Commodity items: no brand, no metal suffix. Brands on panels and breakers
   only.
 - Sort: category, then type, then size, with the app's size table.
-- "1-Pole" everywhere.
+- "1-Pole" everywhere. **Confirmed 2026-10-05 for BREAKERS only** (§ 8 Q1);
+  a single-pole switch keeps its name.
 
 > **READ FIRST — three of these REVERSE decisions the repo has recorded and
 > tests that enforce them.** Carrying them out is fine; doing it without
@@ -592,6 +593,17 @@ is stable once the names are.
    confirmed: breakers only, so a "single-pole switch" keeps its device name.
    It does not change a number. It is first because the repo says the
    opposite today.
+
+   **ANSWERED 2026-10-05 (owner): "1-Pole", breakers only** ("20A 1-Pole
+   breaker"); single-pole switches keep their name. **Not renamed yet** — the
+   rename waits for every question in this section, then ships with
+   CLAUDE.md, ASSEMBLIES_PLAN.md step 6 and the test in one commit. Also
+   asked the same day: search finds a breaker by every supply-house spelling
+   (1-Pole / 1P / single-pole / single pole / SP; 2-Pole / 2P / double-pole /
+   DP; 3-Pole / 3P / three-pole), whatever the name says — Home Depot writes
+   "Single-Pole", Platt "1P". Recorded in `references/owner-questions.md` § 1
+   (on `a-handoff`).
+
 2. **SER and look-alike sizes.** Under "N/3", a #6 SER with a #6 ground and
    one with a #8 ground get the same name, and they are priced differently.
    Confirm:
