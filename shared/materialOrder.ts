@@ -36,10 +36,15 @@ export const MATERIAL_CATEGORY_ORDER = [
   "Wire & Cable",
   "Conduit",
   "Conduit Fittings",
+  // 0117's three shelves, each beside its nearest kin (Track A, 2026-10-06;
+  // a display choice only — reorder freely, the schema list is append-only).
+  "Surface Raceway",
+  "Underground",
   "Boxes",
   "Receptacles",
   "Switches",
   "Wall Plates & Misc",
+  "Service Entrance",
   "Panels",
   "Breakers",
   "Lighting Hardware",

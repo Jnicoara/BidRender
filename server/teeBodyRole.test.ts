@@ -43,16 +43,28 @@ const caller = () =>
   } as unknown as TrpcContext);
 
 describe("the runMaterialRole enum", () => {
-  it("in schema.ts is exactly 0096's list, teeBody last", () => {
+  /** The value list a migration's MODIFY gives `runMaterialRole`. */
+  const rolesIn = (file: string) => {
     const sql = readFileSync(
-      path.resolve(import.meta.dirname, "../drizzle/0096_tee_body_role.sql"),
+      path.resolve(import.meta.dirname, `../drizzle/${file}`),
       "utf8"
     );
     const match = sql.match(/`runMaterialRole` enum\(([^)]*)\)/);
-    expect(match).not.toBeNull();
-    const fromSql = match![1].split(",").map(v => v.trim().replace(/'/g, ""));
-    expect([...RUN_MATERIAL_ROLES]).toEqual(fromSql);
-    expect(RUN_MATERIAL_ROLES[RUN_MATERIAL_ROLES.length - 1]).toBe("teeBody");
+    expect(match, file).not.toBeNull();
+    return match![1].split(",").map(v => v.trim().replace(/'/g, ""));
+  };
+
+  it("in schema.ts is exactly the NEWEST migration's list (0118, locknut and bushing appended)", () => {
+    expect([...RUN_MATERIAL_ROLES]).toEqual(
+      rolesIn("0118_locknut_bushing_roles.sql")
+    );
+  });
+
+  it("only ever APPENDS: 0096's list, teeBody last, is still its opening run", () => {
+    // Reordering an enum rewrites what stored rows mean; appending cannot.
+    const at0096 = rolesIn("0096_tee_body_role.sql");
+    expect(at0096[at0096.length - 1]).toBe("teeBody");
+    expect(RUN_MATERIAL_ROLES.slice(0, at0096.length)).toEqual(at0096);
   });
 });
 

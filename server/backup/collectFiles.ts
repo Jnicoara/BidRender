@@ -50,6 +50,11 @@ export const FILE_SOURCES: FileSource[] = [
     column: "logoKey",
     note: "Company logo used on proposals.",
   },
+  {
+    table: "ai_correction_log",
+    column: "cropKey",
+    note: "Cut-out image of a corrected AI symbol (0108; ai-correction-log-plan.md § 5). Listed before any are written, so they are backed up from the first.",
+  },
 ];
 
 export type StoredFile = {

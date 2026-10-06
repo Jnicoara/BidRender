@@ -46,6 +46,7 @@ import {
 } from "../shared/closeout";
 import type { TrpcContext } from "./_core/context";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
+import { assemblyHours } from "../shared/assemblyHours";
 
 const USER = 9701;
 const OTHER = 9702;
@@ -839,7 +840,13 @@ describeDb("one company's field data never reaches another", () => {
    */
   async function sharedStarter() {
     const list = await caller().assemblies.list();
-    const starter = list.find(a => a.userId === null);
+    // One WITH hours: since 0123 the shipped starters include 159 whose hours
+    // are not set, and those get no suggestion by design (nothing to scale —
+    // closeoutRouter `recomputeSuggestions`). "The first starter" became one
+    // of them, and every case here failed for a reason no company can meet.
+    const starter = list.find(
+      a => a.userId === null && assemblyHours(a.baseLaborHours) !== null
+    );
     expect(starter, "expected a shipped starter assembly").toBeDefined();
     return starter!;
   }

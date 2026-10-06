@@ -203,6 +203,11 @@ const REGISTRY: Record<string, Entry> = {
     since: "2026-09-21",
     why: "Same family as takeoff_groups.assemblyId; not traced.",
   },
+  "materials.parentId": {
+    kind: "unreviewed",
+    since: "2026-10-06",
+    why: "Migration 0119/0120: a brand variant's parent. NOTHING writes it yet (every row NULL), so there is nothing to resolve today. It IS this file's bug shape the day variants ship: a company forking a parent gets a new id while its variants still name the shipped one. The variant code (Batch 5, CLAUDE.md § Brands) must answer it with a resolver before it writes a single parentId.",
+  },
   "bid_line_items.assemblyId": {
     kind: "resolver",
     resolver: "getAssemblyFamilies",

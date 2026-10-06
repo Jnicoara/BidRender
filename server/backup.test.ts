@@ -427,6 +427,12 @@ describe("stored files", () => {
           // takeoff_groups.symbolLookupKey (0099) — which legend symbol a
           // count belongs to, as symbol_links.lookupKey. A name, not a file.
           "symbolLookupKey",
+          // assemblies.mountHeightTypeKey (0110) — a mounting-height TYPE,
+          // like typeKey above. An identifier, not a file.
+          "mountHeightTypeKey",
+          // bid_line_items.quoteItemKey (0115) — which item of a supplier
+          // quote a line is. An identifier, not a file.
+          "quoteItemKey",
         ].includes(column)
       ) {
         continue;
@@ -443,8 +449,9 @@ describe("stored files", () => {
     expect(suspicious.size).toBeGreaterThan(0);
   });
 
-  it("covers plan PDFs, legacy project PDFs and the company logo", () => {
+  it("covers plan PDFs, legacy project PDFs, the company logo and AI correction crops", () => {
     expect(FILE_SOURCES.map(s => `${s.table}.${s.column}`).sort()).toEqual([
+      "ai_correction_log.cropKey",
       "bid_pdfs.storageKey",
       "company_branding.logoKey",
       "projects.pdfKey",

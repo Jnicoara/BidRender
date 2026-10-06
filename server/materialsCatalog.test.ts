@@ -130,11 +130,33 @@ describe("shipped catalog shape", () => {
     }
   });
 
+  /**
+   * Shelves migration 0117 made BEFORE Track C's rows for them ship (step 1:
+   * the column first). Their 50 rows wait in pricing/rows.json. A TRIPWIRE,
+   * not an exemption: the case below goes red as soon as C seeds a row onto
+   * one, and the name then comes off this list.
+   */
+  const AWAITING_ROWS: readonly (typeof MATERIAL_CATEGORIES)[number][] = [
+    "Surface Raceway",
+    "Underground",
+    "Service Entrance",
+  ];
+
   it("fills every shelf it declares", () => {
     // An empty category renders as nothing and is dead weight in the picker.
     const used = new Set(BASELINE_MATERIALS.map(m => m.category));
-    const empty = MATERIAL_CATEGORIES.filter(c => !used.has(c));
+    const empty = MATERIAL_CATEGORIES.filter(
+      c => !used.has(c) && !AWAITING_ROWS.includes(c)
+    );
     expect(empty, `no materials filed under: ${empty.join(", ")}`).toEqual([]);
+  });
+
+  it("keeps a shelf on the awaiting list only while it is still empty", () => {
+    const used = new Set(BASELINE_MATERIALS.map(m => m.category));
+    expect(
+      AWAITING_ROWS.filter(c => used.has(c)),
+      "these have rows now — take them off AWAITING_ROWS"
+    ).toEqual([]);
   });
 
   it("gives every material trade slang to be found by", () => {
@@ -1088,8 +1110,8 @@ describe("starter assemblies", () => {
         .filter(name => /breaker/i.test(name))
     );
     expect(breakerParts.size).toBeGreaterThan(0);
-    expect(
-      Array.from(breakerParts).filter(name => !shipped.has(name))
-    ).toEqual([]);
+    expect(Array.from(breakerParts).filter(name => !shipped.has(name))).toEqual(
+      []
+    );
   });
 });
