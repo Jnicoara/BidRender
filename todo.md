@@ -423,6 +423,16 @@ All additive and nullable. Specs are in the plans named.
 
 ### Flaky tests — fix in a batch before beta
 
+- [ ] **Smoke flow 9, "a refresh keeps the sheet and the zoom": after
+      `page.reload()` the Plans screen stayed BLANK for 60 s** (title "Plans"
+      with no bid name, empty pane). Once, on the release-candidate smoke of
+      `24105ad` (run 37512445462 attempt 1, a slow run at 8.6 min against
+      the usual ~4.4); attempt 2 on the same commit passed, 96 of 96. Not
+      seen on any other run. Could be a staging stall or a real load race
+      after reload — the screenshot is in that run's `smoke-failures`
+      artifact (7 days). If it recurs, look at what the Plans screen waits
+      on after a reload before calling it staging.
+
 Both are timing, not wrong answers, and both touch the shared test database.
 Fix them together: a green run that sometimes lies about being red trains
 everyone to re-run instead of read.
