@@ -61,6 +61,13 @@ type BidTotal = {
   lineCount: number;
   /** So a total that moved because a contractor edited the bid says so. */
   updatedAt: string;
+  /**
+   * Lines with an assembly, a quantity, labor and $0 material — the lines
+   * Track B's rule (`5c98bd1`, `lineMaterialNotPriced`) now counts as one
+   * part not priced each. Lets `--compare` tell that DELIBERATE change from
+   * a fault (release `f8fdec3`, 2026-10-06). Absent in files written before.
+   */
+  laborNoMaterialLines?: number;
 };
 type Measurement = {
   measuredAt: string;
@@ -120,6 +127,18 @@ async function measure(outFile: string) {
     : [];
   const bidCount = (await db.select({ n: sql<number>`count(*)` }).from(bids))[0]
     .n;
+  // Columns that exist at the live commit too (0af50a6), so the "before" run
+  // from that code can count the same thing.
+  const [laborRows] = (await db.execute(
+    sql`SELECT bidId, COUNT(*) AS n FROM bid_line_items
+        WHERE assemblyId IS NOT NULL AND qty > 0
+          AND COALESCE(snapshotLaborHours, 0) > 0
+          AND COALESCE(snapshotMaterialCost, 0) = 0
+        GROUP BY bidId`
+  )) as unknown as [{ bidId: number; n: number }[]];
+  const laborNoMaterial = new Map(
+    laborRows.map(r => [Number(r.bidId), Number(r.n)])
+  );
 
   const result: Measurement = {
     measuredAt: new Date().toISOString(),
@@ -156,6 +175,7 @@ async function measure(outFile: string) {
             incomplete: row.incomplete,
             lineCount: row.lineCount,
             updatedAt: new Date(row.updatedAt).toISOString(),
+            laborNoMaterialLines: laborNoMaterial.get(row.id) ?? 0,
           });
         }
         cursor = page.nextCursor ?? null;
@@ -255,6 +275,7 @@ function compare(beforeFile?: string, afterFile?: string): number {
   );
 
   let problems = 0;
+  let expected = 0;
   if (before.host !== after.host || before.database !== after.database) {
     console.log("FAIL  the two files were measured on DIFFERENT databases");
     problems++;
@@ -285,6 +306,30 @@ function compare(beforeFile?: string, afterFile?: string): number {
       moved.push(`notPriced parts ${b.notPricedParts} -> ${a.notPricedParts}`);
     if (a.incomplete !== b.incomplete)
       moved.push(`incomplete ${b.incomplete} -> ${a.incomplete}`);
+    /*
+      THE ONE DELIBERATE CHANGE in release f8fdec3 that this file can see:
+      Track B's rule (5c98bd1) counts an assembly line with labor and $0
+      material as one part not priced, where it used to read as finished.
+      EXPECTED only when nothing else moved — same total, same not-priced
+      LINES, same incomplete flag — and the parts rose by EXACTLY the number
+      of such lines, counted the same way on both sides. Anything else, even
+      close, stays a FAIL for a person to read.
+    */
+    const laborLines = a.laborNoMaterialLines;
+    if (
+      moved.length === 1 &&
+      a.notPricedParts !== b.notPricedParts &&
+      laborLines !== undefined &&
+      laborLines > 0 &&
+      laborLines === b.laborNoMaterialLines &&
+      a.notPricedParts - b.notPricedParts === laborLines
+    ) {
+      console.log(
+        `EXPECTED bid ${b.bidId}: ${moved[0]} (${laborLines} line(s) with labor and $0 material, Track B's rule 5c98bd1; total unchanged)`
+      );
+      expected++;
+      continue;
+    }
     if (moved.length) {
       // Still a FAIL — but one with a likely innocent cause, named, so the
       // person reading it checks the bid before rolling back the release.
@@ -304,7 +349,10 @@ function compare(beforeFile?: string, afterFile?: string): number {
 
   if (problems === 0) {
     console.log(
-      `ok    all ${before.bids.length} bid(s): totalDue, not-priced and incomplete unchanged`
+      `ok    all ${before.bids.length} bid(s): totalDue unchanged; not-priced and incomplete unchanged` +
+        (expected > 0
+          ? ` except ${expected} EXPECTED (labor with $0 material, listed above)`
+          : "")
     );
     return 0;
   }

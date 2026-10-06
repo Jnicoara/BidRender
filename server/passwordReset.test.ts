@@ -354,6 +354,31 @@ withDb("(a) a reset link works once", () => {
     expect(await completePasswordReset(hashResetToken(token), "ok")).toBe(USER);
   });
 
+  /*
+    The page asks this AS IT OPENS (2026-10-06). Before, a used link opened
+    the full "Choose a new password" form and refused only on Save, after a
+    password had been chosen and typed (staging reset test).
+  */
+  it("says a link is dead before anything is typed: used, older, or unknown", async () => {
+    const check = (token: string) =>
+      publicCaller().caller.auth.checkResetToken({ token });
+
+    const token = await requestLink();
+    expect(await check(token)).toEqual({ usable: true });
+    await publicCaller().caller.auth.resetPassword({
+      token,
+      newPassword: NEW_PASSWORD,
+    });
+    expect(await check(token)).toEqual({ usable: false });
+
+    const older = await requestLink();
+    const newer = await requestLink();
+    expect(await check(older)).toEqual({ usable: false });
+    expect(await check(newer)).toEqual({ usable: true });
+
+    expect(await check("not-a-real-token")).toEqual({ usable: false });
+  });
+
   it("refuses an older link once a newer one has been asked for", async () => {
     const first = await requestLink();
     const second = await requestLink();

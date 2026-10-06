@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { isPasswordValid } from "@shared/passwordRules";
+import { RESET_LINK_UNUSABLE } from "@shared/resetLinkMessages";
 import { RESET_ADDRESS, resetTokenFromHash } from "@/lib/resetLink";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { PasswordStrengthBar } from "@/components/auth/PasswordStrengthBar";
@@ -48,6 +49,28 @@ export default function ResetPasswordPage({
   });
 
   const passwordOk = isPasswordValid(password);
+
+  /*
+    Asked AS THE PAGE OPENS (2026-10-06): a used or expired link used to show
+    the full form and refuse only on Save, after somebody had chosen and typed
+    a password. Same sentence as the server's refusal (shared). While the
+    answer is on its way the form shows as before — a link that turns out
+    dead swaps it for the message, and Save still refuses on the server.
+  */
+  const linkCheck = trpc.auth.checkResetToken.useQuery(
+    { token: token ?? "" },
+    { enabled: Boolean(token), retry: false, refetchOnWindowFocus: false }
+  );
+  if (token && linkCheck.data?.usable === false)
+    return (
+      <AuthShell>
+        <div className="p-6 space-y-4">
+          <h2 className="text-base font-semibold">Reset your password</h2>
+          <p className="text-sm text-muted-foreground">{RESET_LINK_UNUSABLE}</p>
+          <SignInLink onClick={() => onDone("cancelled")} />
+        </div>
+      </AuthShell>
+    );
 
   if (!token)
     return (

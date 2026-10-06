@@ -22,6 +22,7 @@ import {
   resetEmail,
   resetLink,
 } from "../passwordReset";
+import { RESET_LINK_UNUSABLE } from "@shared/resetLinkMessages";
 import { clientKey, createRateLimiter } from "../rateLimit";
 
 const SALT_ROUNDS = 12;
@@ -322,6 +323,20 @@ export const authRouter = router({
     }),
 
   /**
+   * Would this reset link work? Asked by the reset page AS IT OPENS, so a used
+   * or expired link says so before anybody types a password — until
+   * 2026-10-06 the form opened anyway and refused only on Save (staging reset
+   * test). Read-only: it changes nothing and says nothing about the account,
+   * only yes or no about the link. Not rate-limited, for the reason
+   * `newResetToken` gives: a 256-bit token is not worth guessing at.
+   */
+  checkResetToken: publicProcedure
+    .input(z.object({ token: z.string().min(1).max(200) }))
+    .query(async ({ input }) => ({
+      usable: await db.isResetTokenUsable(hashResetToken(input.token)),
+    })),
+
+  /**
    * Set a new password from an emailed link. The link works once, and using it
    * ends every session the account had — both inside
    * `db.completePasswordReset`, in one transaction.
@@ -351,8 +366,7 @@ export const authRouter = router({
       if (userId === null)
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message:
-            "This reset link has expired or has already been used. Ask for a new one from the sign-in page.",
+          message: RESET_LINK_UNUSABLE,
         });
 
       // Whatever session this browser held ended with the rest; drop the

@@ -1518,7 +1518,76 @@ additive ones run BEFORE the push (§ 5, three steps).
 5. Then production, in the same order — see the release entry below for the
    current one, and § 5a for the full commands.
 
-### Staging: migrations 0103–0104 (done 2026-10-05) — NOT yet on live
+### LIVE: `24105ad` and migrations 0096–0104 (released 2026-10-06)
+
+**Done with the owner's four approvals (A start, B database, C code, D done),
+per `live-release-plan.md`.** Live went from `0af50a6` / 96 migrations to
+**`24105ad` / 105**.
+
+**Why `24105ad` and not `f8fdec3`:** `f8fdec3` carries Track B's "labor with
+$0 material is not priced" rule. The priced print refuses any not-priced
+line, and nothing clears that one until `assemblies.laborOnly` (migrations
+0105–0106) and B's code ship. `24105ad` is the last commit before that merge
+and has every Track A fix (`live-release-plan.md` § 0).
+
+What each step printed (times UTC):
+
+| Step                                                   | Printed                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Smoke on `24105ad` (staging, branch `a-smoke-24105ad`) | run 37512445462 attempt 2: **96 passed, 2 skipped**. Attempt 1: flow 9 blank Plans after reload, once (todo.md, must-investigate)                                                                                                                                                                                                                       |
+| Password reset on staging                              | passed (owner), after replacing staging's invalid Resend key                                                                                                                                                                                                                                                                                            |
+| A — pre-flight                                         | live `0af50a6`; gate green on `24105ad` (run 37419721623); 179 commits; 9 migration files                                                                                                                                                                                                                                                               |
+| Backup                                                 | **`2026-10-06T20-03-57Z`**: 63 tables, 3,428 rows, 5/5 files (324.3 MB), `r2://bidsoftware/helixbid`                                                                                                                                                                                                                                                    |
+| Backup verified                                        | restored 63 tables / 3,428 rows = manifest (kept as `bidrender_backup_verify`, dropped afterwards)                                                                                                                                                                                                                                                      |
+| Rehearsal on the restored copy                         | drift before: **96 recorded, 9 tables, FKs 135**; `migrate.mts` **9 applied, 105**; after **matches, FKs 141/141**; second run **nothing to apply**; data counts identical (3 users, 2 bids, 1,534 materials, 22 marks, 2 counts, 2 runs, 0 lines, 8 assemblies); bid totals unchanged (both bids empty, $0); `0af50a6` code on the migrated copy works |
+| B — live totals before                                 | 2/2 bids, read-only session proven (`bidrender-backups/live-totals-before.json`)                                                                                                                                                                                                                                                                        |
+| Live drift before                                      | **96 recorded, the same 9 tables, FKs 135**                                                                                                                                                                                                                                                                                                             |
+| **Live migrate** (~20:11)                              | **"Applied 9 migrations: 0096_tee_body_role to 0104_run_end_connect. This database now has all 105."**                                                                                                                                                                                                                                                  |
+| Live drift after                                       | **matches, FKs 141/141**; second run **nothing to apply**                                                                                                                                                                                                                                                                                               |
+| Old code on the migrated live DB                       | site `0af50a6`, HTTP 200; `0af50a6` code priced both bids unchanged                                                                                                                                                                                                                                                                                     |
+| C — **push `main`** (20:39:58)                         | `0af50a6..24105ad` fast-forward                                                                                                                                                                                                                                                                                                                         |
+| Live build                                             | `/api/version` → **`24105ad`, builtAt 20:40:38** (live at 20:42:56)                                                                                                                                                                                                                                                                                     |
+| D — live totals after                                  | **"all 2 bid(s): totalDue unchanged; not-priced and incomplete unchanged"**                                                                                                                                                                                                                                                                             |
+
+**After the release, by the owner:** the live `RESEND_API_KEY`
+(`bidridge-live`, sending access to `mail.bidridge.com`), then one reset test
+on bidridge.com (release plan step 11). Until then "Forgot password?" says
+reset by email is not set up.
+
+**Next release** carries what `24105ad` left out: Track B's labor rule WITH
+0105–0106 and B's `laborOnly` code, Track C's tie-labels and CAD layers, and
+the reset early-check (`6518fc5`).
+
+### Staging: reset email blocked by an invalid Resend key (fixed 2026-10-06)
+
+**What happened.** The staging password-reset test stopped at step 4: the
+screen said "If an account uses … a reset link is on its way", no email
+arrived, and Resend's dashboard showed no send at all. The account existed and
+a reset token was created, so the app did try. The staging runtime log said:
+
+```
+[email] password-reset NOT sent to jj…@gmail.com: Resend answered 400: API key is invalid
+```
+
+**Fix (owner).** A new Resend API key, pasted into the staging app's
+`RESEND_API_KEY` at **app level** (Run time, Encrypt), saved, redeployed. The
+next reset email arrived, the new password worked, the old one and the used
+link were refused.
+
+**What to remember.**
+
+- **Resend shows no trace of a request it rejects for a bad key**, so "the
+  dashboard shows nothing" does not mean the app never called it. Read the
+  app's own log first: search Runtime Logs for `[email]`. Every refusal
+  writes one line with its reason, and since 2026-10-06 so do the two stops
+  before the email step (no account for the address; an account with no
+  password), as `[auth] password reset: …`.
+- Retyping `STAGING_EMAIL_ALLOWLIST` changed nothing because it was never the
+  cause. Read the log line before changing settings.
+- Live needs its OWN key (`bidridge-live`), never staging's, and is set
+  during the live release (`live-release-plan.md`).
+
+### Staging: migrations 0103–0104 (done 2026-10-05) — on live since 2026-10-06 (`24105ad`, entry above)
 
 Batch 1b (`migrations-0098-batch-plan.md` § S): `'unconfirmed'` appended to
 `takeoff_stamps.status` (every row NULL) and `takeoff_runs.startConnect` /
@@ -1543,7 +1612,7 @@ NULL, as it is on staging and live.
 
 **Live takes 0096–0104 together**: `references/live-release-plan.md`.
 
-### Staging: migrations 0096–0102 (done 2026-10-02) — NOT yet on live
+### Staging: migrations 0096–0102 (done 2026-10-02) — on live since 2026-10-06 (`24105ad`, entry above)
 
 The marks batch (`migrations-0098-batch-plan.md` § S, Batch 1) with the two
 password-reset files from `a-email-reset`. All seven are additive and

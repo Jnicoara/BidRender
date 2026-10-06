@@ -102,11 +102,12 @@ Requests waiting for Track A, which numbers and writes the migrations.
 > **ALL NUMBERED 2026-10-06 (Track A), none written yet — see
 > `references/migrations-next-batch.md` on `a-migrations-plan`**, the one
 > list of every track's asks. In short: `distributionHeightInches` is in
-> 0108 (with C's `contentHash`); `mountHeightTypeKey` and `materialByQuote`
-> in 0109 (with the remove/relocate hours); `bid_quotes` is 0113; the six
-> `bid_line_items` quote columns go in 0114 with `lineRole`; the quoted-line
-> markup is `pricing_defaults.quotedMarkupPct`, 0115. **`laborOnly` is
-> 0105** (owner YES 2026-10-06: shipped labor-only starters marked, others
+> 0109 (with C's `contentHash`); `mountHeightTypeKey` and `materialByQuote`
+> in 0110 (with the remove/relocate hours); `bid_quotes` is 0114; the six
+> `bid_line_items` quote columns go in 0115 with `lineRole`; the quoted-line
+> markup is `pricing_defaults.quotedMarkupPct`, 0116. **`laborOnly` is
+> 0105, its frozen line copy `bid_line_items.snapshotLaborOnly` is 0106**
+> (Track A picked FREEZING, answering B's question below) (owner YES 2026-10-06: shipped labor-only starters marked, others
 > "not priced" until ticked) — first, because it must go live WITH Track B's
 > "labor with $0 material" rule; until then the live release stays on
 > `24105ad`, before that rule (`live-release-plan.md` § 0). Panels: one
@@ -140,13 +141,45 @@ track-c, each working today without its column). All ADDITIVE, nullable,
       mark cannot say "54 in. height" or "tag A2" later and the bid cannot
       price by them. NULL = never read (a hand mark, or before the column).
       Measured: `references/code-first-ceiling.md` § b.
-- [ ] **`takeoff_stamps.mountingHeightIn INT NULL`** — owner's call, ONLY if
-      heights are to be priced: the height read off a label, as a number,
-      rather than parsing `labelWords`. NULL = none read.
+- ~~`takeoff_stamps.mountingHeightIn`~~ **withdrawn 2026-10-06 — a
+  duplicate.** The mark already has `mountHeightInches` +
+  `mountHeightSource` (0098, on staging; requested by Track C itself on
+  2026-10-01, below). A height read off a label goes THERE.
 - [ ] **`symbol_looks.confirmedAt TIMESTAMP NULL`** — when an added look was
       first confirmed by hand ("from a new look", multiple-looks-plan.md
       § 4). Today kept per browser (`@/lib/trustedLooks`), so a colleague's
       browser asks again — safe, not shared. NULL = never confirmed.
+
+**Panel schedules read from the PDF** (Track C, 2026-10-06; built read-only
+on track-c — `@/lib/panelSchedules`, the "Schedules" view on a sheet — and
+writing NOTHING until these land). **Fits Track A's decision, not a second
+table:** A's clash 5 on `a-migrations-plan` (2026-10-06) picked ONE panel
+table, `bid_panels` (Batch 5, with nullable `bidPdfId` / `sheetId`), and a
+child `bid_panel_circuits`. C's earlier `panel_schedules` / `panel_circuits`
+(`code-first-ceiling.md` § e) are withdrawn. All ADDITIVE, nullable, **no
+DEFAULT**, no backfill. Each column is something the reader already reads
+on UNCC E003 (3 of 3 panels, 42/42 circuits each):
+
+- [ ] **On `bid_panels`, beside A's columns** (`name`, `isExisting`,
+      `bidPdfId`, `sheetId` are already in A's plan — not asked twice):
+      `supplyText VARCHAR(64) NULL` ("208/120V, 3-PH, 4W"),
+      `mainsText VARCHAR(96) NULL` ("225 AMP MAIN LUGS ONLY"),
+      `mainsAmps INT NULL`, `fedFromText VARCHAR(160) NULL`,
+      `connectedKva DECIMAL(9,2) NULL`, `demandKva DECIMAL(9,2) NULL`.
+      NULL = not read, or a panel typed in. All as printed — never a
+      parsed value standing in for what the drawing says.
+- [ ] **`bid_panel_circuits`** (A's child table; these are the columns C
+      fills): `panelId` FK `bid_panels.id` ON DELETE CASCADE,
+      `circuitNumber INT NOT NULL`, `breakerText VARCHAR(16) NULL` (as
+      printed: "20/1", "FEED"), `breakerAmps INT NULL`, `poles TINYINT NULL`,
+      `wireSize VARCHAR(16) NULL`, `description VARCHAR(255) NULL`,
+      `loadKva DECIMAL(7,2) NULL`; unique (`panelId`, `circuitNumber`). NULL
+      breaker / wire / load = the cell is empty on the drawing (a space),
+      which must stay distinct from 0.
+- **Fixture schedule rows: NOT asked yet.** The reader reads them (UNCC
+  E004, 6 of 6 types) and shows them read-only. Where they would live
+  overlaps `fixtureTag`, which A lists as undecided — decide that first,
+  then one table, not two.
 
 **Quote items** (Track B, owner-answered 2026-10-05;
 references/quote-items-plan.md § 8). All ADDITIVE, nullable, **no
@@ -193,8 +226,10 @@ NULL`, `createdAt`, `updatedAt`. Index (`userId`, `bidId`).
       frozen when it was added. Either freeze it onto the line
       (`bid_line_items.snapshotLaborOnly BOOLEAN NULL`, with the other
       snapshots) or read the assembly live; **freezing is recommended**, so
-      ticking the box later cannot quietly re-mark finished bids. A to pick
-      with B before writing. - A shipped assembly forks on edit, as every shipped edit does. - **Starter assemblies to ship marked labor-only: NONE today.** Checked
+      ticking the box later cannot quietly re-mark finished bids. **Track A
+      picked FREEZING, 2026-10-06: `snapshotLaborOnly` is migration 0106**
+      (`migrations-next-batch.md`); NULL on a line from before the column
+      reads as "not said", so no existing bid changes when it lands. - A shipped assembly forks on edit, as every shipped edit does. - **Starter assemblies to ship marked labor-only: NONE today.** Checked
       2026-10-06: all 8 shipped starters carry 3–6 parts, and every planned
       one in references/starter-assemblies-plan.md has parts too — even the
       demo ones (DR1–DR4 carry blank covers, wire nuts, a filler plate), so
@@ -235,8 +270,9 @@ All additive and nullable. Specs are in the plans named.
 - [ ] `symbol_looks` table — a legend look WITH its box, so the check needs no
       "Whole legend" in this tab first (today the boxes live in sessionStorage,
       `@/lib/sheetCheckSession`). `references/multiple-looks-plan.md` § 6.
-- [ ] `takeoff_stamps.mountHeightInches decimal(7,2) NULL` +
-      `mountHeightSource` — lets a height read beside a mark be SAVED on it
+- [x] `takeoff_stamps.mountHeightInches decimal(7,2) NULL` +
+      `mountHeightSource` — **landed in 0098 (staging)**; a height tied by
+      `tieLabels` (`54"`) is what fills it. Lets a height read beside a mark be SAVED on it
       (`MARK_HEIGHT_COLUMN`). NULL must stay distinct from 0.
       `references/check-my-marks-plan.md` § 10.
 - [ ] `takeoff_stamps.checkAcceptedAt timestamp NULL` — "Keep" remembered past
@@ -315,6 +351,28 @@ All additive and nullable. Specs are in the plans named.
       3,000:** page `materials.list` and move search to the server, or at
       least off the main thread. The scale test's budgets are the alarm; do
       not loosen them to get past it.
+
+### Before beta: sign-in protection (owner, 2026-10-06)
+
+- [ ] **Block known-leaked passwords** at sign-up, password change and
+      reset: refuse a password found in a breach list (for example the
+      k-anonymity range check against Have I Been Pwned: only the first five
+      characters of the SHA-1 leave the server). The refusal says plainly
+      why. Never a silent rejection.
+- [ ] **Limit repeated wrong sign-in attempts**, per address and per sender,
+      the same way password reset is already limited (`overResetRequestLimit`
+      / `overResetAddressLimit` in `authRouter.ts`). The message names the
+      wait and never says whether the address has an account. Log each lock
+      with a reason, masked, like the reset stops (`deploying.md` § 11,
+      "reset email blocked").
+- [ ] **Refuse a new password that matches the CURRENT one** (owner,
+      2026-10-06), at password change and at reset: compare the new
+      password against the stored hash (`bcrypt.compare`) and refuse with a
+      plain sentence ("That is your current password. Choose a different
+      one."). **Older passwords stay allowed: no password history**, by the
+      owner's decision. Nothing new is stored. A reset that is refused this
+      way must NOT use up the link (the same rule as "refuses a password the
+      rules refuse, and uses nothing up" in `server/passwordReset.test.ts`).
 
 ### Before beta: price an unpriced line right where it blocks you
 
@@ -428,6 +486,20 @@ All additive and nullable. Specs are in the plans named.
       prices.
 
 ### Flaky tests — fix in a batch before beta
+
+- [ ] **MUST INVESTIGATE RIGHT AFTER THE 24105ad LIVE RELEASE (owner,
+      2026-10-06) — treat as a possible REAL bug, not a test flake: a
+      person who reloads the Plans screen and sees nothing for a minute
+      would believe their plans were gone.** Smoke flow 9, "a refresh keeps
+      the sheet and the zoom": after
+      `page.reload()` the Plans screen stayed BLANK for 60 s (title "Plans"
+      with no bid name, empty pane). Once, on the release-candidate smoke of
+      `24105ad` (run 37512445462 attempt 1, a slow run at 8.6 min against
+      the usual ~4.4); attempt 2 on the same commit passed, 96 of 96. Not
+      seen on any other run. Could be a staging stall or a real load race
+      after reload — the screenshot is in that run's `smoke-failures`
+      artifact (7 days). If it recurs, look at what the Plans screen waits
+      on after a reload before calling it staging.
 
 Both are timing, not wrong answers, and both touch the shared test database.
 Fix them together: a green run that sometimes lies about being red trains

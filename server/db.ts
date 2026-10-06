@@ -556,6 +556,34 @@ export async function createPasswordResetToken(
  * which of them it was tells a stranger holding a guessed token nothing useful
  * and tells the real owner nothing they can act on differently.
  */
+/**
+ * Would this reset link work right now? The same three conditions
+ * `completePasswordReset` claims under — it exists, is unused, is unexpired —
+ * read without changing anything, so the page can say a dead link is dead
+ * as soon as it opens instead of only on Save (staging reset test,
+ * 2026-10-06). Asking for a newer link marks the older ones used, so "an
+ * older link" is covered by "unused".
+ */
+export async function isResetTokenUsable(
+  tokenHash: string,
+  now: Date = new Date()
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select({ id: passwordResetTokens.id })
+    .from(passwordResetTokens)
+    .where(
+      and(
+        eq(passwordResetTokens.tokenHash, tokenHash),
+        isNull(passwordResetTokens.usedAt),
+        gt(passwordResetTokens.expiresAt, now)
+      )
+    )
+    .limit(1);
+  return row !== undefined;
+}
+
 export async function completePasswordReset(
   tokenHash: string,
   passwordHash: string,
