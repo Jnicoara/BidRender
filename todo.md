@@ -208,6 +208,45 @@ asks for a column on `takeoff_run_circuits`.
   marked" never creates a circuit row; the count stays the estimator's, as
   the column's own comment in `drizzle/schema.ts` requires.
 
+**Homerun footage** (Track C, 2026-10-06; DESIGN ONLY —
+`references/homerun-footage-plan.md`; nothing computes footage yet). Owner:
+method per bid with a per-area override, ceiling height per area, a per-job
+routing factor, every homerun overridable and starting unconfirmed. Fitted
+to `bid_panels` / `bid_panel_circuits` / `takeoff_run_circuits` above. All
+ADDITIVE, nullable, **no DEFAULT** (NULL = "not said, follow the level
+above"), no backfill. An area is a SHEET (plan § 4).
+
+- [ ] **On `bids`:**
+  - `homerunMethod` VARCHAR(16) NULL — `'measured'`, `'average'` or
+    `'measuredMin'`; NULL = Measured, the default.
+  - `homerunAverageFt` DECIMAL(8,2) NULL.
+  - `homerunMinimumFt` DECIMAL(8,2) NULL.
+  - `homerunRoutingPct` DECIMAL(6,4) NULL — 0.1500 = +15%; NULL = none
+    applied (a starter is shown, inert until accepted).
+  - `homerunRunTypeId` INT NULL, FK `takeoff_run_types.id` ON DELETE SET
+    NULL (plan § 8: conductors from the type, never inferred).
+- [ ] **On `bid_pdf_sheets`, the area override:** `homerunMethod`
+      VARCHAR(16) NULL, `homerunAverageFt` DECIMAL(8,2) NULL,
+      `homerunMinimumFt` DECIMAL(8,2) NULL. NULL = follow the bid.
+      **Ceiling height per area is NOT asked again:** it is
+      `bid_pdf_sheets.distributionHeightInches`, already numbered 0108 above.
+- [ ] **On `bid_panels`, where the panel sits on the plan:** `planSheetId`
+      INT NULL, FK `bid_pdf_sheets.id` ON DELETE SET NULL; `planX` and
+      `planY` DECIMAL(10,2) NULL (page points). Today kept per browser
+      (`bidridge:panel-spots:`, `@/lib/circuitGroups`); NULL = not placed,
+      and Measured then gives no number. Distinct from A's `bidPdfId` /
+      `sheetId`, which say where the SCHEDULE is printed.
+- [ ] **On `bid_panel_circuits`, one homerun per circuit** —
+      `homerunOverrideFt DECIMAL(8,2) NULL` (typed length, replaces L + V;
+      NULL = computed), `homerunFromStampId INT NULL` FK `takeoff_stamps.id`
+      ON DELETE SET NULL (the leaving device when not the closest; NULL =
+      closest), `homerunConfirmedAt TIMESTAMP NULL` (NULL = unconfirmed, how
+      every homerun starts). A circuit read only from tags (no schedule)
+      needs a `bid_panels` row with no schedule behind it — A's "typed in"
+      case.
+- `takeoff_run_circuits.panelCircuitId` (asked above) is what lets a TRACED
+  homerun replace the computed one for its circuit — no further column.
+
 **Quote items** (Track B, owner-answered 2026-10-05;
 references/quote-items-plan.md § 8). All ADDITIVE, nullable, **no
 DEFAULT**, no backfill — step 1 of the three-step deploy.
@@ -511,6 +550,28 @@ All additive and nullable. Specs are in the plans named.
       line optimistically and offers no way back. A line carries frozen
       snapshot prices, so Undo must restore the row, not re-add it at today's
       prices.
+
+### Low priority — homerun reader leftovers, and a stale test plan (Track C, 2026-10-06)
+
+Owner, 2026-10-06: real plans usually do not draw homeruns, so the
+drawn-homerun reader (`@/lib/homeruns`) is a rare-case helper — **kept, not
+tuned further.** Recorded so nobody re-finds them; do not fix now.
+Measurements: `references/code-first-ceiling.md` § d.
+
+- [ ] **3 misses: an arrow tip that ends ON a dark line** (Weld 1 E-200's
+      left GL-22; weld2 p12 L1-6 and L1-9 — tips on a wire, a J-box, a
+      fixture). To the clearance rule that looks like a keynote leader
+      pointing at a symbol.
+- [ ] **1 miss: a tag joined by a leader that has its own arrowhead**
+      (E-200 "GL-22,24,26", 85 pt from its 3-head arrow). Left unread, not
+      guessed.
+- [ ] **1 false find: weld2 p8** — the "A" keynote's leader points at an
+      "(X)" 3.1 pt away and is paired with the device tag "P1A-41". Distance
+      cannot separate it from E-200's real GL-17 (2.6 pt from "CTR").
+- [ ] **Staging's Weld 1 E-100 still says 1/4"** (the fix was to the local
+      test file, 2026-10-06). Re-upload Weld 1 to staging after the next
+      release, so the scale check passes it clean there too. Other
+      worktrees' `reader-accuracy/plans/Weld 1.pdf` copies are also old.
 
 ### Flaky tests — fix in a batch before beta
 
