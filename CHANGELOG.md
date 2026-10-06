@@ -4,6 +4,15 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-06]
+
+- **Fixed: taps on a freshly opened plan could be lost on a slow connection.**
+  The counting tool showed as ready, but for a moment after a sheet opened
+  (longer on a plan just uploaded) nothing was listening on the drawing, and
+  the taps disappeared without a word. They are now kept, shown at once, and
+  saved as soon as the sheet is ready. Found by the browser smoke test on
+  staging, and now tested on a deliberately slowed connection.
+
 ## [2026-10-05]
 
 - **New and existing devices now look different on the drawing at every

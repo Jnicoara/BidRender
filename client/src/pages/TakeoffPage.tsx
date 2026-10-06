@@ -316,8 +316,10 @@ import {
 } from "@/lib/markBatches";
 import {
   adoptRealGroup,
+  adoptRealSheet,
   dropProvisional,
   isProvisionalGroup,
+  isProvisionalSheet,
   lostMarksMessage,
 } from "@/lib/provisionalCount";
 import { earlyTextKey, sheetsToCatchUp } from "@/lib/scaleCatchUp";
@@ -3243,6 +3245,27 @@ export default function TakeoffPage({
     [gridRange, listRange, thumbnailPageCount]
   );
   const activeSheet = sheets.find(s => s.pageNumber === page) ?? null;
+  /*
+    A SHEET DRAWN BEFORE ITS ROW EXISTS (@/lib/provisionalCount, 2026-10-06).
+    A fresh upload is on screen three round trips before its sheet rows are;
+    a tap in that window had no sheet id and `markForClick` dropped it — the
+    staging smoke test's 0 of 3. Taps there are kept under a provisional
+    (negative) id per sheet, drawn at once, and moved onto the real sheet by
+    the effect beside `queueStamp` when the row arrives.
+  */
+  const provisionalSheets = useRef(new Map<SheetKey, number>());
+  const nextProvisionalSheet = useRef(-1);
+  const provisionalSheetFor = useCallback((key: SheetKey) => {
+    let id = provisionalSheets.current.get(key);
+    if (id === undefined) {
+      id = nextProvisionalSheet.current--;
+      provisionalSheets.current.set(key, id);
+    }
+    return id;
+  }, []);
+  /** The sheet id this sheet's unsent marks are held under right now. */
+  const drawnSheetId =
+    activeSheet?.id ?? provisionalSheets.current.get(sheetKey) ?? null;
   sheetNow.current = activeSheet
     ? { id: activeSheet.id, name: activeSheet.name }
     : null;
@@ -5115,7 +5138,8 @@ export default function TakeoffPage({
       const mark = markForClick(
         armedGroupHeld,
         sheetKey,
-        activeSheet?.id ?? null,
+        // No row yet (a fresh upload): kept under a stand-in, never dropped.
+        activeSheet?.id ?? provisionalSheetFor(sheetKey),
         at
       );
       if (!mark) return;
@@ -5136,7 +5160,9 @@ export default function TakeoffPage({
           sent: false,
         },
       ]);
-      mirrorQueue(sheetId);
+      // A stand-in sheet id means nothing after a reload; these marks are
+      // mirrored once the row arrives (the effect below).
+      if (!isProvisionalSheet(sheetId)) mirrorQueue(sheetId);
 
       if (flushTimer.current === null) {
         flushTimer.current = window.setTimeout(flushStamps, FLUSH_AFTER_MS);
@@ -5148,11 +5174,30 @@ export default function TakeoffPage({
       sheetKey,
       armedCategory,
       placingStatus,
+      provisionalSheetFor,
       flushStamps,
       mirrorQueue,
       setPending,
     ]
   );
+
+  /*
+    The row arrived: taps made before it move onto the real sheet, are
+    mirrored, and go (@/lib/provisionalCount, `adoptRealSheet`). Keyed on the
+    sheet in view, which is the only sheet a tap can have been made on.
+  */
+  useEffect(() => {
+    if (!activeSheet) return;
+    const provisional = provisionalSheets.current.get(sheetKey);
+    if (provisional === undefined) return;
+    provisionalSheets.current.delete(sheetKey);
+    setPending(
+      adoptRealSheet(pendingStamps.current, provisional, activeSheet.id)
+    );
+    mirrorQueue(activeSheet.id);
+    flushStamps();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSheet?.id, sheetKey]);
 
   /**
    * Pick up a count the server has not made yet, and keep every click.
@@ -9078,423 +9123,430 @@ export default function TakeoffPage({
                 const fresh = utils.bidPdfs.list.getData({ bidId });
                 return fresh?.find(d => d.id === doc.id)?.url ?? null;
               }}
-              overlay={size =>
-                measurability ? (
-                  <>
-                    {/* Calibration takes the drawing while it is on: two
+              overlay={size => (
+                /*
+                  ALWAYS mounted once the drawing is (PlanPane's own gate).
+                  This read `measurability ? (` until 2026-10-06, so until
+                  that query answered — a round trip after a sheet opens, and
+                  more on a fresh upload, whose sheet rows come three round
+                  trips after the drawing — there was no layer over the
+                  sheet: the count was armed, the pill said so, and every tap
+                  fell on the bare canvas and was lost without a word
+                  (staging smoke, touch.spec, 0 of 3, four runs in a row).
+                  Counting needs no scale and no sheet row: TraceLayer takes
+                  a measurability still loading as "cannot trace yet", and a
+                  tap before the row is kept under a stand-in sheet id
+                  (`provisionalSheetFor`). Each child that needs the row
+                  checks `activeSheet` itself.
+                */
+                <>
+                  {/* Calibration takes the drawing while it is on: two
                               clicks that mean something different from every
                               other click on this screen. */}
-                    {calibrating && activeSheet && (
-                      <CalibrateLayer
-                        // A fresh layer per request — see calibrateSession.
-                        key={calibrateSession}
-                        width={size.width}
-                        height={size.height}
-                        renderScale={size.renderScale}
-                        chromeTarget={size.chromeTarget}
-                        points={calibratePoints}
-                        onPointsChange={setCalibratePoints}
-                        busy={setSheetScale.isPending}
-                        /*
+                  {calibrating && activeSheet && (
+                    <CalibrateLayer
+                      // A fresh layer per request — see calibrateSession.
+                      key={calibrateSession}
+                      width={size.width}
+                      height={size.height}
+                      renderScale={size.renderScale}
+                      chromeTarget={size.chromeTarget}
+                      points={calibratePoints}
+                      onPointsChange={setCalibratePoints}
+                      busy={setSheetScale.isPending}
+                      /*
                           Applying no longer CLOSES this. The layer moves on to
                           checking the scale against a second known dimension,
                           which is the half that catches a plausible wrong
                           answer — see CalibrateLayer's `phase`. It closes
                           through onCancel, from Done or from skipping.
                         */
-                        onApply={scaleText =>
-                          setSheetScale.mutateAsync({
-                            id: activeSheet.id,
-                            scaleText,
-                          })
-                        }
-                        onChecked={() =>
-                          confirmSheetScale.mutateAsync({ id: activeSheet.id })
-                        }
-                        startInCheck={calibrateMode === "check"}
-                        sheetRatio={activeSheet.scaleRatio}
-                        onCancel={() => {
-                          setCalibrating(false);
-                          setCalibratePoints([]);
-                        }}
-                      />
-                    )}
-                    {/* Rendered only while no other tool holds the sheet —
+                      onApply={scaleText =>
+                        setSheetScale.mutateAsync({
+                          id: activeSheet.id,
+                          scaleText,
+                        })
+                      }
+                      onChecked={() =>
+                        confirmSheetScale.mutateAsync({ id: activeSheet.id })
+                      }
+                      startInCheck={calibrateMode === "check"}
+                      sheetRatio={activeSheet.scaleRatio}
+                      onCancel={() => {
+                        setCalibrating(false);
+                        setCalibratePoints([]);
+                      }}
+                    />
+                  )}
+                  {/* Rendered only while no other tool holds the sheet —
                         the structural half of "one tool at a time". */}
-                    {selectingText &&
-                      activeSheet &&
-                      !tracing &&
-                      !calibrating &&
-                      !capturingSymbol &&
-                      !pendingCapture &&
-                      !capturingLegend &&
-                      !legendDraft && (
-                        <TextSelectLayer
-                          width={size.width}
-                          height={size.height}
-                          renderScale={size.renderScale}
-                          sheetKey={`${activeSheet.id}`}
-                          loadTextLayer={size.loadTextLayer}
-                          chromeTarget={size.chromeTarget}
-                          catalog={allMaterials}
-                          onClose={() => setSelectingText(false)}
-                        />
-                      )}
-                    {capturingSymbol && (
-                      <SymbolCaptureLayer
+                  {selectingText &&
+                    activeSheet &&
+                    !tracing &&
+                    !calibrating &&
+                    !capturingSymbol &&
+                    !pendingCapture &&
+                    !capturingLegend &&
+                    !legendDraft && (
+                      <TextSelectLayer
                         width={size.width}
                         height={size.height}
                         renderScale={size.renderScale}
-                        onCancel={() => setCapturingSymbol(false)}
-                        onRegion={(region: CaptureRegion) => {
-                          // The soft preview, at once, so the form is never
-                          // empty while the sharp render runs.
-                          const preview = size.canvas
-                            ? cropToThumbnail(
-                                size.canvas,
-                                region,
-                                size.renderScale
-                              )
-                            : null;
-                          const id = ++captureSeq.current;
-                          setCapturingSymbol(false);
-                          setPendingCapture({
-                            id,
-                            region,
-                            sheetId: activeSheet?.id,
-                            thumbnail: preview,
-                            sharpening: true,
-                            soft: false,
-                          });
-                          const settle = (sharp: string | null) =>
-                            setPendingCapture(current =>
-                              current?.id === id
-                                ? {
-                                    ...current,
-                                    thumbnail: sharp ?? current.thumbnail,
-                                    sharpening: false,
-                                    soft: sharp === null && preview !== null,
-                                  }
-                                : current
-                            );
-                          renderSharpCapture(
-                            region,
-                            size.screenScale,
-                            size.renderRegion
-                          ).then(settle, error => {
-                            console.warn(
-                              "[capture] sharp render failed; keeping the preview",
-                              error
-                            );
-                            settle(null);
-                          });
-                        }}
-                      />
-                    )}
-                    {pendingCapture && (
-                      <SymbolCaptureForm
-                        thumbnail={pendingCapture.thumbnail}
-                        sharpening={pendingCapture.sharpening}
-                        soft={pendingCapture.soft}
+                        sheetKey={`${activeSheet.id}`}
+                        loadTextLayer={size.loadTextLayer}
                         chromeTarget={size.chromeTarget}
-                        onCancel={() => setPendingCapture(null)}
-                        existingFor={name => {
-                          const key = symbolLookupKey(name);
-                          const hit = symbols.find(
-                            s =>
-                              symbolLookupKey(s.label) === key ||
-                              (s.originalName !== null &&
-                                symbolLookupKey(s.originalName) === key)
-                          );
-                          return hit
-                            ? {
-                                label: hit.label,
-                                looks: hit.looks,
-                                thumbnail: hit.thumbnail,
-                              }
-                            : null;
-                        }}
-                        onAddLook={async (label, accepted) => {
-                          // Look-alikes (multiple-looks-plan.md § 4): the new
-                          // look is searched on its own sheet first, and the
-                          // server refuses to save it over marks counted as
-                          // another item until the person says "Add anyway".
-                          const capture = pendingCapture;
-                          const box = normaliseCaptureBox(capture.region);
-                          const boxed = box.width > 0 && box.height > 0;
-                          let check: ReturnType<typeof lookAlikeCheck> = {
-                            spots: [],
-                          };
-                          if (!accepted)
-                            check = lookAlikeCheck(
-                              boxed && capture.sheetId === activeSheet?.id
-                                ? await size
-                                    .findMatching(box, [])
-                                    .then(r => r.result)
-                                    .catch(() => null)
-                                : null
-                            );
-                          const r = await captureSymbol.mutateAsync({
-                            label,
-                            thumbnail: capture.thumbnail,
-                            capturedFromSheetId: capture.sheetId,
-                            box: boxed ? box : undefined,
-                            addAsLook: true,
-                            lookAlike:
-                              "spots" in check
-                                ? { spots: check.spots, accepted }
-                                : undefined,
-                          });
-                          if ("lookAlike" in r && r.lookAlike)
-                            return r.lookAlike;
-                          toast.success(
-                            [
-                              r.lookAlreadySaved
-                                ? "This look is already saved."
-                                : `Added look ${r.looks} for ${label}. It is still one item: one count, one price.`,
-                              "cannotCompare" in check
-                                ? check.cannotCompare
-                                : null,
-                            ]
-                              .filter(Boolean)
-                              .join(" ")
-                          );
-                          setPendingCapture(null);
-                          return null;
-                        }}
-                        onSave={label => {
-                          const box = normaliseCaptureBox(
-                            pendingCapture.region
-                          );
-                          captureSymbol.mutate(
-                            {
-                              label,
-                              thumbnail: pendingCapture.thumbnail,
-                              capturedFromSheetId: pendingCapture.sheetId,
-                              box:
-                                box.width > 0 && box.height > 0
-                                  ? box
-                                  : undefined,
-                            },
-                            {
-                              onSuccess: r =>
-                                toast.success(
-                                  r.lookAlreadySaved
-                                    ? "This look is already saved."
-                                    : r.alreadyKnown && r.lookAdded
-                                      ? `Added look ${r.looks} for ${label}. It is still one item: one count, one price.`
-                                      : r.alreadyKnown
-                                        ? "Already in your legend."
-                                        : r.autoLinked
-                                          ? `Captured and linked to “${
-                                              allAssemblies.find(
-                                                a => a.id === r.assemblyId
-                                              )?.name ?? label
-                                            }”, the assembly of the same name.`
-                                          : // A click on it COUNTS (legend plan
-                                            // § 8a); linking is the row's own
-                                            // control, never the first step.
-                                            "Captured — click it in the legend to start counting. Link it to an assembly from its row whenever you like."
-                                ),
-                            }
-                          );
-                          setPendingCapture(null);
-                        }}
+                        catalog={allMaterials}
+                        onClose={() => setSelectingText(false)}
                       />
                     )}
-                    {capturingLegend && (
-                      <SymbolCaptureLayer
-                        width={size.width}
-                        height={size.height}
-                        renderScale={size.renderScale}
-                        onCancel={() => setCapturingLegend(false)}
-                        onRegion={(region: CaptureRegion) => {
-                          setCapturingLegend(false);
-                          const sheetId = activeSheet?.id;
-                          setLegendDraft({ state: null, sheetId });
-                          readWholeLegend({
-                            box: region,
-                            renderRegion: size.renderRegion,
-                            loadTextLayer: size.loadTextLayer,
-                            library: allAssemblies.map(a => a.name),
-                            captured: symbols.map(s => s.label),
-                          }).then(
-                            state => {
-                              setLegendDraft(current =>
-                                current ? { ...current, state } : current
-                              );
-                              // Kept for "Check sheet", whatever is saved.
-                              // A legend in three columns is three boxes on
-                              // one sheet, so they add up (mergeLegendRows).
-                              if (state.kind === "rows" && doc && activeSheet)
-                                keepSessionLegend({
-                                  bidId,
-                                  docId: doc.id,
-                                  page,
-                                  sheetName: activeSheet.name,
-                                  rows: mergeLegendRows(
-                                    sessionLegend?.docId === doc.id &&
-                                      sessionLegend.page === page
-                                      ? sessionLegend.rows
-                                      : [],
-                                    state.rows.map(r => ({
-                                      name: r.name,
-                                      symbol: r.symbol,
-                                      picture: r.picture,
-                                    }))
-                                  ),
-                                  picks: sessionLegend?.picks ?? {},
-                                });
-                            },
-                            error => {
-                              setLegendDraft(null);
-                              toast.error(
-                                `The legend could not be read: ${
-                                  error instanceof Error
-                                    ? error.message
-                                    : String(error)
-                                }`
-                              );
-                            }
-                          );
-                        }}
-                      />
-                    )}
-                    {legendDraft && (
-                      <LegendCaptureForm
-                        state={legendDraft.state}
-                        library={allAssemblies.map(a => a.name)}
-                        captured={symbols.map(s => s.label)}
-                        chromeTarget={size.chromeTarget}
-                        saving={legendSaving}
-                        onCancel={() => setLegendDraft(null)}
-                        onSave={async picked => {
-                          let saved = 0;
-                          let linked = 0;
-                          const failed: string[] = [];
-                          for (let i = 0; i < picked.length; i++) {
-                            const row = picked[i];
-                            setLegendSaving(
-                              `Saving ${i + 1} of ${picked.length}…`
-                            );
-                            try {
-                              const r = await captureLegendSymbol.mutateAsync({
-                                label: row.name,
-                                thumbnail: row.picture,
-                                capturedFromSheetId: legendDraft.sheetId,
-                              });
-                              saved++;
-                              if (r.autoLinked) linked++;
-                            } catch {
-                              failed.push(row.name);
-                            }
-                          }
-                          setLegendSaving(null);
-                          setLegendDraft(null);
-                          void utils.takeoffStamps.symbols.invalidate();
-                          if (saved > 0) {
-                            toast.success(
-                              `Saved ${saved} symbol${saved === 1 ? "" : "s"} to your legend` +
-                                (linked > 0
-                                  ? `; ${linked} linked to the assembly of the same name.`
-                                  : ".")
-                            );
-                          }
-                          if (failed.length > 0) {
-                            toast.error(
-                              `${failed.length} could not be saved: ${failed.join(", ")}`
-                            );
-                          }
-                        }}
-                      />
-                    )}
-                    {activeSheet && (
-                      <ConnectPointReader
-                        // Only when a run can snap: tracing, or a run's
-                        // ends up for dragging. No reading on a mere look.
-                        enabled={tracing || selectedRunId !== null}
-                        sheetId={activeSheet.id}
-                        marks={wallMarks}
-                        read={size.connectPoints}
-                        onRead={setConnectRead}
-                      />
-                    )}
-                    <TraceLayer
+                  {capturingSymbol && (
+                    <SymbolCaptureLayer
                       width={size.width}
                       height={size.height}
                       renderScale={size.renderScale}
-                      connects={connects}
-                      measurability={measurability}
-                      tracing={tracing}
-                      pathType={tracePathType}
-                      // A quantity trace has no ends; the pill says what it
-                      // counts instead, and what a drop will be proposed as.
-                      endsLabel={
-                        activeTraceMode === "quantity"
-                          ? `Quantity — drops to ${endKindLabel(traceEnds.endKind, heightsForBid?.types)}`
-                          : armedEndsLabel
-                      }
-                      points={tracePoints}
-                      onPointsChange={setTracePoints}
-                      existingRuns={drawnRuns}
-                      runColors={runColors}
-                      pins={pinStyles}
-                      drops={dropMarkers}
-                      onSelectDrop={drop => {
-                        // Open the trace's leg in the panel, with this drop
-                        // expanded — where its type and height are changed.
-                        setSelectedRunId(drop.legId);
-                        setSelectedDrop(drop);
-                        updatePanels(current =>
-                          current.work ? current : togglePanel(current, "work")
+                      onCancel={() => setCapturingSymbol(false)}
+                      onRegion={(region: CaptureRegion) => {
+                        // The soft preview, at once, so the form is never
+                        // empty while the sharp render runs.
+                        const preview = size.canvas
+                          ? cropToThumbnail(
+                              size.canvas,
+                              region,
+                              size.renderScale
+                            )
+                          : null;
+                        const id = ++captureSeq.current;
+                        setCapturingSymbol(false);
+                        setPendingCapture({
+                          id,
+                          region,
+                          sheetId: activeSheet?.id,
+                          thumbnail: preview,
+                          sharpening: true,
+                          soft: false,
+                        });
+                        const settle = (sharp: string | null) =>
+                          setPendingCapture(current =>
+                            current?.id === id
+                              ? {
+                                  ...current,
+                                  thumbnail: sharp ?? current.thumbnail,
+                                  sharpening: false,
+                                  soft: sharp === null && preview !== null,
+                                }
+                              : current
+                          );
+                        renderSharpCapture(
+                          region,
+                          size.screenScale,
+                          size.renderRegion
+                        ).then(settle, error => {
+                          console.warn(
+                            "[capture] sharp render failed; keeping the preview",
+                            error
+                          );
+                          settle(null);
+                        });
+                      }}
+                    />
+                  )}
+                  {pendingCapture && (
+                    <SymbolCaptureForm
+                      thumbnail={pendingCapture.thumbnail}
+                      sharpening={pendingCapture.sharpening}
+                      soft={pendingCapture.soft}
+                      chromeTarget={size.chromeTarget}
+                      onCancel={() => setPendingCapture(null)}
+                      existingFor={name => {
+                        const key = symbolLookupKey(name);
+                        const hit = symbols.find(
+                          s =>
+                            symbolLookupKey(s.label) === key ||
+                            (s.originalName !== null &&
+                              symbolLookupKey(s.originalName) === key)
+                        );
+                        return hit
+                          ? {
+                              label: hit.label,
+                              looks: hit.looks,
+                              thumbnail: hit.thumbnail,
+                            }
+                          : null;
+                      }}
+                      onAddLook={async (label, accepted) => {
+                        // Look-alikes (multiple-looks-plan.md § 4): the new
+                        // look is searched on its own sheet first, and the
+                        // server refuses to save it over marks counted as
+                        // another item until the person says "Add anyway".
+                        const capture = pendingCapture;
+                        const box = normaliseCaptureBox(capture.region);
+                        const boxed = box.width > 0 && box.height > 0;
+                        let check: ReturnType<typeof lookAlikeCheck> = {
+                          spots: [],
+                        };
+                        if (!accepted)
+                          check = lookAlikeCheck(
+                            boxed && capture.sheetId === activeSheet?.id
+                              ? await size
+                                  .findMatching(box, [])
+                                  .then(r => r.result)
+                                  .catch(() => null)
+                              : null
+                          );
+                        const r = await captureSymbol.mutateAsync({
+                          label,
+                          thumbnail: capture.thumbnail,
+                          capturedFromSheetId: capture.sheetId,
+                          box: boxed ? box : undefined,
+                          addAsLook: true,
+                          lookAlike:
+                            "spots" in check
+                              ? { spots: check.spots, accepted }
+                              : undefined,
+                        });
+                        if ("lookAlike" in r && r.lookAlike) return r.lookAlike;
+                        toast.success(
+                          [
+                            r.lookAlreadySaved
+                              ? "This look is already saved."
+                              : `Added look ${r.looks} for ${label}. It is still one item: one count, one price.`,
+                            "cannotCompare" in check
+                              ? check.cannotCompare
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" ")
+                        );
+                        setPendingCapture(null);
+                        return null;
+                      }}
+                      onSave={label => {
+                        const box = normaliseCaptureBox(pendingCapture.region);
+                        captureSymbol.mutate(
+                          {
+                            label,
+                            thumbnail: pendingCapture.thumbnail,
+                            capturedFromSheetId: pendingCapture.sheetId,
+                            box:
+                              box.width > 0 && box.height > 0 ? box : undefined,
+                          },
+                          {
+                            onSuccess: r =>
+                              toast.success(
+                                r.lookAlreadySaved
+                                  ? "This look is already saved."
+                                  : r.alreadyKnown && r.lookAdded
+                                    ? `Added look ${r.looks} for ${label}. It is still one item: one count, one price.`
+                                    : r.alreadyKnown
+                                      ? "Already in your legend."
+                                      : r.autoLinked
+                                        ? `Captured and linked to “${
+                                            allAssemblies.find(
+                                              a => a.id === r.assemblyId
+                                            )?.name ?? label
+                                          }”, the assembly of the same name.`
+                                        : // A click on it COUNTS (legend plan
+                                          // § 8a); linking is the row's own
+                                          // control, never the first step.
+                                          "Captured — click it in the legend to start counting. Link it to an assembly from its row whenever you like."
+                              ),
+                          }
+                        );
+                        setPendingCapture(null);
+                      }}
+                    />
+                  )}
+                  {capturingLegend && (
+                    <SymbolCaptureLayer
+                      width={size.width}
+                      height={size.height}
+                      renderScale={size.renderScale}
+                      onCancel={() => setCapturingLegend(false)}
+                      onRegion={(region: CaptureRegion) => {
+                        setCapturingLegend(false);
+                        const sheetId = activeSheet?.id;
+                        setLegendDraft({ state: null, sheetId });
+                        readWholeLegend({
+                          box: region,
+                          renderRegion: size.renderRegion,
+                          loadTextLayer: size.loadTextLayer,
+                          library: allAssemblies.map(a => a.name),
+                          captured: symbols.map(s => s.label),
+                        }).then(
+                          state => {
+                            setLegendDraft(current =>
+                              current ? { ...current, state } : current
+                            );
+                            // Kept for "Check sheet", whatever is saved.
+                            // A legend in three columns is three boxes on
+                            // one sheet, so they add up (mergeLegendRows).
+                            if (state.kind === "rows" && doc && activeSheet)
+                              keepSessionLegend({
+                                bidId,
+                                docId: doc.id,
+                                page,
+                                sheetName: activeSheet.name,
+                                rows: mergeLegendRows(
+                                  sessionLegend?.docId === doc.id &&
+                                    sessionLegend.page === page
+                                    ? sessionLegend.rows
+                                    : [],
+                                  state.rows.map(r => ({
+                                    name: r.name,
+                                    symbol: r.symbol,
+                                    picture: r.picture,
+                                  }))
+                                ),
+                                picks: sessionLegend?.picks ?? {},
+                              });
+                          },
+                          error => {
+                            setLegendDraft(null);
+                            toast.error(
+                              `The legend could not be read: ${
+                                error instanceof Error
+                                  ? error.message
+                                  : String(error)
+                              }`
+                            );
+                          }
                         );
                       }}
-                      onFinish={finishTrace}
-                      onCancel={cancelTrace}
-                      selectedRunId={selectedRunId}
-                      onSelectRun={setSelectedRunId}
-                      /*
+                    />
+                  )}
+                  {legendDraft && (
+                    <LegendCaptureForm
+                      state={legendDraft.state}
+                      library={allAssemblies.map(a => a.name)}
+                      captured={symbols.map(s => s.label)}
+                      chromeTarget={size.chromeTarget}
+                      saving={legendSaving}
+                      onCancel={() => setLegendDraft(null)}
+                      onSave={async picked => {
+                        let saved = 0;
+                        let linked = 0;
+                        const failed: string[] = [];
+                        for (let i = 0; i < picked.length; i++) {
+                          const row = picked[i];
+                          setLegendSaving(
+                            `Saving ${i + 1} of ${picked.length}…`
+                          );
+                          try {
+                            const r = await captureLegendSymbol.mutateAsync({
+                              label: row.name,
+                              thumbnail: row.picture,
+                              capturedFromSheetId: legendDraft.sheetId,
+                            });
+                            saved++;
+                            if (r.autoLinked) linked++;
+                          } catch {
+                            failed.push(row.name);
+                          }
+                        }
+                        setLegendSaving(null);
+                        setLegendDraft(null);
+                        void utils.takeoffStamps.symbols.invalidate();
+                        if (saved > 0) {
+                          toast.success(
+                            `Saved ${saved} symbol${saved === 1 ? "" : "s"} to your legend` +
+                              (linked > 0
+                                ? `; ${linked} linked to the assembly of the same name.`
+                                : ".")
+                          );
+                        }
+                        if (failed.length > 0) {
+                          toast.error(
+                            `${failed.length} could not be saved: ${failed.join(", ")}`
+                          );
+                        }
+                      }}
+                    />
+                  )}
+                  {activeSheet && (
+                    <ConnectPointReader
+                      // Only when a run can snap: tracing, or a run's
+                      // ends up for dragging. No reading on a mere look.
+                      enabled={tracing || selectedRunId !== null}
+                      sheetId={activeSheet.id}
+                      marks={wallMarks}
+                      read={size.connectPoints}
+                      onRead={setConnectRead}
+                    />
+                  )}
+                  <TraceLayer
+                    width={size.width}
+                    height={size.height}
+                    renderScale={size.renderScale}
+                    connects={connects}
+                    measurability={measurability}
+                    tracing={tracing}
+                    pathType={tracePathType}
+                    // A quantity trace has no ends; the pill says what it
+                    // counts instead, and what a drop will be proposed as.
+                    endsLabel={
+                      activeTraceMode === "quantity"
+                        ? `Quantity — drops to ${endKindLabel(traceEnds.endKind, heightsForBid?.types)}`
+                        : armedEndsLabel
+                    }
+                    points={tracePoints}
+                    onPointsChange={setTracePoints}
+                    existingRuns={drawnRuns}
+                    runColors={runColors}
+                    pins={pinStyles}
+                    drops={dropMarkers}
+                    onSelectDrop={drop => {
+                      // Open the trace's leg in the panel, with this drop
+                      // expanded — where its type and height are changed.
+                      setSelectedRunId(drop.legId);
+                      setSelectedDrop(drop);
+                      updatePanels(current =>
+                        current.work ? current : togglePanel(current, "work")
+                      );
+                    }}
+                    onFinish={finishTrace}
+                    onCancel={cancelTrace}
+                    selectedRunId={selectedRunId}
+                    onSelectRun={setSelectedRunId}
+                    /*
                         Points are editable on the selected run only, with no
                         other tool armed — and never on a locked bid, where
                         the handles are not drawn at all (the server refuses
                         too). A drag is the thing the lock exists to stop.
                       */
-                      editableRunId={
-                        quantitiesLocked || selectingText ? null : selectedRunId
-                      }
-                      onPickEnd={(runId, end) =>
-                        setEndHighlight({ runId, end })
-                      }
-                      onEditPoints={(id, points) =>
-                        editPoints.mutate({ id, points })
-                      }
-                      /*
+                    editableRunId={
+                      quantitiesLocked || selectingText ? null : selectedRunId
+                    }
+                    onPickEnd={(runId, end) => setEndHighlight({ runId, end })}
+                    onEditPoints={(id, points) =>
+                      editPoints.mutate({ id, points })
+                    }
+                    /*
                         The structural half of "one tool at a time", as for
                         the text layer above: while another tool holds the
                         sheet, a click cannot also be a mark.
                       */
-                      stamping={
-                        Boolean(armedGroup) &&
-                        !tracing &&
-                        !capturingSymbol &&
-                        !pendingCapture &&
-                        !calibrating &&
-                        !selectingText
-                      }
-                      armedGroupName={armedGroup?.label ?? null}
-                      zoom={size.zoom}
-                      stamps={[
-                        ...visibleStamps.map(st => ({
-                          id: st.id,
-                          name: st.name,
-                          groupId: st.groupId,
-                          assemblyId: st.assemblyId,
-                          assemblyCategory: st.assemblyCategory ?? null,
-                          x: st.x,
-                          y: st.y,
-                          status: st.status,
-                        })),
-                        /*
+                    stamping={
+                      Boolean(armedGroup) &&
+                      !tracing &&
+                      !capturingSymbol &&
+                      !pendingCapture &&
+                      !calibrating &&
+                      !selectingText
+                    }
+                    armedGroupName={armedGroup?.label ?? null}
+                    zoom={size.zoom}
+                    stamps={[
+                      ...visibleStamps.map(st => ({
+                        id: st.id,
+                        name: st.name,
+                        groupId: st.groupId,
+                        assemblyId: st.assemblyId,
+                        assemblyCategory: st.assemblyCategory ?? null,
+                        x: st.x,
+                        y: st.y,
+                        status: st.status,
+                      })),
+                      /*
                           Clicked and not yet saved, drawn the same way.
 
                           Deliberately NOT put through the Layers filter above:
@@ -9503,243 +9555,239 @@ export default function TakeoffPage({
                           because a layer is hidden is indistinguishable from a
                           click that missed.
                         */
-                        ...pendingMarks
-                          .filter(m => m.sheetId === activeSheet?.id)
-                          .map(m => ({
-                            id: m.key,
-                            name: m.name,
-                            groupId: m.groupId,
-                            assemblyId: m.assemblyId,
-                            assemblyCategory: m.assemblyCategory,
-                            x: m.x,
-                            y: m.y,
-                            // What "placing as" said when it was clicked, so
-                            // an existing device is hollow before the reply.
-                            status: m.status === "new" ? null : m.status,
-                            pending: true,
-                          })),
-                      ]}
-                      proposals={proposals}
-                      onDropStamp={queueStamp}
-                      selectedStampIds={selectedStampIds}
-                      onStampClick={(id, additive) =>
-                        setSelectedStampIds(current =>
-                          clickSelection(current, id, additive)
-                        )
-                      }
-                      onBoxSelect={ids =>
-                        setSelectedStampIds(current =>
-                          boxSelection(current, ids)
-                        )
-                      }
-                      onDeleteSelected={() => deleteSelected(false)}
-                      moveTargets={quantitiesLocked ? [] : moveTargets}
-                      onMoveSelected={groupId =>
-                        moveStamps.mutate({
-                          // A mark still being sent has no id yet.
-                          ids: Array.from(selectedStampIds).filter(
-                            id => id > 0
-                          ),
-                          groupId,
-                        })
-                      }
-                      onSetStatusSelected={
-                        quantitiesLocked || !bidId
-                          ? undefined
-                          : status =>
-                              setMarkStatus.mutate({
-                                bidId,
-                                ids: Array.from(selectedStampIds).filter(
-                                  id => id > 0
-                                ),
-                                status,
-                              })
-                      }
-                      onClearSelection={() => setSelectedStampIds(new Set())}
-                      selectMode={touchSelect}
-                      freePoints={freeLegPoints}
-                      onToggleFreePoints={() => setFreeLegPoints(on => !on)}
-                      focusPoint={focusPoint}
-                      chromeTarget={size.chromeTarget}
-                      legs={{
-                        active: legRootId !== null,
-                        pending: legRootId !== null && tracePoints.length === 0,
-                        busy: legBusy,
-                        prevEnd: legPrevEnd,
-                        startLabel: legStart ? legSnapLabel(legStart) : null,
-                        onNewLeg: at => void beginNewLeg(at),
-                        onStart: at => placeLegStart(at),
-                        preview: at => snapLegStart(at),
-                      }}
-                    />
-                    {/*
+                      ...pendingMarks
+                        // Held under a stand-in until the row arrives.
+                        .filter(m => m.sheetId === drawnSheetId)
+                        .map(m => ({
+                          id: m.key,
+                          name: m.name,
+                          groupId: m.groupId,
+                          assemblyId: m.assemblyId,
+                          assemblyCategory: m.assemblyCategory,
+                          x: m.x,
+                          y: m.y,
+                          // What "placing as" said when it was clicked, so
+                          // an existing device is hollow before the reply.
+                          status: m.status === "new" ? null : m.status,
+                          pending: true,
+                        })),
+                    ]}
+                    proposals={proposals}
+                    onDropStamp={queueStamp}
+                    selectedStampIds={selectedStampIds}
+                    onStampClick={(id, additive) =>
+                      setSelectedStampIds(current =>
+                        clickSelection(current, id, additive)
+                      )
+                    }
+                    onBoxSelect={ids =>
+                      setSelectedStampIds(current => boxSelection(current, ids))
+                    }
+                    onDeleteSelected={() => deleteSelected(false)}
+                    moveTargets={quantitiesLocked ? [] : moveTargets}
+                    onMoveSelected={groupId =>
+                      moveStamps.mutate({
+                        // A mark still being sent has no id yet.
+                        ids: Array.from(selectedStampIds).filter(id => id > 0),
+                        groupId,
+                      })
+                    }
+                    onSetStatusSelected={
+                      quantitiesLocked || !bidId
+                        ? undefined
+                        : status =>
+                            setMarkStatus.mutate({
+                              bidId,
+                              ids: Array.from(selectedStampIds).filter(
+                                id => id > 0
+                              ),
+                              status,
+                            })
+                    }
+                    onClearSelection={() => setSelectedStampIds(new Set())}
+                    selectMode={touchSelect}
+                    freePoints={freeLegPoints}
+                    onToggleFreePoints={() => setFreeLegPoints(on => !on)}
+                    focusPoint={focusPoint}
+                    chromeTarget={size.chromeTarget}
+                    legs={{
+                      active: legRootId !== null,
+                      pending: legRootId !== null && tracePoints.length === 0,
+                      busy: legBusy,
+                      prevEnd: legPrevEnd,
+                      startLabel: legStart ? legSnapLabel(legStart) : null,
+                      onNewLeg: at => void beginNewLeg(at),
+                      onStart: at => placeLegStart(at),
+                      preview: at => snapLegStart(at),
+                    }}
+                  />
+                  {/*
                       Find all matching, last so its rings sit over the marks
                       and take their own clicks (FindMatching.tsx).
                     */}
-                    {findSession &&
-                      activeSheet &&
-                      findSession.sheetId === activeSheet.id && (
-                        <>
-                          {findSession.panel.phase === "boxing" && (
-                            <SymbolCaptureLayer
-                              width={size.width}
-                              height={size.height}
-                              renderScale={size.renderScale}
-                              onCancel={() => setFindSession(null)}
-                              onRegion={region =>
-                                void runFind(region, size.findMatching)
-                              }
-                            />
-                          )}
-                          {findSession.panel.phase === "results" && (
-                            <MatchLayer
-                              width={size.width}
-                              height={size.height}
-                              renderScale={size.renderScale}
-                              items={findSession.panel.items}
-                              selectedId={findSession.panel.selectedId}
-                              onSelect={selectFound}
-                            />
-                          )}
-                          <MatchPanel
-                            label={findSession.group.label}
-                            existingLabel={existingTwin?.label ?? null}
-                            state={findSession.panel}
-                            chromeTarget={size.chromeTarget}
-                            canAskAi={readerAvailable}
-                            onAskAi={() =>
-                              void askAboutScanFinds(size.renderRegion)
+                  {findSession &&
+                    activeSheet &&
+                    findSession.sheetId === activeSheet.id && (
+                      <>
+                        {findSession.panel.phase === "boxing" && (
+                          <SymbolCaptureLayer
+                            width={size.width}
+                            height={size.height}
+                            renderScale={size.renderScale}
+                            onCancel={() => setFindSession(null)}
+                            onRegion={region =>
+                              void runFind(region, size.findMatching)
                             }
-                            savedLooks={{
-                              total: findSession.looks.length,
-                              thisSet: findSession.looks.filter(
-                                l => l.confirmsThisSet
-                              ).length,
-                            }}
-                            onSearchLooks={() =>
-                              void runFind(null, size.findMatching)
-                            }
-                            onConfirm={confirmFound}
-                            onConfirmExisting={ids =>
-                              void confirmFoundExisting(ids)
-                            }
-                            onReject={ids => decideFound(ids, "rejected")}
-                            onNext={nextFound}
-                            onClose={() => setFindSession(null)}
                           />
-                        </>
-                      )}
-                    {checkSession &&
-                      activeSheet &&
-                      checkSession.sheetId === activeSheet.id && (
-                        <>
-                          {checkSession.run !== checkSession.ran && (
-                            <SheetCheckRunner
-                              key={checkSession.run}
-                              run={() => void runCheck(size.sheetCheck)}
-                            />
-                          )}
-                          {checkResult && (
-                            <SheetCheckLayer
-                              width={size.width}
-                              height={size.height}
-                              renderScale={size.renderScale}
-                              rings={sheetCheckRings(
-                                checkResult,
-                                checkSession.hidden
-                              )}
-                              selected={checkSession.selected}
-                            />
-                          )}
-                          <SheetCheckPanel
-                            state={checkSession.state}
-                            legendName={sessionLegend?.sheetName ?? null}
-                            legendRows={sessionLegend?.rows ?? []}
-                            picks={sessionLegend?.picks ?? {}}
-                            locked={quantitiesLocked}
-                            countForItem={countForItem}
-                            moveTargets={moveTargets}
-                            hidden={checkSession.hidden}
+                        )}
+                        {findSession.panel.phase === "results" && (
+                          <MatchLayer
+                            width={size.width}
+                            height={size.height}
+                            renderScale={size.renderScale}
+                            items={findSession.panel.items}
+                            selectedId={findSession.panel.selectedId}
+                            onSelect={selectFound}
+                          />
+                        )}
+                        <MatchPanel
+                          label={findSession.group.label}
+                          existingLabel={existingTwin?.label ?? null}
+                          state={findSession.panel}
+                          chromeTarget={size.chromeTarget}
+                          canAskAi={readerAvailable}
+                          onAskAi={() =>
+                            void askAboutScanFinds(size.renderRegion)
+                          }
+                          savedLooks={{
+                            total: findSession.looks.length,
+                            thisSet: findSession.looks.filter(
+                              l => l.confirmsThisSet
+                            ).length,
+                          }}
+                          onSearchLooks={() =>
+                            void runFind(null, size.findMatching)
+                          }
+                          onConfirm={confirmFound}
+                          onConfirmExisting={ids =>
+                            void confirmFoundExisting(ids)
+                          }
+                          onReject={ids => decideFound(ids, "rejected")}
+                          onNext={nextFound}
+                          onClose={() => setFindSession(null)}
+                        />
+                      </>
+                    )}
+                  {checkSession &&
+                    activeSheet &&
+                    checkSession.sheetId === activeSheet.id && (
+                      <>
+                        {checkSession.run !== checkSession.ran && (
+                          <SheetCheckRunner
+                            key={checkSession.run}
+                            run={() => void runCheck(size.sheetCheck)}
+                          />
+                        )}
+                        {checkResult && (
+                          <SheetCheckLayer
+                            width={size.width}
+                            height={size.height}
+                            renderScale={size.renderScale}
+                            rings={sheetCheckRings(
+                              checkResult,
+                              checkSession.hidden
+                            )}
                             selected={checkSession.selected}
-                            canAskAi={readerAvailable}
-                            renderRegion={size.renderRegion}
-                            chromeTarget={size.chromeTarget}
-                            onPick={(count, item) => {
-                              if (!sessionLegend) return;
-                              const picks = { ...sessionLegend.picks };
-                              const k = count.trim().toLowerCase();
-                              if (item) picks[k] = item;
-                              else delete picks[k];
-                              keepSessionLegend({ ...sessionLegend, picks });
-                              startCheck();
-                            }}
-                            onHide={hideCheckRow}
-                            onSelectRing={(key, at) => {
-                              setCheckSession(s =>
-                                s ? { ...s, selected: key } : s
-                              );
-                              jumpTo(at);
-                            }}
-                            onJump={jumpTo}
-                            onMove={(ids, groupId) =>
-                              moveStamps.mutate({ ids, groupId })
-                            }
-                            onDelete={deleteMarks}
-                            onSelectMarks={ids =>
-                              setSelectedStampIds(new Set(ids))
-                            }
-                            onCount={(group, at) => queueMarksFor(group, at)}
-                            onCountNew={(item, at) => {
-                              void createGroup
-                                .mutateAsync({
-                                  bidId,
-                                  label: countNameFromLegend(item),
-                                  reuseExisting: true,
-                                })
-                                .then(g => {
-                                  // The count is named from the row's first
-                                  // sentence, so it would no longer match the
-                                  // row by name: record the row as its pick.
-                                  if (sessionLegend)
-                                    keepSessionLegend({
-                                      ...sessionLegend,
-                                      picks: {
-                                        ...sessionLegend.picks,
-                                        [g.label.trim().toLowerCase()]: item,
-                                      },
-                                    });
-                                  queueMarksFor(
-                                    {
-                                      groupId: g.id,
-                                      label: g.label,
-                                      assemblyId: null,
-                                    },
-                                    at
-                                  );
-                                  void bidCounts.refetch();
-                                })
-                                .catch(() => {});
-                            }}
-                            onSplit={(_count, ids, label) => {
-                              void createGroup
-                                .mutateAsync({ bidId, label })
-                                .then(g => {
-                                  moveStamps.mutate({ ids, groupId: g.id });
-                                  void bidCounts.refetch();
-                                })
-                                .catch(() => {});
-                            }}
-                            onAskAi={batch =>
-                              askTieBreak(batch, size.renderRegion)
-                            }
-                            onRerun={startCheck}
-                            onClose={() => setCheckSession(null)}
                           />
-                        </>
-                      )}
-                  </>
-                ) : null
-              }
+                        )}
+                        <SheetCheckPanel
+                          state={checkSession.state}
+                          legendName={sessionLegend?.sheetName ?? null}
+                          legendRows={sessionLegend?.rows ?? []}
+                          picks={sessionLegend?.picks ?? {}}
+                          locked={quantitiesLocked}
+                          countForItem={countForItem}
+                          moveTargets={moveTargets}
+                          hidden={checkSession.hidden}
+                          selected={checkSession.selected}
+                          canAskAi={readerAvailable}
+                          renderRegion={size.renderRegion}
+                          chromeTarget={size.chromeTarget}
+                          onPick={(count, item) => {
+                            if (!sessionLegend) return;
+                            const picks = { ...sessionLegend.picks };
+                            const k = count.trim().toLowerCase();
+                            if (item) picks[k] = item;
+                            else delete picks[k];
+                            keepSessionLegend({ ...sessionLegend, picks });
+                            startCheck();
+                          }}
+                          onHide={hideCheckRow}
+                          onSelectRing={(key, at) => {
+                            setCheckSession(s =>
+                              s ? { ...s, selected: key } : s
+                            );
+                            jumpTo(at);
+                          }}
+                          onJump={jumpTo}
+                          onMove={(ids, groupId) =>
+                            moveStamps.mutate({ ids, groupId })
+                          }
+                          onDelete={deleteMarks}
+                          onSelectMarks={ids =>
+                            setSelectedStampIds(new Set(ids))
+                          }
+                          onCount={(group, at) => queueMarksFor(group, at)}
+                          onCountNew={(item, at) => {
+                            void createGroup
+                              .mutateAsync({
+                                bidId,
+                                label: countNameFromLegend(item),
+                                reuseExisting: true,
+                              })
+                              .then(g => {
+                                // The count is named from the row's first
+                                // sentence, so it would no longer match the
+                                // row by name: record the row as its pick.
+                                if (sessionLegend)
+                                  keepSessionLegend({
+                                    ...sessionLegend,
+                                    picks: {
+                                      ...sessionLegend.picks,
+                                      [g.label.trim().toLowerCase()]: item,
+                                    },
+                                  });
+                                queueMarksFor(
+                                  {
+                                    groupId: g.id,
+                                    label: g.label,
+                                    assemblyId: null,
+                                  },
+                                  at
+                                );
+                                void bidCounts.refetch();
+                              })
+                              .catch(() => {});
+                          }}
+                          onSplit={(_count, ids, label) => {
+                            void createGroup
+                              .mutateAsync({ bidId, label })
+                              .then(g => {
+                                moveStamps.mutate({ ids, groupId: g.id });
+                                void bidCounts.refetch();
+                              })
+                              .catch(() => {});
+                          }}
+                          onAskAi={batch =>
+                            askTieBreak(batch, size.renderRegion)
+                          }
+                          onRerun={startCheck}
+                          onClose={() => setCheckSession(null)}
+                        />
+                      </>
+                    )}
+                </>
+              )}
             />
           )}
 

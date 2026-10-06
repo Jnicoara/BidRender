@@ -348,7 +348,13 @@ export function TraceLayer({
    * necessary.
    */
   zoom: number;
-  measurability: Measurability;
+  /**
+   * `undefined` while the sheet's measurability is still LOADING. That is
+   * "cannot trace yet", never "cannot count": the page used to withhold this
+   * whole layer until the query answered, and every tap in that gap fell on
+   * the bare canvas and vanished (staging smoke, 2026-10-06).
+   */
+  measurability: Measurability | undefined;
   tracing: boolean;
   pathType: RunPathType;
   /**
@@ -520,7 +526,7 @@ export function TraceLayer({
       ? traceSnap(hover, hoverAlt || freePoints)
       : null;
 
-  const ratio = measurability.ok ? measurability.ratio : null;
+  const ratio = measurability?.ok ? measurability.ratio : null;
 
   /** Page points → the overlay's pixel space. */
   /*
@@ -996,8 +1002,16 @@ export function TraceLayer({
    *
    * So the overlay always renders. `tracing` is gated by the caller, and this
    * is a note rather than a wall.
+   *
+   * CORRECTED 2026-10-06: "always renders" was true of THIS component and
+   * false of the screen. TakeoffPage only mounted the overlay once the
+   * measurability query had LOADED, so on a freshly opened sheet over a slow
+   * connection the stamp tool was armed with no layer to take the taps — the
+   * same fault as the early return above, one level up, found by the staging
+   * smoke test (0 of 3 taps kept). The page now mounts it with the sheet, and
+   * a measurability still loading is passed as `undefined`.
    */
-  const blocked = !measurability.ok ? measurability : null;
+  const blocked = measurability && !measurability.ok ? measurability : null;
 
   /**
    * The SVG scales with the drawing; everything else must not.
