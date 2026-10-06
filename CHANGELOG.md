@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **A device on a demolition plan is never offered as new work.** Find all
+  matching now reads each plan's printed title on drawn (non-scanned) plans
+  too, as it already did on scans, and every find on a plan titled
+  "Demolition" is shown as demolition — not counted unless you count it,
+  and never taken by "Confirm all". On the Weld 1 power sheet that is all
+  21 finds on its demolition plan, including the panelboards the drawing
+  had put on the ordinary power layer.
+
 - **Fixed: a line with labor but no material could look fully priced.** An
   assembly with hours and no priced material — a light pole built as labor
   only — showed its labor as the line's price, and the bid total looked

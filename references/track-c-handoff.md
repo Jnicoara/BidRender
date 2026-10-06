@@ -140,14 +140,14 @@ red run is not by itself a red suite:
      pointermove, so boxes come out empty and short pans do nothing.
      Dispatch PointerEvents in-page instead (memory: local verification
      gotchas).
-2. **Demolition plans on VECTOR sheets by their title** (found building CAD
-   layers, 2026-10-06). On Weld 1 E-200 the demolition plan draws its
-   devices on the EXISTING layer (E-POWR-E) and 4 panelboards on the NEW
-   one (E-POWR); only 2 devices sit on E-POWR-D. So layers alone leave 4 of
-   21 demolition-plan finds clear (was 6). Scans already find the
-   demolition plan by its title (`planTitles` / `planRegions`,
-   `scanMatching.ts`); the same reading on a vector sheet's text would
-   close it. Small, pure, testable.
+2. ~~Demolition plans on VECTOR sheets by their title~~ **DONE 2026-10-06**
+   (`@/lib/vectorPlans`): the scans' `planTitles` / `planRegions` on the
+   vector text, with an ink map from the line work, plus one vector-only
+   step — a region grows LEFT to the white gap (E-200's demolition title
+   sits ~300 pt right of its drawing's edge). Known answer on Weld 1 E-200:
+   demolition-plan finds clear **4 -> 0**, marked demolition **2 -> 21 of
+   21**, plan A's 53 untouched; the same with no layer information. Hand
+   count unchanged (44/46). The scan path is unchanged.
 3. **"Find on this sheet" from one look** (plan § 5), the third action on a
    look.
 4. **The per-row choice in whole-legend capture** (`LegendCapture.tsx`): a
@@ -173,7 +173,8 @@ item — gives the card its warning in one capture.
 ## Migrations Track A would need
 
 **None for anything above.** Everything listed runs on existing tables.
-**New, 2026-10-06:**
+**New, 2026-10-06 — all three are in `todo.md` § "Track A next migration
+batch" (Find all matching / looks), where A numbers them:**
 
 - `symbol_looks.confirmedAt` (timestamp NULL, additive): when a look was
   first confirmed by hand. Today that lives in each browser

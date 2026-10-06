@@ -122,6 +122,25 @@ Requests waiting for Track A, which numbers and writes the migrations.
       it lands, Track B starts a new count's `dropKind` from it.
       references/vertical-drops-plan.md § 7.
 
+**Find all matching / looks** (Track C, 2026-10-06; built code-only on
+track-c, each working today without its column). All ADDITIVE, nullable,
+**no DEFAULT**, no backfill — step 1 of the three-step deploy.
+
+- [ ] **`takeoff_stamps.labelWords TEXT NULL`** — the labels Find all
+      matching tied to a device when it was confirmed (`tieLabels` in
+      `client/src/lib/findMatching.ts`: "USB", `54"`, "(E)", "A2"). Today
+      they show on the FIND only and are lost when the mark is placed, so a
+      mark cannot say "54 in. height" or "tag A2" later and the bid cannot
+      price by them. NULL = never read (a hand mark, or before the column).
+      Measured: `references/code-first-ceiling.md` § b.
+- [ ] **`takeoff_stamps.mountingHeightIn INT NULL`** — owner's call, ONLY if
+      heights are to be priced: the height read off a label, as a number,
+      rather than parsing `labelWords`. NULL = none read.
+- [ ] **`symbol_looks.confirmedAt TIMESTAMP NULL`** — when an added look was
+      first confirmed by hand ("from a new look", multiple-looks-plan.md
+      § 4). Today kept per browser (`@/lib/trustedLooks`), so a colleague's
+      browser asks again — safe, not shared. NULL = never confirmed.
+
 **Quote items** (Track B, owner-answered 2026-10-05;
 references/quote-items-plan.md § 8). All ADDITIVE, nullable, **no
 DEFAULT**, no backfill — step 1 of the three-step deploy.
@@ -146,10 +165,10 @@ DEFAULT**, no backfill — step 1 of the three-step deploy.
 - [ ] **New table `bid_quotes`**: `id`, `bidId` (FK, cascade), `userId`,
       `supplierName VARCHAR(128) NULL` (free text, like
       `materials.supplierName`), `quotedOn DATE NULL`, `packagePrice
-  DECIMAL(12,2) NULL` (NULL = per-item quote; set = one package price),
+DECIMAL(12,2) NULL` (NULL = per-item quote; set = one package price),
       `carriedFromBidId INT NULL` (provenance only, **no FK** — the old bid may
       be deleted; set = a carried quote, "not updated"), `note VARCHAR(500)
-  NULL`, `createdAt`, `updatedAt`. Index (`userId`, `bidId`).
+NULL`, `createdAt`, `updatedAt`. Index (`userId`, `bidId`).
 - [ ] **The company's quoted-line markup %** (material-markup D4; owner
       answer c: ONE company-wide number) — a nullable decimal beside the
       company markup default; A picks the table. NULL = no quoted-line rule.

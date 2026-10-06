@@ -62,6 +62,8 @@ export type VectorGeometry = {
    */
   layer?: Int16Array;
   layerNames?: string[];
+  /** The page's size in points, when read from a PDF (plan regions need it). */
+  page?: { width: number; height: number };
 };
 
 type Matrix = [number, number, number, number, number, number];
@@ -337,6 +339,7 @@ export function extractVectorGeometry(
     filled: Uint8Array.from(filledOut),
     imageCoverage: Math.min(1, imageArea / pageArea),
     imagePixelsPerPoint,
+    page: { width: pageWidth, height: pageHeight },
     ...(layerIds ? { layer: Int16Array.from(layerOut), layerNames } : {}),
   };
 }
