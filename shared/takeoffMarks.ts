@@ -253,6 +253,58 @@ export function statusLook(value: string | null | undefined): StatusLook {
 }
 
 /**
+ * How strongly a NEW (filled) pin is filled. Pin plan § 7: "the count's
+ * color at ~45%". It was 0.22 until 2026-10-05, and at that strength the
+ * letter's white halo covered most of the tint, so a new pin and an existing
+ * one with a letter looked the same on screen (laptop, high zoom, "Sheet
+ * numbers check" E-200) — the distinction that decides whether a device is
+ * priced. Not opaque: § 4, a pin must not blot out the symbol under it.
+ */
+export const NEW_FILL_OPACITY = 0.5;
+
+/**
+ * How a pin is PAINTED for its status — the numbers TraceLayer draws with,
+ * here so the suite can hold them apart (a React component is out of its
+ * reach).
+ *
+ * Filled and hollow differ in THREE places, so that no one of them has to
+ * carry the difference alone at every zoom:
+ * - the body: a real fill vs none;
+ * - the outline: hollow is 1.5x heavier, so a hollow pin still reads as a
+ *   ring at the 10 px floor where no letter is drawn;
+ * - the letter: on a fill it is dark on a white halo (it sits on color);
+ *   on a hollow pin it is IN the count's color on a thin dark halo, so the
+ *   inside of the pin stays clear — a white halo there filled the hollow
+ *   pin back in, which was the fault.
+ */
+export type MarkPaint = {
+  fillOpacity: number;
+  strokeScale: number;
+  letterFill: string;
+  letterHalo: string;
+  /** Of the stroke width. A dark halo is kept thin so it does not fill. */
+  letterHaloScale: number;
+};
+
+export function markPaint(look: StatusLook, color: string): MarkPaint {
+  return look.filled
+    ? {
+        fillOpacity: NEW_FILL_OPACITY,
+        strokeScale: 1,
+        letterFill: "#0b0b0b",
+        letterHalo: "#ffffff",
+        letterHaloScale: 0.9,
+      }
+    : {
+        fillOpacity: 0,
+        strokeScale: 1.5,
+        letterFill: color,
+        letterHalo: "#0b0b0b",
+        letterHaloScale: 0.5,
+      };
+}
+
+/**
  * Whether a pin of this on-screen diameter can carry its letter. Below it the
  * letter is noise on the symbol and shape + colour remain (pin plan § 3).
  * Looked at 2026-10-01 on the Blueridge set at 1536 px wide: at 92% a pin is

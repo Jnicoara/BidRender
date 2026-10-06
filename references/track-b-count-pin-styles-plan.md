@@ -298,6 +298,15 @@ right.
 > Measured on screen: hollow had to be truly hollow (a white fill hid the
 > symbol, § 4), and the relocate arrow had to be a filled arrowhead (a
 > stroked one read as "+").
+>
+> **Corrected the same day, later (Track B):** as first built, new was
+> filled at 22% — not the ~45% tabled below — and EVERY letter sat on a
+> white halo, so with a letter drawn a new pin and an existing one looked
+> the same. Now `markPaint` (shared/takeoffMarks.ts, tested in
+> `pinLooks.test.ts`): new at 50% with a dark letter on white; existing no
+> fill, a 1.5x outline, and the letter IN the count's color on a thin dark
+> halo, as the table always said. Checked at laptop, tablet-portrait and
+> phone, at Fit and at ~140%.
 
 | Status             | Look                                                     |
 | ------------------ | -------------------------------------------------------- |

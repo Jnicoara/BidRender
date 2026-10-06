@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-05]
 
+- **New and existing devices now look different on the drawing at every
+  zoom.** Once a pin was big enough to carry its letter, a new device and
+  an existing one looked the same, and that difference decides what gets
+  priced. New pins are now clearly filled; existing pins are an empty
+  outline with the letter drawn in the count's color.
 - **A look saved under the wrong item can be moved.** Each look in a legend
   item's list has "Move", which lists the other items. The look keeps its
   picture and box; counted marks stay in their counts on every bid, locked or

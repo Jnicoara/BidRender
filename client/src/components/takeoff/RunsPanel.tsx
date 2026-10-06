@@ -10,7 +10,12 @@
  * Circuit rows follow CLAUDE.md § Editing fields via InlineNumberField —
  * conductor counts are exactly the sort of number someone types down a column.
  */
-import { letterFit, markAppearance, markPath } from "@shared/takeoffMarks";
+import {
+  NEW_FILL_OPACITY,
+  letterFit,
+  markAppearance,
+  markPath,
+} from "@shared/takeoffMarks";
 import type { PinStyle } from "@shared/pinLetters";
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
@@ -112,7 +117,7 @@ function CountSwatch({
       <path
         d={markPath(shape, 10, 10, 8)}
         fill={color}
-        fillOpacity={0.22}
+        fillOpacity={NEW_FILL_OPACITY}
         stroke={color}
         strokeWidth={2}
         strokeLinejoin="round"

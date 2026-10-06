@@ -33,6 +33,7 @@ import {
   LETTER_MIN_PX,
   letterFit,
   markAppearance,
+  markPaint,
   markPath,
   markRadiusInOverlay,
   markScreenDiameter,
@@ -1388,6 +1389,7 @@ export function TraceLayer({
           const at = toScreen({ x: placed.x, y: placed.y });
           const isSelected = !placed.pending && selectedStampIds.has(placed.id);
           const { shape, color, letter, status } = markAppearance(placed, pins);
+          const paint = markPaint(status, color);
           // Below the size a letter can be read at, shape + colour remain.
           const showLetter =
             letter !== null && markScreenDiameter(zoom) >= LETTER_MIN_PX;
@@ -1431,12 +1433,13 @@ export function TraceLayer({
                 d={markPath(shape, at.x, at.y, r)}
                 // Hollow is truly hollow: a white fill hid the plan symbol
                 // underneath (seen 2026-10-05), which § 4 forbids.
+                // Fill, outline weight and letter paint all come from
+                // `markPaint`, so filled and hollow differ in three places.
                 fill={status.filled ? color : "none"}
-                fillOpacity={status.filled ? 0.22 : 0}
+                fillOpacity={paint.fillOpacity}
                 stroke={color}
                 strokeWidth={
-                  (isSelected ? stroke * 1.4 : stroke) *
-                  (status.filled ? 1 : 1.5)
+                  (isSelected ? stroke * 1.4 : stroke) * paint.strokeScale
                 }
                 strokeDasharray={
                   status.dashed ? `${r * 0.45} ${r * 0.3}` : undefined
@@ -1481,8 +1484,11 @@ export function TraceLayer({
                 Where the pin is big enough, the count's LETTER takes the dot's
                 place (shared/pinLetters.ts): it points just as well, and it
                 says which count this is on a print or to a colour-blind eye.
-                Dark text over a pale halo, so it reads on white paper and on
-                black linework alike.
+                On a filled pin: dark text over a pale halo, so it reads on
+                white paper and on black linework alike. On a HOLLOW pin the
+                letter is in the count's color over a thin dark halo instead
+                (`markPaint`): the pale halo filled the inside back in, and
+                new and existing looked the same (2026-10-05).
               */}
               {showLetter ? (
                 <text
@@ -1493,9 +1499,9 @@ export function TraceLayer({
                   fontSize={letterFit(shape, r, letter).size}
                   fontWeight={700}
                   fontFamily="ui-sans-serif, system-ui, sans-serif"
-                  fill="#0b0b0b"
-                  stroke="#ffffff"
-                  strokeWidth={stroke * 0.9}
+                  fill={paint.letterFill}
+                  stroke={paint.letterHalo}
+                  strokeWidth={stroke * paint.letterHaloScale}
                   paintOrder="stroke"
                   pointerEvents="none"
                 >

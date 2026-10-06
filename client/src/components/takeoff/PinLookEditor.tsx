@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import {
   MARK_COLORS,
+  NEW_FILL_OPACITY,
   MARK_SHAPES,
   letterFit,
   markPath,
@@ -77,7 +78,7 @@ function Swatch({
       <path
         d={markPath(shape, c, c, r)}
         fill={color}
-        fillOpacity={0.22}
+        fillOpacity={NEW_FILL_OPACITY}
         stroke={color}
         strokeWidth={2}
         strokeLinejoin="round"

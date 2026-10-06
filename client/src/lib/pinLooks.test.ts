@@ -6,7 +6,12 @@
  */
 import { describe, expect, it } from "vitest";
 import { pinStylesForBid } from "@shared/pinLetters";
-import { MARK_COLORS, markAppearance, statusLook } from "@shared/takeoffMarks";
+import {
+  MARK_COLORS,
+  markAppearance,
+  markPaint,
+  statusLook,
+} from "@shared/takeoffMarks";
 import {
   isPricedMark,
   statusSplit,
@@ -175,6 +180,30 @@ describe("a mark's status: drawn, counted, and said", () => {
       markAppearance({ groupId: 1, assemblyId: null, status: "existing" })
         .status.filled
     ).toBe(false);
+  });
+
+  it("paints new and existing apart even with a letter on them", () => {
+    // The fault (2026-10-05): new was a 0.22 tint and every letter sat on a
+    // white halo, which filled the hollow pin back in — on screen the two
+    // looked the same, and that difference decides what is priced.
+    const color = "#22D3EE";
+    const fresh = markPaint(statusLook(null), color);
+    const existing = markPaint(statusLook("existing"), color);
+    // Body: a fill strong enough to read past the letter, vs none at all.
+    expect(fresh.fillOpacity).toBeGreaterThanOrEqual(0.45);
+    expect(fresh.fillOpacity).toBeLessThan(1); // § 4: never blot the symbol
+    expect(existing.fillOpacity).toBe(0);
+    // Letter: on a hollow pin it must not bring a white patch with it.
+    expect(existing.letterHalo).not.toBe("#ffffff");
+    expect(existing.letterFill).toBe(color);
+    expect(fresh.letterFill).not.toBe(existing.letterFill);
+    // Outline: hollow is heavier, so it still reads as a ring with no letter.
+    expect(existing.strokeScale).toBeGreaterThan(fresh.strokeScale);
+    // Remove is hollow too; relocate is filled.
+    expect(markPaint(statusLook("remove"), color).fillOpacity).toBe(0);
+    expect(markPaint(statusLook("relocate"), color).fillOpacity).toBe(
+      fresh.fillOpacity
+    );
   });
 
   it("prices ONLY a new mark — NULL is new", () => {

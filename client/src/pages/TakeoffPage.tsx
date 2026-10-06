@@ -3082,10 +3082,12 @@ export default function TakeoffPage({
    * sheets until changed, because a run of existing devices is the case it
    * is for, and choosing it per click is the form-on-every-mark D3 rejected.
    * Shown in the counting pill while anything is armed, amber when it is
-   * "existing" — that pill is the cue for a forgotten choice. The marks are
-   * NOT a reliable one yet: drawn with their status from the click, but on
-   * 2026-10-05 a new and an existing pin with a letter looked the same on
-   * screen (new's fill is a 0.22 tint the letter's halo covers). todo.md.
+   * "existing". The marks say it too, from the click: new is filled,
+   * existing hollow with its letter in the count's color (`markPaint`,
+   * shared/takeoffMarks.ts). Until later on 2026-10-05 they did NOT — a
+   * new and an existing pin with a letter looked the same, because new's
+   * 0.22 tint hid under the letter's white halo — so this comment said the
+   * pill was the only cue. Checked on screen after the fix at three widths.
    */
   const [placingStatus, setPlacingStatus] = useState<UserMarkStatus>("new");
   /** Which layers are showing. Null until a sheet's contents are known. */
