@@ -86,10 +86,15 @@ as new parts.
 | 0108 | `0108_assembly_status_hours` | `assemblies.removeLaborHours`, `relocateLaborHours` decimal(10,4) NULL — owner 2026-10-05                                                                                           |
 | 0109 | `0109_group_status_hours`    | `takeoff_groups.removeLaborHours`, `relocateLaborHours` NULL — the per-bid override                                                                                                 |
 | 0110 | `0110_line_role`             | `bid_line_items.lineRole` enum NOT NULL DEFAULT `install`; unique key `(bidId, takeoffGroupId)` → `(…, lineRole)`                                                                   |
+| 0111 | `0111_sheet_run_height`      | `bid_pdf_sheets.distributionHeightInches INT NULL`, no default — per-sheet run height (Track B, vertical-drops-plan § 7 col 1)                                                      |
+| 0112 | `0112_assembly_mount_height` | `assemblies.mountHeightTypeKey VARCHAR(64) NULL`, no default — the height TYPE the device mounts at (Track B, § 7 col 2)                                                            |
 
 > **Added 2026-10-05 (Track A):** 0108–0110 are remove/relocate labor,
-> `remove-relocate-labor-plan.md` (on `a-handoff`). **Batch 3 onward shifts
-> by three** when written — none of it is, so nothing is renumbered on disk.
+> `remove-relocate-labor-plan.md` (on `a-handoff`). **0111–0112 added
+> 2026-10-06** for Track B's two owner-approved columns (vertical drops; the
+> code is built in `faeaab8` and waits on them). All five are additive, so
+> step 3 is empty. **Batch 3 onward shifts by five** when written — none of
+> it is, so nothing is renumbered on disk.
 
 **Batch 3 — "catalog", with C's catalog code.** The old 0100–0107, minus
 `dropExcluded` (now in 0098):
