@@ -78,11 +78,18 @@ as new parts.
 
 **Batch 2 — "before the first outside invite".**
 
-| #    | File                      | Adds                                                                                                                                                                                |
-| ---- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0105 | `0105_signup_invites`     | the invite gate's table (invite-gate plan § 7)                                                                                                                                      |
-| 0106 | `0106_ai_correction_log`  | the correction log (its plan § 4) **plus C's** `askKind enum('crop','note')`, `askFingerprint varchar(64)` and index `(dataUserId, askFingerprint)` — in the CREATE, no second file |
-| 0107 | `0107_sheet_content_hash` | `bid_pdf_sheets.contentHash varchar(64)` (NULL = never read) — C's "never pay twice for the same drawing"                                                                           |
+| #    | File                         | Adds                                                                                                                                                                                |
+| ---- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0105 | `0105_signup_invites`        | the invite gate's table (invite-gate plan § 7)                                                                                                                                      |
+| 0106 | `0106_ai_correction_log`     | the correction log (its plan § 4) **plus C's** `askKind enum('crop','note')`, `askFingerprint varchar(64)` and index `(dataUserId, askFingerprint)` — in the CREATE, no second file |
+| 0107 | `0107_sheet_content_hash`    | `bid_pdf_sheets.contentHash varchar(64)` (NULL = never read) — C's "never pay twice for the same drawing"                                                                           |
+| 0108 | `0108_assembly_status_hours` | `assemblies.removeLaborHours`, `relocateLaborHours` decimal(10,4) NULL — owner 2026-10-05                                                                                           |
+| 0109 | `0109_group_status_hours`    | `takeoff_groups.removeLaborHours`, `relocateLaborHours` NULL — the per-bid override                                                                                                 |
+| 0110 | `0110_line_role`             | `bid_line_items.lineRole` enum NOT NULL DEFAULT `install`; unique key `(bidId, takeoffGroupId)` → `(…, lineRole)`                                                                   |
+
+> **Added 2026-10-05 (Track A):** 0108–0110 are remove/relocate labor,
+> `remove-relocate-labor-plan.md` (on `a-handoff`). **Batch 3 onward shifts
+> by three** when written — none of it is, so nothing is renumbered on disk.
 
 **Batch 3 — "catalog", with C's catalog code.** The old 0100–0107, minus
 `dropExcluded` (now in 0098):
