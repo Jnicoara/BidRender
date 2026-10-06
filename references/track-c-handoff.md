@@ -128,6 +128,18 @@ red run is not by itself a red suite:
      **Found on screen and fixed:** a click with no drag opened the name card
      and saved an item with no picture, no look and no check
      (`isCaptureBox`, `shared/symbolCapture.ts`).
+   - **Labels tied to devices: SEEN ON SCREEN 2026-10-06 (UNCC E111).** A
+     plain duplex boxed: 141 found, 97 clear, 44 need a look; 36 rings say
+     "USB" and 3 say "may be a GFCI", each with "Beside it: …"; the selected
+     USB find reads "Needs a look — "USB" is written beside it — it may be a
+     USB receptacle … Beside it: USB", and Confirm all takes only the 97.
+     The ring fix also makes the device-word NOTE on the capture card able
+     to show — not re-checked on screen. CAD layers (job b) were not seen on
+     screen: the tab went hidden; they rest on the measurement and tests.
+   - **Driving the browser:** the extension's drags often send no
+     pointermove, so boxes come out empty and short pans do nothing.
+     Dispatch PointerEvents in-page instead (memory: local verification
+     gotchas).
 2. **Demolition plans on VECTOR sheets by their title** (found building CAD
    layers, 2026-10-06). On Weld 1 E-200 the demolition plan draws its
    devices on the EXISTING layer (E-POWR-E) and 4 panelboards on the NEW
