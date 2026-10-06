@@ -99,13 +99,15 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
 
 Requests waiting for Track A, which numbers and writes the migrations.
 
-> **Numbered 2026-10-06 (Track A), none written yet** —
-> `migrations-0098-batch-plan.md` § S on `a-migrations-plan`: Batch 2 gains
-> 0108–0110 (remove/relocate labor: `assemblies.removeLaborHours` /
-> `relocateLaborHours`, `takeoff_groups` the same two as the per-bid
-> override, `bid_line_items.lineRole` with a unique-key swap —
-> `remove-relocate-labor-plan.md`) and **0111–0112 for the two items just
-> below**. The quote-item columns further down are NOT numbered yet.
+> **ALL NUMBERED 2026-10-06 (Track A), none written yet — see
+> `references/migrations-next-batch.md` on `a-migrations-plan`**, the one
+> list of every track's asks. In short: `distributionHeightInches` is in
+> 0107 (with C's `contentHash`); `mountHeightTypeKey` and `materialByQuote`
+> in 0108 (with the remove/relocate hours); `bid_quotes` is 0112; the six
+> `bid_line_items` quote columns go in 0113 with `lineRole`; the quoted-line
+> markup is `pricing_defaults.quotedMarkupPct`, 0114. `laborOnly` joins 0108
+> only if the owner says yes. (An earlier note here said 0108–0112 for
+> fewer items; superseded.)
 
 - [ ] **`bid_pdf_sheets.distributionHeightInches INT NULL`** — this
       sheet's run height (Track B, owner's answer b, 2026-10-05). ADDITIVE,
@@ -146,10 +148,10 @@ DEFAULT**, no backfill — step 1 of the three-step deploy.
 - [ ] **New table `bid_quotes`**: `id`, `bidId` (FK, cascade), `userId`,
       `supplierName VARCHAR(128) NULL` (free text, like
       `materials.supplierName`), `quotedOn DATE NULL`, `packagePrice
-  DECIMAL(12,2) NULL` (NULL = per-item quote; set = one package price),
+DECIMAL(12,2) NULL` (NULL = per-item quote; set = one package price),
       `carriedFromBidId INT NULL` (provenance only, **no FK** — the old bid may
       be deleted; set = a carried quote, "not updated"), `note VARCHAR(500)
-  NULL`, `createdAt`, `updatedAt`. Index (`userId`, `bidId`).
+NULL`, `createdAt`, `updatedAt`. Index (`userId`, `bidId`).
 - [ ] **The company's quoted-line markup %** (material-markup D4; owner
       answer c: ONE company-wide number) — a nullable decimal beside the
       company markup default; A picks the table. NULL = no quoted-line rule.
