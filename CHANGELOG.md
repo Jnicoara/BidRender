@@ -6,6 +6,20 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **Find all matching uses the drawing's CAD layers when the PDF keeps
+  them.** On plans exported with layers (Weld 1 does), it searches only the
+  electrical layers — about ten times faster, same finds — and a device
+  drawn on a demolition layer is shown as demolition, never as a new
+  device; one on an "existing" layer says so. Plans without usable layers
+  work exactly as before.
+
+- **Find all matching now reads the little labels beside each device.**
+  "USB", "GF", "(E)", a mounting height like 54" or a fixture tag like A2
+  is tied to the nearest find and shown on it. A "GF" beside a plain
+  receptacle shape now flags it as a possible GFCI instead of counting it
+  as a duplex without a word. On the UNCC test plan the USB receptacles
+  went from 0 of 33 recognised to 33 of 33, and the three duplexes the
+  GFCI search used to pick up silently are now flagged.
 - **Fixed: a freshly uploaded plan could skip reading its printed scale.** On
   a fast connection the sheet list arrived while the page's text was still
   being read, and the reading was thrown away, so the sheet sat on "Set

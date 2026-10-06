@@ -8,7 +8,13 @@
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { findMatching, type MatchBox } from "./findMatching";
+import {
+  LABEL_REACH,
+  findMatching,
+  labelKind,
+  tieLabels,
+  type MatchBox,
+} from "./findMatching";
 import {
   DRAW_OPS,
   extractVectorGeometry,
@@ -539,5 +545,97 @@ describe("lines crossing a symbol (track-c, measured 2026-10-06)", () => {
     const matches = okMatches(findMatching(geo, [], boxAround(102, 100, 9)));
     const dd = matches.find(m => Math.hypot(m.x - 302.5, m.y - 100) < 1)!;
     expect(dd.needsLook.join(" ")).toMatch(/more lines run through it/);
+  });
+});
+
+describe("labels tied to devices (code-first-ceiling.md § b)", () => {
+  /*
+    Measured on UNCC E111: USB labels sit a median 14.3 pt from their device,
+    past the old word ring, which read 0 of 41. The fixture puts each label
+    18 pt below its copy: outside the old ring (about 15.7 pt down for this
+    symbol), inside LABEL_REACH.
+  */
+  const copies = [
+    [100, 100],
+    [300, 100],
+    [500, 100],
+    [700, 100],
+    [900, 100],
+  ] as const;
+  const geo = geometry([{ segs: copies.flatMap(([x, y]) => duplex(x, y)) }]);
+  const below = (x: number, text: string) => word(text, x + 2.5, 118);
+
+  it("a GF beside a duplex shape flags it as a maybe-GFCI — never a silent duplex", () => {
+    const matches = okMatches(
+      findMatching(
+        geo,
+        [below(300, "GF"), below(500, "USB")],
+        boxAround(102, 100, 9)
+      )
+    );
+    const at = (x: number) => matches.find(m => Math.abs(m.x - (x + 2.5)) < 1)!;
+    expect(at(300).needsLook.join(" ")).toMatch(/may be a GFCI/);
+    expect(at(300).labels).toEqual(["GF"]);
+    expect(at(500).needsLook.join(" ")).toMatch(/may be a USB receptacle/);
+    expect(at(100).needsLook).toEqual([]);
+  });
+
+  it("heights and (E) show as labels; (E) also says maybe existing", () => {
+    const matches = okMatches(
+      findMatching(
+        geo,
+        [below(300, '54"'), below(500, "(E)")],
+        boxAround(102, 100, 9)
+      )
+    );
+    const at = (x: number) => matches.find(m => Math.abs(m.x - (x + 2.5)) < 1)!;
+    expect(at(300).labels).toEqual(['54"']);
+    expect(at(300).needsLook).toEqual([]);
+    expect(at(500).maybeExisting.join(" ")).toMatch(/\(E\)/);
+  });
+
+  it("the boxed one's own label is read the same way: a copy without it is flagged", () => {
+    const matches = okMatches(
+      findMatching(geo, [below(100, "GF")], boxAround(102, 100, 9))
+    );
+    const plain = matches.find(m => Math.abs(m.x - 302.5) < 1)!;
+    expect(plain.needsLook.join(" ")).toMatch(/no "GF" beside it/);
+  });
+
+  it("a label halfway between two copies goes to both, flagged — never to one", () => {
+    const tied = tieLabels(
+      [{ text: "USB", cx: 200, cy: 100 }],
+      [
+        { x: 190, y: 100 },
+        { x: 211, y: 100 },
+      ],
+      new Set()
+    );
+    expect(tied).toEqual([
+      [{ word: 0, shared: true }],
+      [{ word: 0, shared: true }],
+    ]);
+  });
+
+  it("nearest within LABEL_REACH only, and never a word that is part of a symbol", () => {
+    const w = [
+      { text: "USB", cx: 100 + LABEL_REACH + 1, cy: 100 },
+      { text: "GF", cx: 110, cy: 100 },
+    ];
+    expect(tieLabels(w, [{ x: 100, y: 100 }], new Set())).toEqual([
+      [{ word: 1, shared: false }],
+    ]);
+    expect(tieLabels(w, [{ x: 100, y: 100 }], new Set([1]))).toEqual([[]]);
+  });
+
+  it("knows a label: device, status, height, fixture tag — not a circuit number", () => {
+    expect(labelKind("GF")).toBe("device");
+    expect(labelKind("(E)")).toBe("existing");
+    expect(labelKind("(X)")).toBe("remove");
+    expect(labelKind('54"')).toBe("height");
+    expect(labelKind("A2")).toBe("fixtureTag");
+    expect(labelKind("(A-8)")).toBe("fixtureTag");
+    expect(labelKind("SL-24")).toBeNull();
+    expect(labelKind("2B")).toBeNull();
   });
 });
