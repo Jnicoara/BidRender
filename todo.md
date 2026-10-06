@@ -477,8 +477,12 @@ All additive and nullable. Specs are in the plans named.
 
 ### Flaky tests — fix in a batch before beta
 
-- [ ] **Smoke flow 9, "a refresh keeps the sheet and the zoom": after
-      `page.reload()` the Plans screen stayed BLANK for 60 s** (title "Plans"
+- [ ] **MUST INVESTIGATE RIGHT AFTER THE 24105ad LIVE RELEASE (owner,
+      2026-10-06) — treat as a possible REAL bug, not a test flake: a
+      person who reloads the Plans screen and sees nothing for a minute
+      would believe their plans were gone.** Smoke flow 9, "a refresh keeps
+      the sheet and the zoom": after
+      `page.reload()` the Plans screen stayed BLANK for 60 s (title "Plans"
       with no bid name, empty pane). Once, on the release-candidate smoke of
       `24105ad` (run 37512445462 attempt 1, a slow run at 8.6 min against
       the usual ~4.4); attempt 2 on the same commit passed, 96 of 96. Not
