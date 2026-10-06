@@ -257,10 +257,11 @@ describe("the § 5j worked example, every term", () => {
     })
   )!;
 
-  it("puts conduit extra on the FLAT length only (§ 7.1)", () => {
+  it("puts conduit extra on flat AND drops (owner, 2026-10-05)", () => {
+    // Was § 7.1's flat only: 5% of 112 = 5.60, bought 126.10.
     expect(q.conduitInstalledFeet).toBe(120.5);
-    expect(q.conduitExtraFeet).toBe(5.6); // 5% of 112, not of 120.50
-    expect(q.conduitBoughtFeet).toBe(126.1);
+    expect(q.conduitExtraFeet).toBe(6.03); // 5% of 120.50 = 6.025, to the cent
+    expect(q.conduitBoughtFeet).toBe(126.53);
   });
 
   it("puts wire extra on flat AND vertical, and makeup per conductor per end", () => {
@@ -291,7 +292,10 @@ describe("rules a tidy-up would break", () => {
     makeupEndInches: 18,
   });
 
-  it("gives the same conduit extra with or without a drop", () => {
+  it("grows the conduit extra with the drop — waste covers the drops too", () => {
+    // Owner, 2026-10-05: conduit waste is on flat + drops, the same base as
+    // wire waste. Under the old rule (flat only) these two were EQUAL, which
+    // is what this test used to assert — so it is red with the old rule.
     const flat = quantitiesForRun(
       run(100),
       [],
@@ -306,8 +310,9 @@ describe("rules a tidy-up would break", () => {
       DROP_8_5,
       withExtras
     )!;
-    expect(dropped.conduitExtraFeet).toBe(flat.conduitExtraFeet);
-    // ...while the WIRE extra does grow with the drop — checked on wire.
+    expect(flat.conduitExtraFeet).toBe(5); // 5% of 100
+    expect(dropped.conduitExtraFeet).toBe(5.43); // 5% of 108.5 = 5.425
+    // ...and the WIRE extra grows with the drop too — checked on wire.
     const flatW = quantitiesForRun(
       run(100),
       TWO_AND_GROUND,
@@ -468,6 +473,7 @@ describe("fittings are counted over INSTALLED pipe, not bought", () => {
         bidDistributionInches: null,
         extraDefaults: undefined,
         runTypes: [],
+        linkedMarks: [],
       }),
       pullPointAnswersByRun: new Map(),
       teesById: new Map(),

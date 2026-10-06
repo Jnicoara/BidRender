@@ -5,7 +5,8 @@
  * tidy-up that merged them would be wrong twice (plan-viewer-overhaul.md § 2.2,
  * § 5j, § 7.1):
  *
- *   conduit extra   a percentage of the RUN LENGTH only
+ *   conduit extra   a percentage of the run length AND its drops (owner,
+ *                   2026-10-05; it was the run length only until then)
  *   wire extra      a percentage of the run length AND its drops
  *   makeup          inches per conductor at each END — never a percentage
  *
@@ -154,7 +155,7 @@ export function ExtrasSection() {
       <div className="space-y-1.5">
         <ExtraRow
           label="Conduit extra"
-          hint="of the run length only — not the drops"
+          hint="of the run length and its drops"
           suffix="%"
           value={
             stored.conduitExtraPct === null

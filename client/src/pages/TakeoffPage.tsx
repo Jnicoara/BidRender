@@ -309,6 +309,7 @@ import {
   type UndoState,
 } from "@/lib/undoStack";
 import { emptiedCountCard } from "@/lib/emptiedCountCard";
+import { selectionDrop } from "@/lib/selectionDrop";
 import {
   nextMarkBatch,
   recoveredMarkKey,
@@ -316,8 +317,10 @@ import {
 } from "@/lib/markBatches";
 import {
   adoptRealGroup,
+  adoptRealSheet,
   dropProvisional,
   isProvisionalGroup,
+  isProvisionalSheet,
   lostMarksMessage,
 } from "@/lib/provisionalCount";
 import { earlyTextKey, sheetsToCatchUp } from "@/lib/scaleCatchUp";
@@ -3253,6 +3256,27 @@ export default function TakeoffPage({
     [gridRange, listRange, thumbnailPageCount]
   );
   const activeSheet = sheets.find(s => s.pageNumber === page) ?? null;
+  /*
+    A SHEET DRAWN BEFORE ITS ROW EXISTS (@/lib/provisionalCount, 2026-10-06).
+    A fresh upload is on screen three round trips before its sheet rows are;
+    a tap in that window had no sheet id and `markForClick` dropped it — the
+    staging smoke test's 0 of 3. Taps there are kept under a provisional
+    (negative) id per sheet, drawn at once, and moved onto the real sheet by
+    the effect beside `queueStamp` when the row arrives.
+  */
+  const provisionalSheets = useRef(new Map<SheetKey, number>());
+  const nextProvisionalSheet = useRef(-1);
+  const provisionalSheetFor = useCallback((key: SheetKey) => {
+    let id = provisionalSheets.current.get(key);
+    if (id === undefined) {
+      id = nextProvisionalSheet.current--;
+      provisionalSheets.current.set(key, id);
+    }
+    return id;
+  }, []);
+  /** The sheet id this sheet's unsent marks are held under right now. */
+  const drawnSheetId =
+    activeSheet?.id ?? provisionalSheets.current.get(sheetKey) ?? null;
   sheetNow.current = activeSheet
     ? { id: activeSheet.id, name: activeSheet.name }
     : null;
@@ -4473,6 +4497,37 @@ export default function TakeoffPage({
     },
   });
   /*
+    A MARK'S OWN DROP — its height, or left off (vertical-drops-plan § 2).
+    Both move a drop, so both refresh through `markDrop`, which reaches the
+    count row, a run end linked to the mark, and the bid's totals.
+  */
+  const setMarkHeight = trpc.takeoffStamps.setHeight.useMutation({
+    onSuccess: (r, input) => {
+      const what = r.updated === 1 ? "mark" : "marks";
+      toast.success(
+        input.inches === null
+          ? `${r.updated} ${what} back to the count's height.`
+          : input.source === "read"
+            ? `Height from the plan used on ${r.updated} ${what}.`
+            : `${r.updated} ${what} at ${r.updated === 1 ? "its" : "their"} own height — drops re-counted.`
+      );
+    },
+    onError: e => toast.error(e.message),
+    onSettled: () => refreshFor("markDrop"),
+  });
+  const setMarkDropExcluded = trpc.takeoffStamps.setDropExcluded.useMutation({
+    onSuccess: (r, input) => {
+      const what = r.updated === 1 ? "mark" : "marks";
+      toast.success(
+        input.excluded
+          ? `No drop on ${r.updated} ${what} — still counted as devices.`
+          : `${r.updated} ${what} given their drop again.`
+      );
+    },
+    onError: e => toast.error(e.message),
+    onSettled: () => refreshFor("markDrop"),
+  });
+  /*
     A count's PIN LOOK (pin plan § 6). "Every job" lands on the legend symbol
     or the assembly, which are not per bid, so those two lists are dropped as
     well as the count list — or the swatch would keep the old look until a
@@ -5130,7 +5185,8 @@ export default function TakeoffPage({
       const mark = markForClick(
         armedGroupHeld,
         sheetKey,
-        activeSheet?.id ?? null,
+        // No row yet (a fresh upload): kept under a stand-in, never dropped.
+        activeSheet?.id ?? provisionalSheetFor(sheetKey),
         at
       );
       if (!mark) return;
@@ -5151,7 +5207,9 @@ export default function TakeoffPage({
           sent: false,
         },
       ]);
-      mirrorQueue(sheetId);
+      // A stand-in sheet id means nothing after a reload; these marks are
+      // mirrored once the row arrives (the effect below).
+      if (!isProvisionalSheet(sheetId)) mirrorQueue(sheetId);
 
       if (flushTimer.current === null) {
         flushTimer.current = window.setTimeout(flushStamps, FLUSH_AFTER_MS);
@@ -5163,11 +5221,30 @@ export default function TakeoffPage({
       sheetKey,
       armedCategory,
       placingStatus,
+      provisionalSheetFor,
       flushStamps,
       mirrorQueue,
       setPending,
     ]
   );
+
+  /*
+    The row arrived: taps made before it move onto the real sheet, are
+    mirrored, and go (@/lib/provisionalCount, `adoptRealSheet`). Keyed on the
+    sheet in view, which is the only sheet a tap can have been made on.
+  */
+  useEffect(() => {
+    if (!activeSheet) return;
+    const provisional = provisionalSheets.current.get(sheetKey);
+    if (provisional === undefined) return;
+    provisionalSheets.current.delete(sheetKey);
+    setPending(
+      adoptRealSheet(pendingStamps.current, provisional, activeSheet.id)
+    );
+    mirrorQueue(activeSheet.id);
+    flushStamps();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSheet?.id, sheetKey]);
 
   /**
    * Pick up a count the server has not made yet, and keep every click.
@@ -6305,6 +6382,12 @@ export default function TakeoffPage({
     [layeredStamps, effectiveLayers]
   );
 
+  /** The selection's own height and left-off drops, for the pill. */
+  const selectionDrops = useMemo(
+    () => selectionDrop(stamps, selectedStampIds),
+    [stamps, selectedStampIds]
+  );
+
   /**
    * Where a run meets each mark on this sheet (shared/connectPoint.ts): the
    * wall for a wall device whose wall the drawing shows, the centre for
@@ -6701,6 +6784,16 @@ export default function TakeoffPage({
       id: r.id,
       label: legs.length > 1 ? `Leg ${i + 1}` : "Run",
       ends: r.ends ?? NO_ENDS,
+      about: {
+        start: {
+          heightSource: r.ends?.startHeightSource ?? "unset",
+          onExisting: r.ends?.startOnExisting ?? false,
+        },
+        end: {
+          heightSource: r.ends?.endHeightSource ?? "unset",
+          onExisting: r.ends?.endOnExisting ?? false,
+        },
+      },
       verticals: r.quantities?.verticals ?? null,
       teeEnds: { start: Boolean(r.startTee), end: Boolean(r.endTee) },
       points: r.points,
@@ -9110,7 +9203,24 @@ export default function TakeoffPage({
                 return fresh?.find(d => d.id === doc.id)?.url ?? null;
               }}
               overlay={size =>
-                measurability ? (
+                /*
+                  Mounted with the DRAWING. This read `measurability ? (`
+                  until 2026-10-06, so until that query answered — a round
+                  trip after a sheet opens, more on a fresh upload, whose
+                  sheet rows come three round trips after the drawing — there
+                  was no layer over the sheet: the count was armed, the pill
+                  said so, and every tap fell on the bare canvas and was lost
+                  without a word (staging smoke, touch.spec, 0 of 3, four runs
+                  in a row). Counting needs no scale and no sheet row:
+                  TraceLayer takes a measurability still loading as "cannot
+                  trace yet", and a tap before the row is kept under a
+                  stand-in sheet id (`provisionalSheetFor`). Each child that
+                  needs the row checks `activeSheet` itself. PlanPane already
+                  calls this only once the sheet has a drawn size; the test is
+                  repeated here rather than dropped so the block below keeps
+                  its shape.
+                */
+                size.width > 0 ? (
                   <>
                     {/* Calibration takes the drawing while it is on: two
                               clicks that mean something different from every
@@ -9581,7 +9691,8 @@ export default function TakeoffPage({
                           click that missed.
                         */
                         ...pendingMarks
-                          .filter(m => m.sheetId === activeSheet?.id)
+                          // Held under a stand-in until the row arrives.
+                          .filter(m => m.sheetId === drawnSheetId)
                           .map(m => ({
                             id: m.key,
                             name: m.name,
@@ -9630,6 +9741,32 @@ export default function TakeoffPage({
                                   id => id > 0
                                 ),
                                 status,
+                              })
+                      }
+                      selectedDrop={selectionDrops}
+                      onSetHeightSelected={
+                        quantitiesLocked || !bidId
+                          ? undefined
+                          : inches =>
+                              setMarkHeight.mutate({
+                                bidId,
+                                ids: Array.from(selectedStampIds).filter(
+                                  id => id > 0
+                                ),
+                                inches,
+                                source: "typed",
+                              })
+                      }
+                      onSetDropExcludedSelected={
+                        quantitiesLocked || !bidId
+                          ? undefined
+                          : excluded =>
+                              setMarkDropExcluded.mutate({
+                                bidId,
+                                ids: Array.from(selectedStampIds).filter(
+                                  id => id > 0
+                                ),
+                                excluded,
                               })
                       }
                       onClearSelection={() => setSelectedStampIds(new Set())}
@@ -9734,6 +9871,15 @@ export default function TakeoffPage({
                             legendRows={sessionLegend?.rows ?? []}
                             picks={sessionLegend?.picks ?? {}}
                             locked={quantitiesLocked}
+                            onUseHeight={(markId, inches) => {
+                              if (!bidId) return;
+                              setMarkHeight.mutate({
+                                bidId,
+                                ids: [markId],
+                                inches,
+                                source: "read",
+                              });
+                            }}
                             countForItem={countForItem}
                             moveTargets={moveTargets}
                             hidden={checkSession.hidden}

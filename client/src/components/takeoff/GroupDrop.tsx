@@ -111,10 +111,13 @@ export function GroupDrop({
     info.dropKind ??
     "";
   const runType = runTypes.find(t => t.id === info.dropRunTypeId);
-  const total =
+  // From the buckets, never "one drop × marks": a mark at its own height
+  // drops a different length (vertical-drops-plan § 2).
+  const total = r ? r.totalDropFeet : null;
+  const atCountHeight =
     r && r.perDropFeet !== null
-      ? Math.round(r.perDropFeet * r.countedMarks.length * 100) / 100
-      : null;
+      ? r.countedMarks.length - (r.ownHeightCount ?? 0)
+      : 0;
 
   return (
     <div className="mt-1.5 space-y-1 rounded border border-border/60 bg-muted/20 px-2 py-1.5">
@@ -198,19 +201,43 @@ export function GroupDrop({
         </div>
       )}
 
-      {r?.status === "counted" && r.perDropFeet !== null && total !== null && (
+      {r?.status === "counted" && total !== null && (
         <>
           <p className="text-xs font-mono text-right">
             <span className="text-muted-foreground/70">
-              {typeLabel}{" "}
-              {r.deviceInches !== null ? formatElevation(r.deviceInches) : ""}
-              {r.distributionInches !== null
-                ? ` from run height ${formatElevation(r.distributionInches)}`
-                : ""}{" "}
-              · {r.perDropFeet.toFixed(2)} ft × {r.countedMarks.length} ={" "}
+              {r.perDropFeet !== null && atCountHeight > 0 && (
+                <>
+                  {typeLabel}{" "}
+                  {r.deviceInches !== null
+                    ? formatElevation(r.deviceInches)
+                    : ""}
+                  {r.distributionInches !== null
+                    ? ` from run height ${formatElevation(r.distributionInches)}`
+                    : ""}{" "}
+                  · {r.perDropFeet.toFixed(2)} ft × {atCountHeight}
+                </>
+              )}
+              {r.ownHeightCount > 0 &&
+                `${r.perDropFeet !== null && atCountHeight > 0 ? " + " : ""}${r.ownHeightCount} at ${r.ownHeightCount === 1 ? "its own height" : "their own heights"}`}{" "}
+              ={" "}
             </span>
             {total.toFixed(2)} ft
           </p>
+          {r.excludedCount > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {r.excludedCount}{" "}
+              {r.excludedCount === 1 ? "mark has" : "marks have"} no drop — left
+              off by hand.
+            </p>
+          )}
+          {r.uncounted && (
+            <p className="text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1">
+              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+              {r.uncounted.count}{" "}
+              {r.uncounted.count === 1 ? "mark has" : "marks have"} no drop
+              counted — {r.uncounted.reason}.
+            </p>
+          )}
           <p className="text-xs text-muted-foreground">
             In {runType?.label ?? "the chosen run type"} — on that type's bid
             lines, with wire extra and makeup. Connectors and elbows for these{" "}
@@ -218,7 +245,10 @@ export function GroupDrop({
           </p>
           {info.whipFeet !== null && info.whipFeet > 0 && (
             <p className="text-xs text-muted-foreground">
-              Whip {info.whipFeet} ft + drop {r.perDropFeet.toFixed(2)} ft each
+              Whip {info.whipFeet} ft + drop{" "}
+              {r.perDropFeet !== null
+                ? `${r.perDropFeet.toFixed(2)} ft each`
+                : "at each mark's height"}
               — this assembly's whip may already include the drop.
             </p>
           )}

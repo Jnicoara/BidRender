@@ -4,7 +4,8 @@
  * references/track-b-held-migrations-plan.md § 1, and plan-viewer-overhaul.md
  * § 2.2 / § 5j / § 7.1 for the three quantities themselves:
  *
- *   conduit extra   a percentage of the TRACED length only (§ 7.1)
+ *   conduit extra   a percentage of traced AND vertical (owner, 2026-10-05;
+ *                   § 7.1 had it on the traced length only)
  *   wire extra      a percentage of traced AND vertical
  *   makeup          feet per conductor per END — never a percentage, wire only
  *

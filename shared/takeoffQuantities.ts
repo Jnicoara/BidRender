@@ -28,8 +28,8 @@
  * A traced line measures flat overhead distance only. The drops and rises at
  * a run's two ends are computed in `shared/takeoffHeights.ts` and handed in
  * here, and they stay a SEPARATE field the whole way through: a drop adds to
- * conduit once and to wire once per conductor, and § 7.1 gives the two
- * allowances different reach over it. Nothing in this module adds a vertical
+ * conduit once and to wire once per conductor, and both allowances reach it
+ * (since 2026-10-05; § 7.1 had conduit's on the flat only). Nothing in this module adds a vertical
  * into a traced length.
  *
  * ── Cable runs are a different shape, not a special case ─────────────────────
@@ -326,8 +326,9 @@ export type CircuitWire = {
    * The run's vertical footage, once per conductor.
    *
    * A drop adds to conduit ONCE and to wire once PER CONDUCTOR — see § 2.4.
-   * Kept as its own field rather than added into `flatFeet`, because § 7.1
-   * applies the wire allowance to this and the conduit allowance to neither.
+   * Kept as its own field rather than added into `flatFeet`, so every foot
+   * can be traced to where it came from. Both allowances apply to it since
+   * 2026-10-05 (owner); § 7.1 had kept the conduit allowance off it.
    */
   verticalFeet: number;
   /** Both of the above. This is the number that goes on the bid. */
@@ -582,10 +583,10 @@ function round2(value: number): number {
  * gets bought, which is both.
  *
  * The vertical is NEVER folded into `runFeet`, for two reasons. An estimator
- * has to be able to see where every foot came from (§ 2.4), and § 7.1 applies
- * the conduit allowance to the traced length ONLY while the wire allowance
- * covers everything — a rule that cannot be written at all once the two have
- * been added together.
+ * has to be able to see where every foot came from (§ 2.4), and the rule for
+ * what each allowance covers has changed once already — § 7.1 put conduit's
+ * on the traced length only until the owner widened it to the drops on
+ * 2026-10-05 — which would have been unwritable with the two added together.
  */
 /**
  * "This run has no verticals to apply" — said out loud.
@@ -637,7 +638,10 @@ export type RunQuantities = {
   */
   /** Pipe installed: flat plus vertical. Null for a cable run — not zero. */
   conduitInstalledFeet: number | null;
-  /** Extra conduit: the FLAT length × the conduit %, never the vertical (§ 7.1). */
+  /**
+   * Extra conduit: (flat + vertical) × the conduit %. Was flat only until
+   * 2026-10-05 (owner; vertical-drops-plan § 3).
+   */
   conduitExtraFeet: number;
   /** Pipe to buy: installed plus extra. Null for a cable run. */
   conduitBoughtFeet: number | null;
@@ -873,10 +877,15 @@ export function quantitiesForRun(
   const groundInstalledFeet = round2(
     groundCore + groundConductors * makeupPerConductor
   );
-  // Conduit extra covers route uncertainty in the FLAT length only; a drop is
-  // arithmetic between two known heights and gets none (§ 7.1).
-  const conduitExtraFeet = round2(length * conduitPct);
+  /*
+    Conduit extra (waste) covers the flat length AND the drops — the same
+    base wire extra already uses. Owner, 2026-10-05: it was the FLAT length
+    only (overhaul § 7.1, "a drop is arithmetic between two known heights"),
+    which made conduit and wire waste disagree about the same footage.
+    references/vertical-drops-plan.md § 3.
+  */
   const conduitInstalledFeet = round2(length + verticalFeet);
+  const conduitExtraFeet = round2(conduitInstalledFeet * conduitPct);
 
   return {
     pathType: "conduit",
@@ -974,8 +983,8 @@ export function totalQuantities(
   cableVerticalFeet: number;
   wireVerticalFeet: number;
   /**
-   * The EXTRA share of each — material only (Q5). Conduit's is on the flat
-   * length alone; wire's and cable's are on flat and vertical (§ 7.1).
+   * The EXTRA share of each — material only (Q5). All of them are on flat
+   * and vertical (conduit's since 2026-10-05; § 7.1 had it on flat alone).
    */
   conduitExtraFeet: number;
   cableExtraFeet: number;
@@ -1156,6 +1165,7 @@ export function totalQuantities(
     wireGround += f.groundBoughtFeet;
     if (f.pathType === "conduit") {
       conduitVertical += f.dropFeet;
+      conduitExtra += f.conduitExtraFeet;
       wireVertical += f.wireInstalledFeet - f.makeupFeet;
       wireExtra += f.wireExtraFeet;
       wireMakeup += f.makeupFeet;

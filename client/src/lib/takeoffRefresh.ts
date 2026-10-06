@@ -133,6 +133,14 @@ export type TakeoffChange =
    */
   | "markStatus"
   /**
+   * A mark's own height set, or its drop left off or given back
+   * (vertical-drops-plan § 2). It moves that mark's drop — the count's row,
+   * a run end linked to it, the run-type lines and the materials list —
+   * so the same queries as a status change, keyed by BID: a drop placed on
+   * one sheet moves the totals every sheet shows.
+   */
+  | "markDrop"
+  /**
    * A count's pin look chosen (shape, letter, colour). No number moves; the
    * count list carries the look. The legend's `symbols` and the assemblies
    * list are not per bid and are the caller's to drop.
@@ -236,6 +244,7 @@ export const QUERIES_MOVED_BY: Readonly<
     ...RUN_QUERIES,
     ...BID_QUANTITY_QUERIES,
   ]),
+  markDrop: unique([...MARK_QUERIES, ...RUN_QUERIES, ...BID_QUANTITY_QUERIES]),
   // The summary lists every count with its swatch, so it follows too.
   pinLook: unique([...MARK_QUERIES, "takeoffSummary.forBid"]),
   sheet: unique(SHEET_QUERIES),

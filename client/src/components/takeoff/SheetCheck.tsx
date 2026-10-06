@@ -253,6 +253,7 @@ export function SheetCheckPanel({
   onCount,
   onCountNew,
   onSplit,
+  onUseHeight,
   onAskAi,
   onRerun,
   onClose,
@@ -284,6 +285,11 @@ export function SheetCheckPanel({
   /** No count is this item yet: start one named after the legend row. */
   onCountNew: (item: string, at: { x: number; y: number }[]) => void;
   onSplit: (count: string, markIds: number[], label: string) => void;
+  /**
+   * Put a height read beside a mark ONTO that mark, as `read`. The only way a
+   * read height reaches a mark: a person accepts it (vertical-drops-plan § 2).
+   */
+  onUseHeight: (markId: number, inches: number) => void;
   onAskAi: (
     batch: ReturnType<typeof tieBreakBatch>
   ) => Promise<{ picks: Map<number, string | null>; message: string | null }>;
@@ -719,9 +725,10 @@ export function SheetCheckPanel({
         <>
           <p className="text-[11px] text-muted-foreground">
             Read from the words beside each mark. Suggestions only — nothing is
-            applied.
-            {!MARK_HEIGHT_COLUMN &&
-              " Heights are shown, not saved: a mark has nowhere to keep one yet."}
+            applied until you choose it.
+            {MARK_HEIGHT_COLUMN
+              ? " Use a height to put it on that mark: its drop is counted from it."
+              : " Heights are shown, not saved: a mark has nowhere to keep one yet."}
           </p>
           {existing.length > 0 && (
             <Button
@@ -761,6 +768,20 @@ export function SheetCheckPanel({
                   <span className="ml-auto shrink-0 font-medium">
                     {parts.join(", ")}
                   </span>
+                  {MARK_HEIGHT_COLUMN &&
+                    actions &&
+                    n.words.heights.map(h => (
+                      <Button
+                        key={h.text}
+                        size="sm"
+                        variant="outline"
+                        className="h-5 px-1.5 text-[11px] shrink-0"
+                        onClick={() => onUseHeight(n.markId, h.inches)}
+                        title={`Put ${h.text} on this mark. Its drop is counted from it.`}
+                      >
+                        Use {h.text}
+                      </Button>
+                    ))}
                 </li>
               );
             })}

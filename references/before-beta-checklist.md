@@ -54,8 +54,10 @@ does not look broken. It gets believed, bid, and won or lost on.
       Run the read-only stub review on production, then set
       `STUB_REVIEW_POINTS` from what it finds · A runs it, B sets it · small ·
       no · `track-b-panning-plan.md` § 7
-- [ ] **A drop can only be removed from a whole count, not from one mark** ·
-      A then B · small · **yes** (0103 `dropExcluded`) · `todo.md` ~1460
+- [x] **A drop can only be removed from a whole count, not from one mark** ·
+      A then B · small · **yes** (0098 `dropExcluded` — this line said 0103) ·
+      `todo.md` ~1460. **DONE 2026-10-05:** "No drop on these" on the
+      selection pill (references/vertical-drops-plan.md § 8).
 - [ ] **Re-applying markup to a line added before markup existed** reads
       today's recipe, and a hand-priced old line gets the company default ·
       B · medium · no · `todo.md` ~1615, `material-markup.md`

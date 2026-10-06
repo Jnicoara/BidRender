@@ -449,7 +449,11 @@ export function groupRunFootage(input: {
     );
     row.makeupFeet += f.makeupFeet;
     if (f.pathType === "cable") row.racewayExtraFeet += f.wireExtraFeet;
-    else row.wireExtraFeet += f.wireExtraFeet;
+    else {
+      row.wireExtraFeet += f.wireExtraFeet;
+      // Conduit waste on drops too (owner, 2026-10-05).
+      row.racewayExtraFeet += f.conduitExtraFeet;
+    }
   }
 
   for (const row of Array.from(byType.values())) {

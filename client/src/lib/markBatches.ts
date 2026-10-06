@@ -26,7 +26,7 @@
  */
 
 import type { UserMarkStatus } from "@shared/markStatus";
-import { isProvisionalGroup } from "./provisionalCount";
+import { isProvisionalGroup, isProvisionalSheet } from "./provisionalCount";
 import { queuedStampStatus, type QueuedStamp } from "./traceDraft";
 
 export type QueuedMark = {
@@ -52,7 +52,14 @@ export type QueuedMark = {
  * them.
  */
 export function nextMarkBatch<T extends QueuedMark>(queue: readonly T[]): T[] {
-  const first = queue.find(m => !m.sent && !isProvisionalGroup(m.groupId));
+  // Nothing goes over under an id the server never made — a count still
+  // being made, or a sheet whose row has not arrived (provisionalCount).
+  const first = queue.find(
+    m =>
+      !m.sent &&
+      !isProvisionalGroup(m.groupId) &&
+      !isProvisionalSheet(m.sheetId)
+  );
   if (!first) return [];
   return queue.filter(
     m =>

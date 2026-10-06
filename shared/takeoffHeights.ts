@@ -271,6 +271,60 @@ export function resolveMountingHeight(
   return UNSET;
 }
 
+/** Where a DEVICE end's height came from, in the order it is looked for. */
+export type DeviceHeightSource =
+  | "run"
+  | "mark-typed"
+  | "mark-read"
+  | "count"
+  | "job"
+  | "company"
+  | "shipped"
+  | "unset";
+
+/** A mark's own height (0098). Source NULL with inches set reads as typed. */
+export type MarkHeight = {
+  inches: number | null;
+  source: "typed" | "read" | null;
+};
+
+/**
+ * THE DEVICE HEIGHT AT A MARK — the one order, for a run end and for a
+ * count's drop alike (references/vertical-drops-plan.md § 2):
+ *
+ *   this run end's own → this mark's (typed, or read and accepted) →
+ *   the count's → job → company → shipped → unset.
+ *
+ * One function, because the run path (server/runVerticals.ts) and the count
+ * path (shared/groupDrops.ts) both resolve a mark's height, and two
+ * resolvers are two chances to put a 54" receptacle at 18" on one screen and
+ * 54" on the other. A read height is only ever STORED once a person
+ * accepted it (Sheet Check's "Use"), so it is applied here like a typed
+ * one; it ranks below typed only because one mark holds one height, and
+ * the source says which wrote it last.
+ */
+export function resolveDeviceHeight(input: {
+  kind: string | null;
+  layers: HeightLayers;
+  /** The run end's own height. Null on a count drop. */
+  runEndInches: number | null;
+  mark: MarkHeight | null;
+  /** The count's "Height for this count". */
+  countInches: number | null;
+}): { inches: number | null; source: DeviceHeightSource } {
+  if (usableInches(input.runEndInches))
+    return { inches: input.runEndInches, source: "run" };
+  if (input.mark && usableInches(input.mark.inches))
+    return {
+      inches: input.mark.inches,
+      source: input.mark.source === "read" ? "mark-read" : "mark-typed",
+    };
+  if (usableInches(input.countInches))
+    return { inches: input.countInches, source: "count" };
+  const rest = resolveMountingHeight(input.kind, input.layers, null);
+  return rest;
+}
+
 /**
  * The distribution height in effect: run → job → company.
  *
@@ -712,19 +766,42 @@ export type RunVerticalClaim = {
   verticalFeet: number;
   startStampId: number | null;
   endStampId: number | null;
+  /**
+   * Whether the run COUNTS a vertical at each end. REQUIRED: a claim is only
+   * a claim where the run carries the drop itself — see
+   * `stampsClaimedByRuns`.
+   */
+  startCountsVertical: boolean;
+  endCountsVertical: boolean;
 };
 
 /** One stamp's own vertical footage, for a device not on a traced run. */
 export type StampVertical = { stampId: number; verticalFeet: number };
 
-/** Every stamp id claimed by a run end. */
+/**
+ * Every stamp id claimed by a run end — an end LINKED to the stamp that also
+ * COUNTS a vertical there.
+ *
+ * ── Linked is not enough (fixed 2026-10-05) ─────────────────────────────────
+ * This used to claim every linked stamp. A branch leg started on a mark is
+ * linked with no end kind, so it counts no vertical there — and the mark's
+ * drop came off its count anyway. The drop was then counted by NOBODY: a
+ * smaller number with nothing on screen pointing at it
+ * (references/vertical-drops-plan.md § 1, gap 5). The rule exists so a drop
+ * is counted ONCE, which means the run may only take it when it counts it.
+ */
 export function stampsClaimedByRuns(
-  runs: readonly Pick<RunVerticalClaim, "startStampId" | "endStampId">[]
+  runs: readonly Pick<
+    RunVerticalClaim,
+    "startStampId" | "endStampId" | "startCountsVertical" | "endCountsVertical"
+  >[]
 ): Set<number> {
   const claimed = new Set<number>();
   for (const run of runs) {
-    if (run.startStampId !== null) claimed.add(run.startStampId);
-    if (run.endStampId !== null) claimed.add(run.endStampId);
+    if (run.startStampId !== null && run.startCountsVertical)
+      claimed.add(run.startStampId);
+    if (run.endStampId !== null && run.endCountsVertical)
+      claimed.add(run.endStampId);
   }
   return claimed;
 }

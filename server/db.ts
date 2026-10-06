@@ -224,7 +224,12 @@ import { unpricedPartsIn, type NotPricedTally } from "../shared/lineNotPriced";
 import { appliedModifiers } from "../shared/modifierLookup";
 import { resolveMaterial, materialIdsToFetch } from "../shared/materialLookup";
 import { resolveAssembly } from "../shared/assemblyLookup";
-import { buildHeightContext, type HeightContext } from "./runVerticals";
+import {
+  buildHeightContext,
+  verticalsForRunRow,
+  type HeightContext,
+  type RunEnds,
+} from "./runVerticals";
 import {
   groupDrops,
   markDropEntries,
@@ -8993,6 +8998,65 @@ export async function setStampStatus(
   return (result as { affectedRows?: number }).affectedRows ?? 0;
 }
 
+/**
+ * A mark's own device height (0098), or NULL to follow its count. `source`
+ * says who wrote it: `typed` by a person, `read` from the plan and ACCEPTED
+ * by one (Sheet Check's "Use") — never written by a read alone.
+ */
+export async function setStampHeight(
+  bidId: number,
+  userId: number,
+  ids: number[],
+  inches: number | null,
+  source: "typed" | "read"
+): Promise<number> {
+  const database = await getDb();
+  if (!database) throw new Error("DB unavailable");
+  const [result] = await database
+    .update(takeoffStamps)
+    .set({
+      mountHeightInches: inches === null ? null : inches.toFixed(2),
+      mountHeightSource: inches === null ? null : source,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        eq(takeoffStamps.userId, userId),
+        inArray(takeoffStamps.id, ids)
+      )
+    );
+  return (result as { affectedRows?: number }).affectedRows ?? 0;
+}
+
+/**
+ * Leave these marks' drops off (0098), or give them back. NULL, not false,
+ * for "has its drop": NULL already means it, and one spelling is one thing
+ * to query for.
+ */
+export async function setStampDropExcluded(
+  bidId: number,
+  userId: number,
+  ids: number[],
+  excluded: boolean
+): Promise<number> {
+  const database = await getDb();
+  if (!database) throw new Error("DB unavailable");
+  const [result] = await database
+    .update(takeoffStamps)
+    .set({ dropExcluded: excluded ? true : null, updatedAt: new Date() })
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        eq(takeoffStamps.userId, userId),
+        inArray(takeoffStamps.id, ids)
+      )
+    );
+  return (result as { affectedRows?: number }).affectedRows ?? 0;
+}
+
 /** Tag where a placed stamp sits — the Location layer. */
 export async function setStampLocation(
   id: number,
@@ -13049,15 +13113,18 @@ export async function heightContextForBid(
   userId: number,
   bidDistributionInches: number | null
 ): Promise<HeightContext> {
-  const [defaults, company, job, extraDefaults, runTypes] = await Promise.all([
-    getHeightDefaults(userId),
-    getMountingHeights(userId),
-    getBidMountingHeights(bidId, userId),
-    // Extra and makeup ride on this context so no caller can load the heights
-    // and forget them (server/runVerticals.ts, `HeightContext.extras`).
-    getExtraDefaults(userId),
-    getRunTypesFor(userId, true),
-  ]);
+  const [defaults, company, job, extraDefaults, runTypes, linkedMarks] =
+    await Promise.all([
+      getHeightDefaults(userId),
+      getMountingHeights(userId),
+      getBidMountingHeights(bidId, userId),
+      // Extra and makeup ride on this context so no caller can load the heights
+      // and forget them (server/runVerticals.ts, `HeightContext.extras`).
+      getExtraDefaults(userId),
+      getRunTypesFor(userId, true),
+      // A linked run end reads its mark's height (vertical-drops-plan § 2).
+      getMarksLinkedByRuns(bidId, userId),
+    ]);
   return buildHeightContext({
     defaults,
     company,
@@ -13065,7 +13132,59 @@ export async function heightContextForBid(
     bidDistributionInches,
     extraDefaults,
     runTypes,
+    linkedMarks,
   });
+}
+
+/**
+ * The marks a run end on this bid is linked to, with what their count says
+ * about drops. Only the linked ones: a bid can hold thousands of marks and a
+ * handful of links, and the height context is loaded on every totals read.
+ */
+export async function getMarksLinkedByRuns(bidId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const runs = await db
+    .select({
+      startStampId: takeoffRuns.startStampId,
+      endStampId: takeoffRuns.endStampId,
+    })
+    .from(takeoffRuns)
+    .where(
+      and(
+        eq(takeoffRuns.bidId, bidId),
+        eq(takeoffRuns.userId, userId),
+        // A run on a removed plan set links nothing that is priced.
+        onLivePlanSheet(takeoffRuns.sheetId, bidId)
+      )
+    );
+  const ids = Array.from(
+    new Set(
+      runs
+        .flatMap(r => [r.startStampId, r.endStampId])
+        .filter((id): id is number => id !== null)
+    )
+  );
+  if (ids.length === 0) return [];
+  return db
+    .select({
+      id: takeoffStamps.id,
+      mountHeightInches: takeoffStamps.mountHeightInches,
+      mountHeightSource: takeoffStamps.mountHeightSource,
+      status: takeoffStamps.status,
+      dropKind: takeoffGroups.dropKind,
+      dropHeightInches: takeoffGroups.dropHeightInches,
+    })
+    .from(takeoffStamps)
+    .leftJoin(takeoffGroups, eq(takeoffStamps.groupId, takeoffGroups.id))
+    .where(
+      and(
+        eq(takeoffStamps.userId, userId),
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        inArray(takeoffStamps.id, ids)
+      )
+    );
 }
 
 /**
@@ -13082,13 +13201,13 @@ export async function loadGroupDrops(
   bidId: number,
   userId: number,
   heights: HeightContext,
-  runs: readonly {
+  // The run ROW (RunEnds), because a run end claims a mark's drop only
+  // where it counts a vertical itself (`stampsClaimedByRuns`).
+  runs: readonly (RunEnds & {
     sheetId: number;
     points: { x: number; y: number }[] | null;
-    startStampId: number | null;
-    endStampId: number | null;
     isSuggestion: boolean;
-  }[],
+  })[],
   scales: ReadonlyMap<
     number,
     { scaleRatio: number | null; scaleSource: string; notToScale: boolean }
@@ -13115,16 +13234,28 @@ export async function loadGroupDrops(
       sheetId: s.sheetId,
       x: Number(s.x),
       y: Number(s.y),
+      // 0098. decimal(7,2) arrives as a string.
+      height: {
+        inches:
+          s.mountHeightInches === null ? null : Number(s.mountHeightInches),
+        source: s.mountHeightSource,
+      },
+      dropExcluded: s.dropExcluded === true,
     })),
     // A suggestion is nobody's claim and nobody's end yet.
     runs: runs
       .filter(r => !r.isSuggestion)
-      .map(r => ({
-        sheetId: r.sheetId,
-        points: r.points ?? [],
-        startStampId: r.startStampId,
-        endStampId: r.endStampId,
-      })),
+      .map(r => {
+        const v = verticalsForRunRow(r, heights);
+        return {
+          sheetId: r.sheetId,
+          points: r.points ?? [],
+          startStampId: r.startStampId,
+          endStampId: r.endStampId,
+          startCountsVertical: v.start.counted,
+          endCountsVertical: v.end.counted,
+        };
+      }),
     heights: {
       layers: heights.layers,
       companyInches: heights.companyInches,

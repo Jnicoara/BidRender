@@ -37,7 +37,34 @@ This is the human-readable companion to the git history — read this to see wha
   anyway" or Cancel, Cancel first). Before, only a look added to an existing
   item was checked.
 
+- **Fixed: taps on a freshly opened plan could be lost on a slow connection.**
+  The counting tool showed as ready, but for a moment after a sheet opened
+  (longer on a plan just uploaded) nothing was listening on the drawing, and
+  the taps disappeared without a word. They are now kept, shown at once, and
+  saved as soon as the sheet is ready. Found by the browser smoke test on
+  staging, and now tested on a deliberately slowed connection.
+
 ## [2026-10-05]
+
+- **Conduit waste now covers the drops too.** The conduit allowance used to
+  apply to the traced run length only, while the wire allowance covered the
+  drops as well. Both now use the same footage, on traced runs and on drops
+  to counted devices — so a 40 ft run with 12.5 ft of drops buys 55.13 ft of
+  conduit at 5%, not 54.50 ft. The settings screens say so.
+
+- **Fixed: a device's drop could vanish from the bid.** When a run started
+  or ended on a marked device but counted no drop there itself, the
+  device's own drop was taken off anyway, so neither counted it. Now the
+  run only takes a drop it actually counts.
+- **A single device can have its own mounting height.** Select marks and
+  set a height in the bar that appears (a receptacle at 54" instead of
+  18"); its drop, the count's total and the bid follow. A height read off
+  the plan in Check sheet is offered as "Use 54"" and is only used when
+  you click it.
+- **One device's drop can be left off** with "No drop on these", and the
+  count says how many.
+- **A run ending on an existing device** still prices its drop, says so on
+  the run, and has a one-click "Leave it off".
 
 - **A newly added look cannot fill a count in one click.** In Find all
   matching, a find that only a recently added look made now says so and

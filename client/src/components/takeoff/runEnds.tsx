@@ -389,12 +389,38 @@ export function RunEndsEditor({
   );
 }
 
+/**
+ * What the server worked out about one end — read only, never part of a
+ * save (vertical-drops-plan § 5).
+ */
+export type EndAbout = {
+  /** Where the device height came from: "mark-typed", "count", "job"… */
+  heightSource: string;
+  /** Linked to a device marked existing — priced, and said (option C). */
+  onExisting: boolean;
+};
+
+/** Words for a height that did not come from the type's own setting. */
+export function heightSourceWords(source: string): string | null {
+  switch (source) {
+    case "mark-typed":
+      return "this mark's height";
+    case "mark-read":
+      return "read from the plan";
+    case "count":
+      return "the count's height";
+    default:
+      return null;
+  }
+}
+
 /** One end of one leg, as the Run ends section lists it. */
 export type RunEndsLeg = {
   id: number;
   /** "Leg 2", or the run's name when it has one leg. */
   label: string;
   ends: RunEndsValue;
+  about: { start: EndAbout; end: EndAbout };
   verticals: RunVerticals | null;
   teeEnds: { start: boolean; end: boolean };
   points: readonly { x: number; y: number }[];
@@ -462,6 +488,8 @@ export function RunEndsSection({
               ? leg.points[0]
               : leg.points[leg.points.length - 1];
           const lit = highlight?.runId === leg.id && highlight.end === which;
+          const about = leg.about[which];
+          const sourceWords = heightSourceWords(about.heightSource);
           const kindField = which === "start" ? "startKind" : "endKind";
           const heightField =
             which === "start" ? "startHeightInches" : "endHeightInches";
@@ -489,12 +517,59 @@ export function RunEndsSection({
                   {onTee
                     ? "branch tee — no drop"
                     : vertical?.counted
-                      ? `${vertical.direction === "drop" ? "Drop" : "Rise"} ${vertical.feet.toFixed(2)} ft`
+                      ? `${vertical.direction === "drop" ? "Drop" : "Rise"} ${vertical.feet.toFixed(2)} ft${sourceWords ? ` · ${sourceWords}` : ""}`
                       : kind === DISTRIBUTION_KIND
                         ? "no drop — carries on"
                         : "not set — no drop counted"}
                 </span>
               </div>
+              {/*
+                OPTION C (owner, 2026-10-05): an end on an EXISTING device
+                prices its drop — new pipe to an old box is real work — and
+                says so, with one click to leave it off. Leaving it off sets
+                the end to "run height", which is already how an end says
+                "no drop here", so nothing new is stored.
+              */}
+              {!onTee && about.onExisting && (
+                <div className="flex items-center justify-between gap-2 rounded bg-muted/40 px-2 py-1 text-xs">
+                  <span className="text-muted-foreground">
+                    Ends on an existing device —{" "}
+                    {vertical?.counted ? "drop priced." : "drop left off."}
+                  </span>
+                  {!locked && vertical?.counted && (
+                    <button
+                      type="button"
+                      className="shrink-0 underline underline-offset-2 hover:text-foreground"
+                      onClick={() =>
+                        onSave(leg.id, {
+                          [kindField]: DISTRIBUTION_KIND,
+                          [heightField]: null,
+                        })
+                      }
+                      title="No new pipe or wire down to this device. The end carries on at run height."
+                    >
+                      Leave it off
+                    </button>
+                  )}
+                  {!locked &&
+                    !vertical?.counted &&
+                    kind === DISTRIBUTION_KIND && (
+                      <button
+                        type="button"
+                        className="shrink-0 underline underline-offset-2 hover:text-foreground"
+                        onClick={() =>
+                          onSave(leg.id, {
+                            [kindField]: null,
+                            [heightField]: null,
+                          })
+                        }
+                        title="Count the drop to this device again, at its count's height"
+                      >
+                        Price it
+                      </button>
+                    )}
+                </div>
+              )}
               {onTee ? (
                 <TeeEnd />
               ) : (

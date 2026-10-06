@@ -56,6 +56,8 @@ const marks = (n: number, sheetId = 1): DropMark[] =>
     sheetId,
     x: 5000 + i * 1000,
     y: 5000,
+    height: { inches: null, source: null },
+    dropExcluded: false,
   }));
 
 function drops(input: {
@@ -123,6 +125,73 @@ describe("thirty receptacles at 18 inches under a 10 ft run height", () => {
   });
 });
 
+describe("a mark's own height, and a mark with its drop left off", () => {
+  const withHeight = (
+    list: DropMark[],
+    i: number,
+    inches: number,
+    source: "typed" | "read"
+  ) => list.map((m, k) => (k === i ? { ...m, height: { inches, source } } : m));
+
+  it("drops a 54-inch mark on an 18-inch count 36 inches less", () => {
+    // check-my-marks-plan § 10.6: the mark's height replaces its count's for
+    // that mark only. 10'-0" run height: 8.5 ft at 18", 5.5 ft at 54".
+    const [d] = drops({ marks: withHeight(marks(3), 0, 54, "typed") });
+    expect(d.ownHeightCount).toBe(1);
+    expect(d.totalDropFeet).toBe(8.5 + 8.5 + 5.5);
+    const totals = totalQuantities([], markDropEntries([d]));
+    expect(totals.conduitBoughtFeet).toBe(22.5); // NOT 25.5
+    expect(totals.markDropCount).toBe(3);
+    expect(d.buckets.map(b => [b.deviceInches, b.marks.length]).sort()).toEqual(
+      [
+        [18, 2],
+        [54, 1],
+      ]
+    );
+  });
+
+  it("applies an accepted read height like a typed one, and says which", () => {
+    const [d] = drops({ marks: withHeight(marks(2), 1, 54, "read") });
+    expect(d.buckets.find(b => b.deviceInches === 54)?.source).toBe(
+      "mark-read"
+    );
+  });
+
+  it("counts a mark with its own height even when the type has none", () => {
+    // A type nobody set a height for: the count's marks are uncounted and
+    // SAID so — but one with a height of its own still drops.
+    const [d] = drops({
+      groups: [group({ dropKind: "ceiling-box" })],
+      marks: withHeight(marks(3), 0, 96, "typed"),
+    });
+    expect(d.status).toBe("counted");
+    expect(d.totalDropFeet).toBe(2);
+    expect(d.uncounted).toEqual({
+      count: 2,
+      reason: "no height set for that type",
+    });
+  });
+
+  it("never counts an unknown height as zero", () => {
+    const [d] = drops({ groups: [group({ dropKind: "ceiling-box" })] });
+    expect(d.status).toBe("no-height");
+    expect(d.reason).toBe("no height set for that type");
+    expect(markDropEntries([d])).toEqual([]);
+  });
+
+  it("leaves off one mark's drop and says how many", () => {
+    const list = marks(30).map((m, i) =>
+      i === 0 ? { ...m, dropExcluded: true } : m
+    );
+    const [d] = drops({ marks: list });
+    expect(d.excludedCount).toBe(1);
+    expect(d.countedMarks).toHaveLength(29);
+    expect(totalQuantities([], markDropEntries([d])).conduitBoughtFeet).toBe(
+      246.5
+    );
+  });
+});
+
 describe("the double-count rule: a vertical is the run's OR the mark's", () => {
   it("leaves out a mark a run end has claimed", () => {
     const claimed: DropRunEnd = {
@@ -133,10 +202,33 @@ describe("the double-count rule: a vertical is the run's OR the mark's", () => {
       ],
       startStampId: null,
       endStampId: 100, // the first mark
+      startCountsVertical: false,
+      endCountsVertical: true, // the run carries this drop itself
     };
     const [d] = drops({ marks: marks(3), runs: [claimed] });
     expect(d.claimedCount).toBe(1);
     expect(d.countedMarks.map(m => m.id)).toEqual([101, 102]);
+  });
+
+  it("keeps a mark's drop when its linked run end counts no drop there", () => {
+    // vertical-drops-plan § 1, gap 5: a leg started on the mark, kind null.
+    const leg: DropRunEnd = {
+      sheetId: 1,
+      points: [
+        { x: 5000, y: 5000 },
+        { x: 0, y: 0 },
+      ],
+      startStampId: 100,
+      endStampId: null,
+      startCountsVertical: false,
+      endCountsVertical: false,
+    };
+    const [d] = drops({ marks: marks(3), runs: [leg] });
+    expect(d.claimedCount).toBe(0);
+    expect(d.countedMarks).toHaveLength(3);
+    expect(totalQuantities([], markDropEntries([d])).conduitBoughtFeet).toBe(
+      25.5
+    );
   });
 
   it("FLAGS a mark near an unlinked run end, and still counts it", () => {
@@ -149,6 +241,8 @@ describe("the double-count rule: a vertical is the run's OR the mark's", () => {
       ],
       startStampId: null,
       endStampId: null,
+      startCountsVertical: false,
+      endCountsVertical: false,
     };
     const [d] = drops({ marks: marks(3), runs: [near] });
     expect(d.mayDoubleCount).toBe(1);
@@ -161,6 +255,8 @@ describe("the double-count rule: a vertical is the run's OR the mark's", () => {
       points: [{ x: 5010, y: 5000 }],
       startStampId: null,
       endStampId: null,
+      startCountsVertical: false,
+      endCountsVertical: false,
     };
     const [d] = drops({ marks: marks(3), runs: [near], ratio: null });
     expect(d.mayDoubleCount).toBe(0);
@@ -183,10 +279,13 @@ describe("extras on a drop follow § 7.1", () => {
     },
   };
 
-  it("adds wire extra and makeup at the device, never conduit extra", () => {
+  it("adds wire extra and makeup at the device, and conduit waste on the drop", () => {
     const [d] = drops({ marks: marks(10), extras: accepted });
     const per = d.perDrop!;
-    expect(per.conduitBoughtFeet).toBe(8.5); // no 5% on a drop
+    // Owner, 2026-10-05: conduit waste covers drops too (was 8.50, none).
+    expect(per.conduitInstalledFeet).toBe(8.5);
+    expect(per.conduitExtraFeet).toBe(0.43); // 5% of 8.50 = 0.425
+    expect(per.conduitBoughtFeet).toBe(8.93);
     // Three wires: 3 × 8.5 laid + 3 × 1.5 ft makeup = 30.00 installed.
     expect(per.wireInstalledFeet).toBe(30);
     expect(per.wireExtraFeet).toBe(2.55); // 10% of 25.50

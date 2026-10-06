@@ -575,6 +575,8 @@ describe("a vertical belongs to the run or the stamp, never both", () => {
     verticalFeet: 8.5,
     startStampId: null,
     endStampId: 41,
+    startCountsVertical: false,
+    endCountsVertical: true,
   };
   const STAMPED_RECEPTACLE = { stampId: 41, verticalFeet: 8.5 };
 
@@ -602,9 +604,24 @@ describe("a vertical belongs to the run or the stamp, never both", () => {
 
   it("claims a stamp at either end of a run", () => {
     const claimed = stampsClaimedByRuns([
-      { startStampId: 7, endStampId: null },
-      { startStampId: null, endStampId: 8 },
-      { startStampId: null, endStampId: null },
+      {
+        startStampId: 7,
+        endStampId: null,
+        startCountsVertical: true,
+        endCountsVertical: false,
+      },
+      {
+        startStampId: null,
+        endStampId: 8,
+        startCountsVertical: false,
+        endCountsVertical: true,
+      },
+      {
+        startStampId: null,
+        endStampId: null,
+        startCountsVertical: true,
+        endCountsVertical: true,
+      },
     ]);
     // Array.from rather than spread: tsconfig sets no `target`, so the
     // compiler's default refuses to iterate a Set, and `target` is not a
@@ -612,13 +629,46 @@ describe("a vertical belongs to the run or the stamp, never both", () => {
     expect(Array.from(claimed).sort()).toEqual([7, 8]);
   });
 
+  it("does NOT take a mark's drop when the run counts none at that end", () => {
+    // The fault (vertical-drops-plan § 1, gap 5): a branch leg started on a
+    // receptacle is linked to it with no end kind, so the run counts no drop
+    // there — and the receptacle's own drop came off its count anyway. The
+    // 8.5 ft was counted by nobody, and nothing on screen said so.
+    const legFromMark = {
+      verticalFeet: 0,
+      startStampId: 41,
+      endStampId: null,
+      startCountsVertical: false,
+      endCountsVertical: false,
+    };
+    expect(stampsClaimedByRuns([legFromMark]).size).toBe(0);
+    const totals = totalVerticalFeet({
+      runs: [legFromMark],
+      stamps: [STAMPED_RECEPTACLE],
+    });
+    expect(totals.totalFeet).toBe(8.5); // NOT 0 — that is the bug
+    expect(totals.ownedByRuns).toEqual([]);
+  });
+
   it("does not double-suppress a stamp two runs both claim", () => {
     // A junction box where one run ends and the next begins. The stamp is
     // dropped once, not subtracted twice.
     const totals = totalVerticalFeet({
       runs: [
-        { verticalFeet: 2, startStampId: null, endStampId: 5 },
-        { verticalFeet: 2, startStampId: 5, endStampId: null },
+        {
+          verticalFeet: 2,
+          startStampId: null,
+          endStampId: 5,
+          startCountsVertical: false,
+          endCountsVertical: true,
+        },
+        {
+          verticalFeet: 2,
+          startStampId: 5,
+          endStampId: null,
+          startCountsVertical: true,
+          endCountsVertical: false,
+        },
       ],
       stamps: [{ stampId: 5, verticalFeet: 2 }],
     });
@@ -629,7 +679,15 @@ describe("a vertical belongs to the run or the stamp, never both", () => {
 
   it("counts every stamp when no run links to anything", () => {
     const totals = totalVerticalFeet({
-      runs: [{ verticalFeet: 0, startStampId: null, endStampId: null }],
+      runs: [
+        {
+          verticalFeet: 0,
+          startStampId: null,
+          endStampId: null,
+          startCountsVertical: false,
+          endCountsVertical: false,
+        },
+      ],
       stamps: [
         { stampId: 1, verticalFeet: 3 },
         { stampId: 2, verticalFeet: 3 },
@@ -1141,7 +1199,94 @@ describe("resolving a stored run's verticals", () => {
     startTeeId: null,
     endTeeId: null,
     traceMode: null,
+    startStampId: null,
+    endStampId: null,
   };
+
+  describe("an end LINKED to a mark (vertical-drops-plan § 2)", () => {
+    const mark = (
+      over: Partial<{
+        inches: number | null;
+        countKind: string | null;
+        countInches: number | null;
+      }> = {}
+    ) => ({
+      ...COMPANY,
+      markAt: (id: number) =>
+        id === 41
+          ? {
+              height: {
+                inches: over.inches === undefined ? null : over.inches,
+                source: "typed" as const,
+              },
+              countKind:
+                over.countKind === undefined ? "receptacle" : over.countKind,
+              countInches:
+                over.countInches === undefined ? null : over.countInches,
+              status: null,
+            }
+          : null,
+    });
+
+    it("reads the mark's own height: 54 inches drops 5.5 ft, not 8.5", () => {
+      const v = verticalsForRunRow(
+        { ...PANEL_TO_RECEPTACLE, endStampId: 41 },
+        mark({ inches: 54 })
+      );
+      expect(v.feet).toBe(5.5);
+    });
+
+    it("an end with no kind takes its mark's count's kind", () => {
+      const v = verticalsForRunRow(
+        { ...PANEL_TO_RECEPTACLE, endKind: null, endStampId: 41 },
+        mark()
+      );
+      expect(v.end.counted).toBe(true);
+      expect(v.feet).toBe(8.5);
+    });
+
+    it("the count's height applies, below the mark's own", () => {
+      const ctx = mark({ countInches: 48 });
+      expect(
+        verticalsForRunRow({ ...PANEL_TO_RECEPTACLE, endStampId: 41 }, ctx).feet
+      ).toBe(6);
+      expect(
+        verticalsForRunRow(
+          { ...PANEL_TO_RECEPTACLE, endStampId: 41 },
+          mark({ countInches: 48, inches: 54 })
+        ).feet
+      ).toBe(5.5);
+    });
+
+    it("the run end's own height still wins over the mark's", () => {
+      const v = verticalsForRunRow(
+        { ...PANEL_TO_RECEPTACLE, endStampId: 41, endHeightInches: 72 },
+        mark({ inches: 54 })
+      );
+      expect(v.feet).toBe(4);
+    });
+
+    it("a mark whose count has no drop leaves a kindless end unanswered", () => {
+      const v = verticalsForRunRow(
+        { ...PANEL_TO_RECEPTACLE, endKind: null, endStampId: 41 },
+        mark({ countKind: null })
+      );
+      expect(v.end).toMatchObject({ counted: false, reason: "no-kind" });
+    });
+
+    it("never on a quantity trace, whose unanswered end is level (D21)", () => {
+      const v = verticalsForRunRow(
+        {
+          ...PANEL_TO_RECEPTACLE,
+          endKind: null,
+          endStampId: 41,
+          traceMode: "quantity",
+        },
+        mark()
+      );
+      expect(v.end.counted).toBe(false);
+    });
+  });
 
   it("drops to a receptacle from the company's run height", () => {
     const verticals = verticalsForRunRow(PANEL_TO_RECEPTACLE, COMPANY);
