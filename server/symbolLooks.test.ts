@@ -33,6 +33,7 @@ import {
   isSameLook,
   lookAlikeWarning,
   lookAlikes,
+  withLookFinds,
   lookCount,
   looksForSearch,
   thumbnailAfterRemoval,
@@ -724,8 +725,8 @@ describe("which marks a new look also lands on", () => {
     ];
     const spots = [spot(10), spot(12), spot(20), spot(30), spot(40), spot(50)];
     expect(lookAlikes(spots, marks, isGfci)).toEqual([
-      { name: "Duplex", marks: 2 },
-      { name: "Switch", marks: 1 },
+      { name: "Duplex", marks: 2, spots: 0 },
+      { name: "Switch", marks: 1, spots: 0 },
     ]);
   });
 
@@ -738,8 +739,8 @@ describe("which marks a new look also lands on", () => {
   it("says it as one sentence that asks", () => {
     expect(
       lookAlikeWarning([
-        { name: "DUPLEX RECEPTACLE", marks: 8 },
-        { name: "Switch", marks: 1 },
+        { name: "DUPLEX RECEPTACLE", marks: 8, spots: 0 },
+        { name: "Switch", marks: 1, spots: 0 },
       ])
     ).toBe(
       "This look also matches 8 marks counted as DUPLEX RECEPTACLE and 1 mark counted as Switch on this sheet. Add it anyway?"
@@ -790,7 +791,7 @@ withDb(
     it("an ADDED look: names the other item and its number of marks, and writes nothing", async () => {
       const { set, gfci } = await setUp();
       const r = await check(set.sheetId, "GFCI");
-      expect(r.alike).toEqual([{ name: "Duplex", marks: 2 }]);
+      expect(r.alike).toEqual([{ name: "Duplex", marks: 2, spots: 0 }]);
       expect(await looksOf(gfci.id)).toHaveLength(1);
     });
 
@@ -806,8 +807,8 @@ withDb(
       const r = await check(set.sheetId, "Receptacle");
       // Duplex twice AND the GFCI's mark: for a new item, every count is another.
       expect(r.alike).toEqual([
-        { name: "Duplex", marks: 2 },
-        { name: "GFCI", marks: 1 },
+        { name: "Duplex", marks: 2, spots: 0 },
+        { name: "GFCI", marks: 1, spots: 0 },
       ]);
       const database = await getDb();
       const rows = await database!
@@ -837,3 +838,72 @@ withDb(
     });
   }
 );
+
+describe("an item's marks and another item's looks, in one warning", () => {
+  it("merges by name, most first, and says each kind in words", () => {
+    const merged = withLookFinds(
+      [{ name: "Duplex", marks: 2, spots: 0 }],
+      [
+        { name: "Switch", spots: 3 },
+        { name: "Duplex", spots: 1 },
+        { name: "Nothing", spots: 0 },
+      ]
+    );
+    expect(merged).toEqual([
+      { name: "Duplex", marks: 2, spots: 1 },
+      { name: "Switch", marks: 0, spots: 3 },
+    ]);
+    expect(lookAlikeWarning(merged)).toBe(
+      "This look also matches 2 marks counted as Duplex, 1 place a look of Duplex also finds and 3 places a look of Switch also finds on this sheet. Add it anyway?"
+    );
+  });
+});
+
+withDb("another item's look on this set finding the same spots", () => {
+  it("lists other items' boxed looks on this set, never the item's own", async () => {
+    const set = await aSet();
+    const gfci = await capture("GFCI", set.sheetId);
+    const duplex = await capture("Duplex", set.sheetId, {
+      box: { ...BOX, x: 400 },
+    });
+    const other = await aSet(USER, "Other set.pdf");
+    await capture("Switch", other.sheetId, { box: { ...BOX, x: 800 } });
+
+    const r = await caller().takeoffStamps.looksOnSet({
+      sheetId: set.sheetId,
+      label: "gfci",
+    });
+    // Same set only (Switch is on another set), and not GFCI's own look.
+    expect(r.looks.map(l => [l.label, l.symbolId])).toEqual([
+      ["Duplex", duplex.id],
+    ]);
+    expect(r.leftOut).toBe(0);
+    expect(gfci.id).not.toBe(duplex.id);
+  });
+
+  it("names the other item when its look also found the spots, and ignores the item's own and foreign ids", async () => {
+    const set = await aSet();
+    const gfci = await capture("GFCI", set.sheetId);
+    const duplex = await capture("Duplex", set.sheetId, {
+      box: { ...BOX, x: 400 },
+    });
+    const theirSet = await aSet(OTHER);
+    const theirs = await caller(OTHER).takeoffStamps.captureSymbol({
+      label: "Theirs",
+      thumbnail: PIC,
+      capturedFromSheetId: theirSet.sheetId,
+      box: BOX,
+    });
+    const r = await caller().takeoffStamps.checkLookAlikes({
+      sheetId: set.sheetId,
+      label: "GFCI",
+      spots: [{ x: 900, y: 900, reach: 6 }],
+      otherLooks: [
+        { symbolId: duplex.id, spots: 4 },
+        { symbolId: gfci.id, spots: 9 },
+        { symbolId: theirs.id, spots: 9 },
+      ],
+    });
+    expect(r.alike).toEqual([{ name: "Duplex", marks: 0, spots: 4 }]);
+  });
+});

@@ -440,6 +440,7 @@ function LookList({
     void utils.takeoffStamps.symbols.invalidate();
     void utils.takeoffStamps.looksFor.invalidate();
     void utils.takeoffStamps.searchLooks.invalidate();
+    void utils.takeoffStamps.looksOnSet.invalidate();
   };
   const move = trpc.takeoffStamps.moveLook.useMutation({
     onSuccess: (r, { lookId }) => {

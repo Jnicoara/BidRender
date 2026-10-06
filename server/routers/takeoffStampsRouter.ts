@@ -63,6 +63,8 @@ import {
   thumbnailAfterRemoval,
   lookAlikes,
   firstLookId,
+  withLookFinds,
+  MAX_LOOK_ALIKE_LOOKS,
   type LookSpot,
   type LookBox,
 } from "../../shared/symbolLooks";
@@ -998,6 +1000,20 @@ export const takeoffStampsRouter = router({
             })
           )
           .max(5000),
+        /**
+         * Other items whose saved looks (`looksOnSet`) also found some of
+         * those spots in the same search, and how many. Named here, under
+         * this company, so an id from elsewhere names nothing.
+         */
+        otherLooks: z
+          .array(
+            z.object({
+              symbolId: z.number().int().positive(),
+              spots: z.number().int().nonnegative(),
+            })
+          )
+          .max(MAX_LOOK_ALIKE_LOOKS)
+          .default([]),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1006,8 +1022,67 @@ export const takeoffStampsRouter = router({
       if (!sheet)
         throw new TRPCError({ code: "NOT_FOUND", message: "Sheet not found." });
       const item = await itemForLabel(input.label, owner);
+      const marks = await lookAlikesOnSheet(sheet.id, input.spots, item, owner);
+      const names = new Map(
+        (await db.getSymbolLinks(owner)).map(row => [row.id, row.label])
+      );
+      const ownId = "id" in item ? item.id : null;
       return {
-        alike: await lookAlikesOnSheet(sheet.id, input.spots, item, owner),
+        alike: withLookFinds(
+          marks,
+          input.otherLooks.flatMap(o => {
+            const name = names.get(o.symbolId);
+            return name && o.symbolId !== ownId
+              ? [{ name, spots: o.spots }]
+              : [];
+          })
+        ),
+      };
+    }),
+
+  /**
+   * Other items' looks captured on the open sheet's plan set, for the
+   * look-alike check (plan § 4): the new look and each of these are searched
+   * together, and a spot both find is a spot two items claim. Only looks
+   * with a box and a sheet (nothing else can be searched), never the item
+   * the label reaches, newest first, at most MAX_LOOK_ALIKE_LOOKS — the
+   * number searched is said, so a capped answer is not read as a full one.
+   * Same set only, so no url is needed: the worker opens this set already.
+   */
+  looksOnSet: procedure
+    .input(
+      z.object({
+        sheetId: z.number().int().positive(),
+        label: nameSchema,
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const owner = ctx.scope.dataUserId;
+      const sheet = await db.getBidPdfSheet(input.sheetId, owner);
+      if (!sheet)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Sheet not found." });
+      const item = await itemForLabel(input.label, owner);
+      const ownId = "id" in item ? item.id : null;
+      const looks = (await db.getSymbolLooksOnSet(sheet.bidPdfId, owner))
+        .map(l => ({ ...l, box: lookBoxOf(l) }))
+        .flatMap(l =>
+          l.symbolLinkId !== ownId && l.box && l.pageNumber !== null
+            ? [{ ...l, box: l.box, pageNumber: l.pageNumber }]
+            : []
+        );
+      return {
+        looks: looks.slice(0, MAX_LOOK_ALIKE_LOOKS).map(l => ({
+          id: l.id,
+          symbolId: l.symbolLinkId,
+          label: l.label,
+          box: l.box,
+          pageNumber: l.pageNumber,
+          setName: null,
+          confirmsThisSet: true,
+          isFirst: false,
+          url: null,
+        })),
+        leftOut: Math.max(0, looks.length - MAX_LOOK_ALIKE_LOOKS),
       };
     }),
 

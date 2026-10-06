@@ -9287,6 +9287,33 @@ export async function countSymbolLooks(
   return new Map(rows.map(r => [r.id, Number(r.n)]));
 }
 
+/**
+ * Every look captured on one plan set, with its item's name and its page,
+ * newest first — for the look-alike check (multiple-looks-plan.md § 4).
+ */
+export async function getSymbolLooksOnSet(bidPdfId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      look: symbolLooks,
+      label: symbolLinks.label,
+      pageNumber: bidPdfSheets.pageNumber,
+    })
+    .from(symbolLooks)
+    .innerJoin(symbolLinks, eq(symbolLinks.id, symbolLooks.symbolLinkId))
+    .leftJoin(bidPdfSheets, eq(bidPdfSheets.id, symbolLooks.sheetId))
+    .where(
+      and(eq(symbolLooks.bidPdfId, bidPdfId), eq(symbolLooks.userId, userId))
+    )
+    .orderBy(desc(symbolLooks.createdAt), desc(symbolLooks.id));
+  return rows.map(r => ({
+    ...r.look,
+    label: r.label,
+    pageNumber: r.pageNumber ?? null,
+  }));
+}
+
 /** One look, scoped by the company owner: another company's id finds nothing. */
 export async function getSymbolLook(
   id: number,

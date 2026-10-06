@@ -124,18 +124,44 @@ export type SavedLook = {
  * items — or, when the comparison cannot be made, the sentence that says so.
  * A scan has no line work to compare, and saying nothing there would read as
  * "checked, nothing alike".
+ *
+ * When other items' looks were searched WITH it (`looksOnSet`, given here as
+ * look id -> item id), the spots are only the new look's own finds, and
+ * `otherLooks` counts, per other item, how many of those spots one of its
+ * looks also found — two items claiming one spot. A spot only another
+ * item's look found is not the new look's business, and is left out.
  */
 export function lookAlikeCheck(
-  result: FindResult | null
-): { spots: LookSpot[] } | { cannotCompare: string } {
-  if (result?.kind === "ok" && !result.scan)
+  result: FindResult | null,
+  lookItems: ReadonlyMap<number, number> = new Map()
+):
+  | { spots: LookSpot[]; otherLooks: { symbolId: number; spots: number }[] }
+  | { cannotCompare: string } {
+  if (result?.kind === "ok" && !result.scan) {
+    // Searched with no looks, a find carries no sources: all of it is the box's.
+    const own = result.matches.filter(m => m.foundByBox !== false);
+    const tally = new Map<number, number>();
+    for (const m of own) {
+      const items = new Set(
+        (m.foundByLooks ?? []).flatMap(id => {
+          const item = lookItems.get(id);
+          return item === undefined ? [] : [item];
+        })
+      );
+      items.forEach(item => tally.set(item, (tally.get(item) ?? 0) + 1));
+    }
     return {
-      spots: result.matches.map(m => ({
+      spots: own.map(m => ({
         x: m.x,
         y: m.y,
         reach: Math.max(m.halfWidth, m.halfHeight),
       })),
+      otherLooks: Array.from(tally, ([symbolId, spots]) => ({
+        symbolId,
+        spots,
+      })),
     };
+  }
   return {
     cannotCompare:
       result?.kind === "scan" || (result?.kind === "ok" && result.scan)

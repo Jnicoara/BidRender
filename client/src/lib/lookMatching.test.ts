@@ -151,7 +151,7 @@ describe("what a new look's own search gives the look-alike check (plan § 4)", 
         matches: [m(100, { halfWidth: 4, halfHeight: 7 })],
         symbol,
       })
-    ).toEqual({ spots: [{ x: 100, y: 100, reach: 7 }] });
+    ).toEqual({ spots: [{ x: 100, y: 100, reach: 7 }], otherLooks: [] });
   });
 
   it("on a scan: says it cannot compare, rather than nothing", () => {
@@ -218,5 +218,33 @@ describe("finds from a NEW look are not swept in by Confirm all (plan § 8 test 
   it("a search of the box alone is untouched: nothing came from any look", () => {
     const items = matchItems([m(100), m(200)], [], new Set());
     expect(clearOpen(items)).toHaveLength(2);
+  });
+});
+
+describe("another item's LOOK finding the new look's spots (plan § 4)", () => {
+  const symbol = { segments: 12, words: [], width: 12, height: 12 };
+  // Look 7 belongs to item 70, look 8 to item 80.
+  const other7: LookSource = { ...here, lookId: 7 };
+  const other8: LookSource = { ...here, lookId: 8 };
+  const lookItems = new Map([
+    [7, 70],
+    [8, 80],
+  ]);
+
+  it("counts, per other item, the new look's spots its looks also find — and only those", () => {
+    const matches = mergeLookResults([
+      { source: box, matches: [m(100), m(200), m(300)] },
+      { source: other7, matches: [m(100), m(200), m(900)] },
+      { source: other8, matches: [m(300)] },
+    ]);
+    const check = lookAlikeCheck({ kind: "ok", matches, symbol }, lookItems);
+    expect(check).toEqual({
+      // 900 was found only by item 70's look: not the new look's spot.
+      spots: [100, 200, 300].map(x => ({ x, y: 100, reach: 6 })),
+      otherLooks: [
+        { symbolId: 70, spots: 2 },
+        { symbolId: 80, spots: 1 },
+      ],
+    });
   });
 });

@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **The warning also catches a symbol another item already claims by its
+  look.** When you save a symbol, the app searches the sheet with it and with
+  the other items' saved looks on the same plans. Places both find are named
+  in the warning ("3 places a look of Switch also finds"), even where nothing
+  has been counted yet.
+
 - **The look-alike warning now covers a brand-new legend item too.** Saving
   a new symbol first searches the sheet with it, and if it lands on marks you
   counted as something else, it asks before creating the item ("Save

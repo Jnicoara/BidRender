@@ -4570,6 +4570,7 @@ export default function TakeoffPage({
       void utils.takeoffStamps.symbols.invalidate();
       void utils.takeoffStamps.looksFor.invalidate();
       void utils.takeoffStamps.searchLooks.invalidate();
+      void utils.takeoffStamps.looksOnSet.invalidate();
     },
   });
   /**
@@ -9252,19 +9253,34 @@ export default function TakeoffPage({
                           let cannotCompare: string | null = null;
                           const sheetId = capture.sheetId;
                           if (!accepted && boxed) {
-                            const check = lookAlikeCheck(
+                            const onSheet =
                               sheetId !== undefined &&
-                                sheetId === activeSheet?.id
-                                ? await size
-                                    .findMatching(box, [])
+                              sheetId === activeSheet?.id
+                                ? sheetId
+                                : null;
+                            // Other items' looks on this set are searched in
+                            // the same pass: a spot both find is claimed twice.
+                            const others =
+                              onSheet === null
+                                ? null
+                                : await utils.takeoffStamps.looksOnSet
+                                    .fetch({ sheetId: onSheet, label })
+                                    .catch(() => null);
+                            const check = lookAlikeCheck(
+                              onSheet === null
+                                ? null
+                                : await size
+                                    .findMatching(box, others?.looks ?? [])
                                     .then(r => r.result)
-                                    .catch(() => null)
-                                : null
+                                    .catch(() => null),
+                              new Map(
+                                (others?.looks ?? []).map(l => [
+                                  l.id,
+                                  l.symbolId,
+                                ])
+                              )
                             );
-                            if (
-                              "cannotCompare" in check ||
-                              sheetId === undefined
-                            )
+                            if ("cannotCompare" in check || onSheet === null)
                               cannotCompare =
                                 "cannotCompare" in check
                                   ? check.cannotCompare
@@ -9272,11 +9288,17 @@ export default function TakeoffPage({
                             else {
                               const { alike } =
                                 await checkLookAlikes.mutateAsync({
-                                  sheetId,
+                                  sheetId: onSheet,
                                   label,
                                   spots: check.spots,
+                                  otherLooks: check.otherLooks,
                                 });
                               if (alike.length > 0) return alike;
+                              cannotCompare = !others
+                                ? "Other items' looks on this set could not be compared."
+                                : others.leftOut > 0
+                                  ? `${others.leftOut} older look${others.leftOut === 1 ? "" : "s"} of other items on this set ${others.leftOut === 1 ? "was" : "were"} not compared.`
+                                  : null;
                             }
                           }
                           const r = await captureSymbol.mutateAsync({
