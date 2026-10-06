@@ -1,5 +1,11 @@
 # Migrations 0098–0105 — one additive batch for Tracks B and C. PLAN ONLY, 2026-09-29
 
+> **FROM 0105 ON, THE NUMBERS LIVE IN `migrations-next-batch.md`
+> (2026-10-06).** That file is the one list of every track's asks. It
+> replaces § S's Batch 2–5 numbers below, which reused 0108–0114 twice and
+> split `bid_pdf_sheets` and `assemblies` across several `ALTER`s. 0096–0104
+> (Batches 1 and 1b) are written and on staging and stay as recorded here.
+
 > **RENUMBERED AGAIN 2026-10-02: § S below is the current list and overrides
 > § R's numbers.** This catalog batch is now 0106–0112. (Before that, on
 > 2026-10-01, § R made it 0100–0107, and § R overrides § 0 and the numbers in
