@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **A click on the plan no longer captures an empty symbol.** With Capture
+  on, a click that is not a drag used to open "Name this symbol" and save an
+  item with no picture, which also skipped every check. Now only a real box
+  opens it, and Capture stays on.
+
 - **Find all matching handles lines running through symbols more safely.**
   Measured first on the hand-counted Weld 1 power plan: walls and wires
   crossing devices caused no misses there, and the two known misses are

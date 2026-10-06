@@ -34,6 +34,7 @@ import {
   SYMBOL_THUMBNAIL_MAX_CHARS,
   captureRenderScale,
   capturePixelSize,
+  isCaptureBox,
   normaliseCaptureBox,
   type CaptureBox,
 } from "@shared/symbolCapture";
@@ -593,14 +594,16 @@ export function SymbolCaptureLayer({
       }}
       onPointerUp={() => {
         if (!start || !current) return;
-        onRegion({
+        const region = {
           x: start.x,
           y: start.y,
           width: current.x - start.x,
           height: current.y - start.y,
-        });
+        };
         setStart(null);
         setCurrent(null);
+        // A click, not a box: nothing to name. The tool stays armed.
+        if (isCaptureBox(region)) onRegion(region);
       }}
     >
       {/* Dim everything but the box being drawn, so the crop is obvious. */}

@@ -85,11 +85,15 @@ this file is stale or the state moved.
 
 ## Not built yet
 
-1. **Not seen on screen this session:** jobs 1–4 above changed the capture
-   card and the Find panel. The laptop was low on memory with A and B
-   running; code and tests are green, the on-screen pass is owed — the
-   two warnings on the card, and a new look's find showing "Found only by
-   a look added recently" with Confirm all leaving it.
+1. **Seen on screen 2026-10-06 (Weld 1 E-200):** a NEW item's capture
+   warned "1 mark counted as Look test tag", and one warned "12 places a
+   look of Look test third also finds and 1 mark counted as …", Cancel
+   first. **Not seen on screen:** the device-word note (no two looks with
+   different GF/WP words were staged) and a new look's find in the panel
+   ("Found only by a look added recently"); both rest on their tests.
+   **Found on screen and fixed:** a click with no drag opened the name card
+   and saved an item with no picture, no look and no check
+   (`isCaptureBox`, `shared/symbolCapture.ts`).
 2. **"Find on this sheet" from one look** (plan § 5), the third action on a
    look.
 3. **The per-row choice in whole-legend capture** (`LegendCapture.tsx`): a
