@@ -8,6 +8,26 @@ was committed and pushed, and `main` was untouched (`0af50a6`). C's databases
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
+## How C merges (owner's rule, 2026-10-06)
+
+**CI is the full suite, not the laptop.** Before merging into local-dev:
+
+1. `pnpm check` and the tests the change touches, locally.
+2. Push `track-c`, then wait for the GitHub Actions **Gate** run's `test` job
+   to go green: `gh run list --branch track-c` / `gh run watch <id>`.
+3. Pull local-dev, merge, push, and confirm the local-dev run's `test` job
+   is green too.
+
+A full local suite only when CI cannot tell you something. `gh` lives at
+`C:\Program Files\GitHub CLI\gh.exe`; a shell started before it was
+installed does not have it on PATH, so use the full path there.
+
+**Read the JOB, not the run.** A local-dev run also deploys staging and runs
+the `smoke` job; on 2026-10-06 every local-dev run was red on `smoke`
+(`touch.spec.ts`, tracked in `track-a-handoff.md`) while `test` was green. A
+red run is not by itself a red suite:
+`gh run view <id> --json jobs --jq '.jobs[] | "\(.name): \(.conclusion)"'`.
+
 ## Done
 
 - **Multiple looks** (`references/multiple-looks-plan.md` § 10), on A's
@@ -83,17 +103,31 @@ this file is stale or the state moved.
   "maybe — a line crosses it" (never clear), a second anchor. E-200 reads
   exactly as before. Scans: 85/85, nothing to build.
 
+- **Code-first ceiling study** (2026-10-06, plan only, NOT merged):
+  `references/code-first-ceiling.md`, numbers from
+  `scripts/codeFirstCeiling.mts`. Top 3 by payoff: tie labels to devices
+  (USB 0 -> 38/38, GF 1 -> 4/4 on UNCC E111), use CAD layers when present
+  (Weld 1: demolition / existing / telecom sorted free, search 14x faster),
+  read panel schedules from text (UNCC 3/3 panels, 42/42 circuits). New
+  this study: UNCC E111 HAS a hand count (243, sheet 234268) — 93% found.
+
 ## Not built yet
 
 1. **Seen on screen 2026-10-06 (Weld 1 E-200):** a NEW item's capture
    warned "1 mark counted as Look test tag", and one warned "12 places a
    look of Look test third also finds and 1 mark counted as …", Cancel
-   first. **Not seen on screen:** the device-word note (no two looks with
-   different GF/WP words were staged) and a new look's find in the panel
-   ("Found only by a look added recently"); both rest on their tests.
-   **Found on screen and fixed:** a click with no drag opened the name card
-   and saved an item with no picture, no look and no check
-   (`isCaptureBox`, `shared/symbolCapture.ts`).
+   first. **Still not seen on screen (second try, 2026-10-06):**
+   - the device-word note — **and it cannot show on today's sheets**: the
+     matcher's word ring reads 1 of 45 labelled devices on UNCC E111 (USB
+     labels sit 14.3 pt out, just past it) and Weld 1 has no GF text at the
+     GFCI. A GFCI + plain-duplex look pair was added on E-200 and correctly
+     said nothing. Fix the ring first (`code-first-ceiling.md` § b, rank 1);
+   - "Found only by a look added recently" in the Find panel — the setup
+     was in place (GFCI item with an added duplex look) when the Chrome
+     window was minimized and the tab went hidden. Rests on its tests.
+     **Found on screen and fixed:** a click with no drag opened the name card
+     and saved an item with no picture, no look and no check
+     (`isCaptureBox`, `shared/symbolCapture.ts`).
 2. **"Find on this sheet" from one look** (plan § 5), the third action on a
    look.
 3. **The per-row choice in whole-legend capture** (`LegendCapture.tsx`): a
