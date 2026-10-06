@@ -40,6 +40,11 @@ import * as db from "../db";
 import { STICK_JOINTS } from "../../shared/runFittings";
 import { MAX_LABOR_UNIT_HOURS } from "../../shared/materialLabor";
 import { RENAMED_BASELINE_MATERIALS } from "../../shared/renamedMaterials";
+import {
+  parseLaborSheet,
+  planAssemblyHoursImport,
+  planLaborImport,
+} from "../../shared/laborImport";
 
 /**
  * How importPrices compares a price-list name to a catalog name: case- and
@@ -614,5 +619,119 @@ export const materialsRouter = router({
       }
 
       return { priced, unmatched, renamed };
+    }),
+
+  /**
+   * THE LABOR-UNIT SHEET (pricing/labor-units-starter.xlsx), pasted one tab
+   * at a time. `apply: false` returns the plan — every change, every row it
+   * could not place — and writes nothing; `apply: true` plans again from the
+   * same text and writes exactly that plan. One function decides both
+   * (shared/laborImport.ts), so the preview cannot promise one thing and
+   * the Apply do another.
+   *
+   * Writes ONLY hours: `laborHours` / `fieldBendLaborHours` on a material,
+   * `baseLaborHours` on an assembly. Never a price, a name or a new row. A
+   * shipped row forks first, exactly as a hand edit does, so one company's
+   * hours never reach another's library.
+   */
+  importLaborSheet: procedure
+    .input(
+      z.object({
+        text: z.string().min(1).max(2_000_000),
+        apply: z.boolean(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const parsed = parseLaborSheet(input.text);
+      if (parsed.kind === "unreadable")
+        return { kind: "unreadable" as const, reason: parsed.reason };
+
+      if (parsed.kind === "assemblies") {
+        const library = await db.getLibraryAssemblies(userId, "active");
+        // A sheet ID is the SHIPPED row's; the company's copy of it answers
+        // for it once they have one (baselineId).
+        const byId = new Map<number, (typeof library)[number]>();
+        for (const a of library) {
+          byId.set(a.id, a);
+          if (a.baselineId != null && a.userId === userId)
+            byId.set(a.baselineId, a);
+        }
+        const plan = planAssemblyHoursImport(parsed.rows, id => {
+          const a = byId.get(id);
+          return a
+            ? {
+                id: a.id,
+                name: a.name,
+                baseLaborHours: Number(a.baseLaborHours),
+              }
+            : null;
+        });
+        if (input.apply)
+          for (const change of plan.changes) {
+            const target = byId.get(change.assemblyId);
+            if (!target) continue;
+            const editableId =
+              target.userId === null
+                ? await db.forkAssembly(target.id, userId)
+                : target.id;
+            await db.updateAssembly(editableId, userId, {
+              baseLaborHours: toDecimal(change.to),
+            });
+          }
+        return {
+          kind: "assemblies" as const,
+          plan,
+          applied: input.apply ? plan.changes.length : 0,
+        };
+      }
+
+      const library = await db.getLibraryMaterials(userId, "active");
+      const byId = new Map<number, (typeof library)[number]>();
+      for (const m of library) {
+        byId.set(m.id, m);
+        if (m.baselineId != null && m.userId === userId)
+          byId.set(m.baselineId, m);
+      }
+      const plan = planLaborImport(
+        parsed.rows,
+        id => {
+          const m = byId.get(id);
+          if (!m) return null;
+          const hours = (v: string | null) => (v === null ? null : Number(v));
+          return {
+            id: m.id,
+            name: m.name,
+            unitOfSale: m.unitOfSale,
+            laborHours: hours(m.laborHours),
+            fieldBendLaborHours: hours(m.fieldBendLaborHours),
+            isRaceway: m.stickLengthFeet !== null,
+          };
+        },
+        name =>
+          RENAMED_BASELINE_MATERIALS_BY_KEY.get(priceListKey(name)) ?? null
+      );
+      if (input.apply) {
+        // Two rows can name one material (its labor unit AND its field
+        // bend): fork once, then write both to the same copy.
+        const forked = new Map<number, number>();
+        for (const change of plan.changes) {
+          const target = byId.get(change.materialId);
+          if (!target) continue;
+          let editableId = forked.get(target.id) ?? target.id;
+          if (target.userId === null && !forked.has(target.id)) {
+            editableId = await db.forkMaterial(target.id, userId);
+            forked.set(target.id, editableId);
+          }
+          await db.updateMaterial(editableId, userId, {
+            [change.field]: toDecimal(change.to),
+          });
+        }
+      }
+      return {
+        kind: "materials" as const,
+        plan,
+        applied: input.apply ? plan.changes.length : 0,
+      };
     }),
 });

@@ -31,7 +31,8 @@ import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useIsMobile } from "@/hooks/useMobile";
-import { Upload, Search, X, Store, AlertTriangle } from "lucide-react";
+import { Upload, Search, X, Store, AlertTriangle, Clock } from "lucide-react";
+import { ImportLaborSheetDialog } from "@/components/ImportLaborSheetDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InlineNumberField } from "@/components/InlineNumberField";
@@ -76,6 +77,7 @@ export default function MaterialDatabasePage() {
   const search = useMaterialSearch(materials);
   const [ageFilter, setAgeFilter] = useState<PriceAge | "all">("all");
   const [importOpen, setImportOpen] = useState(false);
+  const [laborOpen, setLaborOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   /**
@@ -176,6 +178,17 @@ export default function MaterialDatabasePage() {
             <Upload className="w-3.5 h-3.5" />
             <span className="md:hidden">Import</span>
             <span className="hidden md:inline">Import price list</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1.5 text-xs shrink-0"
+            onClick={() => setLaborOpen(true)}
+            title="Paste a tab of the labor-unit sheet. Writes hours only."
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span className="md:hidden">Hours</span>
+            <span className="hidden md:inline">Import labor sheet</span>
           </Button>
         </div>
       </div>
@@ -377,6 +390,16 @@ export default function MaterialDatabasePage() {
         <ImportPriceListDialog
           onClose={() => setImportOpen(false)}
           onDone={refresh}
+        />
+      )}
+      {laborOpen && (
+        <ImportLaborSheetDialog
+          onClose={() => setLaborOpen(false)}
+          // Hours land on materials AND assemblies (tab 2), so both lists go.
+          onDone={() => {
+            refresh();
+            void utils.assemblies.invalidate();
+          }}
         />
       )}
     </div>

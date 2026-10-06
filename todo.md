@@ -196,6 +196,27 @@ NULL`, `createdAt`, `updatedAt`. Index (`userId`, `bidId`).
       conduit, trouble-shoot hour, core drill) ships with `laborOnly = true`
       in its seed row.
 
+**Run bends** (Track B, 2026-10-06; references/run-bends-plan.md § 6). All
+ADDITIVE, nullable, **no DEFAULT**, no backfill. The first waits on the
+owner's answer to Q1 there (a typed count per run reverses D15/D19's
+"nothing typed per run" for this one field).
+
+- [ ] **`takeoff_runs.typedBendCount INT NULL`** — "Bends on this run",
+      typed. NULL = drawn + allowance.
+- [ ] **`takeoff_bend_defaults.kicksPerBoxEnd DECIMAL(4,2) NULL`** — the
+      company's allowance for kicks/offsets at a box end. NULL = not
+      counted, said in amber.
+- [ ] **`takeoff_bend_defaults.kicksAcceptedAt TIMESTAMP NULL`** — when the
+      starter allowance was accepted; NULL = shown and inert.
+
+**Labor units — NO column needed (checked 2026-10-06).** The labor-unit
+sheet writes `materials.laborHours` (0065, hours per unit of sale, NULL =
+not set) and `materials.fieldBendLaborHours` (0084), which both exist. One
+thing for A while in `drizzle/schema.ts` (a track branch may not touch
+`drizzle/`): the `materials` comment at ~line 667 still says "Cost only.
+Labor lives on the assembly, never on the material", which 0065 made false
+— the column's own comment ~15 lines below says the opposite.
+
 ### Requests to Track A from Check sheet (Track C, 2026-10-01) — A numbers these
 
 Check sheet shipped code-only on track-c without any of these; each is behind
