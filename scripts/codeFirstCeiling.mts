@@ -1488,7 +1488,48 @@ async function homerunreader() {
     }
 }
 
+// ── Circuits from device tags (@/lib/circuitGroups), UNCC E111 ─────────────
+/**
+ * The owner's 243 hand marks on E111 grouped by the "2B - n" tag beside
+ * each, with E003's schedules. The hand check of circuits 2B-1..2B-21
+ * (2026-10-06, by eye on tiles with every tag-to-mark link drawn) is in
+ * references/track-c-handoff.md.
+ */
+async function circuits() {
+  const { groupByCircuit } = await import("../client/src/lib/circuitGroups");
+  const { readSchedules } = await import("../client/src/lib/panelSchedules");
+  const db = await import("../server/db");
+  const user = await db.getUserByEmail("reader-test@local.test");
+  if (!user) throw new Error("No reader-test account in this database.");
+  const marks = (await db.getStampsForSheet(234268, user.id)).map(m => ({
+    id: m.id,
+    x: Number(m.x),
+    y: Number(m.y),
+    name: m.groupLabel ?? "?",
+  }));
+  const r = groupByCircuit({
+    words: (await load("UNCC.pdf", 5)).words,
+    devices: marks,
+    panels: readSchedules((await load("UNCC.pdf", 3)).words).panels,
+    placed: {},
+  });
+  const byItem = new Map<string, [number, number]>();
+  for (const m of marks) {
+    const s = byItem.get(m.name) ?? [0, 0];
+    s[1]++;
+    if (r.circuits.some(c => c.devices.includes(m))) s[0]++;
+    byItem.set(m.name, s);
+  }
+  console.log(
+    `UNCC E111: ${marks.length} marks, ${r.circuits.length} circuits; grouped by item ${JSON.stringify(Array.from(byItem))}`
+  );
+  console.log(
+    `untagged (flagged) ${r.untagged.length}; not circuited ${JSON.stringify(r.notCircuited)}; tags with no mark ${r.unmatchedTags.length}; off schedule ${r.circuits.filter(c => c.offSchedule).length}`
+  );
+}
+
 const sections: Record<string, () => Promise<void>> = {
+  circuits,
   homerunreader,
   schedreader,
   scalecheck,

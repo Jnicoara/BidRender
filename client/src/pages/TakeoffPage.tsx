@@ -87,7 +87,23 @@ import {
 import { pinStylesForBid } from "@shared/pinLetters";
 import { pinCountsFor } from "@shared/pinCounts";
 import { PinLookEditor } from "@/components/takeoff/PinLookEditor";
-import { MARK_STATUS_LABEL, type UserMarkStatus } from "@shared/markStatus";
+import {
+  MARK_STATUS_LABEL,
+  markIsSnapTarget,
+  type UserMarkStatus,
+} from "@shared/markStatus";
+import {
+  groupByCircuit,
+  readPanelSpots,
+  rememberPanelSpot,
+} from "@/lib/circuitGroups";
+import {
+  CircuitLayer,
+  CircuitsPanel,
+  CircuitsToggle,
+  type CircuitPick,
+  type SheetCircuitText,
+} from "@/components/takeoff/CircuitsView";
 import { deviceFamily } from "@shared/deviceFamily";
 import {
   FAMILY_MOUNTING,
@@ -611,6 +627,14 @@ function usePdfWorker() {
         pending.current.delete(msg.reqId);
         return;
       }
+      if (msg.type === "circuits") {
+        pending.current.get(msg.reqId)?.resolve({
+          words: msg.words,
+          panels: msg.panels,
+        });
+        pending.current.delete(msg.reqId);
+        return;
+      }
       if (msg.type === "homeruns") {
         pending.current.get(msg.reqId)?.resolve({
           homeruns: msg.homeruns,
@@ -794,6 +818,8 @@ function usePdfWorker() {
         }),
       homeruns: (pageNum: number, hash: string) =>
         ask<SheetHomeruns>({ type: "homeruns", pageNum, hash }),
+      circuits: (pageNum: number, hash: string) =>
+        ask<SheetCircuitText>({ type: "circuits", pageNum, hash }),
       connectPoints: (pageNum: number, hash: string, marks: ConnectMark[]) =>
         ask<[number, ConnectPoint][]>({
           type: "connectPoints",
@@ -917,6 +943,7 @@ function PlanPane({
   onScaleDoubt,
   onSchedules,
   onHomeruns,
+  onCircuitText,
   controlsTarget,
   fitOnly = false,
   thumbnailWants,
@@ -981,6 +1008,11 @@ function PlanPane({
    * with the set's panel schedules to tie them to. Code only, writes nothing.
    */
   onHomeruns?: (pageNumber: number, read: SheetHomeruns) => void;
+  /**
+   * The page's words and the set's schedules, for grouping its marks by
+   * circuit tag (@/lib/circuitGroups). Code only, writes nothing.
+   */
+  onCircuitText?: (pageNumber: number, read: SheetCircuitText) => void;
   /** The check's verdict for that page and that ratio. Never acted on here. */
   onScaleDoubt?: (pageNumber: number, ratio: number, doubt: ScaleDoubt) => void;
   /**
@@ -1139,6 +1171,7 @@ function PlanPane({
     scaleEvidence: scaleEvidenceOnPage,
     schedules: schedulesOnPage,
     homeruns: homerunsOnPage,
+    circuits: circuitsOnPage,
     sheetCheck: sheetCheckOnPage,
   } = usePdfWorker();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -2317,6 +2350,24 @@ function PlanPane({
       cancelled = true;
     };
   }, [page, pageCount, loading, error, hash, homerunsOnPage]);
+
+  // CIRCUIT TAGS ON THIS SHEET, the same way — the grouping itself happens
+  // in the page, where the marks are.
+  const onCircuitTextRef = useRef(onCircuitText);
+  onCircuitTextRef.current = onCircuitText;
+  useEffect(() => {
+    if (loading || error || pageCount === 0) return;
+    let cancelled = false;
+    circuitsOnPage(page, hash)
+      .then(read => {
+        if (!cancelled) onCircuitTextRef.current?.(page, read);
+      })
+      // A failed read shows no circuits, which is what it found.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [page, pageCount, loading, error, hash, circuitsOnPage]);
 
   const onScaleDoubtRef = useRef(onScaleDoubt);
   onScaleDoubtRef.current = onScaleDoubt;
@@ -4220,6 +4271,69 @@ export default function TakeoffPage({
     { sheetId: activeSheet?.id ?? 0 },
     { enabled: Boolean(activeSheet) }
   );
+  /*
+    CIRCUITS ON THIS SHEET (@/lib/circuitGroups): its marks grouped by the
+    circuit tag beside each, read-only. Derived from `stamps` here, so a mark
+    placed, moved or deleted moves the grouping with no invalidation of its
+    own to forget (CLAUDE.md, "a screen showing yesterday's answer").
+  */
+  const [circuitTextByPage, setCircuitTextByPage] = useState<
+    Record<string, SheetCircuitText>
+  >({});
+  const circuitText = doc
+    ? (circuitTextByPage[`${doc.id}:${page}`] ?? null)
+    : null;
+  const circuitDocId = doc?.id ?? null;
+  const handleCircuitText = useCallback(
+    (pageNumber: number, read: SheetCircuitText) => {
+      if (circuitDocId === null) return;
+      setCircuitTextByPage(prev => ({
+        ...prev,
+        [`${circuitDocId}:${pageNumber}`]: read,
+      }));
+    },
+    [circuitDocId]
+  );
+  const [showCircuits, setShowCircuits] = useState(false);
+  const [circuitPick, setCircuitPick] = useState<CircuitPick>(null);
+  const [placingPanel, setPlacingPanel] = useState<string | null>(null);
+  const [panelSpots, setPanelSpots] = useState<
+    Record<string, { x: number; y: number }>
+  >({});
+  useEffect(() => {
+    setPanelSpots(
+      circuitDocId === null
+        ? {}
+        : readPanelSpots(browserStorage(), circuitDocId, page)
+    );
+    setCircuitPick(null);
+    setPlacingPanel(null);
+  }, [circuitDocId, page]);
+  const circuitReport = useMemo(
+    () =>
+      circuitText && circuitText.words.length
+        ? groupByCircuit({
+            words: circuitText.words,
+            // Not an unchecked AI mark: a run will not snap to one either.
+            devices: stamps
+              .filter(s => markIsSnapTarget(s.status))
+              .map(s => ({ id: s.id, x: s.x, y: s.y, name: s.name })),
+            panels: circuitText.panels,
+            placed: panelSpots,
+          })
+        : null,
+    [circuitText, stamps, panelSpots]
+  );
+  const placePanelSpot = useCallback(
+    (panel: string, spot: { x: number; y: number } | null) => {
+      if (circuitDocId === null) return;
+      setPanelSpots(
+        rememberPanelSpot(browserStorage(), circuitDocId, page, panel, spot)
+      );
+    },
+    [circuitDocId, page]
+  );
+
   const { data: symbols = [] } = trpc.takeoffStamps.symbols.useQuery();
   const { data: allAssemblies = [] } = trpc.assemblies.list.useQuery();
 
@@ -9279,6 +9393,41 @@ export default function TakeoffPage({
               />
             )}
 
+            {/* Devices grouped by circuit tag, read-only; only where tagged. */}
+            {!phone && circuitReport && (
+              <CircuitsToggle
+                count={circuitReport.circuits.length}
+                on={showCircuits}
+                onChange={on => {
+                  setShowCircuits(on);
+                  if (!on) {
+                    setCircuitPick(null);
+                    setPlacingPanel(null);
+                  }
+                }}
+              />
+            )}
+            {!phone && showCircuits && circuitReport && (
+              <CircuitsPanel
+                report={circuitReport}
+                pick={circuitPick}
+                onPick={setCircuitPick}
+                placing={placingPanel}
+                onPlace={setPlacingPanel}
+                onUnplace={panel => placePanelSpot(panel, null)}
+                onClose={() => {
+                  setShowCircuits(false);
+                  setCircuitPick(null);
+                  setPlacingPanel(null);
+                }}
+                feetPerPoint={
+                  activeSheet?.scaleRatio != null
+                    ? Number(activeSheet.scaleRatio) / 72 / 12
+                    : null
+                }
+              />
+            )}
+
             {/* Homeruns read off the sheet, read-only; only where it has one. */}
             {!phone && activeHomeruns && (
               <HomerunsToggle
@@ -9583,6 +9732,7 @@ export default function TakeoffPage({
               onScaleDoubt={handleScaleDoubt}
               onSchedules={handleSchedules}
               onHomeruns={handleHomeruns}
+              onCircuitText={handleCircuitText}
               onPageRendered={handlePageRendered}
               /**
                * Re-read the sheet list and hand back this document's
@@ -10237,6 +10387,20 @@ export default function TakeoffPage({
                           />
                         </>
                       )}
+                    {showCircuits && circuitReport && (
+                      <CircuitLayer
+                        width={size.width}
+                        height={size.height}
+                        renderScale={size.renderScale}
+                        report={circuitReport}
+                        pick={circuitPick}
+                        placing={placingPanel}
+                        onPlaced={spot => {
+                          if (placingPanel) placePanelSpot(placingPanel, spot);
+                          setPlacingPanel(null);
+                        }}
+                      />
+                    )}
                     {showHomeruns &&
                       activeHomeruns &&
                       activeHomeruns.homeruns.length > 0 && (

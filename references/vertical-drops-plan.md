@@ -154,6 +154,11 @@ per-run override on every run of one floor. The reason is that case.
 Per-AREA heights and "ceiling height" stay out. Overhaul § 6 carries a line
 saying so.
 
+> **Narrowed 2026-10-06 by the owner, for homeruns:** a ceiling height per
+> area IS wanted, for the up-drop on every homerun. `homerun-footage-plan.md`
+> § 4 meets it with this same per-sheet column (area = sheet), so nothing
+> here changes for runs; a sub-sheet area is not proposed.
+
 Once A adds the column (§ 7), the run height chain becomes
 **run → sheet → job → company**, still with no shipped layer, and a
 sheet's own height is set on the sheet row with the same `HeightFields`

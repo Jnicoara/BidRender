@@ -69,7 +69,7 @@ import { runSheetCheck } from "@/lib/sheetCheck";
 import { layerIdsFrom } from "@/lib/cadLayers";
 import { quarterArcRadii } from "@/lib/scaleCheck";
 import { readSchedules, type PanelSchedule } from "@/lib/panelSchedules";
-import { readHomeruns } from "@/lib/homeruns";
+import { readCircuitTags, readHomeruns } from "@/lib/homeruns";
 import { detectScaleFromText } from "@shared/planScale";
 import {
   extractVectorGeometry,
@@ -978,6 +978,47 @@ self.onmessage = async (e: MessageEvent) => {
         reqId,
         homeruns,
         panels: homeruns.length ? await panelsInDoc(doc, hash) : [],
+      });
+    } catch (err) {
+      self.postMessage({ type: "error", reqId, message: String(err) });
+    }
+    return;
+  }
+
+  if (msg.type === "circuits") {
+    // The page's words, for grouping its marks by circuit tag in the page
+    // (@/lib/circuitGroups — the marks live there), with the set's panel
+    // schedules when the page has any tag. Read-only.
+    const { pageNum, hash, reqId } = msg as {
+      pageNum: number;
+      hash: string;
+      reqId: string;
+    };
+    if (!pdfDoc || loadedHash !== hash) {
+      self.postMessage({
+        type: "error",
+        reqId,
+        message: "PDF not loaded for this hash",
+      });
+      return;
+    }
+    try {
+      const doc = pdfDoc;
+      const matchPage = await readMatchPage(doc, hash, pageNum);
+      const words = matchPage.words.map(w => ({
+        text: w.text,
+        x0: w.x0,
+        x1: w.x1,
+        cx: w.cx,
+        cy: w.cy,
+        height: w.height,
+      }));
+      const tagged = readCircuitTags(words).length > 0;
+      self.postMessage({
+        type: "circuits",
+        reqId,
+        words: tagged ? words : [],
+        panels: tagged ? await panelsInDoc(doc, hash) : [],
       });
     } catch (err) {
       self.postMessage({ type: "error", reqId, message: String(err) });

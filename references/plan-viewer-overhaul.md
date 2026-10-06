@@ -4432,6 +4432,9 @@ This keeps the 2026-09-18 decision that colour means which TYPE a run is
   > on every run of one floor. Per-area and "ceiling height" stay out.
   > Needs `bid_pdf_sheets.distributionHeightInches` (Track A); chain becomes
   > run → sheet → job → company. references/vertical-drops-plan.md § 2, § 7.
+  > **Narrowed again 2026-10-06 by the owner: a ceiling height per AREA for
+  > homeruns.** Met with the same per-sheet column (area = sheet) —
+  > references/homerun-footage-plan.md § 4.
 - **A vertical belongs to the GROUP** (below) **— narrowed 2026-10-05:** a
   MARK may carry its own height (0098), which replaces its count's for
   that mark only (check-my-marks-plan § 10.6; vertical-drops-plan § 2).

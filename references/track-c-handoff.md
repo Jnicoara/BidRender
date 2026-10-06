@@ -131,6 +131,39 @@ red run is not by itself a red suite:
   text — code cannot read them. Columns for Track A, fitted to A's ONE
   table `bid_panels` + `bid_panel_circuits`: todo.md § "Track A next
   migration batch".
+- **Circuits from device tags, read-only** (2026-10-06,
+  `@/lib/circuitGroups`, worker `circuits`, `CircuitsView`: a "Circuits N"
+  toggle where a sheet has tags; a docked panel built for tablets). **The
+  owner's model: plans tag devices ("2B-1"), they rarely draw homeruns** —
+  the drawn-homerun reader below is a kept rare-case helper, not tuned
+  further (its leftovers: todo.md § "Low priority — homerun reader
+  leftovers"). Each tag goes to its nearest mark within 24 pt; where two
+  marks share a spot (a duplex beside a data outlet) the item most often
+  tagged on its own wins; an item never tagged here (data outlets, 73) is
+  listed once, not flagged mark by mark. Panel spot from a "PANEL 2B" label,
+  else tapped by the user (kept per browser, `bidridge:panel-spots:`, for
+  want of a column); closest device at right angles. **Measured on UNCC E111
+  against the owner's 243 hand marks** (`codeFirstCeiling.mts circuits`):
+  duplex 108/108, USB 38/38, GFCI 4/4, J-box 11/20 grouped, 9 flagged
+  untagged, 0 off schedule. **Hand check of circuits 2B-1..2B-21 (20; 2B-14
+  has no marked device), by eye on tiles with every link drawn: 102 devices
+  grouped, 0 on the wrong circuit, 1 missed (2B-4's J-box, tag 26 pt away —
+  flagged orange, not wrong); 19 of 20 circuits exactly right.** Outside the
+  sample: 2B-31's J-box lost its tag to the duplex beside it; 4 data outlets
+  took a tag at floor boxes and the 6-30R spot (no 6-30R mark in the count).
+  E111 has no panel label (panels are drawn on ED111, another scale), so it
+  waits for a tap. SEEN ON SCREEN at tablet size (1180x820, touch): 0
+  buttons under 44 px; place 2B by tap; pick 2B-2 → rings + dashed
+  right-angle path to the panel. The look caught "584 pt" shown as a
+  distance (now feet only, with a scale), the "place the panel first" line
+  repeated on every row, and rings 2 px wide at fit zoom — all fixed.
+- **Homerun footage — DESIGN ONLY** (2026-10-06,
+  `references/homerun-footage-plan.md`): Measured / Average / Measured with
+  a minimum, per bid with a per-area (= per-sheet) override; drops by the
+  existing drop rule; routing factor ADDED to waste on material, never
+  multiplied; overridable, starts unconfirmed. Overrides "no per-area /
+  ceiling heights" — noted in vertical-drops-plan § 2 and overhaul § 6.
+  Four owner questions in § 11. Columns: todo.md "Homerun footage".
 - **Homeruns, read-only** (2026-10-06, `@/lib/homeruns`, worker
   `homeruns`, `HomerunsView`: a "Homeruns N" toggle on a sheet that has
   any, labels beside each arrow). **UNCC draws NO homeruns** (every device

@@ -29,6 +29,16 @@ This is the human-readable companion to the git history — read this to see wha
   ceiling fan starters get their fixture line** — only where no company has
   copied or changed them. Run by hand with the next release; not run on any
   live site yet.
+
+- **See every circuit on a sheet, read from the tags beside the devices.**
+  On a plan where devices are labelled with their circuit ("2B-14"), a
+  "Circuits" button lists each circuit with its devices, what the panel
+  schedule says about it, and — once you tap where the panel is — which
+  device is closest to the panel. It flags devices with no tag and tags that
+  aren't on the schedule, and works on a tablet. Read-only: nothing is
+  priced. Checked by hand on 20 circuits: 102 devices grouped, none on the
+  wrong circuit.
+
 - **All 168 planned starter assemblies are written into the app's starter
   library** — devices (including commercial MC versions), lighting, resi and
   commercial specials, panels and gear, motor/HVAC hookups, demo/retrofit and
