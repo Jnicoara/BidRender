@@ -2,8 +2,10 @@
  * The counts on a bid, as `pinStylesForBid` (shared/pinLetters.ts) needs
  * them — each with the looks chosen at every level it inherits from.
  *
- * Pure, and in client/src/lib, so the suite can hold the two lookups that
- * are easy to get quietly wrong:
+ * Pure, and in shared/ so the takeoff screen AND the takeoff CSV (its "Pin"
+ * column, server/pinStyles.ts) read one rule — moved from client/src/lib on
+ * 2026-10-06 for that. It holds the two lookups that are easy to get quietly
+ * wrong:
  *
  * - THE ASSEMBLY is the company's own copy when one exists. Choosing a look
  *   on a shipped assembly forks it (`takeoffGroups.setLook`), but the count
@@ -15,8 +17,8 @@
  *   its current one — the same rule `setLook` uses, so the look saved is the
  *   look read.
  */
-import { symbolLookupKey } from "@shared/takeoffCounts";
-import type { PinCount, PinLook } from "@shared/pinLetters";
+import { symbolLookupKey } from "./takeoffCounts";
+import type { PinCount, PinLook } from "./pinLetters";
 
 type Look = {
   markShape?: string | null;

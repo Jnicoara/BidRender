@@ -45,6 +45,7 @@ import { FAMILY_SHAPE, deviceFamily, type DeviceFamily } from "./deviceFamily";
 import {
   MARK_COLORS,
   MARK_SHAPES,
+  MARK_SHAPE_NAME,
   isMarkColor,
   type MarkColor,
   type MarkShape,
@@ -385,4 +386,14 @@ export function pinStylesForBid(
     });
   }
   return styles;
+}
+
+/**
+ * A pin in plain words — "S3 diamond", "R wide rectangle" — for the takeoff
+ * CSV's "Pin" column (pin plan decision 11), so a row in the file can be
+ * matched to a marked-up screen. Code and shape only: no glyph, and no
+ * colour, which a black-and-white printout of the file cannot show either.
+ */
+export function pinCode(style: Pick<PinStyle, "letter" | "shape">): string {
+  return `${style.letter} ${MARK_SHAPE_NAME[style.shape].toLowerCase()}`;
 }

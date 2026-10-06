@@ -90,9 +90,12 @@ import {
 import { addAssemblyOverheadHours, calculateBidPrice } from "@shared/pricing";
 import { assemblyHours, previewAssembly } from "@shared/assemblyHours";
 import {
-  defaultLaborHoursFor,
-  isPlaceholderHours,
-} from "@shared/laborHourDefaults";
+  hoursOffer,
+  hoursToSave,
+  newAssemblyHoursDraft,
+  suggestedHoursDraft,
+} from "@/lib/assemblyHoursSuggestion";
+import { isPlaceholderHours } from "@shared/laborHourDefaults";
 import { HourSuggestions } from "@/components/HourSuggestions";
 import { money } from "@/lib/money";
 import {
@@ -183,7 +186,9 @@ const emptyDraft = (): Draft => ({
   category: "Devices",
   trade: "electrical",
   projectType: "both",
-  baseLaborHours: String(defaultLaborHoursFor("").hours),
+  // EMPTY = not set (owner, 2026-10-06). The suggestion is offered beside
+  // the box, never written into it — client/src/lib/assemblyHoursSuggestion.
+  baseLaborHours: newAssemblyHoursDraft(),
   // 0, always. There is no sensible default amount of setup time — it depends
   // entirely on the work — and a suggested figure here would be a number
   // nobody chose quietly inflating every new assembly.
@@ -549,22 +554,17 @@ function AssemblyBuilder({
 
   const isNew = initial.name === "";
 
-  // Suggest hours from the name while the user has not set them, so typing
-  // "GFCI receptacle" lands on a sensible figure instead of the generic 0.5.
-  useEffect(() => {
-    if (!isNew || hoursTouched) return;
-    const suggestion = defaultLaborHoursFor(draft.name);
-    setDraft(d =>
-      String(suggestion.hours) === d.baseLaborHours
-        ? d
-        : { ...d, baseLaborHours: String(suggestion.hours) }
-    );
-  }, [draft.name, hoursTouched, isNew]);
-
-  const suggestion = useMemo(
-    () => defaultLaborHoursFor(draft.name),
-    [draft.name]
+  /*
+    The suggestion follows the NAME ("GFCI receptacle" suggests more than the
+    generic figure) but is only OFFERED, in grey beside the box, with "Use
+    suggested". This used to write it into the box on every name change, so
+    saving without looking stored a figure nobody chose (owner, 2026-10-06).
+  */
+  const offer = useMemo(
+    () => hoursOffer(draft.name, draft.baseLaborHours),
+    [draft.name, draft.baseLaborHours]
   );
+  const suggestion = offer.suggestion;
   const showsPlaceholderHours =
     !hoursTouched &&
     assemblyHours(draft.baseLaborHours) !== null &&
@@ -1034,6 +1034,35 @@ function AssemblyBuilder({
                   <span className="text-xs text-muted-foreground">
                     hours{suggestion.perUnit === "ft" ? " per ft" : ""}
                   </span>
+                  {/* An OFFER, never a value: grey, and saved only if the
+                      user clicks it or types (owner, 2026-10-06). */}
+                  {offer.canUse && (
+                    <>
+                      <span
+                        className="text-xs text-muted-foreground"
+                        title={`A starting placeholder (${suggestion.basis}), not a verified labor unit.`}
+                      >
+                        suggested {suggestion.hours} h
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => {
+                          setHoursTouched(true);
+                          setDraft(d => ({
+                            ...d,
+                            baseLaborHours: suggestedHoursDraft(
+                              hoursOffer(d.name, d.baseLaborHours)
+                            ),
+                          }));
+                        }}
+                      >
+                        Use suggested
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -1341,24 +1370,36 @@ export default function AssembliesLibraryPage() {
         onCancel={() => setCreating(false)}
         onRevert={() => {}}
         onSave={draft => {
-          createAssembly.mutate({
-            name: draft.name,
-            category: draft.category,
-            trade: draft.trade,
-            projectType: draft.projectType,
-            baseLaborHours: assemblyHours(draft.baseLaborHours),
-            overheadLaborHours: Number(draft.overheadLaborHours),
-            laborRateId: draft.laborRateId,
-            materials: draft.materials.map(m => ({
-              materialId: m.materialId,
-              qty: m.qty,
-              // Round-trips, so saving a recipe cannot unmark its whips.
-              isBranchWhip: m.isBranchWhip,
-            })),
-            modifierIds: draft.modifierIds,
-          });
-          toast.success(`Created "${draft.name}"`);
-          setCreating(false);
+          /*
+            Closes on SUCCESS only. A new assembly now opens with its hours
+            NOT SET, and until Track A's 0123 the server refuses to save that
+            with a plain message — closing first would show "Created" and then
+            throw the whole recipe away.
+          */
+          createAssembly.mutate(
+            {
+              name: draft.name,
+              category: draft.category,
+              trade: draft.trade,
+              projectType: draft.projectType,
+              baseLaborHours: hoursToSave(draft.baseLaborHours),
+              overheadLaborHours: Number(draft.overheadLaborHours),
+              laborRateId: draft.laborRateId,
+              materials: draft.materials.map(m => ({
+                materialId: m.materialId,
+                qty: m.qty,
+                // Round-trips, so saving a recipe cannot unmark its whips.
+                isBranchWhip: m.isBranchWhip,
+              })),
+              modifierIds: draft.modifierIds,
+            },
+            {
+              onSuccess: () => {
+                toast.success(`Created "${draft.name}"`);
+                setCreating(false);
+              },
+            }
+          );
         }}
       />
     );
@@ -1413,7 +1454,7 @@ export default function AssembliesLibraryPage() {
               category: draft.category,
               trade: draft.trade,
               projectType: draft.projectType,
-              baseLaborHours: assemblyHours(draft.baseLaborHours),
+              baseLaborHours: hoursToSave(draft.baseLaborHours),
               overheadLaborHours: Number(draft.overheadLaborHours),
               laborRateId: draft.laborRateId,
               materials: draft.materials.map(m => ({

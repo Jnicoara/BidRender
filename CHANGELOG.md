@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **A new assembly starts with its hours empty.** The suggested figure is
+  shown in grey beside the box with a "Use suggested" button, and is only
+  saved if you click it or type a number, so nobody saves a guess by not
+  looking. Until the database update that allows blank hours, saving a blank
+  is refused and the editor stays open with your work in it (it used to
+  close and lose the recipe).
+- **The takeoff spreadsheet has a "Pin" column** — each count's pin as code
+  and shape ("S3 diamond"), the same look the plans screen draws, so a row
+  in the file can be matched to the marks on a sheet. It is the last column,
+  so a spreadsheet built on the old layout keeps working.
 - **An assembly's hours can now be "not set", and the app says so
   everywhere instead of treating them as zero.** The assembly editor takes a
   blank, the library and Quick bid say "hours not set", and a bid line made

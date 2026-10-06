@@ -55,6 +55,22 @@ export const MARK_SHAPES = [
 export type MarkShape = (typeof MARK_SHAPES)[number];
 
 /**
+ * Each shape in words — the look editor's labels and the takeoff CSV's "Pin"
+ * column read this one map, so the file and the screen cannot call a shape
+ * two different things. Plain words, no glyph (pin plan decision 11: a ◇
+ * does not survive every CSV reader).
+ */
+export const MARK_SHAPE_NAME: Record<MarkShape, string> = {
+  circle: "Circle",
+  square: "Square",
+  triangle: "Triangle",
+  diamond: "Diamond",
+  hexagon: "Hexagon",
+  // "Wide" until 2026-10-06; "S3 wide" in a file says nothing about shape.
+  rect: "Wide rectangle",
+};
+
+/**
  * Each library category's shape, through its device family
  * (shared/deviceFamily.ts) — so the category default and a count's own family
  * cannot disagree about what "lighting" looks like.

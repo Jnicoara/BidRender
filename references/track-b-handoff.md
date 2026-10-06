@@ -6,6 +6,22 @@ databases (`bidrender_local_b_new`, `bidrender_test_b`) are migrated to 105
 and `scripts/schemaDrift.mts` says both match. Last gate: `pnpm check` clean,
 292 test files / 4,976 passing / 5 skipped.
 
+## Session 2026-10-06 (night) — new assemblies start "not set"; CSV Pin column
+
+- `304260a` on local-dev: green (tests, staging deploy, smoke).
+- **A NEW assembly's hours start empty** (owner); grey suggestion + "Use
+  suggested" (`client/src/lib/assemblyHoursSuggestion.ts`). Create now
+  closes only on success, so a refused blank no longer loses the recipe.
+- **The takeoff CSV's "Pin" column** (pin plan decision 11) — built; see
+  todo.md's pin-looks entry. Picked as the next job because it needs no A
+  column, moves no bid number, and is testable without a screen.
+- **Next B jobs left with no A column and no bid number** (all display, all
+  need a screen check, so start them when the laptop has memory for a dev
+  server and browser): the pin look editor from the Legend tab and the
+  assembly editor (pin plan § 6); the ring around the symbol at reading zoom
+  (§ 4, needs step 0's measurement first); faint marks (decision 12). Plus
+  todo.md's "hours not set" on-screen check, once A's 0123 is on local-dev.
+
 ## Session 2026-10-06 (evening) — H2 step 2, LT1/LT2 repair
 
 - **H2 step 2 is built**: NULL assembly hours read as "not set" everywhere

@@ -85,7 +85,7 @@ import {
   SquareDashedMousePointer,
 } from "lucide-react";
 import { pinStylesForBid } from "@shared/pinLetters";
-import { pinCountsFor } from "@/lib/pinCounts";
+import { pinCountsFor } from "@shared/pinCounts";
 import { PinLookEditor } from "@/components/takeoff/PinLookEditor";
 import { MARK_STATUS_LABEL, type UserMarkStatus } from "@shared/markStatus";
 import { deviceFamily } from "@shared/deviceFamily";

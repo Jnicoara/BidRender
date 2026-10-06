@@ -17,9 +17,10 @@
 > sit above the receptacle words. A test now checks the letter table against
 > the family map.
 >
-> **Not built:** chosen looks (§ 6), status (§ 7), ring at reading zoom (§ 4),
-> faint marks, the CSV column. The seam is the "NOT BUILT" block in
-> `shared/pinLetters.ts`; the follow-up is in `todo.md`.
+> **Not built:** ring at reading zoom (§ 4), faint marks. Chosen looks (§ 6)
+> and status (§ 7) were built 2026-10-05; **the CSV "Pin" column (decision 11) was built 2026-10-06** — last column of each table, "S3 diamond", the
+> look the screen draws (`server/pinStyles.ts` through the shared
+> `pinCountsFor` + `pinStylesForBid`). The follow-up is in `todo.md`.
 >
 > **FINAL PLAN, 2026-10-01. §§ 1–10 were not built when written; § 11 is (see its box).**
 > Written on `track-b` from the owner's request the same day. **All twelve
@@ -392,7 +393,8 @@ guard 3 (`track-b-phone-and-readability-plan.md` § 3), not before.
 
 **Printing and exports:** today the only export is CSV; nothing draws pins
 off-screen. So: (a) add a **"Pin" column** to the takeoff CSV (letter +
-shape name, e.g. "S3 ◇ diamond") so the file's rows can be matched to a
+shape name, e.g. "S3 diamond" — decision 11 below dropped the ◇ glyph this
+example first had, and that is what was built) so the file's rows can be matched to a
 marked-up screen — cheap, decision 10; (b) any future marked-up-sheet PDF
 must draw pins with the same shared function, and letters are what make it
 work in black and white. A browser print of the Plans screen is not a

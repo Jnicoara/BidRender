@@ -28,6 +28,7 @@ import {
   letterFit,
   markPath,
   type MarkColor,
+  MARK_SHAPE_NAME,
   type MarkShape,
 } from "@shared/takeoffMarks";
 import { cleanLetter, type PinStyle } from "@shared/pinLetters";
@@ -39,14 +40,8 @@ export type PinLookSave = {
   where: "job" | "everyJob";
 };
 
-const SHAPE_NAME: Record<MarkShape, string> = {
-  circle: "Circle",
-  square: "Square",
-  triangle: "Triangle",
-  diamond: "Diamond",
-  hexagon: "Hexagon",
-  rect: "Wide",
-};
+// One map with the takeoff CSV's "Pin" column (shared/takeoffMarks.ts).
+const SHAPE_NAME = MARK_SHAPE_NAME;
 
 const SOURCE_WORD = {
   count: "this job",

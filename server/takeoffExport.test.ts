@@ -27,6 +27,8 @@ import {
 } from "../shared/takeoffExport";
 import type { TrpcContext } from "./_core/context";
 import { lineNotPriced } from "../shared/lineNotPriced";
+import { pinCode, pinStylesForBid } from "../shared/pinLetters";
+import { pinCountsFor } from "../shared/pinCounts";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 9331;
@@ -93,8 +95,8 @@ describe("building the export", () => {
     const doc = buildTakeoffExport(
       source({
         counts: [
-          { sheetId: 1, key: "group:1", name: "Duplex", count: 4 },
-          { sheetId: 2, key: "group:1", name: "Duplex", count: 3 },
+          { sheetId: 1, key: "group:1", name: "Duplex", count: 4, pin: null },
+          { sheetId: 2, key: "group:1", name: "Duplex", count: 3, pin: null },
         ],
       })
     );
@@ -289,7 +291,9 @@ describe("building the export", () => {
     const csv = takeoffExportCsv(
       buildTakeoffExport(
         source({
-          counts: [{ sheetId: 1, key: "k", name: "Duplex", count: 2 }],
+          counts: [
+            { sheetId: 1, key: "k", name: "Duplex", count: 2, pin: null },
+          ],
           runs: [runs({ sheetId: 1 })],
         })
       )
@@ -321,10 +325,10 @@ describe("building the export", () => {
 describe("the export with prices", () => {
   const withRows = source({
     counts: [
-      { sheetId: 1, key: "group:1", name: "Duplex", count: 2 },
-      { sheetId: 2, key: "group:1", name: "Duplex", count: 1 },
-      { sheetId: 1, key: "group:2", name: "Exit sign", count: 4 },
-      { sheetId: 1, key: "group:3", name: "Smoke", count: 1 },
+      { sheetId: 1, key: "group:1", name: "Duplex", count: 2, pin: null },
+      { sheetId: 2, key: "group:1", name: "Duplex", count: 1, pin: null },
+      { sheetId: 1, key: "group:2", name: "Exit sign", count: 4, pin: null },
+      { sheetId: 1, key: "group:3", name: "Smoke", count: 1, pin: null },
     ],
     runs: [
       runs({ sheetId: 1, key: "7" }),
@@ -449,6 +453,55 @@ describe("the export with prices", () => {
     // The quantity columns keep their places; prices are added at the end.
     expect(priced).toContain('"Note","Price status","Unit cost","Line cost"');
     expect(priced).toMatch(/COSTS, before markup, overhead, profit and tax/);
+  });
+
+  it("puts Pin LAST in every table, after prices too, and moves no other column (decision 11)", () => {
+    const pinned = {
+      ...withRows,
+      counts: withRows.counts.map(c =>
+        c.name === "Duplex" ? { ...c, pin: "R circle" } : c
+      ),
+    };
+    const withPins = buildTakeoffExport(pinned);
+    const tables = (csv: string) =>
+      csv
+        .split("\r\n")
+        .filter(l => l.startsWith('"Plan file"'))
+        .map(l => l.split(","));
+
+    const plain = tables(takeoffExportCsv(withPins));
+    expect(plain).toHaveLength(2);
+    for (const header of plain) {
+      expect(header.at(-1)).toBe('"Pin"');
+      // Every column before it is where it always was.
+      expect(header.indexOf('"Note"')).toBe(16);
+    }
+
+    const priced = tables(
+      takeoffExportCsv(buildTakeoffExport({ ...pinned, prices: PRICES }))
+    );
+    for (const header of priced) expect(header.at(-1)).toBe('"Pin"');
+    // The whole-bid table's price columns stay right after Note.
+    expect(priced[1].slice(16, 20)).toEqual([
+      '"Note"',
+      '"Price status"',
+      '"Unit cost"',
+      '"Line cost"',
+    ]);
+
+    // A count row ends with its pin; a run row and a pin-less count, blank.
+    const rows = takeoffExportCsv(withPins).split("\r\n");
+    expect(rows.find(l => l.includes('"Duplex"'))!.endsWith('"R circle"')).toBe(
+      true
+    );
+    expect(rows.find(l => l.includes('"Exit sign"'))!.endsWith('""')).toBe(
+      true
+    );
+  });
+
+  it("writes a pin as code and shape in plain words", () => {
+    expect(pinCode({ letter: "S3", shape: "diamond" })).toBe("S3 diamond");
+    expect(pinCode({ letter: "P", shape: "rect" })).toBe("P wide rectangle");
   });
 
   it("adds Qty on bid when the bid's quantities are locked", () => {
@@ -873,5 +926,53 @@ describe.skipIf(!hasDb)("the export against a real bid", () => {
     const doc = await caller().takeoffExport.get({ bidId: bid!.id });
     expect(doc.bySheet).toEqual([]);
     expect(doc.notes[0]).toContain("Nothing has been counted or traced");
+  });
+  /*
+    THE "PIN" COLUMN (pin plan decision 11) wears the look the takeoff screen
+    draws. The screen resolves it in the browser from three queries; this
+    resolves it the same way from those same three procedures and asserts the
+    file agrees — so a server that resolved pins on its own (a second copy of
+    the rule) would go red the day the two drifted.
+  */
+  async function screenPins(bidId: number) {
+    const [counts, assemblies, symbols] = await Promise.all([
+      caller().takeoffGroups.list({ bidId }),
+      caller().assemblies.list(),
+      caller().takeoffStamps.symbols(),
+    ]);
+    const styles = pinStylesForBid(
+      pinCountsFor(counts.groups, assemblies, symbols)
+    );
+    return new Map(
+      counts.groups.map(g => [g.label, pinCode(styles.get(g.id)!)])
+    );
+  }
+
+  it("gives each count the pin the takeoff screen draws, in both tables", async () => {
+    const { bidId, groupId } = await tracedBid();
+    const doc = await caller().takeoffExport.get({ bidId });
+    const onScreen = await screenPins(bidId);
+    const pin = onScreen.get("Duplex")!;
+    expect(pin).toMatch(/^\S+ [a-z ]+$/);
+    for (const row of [...doc.bySheet, ...doc.wholeBid].filter(
+      r => r.kind === "Count"
+    ))
+      expect(row.pin).toBe(pin);
+    // Runs carry no pin.
+    for (const row of doc.wholeBid.filter(r => r.kind === "Run"))
+      expect(row.pin).toBe("");
+
+    // A look chosen on this job moves the file with the screen.
+    await caller().takeoffGroups.setLook({
+      id: groupId,
+      where: "job",
+      shape: "hexagon",
+      letter: "DX",
+    });
+    const after = await caller().takeoffExport.get({ bidId });
+    expect((await screenPins(bidId)).get("Duplex")).toBe("DX hexagon");
+    expect(after.wholeBid.find(r => r.item === "Duplex")!.pin).toBe(
+      "DX hexagon"
+    );
   });
 });

@@ -38,6 +38,8 @@ import {
 } from "../../shared/lineNotPriced";
 import { bidRollup, companyDefaultsFor } from "../bidPricing";
 import type { Bid } from "../../drizzle/schema";
+import { pinCode } from "../../shared/pinLetters";
+import { pinStylesForBidFromDb } from "../pinStyles";
 
 const procedure = scoped("bids.view", "bids.edit");
 
@@ -65,11 +67,12 @@ export const takeoffExportRouter = router({
       if (!bid)
         throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
 
-      const [jump, stamps, footageInput, palette] = await Promise.all([
+      const [jump, stamps, footageInput, palette, pins] = await Promise.all([
         db.getSheetJumpRows(input.bidId, userId),
         db.getStampsForBid(input.bidId, userId),
         loadRunFootageInput(input.bidId, userId, bid.distributionHeightInches),
         db.getRunTypesFor(userId, true),
+        pinStylesForBidFromDb(input.bidId, userId),
       ]);
 
       // ── Sheets, in plan-set order then page order ──────────────────────────
@@ -120,11 +123,16 @@ export const takeoffExportRouter = router({
             status: stamp.status,
           }))
         )) {
+          // The look the takeoff screen draws, resolved over EVERY count on
+          // the bid (server/pinStyles.ts). Marks with no count have no pin.
+          const style =
+            group.groupId === null ? undefined : pins.get(group.groupId);
           counts.push({
             sheetId,
             key: countKey(group),
             name: group.name,
             count: group.count,
+            pin: style ? pinCode(style) : null,
           });
         }
       });

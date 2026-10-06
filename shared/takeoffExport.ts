@@ -53,6 +53,12 @@ export type TakeoffExportCount = {
   key: string;
   name: string;
   count: number;
+  /**
+   * The count's pin in words — "S3 diamond" (`pinCode`) — the same look
+   * the takeoff screen draws (server/pinStyles.ts). NULL for marks that
+   * belong to no count, which have no pin. Required, so a caller says which.
+   */
+  pin: string | null;
 };
 
 export type RunStatus = "draft" | "committed";
@@ -191,6 +197,11 @@ export type TakeoffExportRow = {
   wireFeet: number | null;
   groundFeet: number | null;
   note: string;
+  /**
+   * The LAST column (pin plan decision 11): a count's pin, "" on a run and
+   * on a count with no pin. Required, so no row builder can leave it out.
+   */
+  pin: string;
   /** Whole-bid rows only, and only when prices were asked for. */
   price?: RowPrice;
 };
@@ -348,6 +359,8 @@ function runRow(
     groundFeet:
       hasFeet && runs.pathType === "conduit" ? round2(runs.groundFeet) : null,
     note: runNote(runs),
+    // Runs have no pin; the cell is blank.
+    pin: "",
   };
 }
 
@@ -554,6 +567,7 @@ export function buildTakeoffExport(
         wireFeet: null,
         groundFeet: null,
         note: "",
+        pin: count.pin ?? "",
       });
     }
     const runs = source.runs
@@ -569,9 +583,16 @@ export function buildTakeoffExport(
     sheet: "All sheets",
     sheetTitle: "",
   };
-  const countTotals = new Map<string, { name: string; count: number }>();
+  const countTotals = new Map<
+    string,
+    { name: string; count: number; pin: string | null }
+  >();
   for (const count of source.counts) {
-    const total = countTotals.get(count.key) ?? { name: count.name, count: 0 };
+    const total = countTotals.get(count.key) ?? {
+      name: count.name,
+      count: 0,
+      pin: count.pin,
+    };
     total.count += count.count;
     countTotals.set(count.key, total);
   }
@@ -644,6 +665,7 @@ export function buildTakeoffExport(
           wireFeet: null,
           groundFeet: null,
           note: "",
+          pin: count.pin ?? "",
         } satisfies TakeoffExportRow,
       })),
     ...Array.from(runTotals.values())
@@ -730,6 +752,13 @@ const HEADER = [
   "Note",
 ] as const;
 
+/**
+ * Pin plan decision 11: "Pin" is the LAST column of each table — after the
+ * price columns where there are any — so a spreadsheet built on the file's
+ * existing column order keeps working.
+ */
+const PIN_HEADER = "Pin";
+
 const blankIfNull = (value: number | null) => (value === null ? "" : value);
 
 function rowCells(row: TakeoffExportRow): (string | number)[] {
@@ -773,12 +802,12 @@ export function takeoffExportCsv(doc: TakeoffExportDoc): string {
       ["Quantities only — no pricing"],
       "",
       ["By sheet"],
-      [...HEADER],
-      ...doc.bySheet.map(rowCells),
+      [...HEADER, PIN_HEADER],
+      ...doc.bySheet.map(row => [...rowCells(row), row.pin]),
       "",
       ["Whole bid"],
-      [...HEADER],
-      ...doc.wholeBid.map(rowCells),
+      [...HEADER, PIN_HEADER],
+      ...doc.wholeBid.map(row => [...rowCells(row), row.pin]),
       "",
       ["Notes"],
       ...doc.notes.map(note => [note]),
@@ -831,12 +860,12 @@ export function takeoffExportCsv(doc: TakeoffExportDoc): string {
     ],
     "",
     ["By sheet"],
-    [...HEADER],
-    ...doc.bySheet.map(rowCells),
+    [...HEADER, PIN_HEADER],
+    ...doc.bySheet.map(row => [...rowCells(row), row.pin]),
     "",
     ["Whole bid"],
-    [...HEADER, ...priceHeader],
-    ...doc.wholeBid.map(row => [...rowCells(row), ...priceCells(row)]),
+    [...HEADER, ...priceHeader, PIN_HEADER],
+    ...doc.wholeBid.map(row => [...rowCells(row), ...priceCells(row), row.pin]),
     "",
     ["Prices"],
     ...footer,

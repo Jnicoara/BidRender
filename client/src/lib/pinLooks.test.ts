@@ -1,6 +1,6 @@
 /**
  * Chosen pin looks and mark-status looks (shared/pinLetters.ts,
- * shared/takeoffMarks.ts, shared/markStatus.ts, @/lib/pinCounts) — pin plan
+ * shared/takeoffMarks.ts, shared/markStatus.ts, shared/pinCounts) — pin plan
  * § 6, § 7 and § 11.4. Red before 2026-10-05: nothing read a chosen look, and
  * every mark drew as new.
  */
@@ -19,7 +19,7 @@ import {
   unpricedStatusNote,
 } from "@shared/markStatus";
 import { groupStamps } from "@shared/takeoffCounts";
-import { pinCountsFor } from "./pinCounts";
+import { pinCountsFor } from "@shared/pinCounts";
 
 const [BLUE, PINK, VIOLET, ORANGE] = MARK_COLORS;
 
@@ -124,7 +124,7 @@ describe("colours: chosen wins, the automatic ones step around it", () => {
   });
 });
 
-describe("where a count takes its look from (@/lib/pinCounts)", () => {
+describe("where a count takes its look from (shared/pinCounts)", () => {
   it("reads the company's FORK of a shipped assembly, not the shipped row", () => {
     // setLook forks a shipped assembly; the count still points at the shipped
     // id. Reading that id would find a row with no look, and the choice would

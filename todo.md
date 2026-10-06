@@ -2156,10 +2156,18 @@ path is ever revived, give it the same treatment first.
       assembly, editor from the card's swatch, "this job / every job") and
       mark status (looks, "Mark as…", the split in words, priced only when
       new).** Still open from this entry: the ring-around-the-symbol, faint
-      marks, the CSV "Pin" column, step 0's `LETTER_MIN_PX`, and the editor
-      on the Legend tab and the assembly editor (it opens from the count card
-      only). "Placing as" (New / Existing in the count pill) BUILT
-      2026-10-05.
+      marks, step 0's `LETTER_MIN_PX`, and the editor on the Legend tab and
+      the assembly editor (it opens from the count card only). "Placing as"
+      (New / Existing in the count pill) BUILT 2026-10-05. **The CSV "Pin"
+      column BUILT 2026-10-06 (Track B, decision 11)**: the LAST column of
+      each table (after prices too), "S3 diamond" / "P wide rectangle", blank
+      on runs; resolved on the server by `server/pinStyles.ts` through the
+      same `pinCountsFor` (moved to `shared/pinCounts.ts`) and
+      `pinStylesForBid` the screen uses, and `server/takeoffExport.test.ts`
+      holds the file equal to what the screen's three queries resolve,
+      including after a chosen look. One shape-name map for the editor and
+      the file (`MARK_SHAPE_NAME`; "Wide" is now "Wide rectangle" in the
+      editor's tooltip).
       **Track B, after A's columns above: pin styles steps 2 and 3.** Step 1
       shipped 2026-10-01 (computed default shape by device family, the wide
       rectangle, letters and first-use colours, safety switch = DS). Still to
@@ -2851,9 +2859,26 @@ one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
       > Order still matters for H2: this code ships BEFORE step 3 (i), the
       > migration that clears the 8 starters' placeholder hours.
 
-      Still open, owner: whether a user's own NEW assembly should still
-      pre-fill hours from `shared/laborHourDefaults.ts` (it does today) or
-      start "not set" (H2's note; D1 covered the shipped starters only).
+      **Owner answered 2026-10-06: a company's NEW assembly starts "not
+      set"** — built: the box opens empty, the suggestion is grey beside it
+      with "Use suggested", and it is saved only on that click or a typed
+      number (`client/src/lib/assemblyHoursSuggestion.ts`). Before 0123 a
+      blank save is refused with the plain server message and the editor
+      stays open (it used to close first and lose the recipe).
+
+- [ ] **ON-SCREEN CHECK of every "hours not set" screen, once Track A's 0123
+      is on local-dev** (owner, 2026-10-06). None of these has been looked at
+      — before 0123 an assembly cannot hold NULL hours, so most cannot be
+      produced. Check each at laptop and tablet width, and that the number
+      MOVES when the hours are then typed (CLAUDE.md § staleness):
+      the **bid line** (hours cell "Hours not set", cost "+ hours not set");
+      the **bid totals** ("+ N parts not priced" counts it); the
+      **dashboard card** for that bid (same count as the bid); the **quote
+      panel** (blocks, "labor hours not set"); the **assembly editor** (empty
+      box, grey "suggested N h", "Use suggested", "Labor — hours not set" in
+      the cost preview, and the library list's "hours not set"); Quick bid's
+      picker; a **kit** holding one ("+ 1 assembly with hours not set"); and
+      the **labor-sheet import** preview ("not set → 0.5 h").
 
 - [x] **LT1/LT2 fixture-line repair BUILT 2026-10-06 (Track B), owner YES.**
       `scripts/repairStarterFixtureLines.mts` (report; `--apply` writes) over
