@@ -59,7 +59,7 @@ export const SCAN_SIZES = [0.9, 1, 1.1] as const;
  * An empty strip at least this wide (points) ends a plan sideways — the
  * white between a plan and the notes column. 1 inch: E1.01's is ~135 pt.
  */
-const PLAN_GAP_POINTS = 72;
+export const PLAN_GAP_POINTS = 72;
 
 // ── 1. Too poor to match ────────────────────────────────────────────────────
 

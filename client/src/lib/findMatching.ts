@@ -36,6 +36,8 @@
  */
 import type { VectorGeometry } from "./vectorGeometry";
 import { drawnOn, electricalView } from "./cadLayers";
+import { demolitionPlanAt, vectorPlanRegions } from "./vectorPlans";
+import type { PlanRegion } from "./scanMatching";
 import type { WordBox } from "./textSelection";
 
 export type MatchBox = { x: number; y: number; width: number; height: number };
@@ -643,6 +645,12 @@ export type PreparedSheet = {
    * far away; this can. Used only by the cut-line test.
    */
   spans: () => SpanGrid;
+  /**
+   * The plans on the sheet by their printed titles (@/lib/vectorPlans),
+   * read on first use from the words and ALL the line work. A find in a
+   * demolition plan is demolition, whatever layer drew it.
+   */
+  plans: () => PlanRegion[];
   lengthOf: (i: number) => number;
 };
 
@@ -681,6 +689,44 @@ class SpanGrid {
   }
 }
 
+/**
+ * The sheet's plans by title, from ALL its line work (the background is
+ * what shows where one plan ends and the next begins). The page size comes
+ * from the PDF; a geometry built by hand falls back to the drawing's extent.
+ */
+function plansOf(geo: VectorGeometry, words: readonly WordBox[]): PlanRegion[] {
+  // Once per page: the worker keeps a page's geometry between searches, and
+  // reading titles and ink over ~100,000 segments is most of a search's time.
+  const cached = plansByGeometry.get(geo);
+  if (cached && cached.words === words) return cached.plans;
+  const plans = readPlans(geo, words);
+  plansByGeometry.set(geo, { words, plans });
+  return plans;
+}
+const plansByGeometry = new WeakMap<
+  VectorGeometry,
+  { words: readonly WordBox[]; plans: PlanRegion[] }
+>();
+
+function readPlans(
+  geo: VectorGeometry,
+  words: readonly WordBox[]
+): PlanRegion[] {
+  let width = geo.page?.width ?? 0;
+  let height = geo.page?.height ?? 0;
+  if (!geo.page) {
+    for (let i = 0; i < geo.segs.length; i += 2) {
+      width = Math.max(width, geo.segs[i]);
+      height = Math.max(height, geo.segs[i + 1]);
+    }
+    for (const w of words) {
+      width = Math.max(width, w.x1);
+      height = Math.max(height, w.y1);
+    }
+  }
+  return vectorPlanRegions(words, geo.segs, width, height);
+}
+
 export function prepareSheet(
   drawn: VectorGeometry,
   words: readonly WordBox[]
@@ -707,8 +753,10 @@ export function prepareSheet(
   });
   const grids = new Map<number, SegmentGrid>();
   let spanGrid: SpanGrid | null = null;
+  let plans: PlanRegion[] | null = null;
   return {
     spans: () => (spanGrid ??= new SpanGrid(segs)),
+    plans: () => (plans ??= plansOf(drawn, words)),
     geo,
     words,
     byLength,
@@ -1627,8 +1675,13 @@ export function searchSymbol(
       maybeExisting,
       isBoxed:
         opts.boxedHere === true && Math.hypot(f.tx - cx, f.ty - cy) <= 2 * tol,
+      // Demolition by layer, else by the plan's printed title — a device on
+      // the demolition plan is demolition whatever layer drew it (E-200's
+      // are on the existing and new layers: @/lib/vectorPlans).
       onDemolitionPlan:
-        on?.role === "demolition" ? `CAD layer ${on.name}` : null,
+        on?.role === "demolition"
+          ? `CAD layer ${on.name}`
+          : demolitionPlanAt(sheet.plans(), f.tx, f.ty),
     };
   });
 

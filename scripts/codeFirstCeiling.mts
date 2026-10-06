@@ -1214,7 +1214,101 @@ async function layered() {
   }
 }
 
+// ── demotitles: demolition plans on vector sheets, by their printed title ──
+/**
+ * Known answer (owner, 2026-10-06): every device in Weld 1 E-200's plan B
+ * ("B DEMOLITION POWER PLAN") is demolition, so no find there may be
+ * CLEAR; and nothing in plan A (the power plan) may be called demolition.
+ * Scored for the matcher as shipped (`findMatching` — layers and, once
+ * built, titles), plus title-region variants measured by hand here.
+ */
+async function demotitles() {
+  const { findMatching } = await import("../client/src/lib/findMatching");
+  const { planTitles, planRegions, regionAt } = await import(
+    "../client/src/lib/scanMatching"
+  );
+  const p = await load("Weld 1.pdf", 5);
+  const geo = extractVectorGeometry(
+    p.list.fnArray,
+    p.list.argsArray,
+    ops,
+    p.viewport.transform,
+    p.viewport.width,
+    p.viewport.height,
+    p.layerName
+  );
+  const regionB = { x0: 1350, y0: 820, x1: 2300, y1: 1680 };
+  const inB = (x: number, y: number) =>
+    x >= regionB.x0 && x <= regionB.x1 && y >= regionB.y0 && y <= regionB.y1;
+  const titles = planTitles(p.words);
+  const raw = planRegions(titles, p.viewport.width, p.viewport.height);
+  // An ink map from the line work, as the scan path makes one from pixels.
+  const cell = 8;
+  const cols = Math.ceil(p.viewport.width / cell);
+  const rows = Math.ceil(p.viewport.height / cell);
+  const data = new Uint8Array(cols * rows);
+  for (let i = 0; i < p.geo.segs.length / 4; i++) {
+    const x = (p.geo.segs[i * 4] + p.geo.segs[i * 4 + 2]) / 2;
+    const y = (p.geo.segs[i * 4 + 1] + p.geo.segs[i * 4 + 3]) / 2;
+    const c = Math.floor(x / cell);
+    const r = Math.floor(y / cell);
+    if (c >= 0 && c < cols && r >= 0 && r < rows) data[r * cols + c] = 1;
+  }
+  const inked = planRegions(titles, p.viewport.width, p.viewport.height, {
+    cell,
+    cols,
+    rows,
+    data,
+  });
+  let finds: {
+    x: number;
+    y: number;
+    type: string;
+    m: import("../client/src/lib/findMatching").Match;
+  }[] = [];
+  for (const [type, t] of Object.entries(TEMPLATES)) {
+    const r = findMatching(geo, p.words, {
+      x: t.at[0] + t.box[0],
+      y: t.at[1] + t.box[1],
+      width: t.box[2] - t.box[0],
+      height: t.box[3] - t.box[1],
+    });
+    if (r.kind === "ok")
+      finds = finds.concat(r.matches.map(m => ({ x: m.x, y: m.y, type, m })));
+  }
+  const clear = (m: import("../client/src/lib/findMatching").Match) =>
+    !m.onDemolitionPlan && !m.needsLook.length && !m.maybeExisting.length;
+  const b = finds.filter(f => inB(f.x, f.y));
+  const a = finds.filter(f => inA(f.x, f.y));
+  console.log(
+    `Weld 1 E-200 as shipped: plan B finds ${b.length}, CLEAR ${b.filter(f => clear(f.m)).length}, marked demolition ${b.filter(f => f.m.onDemolitionPlan).length}; ` +
+      `plan A finds ${a.length}, marked demolition ${a.filter(f => f.m.onDemolitionPlan).length}`
+  );
+  for (const [label, regions] of [
+    ["titles, raw regions", raw],
+    ["titles, ink-trimmed regions", inked],
+  ] as const) {
+    const demo = (f: {
+      x: number;
+      y: number;
+      m: { onDemolitionPlan: string | null };
+    }) =>
+      Boolean(f.m.onDemolitionPlan) ||
+      Boolean(regionAt(regions, f.x, f.y)?.demolition);
+    console.log(
+      `  + ${label}: plan B CLEAR ${b.filter(f => !demo(f) && !f.m.needsLook.length && !f.m.maybeExisting.length).length}, ` +
+        `plan B not demolition ${b.filter(f => !demo(f)).length}/${b.length}; plan A called demolition ${a.filter(demo).length}/${a.length}`
+    );
+    regions.forEach(r =>
+      console.log(
+        `      ${r.demolition ? "DEMO" : "    "} "${r.title}" x ${r.x0.toFixed(0)}-${r.x1.toFixed(0)} y ${r.y0.toFixed(0)}-${r.y1.toFixed(0)}`
+      )
+    );
+  }
+}
+
 const sections: Record<string, () => Promise<void>> = {
+  demotitles,
   layered,
   labels,
   layers,
