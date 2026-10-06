@@ -475,7 +475,8 @@ import { NO_RUN_TYPE_COLORS, runAppearance } from "@shared/takeoffMarks";
 import type { PageRect } from "@shared/planRegion";
 import type { PagePoint } from "@shared/takeoffGeometry";
 import type { RunPathType } from "@shared/takeoffQuantities";
-import { describeScale } from "@shared/planScale";
+import { describeScale, type ScaleCandidate } from "@shared/planScale";
+import { checkScale, type ScaleDoubt } from "@/lib/scaleCheck";
 
 // The upload queue's shape and its operations live in lib/uploadQueue.ts, so
 // that retrying and dismissing can be tested without rendering this page.
@@ -580,6 +581,14 @@ function usePdfWorker() {
       }
       if (msg.type === "connectPoints") {
         pending.current.get(msg.reqId)?.resolve(msg.points);
+        pending.current.delete(msg.reqId);
+        return;
+      }
+      if (msg.type === "scaleEvidence") {
+        pending.current.get(msg.reqId)?.resolve({
+          arcRadii: msg.arcRadii,
+          titleScales: msg.titleScales,
+        });
         pending.current.delete(msg.reqId);
         return;
       }
@@ -745,6 +754,11 @@ function usePdfWorker() {
           box,
           looks,
         }),
+      scaleEvidence: (pageNum: number, hash: string) =>
+        ask<{
+          arcRadii: number[] | null;
+          titleScales: ScaleCandidate[];
+        }>({ type: "scaleEvidence", pageNum, hash }),
       connectPoints: (pageNum: number, hash: string, marks: ConnectMark[]) =>
         ask<[number, ConnectPoint][]>({
           type: "connectPoints",
@@ -864,6 +878,8 @@ function PlanPane({
   onPageRendered,
   overlay,
   onUrlExpired,
+  scaleSet = null,
+  onScaleDoubt,
   controlsTarget,
   fitOnly = false,
   thumbnailWants,
@@ -910,6 +926,13 @@ function PlanPane({
   }) => void;
   /** Fires when a page is shown, with its extracted text, for scale detection. */
   onSheetVisible: (pageNumber: number, text: string) => void;
+  /**
+   * The scale SET on the page on screen, to be checked against its drawing
+   * (@/lib/scaleCheck). NULL = none set, nothing to check.
+   */
+  scaleSet?: { ratio: number; text: string } | null;
+  /** The check's verdict for that page and that ratio. Never acted on here. */
+  onScaleDoubt?: (pageNumber: number, ratio: number, doubt: ScaleDoubt) => void;
   /**
    * Fires each time a page finishes rasterising, with the canvas holding it.
    *
@@ -1063,6 +1086,7 @@ function PlanPane({
     pageTextLayer,
     findMatching: findMatchingOnPage,
     connectPoints: connectPointsOnPage,
+    scaleEvidence: scaleEvidenceOnPage,
     sheetCheck: sheetCheckOnPage,
   } = usePdfWorker();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -2193,6 +2217,51 @@ function PlanPane({
     );
   }, [page, pageCount, loading, error, pageText, hash]);
 
+  /*
+    THE SCALE CHECK. Once a page with a set scale is on screen, its arcs and
+    stated scale are read in the worker and judged against the set ratio. The
+    verdict is REPORTED and nothing more: the toolbar shows a doubt with a
+    one-click fix, and never changes the scale itself. Keyed by page and
+    ratio, so a new scale is checked afresh. Delivered through a ref for the
+    same reason as the text read above.
+  */
+  const onScaleDoubtRef = useRef(onScaleDoubt);
+  onScaleDoubtRef.current = onScaleDoubt;
+  const scaleRatio = scaleSet?.ratio ?? null;
+  const scaleText = scaleSet?.text ?? null;
+  useEffect(() => {
+    if (loading || error || pageCount === 0 || scaleRatio === null) return;
+    let cancelled = false;
+    scaleEvidenceOnPage(page, hash)
+      .then(evidence => {
+        if (cancelled) return;
+        onScaleDoubtRef.current?.(
+          page,
+          scaleRatio,
+          checkScale({
+            ratio: scaleRatio,
+            text: scaleText,
+            arcRadii: evidence.arcRadii,
+            titleScales: evidence.titleScales,
+          })
+        );
+      })
+      // A failed read is no verdict: the toolbar simply shows no doubt.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    page,
+    pageCount,
+    loading,
+    error,
+    hash,
+    scaleRatio,
+    scaleText,
+    scaleEvidenceOnPage,
+  ]);
+
   const go = useCallback(
     (to: number) => {
       onPage(Math.min(Math.max(to, 1), pageCount || 1));
@@ -3264,6 +3333,37 @@ export default function TakeoffPage({
     [gridRange, listRange, thumbnailPageCount]
   );
   const activeSheet = sheets.find(s => s.pageNumber === page) ?? null;
+  /*
+    The scale check's verdicts (@/lib/scaleCheck), keyed by document, page
+    and the RATIO checked — so a scale changed since is never judged by an
+    old verdict. "Keep" holds for this session only: the evidence has not
+    changed, so it is fair to ask again next time the bid is opened.
+  */
+  const [scaleDoubts, setScaleDoubts] = useState<Record<string, ScaleDoubt>>(
+    {}
+  );
+  const [keptScales, setKeptScales] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
+  const scaleKey = (docId: number, pageNumber: number, ratio: number) =>
+    `${docId}:${pageNumber}:${ratio}`;
+  const activeScaleKey =
+    doc && activeSheet?.scaleRatio != null
+      ? scaleKey(doc.id, activeSheet.pageNumber, Number(activeSheet.scaleRatio))
+      : null;
+  const activeScaleDoubt =
+    activeScaleKey && !keptScales.has(activeScaleKey)
+      ? (scaleDoubts[activeScaleKey] ?? null)
+      : null;
+  const docIdForScale = doc?.id ?? null;
+  const handleScaleDoubt = useCallback(
+    (pageNumber: number, ratio: number, doubt: ScaleDoubt) => {
+      if (docIdForScale === null) return;
+      const key = `${docIdForScale}:${pageNumber}:${ratio}`;
+      setScaleDoubts(prev => ({ ...prev, [key]: doubt }));
+    },
+    [docIdForScale]
+  );
   /*
     A SHEET DRAWN BEFORE ITS ROW EXISTS (@/lib/provisionalCount, 2026-10-06).
     A fresh upload is on screen three round trips before its sheet rows are;
@@ -8958,6 +9058,13 @@ export default function TakeoffPage({
                 onClear={() => clearSheetScale.mutate({ id: activeSheet.id })}
                 onMeasure={() => startCalibrating("set")}
                 onCheck={() => startCalibrating("check")}
+                doubt={activeScaleDoubt}
+                onKeepScale={
+                  activeScaleKey
+                    ? () =>
+                        setKeptScales(prev => new Set(prev).add(activeScaleKey))
+                    : undefined
+                }
               />
             )}
 
@@ -9222,6 +9329,15 @@ export default function TakeoffPage({
               }
               onDocumentReady={handleDocumentReady}
               onSheetVisible={handleSheetVisible}
+              scaleSet={
+                activeSheet?.scaleRatio != null && activeSheet.scaleText
+                  ? {
+                      ratio: Number(activeSheet.scaleRatio),
+                      text: activeSheet.scaleText,
+                    }
+                  : null
+              }
+              onScaleDoubt={handleScaleDoubt}
               onPageRendered={handlePageRendered}
               /**
                * Re-read the sheet list and hand back this document's

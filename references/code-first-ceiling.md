@@ -225,10 +225,24 @@ is detected.
 
 **Checking against a dimension mostly cannot be done on electrical
 sheets:** they carry almost no dimension strings (1–3 per sheet, and those
-are `1'-0"` — the graphic scale bar's labels). **The scale bar is the
-check to build instead** — its labelled length against its drawn length.
+are `1'-0"`). ~~The scale bar is the check to build instead.~~
 
-**Effort: small** (bar reading). **Track A: none.**
+> **Corrected 2026-10-06, when it was built.** Those `1'-0"` strings are the
+> scale NOTES ("1/8" = 1'-0""), not a scale bar's labels: measured, **no test
+> sheet has a drawn scale bar or a dimension line** (Weld 1, UNCC). A bar
+> check would have had nothing to run against. What every floor plan does
+> carry is door swings — quarter circles 30–44" in radius — so the check
+> built is `@/lib/scaleCheck` against those, with the sheet's stated scale
+> as tie-breaker. Measured (`codeFirstCeiling.mts scalecheck`): set 2x off
+> either way on Weld E-200 / E-100 and UNCC E111 / E121 / ED111, **12 of 12
+> caught with the right suggestion**; at the true scales it agrees, except
+> **Weld 1 E-100, whose "1/4"" note disagrees with its own doors** (71 swings
+> read 18"; same 27 pt radius as E-200 at 1/8") — a real catch, for the
+> owner to confirm. Scans (Blueridge): no line work, so it says plainly it
+> cannot check. Shown amber beside the scale, one click to apply, "Keep" to
+> leave it; never applied by itself.
+
+**Track A: none.**
 
 ---
 

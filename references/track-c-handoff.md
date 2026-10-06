@@ -103,6 +103,14 @@ red run is not by itself a red suite:
   "maybe — a line crosses it" (never clear), a second anchor. E-200 reads
   exactly as before. Scans: 85/85, nothing to build.
 
+- **Scale check** (2026-10-06, `@/lib/scaleCheck`, worker `scaleEvidence`):
+  a set scale is checked against the door swings on the drawing, with the
+  sheet's stated scale as tie-breaker. Amber "Scale may be wrong" beside
+  the scale, "Use X" / "Keep"; never applied by itself. No test sheet has a
+  scale bar or a dimension line (measured), so doors are the check.
+  12/12 deliberate 2x mis-settings caught on Weld 1 + UNCC; Weld E-100's
+  own "1/4"" note is questioned (its doors say 1/8") — owner to confirm.
+  Scans say they cannot check. `code-first-ceiling.md` § g.
 - **Code-first ceiling study** (2026-10-06, plan only, NOT merged):
   `references/code-first-ceiling.md`, numbers from
   `scripts/codeFirstCeiling.mts`. Top 3 by payoff: tie labels to devices
@@ -186,9 +194,12 @@ batch" (Find all matching / looks), where A numbers them:**
   (`tieLabels`: "USB", `54"`, "(E)", "A2"). Today they show on the FIND
   only and are gone once the mark is placed, so a mark cannot say "54 inch
   height" or "tag A2" later, and the bid cannot price by them. NULL = never
-  read (a hand mark, or before the column). If the owner wants heights
-  priced, a dedicated `mountingHeightIn` (int NULL) beside it beats parsing
-  text. Status "existing" needs nothing new: mark status already holds it.
+  read (a hand mark, or before the column). A HEIGHT needs no new column:
+  `takeoff_stamps.mountHeightInches` + `mountHeightSource` already exist
+  (0098, on staging) — a `mountingHeightIn` asked for here on 2026-10-06 was
+  a duplicate of Track C's own 2026-10-01 request, withdrawn after A caught
+  it. Search todo.md for the TABLE before asking for a column. Status
+  "existing" needs nothing new: mark status already holds it.
 
 Requests that already stand, unchanged:
 

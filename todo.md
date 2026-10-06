@@ -133,9 +133,10 @@ track-c, each working today without its column). All ADDITIVE, nullable,
       mark cannot say "54 in. height" or "tag A2" later and the bid cannot
       price by them. NULL = never read (a hand mark, or before the column).
       Measured: `references/code-first-ceiling.md` § b.
-- [ ] **`takeoff_stamps.mountingHeightIn INT NULL`** — owner's call, ONLY if
-      heights are to be priced: the height read off a label, as a number,
-      rather than parsing `labelWords`. NULL = none read.
+- ~~`takeoff_stamps.mountingHeightIn`~~ **withdrawn 2026-10-06 — a
+  duplicate.** The mark already has `mountHeightInches` +
+  `mountHeightSource` (0098, on staging; requested by Track C itself on
+  2026-10-01, below). A height read off a label goes THERE.
 - [ ] **`symbol_looks.confirmedAt TIMESTAMP NULL`** — when an added look was
       first confirmed by hand ("from a new look", multiple-looks-plan.md
       § 4). Today kept per browser (`@/lib/trustedLooks`), so a colleague's
@@ -189,8 +190,9 @@ All additive and nullable. Specs are in the plans named.
 - [ ] `symbol_looks` table — a legend look WITH its box, so the check needs no
       "Whole legend" in this tab first (today the boxes live in sessionStorage,
       `@/lib/sheetCheckSession`). `references/multiple-looks-plan.md` § 6.
-- [ ] `takeoff_stamps.mountHeightInches decimal(7,2) NULL` +
-      `mountHeightSource` — lets a height read beside a mark be SAVED on it
+- [x] `takeoff_stamps.mountHeightInches decimal(7,2) NULL` +
+      `mountHeightSource` — **landed in 0098 (staging)**; a height tied by
+      `tieLabels` (`54"`) is what fills it. Lets a height read beside a mark be SAVED on it
       (`MARK_HEIGHT_COLUMN`). NULL must stay distinct from 0.
       `references/check-my-marks-plan.md` § 10.
 - [ ] `takeoff_stamps.checkAcceptedAt timestamp NULL` — "Keep" remembered past

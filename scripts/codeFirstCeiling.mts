@@ -1307,7 +1307,57 @@ async function demotitles() {
   }
 }
 
+// ── scalecheck: the wrong-length guard, at true and deliberately wrong scales ─
+async function scalecheck() {
+  const { quarterArcRadii, checkScale, doorsAt } = await import(
+    "../client/src/lib/scaleCheck"
+  );
+  const { detectScaleFromText, parseScaleText } = await import(
+    "../shared/planScale"
+  );
+  const { isScan } = await import("../client/src/lib/findMatching");
+  const cases: [string, number, string][] = [
+    ["Weld 1.pdf", 5, '1/8" = 1\'-0"'],
+    ["Weld 1.pdf", 4, '1/4" = 1\'-0"'], // what its notes say
+    ["UNCC.pdf", 5, '1/4" = 1\'-0"'],
+    ["UNCC.pdf", 6, '1/4" = 1\'-0"'],
+    ["UNCC.pdf", 7, '1/8" = 1\'-0"'],
+    ["Old Blueridge school.pdf", 3, '1/4" = 1\'-0"'],
+  ];
+  for (const [file, pageNo, trueText] of cases) {
+    const p = await load(file, pageNo);
+    const scan = isScan(p.geo);
+    const radii = scan ? null : quarterArcRadii(p.geo.segs);
+    const titleScales = detectScaleFromText(
+      p.words.map(w => w.text).join(" ")
+    ).candidates;
+    const trueRatio = parseScaleText(trueText)!.ratio;
+    for (const [label, ratio] of [
+      ["as stated", trueRatio],
+      ["set 2x too fine", trueRatio / 2],
+      ["set 2x too coarse", trueRatio * 2],
+    ] as const) {
+      const r = checkScale({
+        ratio,
+        text: `${ratio}`,
+        arcRadii: radii,
+        titleScales,
+      });
+      console.log(
+        `${file} p${pageNo} ${label} (1:${ratio}): ${r.kind}` +
+          (r.kind === "mayBeWrong"
+            ? ` -> suggests ${r.suggest.text} — "${r.message}"`
+            : "") +
+          (radii
+            ? `  [door-sized arcs at this scale: ${doorsAt(radii, ratio)} of ${radii.length}]`
+            : "")
+      );
+    }
+  }
+}
+
 const sections: Record<string, () => Promise<void>> = {
+  scalecheck,
   demotitles,
   layered,
   labels,
