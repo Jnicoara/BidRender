@@ -928,6 +928,52 @@ describe("breakers", () => {
     }
   });
 
+  it("finds a breaker by every supply-house pole spelling — today's names AND after the 1-Pole rename", () => {
+    // Owner, 2026-10-05 (references/owner-questions.md § 1): Home Depot
+    // writes "Single-Pole", Platt writes "1P", and an estimator types
+    // whichever their supply house prints. The catalog will be renamed to
+    // "1-Pole" later, so the same searches run against a copy with that
+    // rename applied: "single-pole" must keep finding a row whose name no
+    // longer says it.
+    const renamed = (name: string) =>
+      /breaker/i.test(name) ? name.replace(/Single-Pole/, "1-Pole") : name;
+    const spellings: Array<[string[], string]> = [
+      [
+        ["1-pole", "1 pole", "1p", "single-pole", "single pole", "sp"],
+        "20A Single-Pole breaker",
+      ],
+      [
+        ["2-pole", "2 pole", "2p", "double-pole", "double pole", "dp"],
+        "20A 2-Pole breaker",
+      ],
+      [
+        ["3-pole", "3 pole", "3p", "three-pole", "three pole"],
+        "20A 3-Pole breaker",
+      ],
+    ];
+    for (const [catalog, rename] of [
+      ["as shipped", (n: string) => n],
+      ["renamed to 1-Pole", renamed],
+    ] as const) {
+      const names = BASELINE_MATERIALS.map(m => rename(m.name));
+      const index = BASELINE_MATERIALS.map((m, i) => ({
+        id: String(i),
+        description: names[i],
+        unit: m.unitOfSale,
+        searchAliases: m.searchAliases,
+      }));
+      for (const [words, expected] of spellings) {
+        for (const word of words) {
+          const query = `20a ${word} breaker`;
+          const [top] = smartSearch(index, query, 3).map(
+            hit => names[Number(hit.id)]
+          );
+          expect(top, `"${query}", catalog ${catalog}`).toBe(rename(expected));
+        }
+      }
+    }
+  });
+
   it("ships all three protected types, single-pole", () => {
     for (const type of ["AFCI", "GFCI", "AFCI/GFCI combo"]) {
       for (const amps of ["15", "20"]) {

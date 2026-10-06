@@ -12,7 +12,7 @@ overrides an old one is written down in BOTH places).
 
 ---
 
-## 1. Breakers: "1-Pole" or "Single-Pole"? — OPEN
+## 1. Breakers: "1-Pole" or "Single-Pole"? — ANSWERED 2026-10-05
 
 **The question.** When a breaker is one pole, should its name say
 **"20A 1-Pole breaker"** or **"20A Single-Pole breaker"** (what it says today)?
@@ -35,11 +35,25 @@ pattern, so "1-Pole" makes all three match.
 `a-materials-plan`); CLAUDE.md § Brands, "One convention for single-pole
 breakers".
 
-**Answer:**
+**Answer (owner, 2026-10-05):** "1-Pole" — e.g. "20A 1-Pole breaker".
+**Breakers only**; a single-pole switch keeps its name. **Do not rename
+yet**: the rename waits until every naming question (the materials plan § 8)
+is answered, and then ships as one change with CLAUDE.md, ASSEMBLIES_PLAN.md
+step 6 and the test updated in the same commit.
+
+Added the same day: **search must find a breaker by every spelling a supply
+house uses**, whatever the name says. Home Depot writes "Single-Pole", Platt
+writes "1P". For each pole count:
+
+| Poles | Must all find it                                 |
+| ----- | ------------------------------------------------ |
+| 1     | 1-Pole, 1 pole, 1P, single-pole, single pole, SP |
+| 2     | 2-Pole, 2 pole, 2P, double-pole, double pole, DP |
+| 3     | 3-Pole, 3 pole, 3P, three-pole, three pole       |
 
 ---
 
-## 2. What do REMOVE and RELOCATE cost? — waiting on 1
+## 2. What do REMOVE and RELOCATE cost? — OPEN
 
 **The question.** A mark can now say a device is to be **removed** (demo) or
 **relocated** (moved). Neither buys a new device, so neither is priced as one,
