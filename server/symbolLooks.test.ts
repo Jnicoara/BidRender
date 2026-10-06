@@ -747,86 +747,93 @@ describe("which marks a new look also lands on", () => {
   });
 });
 
-withDb("adding a look that also matches another item's marks", () => {
-  async function setUp() {
-    const set = await aSet();
-    const gfci = await capture("GFCI", set.sheetId);
-    const duplex = await caller().takeoffGroups.create({
-      bidId: set.bidId,
-      label: "Duplex",
+withDb(
+  "a look that also matches another item's marks (checkLookAlikes)",
+  () => {
+    async function setUp() {
+      const set = await aSet();
+      const gfci = await capture("GFCI", set.sheetId);
+      const duplex = await caller().takeoffGroups.create({
+        bidId: set.bidId,
+        label: "Duplex",
+      });
+      await caller().takeoffStamps.drop({
+        bidId: set.bidId,
+        sheetId: set.sheetId,
+        groupId: duplex.id,
+        at: [
+          { x: 200, y: 200 },
+          { x: 300, y: 200 },
+          { x: 400, y: 200 },
+        ],
+      });
+      const own = await caller().takeoffGroups.create({
+        bidId: set.bidId,
+        label: "GFCI",
+        reuseExisting: true,
+        symbolId: gfci.id,
+      });
+      await caller().takeoffStamps.drop({
+        bidId: set.bidId,
+        sheetId: set.sheetId,
+        groupId: own.id,
+        at: [{ x: 600, y: 200 }],
+      });
+      return { set, gfci };
+    }
+    // Two duplexes, the GFCI's own mark, and empty paper.
+    const spots = [200, 300, 600, 900].map(x => ({ x, y: 201, reach: 6 }));
+
+    const check = (sheetId: number, label: string, at = spots) =>
+      caller().takeoffStamps.checkLookAlikes({ sheetId, label, spots: at });
+
+    it("an ADDED look: names the other item and its number of marks, and writes nothing", async () => {
+      const { set, gfci } = await setUp();
+      const r = await check(set.sheetId, "GFCI");
+      expect(r.alike).toEqual([{ name: "Duplex", marks: 2 }]);
+      expect(await looksOf(gfci.id)).toHaveLength(1);
     });
-    await caller().takeoffStamps.drop({
-      bidId: set.bidId,
-      sheetId: set.sheetId,
-      groupId: duplex.id,
-      at: [
-        { x: 200, y: 200 },
-        { x: 300, y: 200 },
-        { x: 400, y: 200 },
-      ],
+
+    it("is nothing when the look lands only on the item's own marks or empty paper", async () => {
+      const { set } = await setUp();
+      expect(
+        (await check(set.sheetId, "GFCI", [spots[2], spots[3]])).alike
+      ).toEqual([]);
     });
-    const own = await caller().takeoffGroups.create({
-      bidId: set.bidId,
-      label: "GFCI",
-      reuseExisting: true,
-      symbolId: gfci.id,
+
+    it("a NEW item's first look is checked too, and no item is created by asking", async () => {
+      const { set } = await setUp();
+      const r = await check(set.sheetId, "Receptacle");
+      // Duplex twice AND the GFCI's mark: for a new item, every count is another.
+      expect(r.alike).toEqual([
+        { name: "Duplex", marks: 2 },
+        { name: "GFCI", marks: 1 },
+      ]);
+      const database = await getDb();
+      const rows = await database!
+        .select()
+        .from(symbolLinks)
+        .where(eq(symbolLinks.userId, USER));
+      expect(rows.map(r => r.label)).toEqual(["GFCI"]);
     });
-    await caller().takeoffStamps.drop({
-      bidId: set.bidId,
-      sheetId: set.sheetId,
-      groupId: own.id,
-      at: [{ x: 600, y: 200 }],
+
+    it("a new name that IS the count's name is its own, not another item", async () => {
+      const { set } = await setUp();
+      expect(
+        (await check(set.sheetId, "duplex", [spots[0], spots[1], spots[3]]))
+          .alike
+      ).toEqual([]);
     });
-    return { set, gfci };
+
+    it("another company's sheet is not found", async () => {
+      const { set } = await setUp();
+      await expect(
+        caller(OTHER).takeoffStamps.checkLookAlikes({
+          sheetId: set.sheetId,
+          label: "GFCI",
+          spots,
+        })
+      ).rejects.toThrow(/not found/i);
+    });
   }
-  // Two duplexes, the GFCI's own mark, and empty paper.
-  const spots = [200, 300, 600, 900].map(x => ({ x, y: 201, reach: 6 }));
-
-  it("warns, naming the item and the number of marks, and saves nothing", async () => {
-    const { set, gfci } = await setUp();
-    const r = await caller().takeoffStamps.captureSymbol({
-      label: "GFCI",
-      thumbnail: PIC2,
-      capturedFromSheetId: set.sheetId,
-      box: { ...BOX, x: 700 },
-      addAsLook: true,
-      lookAlike: { spots, accepted: false },
-    });
-    expect(r).toMatchObject({
-      id: gfci.id,
-      lookAdded: false,
-      lookAlike: [{ name: "Duplex", marks: 2 }],
-      looks: 1,
-    });
-    expect(await looksOf(gfci.id)).toHaveLength(1);
-  });
-
-  it("saves once the person says Add anyway", async () => {
-    const { set, gfci } = await setUp();
-    const r = await caller().takeoffStamps.captureSymbol({
-      label: "GFCI",
-      thumbnail: PIC2,
-      capturedFromSheetId: set.sheetId,
-      box: { ...BOX, x: 700 },
-      addAsLook: true,
-      lookAlike: { spots, accepted: true },
-    });
-    expect(r).toMatchObject({ lookAdded: true, looks: 2 });
-    expect(r).not.toHaveProperty("lookAlike");
-    expect(await looksOf(gfci.id)).toHaveLength(2);
-  });
-
-  it("saves without asking when the look lands only on its own marks", async () => {
-    const { set, gfci } = await setUp();
-    const r = await caller().takeoffStamps.captureSymbol({
-      label: "GFCI",
-      thumbnail: PIC2,
-      capturedFromSheetId: set.sheetId,
-      box: { ...BOX, x: 700 },
-      addAsLook: true,
-      lookAlike: { spots: [spots[2], spots[3]], accepted: false },
-    });
-    expect(r).toMatchObject({ lookAdded: true, looks: 2 });
-    expect(await looksOf(gfci.id)).toHaveLength(2);
-  });
-});
+);

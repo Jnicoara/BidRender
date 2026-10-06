@@ -63,6 +63,7 @@ import {
   thumbnailAfterRemoval,
   lookAlikes,
   firstLookId,
+  type LookSpot,
   type LookBox,
 } from "../../shared/symbolLooks";
 
@@ -159,6 +160,50 @@ async function keepOldPictureAsFirstLook(
     sheetId: from?.id ?? null,
     createdByUserId: null,
   });
+}
+
+/**
+ * The marks on one sheet, counted as an item OTHER than `item`, that a look's
+ * spots land on (`lookAlikes`, plan § 4). A mark is the item's own when its
+ * count carries one of the item's names or counts its assembly.
+ */
+async function lookAlikesOnSheet(
+  sheetId: number,
+  spots: readonly LookSpot[],
+  item: { label: string; lookupKey: string; assemblyId: number | null },
+  owner: number
+) {
+  const marks = (await db.getStampsForSheet(sheetId, owner)).map(row => ({
+    x: Number(row.x),
+    y: Number(row.y),
+    name: stampName(row),
+    assemblyId: row.assemblyId,
+  }));
+  return lookAlikes(
+    spots,
+    marks,
+    mark =>
+      nameMatchesSymbol(mark.name, item) ||
+      (item.assemblyId !== null && mark.assemblyId === item.assemblyId)
+  );
+}
+
+/**
+ * The item a captured label would reach: the existing one it names (its
+ * current or captured name), or a new one — with the same-name library
+ * assembly `captureSymbol` would link it to. Kept beside the capture's own
+ * lookup so the look-alike check judges "another item" against the same one.
+ */
+async function itemForLabel(label: string, owner: number) {
+  const lookupKey = symbolLookupKey(label);
+  const existing =
+    (await db.getSymbolLinkByKey(owner, lookupKey)) ??
+    (await db.getSymbolLinks(owner)).find(row => nameMatchesSymbol(label, row));
+  if (existing) return existing;
+  const same = (await db.getLibraryAssemblies(owner)).find(
+    a => symbolLookupKey(a.name) === lookupKey
+  );
+  return { label, lookupKey, assemblyId: same?.id ?? null };
 }
 
 async function requireSheet(sheetId: number, userId: number) {
@@ -777,28 +822,6 @@ export const takeoffStampsRouter = router({
          * keeps today's answer: the item is left as it is.
          */
         addAsLook: z.boolean().default(false),
-        /**
-         * Where the new look found copies on its own sheet, run by the client
-         * (Find all matching lives in the PDF worker), and whether the person
-         * has already said "Add anyway" (plan § 4). With spots and no yes, a
-         * look that lands on marks counted as ANOTHER item is not saved: the
-         * answer names those items instead. Absent on a scan, where the
-         * comparison cannot be made — the client says so.
-         */
-        lookAlike: z
-          .object({
-            spots: z
-              .array(
-                z.object({
-                  x: z.number().finite(),
-                  y: z.number().finite(),
-                  reach: z.number().finite().nonnegative(),
-                })
-              )
-              .max(5000),
-            accepted: z.boolean(),
-          })
-          .optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -855,38 +878,6 @@ export const takeoffStampsRouter = router({
             isLinked: existing.assemblyId !== null,
             autoLinked: false,
           };
-        // Does it also match another item's marks? Asked before saving,
-        // and nothing is written until the person says yes (plan § 4).
-        if (input.lookAlike && !input.lookAlike.accepted && sheet) {
-          const marks = (
-            await db.getStampsForSheet(sheet.id, ctx.scope.dataUserId)
-          ).map(row => ({
-            x: Number(row.x),
-            y: Number(row.y),
-            name: stampName(row),
-            assemblyId: row.assemblyId,
-          }));
-          const alike = lookAlikes(
-            input.lookAlike.spots,
-            marks,
-            mark =>
-              nameMatchesSymbol(mark.name, existing) ||
-              (existing.assemblyId !== null &&
-                mark.assemblyId === existing.assemblyId)
-          );
-          if (alike.length > 0)
-            return {
-              id: existing.id,
-              alreadyKnown: true,
-              lookAdded: false,
-              lookAlreadySaved: false,
-              lookAlike: alike,
-              looks: lookCount(looks.length, Boolean(existing.thumbnail)),
-              assemblyId: existing.assemblyId,
-              isLinked: existing.assemblyId !== null,
-              autoLinked: false,
-            };
-        }
         await keepOldPictureAsFirstLook(
           existing,
           looks.length,
@@ -972,6 +963,51 @@ export const takeoffStampsRouter = router({
         assemblyId,
         isLinked: assemblyId !== null,
         autoLinked,
+      };
+    }),
+
+  /**
+   * LOOK-ALIKES (multiple-looks-plan.md § 4): asked BEFORE a capture saves —
+   * a new item's first look or a look added to one. Read-only; it writes
+   * nothing. A mutation only so thousands of spots travel in a POST body
+   * rather than a URL.
+   *
+   * The spots are where the boxed symbol was found on its own sheet, run by
+   * the client (the matcher lives in the PDF worker). The answer is every
+   * OTHER item whose marks on that sheet those spots land on. "Other" is
+   * judged against the item the save would reach: the existing one this
+   * label names, or — for a new name — the new item and the same-name
+   * assembly it would be linked to.
+   *
+   * Until 2026-10-06 this was a gate inside `captureSymbol`. It moved because
+   * the spots come from the client either way, so the gate guaranteed
+   * nothing a separate check does not, and it gave the save a second result
+   * shape that every caller had to handle.
+   */
+  checkLookAlikes: procedure
+    .input(
+      z.object({
+        sheetId: z.number().int().positive(),
+        label: nameSchema,
+        spots: z
+          .array(
+            z.object({
+              x: z.number().finite(),
+              y: z.number().finite(),
+              reach: z.number().finite().nonnegative(),
+            })
+          )
+          .max(5000),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const owner = ctx.scope.dataUserId;
+      const sheet = await db.getBidPdfSheet(input.sheetId, owner);
+      if (!sheet)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Sheet not found." });
+      const item = await itemForLabel(input.label, owner);
+      return {
+        alike: await lookAlikesOnSheet(sheet.id, input.spots, item, owner),
       };
     }),
 

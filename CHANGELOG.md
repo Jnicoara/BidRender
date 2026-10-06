@@ -4,6 +4,14 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-06]
+
+- **The look-alike warning now covers a brand-new legend item too.** Saving
+  a new symbol first searches the sheet with it, and if it lands on marks you
+  counted as something else, it asks before creating the item ("Save
+  anyway" or Cancel, Cancel first). Before, only a look added to an existing
+  item was checked.
+
 ## [2026-10-05]
 
 - **A newly added look cannot fill a count in one click.** In Find all

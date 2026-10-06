@@ -179,8 +179,7 @@ export function SymbolCaptureForm({
   soft,
   chromeTarget,
   existingFor,
-  onSave,
-  onAddLook,
+  onCapture,
   onCancel,
 }: {
   thumbnail: string | null;
@@ -202,32 +201,36 @@ export function SymbolCaptureForm({
     looks: number;
     thumbnail: string | null;
   } | null;
-  /** A new item, or a name already in the legend left as it is. */
-  onSave: (label: string) => void;
   /**
-   * "Yes, another look" (multiple-looks-plan.md § 1). Resolves with the other
-   * items the look also lands on when it was NOT saved for that reason
-   * (plan § 4) — the card then asks, Cancel first — or null once saved.
-   * `accepted` is the person's "Add anyway".
+   * Save the capture: a new item ("Save symbol"), or another look of an
+   * existing one ("Yes, another look", multiple-looks-plan.md § 1). Either
+   * way the look is checked first (plan § 4). Resolves with the other items
+   * it also lands on when it was NOT saved for that reason — the card then
+   * asks, Cancel first — or null once saved. `accepted` is "Add anyway".
    */
-  onAddLook: (label: string, accepted: boolean) => Promise<LookAlike[] | null>;
+  onCapture: (
+    label: string,
+    opts: { addAsLook: boolean; accepted: boolean }
+  ) => Promise<LookAlike[] | null>;
   onCancel: () => void;
 }) {
   const [label, setLabel] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [asking, setAsking] = useState<ReturnType<typeof existingFor>>(null);
   const [note, setNote] = useState<string | null>(null);
-  /** Adding a look: checking it, or the look-alike question it raised. */
+  /** Saving: checking the look, or the look-alike question it raised. */
   const [lookStep, setLookStep] = useState<
-    null | "checking" | { alike: LookAlike[] }
+    null | "checking" | { alike: LookAlike[]; addAsLook: boolean }
   >(null);
-  const addLook = (accepted: boolean) => {
+  const save = (addAsLook: boolean, accepted: boolean) => {
     setLookStep("checking");
-    onAddLook(label.trim(), accepted).then(
-      alike => setLookStep(alike ? { alike } : null),
+    onCapture(label.trim(), { addAsLook, accepted }).then(
+      alike => setLookStep(alike ? { alike, addAsLook } : null),
       () => setLookStep(null)
     );
   };
+  const warning =
+    lookStep !== null && typeof lookStep === "object" ? lookStep : null;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -237,13 +240,13 @@ export function SymbolCaptureForm({
     const trimmed = label.trim();
     // Blank writes nothing — a symbol with no name cannot be found again, and
     // the label is what the link is keyed on.
-    if (!trimmed || sharpening) return;
+    if (!trimmed || sharpening || lookStep !== null) return;
     const existing = existingFor(trimmed);
     if (existing) {
       setAsking(existing);
       return;
     }
-    onSave(trimmed);
+    save(false, false);
   };
 
   // pointer-events-auto: the screen layer is click-through by default.
@@ -303,7 +306,41 @@ export function SymbolCaptureForm({
         </p>
       )}
 
-      {asking ? (
+      {warning ? (
+        // Default is Cancel (plan § 4): it takes the focus, and Enter on it
+        // adds nothing.
+        <div
+          className="mt-2.5 rounded-lg border border-border p-2"
+          role="alert"
+        >
+          <p className="text-xs text-[#F5C518]">
+            {lookAlikeWarning(warning.alike)}
+          </p>
+          <p className="text-xs mt-1 text-muted-foreground">
+            If it is drawn like {warning.alike[0].name} on this set, every{" "}
+            {warning.alike[0].name} would be offered as{" "}
+            {asking?.label ?? label.trim()}.
+          </p>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <Button
+              size="sm"
+              className="h-7 text-xs"
+              autoFocus
+              onClick={onCancel}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => save(warning.addAsLook, true)}
+            >
+              {warning.addAsLook ? "Add anyway" : "Save anyway"}
+            </Button>
+          </div>
+        </div>
+      ) : asking ? (
         <div
           className="mt-2.5 rounded-lg border border-border p-2"
           role="group"
@@ -338,37 +375,7 @@ export function SymbolCaptureForm({
               this one
             </span>
           </div>
-          {lookStep !== null && typeof lookStep === "object" ? (
-            // Default is Cancel (plan § 4): it takes the focus, and Enter
-            // on it adds nothing.
-            <div role="alert">
-              <p className="text-xs mt-1.5 text-[#F5C518]">
-                {lookAlikeWarning(lookStep.alike)}
-              </p>
-              <p className="text-xs mt-1 text-muted-foreground">
-                If it is drawn like {lookStep.alike[0].name} on this set, every{" "}
-                {lookStep.alike[0].name} would be offered as {asking.label}.
-              </p>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                <Button
-                  size="sm"
-                  className="h-7 text-xs"
-                  autoFocus
-                  onClick={onCancel}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs"
-                  onClick={() => addLook(true)}
-                >
-                  Add anyway
-                </Button>
-              </div>
-            </div>
-          ) : (
+          {
             <>
               <p className="text-xs mt-1.5">
                 Add this as another look for {asking.label}? It stays one item:
@@ -379,7 +386,7 @@ export function SymbolCaptureForm({
                   size="sm"
                   className="h-7 text-xs"
                   disabled={lookStep === "checking"}
-                  onClick={() => addLook(false)}
+                  onClick={() => save(true, false)}
                 >
                   {lookStep === "checking"
                     ? "Checking against this sheet…"
@@ -412,7 +419,7 @@ export function SymbolCaptureForm({
                 </Button>
               </div>
             </>
-          )}
+          }
         </div>
       ) : (
         <div className="flex items-center gap-1.5 mt-2.5">
@@ -420,10 +427,14 @@ export function SymbolCaptureForm({
             size="sm"
             className="h-7 gap-1.5 text-xs flex-1"
             onClick={commit}
-            disabled={!label.trim() || sharpening}
+            disabled={!label.trim() || sharpening || lookStep !== null}
           >
             <Check className="w-3 h-3" />{" "}
-            {sharpening ? "Sharpening picture…" : "Save symbol"}
+            {sharpening
+              ? "Sharpening picture…"
+              : lookStep === "checking"
+                ? "Checking against this sheet…"
+                : "Save symbol"}
           </Button>
           <Button
             size="sm"

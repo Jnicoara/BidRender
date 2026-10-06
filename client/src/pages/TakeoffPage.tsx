@@ -4558,6 +4558,10 @@ export default function TakeoffPage({
     },
     [selectedStamps, deleteMarks, deleteTargets, removeStamps]
   );
+  /** Look-alikes, asked before a capture saves (multiple-looks-plan.md § 4). */
+  const checkLookAlikes = trpc.takeoffStamps.checkLookAlikes.useMutation({
+    onError: e => toast.error(e.message),
+  });
   const captureSymbol = trpc.takeoffStamps.captureSymbol.useMutation({
     onError: e => toast.error(e.message),
     onSettled: () => {
@@ -9236,91 +9240,77 @@ export default function TakeoffPage({
                               }
                             : null;
                         }}
-                        onAddLook={async (label, accepted) => {
-                          // Look-alikes (multiple-looks-plan.md § 4): the new
-                          // look is searched on its own sheet first, and the
-                          // server refuses to save it over marks counted as
-                          // another item until the person says "Add anyway".
+                        onCapture={async (label, { addAsLook, accepted }) => {
+                          // Look-alikes (multiple-looks-plan.md § 4), for a
+                          // new item's first look and an added one alike: the
+                          // boxed symbol is searched on its own sheet, and the
+                          // spots are checked against marks counted as other
+                          // items BEFORE anything is saved.
                           const capture = pendingCapture;
                           const box = normaliseCaptureBox(capture.region);
                           const boxed = box.width > 0 && box.height > 0;
-                          let check: ReturnType<typeof lookAlikeCheck> = {
-                            spots: [],
-                          };
-                          if (!accepted)
-                            check = lookAlikeCheck(
-                              boxed && capture.sheetId === activeSheet?.id
+                          let cannotCompare: string | null = null;
+                          const sheetId = capture.sheetId;
+                          if (!accepted && boxed) {
+                            const check = lookAlikeCheck(
+                              sheetId !== undefined &&
+                                sheetId === activeSheet?.id
                                 ? await size
                                     .findMatching(box, [])
                                     .then(r => r.result)
                                     .catch(() => null)
                                 : null
                             );
+                            if (
+                              "cannotCompare" in check ||
+                              sheetId === undefined
+                            )
+                              cannotCompare =
+                                "cannotCompare" in check
+                                  ? check.cannotCompare
+                                  : null;
+                            else {
+                              const { alike } =
+                                await checkLookAlikes.mutateAsync({
+                                  sheetId,
+                                  label,
+                                  spots: check.spots,
+                                });
+                              if (alike.length > 0) return alike;
+                            }
+                          }
                           const r = await captureSymbol.mutateAsync({
                             label,
                             thumbnail: capture.thumbnail,
                             capturedFromSheetId: capture.sheetId,
                             box: boxed ? box : undefined,
-                            addAsLook: true,
-                            lookAlike:
-                              "spots" in check
-                                ? { spots: check.spots, accepted }
-                                : undefined,
+                            addAsLook,
                           });
-                          if ("lookAlike" in r && r.lookAlike)
-                            return r.lookAlike;
                           toast.success(
                             [
                               r.lookAlreadySaved
                                 ? "This look is already saved."
-                                : `Added look ${r.looks} for ${label}. It is still one item: one count, one price.`,
-                              "cannotCompare" in check
-                                ? check.cannotCompare
-                                : null,
+                                : r.alreadyKnown && r.lookAdded
+                                  ? `Added look ${r.looks} for ${label}. It is still one item: one count, one price.`
+                                  : r.alreadyKnown
+                                    ? "Already in your legend."
+                                    : r.autoLinked
+                                      ? `Captured and linked to “${
+                                          allAssemblies.find(
+                                            a => a.id === r.assemblyId
+                                          )?.name ?? label
+                                        }”, the assembly of the same name.`
+                                      : // A click on it COUNTS (legend plan
+                                        // § 8a); linking is the row's own
+                                        // control, never the first step.
+                                        "Captured — click it in the legend to start counting. Link it to an assembly from its row whenever you like.",
+                              cannotCompare,
                             ]
                               .filter(Boolean)
                               .join(" ")
                           );
                           setPendingCapture(null);
                           return null;
-                        }}
-                        onSave={label => {
-                          const box = normaliseCaptureBox(
-                            pendingCapture.region
-                          );
-                          captureSymbol.mutate(
-                            {
-                              label,
-                              thumbnail: pendingCapture.thumbnail,
-                              capturedFromSheetId: pendingCapture.sheetId,
-                              box:
-                                box.width > 0 && box.height > 0
-                                  ? box
-                                  : undefined,
-                            },
-                            {
-                              onSuccess: r =>
-                                toast.success(
-                                  r.lookAlreadySaved
-                                    ? "This look is already saved."
-                                    : r.alreadyKnown && r.lookAdded
-                                      ? `Added look ${r.looks} for ${label}. It is still one item: one count, one price.`
-                                      : r.alreadyKnown
-                                        ? "Already in your legend."
-                                        : r.autoLinked
-                                          ? `Captured and linked to “${
-                                              allAssemblies.find(
-                                                a => a.id === r.assemblyId
-                                              )?.name ?? label
-                                            }”, the assembly of the same name.`
-                                          : // A click on it COUNTS (legend plan
-                                            // § 8a); linking is the row's own
-                                            // control, never the first step.
-                                            "Captured — click it in the legend to start counting. Link it to an assembly from its row whenever you like."
-                                ),
-                            }
-                          );
-                          setPendingCapture(null);
                         }}
                       />
                     )}
