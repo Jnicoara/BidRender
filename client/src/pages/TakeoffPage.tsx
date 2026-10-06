@@ -328,7 +328,16 @@ import { pastDragThreshold, swallowNextClick } from "@/lib/dragThreshold";
 import { wheelIntent, type WheelGesture } from "@/lib/wheelIntent";
 import type { PageTextLayer } from "@/lib/textSelection";
 import type { FindResult, MatchBox } from "@/lib/findMatching";
-import { lookAlikeCheck, type SavedLook } from "@/lib/lookMatching";
+import {
+  lookAlikeCheck,
+  lookWordNotes,
+  type SavedLook,
+} from "@/lib/lookMatching";
+import {
+  browserStorage,
+  readTrustedLooks,
+  rememberTrustedLooks,
+} from "@/lib/trustedLooks";
 import type { SheetCheckInput, SheetCheckResult } from "@/lib/sheetCheck";
 import {
   countNameFromLegend,
@@ -352,6 +361,7 @@ import {
   dropLookMatches,
   matchItems,
   nextToLookAt,
+  trustLooks,
   type MatchItem,
   type ScanFindAnswer,
 } from "@/lib/findMatchingSession";
@@ -4584,6 +4594,10 @@ export default function TakeoffPage({
     },
     [selectedStamps, deleteMarks, deleteTargets, removeStamps]
   );
+  /** Look-alikes, asked before a capture saves (multiple-looks-plan.md § 4). */
+  const checkLookAlikes = trpc.takeoffStamps.checkLookAlikes.useMutation({
+    onError: e => toast.error(e.message),
+  });
   const captureSymbol = trpc.takeoffStamps.captureSymbol.useMutation({
     onError: e => toast.error(e.message),
     onSettled: () => {
@@ -4592,6 +4606,7 @@ export default function TakeoffPage({
       void utils.takeoffStamps.symbols.invalidate();
       void utils.takeoffStamps.looksFor.invalidate();
       void utils.takeoffStamps.searchLooks.invalidate();
+      void utils.takeoffStamps.looksOnSet.invalidate();
     },
   });
   /**
@@ -5470,7 +5485,16 @@ export default function TakeoffPage({
                 ...s,
                 panel: {
                   phase: "results",
-                  items: matchItems(result.matches, onSheet),
+                  // Trusted: the item's first look and any look confirmed
+                  // once; an added look's finds wait for a hand confirm.
+                  items: matchItems(
+                    result.matches,
+                    onSheet,
+                    new Set([
+                      ...looks.filter(l => l.isFirst).map(l => l.id),
+                      ...Array.from(readTrustedLooks(browserStorage())),
+                    ])
+                  ),
                   selectedId: null,
                   readMs,
                   findMs,
@@ -5504,7 +5528,14 @@ export default function TakeoffPage({
     (ids: number[], state: MatchItem["state"]) => {
       if (!findSession || findSession.panel.phase !== "results") return;
       const panel = findSession.panel;
-      const items = decide(panel.items, ids, state);
+      let items = decide(panel.items, ids, state);
+      // A find confirmed by hand trusts the new look that alone made it, and
+      // its other finds become ordinary ones (findMatchingSession, trustLooks).
+      if (state === "confirmed") {
+        const t = trustLooks(items, ids);
+        items = t.items;
+        rememberTrustedLooks(browserStorage(), t.trusted);
+      }
       // After one decision, on to the next; after Confirm all, stay put.
       const next =
         ids.length === 1 ? nextToLookAt(items, panel.selectedId) : null;
@@ -9262,91 +9293,137 @@ export default function TakeoffPage({
                               }
                             : null;
                         }}
-                        onAddLook={async (label, accepted) => {
-                          // Look-alikes (multiple-looks-plan.md § 4): the new
-                          // look is searched on its own sheet first, and the
-                          // server refuses to save it over marks counted as
-                          // another item until the person says "Add anyway".
+                        onCapture={async (label, { addAsLook, accepted }) => {
+                          // Look-alikes (multiple-looks-plan.md § 4), for a
+                          // new item's first look and an added one alike: the
+                          // boxed symbol is searched on its own sheet, and the
+                          // spots are checked against marks counted as other
+                          // items BEFORE anything is saved.
                           const capture = pendingCapture;
                           const box = normaliseCaptureBox(capture.region);
                           const boxed = box.width > 0 && box.height > 0;
-                          let check: ReturnType<typeof lookAlikeCheck> = {
-                            spots: [],
-                          };
-                          if (!accepted)
-                            check = lookAlikeCheck(
-                              boxed && capture.sheetId === activeSheet?.id
-                                ? await size
-                                    .findMatching(box, [])
+                          let cannotCompare: string | null = null;
+                          const sheetId = capture.sheetId;
+                          if (!accepted && boxed) {
+                            const onSheet =
+                              sheetId !== undefined &&
+                              sheetId === activeSheet?.id
+                                ? sheetId
+                                : null;
+                            // Other items' looks on this set are searched in
+                            // the same pass: a spot both find is claimed twice.
+                            const others =
+                              onSheet === null
+                                ? null
+                                : await utils.takeoffStamps.looksOnSet
+                                    .fetch({ sheetId: onSheet, label })
+                                    .catch(() => null);
+                            // Adding a look: the item's own looks go in too,
+                            // so their device words can be compared with this
+                            // one's (§ 4 point 1). Their finds are its own.
+                            const key = symbolLookupKey(label);
+                            const ownId = addAsLook
+                              ? symbols.find(
+                                  s =>
+                                    symbolLookupKey(s.label) === key ||
+                                    (s.originalName !== null &&
+                                      symbolLookupKey(s.originalName) === key)
+                                )?.id
+                              : undefined;
+                            const own =
+                              onSheet === null || ownId === undefined
+                                ? null
+                                : await utils.takeoffStamps.searchLooks
+                                    .fetch({
+                                      symbolId: ownId,
+                                      sheetId: onSheet,
+                                    })
+                                    .catch(() => null);
+                            const found =
+                              onSheet === null
+                                ? null
+                                : await size
+                                    .findMatching(box, [
+                                      ...(others?.looks ?? []),
+                                      ...(own?.looks ?? []),
+                                    ])
                                     .then(r => r.result)
-                                    .catch(() => null)
-                                : null
+                                    .catch(() => null);
+                            const check = lookAlikeCheck(
+                              found,
+                              new Map(
+                                (others?.looks ?? []).map(l => [
+                                  l.id,
+                                  l.symbolId,
+                                ])
+                              )
                             );
+                            const ownIds = new Set(
+                              (own?.looks ?? []).map(l => l.id)
+                            );
+                            const notes =
+                              found?.kind === "ok" && found.symbol.device
+                                ? lookWordNotes(
+                                    found.symbol.device,
+                                    (found.looks?.device ?? [])
+                                      .filter(d => ownIds.has(d.id))
+                                      .map(d => d.device)
+                                  )
+                                : [];
+                            if ("cannotCompare" in check || onSheet === null)
+                              cannotCompare =
+                                "cannotCompare" in check
+                                  ? check.cannotCompare
+                                  : null;
+                            else {
+                              const { alike } =
+                                await checkLookAlikes.mutateAsync({
+                                  sheetId: onSheet,
+                                  label,
+                                  spots: check.spots,
+                                  otherLooks: check.otherLooks,
+                                });
+                              if (alike.length > 0 || notes.length > 0)
+                                return { alike, notes };
+                              cannotCompare = !others
+                                ? "Other items' looks on this set could not be compared."
+                                : others.leftOut > 0
+                                  ? `${others.leftOut} older look${others.leftOut === 1 ? "" : "s"} of other items on this set ${others.leftOut === 1 ? "was" : "were"} not compared.`
+                                  : null;
+                            }
+                          }
                           const r = await captureSymbol.mutateAsync({
                             label,
                             thumbnail: capture.thumbnail,
                             capturedFromSheetId: capture.sheetId,
                             box: boxed ? box : undefined,
-                            addAsLook: true,
-                            lookAlike:
-                              "spots" in check
-                                ? { spots: check.spots, accepted }
-                                : undefined,
+                            addAsLook,
                           });
-                          if ("lookAlike" in r && r.lookAlike)
-                            return r.lookAlike;
                           toast.success(
                             [
                               r.lookAlreadySaved
                                 ? "This look is already saved."
-                                : `Added look ${r.looks} for ${label}. It is still one item: one count, one price.`,
-                              "cannotCompare" in check
-                                ? check.cannotCompare
-                                : null,
+                                : r.alreadyKnown && r.lookAdded
+                                  ? `Added look ${r.looks} for ${label}. It is still one item: one count, one price.`
+                                  : r.alreadyKnown
+                                    ? "Already in your legend."
+                                    : r.autoLinked
+                                      ? `Captured and linked to “${
+                                          allAssemblies.find(
+                                            a => a.id === r.assemblyId
+                                          )?.name ?? label
+                                        }”, the assembly of the same name.`
+                                      : // A click on it COUNTS (legend plan
+                                        // § 8a); linking is the row's own
+                                        // control, never the first step.
+                                        "Captured — click it in the legend to start counting. Link it to an assembly from its row whenever you like.",
+                              cannotCompare,
                             ]
                               .filter(Boolean)
                               .join(" ")
                           );
                           setPendingCapture(null);
                           return null;
-                        }}
-                        onSave={label => {
-                          const box = normaliseCaptureBox(
-                            pendingCapture.region
-                          );
-                          captureSymbol.mutate(
-                            {
-                              label,
-                              thumbnail: pendingCapture.thumbnail,
-                              capturedFromSheetId: pendingCapture.sheetId,
-                              box:
-                                box.width > 0 && box.height > 0
-                                  ? box
-                                  : undefined,
-                            },
-                            {
-                              onSuccess: r =>
-                                toast.success(
-                                  r.lookAlreadySaved
-                                    ? "This look is already saved."
-                                    : r.alreadyKnown && r.lookAdded
-                                      ? `Added look ${r.looks} for ${label}. It is still one item: one count, one price.`
-                                      : r.alreadyKnown
-                                        ? "Already in your legend."
-                                        : r.autoLinked
-                                          ? `Captured and linked to “${
-                                              allAssemblies.find(
-                                                a => a.id === r.assemblyId
-                                              )?.name ?? label
-                                            }”, the assembly of the same name.`
-                                          : // A click on it COUNTS (legend plan
-                                            // § 8a); linking is the row's own
-                                            // control, never the first step.
-                                            "Captured — click it in the legend to start counting. Link it to an assembly from its row whenever you like."
-                                ),
-                            }
-                          );
-                          setPendingCapture(null);
                         }}
                       />
                     )}

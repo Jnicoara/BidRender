@@ -52,6 +52,23 @@ export type CaptureBox = {
 };
 
 /** The same box with a positive width and height — dragged up-left or not. */
+/**
+ * The smallest box, in page points on each side, that is a capture at all.
+ * A click with no drag gives a box of nothing, and until 2026-10-06 it still
+ * opened "Name this symbol" and saved an item with no picture, no look and —
+ * because there was nothing to search — no look-alike check (seen on screen,
+ * track-c). A real symbol is several points across.
+ */
+export const CAPTURE_MIN_POINTS = 2;
+
+/** Is this dragged box a capture, or a click that never became one? */
+export function isCaptureBox(box: CaptureBox): boolean {
+  return (
+    Math.abs(box.width) >= CAPTURE_MIN_POINTS &&
+    Math.abs(box.height) >= CAPTURE_MIN_POINTS
+  );
+}
+
 export function normaliseCaptureBox(box: CaptureBox): CaptureBox {
   return {
     x: Math.min(box.x, box.x + box.width),

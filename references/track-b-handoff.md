@@ -6,6 +6,34 @@ databases (`bidrender_local_b_new`, `bidrender_test_b`) are migrated to 105
 and `scripts/schemaDrift.mts` says both match. Last gate: `pnpm check` clean,
 292 test files / 4,976 passing / 5 skipped.
 
+## Standing rules (owner, 2026-10-05) — read before doing anything
+
+**1. Merging: CI is the gate, not the laptop.** Do not run the full suite
+locally before a merge. Instead:
+
+1. `pnpm check` and the tests the change touches, locally.
+2. Push `track-b`, then wait for the GitHub Actions **Gate** workflow's
+   `test` job on `track-b` to go green (`gh run list --branch track-b`,
+   `gh run watch <id>`).
+3. Green: pull `local-dev`, merge `track-b`, push `local-dev`, and confirm
+   the Gate run on `local-dev` is green too. That run also deploys staging,
+   code only, and smoke-tests it.
+4. Red, at either step: fix, push, repeat.
+
+Run the full suite locally only when CI cannot tell you something. Why: the
+laptop runs three tracks at once, and two full local runs on 2026-10-05
+were stopped by Claude Code for low memory.
+
+**2. Stopping a dev server: stop the whole SET, not the process on the
+port.** `pnpm dev` starts a chain: pnpm → cross-env → `tsx watch` → the
+server. Killing only the process holding the port (what was done on
+2026-10-05) left three idle `tsx watch` chains in `C:\dev\BidPhase-B`. An
+idle watcher can restart a server when files change, so it is a dev
+server nobody knows is running. Stop it from the top: find the `pnpm …
+dev` root for this folder and `taskkill /T /F /PID <root>`, then check
+that no `node.exe` whose command line mentions `BidPhase-B` is left. Never
+touch a set whose command line names another track's folder.
+
 ## Done
 
 ### Pin looks — chosen shape, letter, color (pin plan § 6, § 11.4)

@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import type { MatchBox } from "@/lib/findMatching";
 import {
   aiBatch,
+  NEW_LOOK_REASON,
   clearOpen,
   itemKind,
   summary,
@@ -120,6 +121,7 @@ export function MatchLayer({
                         ? [DEMOLITION_REASON(item.onDemolitionPlan)]
                         : []),
                       ...item.needsLook,
+                      ...(item.newLooks.length ? [NEW_LOOK_REASON] : []),
                       ...item.maybeExisting,
                     ].join("; ") || "Found — not counted yet"}
               </title>
@@ -381,6 +383,7 @@ export function MatchPanel({
             {/* The heading already says "demolition plan — not counted". */}
             {[
               ...sel.needsLook,
+              ...(sel.newLooks.length ? [NEW_LOOK_REASON] : []),
               ...sel.maybeExisting,
               ...(sel.foundBy && sel.foundBy > 1
                 ? [`Found by ${sel.foundBy} looks.`]

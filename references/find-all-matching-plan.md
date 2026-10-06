@@ -169,6 +169,73 @@ never taken by Confirm all. On a scan, another set's look is not compared
 at all. Before looks, both branches already followed the rule by
 construction: the only symbol searched was the one boxed on this sheet.
 
+## 4b. Lines crossing symbols — measured, then built (2026-10-06)
+
+**Asked:** do walls, home runs, grid and dimension lines running through or
+touching a symbol make Find all matching miss it, and were the 2 misses on
+Weld 1 E-200 this? Measured with `scripts/lineCrossingCheck.mts` (the same
+sheet, marks and boxes as `findMatchingCheck.mts`), and the scan side with
+`scanMatchingCheck.mts --scores`.
+
+**Vector, Weld 1 E-200:**
+
+- **The 2 misses are NOT crossing lines.** The double duplex at
+  (635.5, 1253) has 68% of a double duplex present, whole or in pieces, 0
+  lines split: it is drawn as a plain duplex. The switch at (667.9, 1207.6)
+  has 0%: nothing is drawn there. As § 2 already said.
+- **No device on the sheet was dropped because a crossing line cut it.**
+  Every place where a type's line work is present as whole segments or
+  collinear pieces (>= 80%) but not returned was checked: two, both correctly
+  not that type (a duplex shape on a GFCI, a double-duplex shape on a plain
+  duplex), and neither had a line actually split.
+- **Lines touching devices are everywhere and already ignored:** 23 of 23
+  duplexes and 24 of 24 junction boxes have a line crossing or touching
+  them. A copy is scored on the symbol's own segments, so extra lines do
+  not lower it.
+- **"Close enough point by point" is not a usable fix:** it marks 283
+  duplex "copies" in plan A, nearly all on nothing. Dense line work puts
+  some line near every point of a circle.
+- **No template holds a crossing line either.** A first reading said the
+  GFCI's box held 10 pieces of a wire chopped up inside it (27.8 of 273.9 pt
+  of its line). **That was wrong, and the measurement was what was wrong:**
+  it counted any template line collinear with a line leaving the box, and
+  printed one by one they are the GFCI's own three receptacle lines (each
+  drawn twice) running out of the box where the home run continues them,
+  plus curve slivers. They are the symbol. The check now says what it
+  counts; read the pieces before calling them a wall.
+- **So on E-200 crossing lines cost nothing**: no miss, no false find, no
+  dirty template. What is built below handles the faults the matcher COULD
+  have on another export — made to happen on purpose in fixtures — and
+  changes nothing on E-200.
+
+**Built (code only, `client/src/lib/findMatching.ts`):**
+
+1. `throughLinePieces` — a line made of collinear pieces end to end that
+   runs in one side of an outline and out the other is not the symbol. Taken
+   out of the template; and at a copy, not counted as "more lines run
+   through it" when it runs on at least half a symbol past both sides.
+   **That margin is measured, not chosen:** a double duplex's second pair
+   pokes 1 and 4 pt out of a duplex's outline, and the first version, with
+   no margin, turned 4 flagged double duplexes into SILENT duplexes on
+   E-200. Caught by re-running the check; pinned by a fixture.
+2. `cutAcross` — a copy whose own line is cut where another line crosses
+   it is OFFERED with "maybe — a line crosses it and cuts part of it",
+   never clear, never taken by Confirm all. Strict: collinear pieces within
+   the line's own ends, short gaps, and a line actually crossing in each
+   gap — a merely missing line still fails (a fixture says so).
+3. A second anchor of another length, so a copy whose rarest line is the
+   one cut is still tried.
+
+After all three, E-200 reads exactly as before (44 of 46, same flags,
+nothing new offered) at 128–164 ms a search against 110–146.
+
+**Scans, Old Blueridge:** 85 of 85 hand marks found. The picture matcher
+has no line work to take apart: a line through a symbol is more black
+pixels, which lowers the likeness. His marks scored 0.80–1.00 against the
+0.70 threshold, and the lowest nine (0.80–0.83, switches and receptacles)
+are already flagged "weaker likeness". **Not checked by eye** whether those
+nine are crossing lines or scan noise. Nothing to build there today.
+
 ## 5. Existing devices and the mark status
 
 - **Until Track A's `takeoff_stamps.status`:** "Count as existing" puts the

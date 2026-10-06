@@ -58,8 +58,7 @@ describe("SymbolCaptureForm placement", () => {
         soft: false,
         chromeTarget: screenLayer,
         existingFor: () => null,
-        onSave: noop,
-        onAddLook: async () => null,
+        onCapture: async () => null,
         onCancel: noop,
       })
     );
@@ -80,8 +79,7 @@ describe("SymbolCaptureForm placement", () => {
         soft: false,
         chromeTarget: null,
         existingFor: () => null,
-        onSave: noop,
-        onAddLook: async () => null,
+        onCapture: async () => null,
         onCancel: noop,
       })
     );
@@ -100,8 +98,7 @@ describe("SymbolCaptureForm while the sharp picture is coming", () => {
         soft,
         chromeTarget: null,
         existingFor: () => null,
-        onSave: noop,
-        onAddLook: async () => null,
+        onCapture: async () => null,
         onCancel: noop,
       })
     );

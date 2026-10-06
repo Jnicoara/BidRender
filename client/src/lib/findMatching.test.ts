@@ -426,3 +426,118 @@ describe("reading the line work from pdf.js", () => {
     expect(lightnessOf([0, 0, 0, 0])).toBe(255);
   });
 });
+
+describe("lines crossing a symbol (track-c, measured 2026-10-06)", () => {
+  /*
+    Measured on Weld 1 E-200 (scripts/lineCrossingCheck.mts): no device was
+    missed, falsely found or mis-templated because of a crossing line. These
+    fixtures make the two faults the matcher COULD have happen on purpose: a
+    wire chopped into pieces inside the box, and a copy whose own line is
+    cut where something crosses it.
+  */
+
+  /** A straight wire from (x1, y1) to (x2, y2), cut into `n` pieces. */
+  const wire = (
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    n: number
+  ): Seg[] =>
+    Array.from({ length: n }, (_, k) => [
+      x1 + ((x2 - x1) * k) / n,
+      y1 + ((y2 - y1) * k) / n,
+      x1 + ((x2 - x1) * (k + 1)) / n,
+      y1 + ((y2 - y1) * (k + 1)) / n,
+    ]);
+
+  it("a wire chopped into pieces through the BOXED one is not part of the symbol", () => {
+    // Boxed duplex at (100, 100), box 92..112 x 90..110. Two wires cross the
+    // box, each in 4 pieces, 2 of them wholly inside the box (34 pt in all,
+    // against the duplex's 58): kept in, no clean copy reaches 80%.
+    const geo = geometry([
+      {
+        segs: [
+          ...duplex(100, 100),
+          ...wire(94, 82, 94, 118, 4),
+          ...wire(84, 107, 120, 107, 4),
+          ...duplex(300, 140, 1),
+          ...duplex(520, 90, 0, true),
+        ],
+      },
+    ]);
+    const matches = okMatches(findMatching(geo, [], boxAround(102, 100, 10)));
+    expect(matches).toHaveLength(3);
+    // And the boxed one is not flagged for lines the box itself had.
+    const boxed = matches.find(m => m.isBoxed)!;
+    expect(boxed.needsLook).toEqual([]);
+  });
+
+  it("a copy whose own line is CUT where a wall crosses it is offered as a maybe, never clear", () => {
+    // The copy at (400, 300): its two long lines are each cut in two at
+    // x = 403, where a wall runs straight through it. Whole segments: 32 of
+    // 58 (the body only) — dropped silently before this.
+    const cut: Seg[] = duplex(400, 300).flatMap(([a, b, c, d]) =>
+      b === d && Math.abs(b - 300) === 1.5
+        ? ([
+            [a, b, 402.6, d],
+            [403.4, b, c, d],
+          ] as Seg[])
+        : [[a, b, c, d] as Seg]
+    );
+    const geo = geometry([
+      {
+        segs: [...duplex(100, 100), ...cut, [403, 260, 403, 340]],
+      },
+    ]);
+    const matches = okMatches(findMatching(geo, [], boxAround(102, 100, 9)));
+    const copy = matches.find(m => Math.hypot(m.x - 402.5, m.y - 300) < 1);
+    expect(copy, "the cut copy is offered").toBeDefined();
+    expect(copy!.needsLook.join(" ")).toMatch(/line crosses it/);
+  });
+
+  it("a line merely missing is still not a copy: the gap must have a line through it", () => {
+    // The same copy with a gap and NOTHING crossing it is a different
+    // drawing, not a cut one.
+    const gapped: Seg[] = duplex(400, 300).flatMap(([a, b, c, d]) =>
+      b === d && Math.abs(b - 300) === 1.5
+        ? ([
+            [a, b, 402.6, d],
+            [403.4, b, c, d],
+          ] as Seg[])
+        : [[a, b, c, d] as Seg]
+    );
+    const geo = geometry([{ segs: [...duplex(100, 100), ...gapped] }]);
+    const matches = okMatches(findMatching(geo, [], boxAround(102, 100, 9)));
+    expect(matches.some(m => Math.hypot(m.x - 402.5, m.y - 300) < 1)).toBe(
+      false
+    );
+  });
+
+  it("a second pair poking a little out of BOTH sides, as on Weld 1, still flags", () => {
+    // Measured on E-200: the real second pair runs 1 and 4 pt past the
+    // duplex's outline. A first version of the crossing-line rule took that
+    // for a wire through it, and 4 double duplexes went to "duplex" with no
+    // flag. A wire runs on well past; this does not.
+    const pair: Seg[] = [
+      [298.5, 91, 298.5, 105.5],
+      [301.5, 91, 301.5, 105.5],
+    ];
+    const geo = geometry([
+      { segs: [...duplex(100, 100), ...duplex(300, 100), ...pair] },
+    ]);
+    const matches = okMatches(findMatching(geo, [], boxAround(102, 100, 9)));
+    const dd = matches.find(m => Math.hypot(m.x - 302.5, m.y - 100) < 1)!;
+    expect(dd.needsLook.join(" ")).toMatch(/more lines run through it/);
+  });
+
+  it("the double duplex's own second pair still flags 'more lines run through it'", () => {
+    // Ends AT the outline, not out the other side: not a crossing line.
+    const geo = geometry([
+      { segs: [...duplex(100, 100), ...duplex(300, 100, 0, false, true)] },
+    ]);
+    const matches = okMatches(findMatching(geo, [], boxAround(102, 100, 9)));
+    const dd = matches.find(m => Math.hypot(m.x - 302.5, m.y - 100) < 1)!;
+    expect(dd.needsLook.join(" ")).toMatch(/more lines run through it/);
+  });
+});

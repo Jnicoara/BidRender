@@ -21,6 +21,14 @@
   (nothing found in the touch path). **Next step: get that run's failure
   screenshot** (Actions → run 37388349708 → smoke-failures, needs a signed-in
   browser), or run `pnpm smoke` locally with one server up.
+- **Update, 2026-10-06 ~01:15 UTC:** the touch failure is NOT flaky — four
+  staging runs in a row (`6bfe956`, `97705c9`, `b14e665`, `6eed153`), both
+  tablets, and it is the ONLY failure left on staging. Locally the full
+  smoke (96 passed, 2 skipped) passes, touch included, after the full flow.
+  It passed on staging only in the run where the flow stopped at test 6.
+  Not fixed: no screenshot yet (`gh` is not installed on the laptop).
+  Ruled out by reading: the "placing as" switch (React state, resets on load)
+  and the flow-6 fix (not on the touch path).
 - **Locally, flow test 2 fails ("0/2 scaled") on a production build against
   `bidrender_local`**; it passes on staging. Unexplained, local only.
 - **Bid-totals script written and rehearsed** (`scripts/bidTotals.mts`,
