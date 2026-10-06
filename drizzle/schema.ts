@@ -500,6 +500,10 @@ export const ASSEMBLY_CATEGORIES = [
   "Panels",
   "Equipment Connections",
   "Low Voltage/EMS",
+  // 0122 (starter-assemblies-plan.md D3). Ships with 0123 and Track B's H2
+  // step-2 code; with it, the starters held for these categories seed.
+  "Demo & Retrofit",
+  "General",
 ] as const;
 
 /**
@@ -659,6 +663,10 @@ export const MATERIAL_CATEGORIES = [
   "Equipment & Appliances",
   "Distribution Equipment",
   "Consumables",
+  // 0117 (migrations-0098-batch-plan.md § 1, Q1): appended, in this order.
+  "Surface Raceway",
+  "Underground",
+  "Service Entrance",
 ] as const;
 
 export type MaterialCategory = (typeof MATERIAL_CATEGORIES)[number];
@@ -788,6 +796,16 @@ export const materials = mysqlTable(
      * house stocks a particular part, without the shipped names pretending to.
      */
     brandNote: varchar("brandNote", { length: 255 }),
+    /**
+     * A brand variant's PARENT (0119/0120, CLAUDE.md § Brands). NULL = its own
+     * parent — every row today. RESTRICT: a parent cannot be deleted out from
+     * under its variants. An assembly points at the parent, never a variant.
+     */
+    parentId: int("parentId").references((): AnyMySqlColumn => materials.id, {
+      onDelete: "restrict",
+    }),
+    /** A variant's brand — panels and breakers only (0121). NULL = generic. */
+    brand: varchar("brand", { length: 64 }),
     /**
      * Trade slang the catalog name does not contain, space-separated, so an
      * electrician finds "Duplex receptacle" by typing "plug" and "4\" square
@@ -1006,9 +1024,14 @@ export const assemblies = mysqlTable(
       .notNull(),
     /** Optional library filter. See PROJECT_TYPES. */
     projectType: mysqlEnum("projectType", PROJECT_TYPES),
-    baseLaborHours: decimal("baseLaborHours", { precision: 10, scale: 4 })
-      .default("0")
-      .notNull(),
+    /**
+     * NULL = "hours not set" (0123, plan D1) — never read as 0. Every reader
+     * goes through shared/assemblyHours.ts, and every write through
+     * `assemblyHoursColumnValue` (server/db.ts). Nullable is also what lifts
+     * the held starters (`liveStarterSchema`), so this edit ships only with
+     * that code (migrations-next-batch.md, 0122/0123 pairing rule).
+     */
+    baseLaborHours: decimal("baseLaborHours", { precision: 10, scale: 4 }),
 
     /**
      * Time this assembly takes that no material line accounts for — laying out,
@@ -1051,6 +1074,26 @@ export const assemblies = mysqlTable(
     laborRateId: int("laborRateId").references(() => laborRates.id, {
       onDelete: "set null",
     }),
+
+    /**
+     * Ticked "Labor only" (0105, owner 2026-10-06): its lines never read
+     * "material not priced". NULL / false = not said — never inferred from
+     * "has no parts" (CLAUDE.md § Editing fields 6).
+     */
+    laborOnly: boolean("laborOnly"),
+    /**
+     * Hours to take this device out / move it, every job (0110, owner Q2).
+     * NULL = not set -> "not priced"; 0 is a real answer.
+     */
+    removeLaborHours: decimal("removeLaborHours", { precision: 10, scale: 4 }),
+    relocateLaborHours: decimal("relocateLaborHours", {
+      precision: 10,
+      scale: 4,
+    }),
+    /** The height TYPE a new count's drop starts from (0110). NULL = not said. */
+    mountHeightTypeKey: varchar("mountHeightTypeKey", { length: 64 }),
+    /** New lines from this assembly start as quote items (0110). NULL = no. */
+    materialByQuote: boolean("materialByQuote"),
 
     /** active / archived / deleted. See materials.status — same lifecycle. */
     status: mysqlEnum("status", LIBRARY_STATUSES).default("active").notNull(),
@@ -1263,6 +1306,12 @@ export const pricingDefaults = mysqlTable(
       precision: 10,
       scale: 6,
     }),
+    /**
+     * The ONE company-wide markup for quoted lines (0116, material-markup D4).
+     * NULL = no quoted-line rule — not a 0% rule. Same type as the column
+     * above because the same markup code reads both.
+     */
+    quotedMarkupPct: decimal("quotedMarkupPct", { precision: 10, scale: 6 }),
 
     defaultLaborRateId: int("defaultLaborRateId").references(
       () => laborRates.id,
@@ -2304,6 +2353,13 @@ export const bidPdfSheets = mysqlTable(
      * each session.
      */
     notToScale: boolean("notToScale").default(false).notNull(),
+    /** Written on the sheet's first read (0109, pay-once). NULL = never read. */
+    contentHash: varchar("contentHash", { length: 64 }),
+    /**
+     * This sheet's run height, inches (0109, vertical-drops § 7). NULL =
+     * follows the job — distinguishable from any answer, so never 0.
+     */
+    distributionHeightInches: int("distributionHeightInches"),
 
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -2704,6 +2760,10 @@ export const RUN_MATERIAL_ROLES = [
     (references/materials-track-c-plan.md § 4).
   */
   "teeBody",
+  // 0118 (track-c-next-batch-plan.md § 4 A1). Nothing writes them until
+  // Track C's locknut/bushing code ships — and that code is what moves totals.
+  "locknut",
+  "bushing",
 ] as const;
 export type RunMaterialRole = (typeof RUN_MATERIAL_ROLES)[number];
 
@@ -3532,6 +3592,15 @@ export const takeoffGroups = mysqlTable(
      * on purpose: deleting a library symbol must not touch a bid.
      */
     symbolLookupKey: varchar("symbolLookupKey", { length: 255 }),
+    /**
+     * This bid's remove / relocate hours (0111, owner Q2) — overrides the
+     * assembly's. NULL = follow the assembly.
+     */
+    removeLaborHours: decimal("removeLaborHours", { precision: 10, scale: 4 }),
+    relocateLaborHours: decimal("relocateLaborHours", {
+      precision: 10,
+      scale: 4,
+    }),
 
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -3667,6 +3736,11 @@ export const takeoffStamps = mysqlTable(
     checkAcceptedAt: timestamp("checkAcceptedAt"),
     /** This one mark takes no drop; NULL follows the count's (H3). */
     dropExcluded: boolean("dropExcluded"),
+    /**
+     * The words Find all matching tied to this device — "USB", `54"`, "(E)"
+     * (0112). NULL = never read. Not a pricing input.
+     */
+    labelWords: text("labelWords"),
 
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -3798,6 +3872,11 @@ export const symbolLooks = mysqlTable(
     createdByUserId: int("createdByUserId").references(() => users.id, {
       onDelete: "set null",
     }),
+    /**
+     * When this look was first confirmed by hand, for every browser (0113;
+     * today per browser in @/lib/trustedLooks). NULL = never confirmed.
+     */
+    confirmedAt: timestamp("confirmedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   t => [
@@ -4336,7 +4415,36 @@ export const bidLineItems = mysqlTable(
      * never `?? 0`, which would call every old line fully priced.
      */
     snapshotUnpricedParts: int("snapshotUnpricedParts"),
+    /**
+     * The assembly's `laborOnly`, FROZEN when the line is added (0106, Track
+     * A's pick). NULL = a line from before the column, read as "not said".
+     */
+    snapshotLaborOnly: boolean("snapshotLaborOnly"),
     snapshotAt: timestamp("snapshotAt").defaultNow().notNull(),
+
+    /**
+     * What this line is FOR (0115, owner Q2): installing the count, removing
+     * it, or relocating it. NOT NULL DEFAULT 'install' on purpose — it is in
+     * a unique key, where NULLs never collide, and 'install' is what every
+     * line before the column already meant.
+     */
+    lineRole: mysqlEnum("lineRole", ["install", "remove", "relocate"])
+      .default("install")
+      .notNull(),
+    /**
+     * Material per unit priced ON THIS BID (0115). NULL = none. ONE column for
+     * quote items and the price box — never two (migrations-next-batch.md,
+     * clash 4).
+     */
+    bidUnitCost: decimal("bidUnitCost", { precision: 12, scale: 4 }),
+    /** Quote items (0115, quote-items-plan.md § 8). NULL = not a quote item. */
+    isQuoteItem: boolean("isQuoteItem"),
+    quoteId: int("quoteId").references(() => bidQuotes.id, {
+      onDelete: "set null",
+    }),
+    quoteShare: decimal("quoteShare", { precision: 12, scale: 2 }),
+    quoteItemKey: varchar("quoteItemKey", { length: 255 }),
+    quoteNote: varchar("quoteNote", { length: 500 }),
 
     sortOrder: int("sortOrder").default(0).notNull(),
 
@@ -4362,10 +4470,16 @@ export const bidLineItems = mysqlTable(
     index("bid_line_items_bidId_idx").on(t.bidId),
     index("bid_line_items_unitLabel_idx").on(t.unitLabel),
     index("bid_line_items_archivedAt_idx").on(t.archivedAt),
-    // R3's first half, in the database: one counted group, at most one line.
+    // R3's first half, in the database: one counted group, at most one line
+    // PER ROLE (0115 swapped this in for 0060's (bidId, takeoffGroupId)).
     // MySQL allows many NULLs here, which is what lets every hand-added line on
-    // every bid share the index without colliding. See drizzle/0060.
-    unique("bid_line_items_bid_group_uq").on(t.bidId, t.takeoffGroupId),
+    // every bid share the index without colliding — and why lineRole is NOT
+    // NULL: a NULL role would never collide either.
+    unique("bid_line_items_bid_group_role_uq").on(
+      t.bidId,
+      t.takeoffGroupId,
+      t.lineRole
+    ),
     // The same half of R3 for traced footage: one type, one role, at most one
     // live line. MySQL allows many NULLs in a unique index, which is what lets
     // every hand-added line share it without colliding. See drizzle/0070.
@@ -5126,3 +5240,217 @@ export const pricingProblemReports = mysqlTable(
 );
 
 export type PricingProblemReport = typeof pricingProblemReports.$inferSelect;
+
+// ─── Migrations 0107, 0108, 0114, 0124 (Track A, 2026-10-06) ─────────────────
+// New tables from references/migrations-next-batch.md. Each mirrors its
+// hand-written .sql file exactly — server/schemaDrift.test.ts compares them.
+// Nothing reads or writes them yet; their code comes after (step 1 first).
+
+/**
+ * A code that lets a NEW company sign up (0107, invite-gate-plan.md § 7) —
+ * not `company_invites`, which add a person to an existing company.
+ * `codeHash` is a SHA-256 of the code, never the code, as company_invites.
+ */
+export const signupInvites = mysqlTable(
+  "signup_invites",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    codeHash: varchar("codeHash", { length: 64 }).notNull(),
+    /** The account must use this address. */
+    email: varchar("email", { length: 320 }).notNull(),
+    /** Written onto the new company. */
+    seatLimit: int("seatLimit").notNull(),
+    earlyAccessId: int("earlyAccessId").references(
+      () => earlyAccessSignups.id,
+      { onDelete: "set null" }
+    ),
+    note: varchar("note", { length: 255 }),
+    expiresAt: timestamp("expiresAt").notNull(),
+    acceptedAt: timestamp("acceptedAt"),
+    acceptedByUserId: int("acceptedByUserId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    revokedAt: timestamp("revokedAt"),
+    /** The platform admin who made it. */
+    createdByUserId: int("createdByUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => [
+    unique("signup_invites_codeHash_unique").on(t.codeHash),
+    index("signup_invites_email_idx").on(t.email),
+  ]
+);
+
+export type SignupInvite = typeof signupInvites.$inferSelect;
+
+/**
+ * One correction a person made to an AI reading (0108,
+ * ai-correction-log-plan.md § 4). Two halves: IDENTIFIED (dataUserId ..
+ * userValue — our own debugging, never shared) and ANONYMISED (shareId ..
+ * crop*) — the only columns sharing would ever read, and nothing may share
+ * them before users agree to terms that say so (todo.md, owner 2026-09-27).
+ * Every column nullable except id, action, shareId, createdAt (§ 9).
+ */
+export const AI_CORRECTION_ACTIONS = [
+  "dismissed",
+  "relabelled",
+  "deleted",
+  "location_set",
+  "deleted_with_group",
+  "accepted",
+] as const;
+
+export const aiCorrectionLog = mysqlTable(
+  "ai_correction_log",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    // ── Identified half ──
+    dataUserId: int("dataUserId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    actorUserId: int("actorUserId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    bidId: int("bidId").references(() => bids.id, { onDelete: "set null" }),
+    sheetId: int("sheetId").references(() => bidPdfSheets.id, {
+      onDelete: "set null",
+    }),
+    findingId: int("findingId").references(() => planCopilotFindings.id, {
+      onDelete: "set null",
+    }),
+    /** A plain int, no FK: on a delete the stamp is already gone. */
+    stampId: int("stampId"),
+    aiLabel: varchar("aiLabel", { length: 255 }),
+    aiAssemblyName: varchar("aiAssemblyName", { length: 255 }),
+    userAssemblyName: varchar("userAssemblyName", { length: 255 }),
+    x: decimal("x", { precision: 12, scale: 4 }),
+    y: decimal("y", { precision: 12, scale: 4 }),
+    /** What it was changed to: location, symbolLinkId, assemblyId. */
+    userValue: json("userValue"),
+    // ── Anonymised half ──
+    /** Random, not derivable from any other id. */
+    shareId: varchar("shareId", { length: 32 }).notNull(),
+    action: mysqlEnum("action", AI_CORRECTION_ACTIONS).notNull(),
+    model: varchar("model", { length: 128 }),
+    tier: mysqlEnum("tier", ["high", "low", "unreadable"]),
+    score: decimal("score", { precision: 5, scale: 4 }),
+    /** Lowercased, whitespace-folded, cut to 40 characters (owner Q4). */
+    labelNormalised: varchar("labelNormalised", { length: 40 }),
+    /** An assembly CATEGORY, never a company's name for it. */
+    aiKind: varchar("aiKind", { length: 64 }),
+    userKind: varchar("userKind", { length: 64 }),
+    trade: varchar("trade", { length: 64 }),
+    /** The sheet number's letter prefix only (E, P, M). */
+    sheetDiscipline: varchar("sheetDiscipline", { length: 8 }),
+    /** YYYY-MM only: exact times across rows can re-identify a company. */
+    month: char("month", { length: 7 }),
+    cropKey: varchar("cropKey", { length: 512 }),
+    /** A missing picture says WHY, never just absent. */
+    cropStatus: mysqlEnum("cropStatus", [
+      "pending",
+      "stored",
+      "unavailable",
+      "failed",
+    ]),
+    cropWidth: int("cropWidth"),
+    cropHeight: int("cropHeight"),
+    cropPointsPerPixel: decimal("cropPointsPerPixel", {
+      precision: 10,
+      scale: 4,
+    }),
+    /** Track C's pay-once ask (legend-and-notes-automation-plan.md). */
+    askKind: mysqlEnum("askKind", ["crop", "note"]),
+    askFingerprint: varchar("askFingerprint", { length: 64 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => [
+    unique("ai_correction_log_shareId_unique").on(t.shareId),
+    index("ai_correction_log_dataUserId_createdAt_idx").on(
+      t.dataUserId,
+      t.createdAt
+    ),
+    index("ai_correction_log_dataUserId_askFingerprint_idx").on(
+      t.dataUserId,
+      t.askFingerprint
+    ),
+  ]
+);
+
+export type AiCorrection = typeof aiCorrectionLog.$inferSelect;
+
+/**
+ * A supplier quote on a bid (0114, quote-items-plan.md § 8). `userId` is the
+ * company owner, as everywhere. `packagePrice` NULL = a per-item quote.
+ * `carriedFromBidId` is provenance only — no FK, the old bid may be deleted.
+ */
+export const bidQuotes = mysqlTable(
+  "bid_quotes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    bidId: int("bidId")
+      .notNull()
+      .references(() => bids.id, { onDelete: "cascade" }),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    supplierName: varchar("supplierName", { length: 128 }),
+    quotedOn: date("quotedOn"),
+    packagePrice: decimal("packagePrice", { precision: 12, scale: 2 }),
+    carriedFromBidId: int("carriedFromBidId"),
+    note: varchar("note", { length: 500 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [index("bid_quotes_userId_bidId_idx").on(t.userId, t.bidId)]
+);
+
+export type BidQuote = typeof bidQuotes.$inferSelect;
+
+/**
+ * One legend entry read off a plan set, and what it was confirmed or
+ * rejected as (0124, legend-reading-plan.md § 5, with Track C's lookId).
+ * `symbolLinkId` is nullable because deleting the symbol sets it NULL.
+ */
+export const bidPdfLegendEntries = mysqlTable(
+  "bid_pdf_legend_entries",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    bidPdfId: int("bidPdfId")
+      .notNull()
+      .references(() => bidPdfs.id, { onDelete: "cascade" }),
+    symbolLinkId: int("symbolLinkId").references(() => symbolLinks.id, {
+      onDelete: "set null",
+    }),
+    groupId: int("groupId").references(() => takeoffGroups.id, {
+      onDelete: "set null",
+    }),
+    lookId: int("lookId").references(() => symbolLooks.id, {
+      onDelete: "set null",
+    }),
+    status: mysqlEnum("status", ["confirmed", "rejected"]).notNull(),
+    source: mysqlEnum("source", ["ai", "manual", "remembered"]).notNull(),
+    sheetId: int("sheetId").references(() => bidPdfSheets.id, {
+      onDelete: "set null",
+    }),
+    /** The box on the legend, page points. */
+    x: decimal("x", { precision: 12, scale: 4 }),
+    y: decimal("y", { precision: 12, scale: 4 }),
+    w: decimal("w", { precision: 12, scale: 4 }),
+    h: decimal("h", { precision: 12, scale: 4 }),
+    /** What the model read, before any fix. */
+    readLabel: varchar("readLabel", { length: 255 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    unique("bid_pdf_legend_entries_pdf_link_uq").on(t.bidPdfId, t.symbolLinkId),
+    index("bid_pdf_legend_entries_userId_idx").on(t.userId),
+  ]
+);
+
+export type BidPdfLegendEntry = typeof bidPdfLegendEntries.$inferSelect;

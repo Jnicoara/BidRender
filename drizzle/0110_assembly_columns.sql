@@ -1,0 +1,18 @@
+-- Four columns on `assemblies`, ONE ALTER (migrations-next-batch.md, clash 2):
+--
+--   removeLaborHours, relocateLaborHours   owner Q2 (remove-relocate-labor-
+--       plan.md): hours to take a device out / move it, set once for every
+--       job. NULL = not set -> "not priced". 0 is a real answer.
+--   mountHeightTypeKey   vertical-drops-plan.md § 7 col 2: the height TYPE a
+--       new count's drop starts from. NULL = not said; a count asks, as today.
+--       (The plan's option table once called it heightTypeKey; its Track A
+--       table and todo.md say mountHeightTypeKey, which is used here.)
+--   materialByQuote      quote-items-plan.md § 8: new lines from this
+--       assembly start as quote items. NULL = no.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- Nullable, no default, no backfill. `laborOnly` is 0105, a release earlier
+-- — two files on purpose.
+--
+-- Hand-written, not generated.
+ALTER TABLE `assemblies` ADD `removeLaborHours` decimal(10,4), ADD `relocateLaborHours` decimal(10,4), ADD `mountHeightTypeKey` varchar(64), ADD `materialByQuote` boolean;

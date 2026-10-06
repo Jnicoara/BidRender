@@ -1,0 +1,11 @@
+-- 0119's self-reference, ON DELETE RESTRICT (migrations-0098-batch-plan.md
+-- § 3): a parent cannot be deleted out from under its variants.
+--
+-- ── ADDITIVE. STEP 1 ─────────────────────────────────────────────────────────
+-- Every parentId is NULL when this runs, so it cannot fail on existing rows.
+-- Known risk to keep in mind (§ 3): `materials` cascades from `users`, so
+-- deleting a user who owns BOTH a parent and its variant could be refused
+-- once variants exist. Nothing creates one yet.
+--
+-- Hand-written, not generated.
+ALTER TABLE `materials` ADD CONSTRAINT `materials_parentId_materials_id_fk` FOREIGN KEY (`parentId`) REFERENCES `materials`(`id`) ON DELETE restrict ON UPDATE no action;

@@ -1,0 +1,16 @@
+-- Two assembly categories APPENDED: 'Demo & Retrofit' and 'General'
+-- (starter-assemblies-plan.md D3; migrations-0098-batch-plan.md § 4a).
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- Appending rewrites no row. The MODIFY restates the WHOLE column, so the
+-- five existing values are listed as ASSEMBLY_CATEGORIES and 0007 have them,
+-- and NOT NULL is kept.
+--
+-- ── PAIRING RULE ─────────────────────────────────────────────────────────────
+-- 0122 + 0123 ship in the SAME release as Track B's H2 step-2 code (882ee8e,
+-- shared/assemblyHours.ts) — never apart (migrations-next-batch.md, boxed
+-- note). With the schema.ts edit, the next boot seeds the starters these two
+-- were holding.
+--
+-- Hand-written, not generated.
+ALTER TABLE `assemblies` MODIFY COLUMN `category` enum('Devices','Lighting','Panels','Equipment Connections','Low Voltage/EMS','Demo & Retrofit','General') NOT NULL;

@@ -1,0 +1,12 @@
+-- 'locknut' and 'bushing' APPENDED to `bid_line_items.runMaterialRole`
+-- (migrations-0098-batch-plan.md § 2; track-c-next-batch-plan.md § 4 A1),
+-- like 0084/0085: no UPDATE.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- Applying it moves nothing. Track C's CODE then starts counting locknuts and
+-- bushings on runs — that is the number that moves, on purpose. The owner's
+-- "wire size not set, bushings not counted" rule is code on top of this.
+-- The column is in bid_line_items_bid_runtype_role_uq; appending is safe.
+--
+-- Hand-written, not generated.
+ALTER TABLE `bid_line_items` MODIFY COLUMN `runMaterialRole` enum('raceway','conductor','ground','coupling','connector','strap','elbow90','elbow45','fieldBend','lb','pullBox','teeBox','teeCover','teeBody','locknut','bushing');

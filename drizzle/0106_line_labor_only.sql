@@ -1,0 +1,11 @@
+-- The assembly's `laborOnly` (0105), FROZEN onto the bid line when it is
+-- added, like every other line snapshot (Track A picked freezing,
+-- 2026-10-06; references/migrations-next-batch.md § 0105–0106). Ticking
+-- "labor only" later cannot quietly re-mark a finished bid.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- NULL = a line from before the column, read as "not said": no existing bid
+-- changes when it lands. Ships with 0105 and Track B's code (same pairing).
+--
+-- Hand-written, not generated.
+ALTER TABLE `bid_line_items` ADD `snapshotLaborOnly` boolean;

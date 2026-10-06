@@ -1,0 +1,11 @@
+-- Three material categories APPENDED, in this order (migrations-0098-batch-
+-- plan.md § 1, answered Q1): 'Surface Raceway' (track-c-retail-catalog-plan
+-- R3), 'Underground', 'Service Entrance' (ASSEMBLIES_PLAN.md).
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- Appending to an enum rewrites no row. The MODIFY restates the WHOLE column,
+-- so the 19 existing values are listed exactly as MATERIAL_CATEGORIES and
+-- 0028 have them, and the column stays nullable ("Nullable on purpose").
+--
+-- Hand-written, not generated.
+ALTER TABLE `materials` MODIFY COLUMN `category` enum('Wire & Cable','Conduit','Conduit Fittings','Boxes','Receptacles','Switches','Wall Plates & Misc','Panels','Breakers','Lighting Hardware','Grounding & Bonding','Life Safety','Low Voltage','Connectors & Terminations','Strut & Supports','Fasteners & Anchors','Equipment & Appliances','Distribution Equipment','Consumables','Surface Raceway','Underground','Service Entrance');

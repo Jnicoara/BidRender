@@ -1,0 +1,17 @@
+-- "Labor only": an assembly the user ticks as having no material, so its
+-- lines never read "material not priced" (owner YES, 2026-10-06;
+-- references/migrations-next-batch.md § 0105–0106; CLAUDE.md § Editing
+-- fields 6, "And the way out").
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- NULL / false = not said: a line with labor and $0 material stays "not
+-- priced", exactly as today. No default (so "never said" stays a value
+-- nothing else produces) and no backfill: never inferred from "has no parts".
+--
+-- ── PAIRING RULE ─────────────────────────────────────────────────────────────
+-- Ships in the SAME release as Track B's labor-only code AND B's "labor with
+-- $0 material is not priced" rule (5c98bd1, already on local-dev) — never
+-- the rule without this and the code (live-release-plan.md § 0).
+--
+-- Hand-written, not generated (see 0065, 0067).
+ALTER TABLE `assemblies` ADD `laborOnly` boolean;

@@ -1,6 +1,59 @@
-# Next migrations — ONE list, every track's asks. PLAN ONLY, 2026-10-06
+# Next migrations — ONE list, every track's asks. 0105–0124 WRITTEN, 2026-10-06
 
-**Nothing here is written, migrated or deployed.** This is the single
+## Status: 0105–0124 written and rehearsed — on NO shared database
+
+**Written 2026-10-06 (Track A), on `local-dev`, applied ONLY to local
+databases** (a copy of `bidrender_local`, `bidrender_test_localdev`).
+**Not on staging, not on live** — the owner approves live. Batch 5 (0125+)
+is not written: its designs are not settled.
+
+**Release rules still in force for these files** (below, unchanged):
+0105–0106 ship only WITH Track B's labor-only code (not written yet) and B's
+labor rule; 0122/0123 ship only with B's H2 step-2 code (on local-dev,
+882ee8e); every file is step 1 (additive, before the push). So the next
+release that carries `local-dev` must apply ALL TWENTY first, and must not
+go out before B's labor-only code is in it.
+
+**Rehearsal, on `bidrender_rehearsal_b2`, a copy of `bidrender_local` (105
+migrations, 4,386 bids, 9,686 lines):**
+
+| Check                                                                               | Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Apply                                                                               | "Applied 20 migrations … now has all 125". Second run: "Nothing to apply".                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Drift (`schemaDrift.mts`)                                                           | No NEW drift. The same 5 legacy foreign keys (`project_*`, `assemblies_laborRateId`) and the same collation lines are already missing on `bidrender_local` before the batch — local history; staging and live measured 141/141 FKs.                                                                                                                                                                                                                                                   |
+| 0115 keys                                                                           | `bid_line_items_bid_group_uq` gone; `bid_line_items_bid_group_role_uq (bidId, takeoffGroupId, lineRole)` present; `bidId` still backed by `bid_line_items_bidId_idx` and the FK's own index. All 9,686 lines `install`.                                                                                                                                                                                                                                                               |
+| No row rewritten                                                                    | 0 assemblies with NULL hours after migrating; 0 lines with `snapshotLaborOnly` or `bidUnitCost` set.                                                                                                                                                                                                                                                                                                                                                                                  |
+| Bid totals (`bidTotals.mts`, before from `60ae696`'s code, after from this batch's) | **All 4,386 bids: total due, not-priced and incomplete unchanged.**                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Starters on boot (new code)                                                         | **167 shared starters** = the 8 already there + 159 of the 160 new ones. One log line: "Holding 1 starter(s) — a part is not in the catalog: DV34". 159 with hours NULL, **0 written as 0**; 29 in the two 0122 categories. (So "8 + 29 + 160" reads as: 8 old, 160 new of which 29 needed 0122, less DV34.)                                                                                                                                                                          |
+| NULL hours read as 0?                                                               | Every read of `baseLaborHours` (searched by the column name: 82 hits in 12 non-test, non-seed files, each read) goes through `assemblyHours` / `snapshotHoursFor` / `previewAssembly`, writes through `assemblyHoursColumnValue`, or sits in a branch that has already handled NULL. The two `?? 0` sites are labelled "absence of money" with `hoursNotSet` / `lineHoursNotSet` beside them. `KitItemLine.baseLaborHours` was `string` and is now `string \| null` (compile-forced). |
+| Tests                                                                               | `server/migrationBatch0105.test.ts` (8 cases) + drift + B's starter and hours tests: 95 pass on 125. On a 105 database drift fails naming the columns, the file fails at setup, and MySQL refuses NULL hours ("cannot be null") and 'General' ("Data truncated").                                                                                                                                                                                                                     |
+
+**STOP — the LT1/LT2 repair MOVES A NUMBER, despite its row below saying
+"Bid number? No".** On the rehearsal copy, report → apply → report behaved
+as documented, but `bidTotals --compare` then failed: **bid 1728273,
+not-priced parts 35 → 36** (total due unchanged). Cause, checked: that bid
+has one LT1 line whose `snapshotUnpricedParts` is NULL (a line from before
+0087), and such a line reads its recipe LIVE (`withUnpricedParts`), so the
+$0 fixture line the repair adds becomes "one more part not priced" on an
+existing bid. **Do not `--apply` on live until Track B / the owner decide**
+— e.g. freeze the OLD recipe's count onto NULL-snapshot lines of LT1/LT2
+first (what 0087 would have frozen), or accept and label it. On live, count
+first: lines on the shared LT1/LT2 with `snapshotUnpricedParts IS NULL`.
+
+**Track A's picks where the sources left a type or key open** (each also in
+its .sql header, reversible until applied anywhere shared): 0107 `codeHash`
+varchar(64) + named unique (as `company_invites` really is), creator FK
+CASCADE, no `updatedAt`; 0108 every unstated type sized from the column it
+copies (`shareId` varchar(32), `action`/`cropStatus` enums, `month` char(7),
+`trade` varchar(64)); 0114 `bidId`/`userId` NOT NULL with FKs CASCADE;
+**0116 `decimal(10,6)`, not the `(6,4)` this list said** — every markup
+column since 0078 is (10,6) and the same code reads them; 0124
+`symbolLinkId` nullable (SET NULL needs it), `userId` FK CASCADE,
+`status`/`source` NOT NULL, six foreign keys (the plan said three).
+
+---
+
+**The plan as written before the files (kept for the record):** This is the single
 numbered list of every column and table any track has asked Track A for,
 after the 105 already on staging AND live (0000–0104; live since
 2026-10-06). **It supersedes the numbers in
@@ -151,9 +204,9 @@ prices; example prices become non-zero), which is why it waits for the
 
 ## Data repairs that ride the release — scripts, not migrations
 
-| Repair                                                                                               | What it does                                                                                                                                                                                                                                                                                                                             | Asked by                 | Bid number?                                                                                         | When                                                                                                                                                                                                                                                             |
-| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **LT1/LT2 fixture line** — `pnpm tsx scripts/repairStarterFixtureLines.mts` (report), then `--apply` | Adds "Surface-mount ceiling fixture" to the SHARED LT1 starter and "Ceiling fan" to the SHARED LT2 (plan D2) — only where no company has forked the row and its lines are exactly the old shipped recipe. Anything else is skipped and logged ("skipped: forked", "skipped: edited"). Repeatable: a second run reports "already has it". | B (owner YES 2026-10-06) | No: bid lines are frozen snapshots, the fixture rows are $0, and no fork or company row is touched. | After the release's push (step 3 slot), with `ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local`. Run the report first; on live expect `would add` or `skipped: forked` for each of LT1 and LT2. **Not on staging or live before the release.** |
+| Repair                                                                                               | What it does                                                                                                                                                                                                                                                                                                                             | Asked by                 | Bid number?                                                                                                                                                                                                                                                                                                                  | When                                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **LT1/LT2 fixture line** — `pnpm tsx scripts/repairStarterFixtureLines.mts` (report), then `--apply` | Adds "Surface-mount ceiling fixture" to the SHARED LT1 starter and "Ceiling fan" to the SHARED LT2 (plan D2) — only where no company has forked the row and its lines are exactly the old shipped recipe. Anything else is skipped and logged ("skipped: forked", "skipped: edited"). Repeatable: a second run reports "already has it". | B (owner YES 2026-10-06) | ~~No: bid lines are frozen snapshots, the fixture rows are $0, and no fork or company row is touched.~~ **YES — measured 2026-10-06 (Track A): a line with `snapshotUnpricedParts` NULL reads the recipe live, so it gains "1 part not priced" (bid 1728273, 35 → 36 on the rehearsal copy). See the STOP note at the top.** | After the release's push (step 3 slot), with `ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local`. Run the report first; on live expect `would add` or `skipped: forked` for each of LT1 and LT2. **Not on staging or live before the release.** |
 
 If the report prints anything other than `would add` / `skipped: forked` for
 LT1 and LT2 (for example `skipped: edited` or `skipped: not found`), **stop

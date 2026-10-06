@@ -6,6 +6,22 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **The server now notes any request that takes over 5 seconds** — which
+  part of the app it was, how long it took, and whether the time went to the
+  database, to waiting for a database connection, or somewhere else. Nothing
+  private is recorded: no bid names, no search text, no file names. Twice
+  today the test site stalled and nothing could say why; the next stall will
+  leave its own explanation.
+
+- **The database changes for the next release are written and rehearsed**
+  (behind the scenes, nothing on the live site yet): "labor only"
+  assemblies, assembly hours that can be "not set", two new assembly
+  categories and three new material categories, remove/relocate labor,
+  supplier quotes, and the tables the invite gate, the AI correction log and
+  legend reading will need. Tried on a full copy of our working database
+  first: not one bid total moved, and the 159 new starter assemblies now
+  load with their hours "not set" — never as zero.
+
 - **A new assembly starts with its hours empty.** The suggested figure is
   shown in grey beside the box with a "Use suggested" button, and is only
   saved if you click it or type a number, so nobody saves a guess by not

@@ -1,0 +1,20 @@
+-- `assemblies.baseLaborHours` may be NULL: "hours not set", never a silent 0
+-- (plan D1, § 11; migrations-0098-batch-plan.md § 11(a), verbatim).
+--
+-- The DEFAULT goes too: a value somebody forgot to supply must read as "not
+-- set", and DEFAULT 0 is exactly the silent zero this exists to end.
+-- `overheadLaborHours` is not touched.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- Changes no row: every existing assembly keeps the hours it has (the 8
+-- starters' 0s become NULL only in step 3 (i), after this AND its code are
+-- live). Applying it moves no number.
+--
+-- ── PAIRING RULE ─────────────────────────────────────────────────────────────
+-- Ships with 0122 and Track B's H2 step-2 code: every reader reads NULL as
+-- "not set" through shared/assemblyHours.ts. The schema.ts edit that makes
+-- the column nullable lifts B's 160 held starters on the next boot — which is
+-- why it must never ship without that code.
+--
+-- Hand-written, not generated.
+ALTER TABLE `assemblies` MODIFY COLUMN `baseLaborHours` decimal(10,4) NULL DEFAULT NULL;

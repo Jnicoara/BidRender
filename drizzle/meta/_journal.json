@@ -736,6 +736,146 @@
       "when": 1789959400000,
       "tag": "0104_run_end_connect",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "5",
+      "when": 1789959500000,
+      "tag": "0105_assembly_labor_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "5",
+      "when": 1789959600000,
+      "tag": "0106_line_labor_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "5",
+      "when": 1789959700000,
+      "tag": "0107_signup_invites",
+      "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "5",
+      "when": 1789959800000,
+      "tag": "0108_ai_correction_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "5",
+      "when": 1789959900000,
+      "tag": "0109_sheet_hash_height",
+      "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "5",
+      "when": 1789960000000,
+      "tag": "0110_assembly_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "5",
+      "when": 1789960100000,
+      "tag": "0111_group_status_hours",
+      "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "5",
+      "when": 1789960200000,
+      "tag": "0112_stamp_label_words",
+      "breakpoints": true
+    },
+    {
+      "idx": 113,
+      "version": "5",
+      "when": 1789960300000,
+      "tag": "0113_look_confirmed_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 114,
+      "version": "5",
+      "when": 1789960400000,
+      "tag": "0114_bid_quotes",
+      "breakpoints": true
+    },
+    {
+      "idx": 115,
+      "version": "5",
+      "when": 1789960500000,
+      "tag": "0115_bid_line_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "5",
+      "when": 1789960600000,
+      "tag": "0116_quoted_markup",
+      "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "5",
+      "when": 1789960700000,
+      "tag": "0117_new_material_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "5",
+      "when": 1789960800000,
+      "tag": "0118_locknut_bushing_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "5",
+      "when": 1789960900000,
+      "tag": "0119_materials_parent_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "5",
+      "when": 1789961000000,
+      "tag": "0120_materials_parent_id_fk",
+      "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "5",
+      "when": 1789961100000,
+      "tag": "0121_materials_brand",
+      "breakpoints": true
+    },
+    {
+      "idx": 122,
+      "version": "5",
+      "when": 1789961200000,
+      "tag": "0122_assembly_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "5",
+      "when": 1789961300000,
+      "tag": "0123_assembly_hours_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 124,
+      "version": "5",
+      "when": 1789961400000,
+      "tag": "0124_bid_pdf_legend_entries",
+      "breakpoints": true
     }
   ]
 }

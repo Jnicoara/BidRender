@@ -1,0 +1,15 @@
+-- Two columns on `bid_pdf_sheets`, ONE ALTER (migrations-next-batch.md, clash 2):
+--
+--   contentHash               Track C, pay-once reading: written on a sheet's
+--                             first read. NULL = never read.
+--   distributionHeightInches  Track B, vertical-drops-plan.md § 7 col 1: this
+--                             sheet's run height. NULL = follows the job —
+--                             the same type as the bid / run / defaults
+--                             columns of that name.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- Nullable, no default, no backfill. B's built code (faeaab8) then moves
+-- vertical footage only on a sheet someone sets; NULL keeps today's chain.
+--
+-- Hand-written, not generated.
+ALTER TABLE `bid_pdf_sheets` ADD `contentHash` varchar(64), ADD `distributionHeightInches` int;

@@ -11,6 +11,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { ENV } from "./env";
 import { serveStatic, setupVite } from "./vite";
+import { slowRequestLogger } from "../slowRequests";
 import { purgeArchivedBidsHandler } from "../scheduled/purgeArchivedBids";
 import { BACKUP_PATH, backupToR2Handler } from "../scheduled/backupToR2";
 import { PLAN_UPLOAD_PATH, planUploadHandler } from "../planUpload";
@@ -84,6 +85,11 @@ async function resolvePort(): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // Measures only, decides nothing — so ahead even of the staging gate: a
+  // request over 5 s logs one line saying where its time went, with no
+  // private data (server/slowRequests.ts). Runtime Logs are wiped by every
+  // deploy, so this is how a stall leaves evidence.
+  app.use(slowRequestLogger());
   // The staging password gate — FIRST, so no route escapes it. Mounts nothing
   // unless STAGING_PASSWORD is set, which production never has. See
   // server/stagingGate.ts.

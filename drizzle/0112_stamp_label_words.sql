@@ -1,0 +1,11 @@
+-- The words Find all matching tied to a device — "USB", `54"`, "(E)", "A2"
+-- (Track C handoff, 2026-10-06). NULL = never read (a hand mark, or a mark
+-- from before the column).
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- Pricing by these words is NOT planned; if it ever is, that is its own
+-- decision. (`mountingHeightIn` beside it is a DUPLICATE of 0098's
+-- mountHeightInches and is deliberately not added — clash 3.)
+--
+-- Hand-written, not generated.
+ALTER TABLE `takeoff_stamps` ADD `labelWords` text;

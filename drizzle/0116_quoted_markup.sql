@@ -1,0 +1,13 @@
+-- The ONE company-wide markup for quoted lines, beside `materialMarkupPct`
+-- (material-markup D4, owner c; quote-items-plan.md § 8). NULL = no quoted-
+-- line rule set — not a 0% rule, exactly as materialMarkupPct (0078).
+--
+-- decimal(10,6), NOT the decimal(6,4) migrations-next-batch.md wrote: it is
+-- read by the same markup code as `materialMarkupPct`, every markup rule and
+-- `snapshotMarkupPct`, all decimal(10,6) since 0078. (6,4) is the type of the
+-- retired pre-0078 `markupPct`. Track A, 2026-10-06.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+--
+-- Hand-written, not generated.
+ALTER TABLE `pricing_defaults` ADD `quotedMarkupPct` decimal(10,6);

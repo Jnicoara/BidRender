@@ -99,6 +99,28 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
 
 Requests waiting for Track A, which numbers and writes the migrations.
 
+> **0105–0124 WRITTEN 2026-10-06 (Track A) on local-dev — applied to LOCAL
+> databases only, never staging or live (owner approves live).** Rehearsed
+> on a copy of `bidrender_local`: no bid total moved (4,386 bids), 167
+> starters seed (DV34 still held), no NULL hours read as 0. Full record:
+> `references/migrations-next-batch.md` § Status. **For Track B, two things:**
+> (1) **your labor-only code** (`lineMaterialNotPriced` + SQL copy reading
+> `snapshotLaborOnly`, the "Labor only" tick) is now the one thing the next
+> release waits for — 0105/0106 are in `drizzle/schema.ts`; (2) **the LT1/LT2
+> repair moves a number**: a line with `snapshotUnpricedParts` NULL reads the
+> recipe live and gains "1 part not priced" (bid 1728273 on the copy, 35 →
+> 36, money unchanged). Not to be `--apply`d on live until decided — freeze
+> the old count onto those lines first, or accept and label it.
+> **Columns now exist for:** laborOnly, snapshotLaborOnly, signup_invites,
+> ai_correction_log (+ askKind/askFingerprint), contentHash,
+> distributionHeightInches (sheet), remove/relocate hours (assembly + count),
+> mountHeightTypeKey, materialByQuote, labelWords, symbol_looks.confirmedAt,
+> bid_quotes, lineRole + the six quote columns, quotedMarkupPct (decimal
+> 10,6), locknut/bushing roles, materials.parentId (+FK) / brand, the 3 + 2
+> new categories, NULL assembly hours, bid_pdf_legend_entries (+ lookId).
+> Nothing reads the new ones yet except B's hours code; each track's code
+> comes next.
+
 > **ALL NUMBERED 2026-10-06 (Track A), none written yet — see
 > `references/migrations-next-batch.md` on `a-migrations-plan`**, the one
 > list of every track's asks. In short: `distributionHeightInches` is in

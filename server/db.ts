@@ -18,6 +18,7 @@ import {
 } from "drizzle-orm";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2/promise";
+import { timePool } from "./slowRequests";
 import {
   QUANTITY_MARK_STATUSES,
   emptySplit,
@@ -334,7 +335,8 @@ export async function getDb() {
     try {
       // The pool is built from mysqlConnection rather than the URL directly, so
       // a managed host's TLS certificate is honoured. See databaseConnection.ts.
-      _pool = createPool(mysqlConnection(process.env.DATABASE_URL));
+      // Timed per request, for the slow-request line (server/slowRequests.ts).
+      _pool = timePool(createPool(mysqlConnection(process.env.DATABASE_URL)));
       _db = drizzle(_pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
@@ -3578,9 +3580,8 @@ export function assemblyHoursColumnValue(
       `${what}: hours can't be left "not set" until the next database update — type the hours for now.`
     );
   }
-  // Through `unknown` only while drizzle/schema.ts still types the column
-  // NOT NULL; once Track A's 0123 lands there, this cast is redundant.
-  return null as unknown as InsertAssembly["baseLaborHours"];
+  // 0123 is in drizzle/schema.ts: the column takes NULL, no cast needed.
+  return null;
 }
 
 /** A starter's hours as written — see `assemblyHoursColumnValue`. */
@@ -5607,6 +5608,16 @@ function feetForRole(
     */
     case "teeBody":
       return { bought: 0, installed: 0 };
+    /*
+      The same tripwire for 0118's roles, for the same reason: a locknut and a
+      bushing are COUNTS, added before the code that counts them
+      (track-c-next-batch-plan.md § 4 A1). Nothing writes either until Track
+      C's code ships; that code adds them to FITTING_KINDS, these labels then
+      fail to compile, and they are deleted.
+    */
+    case "locknut":
+    case "bushing":
+      return { bought: 0, installed: 0 };
   }
 }
 
@@ -6282,6 +6293,8 @@ export function pricingSnapshotOf(
     snapshotMarkupSource: line.snapshotMarkupSource,
     // A copy carries the frozen cost, so it carries what that cost lacks.
     snapshotUnpricedParts: line.snapshotUnpricedParts,
+    // And whether its assembly was labor only when it was frozen (0106).
+    snapshotLaborOnly: line.snapshotLaborOnly,
     snapshotAt: line.snapshotAt,
   };
 }
@@ -7336,7 +7349,8 @@ export type KitItemLine = {
   sortOrder: number;
   name: string;
   category: Assembly["category"];
-  baseLaborHours: string;
+  /** NULL = hours not set (0123) — read through shared/assemblyHours.ts. */
+  baseLaborHours: string | null;
   /** Carried alongside the base hours so a kit's rollup counts them too. */
   overheadLaborHours: string;
   laborRateId: number | null;
