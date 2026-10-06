@@ -4453,6 +4453,12 @@ footage came from.** That distinction is the whole point and is the thing most
 likely to be "simplified" away by someone who sees two percentages and assumes
 they are the same idea applied twice.
 
+> **OVERRIDDEN 2026-10-05 by the owner: conduit waste covers flat + drops,**
+> the same base as wire waste, on traced runs and on count drops. The
+> reasoning below is kept as the record of what was decided first; it no
+> longer governs the arithmetic. `shared/takeoffQuantities.ts`,
+> `shared/groupDrops.ts`; references/vertical-drops-plan.md § 3.
+
 **CONDUIT allowance — traced length ONLY.** It exists to cover _route
 uncertainty_: the jog around a duct, the offset that was not on the plan. A drop
 from a known distribution height to a known mounting height contains none of

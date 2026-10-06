@@ -167,7 +167,10 @@ place to point:
 - A run has two ends. **Each end that is a device or a panel** (its kind is
   a height type, not "run height") adds `|run height − device height|` of
   vertical. A tee end adds none (D20). An end at "run height" adds none.
-- **Conduit** = flat × (1 + conduit extra %) + vertical.
+- **Conduit** = (flat + vertical) × (1 + conduit extra %). **Changed
+  2026-10-05 by the owner:** it was flat × (1 + %) + vertical — waste on the
+  flat length only (overhaul § 7.1). Conduit waste now covers the drops, the
+  same base wire waste uses, on traced runs and count drops alike.
 - **Wire, per conductor** = (flat + vertical) × (1 + wire extra %) +
   makeup at each end. **Makeup still applies, on top, after the vertical** —
   18" per conductor at a device box, 5' at a panel (owner, held-migrations
@@ -175,8 +178,9 @@ place to point:
   of it, one makeup tail per end (Q3).
 - **Labor** is on installed footage — flat + vertical + makeup on wire — not
   on the extra (`laborQty`, Q5).
-- **A count drop** is the same arithmetic for one vertical per new mark, no
-  conduit extra, makeup at the device end, no fittings (labelled, Q8).
+- **A count drop** is the same arithmetic for one vertical per new mark:
+  conduit waste (since 2026-10-05; none before), wire waste, makeup at the
+  device end, no fittings (labelled, Q8).
 - **Never both.** A mark a run end claims is left out of its count's drops.
   Gap 5 changes WHEN a claim counts — see § 8 step 1.
 
@@ -184,22 +188,27 @@ place to point:
 
 The owner worked the conduit by hand as 40 + 4 + 8.5 = **52.5 ft** and
 asked why § 9 said 54.5. **Both are right; they are different
-quantities.** 52.5 is conduit INSTALLED. 54.5 is conduit BOUGHT, which
-adds the conduit extra (waste) on the FLAT length only — never on the
-drops (overhaul § 7.1). The table in § 9 had both rows but did not say
-which one "conduit" meant. Every line, as the code computes it
-(`server/verticalDropsKnownAnswer.test.ts`, green):
+quantities.** 52.5 is conduit INSTALLED. 54.5 was conduit BOUGHT under
+the old rule, which put the conduit waste on the FLAT length only
+(overhaul § 7.1). **The owner then changed the rule the same day:** conduit
+waste covers flat + drops, like wire waste. Every line, as the code now
+computes it (`server/verticalDropsKnownAnswer.test.ts`, green):
 
 **Conduit**
 
-| Step                             | Working         | Feet     |
-| -------------------------------- | --------------- | -------- |
-| Flat (traced)                    | —               | 40.0     |
-| Drop at the panel                | (120 − 72) ÷ 12 | 4.0      |
-| Drop at the receptacle           | (120 − 18) ÷ 12 | 8.5      |
-| **Conduit installed**            | 40 + 4 + 8.5    | **52.5** |
-| Conduit extra (waste), flat only | 40 × 5 %        | 2.0      |
-| **Conduit bought**               | 52.5 + 2.0      | **54.5** |
+| Step                           | Working         | Feet      |
+| ------------------------------ | --------------- | --------- |
+| Flat (traced)                  | —               | 40.0      |
+| Drop at the panel              | (120 − 72) ÷ 12 | 4.0       |
+| Drop at the receptacle         | (120 − 18) ÷ 12 | 8.5       |
+| **Conduit installed**          | 40 + 4 + 8.5    | **52.5**  |
+| Conduit waste, on flat + drops | 52.5 × 5 %      | 2.625     |
+| — kept to the cent (half up)   |                 | 2.63      |
+| **Conduit bought**             | 52.5 + 2.63     | **55.13** |
+
+52.5 × 1.05 = 55.125 exactly; every footage is kept to the hundredth of a
+foot (`round2`), and the waste is rounded before it is added, so the bid
+reads **55.13 ft**. Under the old rule it read 2.00 waste and 54.50 bought.
 
 Makeup is wire only, so conduit gets none.
 
@@ -399,7 +408,7 @@ pure, no database). Priced fixture types, never shipped prices (CLAUDE.md):
 | Vertical, start           | (120 − 72) / 12         | **4.0 ft**   |
 | Vertical, end             | (120 − 18) / 12         | **8.5 ft**   |
 | Conduit installed         | 40 + 4 + 8.5            | **52.5 ft**  |
-| Conduit bought            | 40 × 1.05 + 12.5        | **54.5 ft**  |
+| Conduit bought            | 52.5 × 1.05 = 55.125    | **55.13 ft** |
 | Wire per conductor        | 52.5 × 1.10 + 5.0 + 1.5 | **64.25 ft** |
 | Wire bought, 4 conductors | 64.25 × 4               | **257.0 ft** |
 

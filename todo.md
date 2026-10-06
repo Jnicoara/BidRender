@@ -95,6 +95,25 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
 
 ## Pending / Future
 
+### Track A next migration batch
+
+Requests waiting for Track A, which numbers and writes the migrations.
+
+- [ ] **`bid_pdf_sheets.distributionHeightInches INT NULL`** — this
+      sheet's run height (Track B, owner's answer b, 2026-10-05). ADDITIVE,
+      nullable, **no DEFAULT** (NULL = follows the job, and must stay
+      distinguishable from any answer). Step 1 of the three-step deploy: no
+      `UPDATE`, no backfill. Once it lands, Track B makes the run height chain
+      run → sheet → job → company. references/vertical-drops-plan.md § 7.
+- [ ] **`assemblies.mountHeightTypeKey VARCHAR(64) NULL`** — the height TYPE
+      this assembly's device mounts at, a key of the heights list
+      (`receptacle`, `switch`, or a company's own) — NOT inches, so it
+      re-prices through job → company → shipped like every other height
+      (Track B, owner's answer c, 2026-10-05). ADDITIVE, nullable, **no
+      DEFAULT** (NULL = not said; a count asks, as today). No backfill. Once
+      it lands, Track B starts a new count's `dropKind` from it.
+      references/vertical-drops-plan.md § 7.
+
 ### Requests to Track A from Check sheet (Track C, 2026-10-01) — A numbers these
 
 Check sheet shipped code-only on track-c without any of these; each is behind

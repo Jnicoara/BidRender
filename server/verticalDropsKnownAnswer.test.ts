@@ -13,9 +13,11 @@
  *
  * The question that prompted this file (2026-10-05): "conduit 54.5 ft — by
  * hand I get 52.5." Both are right, and they are different quantities:
- * 52.5 is conduit INSTALLED (flat + both drops); 54.5 is conduit BOUGHT,
- * which adds the 5 % extra on the FLAT length only (2.0 ft), never on the
- * drops (plan-viewer-overhaul § 7.1). Both are pinned below, by name.
+ * 52.5 is conduit INSTALLED (flat + both drops); 54.5 was conduit BOUGHT,
+ * which added the 5 % extra on the FLAT length only (2.0 ft). The owner
+ * then decided the same day that conduit waste covers the drops too, as
+ * wire waste does: bought is now 52.5 × 1.05 = 55.125, kept as 55.13.
+ * Both quantities are pinned below, by name.
  */
 import { describe, expect, it } from "vitest";
 import { quantitiesForRun, type RunCircuit } from "../shared/takeoffQuantities";
@@ -61,9 +63,13 @@ describe("the known-answer run, line by line", () => {
     expect(q.conduitInstalledFeet).toBe(52.5);
   });
 
-  it("conduit BOUGHT: 52.5 + 5 % of the 40 ft flat (2.0) = 54.5 ft", () => {
-    expect(q.conduitExtraFeet).toBe(2);
-    expect(q.conduitBoughtFeet).toBe(54.5);
+  it("conduit BOUGHT: 52.5 × 1.05 = 55.125, to the cent 55.13 ft", () => {
+    // Owner, 2026-10-05: waste is 5 % of flat + drops (52.5 ft), not of
+    // the 40 ft flat. 52.5 × 0.05 = 2.625, kept to the cent as 2.63 (half
+    // up); bought = 52.5 + 2.63 = 55.13. Under the old rule this was
+    // 2.00 and 54.50 — red with it.
+    expect(q.conduitExtraFeet).toBe(2.63);
+    expect(q.conduitBoughtFeet).toBe(55.13);
   });
 
   it("wire: 4 wires × 52.5 = 210; extra 10 % = 21; makeup 4 × (5 + 1.5) = 26; bought 257", () => {

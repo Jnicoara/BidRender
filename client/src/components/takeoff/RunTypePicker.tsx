@@ -1109,7 +1109,7 @@ export function RunTypePicker({
                 {pathType === "conduit" && (
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-muted-foreground">
-                      Conduit extra, run length only
+                      Conduit extra, run and drops
                     </span>
                     <ExtraDraftField
                       value={toPct(draft.conduitExtraPct)}

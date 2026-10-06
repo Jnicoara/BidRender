@@ -19,9 +19,10 @@
  *
  * ── What a drop buys ─────────────────────────────────────────────────────────
  * Pipe (or cable) the length of the drop, and wire per conductor of the run
- * type down it, through the SAME extras rules as a run's vertical (§ 7.1):
- * the wire % applies, the conduit % does not (a drop is arithmetic between two
- * known heights), and makeup is added at the device end only — once per wire,
+ * type down it, through the SAME extras rules as a run's vertical: the wire %
+ * and — since 2026-10-05 (owner) — the conduit % both apply. Until then the
+ * conduit % did not (overhaul § 7.1: "a drop is arithmetic between two known
+ * heights"). Makeup is added at the device end only — once per wire,
  * or once in cable feet on a cable type (Q3). Extra is material only (Q5).
  *
  * ── Fittings are NOT counted (owner, 2026-09-28, Q8) ─────────────────────────
@@ -116,6 +117,8 @@ export type DropFootage = {
   wireBoughtFeet: number;
   groundInstalledFeet: number;
   groundBoughtFeet: number;
+  /** Conduit waste on the drop (owner 2026-10-05: drops get it too). */
+  conduitExtraFeet: number;
   wireExtraFeet: number;
   makeupFeet: number;
 };
@@ -201,6 +204,7 @@ export function dropsFootage(per: DropFootage, count: number): DropFootage {
     wireBoughtFeet: round2(per.wireBoughtFeet * count),
     groundInstalledFeet: round2(per.groundInstalledFeet * count),
     groundBoughtFeet: round2(per.groundBoughtFeet * count),
+    conduitExtraFeet: round2(per.conduitExtraFeet * count),
     wireExtraFeet: round2(per.wireExtraFeet * count),
     makeupFeet: round2(per.makeupFeet * count),
   };
@@ -211,7 +215,9 @@ export function oneDrop(
   feet: number,
   type: DropTypeSpec,
   wirePct: number,
-  makeupInches: number
+  makeupInches: number,
+  /** Conduit waste, on the drop as on a run (owner 2026-10-05). */
+  conduitPct: number
 ): DropFootage {
   const makeup = makeupInches / 12;
   if (type.pathType === "cable") {
@@ -228,6 +234,7 @@ export function oneDrop(
       wireBoughtFeet: 0,
       groundInstalledFeet: 0,
       groundBoughtFeet: 0,
+      conduitExtraFeet: 0,
       wireExtraFeet: round2(feet * wirePct),
       makeupFeet: round2(makeup),
     };
@@ -239,9 +246,11 @@ export function oneDrop(
   return {
     pathType: "conduit",
     dropFeet: feet,
-    // No conduit extra on a drop (§ 7.1): bought is installed.
+    // Conduit waste on the drop, as on a run's drops (owner, 2026-10-05;
+    // until then a drop got none — overhaul § 7.1).
     conduitInstalledFeet: feet,
-    conduitBoughtFeet: feet,
+    conduitBoughtFeet: round2(feet + round2(feet * conduitPct)),
+    conduitExtraFeet: round2(feet * conduitPct),
     cableInstalledFeet: 0,
     cableBoughtFeet: 0,
     wireInstalledFeet: round2(wireInstalled),
@@ -371,6 +380,9 @@ export function groupDrops(input: {
       0;
     const makeup =
       resolveMakeup(kind, null, type.extras, input.extras).value ?? 0;
+    const conduitPct =
+      resolveExtraPct("conduitExtraPct", null, type.extras, input.extras)
+        .value ?? 0;
 
     // Each mark at its own height where it has one, else the count's.
     const buckets = new Map<number, DropBucket>();
@@ -397,7 +409,7 @@ export function groupDrops(input: {
         deviceInches: at.endInches,
         source: own.source,
         perDropFeet: at.feet,
-        perDrop: oneDrop(at.feet, type, wirePct, makeup),
+        perDrop: oneDrop(at.feet, type, wirePct, makeup, conduitPct),
         marks: [],
       };
       buckets.set(at.endInches, {
@@ -417,7 +429,7 @@ export function groupDrops(input: {
       return {
         ...none("counted", null, device),
         perDropFeet: vertical.feet,
-        perDrop: oneDrop(vertical.feet, type, wirePct, makeup),
+        perDrop: oneDrop(vertical.feet, type, wirePct, makeup, conduitPct),
       };
     }
     return {
@@ -435,7 +447,7 @@ export function groupDrops(input: {
       uncounted,
       mayDoubleCount: countedMarks.filter(nearAnOpenEnd).length,
       perDrop: vertical.counted
-        ? oneDrop(vertical.feet, type, wirePct, makeup)
+        ? oneDrop(vertical.feet, type, wirePct, makeup, conduitPct)
         : null,
     };
   });

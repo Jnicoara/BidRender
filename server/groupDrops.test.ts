@@ -279,10 +279,13 @@ describe("extras on a drop follow § 7.1", () => {
     },
   };
 
-  it("adds wire extra and makeup at the device, never conduit extra", () => {
+  it("adds wire extra and makeup at the device, and conduit waste on the drop", () => {
     const [d] = drops({ marks: marks(10), extras: accepted });
     const per = d.perDrop!;
-    expect(per.conduitBoughtFeet).toBe(8.5); // no 5% on a drop
+    // Owner, 2026-10-05: conduit waste covers drops too (was 8.50, none).
+    expect(per.conduitInstalledFeet).toBe(8.5);
+    expect(per.conduitExtraFeet).toBe(0.43); // 5% of 8.50 = 0.425
+    expect(per.conduitBoughtFeet).toBe(8.93);
     // Three wires: 3 × 8.5 laid + 3 × 1.5 ft makeup = 30.00 installed.
     expect(per.wireInstalledFeet).toBe(30);
     expect(per.wireExtraFeet).toBe(2.55); // 10% of 25.50

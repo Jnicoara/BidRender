@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-05]
 
+- **Conduit waste now covers the drops too.** The conduit allowance used to
+  apply to the traced run length only, while the wire allowance covered the
+  drops as well. Both now use the same footage, on traced runs and on drops
+  to counted devices — so a 40 ft run with 12.5 ft of drops buys 55.13 ft of
+  conduit at 5%, not 54.50 ft. The settings screens say so.
+
 - **Fixed: a device's drop could vanish from the bid.** When a run started
   or ended on a marked device but counted no drop there itself, the
   device's own drop was taken off anyway, so neither counted it. Now the
