@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **Adding a look compares the little words beside the symbol.** If your
+  other look of an item has "GF" (or WP, IG and the like) beside it and the
+  new one does not — or the other way round — the card says so before saving,
+  with Cancel first. Read from the drawing's own text; no AI involved.
+
 - **The warning also catches a symbol another item already claims by its
   look.** When you save a symbol, the app searches the sheet with it and with
   the other items' saved looks on the same plans. Places both find are named

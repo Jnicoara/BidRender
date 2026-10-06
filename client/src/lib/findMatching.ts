@@ -85,6 +85,11 @@ export type FindResult =
         words: string[];
         width: number;
         height: number;
+        /**
+         * The BOXED symbol's device words (GF, WP…: DEVICE_WORDS only, so a
+         * circuit number never counts). Absent when no box was searched.
+         */
+        device?: string[];
       };
       /**
        * Present when the sheet is a scan and the picture matcher ran: the
@@ -96,7 +101,16 @@ export type FindResult =
        * Present when the item's saved looks were searched too
        * (@/lib/lookMatching): how many, and what was left out and why.
        */
-      looks?: { searched: number; notes: string[] };
+      looks?: {
+        searched: number;
+        notes: string[];
+        /**
+         * Each saved look's device words (GF, WP…) as rebuilt here, vector
+         * only — what "Your other look has 'GF' beside it" compares
+         * (@/lib/lookMatching, `lookWordNotes`). Absent on a scan.
+         */
+        device?: { id: number; device: string[] }[];
+      };
     }
   | { kind: "scan" | "empty" | "tooBig" | "tooPoor"; message: string };
 

@@ -39,6 +39,14 @@ import {
 } from "@shared/symbolCapture";
 import { lookAlikeWarning, type LookAlike } from "@shared/symbolLooks";
 
+/** What a capture asks before saving (multiple-looks-plan.md § 4). */
+export type LookQuestion = {
+  /** Other items it lands on: their marks, and spots their looks find. */
+  alike: LookAlike[];
+  /** Device words that differ from the item's other looks (`lookWordNotes`). */
+  notes: string[];
+};
+
 /** Longest edge of the instant PREVIEW, in pixels. Not what is saved. */
 const THUMBNAIL_MAX_EDGE = 96;
 
@@ -204,14 +212,16 @@ export function SymbolCaptureForm({
   /**
    * Save the capture: a new item ("Save symbol"), or another look of an
    * existing one ("Yes, another look", multiple-looks-plan.md § 1). Either
-   * way the look is checked first (plan § 4). Resolves with the other items
-   * it also lands on when it was NOT saved for that reason — the card then
-   * asks, Cancel first — or null once saved. `accepted` is "Add anyway".
+   * way the look is checked first (plan § 4). Resolves with the question it
+   * raised when it was NOT saved for that reason — other items it also lands
+   * on, and device words that differ from the item's other looks — and the
+   * card then asks, Cancel first; or null once saved. `accepted` is "Add
+   * anyway".
    */
   onCapture: (
     label: string,
     opts: { addAsLook: boolean; accepted: boolean }
-  ) => Promise<LookAlike[] | null>;
+  ) => Promise<LookQuestion | null>;
   onCancel: () => void;
 }) {
   const [label, setLabel] = useState("");
@@ -220,12 +230,12 @@ export function SymbolCaptureForm({
   const [note, setNote] = useState<string | null>(null);
   /** Saving: checking the look, or the look-alike question it raised. */
   const [lookStep, setLookStep] = useState<
-    null | "checking" | { alike: LookAlike[]; addAsLook: boolean }
+    null | "checking" | (LookQuestion & { addAsLook: boolean })
   >(null);
   const save = (addAsLook: boolean, accepted: boolean) => {
     setLookStep("checking");
     onCapture(label.trim(), { addAsLook, accepted }).then(
-      alike => setLookStep(alike ? { alike, addAsLook } : null),
+      q => setLookStep(q ? { ...q, addAsLook } : null),
       () => setLookStep(null)
     );
   };
@@ -313,14 +323,28 @@ export function SymbolCaptureForm({
           className="mt-2.5 rounded-lg border border-border p-2"
           role="alert"
         >
-          <p className="text-xs text-[#F5C518]">
-            {lookAlikeWarning(warning.alike)}
-          </p>
-          <p className="text-xs mt-1 text-muted-foreground">
-            If it is drawn like {warning.alike[0].name} on this set, every{" "}
-            {warning.alike[0].name} would be offered as{" "}
-            {asking?.label ?? label.trim()}.
-          </p>
+          {warning.alike.length > 0 && (
+            <>
+              <p className="text-xs text-[#F5C518]">
+                {lookAlikeWarning(warning.alike)}
+              </p>
+              <p className="text-xs mt-1 text-muted-foreground">
+                If it is drawn like {warning.alike[0].name} on this set, every{" "}
+                {warning.alike[0].name} would be offered as{" "}
+                {asking?.label ?? label.trim()}.
+              </p>
+            </>
+          )}
+          {warning.notes.map(n => (
+            <p key={n} className="text-xs mt-1 text-[#F5C518]">
+              {n}
+            </p>
+          ))}
+          {warning.alike.length === 0 && (
+            <p className="text-xs mt-1 text-muted-foreground">
+              It may be a different device drawn alike. Add it anyway?
+            </p>
+          )}
           <div className="flex flex-wrap gap-1.5 mt-2">
             <Button
               size="sm"

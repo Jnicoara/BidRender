@@ -327,7 +327,11 @@ import { pastDragThreshold, swallowNextClick } from "@/lib/dragThreshold";
 import { wheelIntent, type WheelGesture } from "@/lib/wheelIntent";
 import type { PageTextLayer } from "@/lib/textSelection";
 import type { FindResult, MatchBox } from "@/lib/findMatching";
-import { lookAlikeCheck, type SavedLook } from "@/lib/lookMatching";
+import {
+  lookAlikeCheck,
+  lookWordNotes,
+  type SavedLook,
+} from "@/lib/lookMatching";
 import {
   browserStorage,
   readTrustedLooks,
@@ -9266,13 +9270,39 @@ export default function TakeoffPage({
                                 : await utils.takeoffStamps.looksOnSet
                                     .fetch({ sheetId: onSheet, label })
                                     .catch(() => null);
-                            const check = lookAlikeCheck(
+                            // Adding a look: the item's own looks go in too,
+                            // so their device words can be compared with this
+                            // one's (§ 4 point 1). Their finds are its own.
+                            const key = symbolLookupKey(label);
+                            const ownId = addAsLook
+                              ? symbols.find(
+                                  s =>
+                                    symbolLookupKey(s.label) === key ||
+                                    (s.originalName !== null &&
+                                      symbolLookupKey(s.originalName) === key)
+                                )?.id
+                              : undefined;
+                            const own =
+                              onSheet === null || ownId === undefined
+                                ? null
+                                : await utils.takeoffStamps.searchLooks
+                                    .fetch({
+                                      symbolId: ownId,
+                                      sheetId: onSheet,
+                                    })
+                                    .catch(() => null);
+                            const found =
                               onSheet === null
                                 ? null
                                 : await size
-                                    .findMatching(box, others?.looks ?? [])
+                                    .findMatching(box, [
+                                      ...(others?.looks ?? []),
+                                      ...(own?.looks ?? []),
+                                    ])
                                     .then(r => r.result)
-                                    .catch(() => null),
+                                    .catch(() => null);
+                            const check = lookAlikeCheck(
+                              found,
                               new Map(
                                 (others?.looks ?? []).map(l => [
                                   l.id,
@@ -9280,6 +9310,18 @@ export default function TakeoffPage({
                                 ])
                               )
                             );
+                            const ownIds = new Set(
+                              (own?.looks ?? []).map(l => l.id)
+                            );
+                            const notes =
+                              found?.kind === "ok" && found.symbol.device
+                                ? lookWordNotes(
+                                    found.symbol.device,
+                                    (found.looks?.device ?? [])
+                                      .filter(d => ownIds.has(d.id))
+                                      .map(d => d.device)
+                                  )
+                                : [];
                             if ("cannotCompare" in check || onSheet === null)
                               cannotCompare =
                                 "cannotCompare" in check
@@ -9293,7 +9335,8 @@ export default function TakeoffPage({
                                   spots: check.spots,
                                   otherLooks: check.otherLooks,
                                 });
-                              if (alike.length > 0) return alike;
+                              if (alike.length > 0 || notes.length > 0)
+                                return { alike, notes };
                               cannotCompare = !others
                                 ? "Other items' looks on this set could not be compared."
                                 : others.leftOut > 0

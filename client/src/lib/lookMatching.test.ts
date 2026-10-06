@@ -8,6 +8,7 @@ import type { Match } from "./findMatching";
 import {
   OTHER_SET_REASON,
   lookAlikeCheck,
+  lookWordNotes,
   mergeLookResults,
   type LookSource,
 } from "./lookMatching";
@@ -246,5 +247,25 @@ describe("another item's LOOK finding the new look's spots (plan § 4)", () => {
         { symbolId: 80, spots: 1 },
       ],
     });
+  });
+});
+
+describe("device words differ between a new look and the item's others (plan § 4 point 1)", () => {
+  it("says what the other look has that this one doesn't, and the reverse", () => {
+    expect(lookWordNotes([], [["GF"]])).toEqual([
+      "Your other look has “GF” beside it; this one doesn't.",
+    ]);
+    expect(lookWordNotes(["WP"], [[]])).toEqual([
+      "This one has “WP” beside it; your other look doesn't.",
+    ]);
+    expect(lookWordNotes(["GF"], [["WP"], ["GF", "WP"]])).toEqual([
+      "Your other looks have “WP” beside them; this one doesn't.",
+    ]);
+  });
+
+  it("says nothing when the words agree, or there is nothing to compare with", () => {
+    expect(lookWordNotes(["GF"], [["GF"]])).toEqual([]);
+    expect(lookWordNotes([], [[], []])).toEqual([]);
+    expect(lookWordNotes(["GF"], [])).toEqual([]);
   });
 });

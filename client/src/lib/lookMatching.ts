@@ -169,3 +169,44 @@ export function lookAlikeCheck(
         : "This look could not be compared with marks counted as other items on this sheet.",
   };
 }
+
+/**
+ * "Your other look has 'GF' beside it; this one doesn't" (multiple-looks-plan
+ * § 4 point 1). The new look's device words (GF, WP, IG… — the matcher's
+ * fixed list, so a circuit number never counts) against the item's other
+ * looks'. A word on one side and not the other is the cheapest sign that the
+ * two pictures are two different devices — a GFCI and a plain duplex drawn
+ * alike. Code only: the words come from the drawing's own text, no AI.
+ *
+ * Nothing to compare (no other look could be rebuilt) says nothing; the
+ * caller says separately when the comparison could not be made at all.
+ */
+export function lookWordNotes(
+  newDevice: readonly string[],
+  otherDevice: readonly (readonly string[])[]
+): string[] {
+  if (otherDevice.length === 0) return [];
+  const other =
+    otherDevice.length === 1 ? "Your other look" : "Your other looks";
+  const theirs = new Set(otherDevice.flat());
+  const mine = new Set(newDevice);
+  const q = (words: string[]) => words.map(w => `“${w}”`).join(", ");
+  const missing = Array.from(theirs)
+    .filter(w => !mine.has(w))
+    .sort();
+  const extra = Array.from(mine)
+    .filter(w => !theirs.has(w))
+    .sort();
+  return [
+    ...(missing.length
+      ? [
+          `${other} ${otherDevice.length === 1 ? "has" : "have"} ${q(missing)} beside ${otherDevice.length === 1 ? "it" : "them"}; this one doesn't.`,
+        ]
+      : []),
+    ...(extra.length
+      ? [
+          `This one has ${q(extra)} beside it; ${other.toLowerCase()} ${otherDevice.length === 1 ? "doesn't" : "don't"}.`,
+        ]
+      : []),
+  ];
+}
