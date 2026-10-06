@@ -38,17 +38,25 @@ two test-only fixes. They go live in the NEXT release, **together with
 0105–0106 and Track B's `laborOnly` code**, so the rule never reaches live
 without its way out.
 
-**Still needed before the window, and not done yet:**
+**Before the window — BOTH DONE 2026-10-06:**
 
-1. **A smoke test on exactly `24105ad`.** It has never run on staging. Pause
-   auto-deploy (`STAGING_AUTODEPLOY=off`), push `24105ad` to `staging` by
-   hand (`git push origin 24105ad:staging --force-with-lease`, Track A only,
-   because it moves staging backwards), wait for `/api/version` to show it,
-   then run `pnpm smoke` against staging with the smoke secrets. Then put
-   staging back on the `local-dev` tip and turn auto-deploy on again.
-2. **The password-reset test passing on staging.** The reset code is the same
-   in `24105ad` and `f8fdec3`. If the cause turns out to be a setting, the
-   test result carries over. If it needs code, this decision is re-made.
+1. **Smoke on exactly `24105ad`: GREEN.** Auto-deploy paused, `staging`
+   pointed at `24105ad` by hand, one-off branch `a-smoke-24105ad` (=
+   `24105ad` + one workflow file) ran `pnpm smoke` against it: run
+   37512445462 **attempt 2: 96 passed, 2 skipped**. Attempt 1 had one
+   failure — after a reload the Plans screen stayed blank for 60 s, on a run
+   twice as slow as usual — recorded in `todo.md` § Flaky tests. Staging was
+   put back on the `local-dev` tip and auto-deploy turned on again.
+2. **Password-reset test on staging: PASSED** (owner). The cause of the
+   earlier failure was an invalid staging `RESEND_API_KEY`, a setting
+   (`deploying.md` § 11), so the result carries over to `24105ad`, whose
+   reset code is the same.
+
+**The live `RESEND_API_KEY` (`bidridge-live`) is added AFTER Approval D**,
+by the owner: saving it redeploys the live app, and an extra build inside
+the window is a thing to avoid. The code live runs today has no email at
+all. Until the key is in, live's "Forgot password?" says, in words, that
+reset by email is not set up. Step 11 then tests it.
 
 Everywhere below that says `f8fdec3`, read **`24105ad`** for this release.
 § 1b's EXPECTED case does not arise for `24105ad`, since the rule is absent.
