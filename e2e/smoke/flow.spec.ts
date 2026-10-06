@@ -54,8 +54,13 @@ async function bidLines(): Promise<BidLine[]> {
 async function armFromLegend(name: string) {
   await page.getByRole("tab", { name: "Legend" }).click();
   // Case-insensitive: after "Reset to original" CI DUPLEX reads "ci duplex".
+  // VISIBLE first: a mark on the drawing carries the count's name in an SVG
+  // <title>, earlier in the page than the legend row. `.first()` alone took
+  // that hidden title and waited on it until the test timed out (staging
+  // smoke run 37538885610, flow 10, with the row on screen).
   await page
     .getByText(new RegExp(`^${name}$`, "i"))
+    .filter({ visible: true })
     .first()
     .click();
   // NO wait for the "Counting …" bar, on purpose. Until 2026-10-01 a by-name
