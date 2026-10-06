@@ -68,7 +68,8 @@ import {
 import { runSheetCheck } from "@/lib/sheetCheck";
 import { layerIdsFrom } from "@/lib/cadLayers";
 import { quarterArcRadii } from "@/lib/scaleCheck";
-import { readSchedules } from "@/lib/panelSchedules";
+import { readSchedules, type PanelSchedule } from "@/lib/panelSchedules";
+import { readHomeruns } from "@/lib/homeruns";
 import { detectScaleFromText } from "@shared/planScale";
 import {
   extractVectorGeometry,
@@ -188,6 +189,49 @@ let matchPages: MatchPage[] = [];
  * — the matcher then searches everything, as before layers.
  */
 const layerIdsByDoc = new Map<string, Promise<Map<string, string>>>();
+
+/**
+ * Every panel schedule in the open set, read once per document from each
+ * page's TEXT only (no line work), for tying homerun tags to circuits.
+ * Asked only when a sheet has a homerun, so a set without any never pays.
+ */
+const panelsByDoc = new Map<string, Promise<PanelSchedule[]>>();
+function panelsInDoc(
+  doc: import("pdfjs-dist").PDFDocumentProxy,
+  hash: string
+): Promise<PanelSchedule[]> {
+  let read = panelsByDoc.get(hash);
+  if (!read) {
+    read = (async () => {
+      const panels: PanelSchedule[] = [];
+      for (let n = 1; n <= doc.numPages; n++) {
+        const page = await doc.getPage(n);
+        const viewport = page.getViewport({ scale: 1 });
+        const content = await page.getTextContent();
+        const items: RawTextItem[] = [];
+        for (const item of content.items)
+          if ("str" in item && item.str)
+            items.push({
+              str: item.str,
+              transform: item.transform,
+              width: item.width,
+            });
+        // A schedule needs its CKT. header; most sheets are skipped here.
+        if (!items.some(i => /CKT/i.test(i.str))) continue;
+        panels.push(
+          ...readSchedules(
+            wordBoxes({ items, viewportTransform: viewport.transform })
+          ).panels
+        );
+      }
+      return panels;
+    })();
+    panelsByDoc.set(hash, read);
+    if (panelsByDoc.size > 2)
+      panelsByDoc.delete(panelsByDoc.keys().next().value!);
+  }
+  return read;
+}
 function layerIdsOf(
   doc: import("pdfjs-dist").PDFDocumentProxy,
   hash: string
@@ -900,6 +944,40 @@ self.onmessage = async (e: MessageEvent) => {
         reqId,
         schedules: readSchedules(matchPage.words),
         scan: isScan(matchPage.geo),
+      });
+    } catch (err) {
+      self.postMessage({ type: "error", reqId, message: String(err) });
+    }
+    return;
+  }
+
+  if (msg.type === "homeruns") {
+    // Homeruns read from the page's line work and text (@/lib/homeruns),
+    // with the set's panel schedules to tie them to. Read-only.
+    const { pageNum, hash, reqId } = msg as {
+      pageNum: number;
+      hash: string;
+      reqId: string;
+    };
+    if (!pdfDoc || loadedHash !== hash) {
+      self.postMessage({
+        type: "error",
+        reqId,
+        message: "PDF not loaded for this hash",
+      });
+      return;
+    }
+    try {
+      const doc = pdfDoc;
+      const matchPage = await readMatchPage(doc, hash, pageNum);
+      const homeruns = isScan(matchPage.geo)
+        ? []
+        : readHomeruns(matchPage.words, matchPage.geo);
+      self.postMessage({
+        type: "homeruns",
+        reqId,
+        homeruns,
+        panels: homeruns.length ? await panelsInDoc(doc, hash) : [],
       });
     } catch (err) {
       self.postMessage({ type: "error", reqId, message: String(err) });

@@ -8,7 +8,7 @@
  *
  * Never presses an AI button — staging spends real money on every call.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 import { SYMBOLS } from "./fixturePlan";
 import {
   createThrowawayBid,
@@ -16,6 +16,7 @@ import {
   dragBox,
   openPlans,
   placeAt,
+  sheetPoint,
   sweepLeftovers,
   thisSheetLine,
   trpc,
@@ -191,8 +192,52 @@ test("5. a second symbol on the SAME assembly keeps its own count", async () => 
     .first()
     .click();
 
+  /*
+    FORCED: the first click lands AFTER the server made the count but BEFORE
+    the page re-armed under its real id. Found locally (this step, 1 run in
+    3): that click was queued under the provisional id after the queue had
+    been adopted, drawn, and never sent — one mark short, for good, nothing
+    said (@/lib/provisionalCount, `settleLateMarks`). The answer's callback
+    writes the "Count again" memory just before it flushes, so the click is
+    fired from inside that write: the exact moment, every run.
+  */
+  const first = await sheetPoint(page, SYMBOLS.switch[0]);
+  await page.evaluate(
+    ({ key, x, y }) => {
+      const w = window as unknown as { __raceFired?: boolean };
+      const setItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k: string, v: string) {
+        setItem.call(this, k, v);
+        if (w.__raceFired !== false || k !== key || !v.includes("CI SWITCH"))
+          return;
+        w.__raceFired = true;
+        const init = {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          button: 0,
+          pointerId: 1,
+          pointerType: "mouse",
+          isPrimary: true,
+        };
+        const target = document.elementFromPoint(x, y);
+        target?.dispatchEvent(new PointerEvent("pointerdown", init));
+        target?.dispatchEvent(new PointerEvent("pointerup", init));
+      };
+      w.__raceFired = false;
+    },
+    { key: `bidridge:last-count:${bidId}`, ...first }
+  );
   await armFromLegend("CI SWITCH");
-  for (const at of SYMBOLS.switch) await placeAt(page, at);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __raceFired?: boolean }).__raceFired
+      )
+    )
+    .toBe(true);
+  for (const at of SYMBOLS.switch.slice(1)) await placeAt(page, at);
   await expect.poll(marksOnSheet).toBe(6);
   await expect(thisSheetLine(page)).toContainText("2 items");
 });
@@ -332,18 +377,73 @@ test("9. a refresh keeps the sheet and the zoom", async () => {
   await zoomIn.click();
   const zoomText = page.getByText(/^\d+%$/).first();
   const before = await zoomText.innerText();
+  /*
+    FORCED: the first read after the reload NEVER answers. This is the one
+    failure seen on the 24105ad candidate (run 37512445462 attempt 1): the
+    screen sat blank for 60 s on a batch that did not come back, because
+    nothing gave up on it. Now a read is abandoned at 20 s and asked again
+    (@/lib/queryDeadline), so the screen must still arrive inside 60 s.
+  */
+  let held = false;
+  const holdFirstPlansList = async (route: Route) => {
+    if (held) return route.continue();
+    held = true; // never continued, fulfilled or aborted: a hung response
+  };
+  await page.route(/\/api\/trpc\/[^?]*bidPdfs\.list/, holdFirstPlansList);
   await page.reload();
   await expect(page.getByText(/^2\/2$/).first()).toBeVisible({
     timeout: 60_000,
   });
+  await page.unroute(/\/api\/trpc\/[^?]*bidPdfs\.list/, holdFirstPlansList);
+  expect(held, "the first plans list was not held — nothing was forced").toBe(
+    true
+  );
+  await expect(page.getByText(/^Plans — /).first()).toBeVisible();
   await expect(page.getByText(/^\d+%$/).first()).toHaveText(before);
 });
 
 test("10. undo and redo a mark; delete one and Undo brings it back", async () => {
+  /*
+    FORCED: the request that makes the count is slow. This step failed once
+    (run 37416743573) with the mark drawn and the tally stuck — the same
+    picture as holding `takeoffGroups.create`. The mark is right to wait; it
+    is counted when the answer comes. But until then it lives only in this
+    tab, so leaving must ASK: a reload in that window used to lose it with no
+    word (@/lib/provisionalCount, `marksOnlyHere`).
+  */
+  let release: () => void = () => {};
+  const released = new Promise<void>(r => (release = r));
+  let heldCreate = false;
+  const holdCreate = async (route: Route) => {
+    if (!heldCreate) {
+      heldCreate = true;
+      await released;
+    }
+    await route.continue();
+  };
+  await page.route(/\/api\/trpc\/[^?]*takeoffGroups\.create/, holdCreate);
   await armFromLegend("CI DUPLEX");
   const start = await marksOnSheet();
   await placeAt(page, SYMBOLS.sheet2Duplex[1]);
+  await expect.poll(() => heldCreate).toBe(true);
+
+  const asked = page
+    .waitForEvent("dialog", { timeout: 10_000 })
+    .then(async dialog => {
+      const type = dialog.type();
+      await dialog.dismiss(); // stay on the page
+      return type;
+    })
+    .catch(() => "no dialog");
+  await page.reload({ timeout: 5_000 }).catch(() => {});
+  expect(await asked, "leaving with an uncounted mark did not ask").toBe(
+    "beforeunload"
+  );
+
+  release();
+  // Counted once the count exists — exactly once, not lost and not doubled.
   await expect.poll(marksOnSheet).toBe(start + 1);
+  await page.unroute(/\/api\/trpc\/[^?]*takeoffGroups\.create/, holdCreate);
   await page.keyboard.press("Escape");
   await page.keyboard.press("Control+z");
   await expect.poll(marksOnSheet).toBe(start);

@@ -19,10 +19,11 @@
  * swings decide between a scale and its neighbours.
  *
  *   Weld 1 E-200, set 1/8": 106 of 121 quarter arcs are 36" — agrees.
- *   Weld 1 E-100, notes say 1/4": 0 door-sized arcs; at 1/8" 85 are 36" —
+ *   Weld 1 E-100, notes said 1/4": 0 door-sized arcs; at 1/8" 85 are 36" —
  *     and E-100 and E-200 draw the same building at the same size (door
- *     radius 27 pt on both). The guard's first real catch: E-100's note is
- *     very likely wrong. For the owner to confirm.
+ *     radius 27 pt on both). The guard's first real catch: the note was
+ *     wrong. Weld 1 is a set we generated, so the owner had the FILE fixed
+ *     to 1/8" (2026-10-06); E-100 now agrees with no warning.
  *   UNCC E111 / E121, 1/4": doors agree (9 at 36"); the ceiling grid agrees
  *     independently (282 gaps of 36 pt = 24"). Must NOT warn, and does not.
  *   UNCC ED111, 1/8": 75 arcs 36" — agrees.
@@ -150,8 +151,8 @@ export const DOORS_OUTVOTE = 3;
  *
  * Measured on every vector test sheet at its true scale and set 2x off each
  * way (scripts/codeFirstCeiling.mts `scalecheck`): all 8 mis-settings are
- * caught with the right suggestion; at the true scales only Weld 1 E-100
- * warns — whose own note is very likely wrong (see the header).
+ * caught with the right suggestion; at the true scales none warns (Weld 1
+ * E-100 did until its wrong note was fixed in the file — see the header).
  *
  *  1. The set scale IS the title's and real doors agree: fine.
  *  2. Doors argue: almost none read as doors at the set scale while another

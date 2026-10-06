@@ -27,15 +27,15 @@ stop and find out why — either this file is stale or the code changed.
 
 ## Summary table
 
-| Idea                          | Measured (vector)                               | Scans                     | Effort        | Track A columns                                   | Payoff                            |
-| ----------------------------- | ----------------------------------------------- | ------------------------- | ------------- | ------------------------------------------------- | --------------------------------- |
-| a. Symbol finding             | E-200 44/46; UNCC 227/243 (93%, best box)       | 85/85 (picture matcher)   | built         | none                                              | —                                 |
-| b. Text tied to symbols       | USB **0 → 38/38**; GF **1 → 4/4**; heights 3/3  | OCR reads none: 0/73      | **small**     | `takeoff_stamps.labelWords` (or per-kind columns) | **high**                          |
-| c. CAD layers                 | Weld 1: yes, tagged; UNCC: declared, not tagged | none                      | medium        | none (read at view time)                          | **high where present**            |
-| d. Home runs                  | inconclusive (no truth; arrow shape unknown)    | —                         | high          | later                                             | unknown                           |
-| e. Panel schedules from text  | UNCC: 3/3 panels, 42/42 circuits each           | OCR, unmeasured           | built (view)  | `bid_panels` + `bid_panel_circuits` (A's)         | **high**                          |
-| f. Addenda, line by line      | identical → 0 changes; made-up → exact          | pixel diff instead        | medium        | `bid_pdfs.supersedesId`                           | high, **unproven on a real pair** |
-| g. Scale from the title block | right on 4/4 vector sheets                      | wrong on the scan ("114") | built (check) | none                                              | medium                            |
+| Idea                          | Measured (vector)                               | Scans                     | Effort        | Track A columns                                   | Payoff                             |
+| ----------------------------- | ----------------------------------------------- | ------------------------- | ------------- | ------------------------------------------------- | ---------------------------------- |
+| a. Symbol finding             | E-200 44/46; UNCC 227/243 (93%, best box)       | 85/85 (picture matcher)   | built         | none                                              | —                                  |
+| b. Text tied to symbols       | USB **0 → 38/38**; GF **1 → 4/4**; heights 3/3  | OCR reads none: 0/73      | **small**     | `takeoff_stamps.labelWords` (or per-kind columns) | **high**                           |
+| c. CAD layers                 | Weld 1: yes, tagged; UNCC: declared, not tagged | none                      | medium        | none (read at view time)                          | **high where present**             |
+| d. Home runs                  | 19/23 by hand; 0 false on UNCC (none drawn)     | —                         | built (view)  | `takeoff_run_circuits.panelCircuitId` (+1)        | medium — no set ties to a schedule |
+| e. Panel schedules from text  | UNCC: 3/3 panels, 42/42 circuits each           | OCR, unmeasured           | built (view)  | `bid_panels` + `bid_panel_circuits` (A's)         | **high**                           |
+| f. Addenda, line by line      | identical → 0 changes; made-up → exact          | pixel diff instead        | medium        | `bid_pdfs.supersedesId`                           | high, **unproven on a real pair**  |
+| g. Scale from the title block | right on 4/4 vector sheets                      | wrong on the scan ("114") | built (check) | none                                              | medium                             |
 
 ---
 
@@ -171,6 +171,78 @@ noise). There is no ground truth for home runs on any sheet.
 count); then measure. Until then no build estimate is honest. **Effort:
 high.**
 
+> **Built 2026-10-06, read-only** (`@/lib/homeruns`, worker `homeruns`, a
+> "Homeruns N" toggle on a sheet that has any; section `homerunreader` of
+> `codeFirstCeiling.mts` re-measures). Three things above were WRONG:
+>
+> - **The arrowheads were there; the detector was not.** Homerun heads on
+>   Weld 1 and weld2 are long thin FILLED triangles — two 9 pt sides on a
+>   3 pt base — and the study capped a side at 8 pt. Its Weld regex also
+>   missed digit-led panel names ("3LP-23,25").
+> - **UNCC E111 has NO homeruns, and neither does any UNCC sheet.** Every
+>   device carries its own "2B-1" tag and no wiring is drawn; its arrows are
+>   keynote leaders. So "the owner marks 10 home runs on E111" could never
+>   have worked. The homeruns in the test sets are on **Weld 1 E-100 / E-200
+>   and weld2's lighting and power plans** (weld2 p8, p12–14, read from the
+>   local upload for bid 1728350).
+> - **No test sheet draws tick marks.** Wire size and count appear only as a
+>   written note under two tags on E-200 ("(3 #12 THWN CU & 1 #12 CU GRD)").
+>
+> **How it reads one:** a circuit tag ("3LP-23,25", "2B - 14", "(E) L1-14",
+> "EXISTING / 1S-9,11"; not "1S-11c", a switch leg; not "E-100" or
+> "X-12,172") paired with the nearest arrow within 32 pt that sits on a
+> wire and points into clear paper. Stacked heads are counted — one per
+> circuit on these sets (3LP-13,15,17 has three) — and a 3-head arrow is
+> never given a one-circuit tag. A tag set away from its arrow is followed
+> along a straight leader. Wire counts come from ticks or a note, **never
+> inferred** (`takeoff_run_circuits.conductorCount`'s rule); otherwise
+> "wires not marked".
+>
+> **Leader vs homerun, measured:** a keynote leader POINTS AT something —
+> its tip touches a black line (UNCC, Weld's security plan: 0.0–2.0 pt) or
+> sits inside a word (a "$" switch glyph, 0.0 pt). A homerun tip has
+> 4.4–13.7 pt of clear paper on Weld 1, and on weld2 lands only on grey
+> background or the light ceiling grid (lightness 128 / 204), so only dark
+> lines count.
+>
+> **Hand check, 23 homeruns, by eye on rendered crops before reading the
+> output** (Weld 1 E-200 13, E-100 2, weld2 p12 two blocks 8):
+>
+> |                                                 |                                                         |
+> | ----------------------------------------------- | ------------------------------------------------------- |
+> | Found, right tag and panel                      | **19 / 23 (83%)**                                       |
+> | Wrong tag on a found arrow                      | 0                                                       |
+> | Head count = circuit count, where stacked       | 7 / 7                                                   |
+> | Wire notes read ("3 wires + ground")            | 2 / 2                                                   |
+> | Ticks claimed where none are drawn              | 0 (was 7 before the regular-spacing and crossing rules) |
+> | False homeruns, UNCC (273 device tags, 7 pages) | **0** (was 28 before the clearance rule)                |
+> | False homeruns elsewhere                        | 1 — weld2 p8, see below                                 |
+>
+> **What fails:**
+>
+> - **A homerun tip that ends ON a dark line** (3 of the 4 misses: E-200's
+>   left GL-22, weld2 L1-6 and L1-9, tips on a wire, a J-box, a fixture).
+>   To code that looks exactly like a leader onto a symbol.
+> - **A leader with its own arrowhead** (E-200 "GL-22,24,26", 85 pt from
+>   its 3-head arrow). Not followed; left unread rather than guessed.
+> - **A keynote leader pointing at a WORD 3 pt away, with a device tag in
+>   reach** (weld2 p8: "A" keynote → "(X)", paired with "P1A-41"). E-200's
+>   real GL-17 tip sits 2.6 pt from an unrelated "CTR", so distance cannot
+>   separate them. The one false find.
+>
+> **Tied to the schedule: 0 of 23 could be, and that is the test sets, not
+> the code.** UNCC's schedules read (E003: 2A / 2B / 2HA, 42/42) but UNCC
+> draws no homeruns; Weld 1 E-003's three PANELBOARD SCHEDULES (GL, 3LP, 1S)
+> and weld2's have NO TEXT — drawn as line work. So every homerun found says
+> "Panel 3LP: no schedule read on this set", and the tie is tested on a
+> fixture shaped like UNCC's 2B rows (`homeruns.test.ts`). It needs one set
+> that has both, or an OCR / AI read of a schedule drawn as lines.
+>
+> Seen on screen (Weld 1 E-200, bid 1728356): "Homeruns 11" in the
+> toolbar; labels beside each arrow, away from the tag. The look caught
+> labels covering their own tags and two boxes stacked — both fixed.
+> **Track A:** `todo.md` § "Track A next migration batch" (Homeruns).
+
 ---
 
 ## e. Panel and fixture schedules, read as tables from the PDF text
@@ -264,7 +336,14 @@ are `1'-0"`). ~~The scale bar is the check to build instead.~~
 > caught with the right suggestion**; at the true scales it agrees, except
 > **Weld 1 E-100, whose "1/4"" note disagrees with its own doors** (71 swings
 > read 18"; same 27 pt radius as E-200 at 1/8") — a real catch, for the
-> owner to confirm. Scans (Blueridge): no line work, so it says plainly it
+> owner to confirm. **Confirmed 2026-10-06: Weld 1 is a set we generated,
+> and the note was our mistake.** The file now says 1/8" on both E-100
+> plans (an incremental update rewriting one content stream; every other
+> byte is the original's), and E-100 agrees with no warning — on screen,
+> 1/8" shows nothing and 1/4" says "title and door swings say 1/8"".
+> The three local uploads of it and C's local database rows for them were
+> updated to match; staging's copy and other worktrees' copies still carry
+> the old note. Scans (Blueridge): no line work, so it says plainly it
 > cannot check. Shown amber beside the scale, one click to apply, "Keep" to
 > leave it; never applied by itself.
 
@@ -305,7 +384,10 @@ are `1'-0"`). ~~The scale bar is the check to build instead.~~
 4. **Scale bar check (g).** Small, mostly built; catches a wrong scale,
    which multiplies every length.
 5. **Addenda line diff (f).** High payoff, but get one real pair first.
-6. **Home runs (d).** Measure with a marked sheet before deciding.
+6. **Home runs (d).** ~~Measure with a marked sheet before deciding.~~
+   Built read-only 2026-10-06: 19 of 23 by hand, 0 false on UNCC. Its
+   payoff waits on a set whose schedule is text AND whose plans draw
+   homeruns — none of the three test sets has both.
 
 **Where AI stays:** scans (no line work, OCR misses the drawing's text), a
 label between two devices, which panel a schedule is, and a layer name
