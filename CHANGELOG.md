@@ -11,6 +11,14 @@ This is the human-readable companion to the git history — read this to see wha
   an existing one looked the same, and that difference decides what gets
   priced. New pins are now clearly filled; existing pins are an empty
   outline with the letter drawn in the count's color.
+
+- **Adding a look warns when it looks like something else you counted.**
+  When you add another look to a legend item, the app first searches the
+  sheet with it. If it lands on marks you counted as a different item, it
+  asks "This look also matches 2 marks counted as Duplex on this sheet. Add
+  it anyway?" — Cancel is the default and nothing is saved until you choose.
+  On a scanned sheet it cannot compare, and the message says so.
+
 - **A look saved under the wrong item can be moved.** Each look in a legend
   item's list has "Move", which lists the other items. The look keeps its
   picture and box; counted marks stay in their counts on every bid, locked or

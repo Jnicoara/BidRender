@@ -184,6 +184,15 @@ duplex on that set, and every duplex then comes back as a GFCI.
 3. **Scans** (no line work): the comparison cannot be made, and the card says
    so instead of saying nothing.
 
+> **Built 2026-10-05: point 2 against MARKS, and point 3.** The client runs
+> the look on its sheet (`lookAlikeCheck`), `captureSymbol` refuses to save
+> over another item's marks until "Add anyway" (`lookAlikes`), and on a scan
+> the save message says it could not compare. On a scan it saves and says so
+> after, rather than asking first: there is nothing to decide. NOT built:
+> point 1, "another item's LOOK finds the same spots", and the "from a new
+> look" tag below. A new item's FIRST look is not checked — only an added
+> one. See `track-c-handoff.md`.
+
 **Every match from every look stays UNCONFIRMED** until the estimator
 confirms it — exactly as now. A look added a minute ago gets no shortcut:
 
