@@ -4,7 +4,46 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-06]
+
+- **A click on the plan no longer captures an empty symbol.** With Capture
+  on, a click that is not a drag used to open "Name this symbol" and save an
+  item with no picture, which also skipped every check. Now only a real box
+  opens it, and Capture stays on.
+
+- **Find all matching handles lines running through symbols more safely.**
+  Measured first on the hand-counted Weld 1 power plan: walls and wires
+  crossing devices caused no misses there, and the two known misses are
+  drawing disagreements. For other drawings: a wall or wire passing through
+  the box you draw is no longer taken as part of the symbol, and a device
+  whose own line is cut where another line crosses it is now offered as
+  "maybe — a line crosses it" for you to check, instead of being skipped
+  without a word. Confirm all never takes those.
+
+- **Adding a look compares the little words beside the symbol.** If your
+  other look of an item has "GF" (or WP, IG and the like) beside it and the
+  new one does not — or the other way round — the card says so before saving,
+  with Cancel first. Read from the drawing's own text; no AI involved.
+
+- **The warning also catches a symbol another item already claims by its
+  look.** When you save a symbol, the app searches the sheet with it and with
+  the other items' saved looks on the same plans. Places both find are named
+  in the warning ("3 places a look of Switch also finds"), even where nothing
+  has been counted yet.
+
+- **The look-alike warning now covers a brand-new legend item too.** Saving
+  a new symbol first searches the sheet with it, and if it lands on marks you
+  counted as something else, it asks before creating the item ("Save
+  anyway" or Cancel, Cancel first). Before, only a look added to an existing
+  item was checked.
+
 ## [2026-10-05]
+
+- **A newly added look cannot fill a count in one click.** In Find all
+  matching, a find that only a recently added look made now says so and
+  needs a look; "Confirm all" leaves it. Confirm one of them by hand and
+  that look is trusted from then on, in this browser. The item's first look
+  and the box you draw are trusted as before.
 
 - **New and existing devices now look different on the drawing at every
   zoom.** Once a pin was big enough to carry its letter, a new device and

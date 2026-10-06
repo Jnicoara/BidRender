@@ -113,6 +113,8 @@ export type SavedLook = {
   pageNumber: number;
   setName: string | null;
   confirmsThisSet: boolean;
+  /** The item's first look: trusted like the box (`firstLookId`). */
+  isFirst: boolean;
   url: string | null;
 };
 
@@ -122,22 +124,89 @@ export type SavedLook = {
  * items — or, when the comparison cannot be made, the sentence that says so.
  * A scan has no line work to compare, and saying nothing there would read as
  * "checked, nothing alike".
+ *
+ * When other items' looks were searched WITH it (`looksOnSet`, given here as
+ * look id -> item id), the spots are only the new look's own finds, and
+ * `otherLooks` counts, per other item, how many of those spots one of its
+ * looks also found — two items claiming one spot. A spot only another
+ * item's look found is not the new look's business, and is left out.
  */
 export function lookAlikeCheck(
-  result: FindResult | null
-): { spots: LookSpot[] } | { cannotCompare: string } {
-  if (result?.kind === "ok" && !result.scan)
+  result: FindResult | null,
+  lookItems: ReadonlyMap<number, number> = new Map()
+):
+  | { spots: LookSpot[]; otherLooks: { symbolId: number; spots: number }[] }
+  | { cannotCompare: string } {
+  if (result?.kind === "ok" && !result.scan) {
+    // Searched with no looks, a find carries no sources: all of it is the box's.
+    const own = result.matches.filter(m => m.foundByBox !== false);
+    const tally = new Map<number, number>();
+    for (const m of own) {
+      const items = new Set(
+        (m.foundByLooks ?? []).flatMap(id => {
+          const item = lookItems.get(id);
+          return item === undefined ? [] : [item];
+        })
+      );
+      items.forEach(item => tally.set(item, (tally.get(item) ?? 0) + 1));
+    }
     return {
-      spots: result.matches.map(m => ({
+      spots: own.map(m => ({
         x: m.x,
         y: m.y,
         reach: Math.max(m.halfWidth, m.halfHeight),
       })),
+      otherLooks: Array.from(tally, ([symbolId, spots]) => ({
+        symbolId,
+        spots,
+      })),
     };
+  }
   return {
     cannotCompare:
       result?.kind === "scan" || (result?.kind === "ok" && result.scan)
         ? "This sheet is a scan, so this look could not be compared with marks counted as other items."
         : "This look could not be compared with marks counted as other items on this sheet.",
   };
+}
+
+/**
+ * "Your other look has 'GF' beside it; this one doesn't" (multiple-looks-plan
+ * § 4 point 1). The new look's device words (GF, WP, IG… — the matcher's
+ * fixed list, so a circuit number never counts) against the item's other
+ * looks'. A word on one side and not the other is the cheapest sign that the
+ * two pictures are two different devices — a GFCI and a plain duplex drawn
+ * alike. Code only: the words come from the drawing's own text, no AI.
+ *
+ * Nothing to compare (no other look could be rebuilt) says nothing; the
+ * caller says separately when the comparison could not be made at all.
+ */
+export function lookWordNotes(
+  newDevice: readonly string[],
+  otherDevice: readonly (readonly string[])[]
+): string[] {
+  if (otherDevice.length === 0) return [];
+  const other =
+    otherDevice.length === 1 ? "Your other look" : "Your other looks";
+  const theirs = new Set(otherDevice.flat());
+  const mine = new Set(newDevice);
+  const q = (words: string[]) => words.map(w => `“${w}”`).join(", ");
+  const missing = Array.from(theirs)
+    .filter(w => !mine.has(w))
+    .sort();
+  const extra = Array.from(mine)
+    .filter(w => !theirs.has(w))
+    .sort();
+  return [
+    ...(missing.length
+      ? [
+          `${other} ${otherDevice.length === 1 ? "has" : "have"} ${q(missing)} beside ${otherDevice.length === 1 ? "it" : "them"}; this one doesn't.`,
+        ]
+      : []),
+    ...(extra.length
+      ? [
+          `This one has ${q(extra)} beside it; ${other.toLowerCase()} ${otherDevice.length === 1 ? "doesn't" : "don't"}.`,
+        ]
+      : []),
+  ];
 }

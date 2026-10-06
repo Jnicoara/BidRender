@@ -20,6 +20,7 @@ import {
   capturePixelSize,
   legendRenderScale,
   normaliseCaptureBox,
+  isCaptureBox,
 } from "@shared/symbolCapture";
 import { sharpRenderScale } from "@/lib/planView";
 
@@ -113,5 +114,14 @@ describe("SYMBOL_THUMBNAIL_MAX_CHARS", () => {
     // takeoff_symbol_links.thumbnail is TEXT: 65,535 bytes. A data URL is
     // ASCII, so characters are bytes.
     expect(SYMBOL_THUMBNAIL_MAX_CHARS).toBeLessThan(65_535);
+  });
+});
+
+describe("a click is not a capture (seen on screen, 2026-10-06)", () => {
+  it("only a box at least CAPTURE_MIN_POINTS on each side opens the name card", () => {
+    expect(isCaptureBox({ x: 10, y: 10, width: 0, height: 0 })).toBe(false);
+    expect(isCaptureBox({ x: 10, y: 10, width: 9, height: 1.5 })).toBe(false);
+    expect(isCaptureBox({ x: 10, y: 10, width: -9, height: -9 })).toBe(true);
+    expect(isCaptureBox({ x: 10, y: 10, width: 2, height: 2 })).toBe(true);
   });
 });

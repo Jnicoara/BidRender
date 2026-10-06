@@ -385,17 +385,20 @@ async function findOnVectorPage(
   const results: LookResult[] = [];
   const notes: string[] = [];
   let symbol: SymbolTemplate | null = null;
+  let boxDevice: string[] | undefined;
   if (box) {
     const made = symbolFromBox(sheet, box);
     if (made.kind !== "ok" && looks.length === 0) return made;
     if (made.kind === "ok") {
       symbol = made.symbol;
+      boxDevice = Array.from(made.symbol.boxedDevice);
       const found = searchSymbol(made.symbol, sheet, { boxedHere: true });
       if (found.kind !== "ok") return found;
       results.push({ source: { kind: "box" }, matches: found.matches });
     } else notes.push(made.message);
   }
   let unusable = 0;
+  const lookDevice: { id: number; device: string[] }[] = [];
   for (const look of looks) {
     let t: SymbolTemplate | null = null;
     try {
@@ -410,6 +413,7 @@ async function findOnVectorPage(
       continue;
     }
     symbol ??= t;
+    lookDevice.push({ id: look.id, device: Array.from(t.boxedDevice) });
     const found = searchSymbol(t, sheet);
     if (found.kind === "ok")
       results.push({ source: sourceOf(look), matches: found.matches });
@@ -433,10 +437,12 @@ async function findOnVectorPage(
       words: symbol.words,
       width: symbol.halfW * 2,
       height: symbol.halfH * 2,
+      device: boxDevice,
     },
     looks: {
       searched: results.filter(r => r.source.kind === "look").length,
       notes,
+      device: lookDevice,
     },
   };
 }

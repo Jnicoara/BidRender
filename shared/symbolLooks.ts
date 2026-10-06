@@ -19,6 +19,11 @@
 
 /** Looks searched at once, this set's first (plan § 9 Q4, decided). */
 export const MAX_LOOKS_PER_SEARCH = 5;
+/**
+ * Other items' looks searched with a new one for the look-alike check (plan
+ * § 4). Each is a full search of the sheet, so the cap is about time.
+ */
+export const MAX_LOOK_ALIKE_LOOKS = 12;
 /** Two boxes on one sheet this close (points, every edge) are one look. */
 export const SAME_LOOK_POINTS = 3;
 
@@ -127,7 +132,13 @@ export type SheetMark = {
   assemblyId: number | null;
 };
 
-export type LookAlike = { name: string; marks: number };
+export type LookAlike = {
+  name: string;
+  /** Its marks on this sheet the new look lands on. */
+  marks: number;
+  /** Places on this sheet one of ITS saved looks also finds (plan § 4). */
+  spots: number;
+};
 
 /**
  * Marks counted as a DIFFERENT item that a new look also lands on — the
@@ -152,19 +163,66 @@ export function lookAlikes(
     );
     if (hit) tally.set(mark.name, (tally.get(mark.name) ?? 0) + 1);
   }
-  return Array.from(tally, ([name, n]) => ({ name, marks: n })).sort(
-    (p, q) => q.marks - p.marks || p.name.localeCompare(q.name)
+  return sortAlikes(
+    Array.from(tally, ([name, n]) => ({ name, marks: n, spots: 0 }))
   );
 }
 
+/**
+ * Add the items whose own saved LOOKS find the same spots as the new look
+ * (plan § 4: "or another item's look on this set finds the same spots").
+ * Merged by name, so one item is one line however it was found.
+ */
+export function withLookFinds(
+  alikes: readonly LookAlike[],
+  found: readonly { name: string; spots: number }[]
+): LookAlike[] {
+  const byName = new Map(alikes.map(a => [a.name, { ...a }]));
+  for (const f of found) {
+    if (f.spots <= 0) continue;
+    const a = byName.get(f.name) ?? { name: f.name, marks: 0, spots: 0 };
+    a.spots += f.spots;
+    byName.set(f.name, a);
+  }
+  return sortAlikes(Array.from(byName.values()));
+}
+
+const sortAlikes = (alikes: LookAlike[]) =>
+  alikes.sort(
+    (p, q) =>
+      q.marks + q.spots - (p.marks + p.spots) || p.name.localeCompare(q.name)
+  );
+
 /** The warning's words: "8 marks counted as DUPLEX RECEPTACLE", and so on. */
 export function lookAlikeWarning(alikes: readonly LookAlike[]): string {
-  const parts = alikes.map(
-    a => `${a.marks} mark${a.marks === 1 ? "" : "s"} counted as ${a.name}`
-  );
+  const parts = alikes.flatMap(a => [
+    ...(a.marks > 0
+      ? [`${a.marks} mark${a.marks === 1 ? "" : "s"} counted as ${a.name}`]
+      : []),
+    ...(a.spots > 0
+      ? [
+          `${a.spots} place${a.spots === 1 ? "" : "s"} a look of ${a.name} also finds`,
+        ]
+      : []),
+  ]);
   const list =
     parts.length <= 1
       ? (parts[0] ?? "")
       : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
   return `This look also matches ${list} on this sheet. Add it anyway?`;
+}
+
+/**
+ * The item's FIRST look: the oldest, the picture it was captured with (or
+ * its old picture, written as a row when a second was added). Its finds are
+ * trusted like the box drawn now; a look ADDED later is not, until someone
+ * confirms one of its finds by hand (plan § 4, "from a new look").
+ */
+export function firstLookId(
+  looks: readonly { id: number; createdAt: Date | string }[]
+): number | null {
+  const time = (l: { createdAt: Date | string }) =>
+    new Date(l.createdAt).getTime();
+  const [first] = [...looks].sort((p, q) => time(p) - time(q) || p.id - q.id);
+  return first?.id ?? null;
 }

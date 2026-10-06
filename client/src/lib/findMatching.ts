@@ -85,6 +85,11 @@ export type FindResult =
         words: string[];
         width: number;
         height: number;
+        /**
+         * The BOXED symbol's device words (GF, WP…: DEVICE_WORDS only, so a
+         * circuit number never counts). Absent when no box was searched.
+         */
+        device?: string[];
       };
       /**
        * Present when the sheet is a scan and the picture matcher ran: the
@@ -96,7 +101,16 @@ export type FindResult =
        * Present when the item's saved looks were searched too
        * (@/lib/lookMatching): how many, and what was left out and why.
        */
-      looks?: { searched: number; notes: string[] };
+      looks?: {
+        searched: number;
+        notes: string[];
+        /**
+         * Each saved look's device words (GF, WP…) as rebuilt here, vector
+         * only — what "Your other look has 'GF' beside it" compares
+         * (@/lib/lookMatching, `lookWordNotes`). Absent on a scan.
+         */
+        device?: { id: number; device: string[] }[];
+      };
     }
   | { kind: "scan" | "empty" | "tooBig" | "tooPoor"; message: string };
 
@@ -187,6 +201,248 @@ function normaliseBox(box: MatchBox): MatchBox {
 }
 
 const wordKey = (w: string) => w.trim().toUpperCase();
+
+type Rect = { x0: number; y0: number; x1: number; y1: number };
+
+/** Why a find cut by a crossing line needs a look (`cutAcross`). */
+export const CUT_THROUGH_REASON =
+  "maybe — a line crosses it and cuts part of it; check it is the same symbol";
+
+/**
+ * Is the symbol line from q1 to q2 there, but CUT where something crosses it?
+ * (Lines crossing symbols, track-c 2026-10-06.) Some CAD exports break a
+ * device's own line where a wall or wire runs over it, so no whole segment
+ * matches and the copy fell under MIN_COVERAGE with nothing said.
+ *
+ * Strict, so a merely MISSING line never passes: two or more collinear
+ * pieces, each within the line's own ends (never a longer line), reaching
+ * both ends; every gap between them short; and a line that is NOT this one
+ * running through every gap. Returns the pieces, or null.
+ */
+function cutAcross(
+  sheet: PreparedSheet,
+  q1x: number,
+  q1y: number,
+  q2x: number,
+  q2y: number,
+  filled: number,
+  tol: number,
+  taken: ReadonlySet<number>
+): number[] | null {
+  const segs = sheet.geo.segs;
+  const L = Math.hypot(q2x - q1x, q2y - q1y);
+  if (L < 3 * tol) return null;
+  const ux = (q2x - q1x) / L;
+  const uy = (q2y - q1y) / L;
+  const off = (x: number, y: number) =>
+    Math.abs((x - q1x) * uy - (y - q1y) * ux);
+  const along = (x: number, y: number) => (x - q1x) * ux + (y - q1y) * uy;
+  const pieces: { i: number; s: number; e: number }[] = [];
+  sheet.spans().near(
+    {
+      x0: Math.min(q1x, q2x) - tol,
+      y0: Math.min(q1y, q2y) - tol,
+      x1: Math.max(q1x, q2x) + tol,
+      y1: Math.max(q1y, q2y) + tol,
+    },
+    i => {
+      if (taken.has(i) || sheet.geo.filled[i] !== filled) return;
+      const ax = segs[i * 4];
+      const ay = segs[i * 4 + 1];
+      const bx = segs[i * 4 + 2];
+      const by = segs[i * 4 + 3];
+      if (off(ax, ay) > tol || off(bx, by) > tol) return;
+      const s = Math.min(along(ax, ay), along(bx, by));
+      const e = Math.max(along(ax, ay), along(bx, by));
+      if (s < -tol || e > L + tol || e - s <= 0) return;
+      pieces.push({ i, s, e });
+    }
+  );
+  if (pieces.length < 2) return null;
+  pieces.sort((p, q) => p.s - q.s);
+  if (pieces[0].s > tol) return null;
+  const gaps: [number, number][] = [];
+  let end = pieces[0].e;
+  for (const p of pieces.slice(1)) {
+    if (p.s > end) gaps.push([end, p.s]);
+    end = Math.max(end, p.e);
+  }
+  if (end < L - tol || gaps.length === 0) return null;
+  const maxGap = Math.max(3 * tol, 0.25 * L);
+  const used = new Set(pieces.map(p => p.i));
+  for (const [g0, g1] of gaps) {
+    const w = g1 - g0;
+    if (w > maxGap) return null;
+    const mx = q1x + ux * ((g0 + g1) / 2);
+    const my = q1y + uy * ((g0 + g1) / 2);
+    const reach = w / 2 + tol;
+    let crossed = false;
+    sheet
+      .spans()
+      .near(
+        { x0: mx - reach, y0: my - reach, x1: mx + reach, y1: my + reach },
+        j => {
+          if (crossed || used.has(j)) return;
+          const ax = segs[j * 4];
+          const ay = segs[j * 4 + 1];
+          const dx = segs[j * 4 + 2] - ax;
+          const dy = segs[j * 4 + 3] - ay;
+          const l2 = dx * dx + dy * dy;
+          if (l2 === 0) return;
+          // Across the line, not along it.
+          if (Math.abs((dx * ux + dy * uy) / Math.sqrt(l2)) > 0.95) return;
+          // It must CROSS the line — ends on opposite sides — and do so in
+          // the gap itself. A neighbour that merely comes near (the symbol's
+          // own outline ending 1 pt from the gap) is not what cut it.
+          const sa = (ax - q1x) * uy - (ay - q1y) * ux;
+          const sb = (ax + dx - q1x) * uy - (ay + dy - q1y) * ux;
+          if (sa * sb > 0) return;
+          const t = sa / (sa - sb || 1e-9);
+          const at = along(ax + t * dx, ay + t * dy);
+          if (at >= g0 - 0.5 * tol && at <= g1 + 0.5 * tol) crossed = true;
+        }
+      );
+    if (!crossed) return null;
+  }
+  return pieces.map(p => p.i);
+}
+
+/** Does segment i pass into the rectangle at all? (Liang–Barsky.) */
+function segEntersRect(segs: Float32Array, i: number, r: Rect): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  const ax = segs[i * 4];
+  const ay = segs[i * 4 + 1];
+  const dx = segs[i * 4 + 2] - ax;
+  const dy = segs[i * 4 + 3] - ay;
+  const clip = (p: number, q: number) => {
+    if (p === 0) return q >= 0;
+    const t = q / p;
+    if (p < 0) {
+      if (t > t1) return false;
+      if (t > t0) t0 = t;
+    } else {
+      if (t < t0) return false;
+      if (t < t1) t1 = t;
+    }
+    return true;
+  };
+  return (
+    clip(-dx, ax - r.x0) &&
+    clip(dx, r.x1 - ax) &&
+    clip(-dy, ay - r.y0) &&
+    clip(dy, r.y1 - ay)
+  );
+}
+
+/**
+ * LINES RUNNING THROUGH an outline — a wall, a home run, a grid or dimension
+ * line — as opposed to the symbol drawn inside it. A through-line is one or
+ * more COLLINEAR pieces, end to end, that go in one side and out the other:
+ * both of its extreme ends lie outside the outline.
+ *
+ * Why: "wholly inside the box" keeps any piece of a wall or wire that a CAD
+ * export chopped up inside the box, and those pieces then become part of
+ * "the symbol" that no other copy has. NOT seen on Weld 1 E-200, where no
+ * template holds such a line (scripts/lineCrossingCheck.mts); the fixture in
+ * findMatching.test.ts makes it happen. A line that ENDS at or inside the
+ * outline — a double duplex's second pair, a receptacle's own lines that a
+ * home run continues (the GFCI on E-200) — is not a through-line and stays.
+ *
+ * `candidates` must include the pieces crossing the outline's edge, wherever
+ * their midpoints are; the caller knows how to find those.
+ */
+function throughLinePieces(
+  segs: Float32Array,
+  candidates: readonly number[],
+  r: Rect,
+  tol: number,
+  /**
+   * How far past the outline BOTH ends must reach. At a copy this is half
+   * the symbol's size: on Weld 1 a double duplex's second pair pokes 1 and
+   * 4 pt out of the duplex's outline, and is the very thing the "more lines
+   * run through it" flag exists to see; a wall or wire runs on well past.
+   * For the box the person drew, the box edge is the boundary (tol).
+   */
+  beyond: number = tol
+): Set<number> {
+  const grown = {
+    x0: r.x0 - tol,
+    y0: r.y0 - tol,
+    x1: r.x1 + tol,
+    y1: r.y1 + tol,
+  };
+  const list = candidates.filter(i => segEntersRect(segs, i, grown));
+  const parent = list.map((_, k) => k);
+  const find = (k: number): number =>
+    parent[k] === k ? k : (parent[k] = find(parent[k]));
+  const len = (i: number) =>
+    Math.hypot(
+      segs[i * 4 + 2] - segs[i * 4],
+      segs[i * 4 + 3] - segs[i * 4 + 1]
+    );
+  for (let p = 0; p < list.length; p++)
+    for (let q = p + 1; q < list.length; q++) {
+      const i = list[p];
+      const j = list[q];
+      const li = len(i) || 1e-9;
+      const ux = (segs[i * 4 + 2] - segs[i * 4]) / li;
+      const uy = (segs[i * 4 + 3] - segs[i * 4 + 1]) / li;
+      const lj = len(j) || 1e-9;
+      const cos = Math.abs(
+        (ux * (segs[j * 4 + 2] - segs[j * 4]) +
+          uy * (segs[j * 4 + 3] - segs[j * 4 + 1])) /
+          lj
+      );
+      if (cos < 0.999) continue;
+      const off = (x: number, y: number) =>
+        Math.abs((x - segs[i * 4]) * uy - (y - segs[i * 4 + 1]) * ux);
+      if (off(segs[j * 4], segs[j * 4 + 1]) > tol) continue;
+      if (off(segs[j * 4 + 2], segs[j * 4 + 3]) > tol) continue;
+      const touch = [0, 2].some(a =>
+        [0, 2].some(
+          b =>
+            Math.hypot(
+              segs[i * 4 + a] - segs[j * 4 + b],
+              segs[i * 4 + a + 1] - segs[j * 4 + b + 1]
+            ) <= tol
+        )
+      );
+      if (touch) parent[find(p)] = find(q);
+    }
+  const groups = new Map<number, number[]>();
+  list.forEach((i, k) => {
+    const g = groups.get(find(k));
+    if (g) g.push(i);
+    else groups.set(find(k), [i]);
+  });
+  const outside = (x: number, y: number) =>
+    x < r.x0 - beyond ||
+    x > r.x1 + beyond ||
+    y < r.y0 - beyond ||
+    y > r.y1 + beyond;
+  const out = new Set<number>();
+  groups.forEach(members => {
+    // The extreme ends along the line's direction.
+    const i0 = members.reduce((a, i) => (len(i) > len(a) ? i : a));
+    const l0 = len(i0) || 1e-9;
+    const ux = (segs[i0 * 4 + 2] - segs[i0 * 4]) / l0;
+    const uy = (segs[i0 * 4 + 3] - segs[i0 * 4 + 1]) / l0;
+    let lo: [number, number, number] = [Infinity, 0, 0];
+    let hi: [number, number, number] = [-Infinity, 0, 0];
+    for (const i of members)
+      for (const a of [0, 2]) {
+        const x = segs[i * 4 + a];
+        const y = segs[i * 4 + a + 1];
+        const t = x * ux + y * uy;
+        if (t < lo[0]) lo = [t, x, y];
+        if (t > hi[0]) hi = [t, x, y];
+      }
+    if (outside(lo[1], lo[2]) && outside(hi[1], hi[2]))
+      members.forEach(i => out.add(i));
+  });
+  return out;
+}
 
 /** A grid of segment indices by midpoint, for "what is near here". */
 class SegmentGrid {
@@ -292,8 +548,49 @@ export type PreparedSheet = {
   lengths: Float64Array;
   wordIndex: Map<string, number[]>;
   grid: (cell: number) => SegmentGrid;
+  /**
+   * Segments by the cells their EXTENT covers, built on first use. The
+   * midpoint grid cannot see a long wall crossing a symbol whose middle is
+   * far away; this can. Used only by the cut-line test.
+   */
+  spans: () => SpanGrid;
   lengthOf: (i: number) => number;
 };
+
+/** Segments indexed by every cell their bounding box covers. */
+class SpanGrid {
+  private cells = new Map<number, number[]>();
+  private static CELL = 16;
+  constructor(segs: Float32Array) {
+    const c = SpanGrid.CELL;
+    const n = segs.length / 4;
+    for (let i = 0; i < n; i++) {
+      const x0 = Math.floor(Math.min(segs[i * 4], segs[i * 4 + 2]) / c);
+      const x1 = Math.floor(Math.max(segs[i * 4], segs[i * 4 + 2]) / c);
+      const y0 = Math.floor(Math.min(segs[i * 4 + 1], segs[i * 4 + 3]) / c);
+      const y1 = Math.floor(Math.max(segs[i * 4 + 1], segs[i * 4 + 3]) / c);
+      for (let cx = x0; cx <= x1; cx++)
+        for (let cy = y0; cy <= y1; cy++) {
+          const k = cx * 100003 + cy;
+          const l = this.cells.get(k);
+          if (l) l.push(i);
+          else this.cells.set(k, [i]);
+        }
+    }
+  }
+  /** Every segment whose extent's cells meet the rectangle, once each. */
+  near(r: Rect, visit: (i: number) => void) {
+    const c = SpanGrid.CELL;
+    const seen = new Set<number>();
+    for (let cx = Math.floor(r.x0 / c); cx <= Math.floor(r.x1 / c); cx++)
+      for (let cy = Math.floor(r.y0 / c); cy <= Math.floor(r.y1 / c); cy++)
+        for (const i of this.cells.get(cx * 100003 + cy) ?? [])
+          if (!seen.has(i)) {
+            seen.add(i);
+            visit(i);
+          }
+  }
+}
 
 export function prepareSheet(
   geo: VectorGeometry,
@@ -317,7 +614,9 @@ export function prepareSheet(
     else wordIndex.set(k, [i]);
   });
   const grids = new Map<number, SegmentGrid>();
+  let spanGrid: SpanGrid | null = null;
   return {
+    spans: () => (spanGrid ??= new SpanGrid(segs)),
     geo,
     words,
     byLength,
@@ -538,14 +837,29 @@ export function symbolFromBox(
     return { kind: "scan", message: SCAN_MESSAGE };
 
   // ── The symbol ──────────────────────────────────────────────────────────
-  const boxed: number[] = [];
+  const wholly: number[] = [];
+  const boxRect: Rect = {
+    x0: box.x - pad,
+    y0: box.y - pad,
+    x1: box.x + box.width + pad,
+    y1: box.y + box.height + pad,
+  };
+  const crossingEdge: number[] = [];
   for (let i = 0; i < n; i++) {
     if (
       inBox(segs[i * 4], segs[i * 4 + 1]) &&
       inBox(segs[i * 4 + 2], segs[i * 4 + 3])
     )
-      boxed.push(i);
+      wholly.push(i);
+    else if (segEntersRect(segs, i, boxRect)) crossingEdge.push(i);
   }
+  // Pieces of a line running THROUGH the box are not the symbol, however
+  // short (throughLinePieces). Only when something crosses the edge at all.
+  const through =
+    crossingEdge.length > 0 && wholly.length <= MAX_SYMBOL_SEGMENTS
+      ? throughLinePieces(segs, [...wholly, ...crossingEdge], boxRect, 0.5)
+      : new Set<number>();
+  const boxed = wholly.filter(i => !through.has(i));
   if (boxed.length > MAX_SYMBOL_SEGMENTS)
     return {
       kind: "tooBig",
@@ -820,10 +1134,37 @@ export function searchSymbol(
     };
   const chosen = anchor as Anchor;
 
+  /*
+    A SECOND anchor, of another length. A copy whose anchor line is cut in
+    two where a wall crosses it has no whole segment of that length, and was
+    never even tried (track-c 2026-10-06, lines crossing symbols). The next
+    rarest line, if the copy still has it whole, gives it a chance.
+  */
+  let second: number | null = null;
+  if (chosen.kind === "seg") {
+    const [clo, chi] = lengthRange(rel[chosen.k].length);
+    let secondCount = Infinity;
+    rel.forEach((r, k) => {
+      if (r.length < Math.max(1, 0.12 * size)) return;
+      const [lo, hi] = lengthRange(r.length);
+      if (lo < chi && hi > clo) return; // the same length band as the first
+      if (hi - lo < secondCount) {
+        second = k;
+        secondCount = hi - lo;
+      }
+    });
+  }
+
   // ── Candidate places and orientations ───────────────────────────────────
   const candidates: { tx: number; ty: number; o: Orient }[] = [];
-  if (chosen.kind === "seg") {
-    const a = rel[chosen.k];
+  const anchorSegs =
+    chosen.kind === "seg"
+      ? second === null
+        ? [chosen.k]
+        : [chosen.k, second as number]
+      : [];
+  for (const k of anchorSegs) {
+    const a = rel[k];
     const [lo, hi] = lengthRange(a.length);
     for (let s = lo; s < hi; s++) {
       const i = byLength[s];
@@ -847,7 +1188,8 @@ export function searchSymbol(
           candidates.push({ tx: px2 - ax1, ty: py2 - ay1, o });
       }
     }
-  } else {
+  }
+  if (chosen.kind === "word") {
     const w = relWords[chosen.k];
     for (const p of words) {
       if (wordKey(p.text) !== w.text) continue;
@@ -872,6 +1214,8 @@ export function searchSymbol(
     coverage: number;
     matched: Set<number>;
     usedWords: Set<number>;
+    /** Only there once lines cut by a crossing line are counted. */
+    cutThrough: boolean;
   };
   const found: Found[] = [];
   const seen = new Set<string>();
@@ -885,7 +1229,9 @@ export function searchSymbol(
 
     let matchedLength = 0;
     let missingLength = 0;
+    let cutLength = 0;
     const matched = new Set<number>();
+    const cutPieces = new Set<number>();
     let failed = false;
     for (const r of rel) {
       const q1x = o.a * r.x1 + o.b * r.y1 + tx;
@@ -910,15 +1256,41 @@ export function searchSymbol(
       if (hit >= 0) {
         matched.add(hit);
         matchedLength += r.length;
-      } else {
-        missingLength += r.length;
-        if (totalLength > 0 && missingLength / totalLength > 1 - MIN_COVERAGE) {
-          failed = true;
-          break;
-        }
+        continue;
+      }
+      // Not whole — but maybe CUT where a line crosses it (cutAcross). Only
+      // asked once something here has matched, which keeps the search fast.
+      const cut =
+        matchedLength > 0
+          ? cutAcross(sheet, q1x, q1y, q2x, q2y, r.filled, tol, matched)
+          : null;
+      if (cut) {
+        cutLength += r.length;
+        cut.forEach(i => cutPieces.add(i));
+        continue;
+      }
+      missingLength += r.length;
+      if (totalLength > 0 && missingLength / totalLength > 1 - MIN_COVERAGE) {
+        failed = true;
+        break;
       }
     }
     let coverage = totalLength > 0 ? matchedLength / totalLength : 1;
+    /*
+      A copy that is only there once its cut lines are counted is OFFERED,
+      flagged — never clear, never silently dropped (track-c, 2026-10-06):
+      the person decides whether the line through it hides the same device.
+      One that reaches MIN_COVERAGE whole is an ordinary find; its cut
+      pieces are its own line work either way.
+    */
+    let cutThrough = false;
+    if (!failed) {
+      cutPieces.forEach(i => matched.add(i));
+      if (totalLength > 0 && coverage < MIN_COVERAGE) {
+        cutThrough = true;
+        coverage = (matchedLength + cutLength) / totalLength;
+      }
+    }
     if (failed) {
       /*
         The same symbol, cut into different pieces. UNCC's legend draws the
@@ -972,6 +1344,7 @@ export function searchSymbol(
       coverage,
       matched,
       usedWords,
+      cutThrough,
     });
   }
 
@@ -995,6 +1368,7 @@ export function searchSymbol(
     const hh = turned ? halfW : halfH;
     const needsLook: string[] = [];
     const maybeExisting: string[] = [];
+    if (f.cutThrough) needsLook.push(CUT_THROUGH_REASON);
 
     // Lighter or darker than the boxed one.
     if (f.matched.size > 0 && rel.length > 0) {
@@ -1022,9 +1396,23 @@ export function searchSymbol(
       wire that only ends at the circle has its middle outside.
     */
     if (totalLength > 0) {
+      // A wall or wire running right through, well past it on both sides,
+      // is not "more symbol" (throughLinePieces). A second pair that only
+      // just pokes out — the double duplex — still is.
+      const near: number[] = [];
+      grid.near(f.tx, f.ty, Math.max(hw, hh) + 3 * size, i => {
+        if (!f.matched.has(i)) near.push(i);
+      });
+      const through = throughLinePieces(
+        segs,
+        near,
+        { x0: f.tx - hw, y0: f.ty - hh, x1: f.tx + hw, y1: f.ty + hh },
+        tol,
+        Math.max(tol, 0.5 * size)
+      );
       let extra = 0;
       grid.near(f.tx, f.ty, Math.max(hw, hh) + size, i => {
-        if (f.matched.has(i)) return;
+        if (f.matched.has(i) || through.has(i)) return;
         const l = lengthOf(i);
         if (l > 1.5 * size) return;
         const mx = (segs[i * 4] + segs[i * 4 + 2]) / 2;
