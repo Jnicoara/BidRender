@@ -363,6 +363,14 @@ All additive and nullable. Specs are in the plans named.
       wait and never says whether the address has an account. Log each lock
       with a reason, masked, like the reset stops (`deploying.md` § 11,
       "reset email blocked").
+- [ ] **Refuse a new password that matches the CURRENT one** (owner,
+      2026-10-06), at password change and at reset: compare the new
+      password against the stored hash (`bcrypt.compare`) and refuse with a
+      plain sentence ("That is your current password. Choose a different
+      one."). **Older passwords stay allowed: no password history**, by the
+      owner's decision. Nothing new is stored. A reset that is refused this
+      way must NOT use up the link (the same rule as "refuses a password the
+      rules refuse, and uses nothing up" in `server/passwordReset.test.ts`).
 
 ### Before beta: price an unpriced line right where it blocks you
 
