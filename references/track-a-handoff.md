@@ -1,5 +1,24 @@
 # Track A handoff — 2026-10-05
 
+## Session 5 (2026-10-06, ~20:50 UTC) — LIVE RELEASED. Read this first
+
+- **Live serves `24105ad`; its database has all 105 migrations** (0096–0104
+  applied 2026-10-06 ~20:11 UTC, code live 20:42). Record:
+  `deploying.md` § 11 "LIVE: `24105ad`". Backup taken just before:
+  `2026-10-06T20-03-57Z`. Every live bid total unchanged before/after.
+- **Owner still to do:** add the live `RESEND_API_KEY` (`bidridge-live`) and
+  run one reset test on bidridge.com. Until then "Forgot password?" says
+  email is not set up.
+- **First job after the release (owner): investigate the blank Plans screen
+  after a reload** (todo.md § Flaky tests, MUST INVESTIGATE). It may be a
+  real bug.
+- **Next release must carry B's labor rule TOGETHER with 0105–0106
+  (`laborOnly` + `snapshotLaborOnly`) and B's code** — never the rule alone
+  (`live-release-plan.md` § 0, `migrations-next-batch.md`). Also in it: C's
+  tie-labels and CAD layers, the reset early-check (`6518fc5`).
+- The staging email cause was an invalid staging Resend key (`deploying.md`
+  § 11); `[email]` lines in Runtime Logs say why any send stops.
+
 ## Session 4 (2026-10-06, ~06:00 UTC) — read this first
 
 - **Do NOT release `44f0f5f` or `6323a7b`.** Both carry this session's
