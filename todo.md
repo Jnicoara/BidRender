@@ -296,6 +296,20 @@ All additive and nullable. Specs are in the plans named.
       least off the main thread. The scale test's budgets are the alarm; do
       not loosen them to get past it.
 
+### Before beta: sign-in protection (owner, 2026-10-06)
+
+- [ ] **Block known-leaked passwords** at sign-up, password change and
+      reset: refuse a password found in a breach list (for example the
+      k-anonymity range check against Have I Been Pwned: only the first five
+      characters of the SHA-1 leave the server). The refusal says plainly
+      why. Never a silent rejection.
+- [ ] **Limit repeated wrong sign-in attempts**, per address and per sender,
+      the same way password reset is already limited (`overResetRequestLimit`
+      / `overResetAddressLimit` in `authRouter.ts`). The message names the
+      wait and never says whether the address has an account. Log each lock
+      with a reason, masked, like the reset stops (`deploying.md` § 11,
+      "reset email blocked").
+
 ### Before beta: price an unpriced line right where it blocks you
 
 > **2026-10-05:** quote items (references/quote-items-plan.md § 8) need the

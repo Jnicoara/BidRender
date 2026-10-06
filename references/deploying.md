@@ -1518,6 +1518,35 @@ additive ones run BEFORE the push (§ 5, three steps).
 5. Then production, in the same order — see the release entry below for the
    current one, and § 5a for the full commands.
 
+### Staging: reset email blocked by an invalid Resend key (fixed 2026-10-06)
+
+**What happened.** The staging password-reset test stopped at step 4: the
+screen said "If an account uses … a reset link is on its way", no email
+arrived, and Resend's dashboard showed no send at all. The account existed and
+a reset token was created, so the app did try. The staging runtime log said:
+
+```
+[email] password-reset NOT sent to jj…@gmail.com: Resend answered 400: API key is invalid
+```
+
+**Fix (owner).** A new Resend API key, pasted into the staging app's
+`RESEND_API_KEY` at **app level** (Run time, Encrypt), saved, redeployed. The
+next reset email arrived, the new password worked, the old one and the used
+link were refused.
+
+**What to remember.**
+
+- **Resend shows no trace of a request it rejects for a bad key**, so "the
+  dashboard shows nothing" does not mean the app never called it. Read the
+  app's own log first: search Runtime Logs for `[email]`. Every refusal
+  writes one line with its reason, and since 2026-10-06 so do the two stops
+  before the email step (no account for the address; an account with no
+  password), as `[auth] password reset: …`.
+- Retyping `STAGING_EMAIL_ALLOWLIST` changed nothing because it was never the
+  cause. Read the log line before changing settings.
+- Live needs its OWN key (`bidridge-live`), never staging's, and is set
+  during the live release (`live-release-plan.md`).
+
 ### Staging: migrations 0103–0104 (done 2026-10-05) — NOT yet on live
 
 Batch 1b (`migrations-0098-batch-plan.md` § S): `'unconfirmed'` appended to
