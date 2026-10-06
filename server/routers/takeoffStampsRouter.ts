@@ -571,6 +571,15 @@ export const takeoffStampsRouter = router({
          * (shared/markStatus.ts, rules 1 and 2).
          */
         status: row.status,
+        /**
+         * The mark's own height (0098), null = follows its count, and who
+         * wrote it. Listed by hand: this feeds a screen (CLAUDE.md).
+         */
+        mountHeightInches:
+          row.mountHeightInches === null ? null : Number(row.mountHeightInches),
+        mountHeightSource: row.mountHeightSource,
+        /** "No drop on these" (0098). */
+        dropExcluded: row.dropExcluded === true,
       }));
     }),
 
@@ -604,6 +613,69 @@ export const takeoffStampsRouter = router({
         ctx.scope.dataUserId,
         input.ids,
         input.status === "new" ? null : input.status
+      );
+      return { updated };
+    }),
+
+  /**
+   * A mark's own device height, in inches, or null to follow its count
+   * (references/vertical-drops-plan.md § 2). `read` is only ever sent by
+   * Sheet Check's "Use" — a height read off the plan reaches a mark when a
+   * person accepts it, never by being read. Refused on a locked bid: a
+   * height moves a drop, and a drop is a quantity.
+   */
+  setHeight: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        ids: z.array(z.number().int().positive()).min(1).max(2000),
+        // Floor to a high bay: -60 in (below a slab) to 50 ft.
+        inches: z.number().min(-60).max(600).nullable(),
+        source: z.enum(["typed", "read"]),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("a mark's height cannot be changed"),
+        });
+      const updated = await db.setStampHeight(
+        input.bidId,
+        ctx.scope.dataUserId,
+        input.ids,
+        input.inches,
+        input.source
+      );
+      return { updated };
+    }),
+
+  /**
+   * "No drop on these" — or give them back. A mark left off keeps its
+   * place in the count; only its drop goes, and the count's row says how
+   * many (shared/groupDrops.ts `excludedCount`).
+   */
+  setDropExcluded: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        ids: z.array(z.number().int().positive()).min(1).max(2000),
+        excluded: z.boolean(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("a mark's drop cannot be changed"),
+        });
+      const updated = await db.setStampDropExcluded(
+        input.bidId,
+        ctx.scope.dataUserId,
+        input.ids,
+        input.excluded
       );
       return { updated };
     }),

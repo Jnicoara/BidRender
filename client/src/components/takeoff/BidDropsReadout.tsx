@@ -164,7 +164,9 @@ export function BidDropsReadout({
                     <span className="text-xs text-muted-foreground">
                       {" "}
                       · {d.count} to {d.label || "device"},{" "}
-                      {d.perDropFeet.toFixed(2)} ft each
+                      {d.perDropFeet !== null
+                        ? `${d.perDropFeet.toFixed(2)} ft each`
+                        : "heights vary by mark"}
                     </span>
                   </span>
                   <span className="text-xs font-mono tabular-nums shrink-0">

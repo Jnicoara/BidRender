@@ -79,6 +79,7 @@ import {
   extrasForRunRow,
   extrasViewForRunRow,
   verticalsForRunRow,
+  endOfRun,
 } from "../runVerticals";
 import {
   extraPctSchema,
@@ -390,6 +391,23 @@ export const takeoffRunsRouter = router({
         }));
 
         const traced = tracedRunOf(run);
+        // What each end resolves to — the same function the arithmetic uses.
+        const startEnd = endOfRun(
+          run.startKind,
+          run.startHeightInches,
+          run.startTeeId,
+          run.startStampId,
+          run.traceMode,
+          heights
+        );
+        const endEnd = endOfRun(
+          run.endKind,
+          run.endHeightInches,
+          run.endTeeId,
+          run.endStampId,
+          run.traceMode,
+          heights
+        );
         return {
           id: run.id,
           name: run.name,
@@ -466,6 +484,21 @@ export const takeoffRunsRouter = router({
             distributionHeightInches: run.distributionHeightInches,
             startStampId: run.startStampId,
             endStampId: run.endStampId,
+            /**
+             * Where each end's device height came from — "this mark, typed",
+             * "read from the plan", the count's — so the row can say it
+             * (vertical-drops-plan § 5). A height nobody can trace back is
+             * a number nobody can check.
+             */
+            startHeightSource: startEnd.source,
+            endHeightSource: endEnd.source,
+            /**
+             * The end is linked to a device marked EXISTING. Its drop is
+             * still priced (owner, 2026-10-05: option C) and the row SAYS so,
+             * with one click to leave it off. Never silent either way.
+             */
+            startOnExisting: startEnd.mark?.status === "existing",
+            endOnExisting: endEnd.mark?.status === "existing",
           },
           /**
            * Whose wire this run is, and what the estimator actually said (D18).
@@ -2020,7 +2053,7 @@ export const takeoffRunsRouter = router({
       const fromMarks = (
         await db.loadGroupDrops(input.bidId, userId, heights, allRuns, scales)
       )
-        .filter(d => d.status === "counted" && d.perDropFeet !== null)
+        .filter(d => d.status === "counted" && d.totalDropFeet !== null)
         .map(d => ({
           groupId: d.groupId,
           groupLabel: groupLabel.get(d.groupId) ?? "Count",
@@ -2030,11 +2063,10 @@ export const takeoffRunsRouter = router({
               heights.types
             ) ?? "",
           count: d.countedMarks.length,
-          perDropFeet: d.perDropFeet as number,
-          feet:
-            Math.round(
-              (d.perDropFeet as number) * d.countedMarks.length * 100
-            ) / 100,
+          // One length only when every mark drops the same: a mark at its
+          // own height makes "N × one drop" false, so it is never sent.
+          perDropFeet: d.buckets.length === 1 ? d.buckets[0].perDropFeet : null,
+          feet: d.totalDropFeet as number,
           runTypeId: d.runTypeId,
           mayDoubleCount: d.mayDoubleCount,
         }))

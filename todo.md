@@ -1789,7 +1789,9 @@ path is ever revived, give it the same treatment first.
       counts into `status`.** The code now reads `status`; the twin counts
       (`shared/existingToRemain.ts`) still price as NEW if sent. Per 0098's
       header this is a separate step-3 migration, now unblocked.
-- [ ] **Decide: a RUN ending on an existing mark.** A run end can claim a
+- [x] **DECIDED AND BUILT 2026-10-05: option C** — priced, with "Leave it
+      off" on the run row (references/vertical-drops-plan.md § 4).
+      **Decide: a RUN ending on an existing mark.** A run end can claim a
       mark (`startStampId`/`endStampId`) and then prices its own drop there.
       Not a mark count, so the status rule does not touch it; new conduit to
       an existing device can be real work. Found by the 2026-10-05 audit.

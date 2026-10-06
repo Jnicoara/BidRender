@@ -6,6 +6,20 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-05]
 
+- **Fixed: a device's drop could vanish from the bid.** When a run started
+  or ended on a marked device but counted no drop there itself, the
+  device's own drop was taken off anyway, so neither counted it. Now the
+  run only takes a drop it actually counts.
+- **A single device can have its own mounting height.** Select marks and
+  set a height in the bar that appears (a receptacle at 54" instead of
+  18"); its drop, the count's total and the bid follow. A height read off
+  the plan in Check sheet is offered as "Use 54"" and is only used when
+  you click it.
+- **One device's drop can be left off** with "No drop on these", and the
+  count says how many.
+- **A run ending on an existing device** still prices its drop, says so on
+  the run, and has a one-click "Leave it off".
+
 - **New and existing devices now look different on the drawing at every
   zoom.** Once a pin was big enough to carry its letter, a new device and
   an existing one looked the same, and that difference decides what gets

@@ -6,10 +6,13 @@
  */
 
 /**
- * `takeoff_stamps.mountHeightInches` + `mountHeightSource`. Until then a
- * height read beside a mark is SHOWN, never saved onto the mark.
+ * `takeoff_stamps.mountHeightInches` + `mountHeightSource` (0098). ON since
+ * 2026-10-05: a height read beside a mark is offered ("Use 54"") and saved
+ * as `read` only when a person chooses it — never by being read
+ * (references/vertical-drops-plan.md § 2). While it was off, a read height
+ * was shown and never saved.
  */
-export const MARK_HEIGHT_COLUMN = false;
+export const MARK_HEIGHT_COLUMN = true;
 
 /**
  * `takeoff_stamps.checkAcceptedAt`. Until then "Keep" on a mark the check

@@ -90,7 +90,9 @@ run panel (Track B).
 **Source:** `todo.md` "Decide: a RUN ending on an existing mark";
 `references/track-b-handoff.md` Open 2.
 
-**Answer:**
+**Answer:** **2026-10-05 — option C:** keep pricing the drop, with a
+one-click "Leave it off" on the run row; no new column. Built by Track B
+the same day (references/vertical-drops-plan.md § 4).
 
 ---
 

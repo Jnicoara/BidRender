@@ -1,8 +1,18 @@
 # Vertical drops — plan (Track B, 2026-10-05)
 
-PLAN ONLY. Nothing here is built by this document. No migration is written;
-§ 7 lists what Track A would add if the owner chooses the options that need
-it.
+**Status, 2026-10-05 (later the same day): the owner answered § 10, and
+the code-only part is BUILT** (§ 8 says what, with tests). Two parts wait
+for Track A's columns, listed in § 7: the per-sheet run height and the
+assembly's mounting height. No migration was written by Track B.
+
+**Owner's answers (2026-10-05):**
+
+| Q   | Answer                                                                                                                  |
+| --- | ----------------------------------------------------------------------------------------------------------------------- |
+| a   | A run ending on an EXISTING device: **option C** — price the drop, one-click "Leave it off", no column.                 |
+| b   | **Yes — run height per sheet.** Overrides overhaul § 6 "No per-area heights" (recorded there too). One column, Track A. |
+| c   | **Yes — assemblies carry the device's mounting height.** One column, Track A.                                           |
+| d   | Relocates: **wait** until remove/relocate labor pricing is decided.                                                     |
 
 ## 0. Read this first: most of this already exists
 
@@ -133,14 +143,21 @@ short with nothing on screen to say so.
 read today. Out of scope here; if wanted, it follows the same rule as a mark
 height: offered, never applied silently.
 
-### Per-sheet or per-area run height — OWNER QUESTION, not decided here
+### Per-sheet run height — DECIDED 2026-10-05: yes (waits on Track A)
 
 The request asked for "a ceiling/deck height per sheet or per area".
-**Overhaul § 6 decided "No per-area heights. Per-run override is enough"**,
-and "ceiling height stays out of the model". Re-opening it needs the
-owner's reason. The case for a **per-SHEET** run height (not per area) is a
-multi-storey job where floor 1 runs at 12' and floor 2 at 10': today that
-is a per-run override on every run of one floor. Options in § 9, Q2.
+**Overhaul § 6 had decided "No per-area heights. Per-run override is
+enough"**, and "ceiling height stays out of the model". **The owner
+overrode the first half for SHEETS on 2026-10-05** (answer b): a
+multi-storey job where floor 1 runs at 12' and floor 2 at 10' was a
+per-run override on every run of one floor. The reason is that case.
+Per-AREA heights and "ceiling height" stay out. Overhaul § 6 carries a line
+saying so.
+
+Once A adds the column (§ 7), the run height chain becomes
+**run → sheet → job → company**, still with no shipped layer, and a
+sheet's own height is set on the sheet row with the same `HeightFields`
+control ("follows the job" when empty).
 
 ## 3. How a drop adds to a run
 
@@ -163,10 +180,58 @@ place to point:
 - **Never both.** A mark a run end claims is left out of its count's drops.
   Gap 5 changes WHEN a claim counts — see § 8 step 1.
 
-## 4. A run that ends on an EXISTING mark — options, not decided
+### The known-answer run, line by line (asked 2026-10-05)
 
-Owner question 3 in `references/owner-questions.md`, unanswered. Today the
-run prices its drop there; the count path already skips existing marks.
+The owner worked the conduit by hand as 40 + 4 + 8.5 = **52.5 ft** and
+asked why § 9 said 54.5. **Both are right; they are different
+quantities.** 52.5 is conduit INSTALLED. 54.5 is conduit BOUGHT, which
+adds the conduit extra (waste) on the FLAT length only — never on the
+drops (overhaul § 7.1). The table in § 9 had both rows but did not say
+which one "conduit" meant. Every line, as the code computes it
+(`server/verticalDropsKnownAnswer.test.ts`, green):
+
+**Conduit**
+
+| Step                             | Working         | Feet     |
+| -------------------------------- | --------------- | -------- |
+| Flat (traced)                    | —               | 40.0     |
+| Drop at the panel                | (120 − 72) ÷ 12 | 4.0      |
+| Drop at the receptacle           | (120 − 18) ÷ 12 | 8.5      |
+| **Conduit installed**            | 40 + 4 + 8.5    | **52.5** |
+| Conduit extra (waste), flat only | 40 × 5 %        | 2.0      |
+| **Conduit bought**               | 52.5 + 2.0      | **54.5** |
+
+Makeup is wire only, so conduit gets none.
+
+**Wire** — 3 insulated conductors + the run's 1 shared ground = 4 wires
+
+| Step                                    | Working      | Feet      |
+| --------------------------------------- | ------------ | --------- |
+| Wire down the run and both drops        | 4 × 52.5     | 210.0     |
+| Makeup at the panel (60" per wire)      | 4 × 5.0      | 20.0      |
+| Makeup at the receptacle (18" per wire) | 4 × 1.5      | 6.0       |
+| **Wire installed**                      | 210 + 20 + 6 | **236.0** |
+| Wire extra (waste), on flat + drops     | 210 × 10 %   | 21.0      |
+| **Wire bought**                         | 236 + 21     | **257.0** |
+
+Wire extra is on the wire run (flat + vertical), not on the makeup; makeup
+is added, never multiplied. Per conductor: 52.5 × 1.10 + 5.0 + 1.5 =
+64.25, × 4 = 257.0 — the same answer by § 9's route.
+
+## 4. A run that ends on an EXISTING mark — DECIDED 2026-10-05: option C
+
+**The owner chose C** (answer a). BUILT: a run end LINKED to a mark marked
+existing prices its drop, and the run row says "Ends on an existing device
+— drop priced. [Leave it off]"; leaving it off sets that end to run height
+(`endKind = distribution`) and the row then says "drop left off. [Price
+it]". No column. Recorded in `references/owner-questions.md` § 3 too.
+
+Limit worth knowing: this applies to an end LINKED to the mark (the Link
+chip, or a leg started on it). A run that merely ends near an existing
+device is not linked, and its end prices whatever its picker says, as
+before.
+
+The options as they were laid out:
 
 - **A. Keep pricing the drop, and say so** (the recommendation already on
   file). The pipe and wire down to an old box are new work. The run row
@@ -193,24 +258,35 @@ Mostly built; the additions are marked NEW.
 - **On the run row:** flat, vertical, total — the closed row shows the
   arithmetic (§ 5d decision 4), e.g. "40.0 ft flat + 12.5 ft vertical
   (panel 6'-0" → run 10'-0" → receptacle 1'-6")".
-- **NEW — where each end's height came from**, in words, when it is not the
-  type default: "receptacle at 4'-6" (this mark, typed)", "(read from the
-  plan)". A height nobody can trace back is a number nobody can check.
+- **BUILT — where each end's height came from**, in words, when it is not
+  the type default: "Drop 5.50 ft · this mark's height", "· read from the
+  plan", "· the count's height" (`heightSourceWords`, runEnds.tsx). A
+  height nobody can trace back is a number nobody can check.
 - **Amber when a height is unknown**, with the reason and the fix in one
   line: "No drop at the end — no height set for Panel. Set it". Built for
   runs (`uncountedEnds`) and counts ("No drop counted — …").
 - **Never silently 0.** An unset height is excluded with a named reason
-  (`verticalAtEnd`); 0 is only ever a real height (floor box). Every new
-  height field uses `InlineNumberField` with an explicit `whenUnset`
-  placeholder ("follows the count") — CLAUDE.md § 6, measurement convention.
-- **NEW — on a mark's popover:** its height and source, editable, "follows
-  the count (1'-6")" when unset.
-- **NEW — gap 5's warning** if anything still claims a mark with no vertical
-  at that end: "This run takes the drop off 1 receptacle but counts none
-  here".
-- **NEW — existing-device wording** per the owner's answer to § 4.
-- **The card says it in words.** A count row keeps "N drops · M ft", and
-  gains "1 at its own height" / "1 left off" when a mark differs.
+  (`verticalAtEnd`); 0 is only ever a real height (floor box). A count
+  whose type has no height, with some marks at heights of their own, counts
+  those and says in amber "2 marks have no drop counted — no height set for
+  that type" (`GroupDrop.uncounted`).
+- **BUILT — on the selection pill, not a popover** (there is no mark
+  popover; the pill is where "Mark as…" already lives): **Height** with the
+  shared `HeightFields` control — empty reads "the count's", mixed reads
+  "heights differ", "Follow the count" clears it — and **"No drop on
+  these" / "Give these a drop"**. `HeightFields` rather than
+  `InlineNumberField`, because it is the height control the count row and
+  the run ends already use, so the three cannot drift (CLAUDE.md § "Copying
+  a layout").
+- **Gap 5 needed no warning:** the rule was fixed instead, so a claim that
+  counts nothing no longer takes the drop.
+- **BUILT — existing-device wording** per option C (§ 4).
+- **BUILT — the card says it in words.** "18" × 3 + 1 at its own height =
+  31.00 ft", and "1 mark has no drop — left off by hand". The bid-wide
+  drops readout says "heights vary by mark" instead of a per-drop length
+  when marks differ — "N × one drop" is never shown when it is false.
+- **BUILT — Sheet Check offers a read height:** "Use 54"" beside each mark
+  a height was read for; only that click writes it (as `read`).
 - Wording is "run height" everywhere a person reads it
   (before-beta-checklist: "one setting, six names" is its own cleanup).
 
@@ -229,7 +305,31 @@ run row, the card and the total MOVE.
 **For the core of this plan: none.** Gaps 1, 2, 3, 4 and 5 use columns that
 already exist (0094/0095, 0098, 0050–0052). Option C in § 4 needs none.
 
-Only if the owner chooses them:
+### FOR TRACK A — the two columns the owner asked for (2026-10-05)
+
+| #   | Column                                             | Kind                               | Meaning                                                                                                                                                            |
+| --- | -------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `bid_pdf_sheets.distributionHeightInches INT NULL` | **ADDITIVE**, nullable, NO default | This sheet's run height. NULL = follows the job. Chain: run → **sheet** → job → company.                                                                           |
+| 2   | `assemblies.mountHeightTypeKey VARCHAR(64) NULL`   | **ADDITIVE**, nullable, NO default | The height TYPE this assembly's device mounts at (a key of the heights list: `receptacle`, `switch`, or a company's own). NULL = not said; a count asks, as today. |
+
+- Both are **step 1** of the three-step deploy: no `UPDATE`, no backfill,
+  no existing meaning changes. NULL must stay distinguishable from any
+  answer, so **no `DEFAULT`**.
+- **Why a type KEY on the assembly, not inches:** a height in inches on the
+  assembly would be a fourth place a receptacle's height lives, and would
+  not move when the company changes its receptacle height. A key resolves
+  through the existing chain (job → company → shipped), so it re-prices
+  like everything else. A device mounted somewhere unusual is still a
+  per-count or per-mark height.
+- **Track B after A:** a new count from an assembly with a key starts with
+  `dropKind` answered (still editable — both directions, CLAUDE.md); a
+  linked run end whose count has no `dropKind` may then use its
+  assembly's key. A shipped assembly forks on edit, as now.
+  `symbol_links` is NOT asked for: a legend symbol links to an assembly
+  and takes its key; a second column would be a second answer to one
+  question.
+
+### The options as they were laid out (A and B chosen, D not)
 
 | Option | Column                                             | Kind                           | Why                                                                                                                                                                            |
 | ------ | -------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -243,6 +343,23 @@ edit, and a decision on whether `symbol_links` gets the same column (a
 legend symbol is more specific than its assembly — pin plan § 6 precedence).
 
 ## 8. Build order (Track B, code only)
+
+**BUILT 2026-10-05**, all code, no migration:
+
+| Step | What                                                                                     | Where                                                                                                           | Test                                                                     |
+| ---- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1    | A run end claims a mark's drop only where it counts a vertical (gap 5)                   | `stampsClaimedByRuns`; `loadGroupDrops` passes each end's result                                                | takeoffVerticals + groupDrops (both red with the old rule), markDropsBid |
+| 2    | A linked end with no kind takes its count's `dropKind` (not on a quantity trace, D21)    | `endOfRun`, server/runVerticals.ts                                                                              | takeoffVerticals "an end LINKED to a mark"                               |
+| 3    | Mark heights read, one order for both paths                                              | `resolveDeviceHeight` (shared/takeoffHeights.ts), used by `endOfRun` and `groupDrops`; drops bucketed by height | groupDrops, takeoffVerticals, markDropsBid                               |
+| 4    | `dropExcluded` read; "No drop on these" on the pill                                      | `groupDrops`, `takeoffStamps.setDropExcluded`                                                                   | groupDrops, markDropsBid                                                 |
+| 5    | Typed height on the pill; read height accepted from Sheet Check; `MARK_HEIGHT_COLUMN` on | `takeoffStamps.setHeight`, TraceLayer pill, SheetCheck "Use"                                                    | markDropsBid, selectionDrop                                              |
+| 6    | Existing-device wording and "Leave it off" (option C)                                    | `listForSheet` `ends.*OnExisting`, runEnds.tsx                                                                  | markDropsBid                                                             |
+| —    | The known-answer run                                                                     | —                                                                                                               | verticalDropsKnownAnswer                                                 |
+
+Waiting on Track A (§ 7): the per-sheet run height and the assembly's
+mounting height type. Waiting on the owner: relocates (answer d).
+
+The original order, as planned:
 
 0. **Fix the stale records** (gap 7) — docs only, in the same commit as
    step 1, each with a line saying what replaced it and when.
@@ -297,8 +414,10 @@ Variants on the same fixture, each a separate `it`:
 
 - **Mark height:** end linked to a receptacle mark with
   `mountHeightInches = 54` → end vertical 5.5 ft, conduit installed 49.5.
-- **Read vs typed:** the same mark with `read` 54 and then `typed` 48 →
-  typed wins (6.0 ft).
+- **Read vs typed:** one mark holds ONE height, so a later typed 48 simply
+  replaces an accepted read 54 (6.0 ft) and the source says `typed`. (The
+  plan first said "typed wins"; with one column there is nothing for it to
+  win against — whichever a person chose last is the height.)
 - **Unset:** panel height cleared → start vertical not counted, reason
   `height-not-set`, conduit installed 48.5 — and NOT 40 + 4 + 8.5 with a 0.
 - **Gap 5:** a leg starting on a mark with kind null → the mark's count drop
@@ -314,18 +433,13 @@ check" E-200 at laptop and tablet-portrait — trace the known-answer run,
 read the row, set a mark's height, and watch the row, card and total move.
 Delete the test counts afterwards.
 
-## 10. Open questions for the owner
+## 10. Questions for the owner — ANSWERED 2026-10-05
 
-1. **§ 4 — a run ending on an existing device:** A (price it, say so),
-   B (never), C (price it, one-click "leave it off" — no column), or D.
-2. **Per-sheet run height** (§ 2, option A column): wanted for multi-storey
-   jobs, against the recorded "no per-area heights" decision? Per-area
-   stays out either way unless you say otherwise.
-3. **Assembly height type** (§ 7 option B): should the library say what
-   height a device mounts at, so a new count's drop is answered before
-   anyone opens it? This is the "build once, every job one click" end of
-   the manual-to-automated range; leaving it out keeps today's per-count
-   answer.
-4. **Remove and relocate:** still unpriced as labor (handoff Open 1). A
-   relocate is often a new drop to a new spot; when that is decided, it
-   decides whether a relocate mark gets a drop.
+1. **§ 4 — a run ending on an existing device:** **C** — price it,
+   one-click "Leave it off". Built.
+2. **Per-sheet run height:** **yes**, overriding "no per-area heights" for
+   sheets. Column 1 in § 7, for Track A.
+3. **Assembly height type:** **yes**. Column 2 in § 7, for Track A.
+4. **Remove and relocate:** **wait** until remove/relocate labor pricing is
+   decided. Until then a relocate mark gets no count drop (the existing
+   `isPricedMark` rule) and nothing here changes that.

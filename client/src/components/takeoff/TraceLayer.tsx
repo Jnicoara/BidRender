@@ -55,6 +55,7 @@ import {
 } from "@/hooks/useCrosshairColor";
 import { Check, Ruler, TriangleAlert, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { HeightFields } from "@/components/HeightFields";
 import { traceReadout } from "@/lib/traceReadout";
 import {
   formatFeetInches,
@@ -290,6 +291,9 @@ export function TraceLayer({
   moveTargets,
   onMoveSelected,
   onSetStatusSelected,
+  selectedDrop,
+  onSetHeightSelected,
+  onSetDropExcludedSelected,
   onClearSelection,
   focusPoint,
   chromeTarget,
@@ -404,6 +408,15 @@ export function TraceLayer({
   onMoveSelected?: (groupId: number) => void;
   /** Set the selected marks' status. Omitted (a locked bid), no control. */
   onSetStatusSelected?: (status: UserMarkStatus) => void;
+  /**
+   * The selection's own height (null: none set, or they differ) and how
+   * many have their drop left off (vertical-drops-plan § 2).
+   */
+  selectedDrop?: { inches: number | null; mixed: boolean; excluded: number };
+  /** Set the selected marks' own height, or null to follow the count. */
+  onSetHeightSelected?: (inches: number | null) => void;
+  /** "No drop on these" / give them back. Omitted (locked), no control. */
+  onSetDropExcludedSelected?: (excluded: boolean) => void;
   onClearSelection: () => void;
   /** Highlighted after a jump from the counted-items list. */
   focusPoint: { x: number; y: number } | null;
@@ -433,6 +446,14 @@ export function TraceLayer({
   const pillShape = coarse
     ? "w-max max-w-[calc(100%-1rem)] flex-wrap justify-center rounded-2xl"
     : "w-max whitespace-nowrap rounded-full";
+  /*
+    The SELECTION pill wraps on every device. With "Move to…", "Mark as…",
+    a height and "No drop on these" it is wider than the drawing pane at
+    laptop width, and one unwrapped row ran off both sides — the count of
+    marks selected was under the side panel (seen 2026-10-05, 1536 px).
+  */
+  const widePillShape =
+    "w-max max-w-[calc(100%-1rem)] flex-wrap justify-center rounded-2xl";
   const svgRef = useRef<SVGSVGElement | null>(null);
   /** When the last press while tracing landed — see @/lib/traceClick. */
   const lastTracePress = useRef(Number.NEGATIVE_INFINITY);
@@ -2103,7 +2124,7 @@ export function TraceLayer({
             <div
               className={cn(
                 "absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
-                pillShape
+                widePillShape
               )}
               role="status"
               aria-live="polite"
@@ -2176,6 +2197,53 @@ export function TraceLayer({
                     </option>
                   ))}
                 </select>
+              )}
+              {onSetHeightSelected && selectedDrop && (
+                /*
+                  THESE MARKS' OWN HEIGHT (vertical-drops-plan § 2). Empty
+                  follows the count — a real height IS in effect, so it is
+                  not "not set". The same control the count row and the run
+                  ends use, so the three cannot drift apart.
+                */
+                <span className="flex items-center gap-1 pointer-events-auto text-xs">
+                  <span className="text-muted-foreground">Height</span>
+                  <HeightFields
+                    compact
+                    value={selectedDrop.inches}
+                    belowFloor={false}
+                    ariaPrefix="The selected marks' own height"
+                    onSave={inches => onSetHeightSelected(inches)}
+                    onClear={
+                      selectedDrop.inches !== null || selectedDrop.mixed
+                        ? () => onSetHeightSelected(null)
+                        : undefined
+                    }
+                    clearLabel="Follow the count"
+                    unsetLabel={
+                      selectedDrop.mixed ? "heights differ" : "the count's"
+                    }
+                    setLabel="Set"
+                  />
+                </span>
+              )}
+              {onSetDropExcludedSelected && selectedDrop && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-xs pointer-events-auto"
+                  onClick={() =>
+                    onSetDropExcludedSelected(selectedDrop.excluded === 0)
+                  }
+                  title={
+                    selectedDrop.excluded === 0
+                      ? "Leave these marks' drops off the bid. They stay counted as devices."
+                      : "Count these marks' drops again."
+                  }
+                >
+                  {selectedDrop.excluded === 0
+                    ? "No drop on these"
+                    : "Give these a drop"}
+                </Button>
               )}
               <Button
                 size="sm"

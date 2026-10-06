@@ -1671,6 +1671,13 @@ take.
 
 ## 5d. Phase 5 — verticals on runs. PLANNED 2026-09-18, not built
 
+> **BUILT — this heading was stale until 2026-10-05.** Run-end verticals
+> (`shared/takeoffHeights.ts`, `server/runVerticals.ts`) and, later, drops
+> on counted marks (`shared/groupDrops.ts`) are live and priced. One
+> difference from this section: accepting the stamp suggestion did NOT set
+> the end kind; since 2026-10-05 a linked end with no kind takes its
+> mark's count's kind instead. references/vertical-drops-plan.md.
+
 The money phase, and the first database change since the viewer work started.
 Everything below is governed by § 5a: measure honest, pad visibly. A vertical is
 a measurement, not a pad, and it is shown as its own number everywhere it is
@@ -4420,6 +4427,14 @@ This keeps the 2026-09-18 decision that colour means which TYPE a run is
 - **Elevations stored in inches, displayed in feet and inches.**
 - **No per-area heights.** Per-run override is enough; per-area is a demo
   feature that gets used twice.
+  > **Narrowed 2026-10-05 by the owner: a run height PER SHEET, yes.** A
+  > multi-storey job (floor 1 at 12', floor 2 at 10') was a per-run override
+  > on every run of one floor. Per-area and "ceiling height" stay out.
+  > Needs `bid_pdf_sheets.distributionHeightInches` (Track A); chain becomes
+  > run → sheet → job → company. references/vertical-drops-plan.md § 2, § 7.
+- **A vertical belongs to the GROUP** (below) **— narrowed 2026-10-05:** a
+  MARK may carry its own height (0098), which replaces its count's for
+  that mark only (check-my-marks-plan § 10.6; vertical-drops-plan § 2).
 - **The double-count rule goes in the CODE**, not only in this document.
 - **The run end device type is picked by the user, never guessed** from a nearby
   stamp.
