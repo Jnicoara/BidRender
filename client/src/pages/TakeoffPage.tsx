@@ -328,6 +328,11 @@ import { wheelIntent, type WheelGesture } from "@/lib/wheelIntent";
 import type { PageTextLayer } from "@/lib/textSelection";
 import type { FindResult, MatchBox } from "@/lib/findMatching";
 import { lookAlikeCheck, type SavedLook } from "@/lib/lookMatching";
+import {
+  browserStorage,
+  readTrustedLooks,
+  rememberTrustedLooks,
+} from "@/lib/trustedLooks";
 import type { SheetCheckInput, SheetCheckResult } from "@/lib/sheetCheck";
 import {
   countNameFromLegend,
@@ -351,6 +356,7 @@ import {
   dropLookMatches,
   matchItems,
   nextToLookAt,
+  trustLooks,
   type MatchItem,
   type ScanFindAnswer,
 } from "@/lib/findMatchingSession";
@@ -5438,7 +5444,16 @@ export default function TakeoffPage({
                 ...s,
                 panel: {
                   phase: "results",
-                  items: matchItems(result.matches, onSheet),
+                  // Trusted: the item's first look and any look confirmed
+                  // once; an added look's finds wait for a hand confirm.
+                  items: matchItems(
+                    result.matches,
+                    onSheet,
+                    new Set([
+                      ...looks.filter(l => l.isFirst).map(l => l.id),
+                      ...Array.from(readTrustedLooks(browserStorage())),
+                    ])
+                  ),
                   selectedId: null,
                   readMs,
                   findMs,
@@ -5472,7 +5487,14 @@ export default function TakeoffPage({
     (ids: number[], state: MatchItem["state"]) => {
       if (!findSession || findSession.panel.phase !== "results") return;
       const panel = findSession.panel;
-      const items = decide(panel.items, ids, state);
+      let items = decide(panel.items, ids, state);
+      // A find confirmed by hand trusts the new look that alone made it, and
+      // its other finds become ordinary ones (findMatchingSession, trustLooks).
+      if (state === "confirmed") {
+        const t = trustLooks(items, ids);
+        items = t.items;
+        rememberTrustedLooks(browserStorage(), t.trusted);
+      }
       // After one decision, on to the next; after Confirm all, stay put.
       const next =
         ids.length === 1 ? nextToLookAt(items, panel.selectedId) : null;

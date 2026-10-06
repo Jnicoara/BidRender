@@ -41,9 +41,15 @@ import {
   applyAiAnswers,
   clearOpen,
   itemKind,
-  matchItems,
+  matchItems as matchItemsTrusting,
   summary,
 } from "./findMatchingSession";
+
+// No saved looks in these finds, so which looks are trusted cannot matter.
+const matchItems = (
+  matches: Parameters<typeof matchItemsTrusting>[0],
+  marks: Parameters<typeof matchItemsTrusting>[1]
+) => matchItemsTrusting(matches, marks, new Set());
 
 type FixturePage = { width: number; height: number; layer: PageTextLayer };
 const fixture = JSON.parse(

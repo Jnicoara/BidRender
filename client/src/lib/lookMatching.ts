@@ -113,6 +113,8 @@ export type SavedLook = {
   pageNumber: number;
   setName: string | null;
   confirmsThisSet: boolean;
+  /** The item's first look: trusted like the box (`firstLookId`). */
+  isFirst: boolean;
   url: string | null;
 };
 

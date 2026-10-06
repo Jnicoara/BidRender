@@ -311,6 +311,12 @@ withDb("the looks Find all matching is given", () => {
       ["Old Blueridge school.pdf", true],
       ["Weld 1.pdf", false],
     ]);
+    // The first look (Weld, captured with the item) is trusted; the one
+    // added since is not, until a find from it is confirmed by hand.
+    expect(onBlue.looks.map(l => [l.setName, l.isFirst])).toEqual([
+      ["Old Blueridge school.pdf", false],
+      ["Weld 1.pdf", true],
+    ]);
     // Only another set's look needs its drawing opened from elsewhere.
     expect(onBlue.looks[0].url).toBeNull();
     expect(typeof onBlue.looks[1].url).toBe("string");

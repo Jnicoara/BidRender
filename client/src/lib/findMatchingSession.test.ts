@@ -8,12 +8,18 @@ import {
   clearOpen,
   decide,
   itemKind,
-  matchItems,
+  matchItems as matchItemsTrusting,
   nextToLookAt,
   summary,
   type MatchItem,
   type ScanFindAnswer,
 } from "./findMatchingSession";
+
+// No saved looks in these finds, so which looks are trusted cannot matter.
+const matchItems = (
+  matches: Parameters<typeof matchItemsTrusting>[0],
+  marks: Parameters<typeof matchItemsTrusting>[1]
+) => matchItemsTrusting(matches, marks, new Set());
 
 const m = (x: number, over: Partial<Match> = {}): Match => ({
   x,

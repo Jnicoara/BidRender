@@ -33,6 +33,11 @@ export type MatchItem = Match & {
    * reason, never a decision.
    */
   ai: ScanFindAnswer | "noAnswer" | null;
+  /**
+   * The untrusted looks that alone found it (`newLooksOf`); empty for an
+   * ordinary find. Non-empty means it needs a look.
+   */
+  newLooks: number[];
 };
 
 /** The AI's answers for a scan find (server/tieBreak.ts). */
@@ -44,10 +49,14 @@ export type PlacedMark = { x: number; y: number; name: string };
  * Build the session's items. A copy that already has a mark on it (any
  * count) is offered as already counted, not as a new one — confirming it
  * again would count one device twice.
+ *
+ * `trustedLooks` is REQUIRED, not optional, because forgetting it would
+ * trust every look — the wrong-count risk it exists for. See `newLooksOf`.
  */
 export function matchItems(
   matches: readonly Match[],
-  marks: readonly PlacedMark[]
+  marks: readonly PlacedMark[],
+  trustedLooks: ReadonlySet<number>
 ): MatchItem[] {
   return matches.map((m, id) => {
     const reach = Math.max(4, Math.max(m.halfWidth, m.halfHeight));
@@ -58,8 +67,54 @@ export function matchItems(
       state: "open",
       alreadyCounted: on?.name ?? null,
       ai: null,
+      newLooks: newLooksOf(m, trustedLooks),
     };
   });
+}
+
+/**
+ * FROM A NEW LOOK (multiple-looks-plan.md § 4, § 8 test 7). A look added to
+ * an item is not trusted until someone confirms one of its finds by hand: a
+ * wrong look ("GFCI" drawn like a duplex here) would otherwise put every
+ * duplex into Confirm all as a GFCI — a wrong count in one click.
+ *
+ * Trusted: the box drawn now, the item's first look, and any look already
+ * confirmed once. A find that ONLY untrusted looks made returns those looks'
+ * ids; it needs a look, and Confirm all leaves it. Any trusted source finding
+ * it too makes it an ordinary find.
+ */
+export function newLooksOf(
+  m: Pick<Match, "foundByBox" | "foundByLooks">,
+  trustedLooks: ReadonlySet<number>
+): number[] {
+  const looks = m.foundByLooks ?? [];
+  if (m.foundByBox !== false || looks.length === 0) return [];
+  return looks.some(id => trustedLooks.has(id)) ? [] : looks;
+}
+
+export const NEW_LOOK_REASON =
+  "Found only by a look added recently. Confirm one by hand to trust that look; until then Confirm all leaves its finds.";
+
+/**
+ * Someone confirmed a find by hand: the looks that alone made it are now
+ * trusted, and every other find they made becomes an ordinary one. Returns
+ * the looks newly trusted, for the caller to remember.
+ */
+export function trustLooks(
+  items: readonly MatchItem[],
+  confirmedIds: readonly number[]
+): { items: MatchItem[]; trusted: number[] } {
+  const ids = new Set(confirmedIds);
+  const trusted = Array.from(
+    new Set(items.filter(i => ids.has(i.id)).flatMap(i => i.newLooks))
+  );
+  if (trusted.length === 0) return { items: [...items], trusted };
+  return {
+    items: items.map(i =>
+      i.newLooks.some(l => trusted.includes(l)) ? { ...i, newLooks: [] } : i
+    ),
+    trusted,
+  };
 }
 
 export type ItemKind =
@@ -79,7 +134,7 @@ export type ItemKind =
 export function itemKind(item: MatchItem): ItemKind {
   if (item.alreadyCounted) return "already";
   if (item.onDemolitionPlan) return "demolition";
-  if (item.needsLook.length) return "needsLook";
+  if (item.needsLook.length || item.newLooks.length) return "needsLook";
   if (item.maybeExisting.length) return "maybeExisting";
   return "clear";
 }

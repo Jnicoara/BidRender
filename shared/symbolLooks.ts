@@ -168,3 +168,18 @@ export function lookAlikeWarning(alikes: readonly LookAlike[]): string {
       : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
   return `This look also matches ${list} on this sheet. Add it anyway?`;
 }
+
+/**
+ * The item's FIRST look: the oldest, the picture it was captured with (or
+ * its old picture, written as a row when a second was added). Its finds are
+ * trusted like the box drawn now; a look ADDED later is not, until someone
+ * confirms one of its finds by hand (plan § 4, "from a new look").
+ */
+export function firstLookId(
+  looks: readonly { id: number; createdAt: Date | string }[]
+): number | null {
+  const time = (l: { createdAt: Date | string }) =>
+    new Date(l.createdAt).getTime();
+  const [first] = [...looks].sort((p, q) => time(p) - time(q) || p.id - q.id);
+  return first?.id ?? null;
+}

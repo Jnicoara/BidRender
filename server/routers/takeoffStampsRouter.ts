@@ -62,6 +62,7 @@ import {
   looksForSearch,
   thumbnailAfterRemoval,
   lookAlikes,
+  firstLookId,
   type LookBox,
 } from "../../shared/symbolLooks";
 
@@ -1005,6 +1006,7 @@ export const takeoffStampsRouter = router({
           message: "Symbol not found.",
         });
       const rows = await db.getSymbolLooks(item.id, owner);
+      const first = firstLookId(rows);
       const chosen = looksForSearch(
         rows.map(r => ({ ...r, box: lookBoxOf(r) })),
         sheet.bidPdfId
@@ -1022,6 +1024,8 @@ export const takeoffStampsRouter = router({
             pageNumber: l.pageNumber,
             setName: l.setName,
             confirmsThisSet: here,
+            /** Trusted like the box; an added look is not, until confirmed once. */
+            isFirst: l.id === first,
             url: pdf ? await planViewerUrl(pdf.storageKey, new Date()) : null,
           };
         })

@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-05]
 
+- **A newly added look cannot fill a count in one click.** In Find all
+  matching, a find that only a recently added look made now says so and
+  needs a look; "Confirm all" leaves it. Confirm one of them by hand and
+  that look is trusted from then on, in this browser. The item's first look
+  and the box you draw are trusted as before.
+
 - **New and existing devices now look different on the drawing at every
   zoom.** Once a pin was big enough to carry its letter, a new device and
   an existing one looked the same, and that difference decides what gets
