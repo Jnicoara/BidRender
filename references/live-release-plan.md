@@ -12,6 +12,46 @@ nine migration files below.
 > after a save). `f8fdec3` has both. If staging serves anything else on the
 > day, this file is stale for that commit — stop and re-check § 1b.
 
+## 0. WHICH COMMIT — decided 2026-10-06: release BEFORE Track B's rule
+
+**`f8fdec3` must not go live as it stands.** It carries Track B's rule
+(`5c98bd1`, merged in `41462a7` → `6877993`): a line with labor and $0
+material is "not priced". The priced print refuses any bid with a "not
+priced" line, with no way past (`ProposalPage.tsx`), and nothing a person can
+type clears this one. A labor-only assembly (demo, pull wire) would block its
+bid's priced print. The owner's fix, `assemblies.laborOnly`, is migration
+**0105** (`migrations-next-batch.md`) plus Track B's code. Neither exists yet.
+(The 8 shipped starter assemblies include no labor-only one, so nothing
+shipped is caught today, but any contractor-built one would be.)
+
+**So this release goes out on `24105ad`.** It is the last commit before the
+merge that brought the rule in, and it carries every Track A fix: taps kept
+on a fresh plan, no double count, no stale "0 marks", the printed scale
+read. **Gate green (run 37419721623).** Measured 2026-10-06 against the live
+code on the local real-data copy: **all 4,386 bids identical**, totals,
+not-priced and incomplete alike, with not even an EXPECTED line.
+
+**What `24105ad` does NOT have, compared with `f8fdec3`:** Track B's rule
+(on purpose), Track C's tie-labels and CAD layers (`e6fcde3`, `68fe317`), and
+two test-only fixes. They go live in the NEXT release, **together with
+0105 and Track B's `laborOnly` code**, so the rule never reaches live
+without its way out.
+
+**Still needed before the window, and not done yet:**
+
+1. **A smoke test on exactly `24105ad`.** It has never run on staging. Pause
+   auto-deploy (`STAGING_AUTODEPLOY=off`), push `24105ad` to `staging` by
+   hand (`git push origin 24105ad:staging --force-with-lease`, Track A only,
+   because it moves staging backwards), wait for `/api/version` to show it,
+   then run `pnpm smoke` against staging with the smoke secrets. Then put
+   staging back on the `local-dev` tip and turn auto-deploy on again.
+2. **The password-reset test passing on staging.** The reset code is the same
+   in `24105ad` and `f8fdec3`. If the cause turns out to be a setting, the
+   test result carries over. If it needs code, this decision is re-made.
+
+Everywhere below that says `f8fdec3`, read **`24105ad`** for this release.
+§ 1b's EXPECTED case does not arise for `24105ad`, since the rule is absent.
+
 Read with `deploying.md` § 4 (deploy sequence), § 5 (three steps), § 5a
 (backup and verify commands) and § 6 (verifying a deploy). This file is the
 checklist for THIS release; those are the reasons.
