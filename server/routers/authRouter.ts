@@ -9,7 +9,12 @@ import * as db from "../db";
 import { nanoid } from "nanoid";
 import { toPublicUser } from "@shared/publicUser";
 import { PASSWORD_MAX_LENGTH, passwordProblem } from "@shared/passwordRules";
-import { emailAvailability, emailLinkBase, sendEmail } from "../email";
+import {
+  emailAvailability,
+  emailLinkBase,
+  maskAddress,
+  sendEmail,
+} from "../email";
 import {
   RESET_TOKEN_TTL_MS,
   hashResetToken,
@@ -277,6 +282,26 @@ export const authRouter = router({
       }
 
       const user = await db.getUserByEmail(email);
+      /*
+        EVERY stop says why in the log (2026-10-06). The screen must answer
+        alike for every address (no account enumeration), so the LOG is the
+        only place a missing email can be explained — and these two stops
+        used to write nothing at all, which left a reset that never arrived
+        undiagnosable from the logs (the staging reset test, step 4). Masked
+        the same way the email door masks; never the full address.
+      */
+      if (!user)
+        console.warn(
+          `[auth] password reset: no account uses ${maskAddress(email)} — nothing sent`
+        );
+      else if (!user.passwordHash || !user.email)
+        console.warn(
+          `[auth] password reset: account ${user.id} has ${
+            user.passwordHash
+              ? "no email address"
+              : "no password (signs in another way)"
+          } — nothing sent`
+        );
       if (user?.passwordHash && user.email) {
         const token = newResetToken();
         await db.createPasswordResetToken(

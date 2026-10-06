@@ -99,13 +99,20 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
 
 Requests waiting for Track A, which numbers and writes the migrations.
 
-> **Numbered 2026-10-06 (Track A), none written yet** —
-> `migrations-0098-batch-plan.md` § S on `a-migrations-plan`: Batch 2 gains
-> 0108–0110 (remove/relocate labor: `assemblies.removeLaborHours` /
-> `relocateLaborHours`, `takeoff_groups` the same two as the per-bid
-> override, `bid_line_items.lineRole` with a unique-key swap —
-> `remove-relocate-labor-plan.md`) and **0111–0112 for the two items just
-> below**. The quote-item columns further down are NOT numbered yet.
+> **ALL NUMBERED 2026-10-06 (Track A), none written yet — see
+> `references/migrations-next-batch.md` on `a-migrations-plan`**, the one
+> list of every track's asks. In short: `distributionHeightInches` is in
+> 0108 (with C's `contentHash`); `mountHeightTypeKey` and `materialByQuote`
+> in 0109 (with the remove/relocate hours); `bid_quotes` is 0113; the six
+> `bid_line_items` quote columns go in 0114 with `lineRole`; the quoted-line
+> markup is `pricing_defaults.quotedMarkupPct`, 0115. **`laborOnly` is
+> 0105** (owner YES 2026-10-06: shipped labor-only starters marked, others
+> "not priced" until ticked) — first, because it must go live WITH Track B's
+> "labor with $0 material" rule; until then the live release stays on
+> `24105ad`, before that rule (`live-release-plan.md` § 0). Panels: one
+> `bid_panels` table (+ `bid_panel_circuits`); quotes: B's quote items, H1
+> `quoteBucket` dropped. (An earlier note here said 0108–0112 for fewer
+> items; superseded.)
 
 - [ ] **`bid_pdf_sheets.distributionHeightInches INT NULL`** — this
       sheet's run height (Track B, owner's answer b, 2026-10-05). ADDITIVE,

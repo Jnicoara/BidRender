@@ -456,4 +456,6 @@ Delete the test counts afterwards.
    new wire or boxes are counted as normal new work, so **no count drop on a
    remove or relocate mark**, which is what the code already does. Nothing
    to build here. The labor lines are `remove-relocate-labor-plan.md`
-   (Track A). Track A slots § 7's two columns as Batch 2 files 0111–0112.
+   (Track A). § 7's two columns are numbered in Track A's
+   `migrations-next-batch.md`: column 1 in 0108, column 2 in 0109 (each
+   shares its table's one `ALTER`).

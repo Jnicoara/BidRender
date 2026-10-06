@@ -8,8 +8,8 @@
   as left over), and the panel could show **"0 marks"** after a save (React
   Query does not cancel a first fetch on invalidate). Staging run
   37415935629 caught the double (6 for 3). Live (`0af50a6`) never had this
-  code. The release candidate is the first commit after the fixes that gets
-  a green smoke on staging.
+  code. **Release candidate: `f8fdec3`**, green smoke on staging (run
+  37422435526, 96 passed, 2 skipped), 2026-10-06 06:27 UTC.
 - **Flow test 2's local failures were a real bug**, now fixed (`6323a7b`,
   `client/src/lib/pageTextRead.ts`): a fresh upload's printed scale was
   thrown away when the sheet list arrived mid-read. No wrong lengths: the
