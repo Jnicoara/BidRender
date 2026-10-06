@@ -1,9 +1,16 @@
-# Live release: migrations 0096–0104 and the code that matches. PLAN ONLY, 2026-10-05
+# Live release: `f8fdec3` and migrations 0096–0104. PLAN ONLY, updated 2026-10-06
 
-**Nothing here has been run on live.** Live serves `0af50a6` and its database
-records **96** migrations (0000–0095). Staging has run everything below
-(`deploying.md` § 11, the 0096–0102 and 0103–0104 entries) and serves the
-code that matches.
+**Nothing here has been run on live.** Checked 2026-10-06 17:19 UTC: live
+serves **`0af50a6`** (built 2026-10-01) and its database records **96**
+migrations (0000–0095, as of the last check — step 5 asks again). Staging
+serves **`f8fdec3`** with all 105, and that commit has a **green gate (run 37421570630) and a green smoke test on staging (run 37422435526: 96 passed,
+2 skipped)**. Between the two commits: 187 non-merge commits, and exactly the
+nine migration files below.
+
+> **Do not release `44f0f5f` or `6323a7b`.** Both carry the "keep early taps"
+> change without its two follow-up fixes (taps counted twice; "0 marks"
+> after a save). `f8fdec3` has both. If staging serves anything else on the
+> day, this file is stale for that commit — stop and re-check § 1b.
 
 Read with `deploying.md` § 4 (deploy sequence), § 5 (three steps), § 5a
 (backup and verify commands) and § 6 (verifying a deploy). This file is the
@@ -11,10 +18,10 @@ checklist for THIS release; those are the reasons.
 
 ## 1. What goes live
 
-| What          | From        | To                                                                                                                                                   |
-| ------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Code (`main`) | `0af50a6`   | **the commit staging is serving** at release time — today `af65f84`. Never the tip of `local-dev` if it has moved (§ 4: release what staging tested) |
-| Live database | 96 recorded | **105 recorded**: 9 files, 0096–0104                                                                                                                 |
+| What          | From        | To                                                                                                                                                      |
+| ------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Code (`main`) | `0af50a6`   | **`f8fdec3`** — the commit staging serves and the smoke test passed on. Never the tip of `local-dev` if it has moved (§ 4: release what staging tested) |
+| Live database | 96 recorded | **105 recorded**: 9 files, 0096–0104                                                                                                                    |
 
 **The nine files, all ADDITIVE — step 1 of the three, migrate BEFORE the
 code. Step 3 is empty: no file has an `UPDATE`, no existing value changes
@@ -32,11 +39,34 @@ meaning.**
 | 0103 | `'unconfirmed'` appended to `takeoff_stamps.status`                                        | enum append on an all-NULL column |
 | 0104 | `takeoff_runs`: startConnect, endConnect                                                   | nullable columns                  |
 
-**Does any number on a live bid move? It must not.** Every new column is NULL
-on every row, and NULL is today's meaning everywhere: a mark with no status
-is new, so the "only new marks are quantities" rule (`shared/markStatus.ts`)
-counts exactly what is counted now. § 4 step 9 below MEASURES that rather than
-trusting it.
+**Does applying the migrations move any number on a live bid? It must not.**
+Every new column is NULL on every row, and NULL is today's meaning
+everywhere: a mark with no status is new, so the "only new marks are
+quantities" rule (`shared/markStatus.ts`) counts exactly what is counted now.
+
+### 1b. The CODE does change one number on purpose — measured, not assumed
+
+`f8fdec3` includes Track B's rule (`5c98bd1`): **an assembly line with labor
+and $0 material now counts its material as "not priced"**, where it used to
+read as finished. Totals do not move (the material was $0 either way); the
+"N not priced" count on those bids rises by one per such line.
+
+**Measured 2026-10-06** on the local real-data copy (`bidrender_local`, at
+105 migrations): `bidTotals.mts` from `0af50a6` against `f8fdec3`, same
+database — **4,386 bids, every total unchanged, one bid's not-priced parts
+0 → 2**, a fixture with two such lines. That is exactly the rule.
+
+`bidTotals.mts --compare` now labels that case **EXPECTED** — only when the
+total, the not-priced lines and the incomplete flag are all identical and
+the parts rose by exactly the number of labor-with-$0-material lines on that
+bid. Anything else stays **FAIL**. Checked both ways: one cent added to that
+bid's total → FAIL; a parts rise on a bid with no such lines → FAIL.
+
+Other changes in `f8fdec3` that touch quantities (the drop-claim fix,
+"conduit waste covers the drops", mark status) moved **no total** on the
+local copy. If one moves on the live copy, it is a **FAIL and a stop**: the
+owner looks at that bid before anything goes further. A moved total is
+never labelled expected.
 
 **What changes for a person:** "Forgot password?" appears on the sign-in page.
 It sends mail only if live has `RESEND_API_KEY` (§ 2); without it the screen
@@ -55,14 +85,15 @@ Settings now signs every OTHER device out.
 - There is no settings-check script for live (`stagingSettingsCheck.mts` is
   staging's): read the settings page and confirm these by eye.
 
-**The owner approves, explicitly, at four points (each is a stop until "yes"):**
+**The owner approves, explicitly, at four points. Each is a full stop until
+the owner says "yes".**
 
-| #   | Approve                           | Evidence put in front of the owner                                                                                                                              |
-| --- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A   | Go / no-go for the release window | Staging serves the release commit; **the smoke test is green on it** (Actions → Gate → smoke); the gate is green on it; `git log main..<commit> --oneline` read |
-| B   | Touch the live database           | The fresh live backup restored and verified; the rehearsal on it printed **9 applied, 105 recorded, matches**, and data counts unchanged                        |
-| C   | Push `main`                       | Live migrated (9 applied, matches); the OLD code still opens a real bid, its plans and totals                                                                   |
-| D   | Done                              | `/api/version` shows the commit with a fresh `builtAt`; every live bid's total equals the "before" figure (§ 4 step 9)                                          |
+| #   | The owner is asked                            | What Track A shows first                                                                                                                                                                                                                                     |
+| --- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A   | **"Start the release of `f8fdec3` now?"**     | Staging serves `f8fdec3`; gate and smoke green on it (runs 37421570630, 37422435526 — or newer runs on the same commit); what changes for a person (§ 1); nobody else merging (step 0).                                                                      |
+| B   | **"Change the live database (add 9 files)?"** | A fresh live backup, restored and verified; on that copy: **9 applied, 105 recorded, "matches", foreign keys 141/141, second run applies 0**, data counts unchanged, and the bid-totals compare on the copy: **every total unchanged**, any EXPECTED listed. |
+| C   | **"Put the new code live (push `main`)?"**    | Live migrated (9 applied, matches) and the OLD code (`0af50a6`) still opens a real bid, its plans and its totals.                                                                                                                                            |
+| D   | **"Call it done?"**                           | `/api/version` on bidridge.com shows `f8fdec3` with a fresh `builtAt`; the bid-totals compare on live: **every total unchanged**, only EXPECTED lines otherwise (§ 1b).                                                                                      |
 
 ## 3. Rollback — decided before starting
 
@@ -92,9 +123,10 @@ you think it is, and those want opposite responses.
    commit staging serves cannot move. Optionally pause staging auto-deploy
    (`STAGING_AUTODEPLOY=off`).
 1. **Pre-flight** (§ 3 of `deploying.md`): `curl -s
-https://staging.bidridge.com/api/version` → note `commit`; `git log
-main..<commit> --oneline`; `git status --porcelain` empty; the gate AND the
-   smoke job green on `<commit>`. → **Approval A.**
+https://staging.bidridge.com/api/version` → **`f8fdec3`**; `curl -s
+https://bidridge.com/api/version` → **`0af50a6`**; `git log
+main..f8fdec3 --oneline` read; `git status --porcelain` empty; the gate AND
+   the smoke job green on `f8fdec3`. → **Approval A.**
 2. **Back up live and prove it** (`deploying.md` § 5a steps 1–2):
    `DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/backup.mts`
    (note the run id), then `verifyBackup.mts` into the local MySQL with
@@ -124,13 +156,20 @@ main..<commit> --oneline`; `git status --porcelain` empty; the gate AND the
    DOTENV_CONFIG_PATH=../BidPhase/.env.production.local pnpm tsx scripts/bidTotals.mts ../bidrender-backups/live-totals-before.json
    ```
 
+   **Copy the script from a checkout at or after 2026-10-06** — that version
+   also counts each bid's labor-with-$0-material lines, which § 1b's
+   EXPECTED label needs on BOTH sides. An older copy gives a "before" file
+   without the count, and the compare then calls the expected change a FAIL.
+
    → `ok read only: MySQL refused a write`, then `N bid(s) priced for M
 owner(s); the bids table holds N` — the two N must match, and the script
    exits 1 if they do not. Read only by construction: every connection is
    `SET SESSION TRANSACTION READ ONLY` and the script proves MySQL refuses a
    write before reading anything. **Rehearsed 2026-10-05** on a copy of
    `bidrender_local` (4,234 bids, 1,210 with a non-zero total): `0af50a6` on
-   98 migrations against this checkout on 105 → all 4,234 unchanged.
+   98 migrations against the code on 105 → all 4,234 unchanged. **And
+   2026-10-06 against `f8fdec3`**: 4,386 bids, every total unchanged, 1
+   EXPECTED (§ 1b).
 
    **If it prints `FAIL owner N: Failed query: insert into pricing_defaults`**,
    that owner has never had a pricing-defaults row and the app would create
@@ -146,15 +185,18 @@ DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/migrate.mts` →
 7. **The OLD code against the migrated database:** `curl -s
 https://bidridge.com/api/version` still `0af50a6`; open a real bid, its
    plans, its totals. → **Approval C.**
-8. **Release:** `git checkout main && git merge --ff-only <commit> && git push
+8. **Release:** `git checkout main && git merge --ff-only f8fdec3 && git push
 origin main && git checkout local-dev`. The ruleset accepts it only
    because the gate passed on that exact commit. Watch DigitalOcean →
    Activity (3–6 min); `/api/version` → the commit and a fresh `builtAt`.
 9. **Every live bid's total, AFTER** — the same script, from the released
-   commit (this checkout at `<commit>`), then
+   commit (a checkout at `f8fdec3` or later docs on top of it), then
    `pnpm tsx scripts/bidTotals.mts --compare live-totals-before.json live-totals-after.json`.
-   **Every `totalDue`, not-priced count and `incomplete` must equal step 4's.**
-   A difference is a stop: roll back the code first (§ 3), then find out why
+   **Every `totalDue` must equal step 4's, no exceptions.** Not-priced and
+   `incomplete` must equal step 4's too, except lines the compare prints as
+   **EXPECTED** (§ 1b: labor with $0 material). Last line to expect: `ok all
+N bid(s): totalDue unchanged; …` (with "except K EXPECTED" if any).
+   Any **FAIL** is a stop: roll back the code first (§ 3), then find out why
    on the restored copy. One honest exception to check before rolling back:
    a contractor can edit a bid during the window, and that is a real change,
    not a fault. `--compare` adds "bid edited at …, after before was measured"
@@ -169,8 +211,10 @@ origin main && git checkout local-dev`. The ruleset accepts it only
 
 ## 5. What is deliberately NOT in this release
 
-- **Batch 2 onward** (invite gate, correction log, catalog, legend reading) —
-  not written.
+- **Every migration from 0105 on** — the invite gate, the correction log,
+  remove/relocate labor, quote items, B's height columns, C's look and
+  label columns, the catalog and legend batches. Numbered in
+  `migrations-next-batch.md`; none written.
 - **The materials rename** — waits on the size-reading fix and the owner's
   answers (`materials-naming-and-pricing-plan.md`).
 - **The twin-count fold** (step 3, R.9) — not written; nothing on live has
@@ -178,15 +222,15 @@ origin main && git checkout local-dev`. The ruleset accepts it only
 
 ## SHORT SUMMARY
 
-- Live goes from `0af50a6` / 96 migrations to the staging-tested commit / 105
-  — nine additive files, no `UPDATE`, no meaning change; step 3 is empty.
-- Four owner approvals: go (smoke green on the commit), touch the database
-  (backup verified + rehearsal 9/105/matches), push `main` (old code still
-  works on the migrated database), done (every bid total unchanged).
+- Live goes from `0af50a6` / 96 migrations to **`f8fdec3`** / 105 — nine
+  additive files, no `UPDATE`, no meaning change; step 3 is empty. `f8fdec3`
+  is green on the gate and on the staging smoke test.
+- Four owner approvals: A start, B change the live database, C push the new
+  code, D done — each with its evidence in § 2.
+- One number changes on purpose: lines with labor and $0 material now say
+  "not priced" (Track B's rule). Totals do not move. The compare labels that
+  EXPECTED and fails on anything else; measured on 4,386 local bids (1 such).
 - Rollback is the DigitalOcean button for code; migrations need none, because
   old code runs on them — proven on live before the push.
-- A bid-totals before/after comparison is the wrong-number check:
-  `scripts/bidTotals.mts`, read only by construction, rehearsed 2026-10-05
-  (4,234 bids unchanged across 0098–0104 on a local copy).
 - Live needs `RESEND_API_KEY` for reset email, and must NOT get the staging
   settings.
